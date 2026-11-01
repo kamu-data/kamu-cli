@@ -75,7 +75,7 @@ impl LocalSyncHelper {
             .await
     }
 
-    /// The target as the pull planner names it
+    /// Resolves `dst_ref` to a pull target the way the pull planner does
     async fn pull_local_target(
         &self,
         dst_ref: odf::DatasetRef,

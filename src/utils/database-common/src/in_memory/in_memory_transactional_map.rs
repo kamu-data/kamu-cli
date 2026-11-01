@@ -24,14 +24,13 @@ use crate::{
 /// A map whose changes inside a transaction opened by
 /// `InMemoryTransactionManager` form a working set: the transaction reads its
 /// own changes over the committed entries, other transactions see them only
-/// after the commit, and a rollback drops them. A commit fails when another
-/// transaction committed a key this one changed since it first changed it.
+/// after the commit, and a rollback drops them. A commit fails if another
+/// transaction committed a key after this one first changed it.
 ///
 /// Unlike a database, a write never waits for another transaction: two
-/// transactions changing one key both succeed at write time, each checked
-/// against its own view, and the later commit fails with a conflict. In
-/// Postgres the later writer would wait for the first and then fail its own
-/// check, such as a compare-and-set, at write time.
+/// transactions changing one key both succeed at write time, and the later
+/// commit fails with a conflict. In Postgres the later writer would wait for
+/// the first and fail its own check, such as a compare-and-set.
 ///
 /// Conflicts are found per key only, so unlike a database:
 /// - two transactions writing one key always conflict, even where Postgres serialises them, as with

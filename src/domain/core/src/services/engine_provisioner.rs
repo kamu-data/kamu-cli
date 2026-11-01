@@ -60,8 +60,8 @@ pub enum EngineProvisioningError {
 }
 
 impl EngineProvisioningError {
-    /// Whether provisioning again could succeed. An engine name no node
-    /// configures fails the same way until the dataset's metadata changes.
+    /// Whether provisioning again could succeed. An engine this node does not
+    /// configure fails the same way until the dataset's metadata changes.
     pub fn is_recoverable(&self) -> bool {
         match self {
             Self::UnsupportedEngine(_) => false,

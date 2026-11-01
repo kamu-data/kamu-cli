@@ -17,8 +17,8 @@ use crate::{AmbiguousPullSourceError, FindPullAliasError, PullError};
 /// Decides how a local dataset is brought up to date.
 ///
 /// A dataset with a pull source is synced from it, whatever its kind (see
-/// [`crate::DatasetPullSourceResolver`]). Otherwise a root dataset is updated by polling ingest
-/// and a derivative by transform.
+/// [`crate::DatasetPullSourceResolver`]). Otherwise a root dataset is updated
+/// by polling ingest and a derivative by transform.
 #[cfg_attr(feature = "testing", mockall::automock)]
 #[async_trait::async_trait]
 pub trait DatasetUpdateKindResolver: Send + Sync {

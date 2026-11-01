@@ -221,12 +221,12 @@ sequenceDiagram
 ```
 
 1. **Heads and comparison.** `MetadataChainComparator::compare_chains` walks both chains and
-   returns `Equal`, `LhsAhead` (the blocks to copy), `LhsBehind` or `Divergence`. A destination
-   with no blocks yet, such as a dataset to create, is passed as no chain, so the whole source chain
-   is ahead. Without `force`,
-   behind is `DestinationAhead` and divergence is `DatasetsDiverged`. With `force`, the whole
-   source chain, `Seed` included, is appended onto the destination; this protocol does not compare
-   the two `Seed` blocks.
+   returns `Equal`, `LhsAhead` (the blocks to copy), `LhsBehind`, `Divergence` or
+   `DifferentDatasets`. A destination with no blocks yet, such as a dataset to create, is passed as
+   no chain, so the whole source chain is ahead. Without `force`, behind is `DestinationAhead` and
+   divergence is `DatasetsDiverged`. With `force`, the whole source chain, `Seed` included, is
+   appended onto the destination. Chains that start from `Seed`s of different dataset IDs fail with
+   `DatasetIdMismatch`, `force` or not.
 2. **Seed.** For a local destination to create, the source's `Seed` block is stored without
    `HEAD` or entry ([§4](#4-sync-requests)); its computed hash must equal the source's.
 3. **Objects.** Every data slice and checkpoint referenced by the new blocks is streamed from the
@@ -357,12 +357,15 @@ sequenceDiagram
 `DatasetPushCompleteResponse` is `Ok(DatasetPushCompleteConfirmed)`, or an error sent as the reason
 of a close with code 1013 ("try again later"): `Internal`, or `UpdatedConcurrently` when the CAS on
 `HEAD` fails. The conflict carries no heads, since a close frame reason holds at most 123 bytes; the
-server logs them. A client that predates the typed response takes any JSON object here, including
-the reason of a close with the usual error code 1011, for a bare confirmation; it reads a close
-with any other code as a disconnect, so with 1013 it fails the push instead of reporting success.
-The current client reads the reason of both codes. The client accepts the bare `{}` confirmation of a server that predates it. Progress
-requests carry `progress_requested: true`, so one still in flight is skipped rather than taken for
-the confirmation; a server that predates the field sends `{}`, which stays ambiguous.
+server logs them. Progress requests carry `progress_requested: true`, so one still in flight is
+skipped rather than taken for the confirmation. Peers without these messages still interoperate:
+
+| Peer | Behaviour |
+| --- | --- |
+| Client without `DatasetPushCompleteResponse` | takes any JSON object, including the reason of a close with the usual error code 1011, for a bare confirmation; reads a close with any other code as a disconnect, so with 1013 it fails the push instead of reporting success |
+| Client with it | reads the reason of a close with 1011 or 1013 as the error |
+| Server without `DatasetPushCompleteResponse` | sends a bare `{}` confirmation, which the client accepts |
+| Server without `progress_requested` | sends `{}` for a progress request too, so a reply in flight stays ambiguous |
 
 Server-side details:
 
@@ -375,8 +378,8 @@ Server-side details:
   `current_head`. With `force` the batch may replace a divergent history, so the commit expects
   the request's `current_head` instead, or the `Seed` when the push created the dataset
   (`SetRefCheckRefMode::Explicit`). Either way a head moved after initiation fails the push with
-  `UpdatedConcurrently`. A server that predates this expects whatever `HEAD` is at commit time
-  under `force`. A batch starting with a `Seed` into an existing dataset, with `force` or without a
+  `UpdatedConcurrently`. A server without this check compares against `HEAD` at commit time under
+  `force`. A batch starting with a `Seed` into an existing dataset, with `force` or without a
   `HEAD`, is refused with `SeedBlockOverwriteRestricted` when that `Seed` is of another dataset.
 - While objects upload, the server asks for progress every
   `protocol.smartTransferProtocol.uploadProgressInterval` of the node configuration
@@ -409,8 +412,8 @@ upload is not re-hashed by the server.
 `kamu push <dataset>…` builds `PushDatasetUseCase::execute_multi`:
 
 1. **Authorization:** `SyncTo` on every dataset to push, which needs Read
-   ([`DatasetOperationGuard`](../../src/domain/datasets/domain/src/services/dataset_operation_guard.rs), [§10](#10-authorization)); any failure
-   returns only those failures.
+   ([`DatasetOperationGuard`](../../src/domain/datasets/domain/src/services/dataset_operation_guard.rs),
+   [§10](#10-authorization)); any failure returns only those failures.
 2. **Plan:** `PushRequestPlanner::collect_plan` resolves each dataset's target with
    `RemoteAliasResolver::resolve_push_target` ([§9](#9-remote-repositories-and-aliases)).
 3. **Sync requests:** source = the local dataset, destination = the target URL.
@@ -454,9 +457,8 @@ calls it with no transaction held:
 | `find_dataset_by_pull_alias` | the current account's dataset whose pull aliases contain a remote ref: the dataset named as the remote one first, then a scan of the account's datasets |
 
 `DatasetPullSource::to_sync_endpoint` gives the `SyncEndpoint` a sync task reads, without
-credentials. `resolve_pull_source`, `resolve_remote_source` and `to_sync_endpoint` have no
-production caller: a pull resolves its source URL with `RemoteDatasetUrlResolver` during the
-transfer.
+credentials. A pull resolves its source URL with `RemoteDatasetUrlResolver` during the transfer
+([§4](#4-sync-requests)).
 
 How `kamu pull` uses pull aliases to decide that a dataset is synced belongs to
 [dataset-pull.md](dataset-pull.md#51-resolving-each-request).
@@ -502,9 +504,9 @@ heads in `InvalidHead` when `HEAD` moved before the push began, and none in
 surprising: a Smart-protocol push onto a remote that is ahead fails with `DatasetsDiverged`, not
 `DestinationAhead`; and server-side internal failures reach the client as `Internal` with the
 generic message "Internal error", the cause staying in the server log (the one exception is a
-failure while computing the pull transfer plan, whose message is forwarded as is). In a phase whose
-reply has no `Internal` case, the client still reads that reply and reports the server's failed
-phase. Of the typed
+failure while computing the pull transfer plan, whose message is forwarded as is). When the server
+fails in a phase whose reply has no `Internal` case, the client reads the close reason as an
+internal error and reports the phase it names, instead of failing to parse the reply. Of the typed
 protocol errors, `InvalidInterval` (→ `DatasetsDiverged` on pull), `SeedBlockOverwriteRestricted`
 (→ `OverwriteSeedBlock` on push; on pull the client makes the `Seed` check itself), `RefCollision`
 and `NameCollision` keep their meaning. A metadata batch or an object download that cannot be read
@@ -546,7 +548,7 @@ into the recoverability of the failed task.
 | Plain `http(s)://` URLs | Read-only through the Simple protocol; a push to a *registered* `http(s)` repository is rewritten to `odf+http(s)` by `resolve_push_target` and uses the Smart protocol |
 | Created destination | Created by the commit, with its `HEAD` at the last transferred block; for a pull that fails before it, see [§4](#4-sync-requests) |
 | Unreferenced objects | A failed or concurrent sync can leave uploaded objects that no block references |
-| `force` | Replaces the destination's history from the source, but only from the destination head the sync observed: a head moved meanwhile fails with `HeadMoved`. The Smart protocol refuses a different `Seed` (`OverwriteSeedBlock`, `SeedBlockOverwriteRestricted`); the Simple protocol does not check |
+| `force` | Replaces the destination's history from the source, but only from the destination head the sync observed: a head moved meanwhile fails with `HeadMoved`. The Smart protocol refuses a different `Seed` (`OverwriteSeedBlock`, `SeedBlockOverwriteRestricted`); the Simple protocol refuses only a `Seed` of another dataset ID (`DatasetIdMismatch`) |
 | Trusted local source | A push from a local dataset skips validation and hash recomputation |
 
 ---

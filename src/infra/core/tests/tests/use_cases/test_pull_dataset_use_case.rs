@@ -1650,8 +1650,9 @@ impl PullUseCaseHarness {
         .await
     }
 
-    /// Chains one unreferenced block per entry after the current `HEAD`, sets
-    /// each entry to report the step onto its block, and returns the last one
+    /// Chains one unreferenced block per entry from `created.head`, sets each
+    /// entry to report the step from the previous block onto its own, and
+    /// returns the last block
     async fn chain_reported_heads(
         &self,
         created: &CreateDatasetResult,
@@ -2031,8 +2032,7 @@ impl PullUseCaseHarnessMocks {
     }
 
     /// Expects one authorized pull of the existing `foo` from `remote_ref`,
-    /// committed from the head the transfer expected up to
-    /// [`Self::synced_head`]
+    /// committed from its expected head to [`Self::synced_head`]
     fn for_sync_into_existing_updated(
         self,
         alias_foo: &odf::DatasetAlias,

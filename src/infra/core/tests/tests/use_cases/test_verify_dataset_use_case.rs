@@ -287,7 +287,8 @@ impl VerifyUseCaseHarness {
             .await
     }
 
-    /// Records a transform of `derived` that read `input`, as if it had run
+    /// Records a transform of `derived` that consumed nothing of `input` yet,
+    /// as if it had run
     async fn append_execute_transform(
         &self,
         derived: &CreateDatasetResult,
@@ -307,7 +308,7 @@ impl VerifyUseCaseHarness {
                 .prev(&head, head_block.sequence_number)
                 .system_time(self.system_time_source().now())
                 .build(),
-                // A transform that read nothing yet: replay planning only needs the record
+                // Replay planning only needs the record, so the block is not validated
                 odf::dataset::AppendOpts {
                     validation: odf::dataset::AppendValidation::None,
                     ..odf::dataset::AppendOpts::default()

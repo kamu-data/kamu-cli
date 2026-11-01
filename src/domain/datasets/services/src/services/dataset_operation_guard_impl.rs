@@ -160,9 +160,8 @@ impl DatasetOperationGuard for DatasetOperationGuardImpl {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Outcome of one (permission, dataset) check. Permission checkers deny only for
-/// missing permissions, so the error is rebuilt for every request that
-/// shares the check.
+/// Outcome of one (permission, dataset) check. A denial always means a missing
+/// permission, so no error is stored; `check` rebuilds it per request.
 enum Verdict {
     Allowed,
     NotFound,

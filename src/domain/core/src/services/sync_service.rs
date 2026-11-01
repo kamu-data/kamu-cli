@@ -35,13 +35,10 @@ pub trait SyncService: Send + Sync {
         listener: Option<Arc<dyn SyncListener>>,
     ) -> Result<SyncResult, SyncError>;
 
-    /// Resolves the remote source, opens it and checks it has a `HEAD`, then
-    /// writes the blocks, data and checkpoints a local dataset lacks as
-    /// unreferenced objects. All network access of a pull happens here, with
-    /// no transaction held; no reference moves: the caller commits it with
-    /// [`LocalSyncCommitter`]. The listener gets `begin` and progress;
-    /// reporting the outcome is up to the caller, since only the commit
-    /// decides it
+    /// Resolves and opens the remote source and writes the blocks, data and
+    /// checkpoints the local dataset lacks as unreferenced objects, with no
+    /// transaction held. Commit with [`LocalSyncCommitter`]; the listener gets
+    /// `begin` and progress, and the caller reports the outcome.
     async fn transfer_into_local(
         &self,
         request: LocalSyncRequest,
@@ -52,7 +49,7 @@ pub trait SyncService: Send + Sync {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// A push of a dataset of this node into a destination that is not one
+/// A push of a dataset of this node into a destination outside it
 #[derive(Debug, Clone)]
 pub struct SyncRequest {
     pub src: ResolvedDataset,
@@ -76,8 +73,9 @@ pub struct LocalSyncRequest {
 pub enum LocalSyncTarget {
     /// An existing dataset, whose `HEAD` must still be `expected_head` when
     /// the transfer is committed. Read it in a transaction: a detached
-    /// dataset reads the storage `HEAD`, which may lag behind. `None` for an
-    /// entry left without `HEAD` by an interrupted creation
+    /// dataset reads the storage `HEAD`, which may lag behind.
+    /// `expected_head` is `None` for an entry left without `HEAD` by an
+    /// interrupted creation
     Existing {
         dataset: ResolvedDataset,
         expected_head: Option<odf::Multihash>,
@@ -368,7 +366,7 @@ impl SyncError {
     /// Whether running the same sync again could succeed. Conflicts between
     /// the chains and errors in the request fail the same way on a retry;
     /// concurrent updates and infrastructure failures, network included, may
-    /// not
+    /// succeed on one
     pub fn is_recoverable(&self) -> bool {
         use kamu_datasets::CreateDatasetError as E;
 

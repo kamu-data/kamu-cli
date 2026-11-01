@@ -185,8 +185,8 @@ iteration per depth. The job follows the item's kind:
 
 | Item | Job | Built by | Holds |
 | --- | --- | --- | --- |
-| ingest | `Ingest(PullIngestItem)` | `build_ingest_item` | target; the ingest itself is planned when the job runs |
-| sync | `Sync(PullSyncItem)` | `build_sync_item`, which only records the remote ref | local target (existing or to create) and remote ref; the job reads the target's `HEAD` and the transfer resolves the source when it runs ([dataset-sync.md](dataset-sync.md#4-sync-requests)) |
+| ingest | `Ingest(PullIngestItem)` | `build_pull_multi_plan`, inline | target; the ingest itself is planned when the job runs |
+| sync | `Sync(PullSyncItem)` | `build_pull_multi_plan`, inline, which only records the remote ref | local target (existing or to create) and remote ref; the job reads the target's `HEAD` and the transfer resolves the source when it runs ([dataset-sync.md](dataset-sync.md#4-sync-requests)) |
 | transform | `Transform(PullTransformItem)` | `build_transform_item` → `TransformPlanner::describe_transform`, which fails a broken transform before any job runs | target and the handles of its inputs; the transform itself is elaborated when the job runs |
 
 A dataset with a pull alias is always synced, whatever its kind: a derivative pulled from a
@@ -261,8 +261,9 @@ The sync listener takes `SyncError` because pull and push share it.
 
 `PullAuthorization::authorize` runs per iteration, in one transaction: each job becomes an
 operation on its target (`PullPlanIterationJob::as_operation_request`), and one
-[`DatasetOperationGuard`](../../src/domain/datasets/domain/src/services/dataset_operation_guard.rs) call checks them all for the current account. That
-guard owns which permissions each operation needs:
+[`DatasetOperationGuard`](../../src/domain/datasets/domain/src/services/dataset_operation_guard.rs)
+call checks them all for the current account. That guard owns which permissions each operation
+needs:
 
 | Job | Operation | Checks |
 | --- | --- | --- |
@@ -319,9 +320,8 @@ planning errors and `Access` are not, apart from an internal failure inside `Sca
 
 An `InternalError` returned by a job runner itself aborts the whole pull rather than becoming a
 per-dataset error; a failure to plan an ingest, resolve its env vars or move `HEAD` is a
-per-dataset error
-([§6.2](#62-per-job-runners)). A job that panics re-raises the panic in the command (`JoinSet::join_all`), aborting the
-other jobs of its iteration.
+per-dataset error ([§6.2](#62-per-job-runners)). A job that panics re-raises the panic in the
+command (`JoinSet::join_all`), aborting the other jobs of its iteration.
 
 Any failed dataset makes the command return an error. The CLI still processes the outbox before
 reporting it, so the deferred consumers of the datasets that did update run in the same command.

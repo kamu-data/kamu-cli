@@ -201,7 +201,7 @@ async fn test_pull_with_head_moved_during_transfer_s3() {
 
 #[test_log::test(tokio::test)]
 async fn test_pull_from_unreachable_repository_fails_recoverably() {
-    // Nothing listens on the TCP port multiplexer port of the loopback
+    // Nothing listens on loopback port 1 (tcpmux)
     let harness = LocalPullHarness::new(Url::parse("http://127.0.0.1:1/").unwrap());
 
     let result = harness.pull(SyncOptions::default(), None).await;

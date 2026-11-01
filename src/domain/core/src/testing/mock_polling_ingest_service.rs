@@ -21,8 +21,8 @@ impl MockPollingIngestService {
         self
     }
 
-    /// Reports `HEAD` moved between the `heads` set by the time of ingest,
-    /// without moving any reference.
+    /// Expects one ingest and reports an update between `heads`, which the
+    /// test sets before it runs; moves no reference.
     pub fn make_expect_ingest_updated(
         mut self,
         dataset_alias: odf::DatasetAlias,

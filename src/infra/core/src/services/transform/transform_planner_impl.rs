@@ -367,7 +367,7 @@ impl TransformPlanner for TransformPlannerImpl {
             return Ok(TransformStatus::InputBreakingChange { breaking_inputs });
         }
 
-        // An input has advanced exactly when elaboration would consume something from it
+        // Only inputs that elaboration would consume from can have advanced
         let output_has_schema = plan.preliminary_request.schema.is_some();
         let request = match self.elaborate_preliminary(plan, None).await {
             Ok(TransformElaboration::Elaborated(plan)) => plan.request,
@@ -638,7 +638,7 @@ impl VerificationHistory {
         Ok(visitor.into_state())
     }
 
-    /// The newest of `events` set before the block `sequence_number`
+    /// The newest of `events` set before the block at `sequence_number`
     fn in_effect<T>(events: &[(u64, T)], sequence_number: u64) -> Option<&T> {
         events
             .iter()

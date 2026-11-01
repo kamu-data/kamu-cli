@@ -183,13 +183,13 @@ count.
    by its existing hash, and the merged file, whose hashes and size are computed on commit. Every
    block gets a new `system_time` and `prev_block_hash`, so every hash after the `Seed` changes.
    Blocks are written with `update_block_ref: false`.
-3. **Report.** `Success { old_head, new_head, old_num_blocks, new_num_blocks }`. The executor never
-   moves `HEAD`.
+3. **Report.** `Success { old_head, new_head, old_num_blocks, new_num_blocks, breaking }`. The
+   executor never moves `HEAD`.
 
 The caller moves `HEAD` with a compare-and-swap against `old_head`. A write that moved `HEAD`
-after planning (an ingest, a push, another compaction) makes the swap fail, and the new blocks and merged files
-stay unreferenced. The use case returns `CompactionError::RefCASFailed` with the expected and actual
-heads; the task runners return the recoverable `DatasetCommitError`
+after planning (an ingest, a push, another compaction) makes the swap fail, and the new blocks and
+merged files stay unreferenced. The use case returns `CompactionError::RefCASFailed` with the
+expected and actual heads; the task runners return the recoverable `DatasetCommitError`
 ([task-system.md](task-system.md#72-hard-compaction-and-reset-to-metadata)).
 
 `CompactionListener` receives the plan, the result, and the `GatherChainInfo`, `MergeDataslices`

@@ -44,7 +44,8 @@ impl TransformFlowEvaluator for TransformFlowEvaluatorImpl {
             .await
         {
             Ok(status) => Ok(status),
-            // Waits for the metadata to change, without failing the sensor
+            // Reported as up to date, so the sensor waits for the inputs to be restored
+            // instead of failing
             Err(TransformStatusError::InputsChanged(e)) => {
                 tracing::warn!(error = %e, "Transform cannot run until its inputs are restored");
                 Ok(TransformStatus::UpToDate)

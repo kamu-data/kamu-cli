@@ -78,7 +78,7 @@ pub async fn test_repository_aliases_commands(kamu: KamuCliPuppet) {
         [pull.clone(), shared_pull.clone(), shared_push.clone()]
     );
 
-    // Without a kind flag, the alias is removed whatever its kind
+    // Without a kind flag, the alias is removed under every kind
     kamu.execute(["repo", "alias", "rm", "foo", &shared_pull.alias])
         .await
         .success();

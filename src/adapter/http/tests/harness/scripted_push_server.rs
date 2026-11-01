@@ -34,11 +34,9 @@ pub(crate) struct ScriptedPushServer {
 /// What the server does once the client asked to transfer objects
 #[derive(Clone, Copy)]
 enum PushScript {
-    /// Skips every upload. Right after the client reports the upload complete
-    /// it sends one more progress request, as a real server does when its
-    /// timer fires just before that report arrives, then fails the completion
-    /// with `UpdatedConcurrently`. A client that read the stale request as
-    /// the reply would report success
+    /// Skips every upload, sends one more progress request after the client
+    /// reports completion (as a real server's timer can), then fails the
+    /// completion with `UpdatedConcurrently`
     StaleProgressRequest,
 
     /// Takes every object by HTTP upload, but holds each upload until the

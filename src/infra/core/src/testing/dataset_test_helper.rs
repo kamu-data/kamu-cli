@@ -66,8 +66,9 @@ impl DatasetTestHelper {
         Self::append_random_data_to(&**resolved_dataset, data_size).await
     }
 
-    /// Appends 10 records to a dataset opened directly, such as a copy in a
-    /// repository
+    /// Appends a block claiming 10 records, with sample data and a random
+    /// checkpoint of `data_size` bytes, to a dataset opened directly, such as a
+    /// copy in a repository
     pub async fn append_random_data_to(
         dataset: &dyn odf::Dataset,
         data_size: usize,

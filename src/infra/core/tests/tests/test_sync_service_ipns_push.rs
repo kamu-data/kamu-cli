@@ -325,8 +325,8 @@ impl IpnsPushHarness {
         Self::copy_dir(&dataset_dir, &self.gateway_dir.join("ipns").join(KEY_ID));
     }
 
-    /// Publishes the dataset one block ahead of its local `HEAD`, which stays
-    /// where it was; returns the published head
+    /// Publishes the dataset one block ahead of `created.head` and moves the
+    /// local `HEAD` back there; returns the published head
     async fn publish_ahead_of(&self, created: &CreateDatasetResult) -> odf::Multihash {
         let published_head = self.advance(created, "published").await;
         self.publish_copy(created);

@@ -60,9 +60,8 @@ pub struct SimpleTransferProtocol {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl SimpleTransferProtocol {
-    /// Pushes into a dataset that is not a dataset of this node.
-    /// Moves its `HEAD` by the storage's own compare-and-swap from the head
-    /// read at the start
+    /// Pushes into a remote dataset, moving its `HEAD` by the storage's own
+    /// compare-and-swap from the head read at the start
     pub async fn push(
         &self,
         src_ref: &odf::DatasetRefAny,
@@ -178,7 +177,7 @@ impl SimpleTransferProtocol {
 
         let num_blocks = u64::try_from(blocks_desc_ordered.len()).unwrap();
 
-        // Safety: there are blocks, oldest last
+        // `collect_new_blocks` returned at least one block; the oldest is last
         ensure_seed_matches_headless_target(dst, blocks_desc_ordered.last().unwrap())?;
         let TransferTarget {
             storage: dst_dataset,
@@ -227,7 +226,7 @@ impl SimpleTransferProtocol {
     }
 
     /// The `HEAD` of a remote repository is not a dataset reference of this
-    /// node, so the chain moves it by its own compare-and-set rather than
+    /// node, so the chain moves it by its own compare-and-swap rather than
     /// through `DatasetHeadCommitter`
     async fn append_to_remote(
         dst: &dyn odf::Dataset,

@@ -32,10 +32,8 @@ struct StoredSeed {
 }
 
 impl StoredSeed {
-    /// Stores a new dataset from the first block a source sent. Storage takes
-    /// over a dataset left without `HEAD` by an earlier failed pull. The short
-    /// transaction writes nothing to the database: database-backed storage
-    /// only needs one to build the dataset, which is detached from it on return
+    /// Stores a new dataset from the source's `Seed`, taking over one an earlier
+    /// failed pull left without `HEAD`. Writes nothing to the database.
     async fn store(
         catalog: &dill::Catalog,
         (seed_hash, seed, seed_block_bytes): odf::dataset::HashedMetadataBlockBytesDecoded,

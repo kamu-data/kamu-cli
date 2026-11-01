@@ -36,7 +36,8 @@ pub struct InMemoryTransactionManager {
     open_transactions: Mutex<Vec<OpenTransaction>>,
 }
 
-/// A transaction that has not ended yet, and whether it can still end
+/// A transaction that has not ended yet, with a handle telling whether any
+/// reference to it is still alive
 struct OpenTransaction {
     id: TransactionId,
     liveness: Weak<dyn Any + Send + Sync>,
@@ -114,7 +115,7 @@ impl DatabaseTransactionManager for InMemoryTransactionManager {
         self.end(transaction_id);
 
         // Every participant stays locked from its check until all changes apply,
-        // so no other change lands in between. Participants lock in a fixed order
+        // so no other change lands in between. Participants lock in registration order
         let prepared = self
             .participants
             .iter()

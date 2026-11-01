@@ -192,10 +192,10 @@ pub trait MetadataChainExt: MetadataChain {
     }
 
     /// Appends the blocks like `append_batch`, then moves `HEAD` once to the
-    /// last one by compare-and-set from `expected_head`. For a chain whose
-    /// `HEAD` is written directly, such as a dataset in a remote repository; a
-    /// node moves the `HEAD` of its own datasets through its commit primitive.
-    /// Returns `None` for an empty batch.
+    /// last one by compare-and-set from `expected_head`. Returns `None` for an
+    /// empty batch. Meant for chains whose `HEAD` is written directly, such as
+    /// remote datasets; local datasets move `HEAD` through the node's head
+    /// committer.
     async fn append_batch_and_set_head(
         &self,
         new_blocks: Box<dyn Iterator<Item = HashedMetadataBlockBytesDecoded> + Send>,

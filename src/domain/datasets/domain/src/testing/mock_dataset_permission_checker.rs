@@ -362,7 +362,8 @@ impl MockDatasetPermissionChecker {
     }
 
     /// Expects the principal-explicit classification of `permission` to include
-    /// the given dataset; other datasets in the same call are authorized
+    /// the given dataset, answered per `success` (never called when `times` is
+    /// 0); other datasets in the same call are authorized
     pub fn expect_authorize_for(
         self,
         permission: DatasetPermission,

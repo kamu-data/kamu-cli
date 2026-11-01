@@ -326,8 +326,9 @@ task is `Running` if and only if its `Running` message exists, and likewise for 
 
 A dataset planner that keeps a `ResolvedDataset` in the definition calls
 `detach_from_transaction()` before returning, so the definition can outlive that transaction and
-be used by the runner; the update planner keeps only handles. A runner that needs the database again opens a new transaction and
-re-resolves what it needs (`DatasetUpdateSteps`, `LocalSyncCommitter`).
+be used by the runner; the update planner keeps only handles. A runner that needs the database
+again opens a new transaction and re-resolves what it needs (`DatasetUpdateSteps`,
+`LocalSyncCommitter`).
 
 `TaskSchedulerImpl` itself opens no transactions: `create_task`, `cancel_task` and `try_take` run in
 the caller's, which is how the flow system creates a task atomically with the flow event that
@@ -356,11 +357,12 @@ Ingest, transform and compaction share one shape: **the core service writes new 
 `update_block_ref: false` outside any transaction, and the runner then moves `HEAD` in a short
 transaction with compare-and-swap** — the runner re-resolves the dataset through
 `DatasetRegistry` and moves `HEAD` from `old_head` to `new_head` through `DatasetHeadCommitter`
-(`DatasetUpdateSteps::commit_head`, the step `kamu pull` also uses;
-`HeadCommitTaskOutcome::into_failed_task_outcome` in `task_head_commit.rs`, shared by the update,
-compaction and reset runners, turns a commit that did not happen into the task's outcome). Blocks written by an attempt that never reaches that step stay unreferenced, so a re-run
-after a crash, or a concurrent writer that moved `HEAD` first, cannot corrupt the chain. Sync and
-reset differ:
+(`DatasetUpdateSteps::commit_head`, the step `kamu pull` also uses). `task_head_commit.rs` turns
+a commit that did not happen into the task's outcome: `HeadCommitTaskOutcome` for the update and
+compaction runners, and its `head_moved_outcome` and `dataset_deleted_outcome` for the reset runner
+too. Blocks written by an attempt that never reaches that step stay unreferenced, so a re-run after
+a crash, or a concurrent writer that moved `HEAD` first, cannot corrupt the chain. Sync and reset
+differ:
 
 | Task / job | Writes blocks | Moves `HEAD` | Transaction around the work |
 | --- | --- | --- | --- |
@@ -387,10 +389,11 @@ fetch_uncacheable }`. The dataset decides what "update" means.
 1. `PullRequestPlanner::build_pull_plan(PullRequest::local(id), non-recursive)` builds a
    single-node pull plan and yields one `PullPlanIterationJob`: `Ingest`, `Transform` or `Sync`,
    chosen as described in [dataset-pull.md](dataset-pull.md#53-turning-items-into-jobs).
-2. The job is stored in `TaskDefinitionDatasetUpdate` as a `DatasetUpdateJob`, with the ingest and sync options. Every job keeps only the target's handle,
-   and a sync job also the remote ref: the runner plans them itself, so the definition holds no
-   writer state, no environment variable values and nothing read from a remote. A planned sync
-   into a dataset that does not exist is a planning error.
+2. The job is stored in `TaskDefinitionDatasetUpdate` as a `DatasetUpdateJob`, with the ingest
+   and sync options. Every job keeps only the target's handle, and a sync job also the remote ref:
+   the runner plans them itself, so the definition holds no writer state, no environment variable
+   values and nothing read from a remote. A planned sync into a dataset that does not exist is a
+   planning error.
 
 A planning error is logged and classified by `PullError::is_recoverable()`
 ([dataset-pull.md](dataset-pull.md#9-results-and-errors)), and the task fails with an empty error
@@ -494,7 +497,8 @@ so a `HEAD` change between planning and running fails the task.
 | --- | --- |
 | `SetReferenceFailed(BlockNotFound)` — the target block is not in the dataset's block store | typed `TaskErrorDatasetReset::ResetHeadNotFound`, unrecoverable |
 | `SetReferenceFailed(CASFailed)` — `HEAD` moved after planning | typed `DatasetCommitError` → `HeadMoved`, recoverable |
-| `SetReferenceFailed(Access)`, `SetReferenceFailed(Internal)`, `Internal` | empty, recoverable |
+| `SetReferenceFailed(Access)` — moving `HEAD` is not allowed | empty, unrecoverable |
+| `SetReferenceFailed(Internal)`, `Internal` | empty, recoverable |
 
 The success result is `TaskResultDatasetReset { reset_result: ResetResult { old_head, new_head } }`.
 
@@ -698,8 +702,8 @@ changes and failure reasons in flow histories, with the harness in
    one, so the store indexes it.
 2. **Definition** — `task_definition_struct!` with the resolved inputs the runner needs, and a
    `dev.kamu.tasks.<area>.<action>` task type.
-3. **Result and errors** — `task_result_struct!` or `task_result_enum!` if the flow needs data back;
-   `task_error_enum!` for failures a flow or UI must tell apart, choosing `recoverable`
+3. **Result and errors** — `task_result_struct!` or `task_result_enum!` if the flow needs data
+   back; `task_error_enum!` for failures a flow or UI must tell apart, choosing `recoverable`
    deliberately. Otherwise use the empty variants.
 4. **Planner** — a dill component implementing `TaskDefinitionPlanner` with
    `TaskDefinitionPlannerMeta`. Open your own transaction if you read the database, and detach

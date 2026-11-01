@@ -16,10 +16,10 @@ use crate::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// The transactional steps of updating one local dataset, shared by
-/// `kamu pull` and the update task. Each step opens a short transaction of
-/// its own and returns what it read detached from it, so no transaction is
-/// held while the caller ingests, transforms or transfers between steps.
+/// The transactional steps of updating one local dataset. Each step opens a
+/// short transaction of its own and returns what it read detached from it,
+/// so no transaction is held while the caller ingests, transforms or
+/// transfers between steps.
 #[async_trait::async_trait]
 pub trait DatasetUpdateSteps: Send + Sync {
     /// Plans the first ingest iteration and resolves the dataset's

@@ -339,8 +339,9 @@ impl TestHarness {
             .unwrap()
     }
 
-    /// Creates a root with a polling source over a CSV file, ingests it, and a
-    /// derivative of it. Returns the CSV path, the root and the derivative.
+    /// Creates a root with a polling source over a CSV file, ingests it, and
+    /// creates a derivative of it. Returns the CSV path, the root and the
+    /// derivative.
     async fn new_root_ingested_and_deriv(
         &self,
         transform: odf::metadata::Transform,

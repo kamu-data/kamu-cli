@@ -37,15 +37,16 @@ pub trait TransformPlanner: Send + Sync {
     ) -> Result<TransformElaboration, TransformElaborateError>;
 
     /// Rebuilds the request of a stored plan at the heads and the system time
-    /// it names
+    /// it names; fails with `HeadMoved` when `HEAD` is no longer the planned
+    /// head
     async fn rebuild_transform(
         &self,
         target: ResolvedDataset,
         stored: &TransformPlanPayload,
     ) -> Result<TransformExecutionPlan, TransformRebuildError>;
 
-    /// Tells whether `target` has input data to transform, without building
-    /// the request
+    /// Tells whether `target` has new input data to transform, or an input
+    /// whose history was rewritten
     async fn evaluate_transform_status(
         &self,
         target: ResolvedDataset,
@@ -58,9 +59,9 @@ pub trait TransformPlanner: Send + Sync {
         block_range: (Option<odf::Multihash>, Option<odf::Multihash>),
     ) -> Result<VerifyTransformOperation, VerifyTransformPlanError>;
 
-    /// The inputs that replaying the transforms in `block_range` reads, the
-    /// same ones [`Self::build_transform_verification_plan`] resolves, without
-    /// reading them
+    /// The inputs that replaying the transforms in `block_range` reads, as
+    /// [`Self::build_transform_verification_plan`] resolves them, without
+    /// building the plan
     async fn get_verification_inputs(
         &self,
         target: ResolvedDataset,

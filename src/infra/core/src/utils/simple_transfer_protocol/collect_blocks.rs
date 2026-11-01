@@ -163,7 +163,6 @@ impl SimpleTransferProtocol {
 /// The blocks a destination lacks, up to the source head they were read from
 pub(super) struct NewBlocks {
     pub(super) src_head: odf::Multihash,
-    /// Newest first
     pub(super) blocks_desc_ordered: Vec<odf::dataset::HashedMetadataBlockBytesDecoded>,
 }
 

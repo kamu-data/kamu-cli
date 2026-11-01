@@ -20,7 +20,7 @@ use crate::*;
 /// Plans polling ingest iterations of root datasets. Every method only reads.
 ///
 /// Call it in a transaction, with `target` resolved in that transaction, and
-/// detach `target` before passing the plan to [`PollingIngestService`].
+/// detach `target` before passing it and the plan to [`PollingIngestService`].
 #[cfg_attr(feature = "testing", mockall::automock)]
 #[async_trait::async_trait]
 pub trait PollingIngestPlanner: Send + Sync {
@@ -30,7 +30,8 @@ pub trait PollingIngestPlanner: Send + Sync {
         target: ResolvedDataset,
     ) -> Result<PollingIngestPlan, PollingIngestPlanError>;
 
-    /// Rebuilds the plan of a stored payload at the head it names
+    /// Rebuilds the plan of a stored payload; fails with `HeadMoved` when
+    /// `HEAD` is no longer the head it names
     async fn rebuild_ingest(
         &self,
         target: ResolvedDataset,

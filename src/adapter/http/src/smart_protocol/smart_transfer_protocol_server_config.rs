@@ -15,7 +15,7 @@ use std::time::Duration;
 #[derive(Debug, Clone)]
 pub struct SmartTransferProtocolServerConfig {
     /// How often a push asks the client for upload progress while objects
-    /// are uploaded; never zero
+    /// are uploaded; must not be zero
     pub upload_progress_interval: Duration,
 }
 

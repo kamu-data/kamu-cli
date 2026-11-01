@@ -989,7 +989,7 @@ async fn test_transform_rebuild_detects_mismatch() {
     let stored =
         TransformPlanPayload::from_request(&harness.elaborated_request(bar_target.clone()).await);
 
-    // A stored plan that does not describe what its pins produce
+    // A stored plan whose input interval disagrees with what its pinned heads produce
     let mut tampered = stored.clone();
     tampered.query_inputs[0].offset_interval = None;
     assert_matches!(

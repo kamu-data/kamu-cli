@@ -37,7 +37,7 @@ impl PullTarget {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Resolves the local dataset each pull request updates, or creates
+/// Resolves the local dataset each pull request updates or will create
 pub(super) struct PullTargetResolver<'a> {
     dataset_registry: &'a dyn DatasetRegistry,
     pull_source_resolver: &'a dyn DatasetPullSourceResolver,

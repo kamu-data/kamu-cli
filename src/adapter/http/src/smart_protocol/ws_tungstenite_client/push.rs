@@ -413,7 +413,7 @@ impl WsSmartTransferProtocolClient {
             return Ok(SyncResult::UpToDate);
         }
 
-        // Read before the remote head moves, so a failure here aborts the push
+        // Read before connecting, so a failure here leaves the remote untouched
         let increment = sync_increment(src.as_metadata_chain(), dst_head, &src_head).await?;
 
         let maybe_access_token = self.access_token(http_dst_url);

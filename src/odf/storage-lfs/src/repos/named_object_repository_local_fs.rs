@@ -40,13 +40,10 @@ impl NamedObjectRepositoryLocalFS {
         Self { root }
     }
 
-    /// Compares and writes under a lock file `{name}.lock`, created exclusively
-    /// next to the object, the way git locks its references. The new content
-    /// is written into the lock file, which is then renamed over the object,
-    /// so the lock disappears with the write; a mismatch removes it. Both
-    /// steps are portable. The lock orders only writers that take it, not
-    /// `set`. A lock still held after the retries is reported with its path:
-    /// a writer that was interrupted leaves it behind, and it must be removed
+    /// Compares and writes under an exclusively created `{name}.lock`, as git
+    /// locks refs: the new content goes into the lock file, which is renamed
+    /// over the object. Only writers taking the lock are ordered, not `set`; a
+    /// lock left by an interrupted writer must be removed by hand.
     fn compare_and_set_blocking(
         root: &Path,
         name: &str,

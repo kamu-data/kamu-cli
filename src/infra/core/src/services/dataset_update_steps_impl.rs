@@ -156,8 +156,8 @@ impl DatasetUpdateStepsImpl {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Each step is an info span named after it, with the dataset and how the
-/// step ended in `outcome`
+// Each step is an info span named after it, with the dataset and how the
+// step ended in `outcome`
 #[common_macros::method_names_consts]
 #[async_trait::async_trait]
 impl DatasetUpdateSteps for DatasetUpdateStepsImpl {

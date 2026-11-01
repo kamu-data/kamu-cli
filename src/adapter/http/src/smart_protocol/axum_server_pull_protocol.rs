@@ -217,8 +217,8 @@ impl AxumServerPullProtocolInstance {
 
                 let dataset_handle = self.dataset_handle.clone();
                 let PlannedPull { request, stop_at } = planned_pull;
-                // The batch ends at the head the plan was made from, so a head that
-                // moved since sends the blocks the plan counted
+                // The batch ends at the head the plan was made from, so it matches the
+                // plan even if `HEAD` has moved since
                 let stop_at = stop_at.ok_or_else(|| {
                     "Metadata was requested after a failed plan"
                         .protocol_int_err(PullPhase::MetadataRequest)

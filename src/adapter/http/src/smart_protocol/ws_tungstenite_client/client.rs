@@ -23,7 +23,7 @@ pub struct WsSmartTransferProtocolClient {
 }
 
 impl WsSmartTransferProtocolClient {
-    /// The catalog a pulled dataset is created from
+    /// The catalog a pulled dataset is created in
     pub(super) fn catalog(&self) -> &dill::Catalog {
         &self.catalog
     }

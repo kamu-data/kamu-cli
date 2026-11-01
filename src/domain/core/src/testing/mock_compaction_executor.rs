@@ -13,8 +13,8 @@ use crate::*;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl MockCompactionExecutor {
-    /// Reports `HEAD` moved between the `heads` set by the time of execution,
-    /// without moving any reference.
+    /// Expects one compaction and reports an update between `heads`, which the
+    /// test sets before it runs; moves no reference.
     pub fn make_expect_compaction_success(
         mut self,
         target_alias: odf::DatasetAlias,

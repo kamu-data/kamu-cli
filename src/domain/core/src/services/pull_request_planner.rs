@@ -259,8 +259,6 @@ impl PullRequest {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 #[derive(Debug)]
 pub struct PullResponse {
     /// Parameters passed into the call. Empty for datasets that were pulled as
@@ -483,8 +481,8 @@ impl PullError {
     /// Whether pulling the same dataset again could succeed. A missing
     /// dataset, a request or alias the pull cannot act on, and denied access
     /// fail the same way on a retry; a moved `HEAD` and infrastructure
-    /// failures may not. Ingest, transform and sync errors are classified
-    /// by their own operation.
+    /// failures may succeed on one. Ingest, transform and sync errors are
+    /// classified by their own operation.
     pub fn is_recoverable(&self) -> bool {
         match self {
             Self::NotFound(_)

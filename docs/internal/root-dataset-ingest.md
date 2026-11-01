@@ -234,7 +234,8 @@ A polling ingest has three steps, the same for every caller:
 | **Commit** | the caller moves `HEAD` through `DatasetHeadCommitter` ([§8](#8-committing-and-concurrency)) | a new one |
 
 Planning fails with `SourceNotDefined` when the dataset has no `SetPollingSource`.
-`PollingIngestPlanPayload` is the plan's stored form: the dataset, the expected head, the
+`PollingIngestPlanPayload` is the plan's stored form, for a caller that stores a plan before
+running it (only tests do): the dataset, the expected head, the
 `SetPollingSource` block and the source state, offset and watermark it found.
 `rebuild_ingest` turns it back into a plan, failing with `HeadMoved` when the head is no longer the
 expected one and with `Mismatch` when the facts differ, which only a defect can cause.
@@ -260,8 +261,8 @@ their only path: it returns an empty map unless secrets encryption is configured
    explicit schema.
 6. **Stage and commit** through the writer with the fetch's new source state and event time.
 7. Return `Updated { old_head, new_head, has_more, uncacheable, increment, new_source_state,
-   metadata_state }`, where `metadata_state` is the advanced writer state. `increment` counts the blocks, records and watermark between
-   the two heads.
+   metadata_state }`, where `metadata_state` is the advanced writer state. `increment` counts the
+   blocks, records and watermark between the two heads.
 
 The working directory `RunInfoDir/ingest-<operation_id>/` is removed after a successful iteration
 and kept after a failed one, whose errors may point at logs in it. The service never moves
@@ -270,16 +271,17 @@ and kept after a failed one, whose errors may point at logs in it. The service n
 ### 5.2 Fetch steps
 
 `FetchService::fetch` dispatches on `FetchStep`. URL, headers, the container image, args and env
-values, the MQTT password and the EVM node URL pass through `${{ env.NAME || default }}`
-templating. A name that is not set falls through to the next option; a lookup that fails, such as
-a secret that cannot be decrypted, fails the fetch. With secrets encryption enabled (`DatasetKeyValueServiceImpl`), names resolve from the
-dataset's env vars only; without it (`DatasetKeyValueServiceSysEnv`), any supplied dataset env vars
-are checked first and the process environment is the fallback, which in practice means the process
-environment, since no dataset env var service is wired in that mode.
+values, the MQTT password and the EVM node URL pass through `${{ env.NAME || default }}` templating.
+A name that is not set falls through to the next option; a lookup that fails, such as a secret that
+cannot be decrypted, fails the fetch. With secrets encryption enabled
+(`DatasetKeyValueServiceImpl`), names resolve from the dataset's env vars only; without it
+(`DatasetKeyValueServiceSysEnv`), any supplied dataset env vars are checked first and the process
+environment is the fallback, which in practice means the process environment, since no dataset env
+var service is wired in that mode.
 
 | Fetch step | Source state written | `has_more` | Notes |
 | --- | --- | --- | --- |
-| `Url` `file://` | `LastModified` (file mtime) | never | Zero-copy: the original file is read in place, and no savepoint is kept |
+| `Url` `file://` | `LastModified` (file mtime) | never | Zero-copy: the original file is read in place ([§5.3](#53-savepoints)) |
 | `Url` `http(s)://` | `ETag` or `LastModified` from response headers, else none | never | Sends `If-None-Match` / `If-Modified-Since`; `304` is up to date |
 | `Url` `ftp(s)://` | none | never | Uncacheable after the first ingest; behind the `ingest-ftp` feature |
 | `FilesGlob` | `ETag` = name of the file just ingested | when more files sort after it | One file per iteration, ordered by name; event time from system time or the file path |
@@ -323,7 +325,7 @@ A source that yields data in batches (glob, container, EVM) reports `has_more`. 
 
 | Driver | Behaviour |
 | --- | --- |
-| `kamu pull` | `PullOptions::exhaust_sources` is set; `PullIngestLoop` repeats the iteration, moving `HEAD` after each one. A failure after earlier iterations committed is `PullError::IngestStopped`, which reports what was committed ([dataset-pull.md](dataset-pull.md#62-per-job-runners)) |
+| `kamu pull` | `PullOptions::exhaust_sources` is set; `PullIngestLoop` repeats the iteration, moving `HEAD` after each one ([dataset-pull.md](dataset-pull.md#62-per-job-runners)) |
 | Ingest flow | one iteration per task; on success with `has_more` and `fetch_next_iteration` in the flow's ingest config, `FlowControllerIngest` schedules the next flow immediately |
 
 ---
@@ -334,8 +336,9 @@ A source that yields data in batches (glob, container, EVM) reports `has_more`. 
 
 `PushIngestDataUseCaseImpl::execute(target, data_source, options, listener)` first authorizes
 `PushIngest` (Write) on the target for the current account through
-[`DatasetOperationGuard`](../../src/domain/datasets/domain/src/services/dataset_operation_guard.rs), before anything is read; a denial is
-`PushIngestDataError::Access`, a missing dataset `NotFound`. Then:
+[`DatasetOperationGuard`](../../src/domain/datasets/domain/src/services/dataset_operation_guard.rs),
+before anything is read; a denial is `PushIngestDataError::Access`, a missing dataset `NotFound`.
+Then:
 
 1. **Add a push source** (uploads through the HTTP endpoint only) —
    `PushIngestPlannerImpl::plan_push_source_creation` returns an
@@ -410,10 +413,10 @@ Ingest separates **appending blocks** from **publishing them**:
    `update_block_ref: false`. Data files and blocks land in storage; `HEAD` does not move, so no
    reader sees them yet.
 2. The caller moves `HEAD` from `old_head` through `DatasetHeadCommitter`, a CAS in the caller's
-   transaction. This goes through `DatasetReferenceServiceImpl::set_reference`, which writes the reference row and posts
-   `DatasetReferenceMessage::Updated` in the same transaction; consumers write the storage-level
-   reference, index the new blocks (which feeds the dependency graph), and update statistics and
-   search ([outbox.md](outbox.md)).
+   transaction. This goes through `DatasetReferenceServiceImpl::set_reference`, which writes the
+   reference row and posts `DatasetReferenceMessage::Updated` in the same transaction; consumers
+   write the storage-level reference, index the new blocks (which feeds the dependency graph), and
+   update statistics and search ([outbox.md](outbox.md)).
 
 Consequences:
 
@@ -454,13 +457,13 @@ and internal errors are recoverable. The update task maps the flag to its outcom
 ([task-system.md](task-system.md#71-update-dataset)).
 
 The writer reports a value that does not parse or cast to its column's type as `ExecutionError`,
-including CSV and JSON values the readers decode only when the data is written. A CAS conflict when moving `HEAD` after a
-successful ingest becomes the recoverable task error `DatasetCommitError` → `HeadMoved`; any other
-failure to move `HEAD` is returned from the runner as an internal error, which the task agent also
-records as a recoverable failure. The retry plans from the new head. It reuses the fetch
-savepoint only if the winning commit left the source state unchanged; if the winner was a push or
-`set-watermark`, which write no source state, the source now looks uncacheable and the retry is
-skipped as up to date unless `fetch_uncacheable` is set.
+including CSV and JSON values the readers decode only when the data is written. A CAS conflict when
+moving `HEAD` after a successful ingest becomes the recoverable task error `DatasetCommitError` →
+`HeadMoved`; any other failure to move `HEAD` is returned from the runner as an internal error,
+which the task agent also records as a recoverable failure. The retry plans from the new head. It
+reuses the fetch savepoint only if the winning commit left the source state unchanged; if the winner
+was a push or `set-watermark`, which write no source state, the source now looks uncacheable and the
+retry is skipped as up to date unless `fetch_uncacheable` is set.
 
 The HTTP handler maps push errors to status codes: `SourceNotFound` and `ReadError` → 400,
 unsupported media type → 415, `QuotaExceeded` → 403, `NotFound` and `Access` → 404 (a dataset the
@@ -490,10 +493,10 @@ hours. A long-running server does not evict while it runs.
   polling and push service tests in `src/infra/core/tests/tests/ingest/`; CLI scenarios in
   `src/e2e/app/cli/repo-tests/src/commands/` (`test_ingest_command.rs`, `test_pull_command.rs`),
   wired for SQLite only when they check only CLI output.
-- Server-side ingest flows run end to end in `src/e2e/app/cli/repo-tests/src/test_flow.rs` on
-  SQLite and Postgres: env vars from a `VariableSet`, failure without and with retries,
-  `fetchNextIteration`, and a manual trigger forcing `fetchUncacheable`. With the system time frozen,
-  a follow-up flow waits out its throttling period only when the test advances the time.
+- Server-side ingest flows run end to end in `src/e2e/app/cli/repo-tests/src/test_flow.rs` on SQLite
+  and Postgres: env vars from a `VariableSet`, failure without and with retries,
+  `fetchNextIteration`, and a manual trigger forcing `fetchUncacheable`. With the system time
+  frozen, a follow-up flow waits out its throttling period only when the test advances the time.
 - The pull loop (`exhaust_sources`, `IngestStopped`, head moved) is tested in
   `test_pull_dataset_use_case.rs`; the update task runner in
   `src/adapter/task-dataset/tests/`, including a real planner and service over a `file://` source
@@ -501,8 +504,8 @@ hours. A long-running server does not evict while it runs.
 - `MockPollingIngestService` (helpers in `src/domain/core/src/testing/mock_polling_ingest_service.rs`)
   stands in for the polling service where a test needs no fetching;
   `make_expect_ingest_iterations` reports a sequence of `MockIngestIteration`s.
-- `file://` and `FilesGlob` sources are zero-copy and keep no savepoints. Tests of downloaded data
-  and savepoints serve files over HTTP in-process with `test_utils::HttpFileServer`, which sends
+- Zero-copy sources keep no savepoints ([§5.3](#53-savepoints)), so tests of downloaded data and
+  savepoints serve files over HTTP in-process with `test_utils::HttpFileServer`, which sends
   `Last-Modified` but no `ETag`.
 - Containerized fetch and preprocess tests need Podman or Docker and are grouped separately; see
   [`DEVELOPER.md`](../../DEVELOPER.md).

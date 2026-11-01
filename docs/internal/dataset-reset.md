@@ -205,7 +205,8 @@ consumers handle a rewrite as follows:
 | `ResetPlanningError::OldHeadMismatch` | planner | the head changed since the caller looked |
 | `ResetExecutionError::SetReferenceFailed(BlockNotFound)` | executor | the target block is not in the dataset's block store |
 | `ResetExecutionError::SetReferenceFailed(CASFailed)` | executor | `HEAD` moved after planning |
-| `ResetExecutionError::SetReferenceFailed(…)`, `Internal` | executor | storage or database failure |
+| `ResetExecutionError::SetReferenceFailed(Access)` | executor | moving `HEAD` is not allowed |
+| `ResetExecutionError::SetReferenceFailed(Internal)`, `Internal` | executor | storage or database failure |
 
 `ResetResult { old_head, new_head }` reports the head the planner read and the new head. The CLI
 prints errors as failures; task and GraphQL mappings are owned by

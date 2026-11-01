@@ -30,18 +30,12 @@ use crate::{
 #[cfg_attr(feature = "testing", mockall::automock)]
 #[async_trait::async_trait]
 pub trait TransformExecutor: Send + Sync {
-    /// Runs the engine and appends the resulting blocks without moving
-    /// `HEAD`. Needs no transaction: `target` and the datasets of `plan` are
-    /// expected to be detached. The caller commits `HEAD` afterwards.
-    ///
-    /// Reports `begin` and engine progress to the listener; the caller reports
-    /// the outcome, after its commit.
-    ///
-    /// Returns `UpToDate` when the engine produced nothing that would advance
-    /// the dataset.
-    ///
-    /// `operation_id` identifies this execution attempt: it names the engine
-    /// run directory and container, so every attempt needs its own.
+    /// Runs the engine and appends the resulting blocks without moving `HEAD`;
+    /// `UpToDate` when nothing would advance the dataset. Needs no
+    /// transaction: `target` and the datasets of `plan` are detached. The
+    /// listener gets `begin` and engine progress; the caller commits `HEAD`
+    /// and reports the outcome. `operation_id` is unique per attempt, as
+    /// [`crate::engine::Engine::execute_transform`] requires.
     async fn execute_transform(
         &self,
         target: ResolvedDataset,

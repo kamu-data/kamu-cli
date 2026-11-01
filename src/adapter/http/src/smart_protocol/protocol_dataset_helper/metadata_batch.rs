@@ -99,7 +99,7 @@ pub fn decode_metadata_batch(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// A metadata batch received from the other side of a transfer that cannot be
+/// Why a metadata batch received from the other side of a transfer cannot be
 /// read
 #[derive(Error, Debug)]
 pub enum DecodeMetadataBatchError {

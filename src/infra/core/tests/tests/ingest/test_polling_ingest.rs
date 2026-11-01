@@ -1420,7 +1420,7 @@ async fn test_ingest_polling_resumes_from_savepoint_without_downloading() {
     );
     assert_eq!(harness.savepoints_left(), 1);
 
-    // Downloading again would fail with `NotFound`
+    // A re-download would fail with `NotFound`, so `ExecutionError` shows the savepoint was resumed
     harness.remove_served_file("data.csv");
     let res = harness.ingest(target).await;
 

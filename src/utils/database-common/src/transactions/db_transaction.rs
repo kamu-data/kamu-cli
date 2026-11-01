@@ -50,7 +50,8 @@ impl TransactionRef {
         self.inner.id()
     }
 
-    /// Tells whether any reference to this transaction is still alive
+    /// A weak handle that upgrades only while some reference to this
+    /// transaction is alive
     pub(crate) fn liveness(&self) -> Weak<dyn Any + Send + Sync> {
         let inner: Arc<dyn Any + Send + Sync> = self.inner.clone();
         Arc::downgrade(&inner)

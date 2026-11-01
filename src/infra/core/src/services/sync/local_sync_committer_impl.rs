@@ -49,8 +49,8 @@ impl LocalSyncCommitter for LocalSyncCommitterImpl {
             } => {
                 use odf::dataset::SetChainRefError as E;
 
-                // The transfer ran detached, the commit needs this transaction. The
-                // dataset may have been deleted meanwhile
+                // The transfer ran detached; the commit needs this transaction, and
+                // the dataset may have been deleted meanwhile
                 let dataset = self
                     .dataset_registry
                     .get_dataset_by_id(dataset.get_id())

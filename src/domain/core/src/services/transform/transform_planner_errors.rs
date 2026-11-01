@@ -14,7 +14,7 @@ use crate::{InputNotPulledError, InvalidInputIntervalError};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Errors of reading the transform a dataset defines
+/// Errors when reading the transform a dataset defines
 #[derive(Debug, Error)]
 pub enum TransformPlanError {
     #[error(transparent)]
@@ -79,9 +79,9 @@ pub enum TransformElaborateError {
 }
 
 impl TransformElaborateError {
-    /// Whether elaborating again could succeed. A missing or changed transform
-    /// and a rewritten input history need a change of metadata first; an
-    /// input without data can still receive it.
+    /// Whether elaborating again could succeed. A missing transform, changed
+    /// inputs and a rewritten input history need a change of metadata first;
+    /// an input without data can still receive it.
     pub fn is_recoverable(&self) -> bool {
         match self {
             Self::TransformNotDefined(_)
@@ -265,8 +265,8 @@ pub struct TransformInputsChangedError {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Another writer moved the dataset's head since the stored plan was made, so
-/// the plan no longer applies
+/// The dataset's head is no longer the one a stored plan was made at. Discard
+/// the plan and plan again.
 #[derive(Debug, Error)]
 #[error(
     "Head of {dataset_id} moved from {expected_head} to {actual_head} since its transform was \

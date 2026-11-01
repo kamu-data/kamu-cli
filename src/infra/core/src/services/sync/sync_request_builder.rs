@@ -33,8 +33,8 @@ pub struct SyncRequestBuilder {
 }
 
 impl SyncRequestBuilder {
-    /// Builds a push of a dataset of this node into a destination that is not
-    /// one
+    /// Builds a push of a local dataset to a remote destination; a local
+    /// destination is rejected
     #[tracing::instrument(level = "debug", skip_all, fields(%src_ref, ?dst_ref, %create_dst_if_not_exists))]
     pub async fn build_sync_request(
         &self,

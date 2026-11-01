@@ -58,8 +58,9 @@ recomputed from scratch.
 ## 1. Purpose & scope
 
 This page covers the path from a `SetTransform` to a new `HEAD` of a derivative dataset: the domain
-interfaces, the transform planner and executor, the engine provisioner and `ODFEngine` (the host-side
-engine client), the entry points that drive them, and transform replay during verification.
+interfaces, the transform planner and executor, the engine provisioner and `ODFEngine` (the
+host-side engine client), the entry points that drive them, and transform replay during
+verification.
 
 Out of scope, each with its own owner:
 
@@ -127,7 +128,7 @@ that transaction ([§4.4](#44-transactions)):
 | --- | --- | --- |
 | `describe_transform(target)` | `TransformDescription`: the `SetTransform` block in effect, the transform, and the input handles in `SetTransform` order | pull planning, to fail a broken transform early and to check `Read` on the inputs |
 | `elaborate_transform(target)` | `Elaborated(TransformExecutionPlan)` (the request and the resolved inputs) or `UpToDate`, at the current heads and time | `kamu pull`, the update task |
-| `rebuild_transform(target, stored)` | the `TransformExecutionPlan` of a stored plan ([§4.5](#45-rebuilding-a-stored-plan)) | workers that store a plan before running it |
+| `rebuild_transform(target, stored)` | the `TransformExecutionPlan` of a stored plan ([§4.5](#45-rebuilding-a-stored-plan)) | a caller that stores a plan before running it; only tests do |
 | `evaluate_transform_status(target)` | `TransformStatus` ([§6](#6-entry-points)) | the transform flow sensor |
 | `build_transform_verification_plan(target, range)` | one replay step per `ExecuteTransform` ([§6](#6-entry-points)) | `kamu verify` |
 
@@ -227,15 +228,15 @@ planned ([§6](#6-entry-points)).
 
 ### 4.5 Rebuilding a stored plan
 
-A worker that stores a plan before running the engine must rebuild the same request after a
-restart. `TransformPlanPayload::from_request` maps a request to the compact form stored as the
-`TransformPlan` condition: the dataset, `system_time`, the expected head, `transform_block`, and
-per input the head it was elaborated at, its offset interval and watermark. It names no data,
-checkpoint or staging paths, which are derived from the heads again.
+A caller that stores a plan before running the engine must be able to rebuild the same request
+after a restart. `TransformPlanPayload::from_request` maps a request to that compact form,
+serialized with `kind: "TransformPlan"`: the dataset, `system_time`, the expected head,
+`transform_block`, and per input the head it was elaborated at, its offset interval and
+watermark. It names no data, checkpoint or staging paths, which are derived from the heads again.
 
 `rebuild_transform(target, stored)` reads the target's current `HEAD` itself:
 
-| Outcome | Meaning | The worker |
+| Outcome | Meaning | The caller |
 | --- | --- | --- |
 | `TransformExecutionPlan` | `HEAD` is still the stored expected head; the request is elaborated at the stored input heads and system time | runs it |
 | `HeadMoved` | another writer moved `HEAD` since the plan was stored | discards the plan and elaborates again |

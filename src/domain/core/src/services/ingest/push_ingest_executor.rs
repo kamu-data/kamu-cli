@@ -62,7 +62,7 @@ pub enum PushIngestStage {
 }
 
 /// Progress of a push ingest. The executor reports `begin` and the stages;
-/// the push ingest ends it with `success` once `HEAD` is committed, or with
+/// the push ingest use case ends it with `success` once `HEAD` is committed, or with
 /// `error` for any failure
 pub trait PushIngestListener: Send + Sync {
     fn begin(&self) {}

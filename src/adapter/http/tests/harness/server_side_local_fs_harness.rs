@@ -115,8 +115,8 @@ impl ServerSideLocalFsHarness {
             );
     }
 
-    /// Arms dataset change messages on the server to fail. Taken before
-    /// `api_server_run`, which consumes the harness
+    /// The server's dataset change listener, which a test arms to fail. Taken
+    /// before `api_server_run`, which consumes the harness
     pub fn dataset_change_listener(&self) -> Arc<FailingDatasetChangeListener> {
         self.base_catalog.get_one().unwrap()
     }
@@ -234,9 +234,9 @@ impl ServerSideLocalFsHarness {
                 .add::<OAuthDeviceCodeGeneratorDefault>()
                 .add::<InMemoryOAuthDeviceCodeRepository>();
 
-            // A failed transaction rolls back the dataset repositories, which every
-            // read goes through. Storage files it wrote stay, such as the `refs/head`
-            // file, which an immediate consumer writes
+            // A failed transaction rolls back the dataset repositories every read goes
+            // through; storage files stay, such as `refs/head` written by an immediate
+            // consumer
             b.add::<InMemoryTransactionManager>();
             b.add::<FailingDatasetChangeListener>();
 

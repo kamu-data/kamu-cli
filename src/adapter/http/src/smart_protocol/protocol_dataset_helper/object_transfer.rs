@@ -23,8 +23,8 @@ use crate::{BearerHeader, OdfSmtpVersion};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// How the client transfers one object, as the server prepares it for each
-/// object the client asks for
+/// How the client transfers an object, prepared by the server for each object
+/// the client asks for
 #[async_trait::async_trait]
 pub trait ObjectTransferStrategy: Sized + Send {
     async fn prepare(
@@ -412,7 +412,8 @@ pub async fn dataset_export_object_file(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// A transfer URL may be presigned, with its signature in the query
+/// The URL without its query, where a presigned transfer URL carries its
+/// signature; safe to log
 pub fn url_without_query(url: &Url) -> Url {
     let mut url = url.clone();
     url.set_query(None);

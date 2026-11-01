@@ -157,7 +157,8 @@ pub struct TransformResponseExt {
     /// interval is empty.
     pub new_data: Option<OwnedFile>,
     /// Directory the engine ran in, if it used one. The caller removes it
-    /// once the response is committed.
+    /// once the response's blocks are written; a failed run keeps it for its
+    /// logs.
     pub run_dir: Option<PathBuf>,
 }
 

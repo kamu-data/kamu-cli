@@ -69,7 +69,7 @@ impl TransformPlanPayload {
 #[serde(rename_all = "camelCase")]
 pub struct TransformPlanPayloadInput {
     pub dataset_id: odf::DatasetID,
-    /// Input head the plan was computed against
+    /// Input head the plan was elaborated at
     pub planned_head: odf::Multihash,
     /// Records of the input the transform consumes, if any
     #[serde(default, skip_serializing_if = "Option::is_none")]

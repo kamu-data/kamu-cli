@@ -23,7 +23,7 @@ pub async fn sync_increment(
 ) -> Result<odf::dataset::MetadataChainIncrementInterval, SyncError> {
     use odf::dataset::GetIncrementError as E;
 
-    // A source chain that diverged from the destination lacks its old head
+    // After a forced sync over a divergence the chain may not hold the old head
     let old_head = match old_head {
         Some(old_head) if contains_block(chain, old_head).await? => Some(old_head),
         Some(_) | None => None,

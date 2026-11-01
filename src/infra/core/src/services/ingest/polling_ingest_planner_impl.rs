@@ -102,8 +102,7 @@ impl PollingIngestPlanner for PollingIngestPlannerImpl {
     }
 
     /// Dataset environment variables are enabled only when secrets encryption
-    /// is configured and enabled. Both dependencies are looked up leniently:
-    /// a catalog that does not wire them has the feature disabled.
+    /// is configured and enabled and a resolver is registered
     #[tracing::instrument(level = "debug", skip_all, fields(%dataset_id))]
     async fn resolve_env_vars(
         &self,

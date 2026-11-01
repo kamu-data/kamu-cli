@@ -27,8 +27,8 @@ pub trait IpfsService: Send + Sync {
     /// Finds the node's IPNS key with this ID
     async fn find_ipns_key(&self, key_id: &str) -> Result<Option<IpnsKey>, InternalError>;
 
-    /// Resolves the key's name to a CID on this node only, with a short
-    /// timeout; `None` when it does not resolve, as for a key never published
+    /// Resolves the key's name to a CID with a short DHT timeout; `None` when
+    /// it does not resolve, as for a key never published
     async fn resolve_ipns_name_locally(
         &self,
         key: &IpnsKey,

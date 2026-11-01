@@ -29,8 +29,8 @@ impl MockTransformExecutor {
         self
     }
 
-    /// Reports `HEAD` moved between the `heads` set by the time of execution,
-    /// without moving any reference.
+    /// Expects one transform and reports an update between `heads`, which the
+    /// test sets before it runs; moves no reference.
     pub fn make_expect_transform_updated(
         mut self,
         target_alias: odf::DatasetAlias,

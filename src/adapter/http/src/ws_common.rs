@@ -35,8 +35,8 @@ pub enum ReadMessageError {
         message: String,
     },
 
-    /// The server closed the session with a reason that is no reply this
-    /// client can read
+    /// The server closed the session with a reason this client cannot read as
+    /// a reply
     #[error("Server closed the session with an unreadable reply {reason:?}")]
     UnreadableCloseReason {
         reason: String,

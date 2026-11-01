@@ -27,15 +27,11 @@ use crate::*;
 #[cfg_attr(feature = "testing", mockall::automock)]
 #[async_trait::async_trait]
 pub trait PollingIngestService: Send + Sync {
-    /// Runs one ingest iteration of a plan from [`PollingIngestPlanner`]:
-    /// fetches from the polling source and appends the new blocks without
-    /// moving `HEAD`. The caller commits `HEAD` from `old_head` to `new_head`.
-    ///
-    /// Reports `begin` and progress to the listener; the caller reports the
-    /// outcome, after its commit.
-    ///
-    /// `operation_id` names this attempt's working directory, which is removed
-    /// after a successful iteration and kept after a failed one.
+    /// Runs one iteration of a plan from [`PollingIngestPlanner`] and appends
+    /// the new blocks without moving `HEAD`; the caller commits `HEAD` from
+    /// `old_head` to `new_head` and reports the outcome. The listener gets
+    /// `begin` and progress. `operation_id` names the attempt's working
+    /// directory, which only a failed attempt keeps.
     async fn ingest(
         &self,
         target: ResolvedDataset,
@@ -82,8 +78,8 @@ impl Default for SchemaInferenceOpts {
 #[derive(Debug, Clone)]
 pub enum PollingIngestResult {
     UpToDate {
-        /// The source has data but no source state, and fetching uncacheable
-        /// sources was not requested
+        /// The dataset has data but its source records no state to compare
+        /// with, so a change cannot be detected without fetching
         uncacheable: bool,
     },
     Updated {

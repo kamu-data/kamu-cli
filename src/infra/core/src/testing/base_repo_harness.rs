@@ -231,7 +231,7 @@ impl BaseRepoHarness {
     }
 
     /// Appends a `SetInfo` block after the current `HEAD` without moving any
-    /// reference.
+    /// reference
     pub async fn append_unreferenced_block(
         &self,
         created: &CreateDatasetResult,

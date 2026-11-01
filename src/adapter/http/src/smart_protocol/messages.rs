@@ -63,13 +63,13 @@ pub struct DatasetPullInvalidIntervalError {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Pull stage 1: request metadata update
+/// Pull phase 1: request metadata update
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
 pub struct DatasetPullMetadataRequest {}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Pull stage 1: metadata update response
+/// Pull phase 1: metadata update response
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
 pub struct DatasetMetadataPullResponse {
     pub blocks: MetadataBlocksBatch,
@@ -77,7 +77,7 @@ pub struct DatasetMetadataPullResponse {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Pull stage 2: object transfer request
+/// Pull phase 2: object transfer request
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
 pub struct DatasetPullObjectsTransferRequest {
     pub object_files: Vec<ObjectFileReference>,
@@ -85,7 +85,7 @@ pub struct DatasetPullObjectsTransferRequest {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Pull stage 2: object transfer response
+/// Pull phase 2: object transfer response
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
 pub struct DatasetPullObjectsTransferResponse {
     pub object_transfer_strategies: Vec<PullObjectTransferStrategy>,
@@ -275,22 +275,20 @@ pub enum ObjectPushStrategy {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Push stage 3: object upload progress request, sent by the server
+/// Push phase3: object upload progress request, sent by the server
 /// periodically while the client uploads objects
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
 pub struct DatasetPushObjectsUploadProgressRequest {
-    /// Always `true` when sent. A request that arrives after the client
-    /// finished uploading is read alongside the complete response, and the
-    /// field keeps it apart from the bare confirmation of an older server.
-    /// An older server sends `{}`, which stays indistinguishable from that
-    /// confirmation.
+    /// Always `true` when sent, so a request read with the complete response
+    /// is not taken for an older server's bare `{}` confirmation. An older
+    /// server's request is also `{}` and stays indistinguishable from it.
     #[serde(default)]
     pub progress_requested: bool,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Push stage 3: object upload progress response
+/// Push phase3: object upload progress response
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
 pub struct DatasetPushObjectsUploadProgressResponse {
     pub details: ObjectsUploadProgressDetails,
@@ -313,28 +311,28 @@ pub struct ObjectsUploadProgressDetailsRunning {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Push stage 4: complete handshake indication
+/// Push phase4: complete handshake indication
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
 pub struct DatasetPushComplete {}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Push stage 4: complete handshake acknowledge
+/// Push phase4: complete handshake acknowledge
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
 pub struct DatasetPushCompleteConfirmed {}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Push stage 4: response to the complete request.
+/// Push phase4: response to the complete request.
 ///
-/// A client that predates it reads `{"Ok": {}}` as a bare
+/// A client that predates this type reads `{"Ok": {}}` as a bare
 /// `DatasetPushCompleteConfirmed`, ignoring the unknown key.
 pub type DatasetPushCompleteResponse =
     Result<DatasetPushCompleteConfirmed, DatasetPushCompleteError>;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Push stage 4: the pushed blocks could not be committed
+/// Push phase4: the pushed blocks could not be committed
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
 pub enum DatasetPushCompleteError {
     Internal(TransferInternalError),
@@ -346,7 +344,7 @@ pub enum DatasetPushCompleteError {
 /// The destination `HEAD` moved while the pushed blocks were being committed;
 /// nothing was committed.
 ///
-/// It carries no heads: errors of this stage travel as the close frame reason,
+/// It carries no heads: errors of this phase travel as the close frame reason,
 /// which is limited to 123 bytes. A text message would not do, since a client
 /// that predates `DatasetPushCompleteResponse` takes any text reply for a
 /// confirmation.
@@ -355,7 +353,7 @@ pub struct DatasetPushUpdatedConcurrentlyError {}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Push stage 4: the complete response as a client reads it, accepting the
+/// Push phase4: the complete response as a client reads it, accepting the
 /// bare confirmation sent by a server that predates
 /// `DatasetPushCompleteResponse`, and skipping an upload progress request
 /// the server sent before it read that the upload had finished

@@ -492,11 +492,13 @@ source is `UpstreamFlow` and dispatch it with their own binding as input:
 
 | Controller | Result → cause |
 | --- | --- |
-| Ingest | `Updated` → `NewData` from the result's `increment`, which the task computed and every `Updated` result carries. First, if `has_more` and the configuration sets `fetch_next_iteration`, runs the same binding again with `IterationFinished`. `UpToDate` → nothing |
-| Transform | `Updated` → `NewData` from the result's `increment`, which the task computed and every `Updated` result carries. `UpToDate` → nothing |
+| Ingest | `Updated` → `NewData` from the result's `increment`. First, if `has_more` and the configuration sets `fetch_next_iteration`, runs the same binding again with `IterationFinished`. `UpToDate` → nothing |
+| Transform | `Updated` → `NewData` from the result's `increment`. `UpToDate` → nothing |
 | Compact | `Success` with `breaking` → `Breaking`; `NothingToDo`, or a `Success` that is not breaking → nothing |
 | Reset | head changed → `Breaking` |
 | Reset to metadata | `Success` with `breaking` → `Breaking`, then re-activates the dataset's own sensor, so a derivative with a reactive trigger schedules its rebuild from its inputs immediately, under that trigger's batching rule, instead of waiting for the next input change |
+
+The task computes the `increment` itself, and every `Updated` result carries one.
 
 Breaking changes therefore cascade: with `Recover`, each downstream dataset resets to metadata in
 turn, which dispatches `Breaking` again. With `NoAction`, the downstream transform will next fail

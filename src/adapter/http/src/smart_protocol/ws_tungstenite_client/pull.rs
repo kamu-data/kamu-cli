@@ -287,7 +287,7 @@ impl WsSmartTransferProtocolClient {
                     });
                 }
 
-                // Safety: there are blocks, oldest first
+                // The batch is non-empty: `new_head` was found in it
                 let TransferTarget {
                     storage: dst_storage,
                     target,

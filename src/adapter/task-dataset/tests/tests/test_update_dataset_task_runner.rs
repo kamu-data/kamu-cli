@@ -1064,8 +1064,8 @@ impl UpdateDatasetTaskRunnerHarness {
         DatasetTestHelper::append_random_data_to(repo_dataset.as_ref(), 32).await
     }
 
-    /// Syncs `alias` once from its remote: up to date without `heads`,
-    /// otherwise transferred up to their new head
+    /// Expects one sync of `alias` from its remote: up to date without
+    /// `heads`, otherwise updated to their new head
     fn new_syncing(alias: &odf::DatasetAlias, heads: Option<&ReportedHeads>) -> Self {
         Self::new(UpdateDatasetTaskRunnerMocks {
             mock_sync_service: MockSyncService::new()
@@ -1235,8 +1235,8 @@ impl UpdateDatasetTaskRunnerHarness {
         .await
     }
 
-    /// Converts a planned sync into a dataset `alias` that does not exist yet
-    /// into an update task job
+    /// Converts a planned sync whose target `alias` does not exist yet into an
+    /// update task job
     fn sync_job_into_new(
         alias: &odf::DatasetAlias,
     ) -> Result<DatasetUpdateJob, UpdateTargetMissingError> {

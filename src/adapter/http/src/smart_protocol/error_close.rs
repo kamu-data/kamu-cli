@@ -35,8 +35,9 @@ pub struct ErrorReplyClose {
 }
 
 impl ErrorReplyClose {
-    /// The internal error any phase may end with. Its reason has the shape of
-    /// the `Err` of the first phase's response
+    /// The internal error any phase may end with, shaped as the `Err` of that
+    /// phase's response; a failed completion closes with
+    /// [`PUSH_NOT_COMPLETED_CLOSE_CODE`]
     pub fn internal(phase: TransferPhase) -> Result<Self, WriteMessageError> {
         let error = TransferInternalError {
             phase,
@@ -72,11 +73,9 @@ impl ErrorReplyClose {
         })
     }
 
-    /// Reads the reply a client expects from a close frame. A close that
-    /// carries no error reply is a disconnect. A reason that is not the
-    /// expected reply is read as the internal error any phase may end with,
-    /// so the client learns the phase that failed; otherwise the raw reason is
-    /// kept in the error
+    /// Reads the reply a client expects from a close frame. Other close codes
+    /// are a disconnect; an unexpected reason is read as the phase's internal
+    /// error, or kept raw when it is not one
     pub fn read<TPayload: DeserializeOwned>(
         code: u16,
         reason: &str,
@@ -127,7 +126,8 @@ mod tests {
         ] {
             assert_matches!(ClientBeforeTypedReply::read_completion(&close), Err(_));
 
-            // The same reply in an `Error` close would have read as a confirmation
+            // The same reply in an `ERROR_REPLY_CLOSE_CODE` close would have read as a
+            // confirmation
             let error_close = ErrorReplyClose {
                 code: ERROR_REPLY_CLOSE_CODE,
                 reason: close.reason,
@@ -224,8 +224,8 @@ mod tests {
     }
 
     /// How a client that predates `DatasetPushCompleteResponse` reads the reply to
-    /// its complete request: the reason of an `Error` close as the reply, and any
-    /// other close as a disconnect
+    /// its complete request: the reason of an [`ERROR_REPLY_CLOSE_CODE`] close as
+    /// the reply, and any other close as a disconnect
     struct ClientBeforeTypedReply;
 
     #[derive(serde::Deserialize, Debug)]

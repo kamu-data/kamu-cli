@@ -784,8 +784,8 @@ pub fn database_transactional_test(input: TokenStream) -> TokenStream {
                 #fixture (&harness.catalog).await;
             }
         },
-        // Both as `inmem`, and inside one transaction of `InMemoryTransactionManager`,
-        // which the harness registers in `new_transactional()`
+        // Runs the fixture both as `inmem` and inside one transaction of
+        // `InMemoryTransactionManager`, which the harness registers in `new_transactional()`
         "inmem_with_transaction" => {
             let in_transaction_function_name = format_ident!("{test_function_name}_in_transaction");
             quote! {

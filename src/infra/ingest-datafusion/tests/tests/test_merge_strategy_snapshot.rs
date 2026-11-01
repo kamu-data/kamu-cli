@@ -397,8 +397,8 @@ async fn test_snapshot_merge_empty_input_retracts_all() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// `year` is a regular column here, not the event time, so a change in it is a change in a
-// non-compared column
+/// `year` is a regular column here, not the event time, so a change in it is a change in a
+/// non-compared column
 async fn test_snapshot_merge_compare_population<L, I, E, S>(ledger: L, input: I, expected: E)
 where
     L: IntoIterator<Item = (odf::metadata::OperationType, i32, S, i64)>,
@@ -430,7 +430,6 @@ where
     let actual = strat.merge(Some(prev), new).unwrap();
     let actual = actual.sort(strat.sort_order()).unwrap();
 
-    // `year` stays non-null in the output, as it is not the event time column
     testing::assert_dfs_equivalent(expected, actual, false, true, true).await;
 }
 

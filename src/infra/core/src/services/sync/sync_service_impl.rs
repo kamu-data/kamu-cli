@@ -429,7 +429,7 @@ impl SyncServiceImpl {
         let src = self.open_remote_source(src_ref).await?;
 
         if src.url.is_odf_protocol() {
-            // The Simple protocol reads the source `HEAD` as it compares the chains
+            // The Simple protocol fails on a missing source `HEAD` itself; the smart one does not
             if try_resolve_head(src.dataset.as_metadata_chain())
                 .await?
                 .is_none()

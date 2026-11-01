@@ -93,8 +93,8 @@ Choose by what the code under test touches, not by how small the test is.
 - If an integration test can only reach the logic through a private item, the logic is usually a
   concept of its own. Extract it into a public type with a narrow API and test that from `tests/`,
   rather than testing the private item inline or widening visibility only for the test. Example:
-  `EngineTransformOutput`, which checks an engine's output files against its response, was a
-  private method of `ODFEngine` tested inline with temp files.
+  `EngineTransformOutput` checks an engine's output files against its response as a public type
+  tested from `tests/`, instead of a private `ODFEngine` method tested inline with temp files.
 - Pure helpers private to a module stay private and get an inline unit test.
 
 ---
@@ -355,7 +355,7 @@ Do not re-propose these without new evidence.
 
 | Approach | Why it was rejected |
 |---|---|
-| An inline `#[cfg(test)]` module that writes temp files to reach a private method | It is an integration test hidden in a source file: it couples the test to private internals and keeps the logic from being reused. Extract the logic into a public type and test it from `tests/`. |
+| An inline `#[cfg(test)]` module that writes temp files to reach a private method | It is an integration test hidden in a source file, coupled to private internals, and it keeps the logic from being reused; the fix is in [Unit or integration test](#unit-or-integration-test). |
 
 ## What lives elsewhere
 

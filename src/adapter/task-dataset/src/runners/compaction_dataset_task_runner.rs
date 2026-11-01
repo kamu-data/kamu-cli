@@ -24,8 +24,8 @@ use crate::{
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Runs both compaction modes, hard compaction and reset to metadata, which
-/// differ only in their plan and in the result type they report.
+/// Runs hard compaction and reset-to-metadata tasks, which differ only in
+/// their plan and in the result type they report.
 #[dill::component(pub)]
 #[dill::interface(dyn TaskRunner)]
 #[dill::meta(TaskRunnerMeta {

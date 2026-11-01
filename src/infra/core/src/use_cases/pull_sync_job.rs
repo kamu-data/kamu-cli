@@ -66,7 +66,8 @@ impl PullSyncJob {
         })
     }
 
-    /// The listener hears the outcome after the commit, which decides it
+    /// Reports the outcome to the listener; a transfer is reported only after
+    /// its commit, which decides the outcome
     fn notify(listener: Option<&dyn SyncListener>, sync_result: Result<&SyncResult, &SyncError>) {
         if let Some(listener) = listener {
             match sync_result {
