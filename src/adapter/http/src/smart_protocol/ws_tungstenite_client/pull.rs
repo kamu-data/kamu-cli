@@ -28,7 +28,19 @@ use crate::smart_protocol::protocol_dataset_helper::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[common_macros::method_names_consts]
 impl WsSmartTransferProtocolClient {
+    #[tracing::instrument(
+        level = "info",
+        name = WsSmartTransferProtocolClient_pull_send_request,
+        skip_all,
+        fields(
+            dst_head = dst_head.as_ref().map(tracing::field::display),
+            num_blocks = tracing::field::Empty,
+            num_objects = tracing::field::Empty,
+            bytes = tracing::field::Empty,
+        )
+    )]
     async fn pull_send_request(
         &self,
         socket: &mut TungsteniteStream,
@@ -60,6 +72,14 @@ impl WsSmartTransferProtocolClient {
 
         match dataset_pull_response {
             Ok(success) => {
+                let plan = &success.transfer_plan;
+                tracing::Span::current()
+                    .record("num_blocks", plan.num_blocks)
+                    .record("num_objects", plan.num_objects)
+                    .record(
+                        "bytes",
+                        plan.bytes_in_raw_blocks + plan.bytes_in_raw_objects,
+                    );
                 tracing::debug!(
                     num_blocks = % success.transfer_plan.num_blocks,
                     bytes_in_raw_blocks = % success.transfer_plan.bytes_in_raw_blocks,
@@ -86,6 +106,12 @@ impl WsSmartTransferProtocolClient {
         }
     }
 
+    #[tracing::instrument(
+        level = "info",
+        name = WsSmartTransferProtocolClient_pull_send_metadata_request,
+        skip_all,
+        fields(num_blocks = tracing::field::Empty)
+    )]
     async fn pull_send_metadata_request(
         &self,
         socket: &mut TungsteniteStream,
@@ -106,6 +132,11 @@ impl WsSmartTransferProtocolClient {
             .map_err(|e| {
                 PullClientError::ReadFailed(PullReadError::new(e, PullPhase::MetadataRequest))
             })?;
+
+        tracing::Span::current().record(
+            "num_blocks",
+            dataset_metadata_pull_response.blocks.num_blocks,
+        );
 
         tracing::debug!(
             num_blocks = % dataset_metadata_pull_response.blocks.num_blocks,
@@ -165,6 +196,57 @@ impl WsSmartTransferProtocolClient {
             });
 
         Ok(dataset_objects_pull_response)
+    }
+
+    #[tracing::instrument(
+        level = "info",
+        name = WsSmartTransferProtocolClient_pull_objects,
+        skip_all,
+        fields(num_objects = object_files.len())
+    )]
+    async fn pull_objects(
+        &self,
+        socket: &mut TungsteniteStream,
+        dst: &dyn odf::Dataset,
+        object_files: Vec<ObjectFileReference>,
+        max_parallel_transfers: usize,
+    ) -> Result<(), SyncError> {
+        // TODO: analyze sizes and split on stages
+        let object_files_transfer_plan = if object_files.is_empty() {
+            vec![]
+        } else {
+            vec![object_files]
+        };
+
+        tracing::debug!(
+            "Object files transfer plan consist of {} stages",
+            object_files_transfer_plan.len()
+        );
+
+        let mut stage_index = 0;
+        for stage_object_files in object_files_transfer_plan {
+            stage_index += 1;
+            tracing::debug!(
+                "Stage #{}: querying {} data objects",
+                stage_index,
+                stage_object_files.len()
+            );
+
+            let dataset_objects_pull_response = self
+                .pull_send_objects_request(socket, stage_object_files)
+                .await
+                .inspect_err(|e| tracing::debug!("Pull process aborted with error: {e}"))
+                .int_err()?;
+
+            futures::stream::iter(dataset_objects_pull_response.object_transfer_strategies)
+                .map(Ok)
+                .try_for_each_concurrent(/* limit */ max_parallel_transfers, |s| async move {
+                    dataset_import_object_file(dst, s).await
+                })
+                .await?;
+        }
+
+        Ok(())
     }
 
     pub(super) async fn pull_flow(
@@ -306,42 +388,13 @@ impl WsSmartTransferProtocolClient {
                 )
                 .await?;
 
-                // TODO: analyze sizes and split on stages
-                let object_files_transfer_plan = if object_files.is_empty() {
-                    vec![]
-                } else {
-                    vec![object_files]
-                };
-
-                tracing::debug!(
-                    "Object files transfer plan consist of {} stages",
-                    object_files_transfer_plan.len()
-                );
-
-                let mut stage_index = 0;
-                for stage_object_files in object_files_transfer_plan {
-                    stage_index += 1;
-                    tracing::debug!(
-                        "Stage #{}: querying {} data objects",
-                        stage_index,
-                        stage_object_files.len()
-                    );
-
-                    let dataset_objects_pull_response = self
-                        .pull_send_objects_request(ws_stream, stage_object_files)
-                        .await
-                        .inspect_err(|e| tracing::debug!("Pull process aborted with error: {e}"))
-                        .int_err()?;
-
-                    let dst_ref = dst_storage.as_ref();
-                    futures::stream::iter(dataset_objects_pull_response.object_transfer_strategies)
-                        .map(Ok)
-                        .try_for_each_concurrent(
-                            /* limit */ transfer_options.max_parallel_transfers,
-                            |s| async move { dataset_import_object_file(dst_ref, s).await },
-                        )
-                        .await?;
-                }
+                self.pull_objects(
+                    ws_stream,
+                    dst_storage.as_ref(),
+                    object_files,
+                    transfer_options.max_parallel_transfers,
+                )
+                .await?;
 
                 append_transferred_blocks(
                     dst_storage.as_ref(),

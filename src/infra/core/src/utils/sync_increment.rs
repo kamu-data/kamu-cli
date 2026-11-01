@@ -31,10 +31,13 @@ pub async fn sync_increment(
 
     match chain.get_increment_for_interval(old_head, new_head).await {
         Ok(increment) => Ok(increment),
-        Err(E::InvalidInterval(_)) => chain
-            .get_increment_for_interval(None, new_head)
-            .await
-            .map_err(|e| SyncError::Internal(e.int_err())),
+        Err(E::InvalidInterval(e)) => {
+            tracing::info!(error = %e, "Counting the increment over the whole chain");
+            chain
+                .get_increment_for_interval(None, new_head)
+                .await
+                .map_err(|e| SyncError::Internal(e.int_err()))
+        }
         Err(e @ (E::BlockNotFound(_) | E::Internal(_))) => Err(SyncError::Internal(e.int_err())),
     }
 }

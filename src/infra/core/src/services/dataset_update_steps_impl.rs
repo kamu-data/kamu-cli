@@ -15,6 +15,15 @@ use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_core::*;
 use kamu_datasets::{DatasetHeadCommitter, DatasetRegistry, DatasetRegistryExt};
 
+use crate::utils::span_outcome::{
+    DATASET_DELETED,
+    FAILED,
+    UP_TO_DATE,
+    UPDATED,
+    record_outcome,
+    sync_error_outcome,
+};
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[component(pub)]
@@ -58,6 +67,26 @@ impl DatasetUpdateStepsImpl {
         }
 
         Ok(sync_result)
+    }
+
+    async fn commit_transferred(
+        &self,
+        transferred: TransferredSync,
+        maybe_pull_alias: Option<&odf::DatasetRefRemote>,
+    ) -> Result<Option<SyncResult>, SyncError> {
+        let result = match maybe_pull_alias {
+            Some(pull_alias) => {
+                self.commit_sync_with_pull_alias(transferred, pull_alias)
+                    .await
+            }
+            None => self.commit_sync(transferred).await,
+        };
+        match result {
+            Ok(sync_result) => Ok(Some(sync_result)),
+            // The committer opens an existing target again by its ID
+            Err(SyncError::DatasetNotFound(_)) => Ok(None),
+            Err(e) => Err(e),
+        }
     }
 
     #[transactional_method2(dataset_registry: Arc<dyn DatasetRegistry>, polling_ingest_planner: Arc<dyn PollingIngestPlanner>)]
@@ -206,7 +235,7 @@ impl DatasetUpdateSteps for DatasetUpdateStepsImpl {
             Ok(Some(LocalSyncTarget::Existing { .. })) => "existing",
             Ok(Some(LocalSyncTarget::New(_))) => "new",
             Ok(None) => DATASET_DELETED,
-            Err(_) => FAILED,
+            Err(e) => sync_error_outcome(e),
         });
         result
     }
@@ -235,39 +264,26 @@ impl DatasetUpdateSteps for DatasetUpdateStepsImpl {
         options: SyncOptions,
         listener: Option<Arc<dyn SyncListener>>,
         maybe_pull_alias: Option<&odf::DatasetRefRemote>,
-    ) -> Result<SyncResult, SyncError> {
+    ) -> Result<Option<SyncResult>, SyncError> {
         let sync_service = self.sync_service.get().int_err()?;
         let result = match sync_service
             .transfer_into_local(request, options, listener)
             .await
         {
-            Ok(SyncTransfer::UpToDate) => Ok(SyncResult::UpToDate),
-            Ok(SyncTransfer::Transferred(transferred)) => match maybe_pull_alias {
-                Some(pull_alias) => {
-                    self.commit_sync_with_pull_alias(transferred, pull_alias)
-                        .await
-                }
-                None => self.commit_sync(transferred).await,
-            },
+            Ok(SyncTransfer::UpToDate) => Ok(Some(SyncResult::UpToDate)),
+            Ok(SyncTransfer::Transferred(transferred)) => {
+                self.commit_transferred(transferred, maybe_pull_alias).await
+            }
             Err(e) => Err(e),
         };
         record_outcome(match &result {
-            Ok(SyncResult::Updated { .. }) => "updated",
-            Ok(SyncResult::UpToDate) => UP_TO_DATE,
-            Err(_) => FAILED,
+            Ok(Some(SyncResult::Updated { .. })) => UPDATED,
+            Ok(Some(SyncResult::UpToDate)) => UP_TO_DATE,
+            Ok(None) => DATASET_DELETED,
+            Err(e) => sync_error_outcome(e),
         });
         result
     }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-const DATASET_DELETED: &str = "dataset_deleted";
-const UP_TO_DATE: &str = "up_to_date";
-const FAILED: &str = "failed";
-
-fn record_outcome(outcome: &'static str) {
-    tracing::Span::current().record("outcome", outcome);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

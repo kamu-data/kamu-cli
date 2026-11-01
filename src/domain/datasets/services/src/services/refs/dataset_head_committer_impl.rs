@@ -16,9 +16,10 @@ use kamu_datasets::{DatasetHeadCommitter, ResolvedDataset};
 #[interface(dyn DatasetHeadCommitter)]
 pub struct DatasetHeadCommitterImpl {}
 
+#[common_macros::method_names_consts]
 #[async_trait::async_trait]
 impl DatasetHeadCommitter for DatasetHeadCommitterImpl {
-    #[tracing::instrument(level = "debug", skip_all, fields(dataset_id = %target.get_id(), ?expected_head, %new_head))]
+    #[tracing::instrument(name = DatasetHeadCommitterImpl_commit_head, level = "debug", skip_all, fields(dataset_id = %target.get_id(), ?expected_head, %new_head))]
     async fn commit_head(
         &self,
         target: &ResolvedDataset,

@@ -25,10 +25,12 @@ pub struct SetWatermarkExecutorImpl {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[common_macros::method_names_consts]
 #[async_trait::async_trait]
 impl SetWatermarkExecutor for SetWatermarkExecutorImpl {
     #[tracing::instrument(
-        level = "debug",
+        name = SetWatermarkExecutorImpl_execute,
+        level = "info",
         skip_all,
         fields(
             target=%target.get_handle(),

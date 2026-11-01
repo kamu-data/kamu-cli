@@ -53,6 +53,7 @@ pub struct AxumServerPushProtocolInstance {
     upload_progress_interval: Duration,
 }
 
+#[common_macros::method_names_consts]
 impl AxumServerPushProtocolInstance {
     pub fn new(
         socket: axum::extract::ws::WebSocket,
@@ -299,6 +300,16 @@ impl AxumServerPushProtocolInstance {
         Ok(())
     }
 
+    #[tracing::instrument(
+        level = "info",
+        name = AxumServerPushProtocolInstance_handle_push_request_initiation,
+        skip_all,
+        fields(
+            num_blocks = tracing::field::Empty,
+            num_objects = tracing::field::Empty,
+            bytes = tracing::field::Empty,
+        )
+    )]
     async fn handle_push_request_initiation(
         &mut self,
     ) -> Result<DatasetPushRequest, PushServerError> {
@@ -307,6 +318,15 @@ impl AxumServerPushProtocolInstance {
             .map_err(|e| {
                 PushServerError::ReadFailed(PushReadError::new(e, PushPhase::InitialRequest))
             })?;
+
+        let plan = &push_request.transfer_plan;
+        tracing::Span::current()
+            .record("num_blocks", plan.num_blocks)
+            .record("num_objects", plan.num_objects)
+            .record(
+                "bytes",
+                plan.bytes_in_raw_blocks + plan.bytes_in_raw_objects,
+            );
 
         tracing::debug!(
             "Push client sent a push request: currentHead={:?} sizeEstimate={:?}",
@@ -336,9 +356,6 @@ impl AxumServerPushProtocolInstance {
                         Err(e) => Err(e),
                     }
                 })
-                .instrument(tracing::debug_span!(
-                    "AxumServerPushProtocolInstance::handle_push_request_initiation"
-                ))
                 .await
         } else {
             Ok(None)
@@ -368,6 +385,12 @@ impl AxumServerPushProtocolInstance {
         }
     }
 
+    #[tracing::instrument(
+        level = "info",
+        name = AxumServerPushProtocolInstance_try_handle_push_metadata_request,
+        skip_all,
+        fields(num_blocks = tracing::field::Empty)
+    )]
     async fn try_handle_push_metadata_request(
         &mut self,
         push_request: DatasetPushRequest,
@@ -380,6 +403,8 @@ impl AxumServerPushProtocolInstance {
                     PushPhase::MetadataRequest,
                 ))),
             }?;
+
+        tracing::Span::current().record("num_blocks", push_metadata_request.new_blocks.num_blocks);
 
         tracing::debug!(
             num_blocks = %push_metadata_request.new_blocks.num_blocks,
@@ -423,6 +448,12 @@ impl AxumServerPushProtocolInstance {
         Ok(new_blocks)
     }
 
+    #[tracing::instrument(
+        level = "info",
+        name = AxumServerPushProtocolInstance_try_handle_push_objects_request,
+        skip_all,
+        fields(num_objects = tracing::field::Empty)
+    )]
     async fn try_handle_push_objects_request(&mut self) -> Result<bool, PushServerError> {
         let request = axum_read_payload::<DatasetPushObjectsTransferRequest>(&mut self.socket)
             .await
@@ -431,6 +462,7 @@ impl AxumServerPushProtocolInstance {
             })?;
 
         let objects_count = request.object_files.len();
+        tracing::Span::current().record("num_objects", objects_count);
 
         tracing::debug!(
             % objects_count,
@@ -450,9 +482,6 @@ impl AxumServerPushProtocolInstance {
                 self.dataset_url.clone(),
                 self.maybe_bearer_header.clone(),
             )
-            .instrument(tracing::debug_span!(
-                "AxumServerPushProtocolInstance::try_handle_push_objects_request",
-            ))
             .await
             .protocol_int_err(PushPhase::ObjectsRequest)?;
 
@@ -507,6 +536,11 @@ impl AxumServerPushProtocolInstance {
         Ok(request.is_truncated)
     }
 
+    #[tracing::instrument(
+        level = "info",
+        name = AxumServerPushProtocolInstance_try_handle_push_complete,
+        skip_all
+    )]
     async fn try_handle_push_complete(
         &mut self,
         new_blocks: VecDeque<odf::dataset::HashedMetadataBlockBytesDecoded>,
@@ -526,6 +560,47 @@ impl AxumServerPushProtocolInstance {
             "The push completed with no blocks for a dataset that does not exist"
                 .protocol_int_err(PushPhase::CompleteRequest)
         })?;
+        self.commit_pushed_blocks(
+            dataset_handle,
+            new_blocks,
+            expected_head,
+            force_update_if_diverged,
+            old_head_maybe,
+        )
+        .await?;
+
+        tracing::debug!("Sending completion confirmation");
+
+        axum_write_payload::<DatasetPushCompleteResponse>(
+            &mut self.socket,
+            Ok(DatasetPushCompleteConfirmed {}),
+        )
+        .await
+        .map_err(|e| {
+            PushServerError::WriteFailed(PushWriteError::new(e, PushPhase::CompleteRequest))
+        })?;
+
+        Ok(())
+    }
+
+    #[tracing::instrument(
+        level = "info",
+        name = AxumServerPushProtocolInstance_commit_pushed_blocks,
+        skip_all,
+        fields(
+            target = %dataset_handle,
+            num_blocks = new_blocks.len(),
+            new_head = tracing::field::Empty,
+        )
+    )]
+    async fn commit_pushed_blocks(
+        &mut self,
+        dataset_handle: odf::DatasetHandle,
+        new_blocks: VecDeque<odf::dataset::HashedMetadataBlockBytesDecoded>,
+        expected_head: Option<odf::Multihash>,
+        force_update_if_diverged: bool,
+        old_head_maybe: Option<odf::Multihash>,
+    ) -> Result<(), PushServerError> {
         // Without `force` the batch must extend `HEAD`, so the commit expects the
         // block the batch is appended to. With `force` the batch may replace a
         // divergent history, so it expects the head the client observed instead
@@ -537,7 +612,7 @@ impl AxumServerPushProtocolInstance {
         // The commit and the message announcing it share one transaction, so
         // flows hear about every push that moved `HEAD`
         let maybe_bearer_header = self.maybe_bearer_header.clone();
-        DatabaseTransactionRunner::new(self.catalog.clone())
+        let new_head = DatabaseTransactionRunner::new(self.catalog.clone())
             .transactional_with4(
                 |dataset_registry: Arc<dyn DatasetRegistry>,
                  append_dataset_metadata_batch: Arc<dyn AppendDatasetMetadataBatchUseCase>,
@@ -588,12 +663,9 @@ impl AxumServerPushProtocolInstance {
                         )
                         .await?;
 
-                    Ok::<(), AppendDatasetMetadataBatchUseCaseError>(())
+                    Ok::<_, AppendDatasetMetadataBatchUseCaseError>(new_head)
                 },
             )
-            .instrument(tracing::debug_span!(
-                "AxumServerPushProtocolInstance::try_handle_push_complete"
-            ))
             .await
             .map_err(|e| match e {
                 AppendDatasetMetadataBatchUseCaseError::SetRefError(
@@ -610,16 +682,7 @@ impl AxumServerPushProtocolInstance {
                 }
             })?;
 
-        tracing::debug!("Sending completion confirmation");
-
-        axum_write_payload::<DatasetPushCompleteResponse>(
-            &mut self.socket,
-            Ok(DatasetPushCompleteConfirmed {}),
-        )
-        .await
-        .map_err(|e| {
-            PushServerError::WriteFailed(PushWriteError::new(e, PushPhase::CompleteRequest))
-        })?;
+        tracing::Span::current().record("new_head", tracing::field::display(&new_head));
 
         Ok(())
     }

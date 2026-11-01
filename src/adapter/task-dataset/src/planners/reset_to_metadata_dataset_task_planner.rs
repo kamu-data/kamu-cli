@@ -28,9 +28,10 @@ pub struct ResetToMetadataDatasetTaskPlanner {
     catalog: dill::Catalog,
 }
 
+#[common_macros::method_names_consts]
 impl ResetToMetadataDatasetTaskPlanner {
     #[transactional_method2(dataset_registry: Arc<dyn DatasetRegistry>, compaction_planner: Arc<dyn CompactionPlanner>)]
-    #[tracing::instrument(level = "debug", skip_all, fields(?args))]
+    #[tracing::instrument(name = ResetToMetadataDatasetTaskPlanner_plan_reset_to_metadata, level = "debug", skip_all, fields(?args))]
     async fn plan_reset_to_metadata(
         &self,
         args: &LogicalPlanDatasetResetToMetadata,

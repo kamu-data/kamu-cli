@@ -12,6 +12,8 @@ use std::sync::Arc;
 use internal_error::InternalError;
 use kamu_core::*;
 
+use crate::utils::span_outcome::record_pull_outcome;
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// Runs one sync job of `kamu pull`: reads the target, transfers and commits
@@ -19,12 +21,25 @@ pub(crate) struct PullSyncJob {
     update_steps: Arc<dyn DatasetUpdateSteps>,
 }
 
+#[common_macros::method_names_consts]
 impl PullSyncJob {
     pub(crate) fn new(update_steps: Arc<dyn DatasetUpdateSteps>) -> Self {
         Self { update_steps }
     }
 
+    #[tracing::instrument(level = "info", name = PullSyncJob_run, skip_all, fields(target = %psi.local_target.as_local_ref(), outcome))]
     pub(crate) async fn run(
+        self,
+        psi: PullSyncItem,
+        options: PullOptions,
+        listener: Option<Arc<dyn SyncListener>>,
+    ) -> Result<PullResponse, InternalError> {
+        let response = self.run_job(psi, options, listener).await;
+        record_pull_outcome(&response);
+        response
+    }
+
+    async fn run_job(
         self,
         psi: PullSyncItem,
         options: PullOptions,
@@ -35,23 +50,21 @@ impl PullSyncJob {
             .resolve_sync_target(&psi.local_target)
             .await
         {
-            Ok(Some(dst)) => {
-                let sync_result = self
-                    .transfer_and_commit(&psi, dst, &options, listener.clone())
-                    .await;
-                Self::notify(listener.as_deref(), sync_result.as_ref());
-                sync_result.map(Into::into).map_err(Self::into_pull_error)
-            }
-            Ok(None) => {
-                let local_ref = psi.local_target.as_local_ref();
-                Self::notify(
-                    listener.as_deref(),
-                    Err(&DatasetAnyRefUnresolvedError::new(local_ref.clone()).into()),
-                );
-                Err(PullError::NotFound(odf::DatasetNotFoundError::new(
-                    local_ref,
-                )))
-            }
+            Ok(Some(dst)) => match self
+                .transfer_and_commit(&psi, dst, &options, listener.clone())
+                .await
+            {
+                Ok(Some(sync_result)) => {
+                    Self::notify(listener.as_deref(), Ok(&sync_result));
+                    Ok(sync_result.into())
+                }
+                Ok(None) => Err(Self::dataset_deleted(&psi, listener.as_deref())),
+                Err(e) => {
+                    Self::notify(listener.as_deref(), Err(&e));
+                    Err(Self::into_pull_error(e))
+                }
+            },
+            Ok(None) => Err(Self::dataset_deleted(&psi, listener.as_deref())),
             Err(e) => {
                 Self::notify(listener.as_deref(), Err(&e));
                 Err(Self::into_pull_error(e))
@@ -77,6 +90,15 @@ impl PullSyncJob {
         }
     }
 
+    fn dataset_deleted(psi: &PullSyncItem, listener: Option<&dyn SyncListener>) -> PullError {
+        let local_ref = psi.local_target.as_local_ref();
+        Self::notify(
+            listener,
+            Err(&DatasetAnyRefUnresolvedError::new(local_ref.clone()).into()),
+        );
+        PullError::NotFound(odf::DatasetNotFoundError::new(local_ref))
+    }
+
     /// A lost commit race is the pull's [`PullError::HeadMoved`], the same as
     /// for an ingest or a transform. A local commit always knows the heads.
     fn into_pull_error(error: SyncError) -> PullError {
@@ -93,7 +115,7 @@ impl PullSyncJob {
         dst: LocalSyncTarget,
         options: &PullOptions,
         listener: Option<Arc<dyn SyncListener>>,
-    ) -> Result<SyncResult, SyncError> {
+    ) -> Result<Option<SyncResult>, SyncError> {
         self.update_steps
             .transfer_and_commit_sync(
                 LocalSyncRequest {

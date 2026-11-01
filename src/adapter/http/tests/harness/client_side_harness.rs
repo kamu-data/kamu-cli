@@ -437,6 +437,7 @@ impl ClientSideHarness {
             )
             .await
             .unwrap()
+            .unwrap()
     }
 
     pub async fn push_dataset(

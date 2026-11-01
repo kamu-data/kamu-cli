@@ -28,9 +28,10 @@ pub struct HardCompactDatasetTaskPlanner {
     catalog: dill::Catalog,
 }
 
+#[common_macros::method_names_consts]
 impl HardCompactDatasetTaskPlanner {
     #[transactional_method2(dataset_registry: Arc<dyn DatasetRegistry>, compaction_planner: Arc<dyn CompactionPlanner>)]
-    #[tracing::instrument(level = "debug", skip_all, fields(?args))]
+    #[tracing::instrument(name = HardCompactDatasetTaskPlanner_plan_hard_compaction, level = "debug", skip_all, fields(?args))]
     async fn plan_hard_compaction(
         &self,
         args: &LogicalPlanDatasetHardCompact,

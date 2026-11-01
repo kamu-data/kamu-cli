@@ -21,8 +21,10 @@ use kamu_datasets::ResolvedDataset;
 #[interface(dyn CompactionPlanner)]
 pub struct CompactionPlannerImpl {}
 
+#[common_macros::method_names_consts]
 impl CompactionPlannerImpl {
     #[tracing::instrument(
+        name = CompactionPlannerImpl_plan_dataset_compaction,
         level = "debug",
         skip_all,
         fields(
@@ -209,9 +211,10 @@ impl CompactionPlannerImpl {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[common_macros::method_names_consts]
 #[async_trait::async_trait]
 impl CompactionPlanner for CompactionPlannerImpl {
-    #[tracing::instrument(level = "debug", skip_all, fields(target=%target.get_handle(), ?options))]
+    #[tracing::instrument(name = CompactionPlannerImpl_plan_compaction, level = "debug", skip_all, fields(target=%target.get_handle(), ?options))]
     async fn plan_compaction(
         &self,
         target: ResolvedDataset,

@@ -201,7 +201,12 @@ impl TransformPlannerImpl {
             let input = datasets_map.get_by_id(&query_input.dataset_id);
             match collect_unprocessed_input_blocks(query_input, input).await {
                 Ok(_) => {}
-                Err(CollectUnprocessedInputBlocksError::InvalidInputInterval(_)) => {
+                Err(CollectUnprocessedInputBlocksError::InvalidInputInterval(e)) => {
+                    tracing::warn!(
+                        input_id = %query_input.dataset_id,
+                        error = %e,
+                        "Input history was rewritten",
+                    );
                     breaking_inputs.push(query_input.clone());
                 }
                 Err(CollectUnprocessedInputBlocksError::Internal(e)) => return Err(e),
@@ -213,9 +218,10 @@ impl TransformPlannerImpl {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[common_macros::method_names_consts]
 #[async_trait::async_trait]
 impl TransformPlanner for TransformPlannerImpl {
-    #[tracing::instrument(level = "info", skip_all, fields(target=%target.get_handle()))]
+    #[tracing::instrument(name = TransformPlannerImpl_describe_transform, level = "info", skip_all, fields(target=%target.get_handle()))]
     async fn describe_transform(
         &self,
         target: ResolvedDataset,
@@ -254,7 +260,7 @@ impl TransformPlanner for TransformPlannerImpl {
         })
     }
 
-    #[tracing::instrument(level = "info", skip_all, fields(target=%target.get_handle()))]
+    #[tracing::instrument(name = TransformPlannerImpl_elaborate_transform, level = "info", skip_all, fields(target=%target.get_handle()))]
     async fn elaborate_transform(
         &self,
         target: ResolvedDataset,
@@ -263,7 +269,7 @@ impl TransformPlanner for TransformPlannerImpl {
         self.elaborate_preliminary(plan, None).await
     }
 
-    #[tracing::instrument(level = "info", skip_all, fields(target=%target.get_handle()))]
+    #[tracing::instrument(name = TransformPlannerImpl_rebuild_transform, level = "info", skip_all, fields(target=%target.get_handle()))]
     async fn rebuild_transform(
         &self,
         target: ResolvedDataset,
@@ -337,7 +343,7 @@ impl TransformPlanner for TransformPlannerImpl {
         Ok(plan)
     }
 
-    #[tracing::instrument(level = "info", skip_all, fields(target=%target.get_handle()))]
+    #[tracing::instrument(name = TransformPlannerImpl_evaluate_transform_status, level = "info", skip_all, fields(target=%target.get_handle()))]
     async fn evaluate_transform_status(
         &self,
         target: ResolvedDataset,
@@ -373,7 +379,8 @@ impl TransformPlanner for TransformPlannerImpl {
             Ok(TransformElaboration::Elaborated(plan)) => plan.request,
             Ok(TransformElaboration::UpToDate) => return Ok(TransformStatus::UpToDate),
             // The derivative waits for its input
-            Err(TransformElaborateError::InputNotPulled(_)) => {
+            Err(TransformElaborateError::InputNotPulled(e)) => {
+                tracing::info!(error = %e, "Waiting for an input to be pulled");
                 return Ok(TransformStatus::UpToDate);
             }
             Err(TransformElaborateError::TransformNotDefined(e)) => return Err(e.into()),
@@ -403,7 +410,7 @@ impl TransformPlanner for TransformPlannerImpl {
         }
     }
 
-    #[tracing::instrument(level = "info", skip_all, fields(target=%target.get_handle(), ?block_range))]
+    #[tracing::instrument(name = TransformPlannerImpl_build_transform_verification_plan, level = "info", skip_all, fields(target=%target.get_handle(), ?block_range))]
     async fn build_transform_verification_plan(
         &self,
         target: ResolvedDataset,
@@ -487,7 +494,7 @@ impl TransformPlanner for TransformPlannerImpl {
         })
     }
 
-    #[tracing::instrument(level = "debug", skip_all, fields(target=%target.get_handle(), ?block_range))]
+    #[tracing::instrument(name = TransformPlannerImpl_get_verification_inputs, level = "debug", skip_all, fields(target=%target.get_handle(), ?block_range))]
     async fn get_verification_inputs(
         &self,
         target: ResolvedDataset,

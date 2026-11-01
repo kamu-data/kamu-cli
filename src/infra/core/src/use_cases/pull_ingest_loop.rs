@@ -13,6 +13,8 @@ use internal_error::{InternalError, ResultIntoInternal};
 use kamu_core::*;
 use random_strings::get_random_name;
 
+use crate::utils::span_outcome::record_pull_outcome;
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// Repeats polling ingest iterations of one dataset for `kamu pull`,
@@ -22,6 +24,7 @@ pub(crate) struct PullIngestLoop {
     polling_ingest_service: Arc<dyn PollingIngestService>,
 }
 
+#[common_macros::method_names_consts]
 impl PullIngestLoop {
     pub(crate) fn new(
         update_steps: Arc<dyn DatasetUpdateSteps>,
@@ -34,7 +37,19 @@ impl PullIngestLoop {
     }
 
     /// Runs the ingest job of one dataset and reports it as the pull's response
+    #[tracing::instrument(level = "info", name = PullIngestLoop_run, skip_all, fields(target = %pii.target, outcome))]
     pub(crate) async fn run(
+        self,
+        pii: PullIngestItem,
+        options: PullOptions,
+        maybe_listener: Option<Arc<dyn PollingIngestListener>>,
+    ) -> Result<PullResponse, InternalError> {
+        let response = self.run_job(pii, options, maybe_listener).await;
+        record_pull_outcome(&response);
+        response
+    }
+
+    async fn run_job(
         self,
         pii: PullIngestItem,
         options: PullOptions,

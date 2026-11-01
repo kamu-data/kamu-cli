@@ -25,6 +25,7 @@ pub struct TransformExecutorImpl {
     engine_provisioner: Arc<dyn EngineProvisioner>,
 }
 
+#[common_macros::method_names_consts]
 #[component(pub)]
 #[interface(dyn TransformExecutor)]
 impl TransformExecutorImpl {
@@ -33,7 +34,7 @@ impl TransformExecutorImpl {
     }
 
     // Note: Can be called from multiple threads
-    #[tracing::instrument(level = "info", skip_all, fields(%operation_id))]
+    #[tracing::instrument(name = TransformExecutorImpl_do_transform, level = "info", skip_all, fields(%operation_id))]
     async fn do_transform<CommitFn, Fut>(
         engine_provisioner: Arc<dyn EngineProvisioner>,
         request: TransformRequestExt,
@@ -220,9 +221,10 @@ impl TransformExecutorImpl {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[common_macros::method_names_consts]
 #[async_trait::async_trait]
 impl TransformExecutor for TransformExecutorImpl {
-    #[tracing::instrument(level = "info", skip_all, fields(target=%target.get_handle()))]
+    #[tracing::instrument(name = TransformExecutorImpl_execute_transform, level = "info", skip_all, fields(target=%target.get_handle()))]
     async fn execute_transform(
         &self,
         target: ResolvedDataset,
@@ -251,7 +253,7 @@ impl TransformExecutor for TransformExecutorImpl {
         )
     }
 
-    #[tracing::instrument(level = "info", skip_all, fields(target=%target.get_handle()))]
+    #[tracing::instrument(name = TransformExecutorImpl_execute_verify_transform, level = "info", skip_all, fields(target=%target.get_handle()))]
     async fn execute_verify_transform(
         &self,
         target: ResolvedDataset,

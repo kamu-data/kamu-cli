@@ -7953,6 +7953,7 @@ dependencies = [
  "bytes",
  "canonical_json",
  "chrono",
+ "common-macros",
  "container-runtime",
  "database-common",
  "database-common-macros",

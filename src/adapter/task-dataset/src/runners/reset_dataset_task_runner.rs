@@ -16,6 +16,7 @@ use kamu_datasets::{DatasetRegistry, DatasetRegistryExt};
 use kamu_task_system::*;
 
 use super::task_head_commit::{dataset_deleted_outcome, head_moved_outcome};
+use super::task_span_outcome::record_task_outcome;
 use crate::{TaskDefinitionDatasetReset, TaskErrorDatasetReset, TaskResultDatasetReset};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -30,10 +31,20 @@ pub struct ResetDatasetTaskRunner {
     reset_executor: Arc<dyn ResetExecutor>,
 }
 
+#[common_macros::method_names_consts]
 impl ResetDatasetTaskRunner {
-    #[tracing::instrument(level = "debug", skip_all, fields(?task_reset))]
-    #[transactional_method1(dataset_registry: Arc<dyn DatasetRegistry>)]
+    #[tracing::instrument(name = ResetDatasetTaskRunner_run_reset, level = "info", skip_all, fields(target = %task_reset.dataset_handle, outcome))]
     async fn run_reset(
+        &self,
+        task_reset: TaskDefinitionDatasetReset,
+    ) -> Result<TaskOutcome, InternalError> {
+        let outcome = self.run_reset_job(task_reset).await;
+        record_task_outcome(&outcome);
+        outcome
+    }
+
+    #[transactional_method1(dataset_registry: Arc<dyn DatasetRegistry>)]
+    async fn run_reset_job(
         &self,
         task_reset: TaskDefinitionDatasetReset,
     ) -> Result<TaskOutcome, InternalError> {
@@ -61,7 +72,7 @@ impl ResetDatasetTaskRunner {
                 )),
                 ResetExecutionError::SetReferenceFailed(
                     odf::dataset::SetChainRefError::CASFailed(e),
-                ) => Ok(head_moved_outcome(task_reset.dataset_handle.id, e)),
+                ) => Ok(head_moved_outcome(task_reset.dataset_handle.id, Some(e))),
                 // Retrying under the same account cannot gain the access
                 ResetExecutionError::SetReferenceFailed(
                     odf::dataset::SetChainRefError::Access(e),

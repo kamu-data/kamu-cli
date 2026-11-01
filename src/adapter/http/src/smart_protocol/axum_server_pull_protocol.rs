@@ -13,7 +13,6 @@ use database_common::DatabaseTransactionRunner;
 use dill::Catalog;
 use internal_error::ResultIntoInternal;
 use kamu_datasets::DatasetRegistry;
-use tracing::Instrument;
 use url::Url;
 
 use super::error_close::ErrorReplyClose;
@@ -35,6 +34,7 @@ pub struct AxumServerPullProtocolInstance {
     maybe_bearer_header: Option<BearerHeader>,
 }
 
+#[common_macros::method_names_consts]
 impl AxumServerPullProtocolInstance {
     pub fn new(
         socket: axum::extract::ws::WebSocket,
@@ -103,6 +103,17 @@ impl AxumServerPullProtocolInstance {
         Ok(())
     }
 
+    #[tracing::instrument(
+        level = "info",
+        name = AxumServerPullProtocolInstance_handle_pull_request_initiation,
+        skip_all,
+        fields(
+            dataset_id = %self.dataset_handle.id,
+            num_blocks = tracing::field::Empty,
+            num_objects = tracing::field::Empty,
+            bytes = tracing::field::Empty,
+        )
+    )]
     async fn handle_pull_request_initiation(&mut self) -> Result<PlannedPull, PullServerError> {
         let pull_request = axum_read_payload::<DatasetPullRequest>(&mut self.socket)
             .await
@@ -158,9 +169,6 @@ impl AxumServerPullProtocolInstance {
                     transfer_plan,
                 })
             })
-            .instrument(tracing::debug_span!(
-                "AxumServerPullProtocolInstance::handle_pull_request_initiation"
-            ))
             .await;
 
         let planned_stop_at = transfer_plan_result
@@ -172,6 +180,13 @@ impl AxumServerPullProtocolInstance {
             &mut self.socket,
             match transfer_plan_result {
                 Ok(PlannedTransfer { transfer_plan, .. }) => {
+                    tracing::Span::current()
+                        .record("num_blocks", transfer_plan.num_blocks)
+                        .record("num_objects", transfer_plan.num_objects)
+                        .record(
+                            "bytes",
+                            transfer_plan.bytes_in_raw_blocks + transfer_plan.bytes_in_raw_objects,
+                        );
                     tracing::debug!("Sending size estimate: {:?}", transfer_plan);
                     Ok(DatasetPullSuccessResponse { transfer_plan })
                 }
@@ -208,59 +223,9 @@ impl AxumServerPullProtocolInstance {
         &mut self,
         planned_pull: PlannedPull,
     ) -> Result<bool, PullServerError> {
-        let maybe_pull_metadata_request =
-            axum_read_payload::<DatasetPullMetadataRequest>(&mut self.socket).await;
-
-        match maybe_pull_metadata_request {
+        match axum_read_payload::<DatasetPullMetadataRequest>(&mut self.socket).await {
             Ok(_) => {
-                tracing::debug!("Pull client sent a pull metadata request");
-
-                let dataset_handle = self.dataset_handle.clone();
-                let PlannedPull { request, stop_at } = planned_pull;
-                // The batch ends at the head the plan was made from, so it matches the
-                // plan even if `HEAD` has moved since
-                let stop_at = stop_at.ok_or_else(|| {
-                    "Metadata was requested after a failed plan"
-                        .protocol_int_err(PullPhase::MetadataRequest)
-                })?;
-
-                let metadata_batch = DatabaseTransactionRunner::new(self.catalog.clone())
-                    .transactional_with(|dataset_registry: Arc<dyn DatasetRegistry>| async move {
-                        let resolved_dataset = dataset_registry
-                            .get_dataset_by_handle(&dataset_handle)
-                            .await;
-
-                        prepare_dataset_metadata_batch(
-                            resolved_dataset.as_metadata_chain(),
-                            &stop_at,
-                            request.begin_after.as_ref(),
-                            request.force_update_if_diverged,
-                        )
-                        .await
-                    })
-                    .instrument(tracing::debug_span!(
-                        "AxumServerPullProtocolInstance::try_handle_pull_metadata_request",
-                    ))
-                    .await
-                    .protocol_int_err(PullPhase::MetadataRequest)?;
-
-                tracing::debug!(
-                    num_blocks = % metadata_batch.num_blocks,
-                    payload_size = % metadata_batch.payload.len(),
-                    "Metadata batch of blocks formed",
-                );
-
-                axum_write_payload::<DatasetMetadataPullResponse>(
-                    &mut self.socket,
-                    DatasetMetadataPullResponse {
-                        blocks: metadata_batch,
-                    },
-                )
-                .await
-                .map_err(|e| {
-                    PullServerError::WriteFailed(PullWriteError::new(e, PullPhase::MetadataRequest))
-                })?;
-
+                self.handle_pull_metadata_request(planned_pull).await?;
                 Ok(true)
             }
             Err(ReadMessageError::Closed) => Ok(false),
@@ -271,44 +236,68 @@ impl AxumServerPullProtocolInstance {
         }
     }
 
-    async fn try_handle_pull_objects_request(&mut self) -> Result<bool, PullServerError> {
-        let maybe_pull_objects_transfer_request =
-            axum_read_payload::<DatasetPullObjectsTransferRequest>(&mut self.socket).await;
+    #[tracing::instrument(
+        level = "info",
+        name = AxumServerPullProtocolInstance_handle_pull_metadata_request,
+        skip_all,
+        fields(num_blocks = tracing::field::Empty)
+    )]
+    async fn handle_pull_metadata_request(
+        &mut self,
+        planned_pull: PlannedPull,
+    ) -> Result<(), PullServerError> {
+        tracing::debug!("Pull client sent a pull metadata request");
 
-        match maybe_pull_objects_transfer_request {
-            Ok(request) => {
-                tracing::debug!(
-                    objects_count = %request.object_files.len(),
-                    "Pull client sent a pull objects request"
-                );
+        let dataset_handle = self.dataset_handle.clone();
+        let PlannedPull { request, stop_at } = planned_pull;
+        // The batch ends at the head the plan was made from, so it matches the
+        // plan even if `HEAD` has moved since
+        let stop_at = stop_at.ok_or_else(|| {
+            "Metadata was requested after a failed plan"
+                .protocol_int_err(PullPhase::MetadataRequest)
+        })?;
 
-                let object_transfer_strategies =
-                    prepare_object_transfer_strategies::<PullObjectTransferStrategy>(
-                        &self.catalog,
-                        self.dataset_handle.clone(),
-                        request.object_files,
-                        self.dataset_url.clone(),
-                        self.maybe_bearer_header.clone(),
-                    )
-                    .instrument(tracing::debug_span!(
-                        "AxumServerPullProtocolInstance::try_handle_pull_objects_request",
-                    ))
-                    .await
-                    .protocol_int_err(PullPhase::ObjectsRequest)?;
+        let metadata_batch = DatabaseTransactionRunner::new(self.catalog.clone())
+            .transactional_with(|dataset_registry: Arc<dyn DatasetRegistry>| async move {
+                let resolved_dataset = dataset_registry
+                    .get_dataset_by_handle(&dataset_handle)
+                    .await;
 
-                tracing::debug!("Object transfer strategies defined");
-
-                axum_write_payload::<DatasetPullObjectsTransferResponse>(
-                    &mut self.socket,
-                    DatasetPullObjectsTransferResponse {
-                        object_transfer_strategies,
-                    },
+                prepare_dataset_metadata_batch(
+                    resolved_dataset.as_metadata_chain(),
+                    &stop_at,
+                    request.begin_after.as_ref(),
+                    request.force_update_if_diverged,
                 )
                 .await
-                .map_err(|e| {
-                    PullServerError::WriteFailed(PullWriteError::new(e, PullPhase::ObjectsRequest))
-                })?;
+            })
+            .await
+            .protocol_int_err(PullPhase::MetadataRequest)?;
 
+        tracing::Span::current().record("num_blocks", metadata_batch.num_blocks);
+
+        tracing::debug!(
+            num_blocks = % metadata_batch.num_blocks,
+            payload_size = % metadata_batch.payload.len(),
+            "Metadata batch of blocks formed",
+        );
+
+        axum_write_payload::<DatasetMetadataPullResponse>(
+            &mut self.socket,
+            DatasetMetadataPullResponse {
+                blocks: metadata_batch,
+            },
+        )
+        .await
+        .map_err(|e| {
+            PullServerError::WriteFailed(PullWriteError::new(e, PullPhase::MetadataRequest))
+        })
+    }
+
+    async fn try_handle_pull_objects_request(&mut self) -> Result<bool, PullServerError> {
+        match axum_read_payload::<DatasetPullObjectsTransferRequest>(&mut self.socket).await {
+            Ok(request) => {
+                self.handle_pull_objects_request(request).await?;
                 Ok(true)
             }
             Err(ReadMessageError::Closed) => Ok(false),
@@ -317,6 +306,46 @@ impl AxumServerPullProtocolInstance {
                 PullPhase::ObjectsRequest,
             ))),
         }
+    }
+
+    #[tracing::instrument(
+        level = "info",
+        name = AxumServerPullProtocolInstance_handle_pull_objects_request,
+        skip_all,
+        fields(num_objects = request.object_files.len())
+    )]
+    async fn handle_pull_objects_request(
+        &mut self,
+        request: DatasetPullObjectsTransferRequest,
+    ) -> Result<(), PullServerError> {
+        tracing::debug!(
+            objects_count = %request.object_files.len(),
+            "Pull client sent a pull objects request"
+        );
+
+        let object_transfer_strategies =
+            prepare_object_transfer_strategies::<PullObjectTransferStrategy>(
+                &self.catalog,
+                self.dataset_handle.clone(),
+                request.object_files,
+                self.dataset_url.clone(),
+                self.maybe_bearer_header.clone(),
+            )
+            .await
+            .protocol_int_err(PullPhase::ObjectsRequest)?;
+
+        tracing::debug!("Object transfer strategies defined");
+
+        axum_write_payload::<DatasetPullObjectsTransferResponse>(
+            &mut self.socket,
+            DatasetPullObjectsTransferResponse {
+                object_transfer_strategies,
+            },
+        )
+        .await
+        .map_err(|e| {
+            PullServerError::WriteFailed(PullWriteError::new(e, PullPhase::ObjectsRequest))
+        })
     }
 }
 

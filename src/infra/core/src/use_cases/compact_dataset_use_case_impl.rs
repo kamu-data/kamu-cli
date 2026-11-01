@@ -110,7 +110,7 @@ impl CompactDatasetUseCase for CompactDatasetUseCaseImpl {
         level = "info",
         name = CompactDatasetUseCaseImpl_execute,
         skip_all,
-        fields(dataset_handle, ?options)
+        fields(target = %dataset_handle, ?options)
     )]
     async fn execute(
         &self,
@@ -146,9 +146,9 @@ impl CompactDatasetUseCase for CompactDatasetUseCaseImpl {
 
     #[tracing::instrument(
         level = "info",
-        name = "CompactDatasetUseCase::execute_multi",
+        name = CompactDatasetUseCaseImpl_execute_multi,
         skip_all,
-        fields(?dataset_handles, ?options)
+        fields(num_datasets = dataset_handles.len(), ?options)
     )]
     async fn execute_multi(
         &self,

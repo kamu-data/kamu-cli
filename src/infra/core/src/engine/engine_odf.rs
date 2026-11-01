@@ -34,6 +34,7 @@ pub struct ODFEngine {
     run_info_dir: Arc<RunInfoDir>,
 }
 
+#[common_macros::method_names_consts]
 impl ODFEngine {
     pub fn new(
         container_runtime: Arc<ContainerRuntime>,
@@ -62,7 +63,7 @@ impl ODFEngine {
         }
     }
 
-    #[tracing::instrument(level = "info", skip_all, fields(container_name = engine_container.container_name()))]
+    #[tracing::instrument(name = ODFEngine_execute_raw_query, level = "info", skip_all, fields(container_name = engine_container.container_name()))]
     async fn execute_raw_query(
         &self,
         engine_container: &EngineContainer,
@@ -113,7 +114,7 @@ impl ODFEngine {
         })
     }
 
-    #[tracing::instrument(level = "info", skip_all, fields(container_name = engine_container.container_name()))]
+    #[tracing::instrument(name = ODFEngine_execute_transform, level = "info", skip_all, fields(container_name = engine_container.container_name()))]
     async fn execute_transform(
         &self,
         engine_container: &EngineContainer,

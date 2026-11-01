@@ -44,6 +44,7 @@ pub struct PollingIngestServiceImpl {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[common_macros::method_names_consts]
 impl PollingIngestServiceImpl {
     async fn ingest_inner(
         &self,
@@ -99,6 +100,7 @@ impl PollingIngestServiceImpl {
     }
 
     #[tracing::instrument(
+        name = PollingIngestServiceImpl_ingest_iteration,
         level = "info",
         skip_all,
         fields(
@@ -306,7 +308,7 @@ impl PollingIngestServiceImpl {
         Ok(stage_result)
     }
 
-    #[tracing::instrument(level = "info", skip_all)]
+    #[tracing::instrument(name = PollingIngestServiceImpl_fetch, level = "info", skip_all)]
     async fn fetch(
         &self,
         args: &IngestIterationArgs<'_>,
@@ -485,7 +487,7 @@ impl PollingIngestServiceImpl {
         Ok(())
     }
 
-    #[tracing::instrument(level = "info", skip_all)]
+    #[tracing::instrument(name = PollingIngestServiceImpl_prepare, level = "info", skip_all)]
     async fn prepare(
         &self,
         args: &IngestIterationArgs<'_>,
@@ -527,7 +529,7 @@ impl PollingIngestServiceImpl {
         }
     }
 
-    #[tracing::instrument(level = "info", skip_all)]
+    #[tracing::instrument(name = PollingIngestServiceImpl_read, level = "info", skip_all)]
     async fn read(
         &self,
         args: &IngestIterationArgs<'_>,
@@ -579,9 +581,10 @@ impl PollingIngestServiceImpl {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[common_macros::method_names_consts]
 #[async_trait::async_trait]
 impl PollingIngestService for PollingIngestServiceImpl {
-    #[tracing::instrument(level = "info", skip_all, fields(target=%target.get_handle()))]
+    #[tracing::instrument(name = PollingIngestServiceImpl_ingest, level = "info", skip_all, fields(target=%target.get_handle()))]
     async fn ingest(
         &self,
         target: ResolvedDataset,

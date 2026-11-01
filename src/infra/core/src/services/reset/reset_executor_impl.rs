@@ -23,9 +23,10 @@ pub struct ResetExecutorImpl {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[common_macros::method_names_consts]
 #[async_trait::async_trait]
 impl ResetExecutor for ResetExecutorImpl {
-    #[tracing::instrument(level = "debug", skip_all, fields(target=%target.get_handle(), new_head=%plan.new_head))]
+    #[tracing::instrument(name = ResetExecutorImpl_execute, level = "info", skip_all, fields(target=%target.get_handle(), new_head=%plan.new_head))]
     async fn execute(
         &self,
         target: ResolvedDataset,

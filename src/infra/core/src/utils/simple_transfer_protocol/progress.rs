@@ -23,6 +23,12 @@ impl SimpleTransferProtocol {
         num_blocks: u64,
     ) {
         stats.dst.metadata_blocks_written += num_blocks;
+        tracing::info!(
+            num_blocks,
+            data_slices = stats.dst.data_slices_written,
+            checkpoints = stats.dst.checkpoints_written,
+            "Transferred blocks and objects"
+        );
         listener.on_status(SyncStage::CommitBlocks, &stats);
     }
 }

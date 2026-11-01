@@ -41,7 +41,7 @@ impl SetWatermarkUseCase for SetWatermarkUseCaseImpl {
         level = "info",
         name = SetWatermarkUseCaseImpl_execute,
         skip_all,
-        fields(dataset_handle, new_watermark)
+        fields(target = %dataset_handle, %new_watermark)
     )]
     async fn execute(
         &self,

@@ -190,7 +190,12 @@ impl DatasetStorageUnitWriter for DatasetStorageUnitS3 {
                 }
 
                 // No head, so continue creating
-                Err(GetRefError::NotFound(_)) => {}
+                Err(GetRefError::NotFound(_)) => {
+                    tracing::info!(
+                        dataset_id = %seed_block.event.dataset_id,
+                        "Taking over a stored dataset left without HEAD"
+                    );
+                }
 
                 // Errors...
                 Err(GetRefError::Access(e)) => {

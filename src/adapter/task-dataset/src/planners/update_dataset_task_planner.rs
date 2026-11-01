@@ -34,9 +34,10 @@ pub struct UpdateDatasetTaskPlanner {
     tenancy_config: Arc<TenancyConfig>,
 }
 
+#[common_macros::method_names_consts]
 impl UpdateDatasetTaskPlanner {
     #[transactional_method1(pull_request_planner: Arc<dyn PullRequestPlanner>)]
-    #[tracing::instrument(level = "debug", skip_all, fields(?args))]
+    #[tracing::instrument(name = UpdateDatasetTaskPlanner_plan_update, level = "debug", skip_all, fields(?args))]
     async fn plan_update(
         &self,
         args: &LogicalPlanDatasetUpdate,

@@ -359,8 +359,9 @@ transaction with compare-and-swap** — the runner re-resolves the dataset throu
 `DatasetRegistry` and moves `HEAD` from `old_head` to `new_head` through `DatasetHeadCommitter`
 (`DatasetUpdateSteps::commit_head`, the step `kamu pull` also uses). `task_head_commit.rs` turns
 a commit that did not happen into the task's outcome: `HeadCommitTaskOutcome` for the update and
-compaction runners, and its `head_moved_outcome` and `dataset_deleted_outcome` for the reset runner
-too. Blocks written by an attempt that never reaches that step stay unreferenced, so a re-run after
+compaction runners, and its `head_moved_outcome` and `dataset_deleted_outcome` for a sync's commit
+and the reset runner too. Both log a warning; `head_moved_outcome` names the expected and actual
+heads. Blocks written by an attempt that never reaches that step stay unreferenced, so a re-run after
 a crash, or a concurrent writer that moved `HEAD` first, cannot corrupt the chain. Sync and reset
 differ:
 

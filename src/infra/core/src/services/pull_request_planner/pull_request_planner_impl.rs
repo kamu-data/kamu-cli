@@ -31,6 +31,7 @@ pub struct PullRequestPlannerImpl {
     current_account_subject: Arc<CurrentAccountSubject>,
 }
 
+#[common_macros::method_names_consts]
 #[component(pub)]
 #[interface(dyn PullRequestPlanner)]
 impl PullRequestPlannerImpl {
@@ -74,7 +75,7 @@ impl PullRequestPlannerImpl {
     // provided references) assigning depth index to every dataset in the
     // graph(s). Datasets that share the same depth level are independent and
     // can be pulled in parallel.
-    #[tracing::instrument(level = "debug", skip_all, fields(?requests, ?options))]
+    #[tracing::instrument(name = PullRequestPlannerImpl_collect_pull_graph, level = "debug", skip_all, fields(num_requests = requests.len(), ?options))]
     async fn collect_pull_graph(
         &self,
         requests: &[PullRequest],
@@ -109,7 +110,7 @@ impl PullRequestPlannerImpl {
         (ordered, errors)
     }
 
-    #[tracing::instrument(level = "debug", skip_all, fields(?request, ?options))]
+    #[tracing::instrument(name = PullRequestPlannerImpl_build_single_node_pull_graph, level = "debug", skip_all, fields(?request, ?options))]
     async fn build_single_node_pull_graph(
         &self,
         request: &PullRequest,
@@ -147,7 +148,7 @@ impl PullRequestPlannerImpl {
         (first_depth, plan, rest)
     }
 
-    #[tracing::instrument(level = "debug", skip_all, fields(%hdl))]
+    #[tracing::instrument(name = PullRequestPlannerImpl_build_transform_item, level = "debug", skip_all, fields(%hdl))]
     async fn build_transform_item(
         &self,
         hdl: odf::DatasetHandle,
@@ -175,9 +176,10 @@ impl PullRequestPlannerImpl {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[common_macros::method_names_consts]
 #[async_trait::async_trait]
 impl PullRequestPlanner for PullRequestPlannerImpl {
-    #[tracing::instrument(level = "debug", skip_all, fields(?request, ?options))]
+    #[tracing::instrument(name = PullRequestPlannerImpl_build_pull_plan, level = "debug", skip_all, fields(?request, ?options))]
     async fn build_pull_plan(
         &self,
         request: PullRequest,
@@ -209,7 +211,7 @@ impl PullRequestPlanner for PullRequestPlannerImpl {
         }
     }
 
-    #[tracing::instrument(level = "debug", skip_all, fields(?requests, ?options))]
+    #[tracing::instrument(name = PullRequestPlannerImpl_build_pull_multi_plan, level = "debug", skip_all, fields(num_requests = requests.len(), ?options))]
     async fn build_pull_multi_plan(
         &self,
         requests: &[PullRequest],
@@ -311,7 +313,7 @@ impl PullRequestPlanner for PullRequestPlannerImpl {
         PullPlan { iterations, errors }
     }
 
-    #[tracing::instrument(level = "debug", skip_all, fields(?options))]
+    #[tracing::instrument(name = PullRequestPlannerImpl_build_pull_plan_all_owner_datasets, level = "debug", skip_all, fields(?options))]
     async fn build_pull_plan_all_owner_datasets(
         &self,
         options: &PullOptions,

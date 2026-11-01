@@ -229,7 +229,8 @@ the iteration started from, which posts `DatasetReferenceMessage`
 makes any outcome but committed that dataset's error: `PullError::HeadMoved` with the expected and
 actual heads, `NotFound` or `Access`. A sync job's lost race, `SyncError::HeadMoved` from
 `LocalSyncCommitter`, becomes the same `PullError::HeadMoved`, so a conflict has one shape for every
-job. After earlier commits of the same job it is the `source` of `IngestStopped` or
+job; a target deleted before the commit makes `transfer_and_commit_sync` return `None`, which
+becomes the same `NotFound`. After earlier commits of the same job it is the `source` of `IngestStopped` or
 `TransformStopped`.
 
 ### 6.3 Listeners

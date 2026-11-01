@@ -23,6 +23,8 @@ use kamu_datasets::{
 };
 use random_strings::get_random_name;
 
+use crate::utils::span_outcome::record_pull_outcome;
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// Runs one transform job of `kamu pull`: elaborates, resets the derivative
@@ -36,6 +38,7 @@ pub(crate) struct PullTransformJob {
     catalog: dill::Catalog,
 }
 
+#[common_macros::method_names_consts]
 impl PullTransformJob {
     pub(crate) fn new(
         update_steps: Arc<dyn DatasetUpdateSteps>,
@@ -53,7 +56,19 @@ impl PullTransformJob {
         }
     }
 
+    #[tracing::instrument(level = "info", name = PullTransformJob_run, skip_all, fields(target = %pti.target, outcome))]
     pub(crate) async fn run(
+        self,
+        pti: PullTransformItem,
+        transform_options: TransformOptions,
+        maybe_listener: Option<Arc<dyn TransformListener>>,
+    ) -> Result<PullResponse, InternalError> {
+        let response = self.run_job(pti, transform_options, maybe_listener).await;
+        record_pull_outcome(&response);
+        response
+    }
+
+    async fn run_job(
         self,
         pti: PullTransformItem,
         transform_options: TransformOptions,

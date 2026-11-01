@@ -128,7 +128,7 @@ impl VerifyDatasetUseCase for VerifyDatasetUseCaseImpl {
         level = "info",
         name = VerifyDatasetUseCaseImpl_execute_multi,
         skip_all,
-        fields(?requests)
+        fields(num_requests = requests.len())
     )]
     async fn execute_multi(
         &self,

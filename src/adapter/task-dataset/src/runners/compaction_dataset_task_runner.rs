@@ -15,6 +15,7 @@ use kamu_datasets::ResolvedDataset;
 use kamu_task_system::*;
 
 use super::task_head_commit::HeadCommitTaskOutcome as _;
+use super::task_span_outcome::record_task_outcome;
 use crate::{
     TaskDefinitionDatasetHardCompact,
     TaskDefinitionDatasetResetToMetadata,
@@ -41,8 +42,21 @@ pub struct CompactionDatasetTaskRunner {
 
 #[common_macros::method_names_consts]
 impl CompactionDatasetTaskRunner {
-    #[tracing::instrument(name = CompactionDatasetTaskRunner_run_compaction, level = "debug", skip_all)]
+    #[tracing::instrument(name = CompactionDatasetTaskRunner_run_compaction, level = "info", skip_all, fields(target = %target.get_handle(), outcome))]
     async fn run_compaction(
+        &self,
+        target: ResolvedDataset,
+        plan: CompactionPlan,
+        into_task_result: fn(CompactionResult) -> TaskResult,
+    ) -> Result<TaskOutcome, InternalError> {
+        let outcome = self
+            .run_compaction_job(target, plan, into_task_result)
+            .await;
+        record_task_outcome(&outcome);
+        outcome
+    }
+
+    async fn run_compaction_job(
         &self,
         target: ResolvedDataset,
         plan: CompactionPlan,

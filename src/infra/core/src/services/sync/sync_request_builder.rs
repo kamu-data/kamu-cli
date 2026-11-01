@@ -32,10 +32,11 @@ pub struct SyncRequestBuilder {
     remote_dataset_url_resolver: Arc<dyn RemoteDatasetUrlResolver>,
 }
 
+#[common_macros::method_names_consts]
 impl SyncRequestBuilder {
     /// Builds a push of a local dataset to a remote destination; a local
     /// destination is rejected
-    #[tracing::instrument(level = "debug", skip_all, fields(%src_ref, ?dst_ref, %create_dst_if_not_exists))]
+    #[tracing::instrument(name = SyncRequestBuilder_build_sync_request, level = "debug", skip_all, fields(%src_ref, ?dst_ref, %create_dst_if_not_exists))]
     pub async fn build_sync_request(
         &self,
         src_ref: odf::DatasetRef,

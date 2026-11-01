@@ -29,6 +29,7 @@ pub(crate) struct AuthorizedIteration {
     pub denied: Vec<PullResponse>,
 }
 
+#[common_macros::method_names_consts]
 impl PullAuthorization {
     pub(crate) fn new(catalog: dill::Catalog) -> Self {
         Self { catalog }
@@ -37,7 +38,7 @@ impl PullAuthorization {
     /// Denials come in job order. A sync into a dataset that does not exist
     /// yet is not checked.
     #[transactional_method2(dataset_operation_guard: Arc<dyn DatasetOperationGuard>, current_account_subject: Arc<CurrentAccountSubject>)]
-    #[tracing::instrument(level = "debug", name = "PullDatasetUseCase::authorize", skip_all, fields(?iteration))]
+    #[tracing::instrument(level = "debug", name = PullAuthorization_authorize, skip_all, fields(depth = iteration.depth, num_jobs = iteration.jobs.len()))]
     pub(crate) async fn authorize(
         &self,
         iteration: PullPlanIteration,

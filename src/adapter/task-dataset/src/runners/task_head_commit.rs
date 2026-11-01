@@ -26,7 +26,7 @@ impl HeadCommitTaskOutcome for HeadCommit {
         match self {
             Self::Committed => None,
             Self::DatasetDeleted => Some(dataset_deleted_outcome(dataset_handle)),
-            Self::HeadMoved(e) => Some(head_moved_outcome(dataset_handle.id.clone(), e)),
+            Self::HeadMoved(e) => Some(head_moved_outcome(dataset_handle.id.clone(), Some(e))),
             // Retrying under the same account cannot gain the access
             Self::NotAllowed(e) => {
                 tracing::error!(error = ?e, error_msg = %e, "Not allowed to commit the task's head");
@@ -41,12 +41,16 @@ impl HeadCommitTaskOutcome for HeadCommit {
 /// The outcome of a task whose `HEAD` was moved by another writer first
 pub(crate) fn head_moved_outcome(
     dataset_id: odf::DatasetID,
-    cas_error: odf::dataset::RefCASError,
+    heads: Option<odf::dataset::RefCASError>,
 ) -> TaskOutcome {
-    TaskOutcome::Failed(
-        TaskErrorDatasetCommit::HeadMoved(DatasetHeadMovedError::new(dataset_id, cas_error))
-            .into_task_error(),
-    )
+    let error = DatasetHeadMovedError::new(dataset_id, heads);
+    tracing::warn!(
+        dataset_id = %error.dataset_id,
+        expected_head = ?error.expected_head,
+        actual_head = ?error.actual_head,
+        "The task's dataset head was moved concurrently"
+    );
+    TaskOutcome::Failed(TaskErrorDatasetCommit::HeadMoved(error).into_task_error())
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

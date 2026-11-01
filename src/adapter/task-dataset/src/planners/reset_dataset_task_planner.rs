@@ -28,9 +28,10 @@ pub struct ResetDatasetTaskPlanner {
     catalog: dill::Catalog,
 }
 
+#[common_macros::method_names_consts]
 impl ResetDatasetTaskPlanner {
     #[transactional_method2(dataset_registry: Arc<dyn DatasetRegistry>, reset_planner: Arc<dyn ResetPlanner>)]
-    #[tracing::instrument(level = "debug", skip_all, fields(?args))]
+    #[tracing::instrument(name = ResetDatasetTaskPlanner_plan_reset, level = "debug", skip_all, fields(?args))]
     async fn plan_reset(
         &self,
         args: &LogicalPlanDatasetReset,

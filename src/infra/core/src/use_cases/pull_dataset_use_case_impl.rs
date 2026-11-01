@@ -33,8 +33,9 @@ pub struct PullDatasetUseCaseImpl {
     catalog: dill::Catalog,
 }
 
+#[common_macros::method_names_consts]
 impl PullDatasetUseCaseImpl {
-    #[tracing::instrument(level = "info", skip_all)]
+    #[tracing::instrument(name = PullDatasetUseCaseImpl_pull_by_plan, level = "info", skip_all)]
     async fn pull_by_plan(
         &self,
         plan: Vec<PullPlanIteration>,
@@ -165,11 +166,12 @@ impl PullDatasetUseCaseImpl {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[common_macros::method_names_consts]
 #[async_trait::async_trait]
 impl PullDatasetUseCase for PullDatasetUseCaseImpl {
     #[tracing::instrument(
         level = "info",
-        name = "PullDatasetUseCase::execute",
+        name = PullDatasetUseCaseImpl_execute,
         skip_all,
         fields(?request, ?options)
     )]
@@ -190,9 +192,9 @@ impl PullDatasetUseCase for PullDatasetUseCaseImpl {
 
     #[tracing::instrument(
         level = "info",
-        name = "PullDatasetUseCase::execute_multi",
+        name = PullDatasetUseCaseImpl_execute_multi,
         skip_all,
-        fields(?requests, ?options)
+        fields(num_requests = requests.len(), ?options)
     )]
     async fn execute_multi(
         &self,
@@ -220,7 +222,7 @@ impl PullDatasetUseCase for PullDatasetUseCaseImpl {
 
     #[tracing::instrument(
         level = "info",
-        name = "PullDatasetUseCase::execute_all_owned",
+        name = PullDatasetUseCaseImpl_execute_all_owned,
         skip_all,
         fields(?options)
     )]

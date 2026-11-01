@@ -50,7 +50,8 @@ pub trait DatasetUpdateSteps: Send + Sync {
         new_head: &odf::Multihash,
     ) -> Result<HeadCommit, InternalError>;
 
-    /// Transfers with no transaction held, then commits. A dataset the pull
+    /// Transfers with no transaction held, then commits; `None` when the
+    /// existing target was deleted before the commit. A dataset the pull
     /// creates gets `maybe_pull_alias` in the commit's transaction, so it
     /// never exists without it
     async fn transfer_and_commit_sync(
@@ -59,7 +60,7 @@ pub trait DatasetUpdateSteps: Send + Sync {
         options: SyncOptions,
         listener: Option<Arc<dyn SyncListener>>,
         maybe_pull_alias: Option<&odf::DatasetRefRemote>,
-    ) -> Result<SyncResult, SyncError>;
+    ) -> Result<Option<SyncResult>, SyncError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

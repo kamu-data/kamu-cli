@@ -37,9 +37,10 @@ impl PollingIngestPlannerImpl {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[common_macros::method_names_consts]
 #[async_trait::async_trait]
 impl PollingIngestPlanner for PollingIngestPlannerImpl {
-    #[tracing::instrument(level = "debug", skip_all, fields(target=%target.get_handle()))]
+    #[tracing::instrument(name = PollingIngestPlannerImpl_plan_ingest, level = "debug", skip_all, fields(target=%target.get_handle()))]
     async fn plan_ingest(
         &self,
         target: ResolvedDataset,
@@ -47,7 +48,7 @@ impl PollingIngestPlanner for PollingIngestPlannerImpl {
         Self::plan_at(target, None).await
     }
 
-    #[tracing::instrument(level = "debug", skip_all, fields(target=%target.get_handle()))]
+    #[tracing::instrument(name = PollingIngestPlannerImpl_rebuild_ingest, level = "debug", skip_all, fields(target=%target.get_handle()))]
     async fn rebuild_ingest(
         &self,
         target: ResolvedDataset,
@@ -103,7 +104,7 @@ impl PollingIngestPlanner for PollingIngestPlannerImpl {
 
     /// Dataset environment variables are enabled only when secrets encryption
     /// is configured and enabled and a resolver is registered
-    #[tracing::instrument(level = "debug", skip_all, fields(%dataset_id))]
+    #[tracing::instrument(name = PollingIngestPlannerImpl_resolve_env_vars, level = "debug", skip_all, fields(%dataset_id))]
     async fn resolve_env_vars(
         &self,
         dataset_id: &odf::DatasetID,

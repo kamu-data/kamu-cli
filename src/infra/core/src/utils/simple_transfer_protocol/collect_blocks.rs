@@ -41,7 +41,10 @@ impl SimpleTransferProtocol {
             CompareChainsResult::Equal => return Ok(None),
             CompareChainsResult::LhsAhead {
                 lhs_ahead_blocks: src_ahead_blocks,
-            } => src_ahead_blocks,
+            } => {
+                tracing::info!(num_blocks = src_ahead_blocks.len(), "Source is ahead");
+                src_ahead_blocks
+            }
             CompareChainsResult::LhsBehind {
                 ref rhs_ahead_blocks,
             } => {
@@ -52,6 +55,10 @@ impl SimpleTransferProtocol {
                         dst_ahead_size: rhs_ahead_blocks.len(),
                     }));
                 }
+                tracing::warn!(
+                    dst_ahead_size = rhs_ahead_blocks.len(),
+                    "Destination is ahead, a forced sync writes the whole source chain over it"
+                );
                 Self::load_all_blocks(src_chain, &src_head).await?
             }
             CompareChainsResult::Divergence {
@@ -68,6 +75,12 @@ impl SimpleTransferProtocol {
                         }),
                     }));
                 }
+                tracing::warn!(
+                    uncommon_blocks_in_src,
+                    uncommon_blocks_in_dst,
+                    "Chains diverged, a forced sync writes the whole source chain over the \
+                     destination"
+                );
                 Self::load_all_blocks(src_chain, &src_head).await?
             }
             CompareChainsResult::DifferentDatasets {

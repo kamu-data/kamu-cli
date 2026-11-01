@@ -40,7 +40,7 @@ impl ResetDatasetUseCase for ResetDatasetUseCaseImpl {
         level = "info",
         name = ResetDatasetUseCaseImpl_execute,
         skip_all,
-        fields(dataset_handle, ?maybe_new_head, ?maybe_old_head)
+        fields(target = %dataset_handle, ?maybe_new_head, ?maybe_old_head)
     )]
     async fn execute(
         &self,

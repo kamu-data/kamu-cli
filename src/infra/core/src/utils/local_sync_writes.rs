@@ -128,6 +128,10 @@ pub(crate) fn ensure_seed_matches_headless_target(
         .into());
     }
 
+    tracing::info!(
+        dataset_id = %dst_dataset_id,
+        "Writing the whole source chain into a dataset left without HEAD"
+    );
     Ok(())
 }
 

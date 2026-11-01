@@ -20,9 +20,11 @@ pub struct ResetPlannerImpl {}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[common_macros::method_names_consts]
 #[async_trait::async_trait]
 impl ResetPlanner for ResetPlannerImpl {
     #[tracing::instrument(
+        name = ResetPlannerImpl_plan_reset,
         level = "debug",
         skip_all,
         fields(target=%target.get_handle(), ?maybe_old_head, ?maybe_new_head)

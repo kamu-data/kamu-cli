@@ -70,9 +70,10 @@ impl EngineDatafusionInproc {
     }
 }
 
+#[common_macros::method_names_consts]
 #[async_trait::async_trait]
 impl Engine for EngineDatafusionInproc {
-    #[tracing::instrument(level = "info", skip_all)]
+    #[tracing::instrument(name = EngineDatafusionInproc_execute_raw_query, level = "info", skip_all)]
     async fn execute_raw_query(
         &self,
         request: RawQueryRequestExt,
@@ -113,7 +114,7 @@ impl Engine for EngineDatafusionInproc {
         })
     }
 
-    #[tracing::instrument(level = "info", skip_all)]
+    #[tracing::instrument(name = EngineDatafusionInproc_execute_transform, level = "info", skip_all)]
     async fn execute_transform(
         &self,
         _request: TransformRequestExt,

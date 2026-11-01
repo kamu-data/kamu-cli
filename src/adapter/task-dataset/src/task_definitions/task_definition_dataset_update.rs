@@ -38,6 +38,15 @@ pub enum DatasetUpdateJob {
     },
 }
 
+impl DatasetUpdateJob {
+    /// The dataset the job updates
+    pub fn target(&self) -> &odf::DatasetHandle {
+        match self {
+            Self::Ingest(target) | Self::Transform(target) | Self::Sync { target, .. } => target,
+        }
+    }
+}
+
 impl TryFrom<PullPlanIterationJob> for DatasetUpdateJob {
     type Error = UpdateTargetMissingError;
 

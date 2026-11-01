@@ -73,6 +73,7 @@ impl LocalSyncHelper {
         self.update_steps()
             .transfer_and_commit_sync(request, options, listener, None)
             .await
+            .map(|maybe_result| maybe_result.expect("The sync target must not be deleted"))
     }
 
     /// Resolves `dst_ref` to a pull target the way the pull planner does

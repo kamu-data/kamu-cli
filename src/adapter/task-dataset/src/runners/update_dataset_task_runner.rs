@@ -19,6 +19,7 @@ use super::task_head_commit::{
     dataset_deleted_outcome,
     head_moved_outcome,
 };
+use super::task_span_outcome::record_task_outcome;
 use crate::{
     DatasetUpdateJob,
     InputDatasetCompactedError,
@@ -42,8 +43,17 @@ pub struct UpdateDatasetTaskRunner {
 
 #[common_macros::method_names_consts]
 impl UpdateDatasetTaskRunner {
-    #[tracing::instrument(name = UpdateDatasetTaskRunner_run_update, level = "debug", skip_all)]
+    #[tracing::instrument(name = UpdateDatasetTaskRunner_run_update, level = "info", skip_all, fields(target = %task_update.job.target(), outcome))]
     async fn run_update(
+        &self,
+        task_update: TaskDefinitionDatasetUpdate,
+    ) -> Result<TaskOutcome, InternalError> {
+        let outcome = self.run_update_job(task_update).await;
+        record_task_outcome(&outcome);
+        outcome
+    }
+
+    async fn run_update_job(
         &self,
         task_update: TaskDefinitionDatasetUpdate,
     ) -> Result<TaskOutcome, InternalError> {
@@ -97,12 +107,12 @@ impl UpdateDatasetTaskRunner {
             .await;
 
         match sync_result {
-            Ok(SyncResult::Updated {
+            Ok(Some(SyncResult::Updated {
                 old_head,
                 new_head,
                 increment,
                 ..
-            }) => Ok(TaskOutcome::Success(
+            })) => Ok(TaskOutcome::Success(
                 TaskResultDatasetUpdate::Updated {
                     old_head,
                     new_head,
@@ -111,11 +121,12 @@ impl UpdateDatasetTaskRunner {
                 }
                 .into_task_result(),
             )),
-            Ok(SyncResult::UpToDate) => Ok(TaskOutcome::Success(
+            Ok(Some(SyncResult::UpToDate)) => Ok(TaskOutcome::Success(
                 TaskResultDatasetUpdate::UpToDate(PullResultUpToDate::Sync).into_task_result(),
             )),
-            Err(SyncError::HeadMoved(SyncHeadMovedError { heads: Some(e) })) => {
-                Ok(head_moved_outcome(target_handle.id.clone(), e))
+            Ok(None) => Ok(dataset_deleted_outcome(target_handle)),
+            Err(SyncError::HeadMoved(SyncHeadMovedError { heads })) => {
+                Ok(head_moved_outcome(target_handle.id.clone(), heads))
             }
             Err(e) => {
                 tracing::error!(error = ?e, error_msg = %e, "Sync failed");

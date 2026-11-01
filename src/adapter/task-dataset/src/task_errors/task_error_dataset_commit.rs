@@ -28,11 +28,13 @@ pub struct DatasetHeadMovedError {
 }
 
 impl DatasetHeadMovedError {
-    pub fn new(dataset_id: odf::DatasetID, cas_error: odf::dataset::RefCASError) -> Self {
+    /// `heads` are `None` when the destination did not report them
+    pub fn new(dataset_id: odf::DatasetID, heads: Option<odf::dataset::RefCASError>) -> Self {
+        let (expected_head, actual_head) = heads.map_or((None, None), |e| (e.expected, e.actual));
         Self {
             dataset_id,
-            expected_head: cas_error.expected,
-            actual_head: cas_error.actual,
+            expected_head,
+            actual_head,
         }
     }
 }

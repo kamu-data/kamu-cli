@@ -27,7 +27,19 @@ use crate::smart_protocol::protocol_dataset_helper::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[common_macros::method_names_consts]
 impl WsSmartTransferProtocolClient {
+    #[tracing::instrument(
+        level = "info",
+        name = WsSmartTransferProtocolClient_push_send_request,
+        skip_all,
+        fields(
+            dst_head = dst_head.map(tracing::field::display),
+            num_blocks = transfer_plan.num_blocks,
+            num_objects = transfer_plan.num_objects,
+            bytes = transfer_plan.bytes_in_raw_blocks + transfer_plan.bytes_in_raw_objects,
+        )
+    )]
     async fn push_send_request(
         &self,
         socket: &mut TungsteniteStream,
@@ -76,6 +88,12 @@ impl WsSmartTransferProtocolClient {
         }
     }
 
+    #[tracing::instrument(
+        level = "info",
+        name = WsSmartTransferProtocolClient_push_send_metadata_request,
+        skip_all,
+        fields(%src_head, num_blocks = tracing::field::Empty)
+    )]
     async fn push_send_metadata_request(
         &self,
         socket: &mut TungsteniteStream,
@@ -94,6 +112,8 @@ impl WsSmartTransferProtocolClient {
         )
         .await
         .int_err()?;
+
+        tracing::Span::current().record("num_blocks", metadata_batch.num_blocks);
 
         tracing::debug!(
             num_blocks = % metadata_batch.num_blocks,
@@ -126,6 +146,42 @@ impl WsSmartTransferProtocolClient {
             })?;
 
         Ok(dataset_metadata_push_response)
+    }
+
+    #[tracing::instrument(
+        level = "info",
+        name = WsSmartTransferProtocolClient_push_objects,
+        skip_all,
+        fields(num_objects = tracing::field::Empty)
+    )]
+    async fn push_objects(
+        &self,
+        socket: &mut TungsteniteStream,
+        src: &dyn odf::Dataset,
+        src_head: &odf::Multihash,
+        dst_head: Option<&odf::Multihash>,
+        transfer_options: TransferOptions,
+    ) -> Result<(), SyncError> {
+        let missing_objects = collect_object_references_from_interval(
+            src,
+            src_head,
+            dst_head,
+            transfer_options.force_update_if_diverged,
+            false,
+        )
+        .await
+        .inspect_err(|e| tracing::debug!("Push process aborted with error: {e}"))
+        .int_err()?;
+
+        tracing::Span::current().record("num_objects", missing_objects.len());
+
+        let push_objects_response = self
+            .push_send_objects_request(socket, missing_objects)
+            .await
+            .inspect_err(|e| tracing::debug!("Push process aborted with error: {e}"))?;
+
+        self.export_group_of_object_files(socket, push_objects_response, src, transfer_options)
+            .await
     }
 
     async fn push_send_objects_request(
@@ -305,6 +361,11 @@ impl WsSmartTransferProtocolClient {
         Ok(())
     }
 
+    #[tracing::instrument(
+        level = "info",
+        name = WsSmartTransferProtocolClient_push_send_complete_request,
+        skip_all
+    )]
     async fn push_send_complete_request(
         &self,
         socket: &mut TungsteniteStream,
@@ -443,26 +504,11 @@ impl WsSmartTransferProtocolClient {
             .await
             .inspect_err(|e| tracing::debug!("Push process aborted with error: {e}"))?;
 
-            let missing_objects = collect_object_references_from_interval(
+            self.push_objects(
+                ws_stream,
                 src.as_ref(),
                 &src_head,
                 dst_head,
-                transfer_options.force_update_if_diverged,
-                false,
-            )
-            .await
-            .inspect_err(|e| tracing::debug!("Push process aborted with error: {e}"))
-            .int_err()?;
-
-            let push_objects_response = self
-                .push_send_objects_request(ws_stream, missing_objects)
-                .await
-                .inspect_err(|e| tracing::debug!("Push process aborted with error: {e}"))?;
-
-            self.export_group_of_object_files(
-                ws_stream,
-                push_objects_response,
-                src.as_ref(),
                 transfer_options,
             )
             .await?;

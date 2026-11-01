@@ -787,7 +787,18 @@ async fn test_sync_head_moved_without_heads_fails_recoverably() {
     })
     .await;
 
-    assert_eq!(TaskOutcome::Failed(TaskError::empty_recoverable()), outcome);
+    let TaskOutcome::Failed(task_error) = &outcome else {
+        panic!("The sync must fail, got {outcome:?}");
+    };
+    assert_matches!(
+        TaskErrorDatasetCommit::from_task_error(task_error).unwrap(),
+        TaskErrorDatasetCommit::HeadMoved(DatasetHeadMovedError {
+            expected_head: None,
+            actual_head: None,
+            ..
+        })
+    );
+    assert!(outcome.is_recoverable_failure());
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -48,9 +48,10 @@ pub struct PushDatasetUseCaseImpl {
     sync_service: Arc<dyn SyncService>,
 }
 
+#[common_macros::method_names_consts]
 impl PushDatasetUseCaseImpl {
     #[transactional_method2(dataset_operation_guard: Arc<dyn DatasetOperationGuard>, current_account_subject: Arc<CurrentAccountSubject>)]
-    #[tracing::instrument(level = "debug", name = "PushDatasetUseCase::authorizations", skip_all, fields(?dataset_handles, ?push_target))]
+    #[tracing::instrument(level = "debug", name = PushDatasetUseCaseImpl_make_authorization_checks, skip_all, fields(num_datasets = dataset_handles.len(), ?push_target))]
     async fn make_authorization_checks(
         &self,
         dataset_handles: Vec<odf::DatasetHandle>,
@@ -91,9 +92,9 @@ impl PushDatasetUseCaseImpl {
     #[transactional_method1(sync_request_builder: Arc<SyncRequestBuilder>)]
     #[tracing::instrument(
         level = "debug",
-        name = "PushDatasetUseCase::build_sync_requests",
+        name = PushDatasetUseCaseImpl_build_sync_requests,
         skip_all,
-        fields(?plan, ?sync_options, ?push_target)
+        fields(num_items = plan.len(), ?sync_options, ?push_target)
     )]
     async fn build_sync_requests(
         &self,
@@ -173,13 +174,14 @@ impl PushDatasetUseCaseImpl {
     }
 }
 
+#[common_macros::method_names_consts]
 #[async_trait::async_trait]
 impl PushDatasetUseCase for PushDatasetUseCaseImpl {
     #[tracing::instrument(
         level = "info",
-        name = "PushDatasetUseCase::execute_multi",
+        name = PushDatasetUseCaseImpl_execute_multi,
         skip_all,
-        fields(?dataset_handles, ?options)
+        fields(num_datasets = dataset_handles.len(), ?options)
     )]
     async fn execute_multi(
         &self,

@@ -39,6 +39,7 @@ pub struct SyncServiceImpl {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[common_macros::method_names_consts]
 #[component(pub)]
 #[interface(dyn SyncService)]
 impl SyncServiceImpl {
@@ -58,7 +59,7 @@ impl SyncServiceImpl {
         }
     }
 
-    #[tracing::instrument(level = "debug", skip_all, fields(?src, ?dst, ?opts))]
+    #[tracing::instrument(level = "debug", name = SyncServiceImpl_push_generic, skip_all, fields(?src, ?dst, ?opts))]
     async fn push_generic(
         &self,
         src: ResolvedDataset,
@@ -85,7 +86,7 @@ impl SyncServiceImpl {
             .await
     }
 
-    #[tracing::instrument(level = "debug", skip_all, fields(?src, ?dst, ?opts))]
+    #[tracing::instrument(level = "debug", name = SyncServiceImpl_transfer_generic, skip_all, fields(?src, ?dst, ?opts))]
     async fn transfer_generic(
         &self,
         src: SyncRefRemote,
@@ -115,7 +116,7 @@ impl SyncServiceImpl {
             .await
     }
 
-    #[tracing::instrument(level = "debug", skip_all, fields(%src_url, ?dst, ?opts))]
+    #[tracing::instrument(level = "debug", name = SyncServiceImpl_transfer_smart_pull, skip_all, fields(%src_url, ?dst, ?opts))]
     async fn transfer_smart_pull(
         &self,
         src_url: &Url,
@@ -139,7 +140,7 @@ impl SyncServiceImpl {
             .await
     }
 
-    #[tracing::instrument(level = "debug", skip_all, fields(?src, %dst_url, ?opts))]
+    #[tracing::instrument(level = "debug", name = SyncServiceImpl_sync_smart_push_transfer_protocol, skip_all, fields(?src, %dst_url, ?opts))]
     async fn sync_smart_push_transfer_protocol(
         &self,
         src: ResolvedDataset,
@@ -170,7 +171,7 @@ impl SyncServiceImpl {
             .await
     }
 
-    #[tracing::instrument(level = "debug", skip_all, fields(%dst_url, ?opts))]
+    #[tracing::instrument(level = "debug", name = SyncServiceImpl_sync_to_ipfs, skip_all, fields(%dst_url, ?opts))]
     async fn sync_to_ipfs(
         &self,
         src_dataset: ResolvedDataset,
@@ -354,7 +355,6 @@ impl SyncServiceImpl {
         })
     }
 
-    #[tracing::instrument(level = "info", name = "sync", skip_all, fields(src=?src, dst=?dst))]
     async fn sync_impl(
         &self,
         src: ResolvedDataset,
@@ -418,7 +418,6 @@ impl SyncServiceImpl {
         })
     }
 
-    #[tracing::instrument(level = "info", name = "transfer_into_local", skip_all, fields(src=?src_ref, dst=?dst))]
     async fn transfer_into_local_impl(
         &self,
         src_ref: odf::DatasetRefRemote,
@@ -445,9 +444,10 @@ impl SyncServiceImpl {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[common_macros::method_names_consts]
 #[async_trait::async_trait]
 impl SyncService for SyncServiceImpl {
-    #[tracing::instrument(level = "debug", skip_all, fields(?request, ?options))]
+    #[tracing::instrument(level = "info", name = SyncServiceImpl_sync, skip_all, fields(?request, ?options))]
     async fn sync(
         &self,
         request: SyncRequest,
@@ -460,7 +460,7 @@ impl SyncService for SyncServiceImpl {
             .await
     }
 
-    #[tracing::instrument(level = "debug", skip_all, fields(?request, ?options))]
+    #[tracing::instrument(level = "info", name = SyncServiceImpl_transfer_into_local, skip_all, fields(?request, ?options))]
     async fn transfer_into_local(
         &self,
         request: LocalSyncRequest,

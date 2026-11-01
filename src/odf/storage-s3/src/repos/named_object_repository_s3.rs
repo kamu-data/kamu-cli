@@ -152,7 +152,14 @@ impl NamedObjectRepository for NamedObjectRepositoryS3 {
             Ok(_) => Ok(()),
             Err(err) => match err.raw_response().map(|r| r.status().as_u16()) {
                 Some(PRECONDITION_FAILED | CONFLICT) => Err(mismatch()),
-                Some(NOT_IMPLEMENTED) => Err(CompareAndSetNamedError::NotSupported),
+                Some(NOT_IMPLEMENTED) => {
+                    tracing::warn!(
+                        %name,
+                        "The S3 store does not support conditional writes, so concurrent writers \
+                         may overwrite each other"
+                    );
+                    Err(CompareAndSetNamedError::NotSupported)
+                }
                 // TODO: Detect credentials error
                 _ => Err(err.into_service_error().int_err().into()),
             },
