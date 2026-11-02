@@ -260,6 +260,14 @@ impl ElasticsearchDatasetBaseHarness {
         self.dataset_base_use_case_harness.no_subject_catalog()
     }
 
+    /// Setup steps that check permissions run as the node, which may change any
+    /// dataset
+    fn node_catalog(&self) -> dill::Catalog {
+        dill::CatalogBuilder::new_chained(self.no_subject_catalog())
+            .add_value(Principal::Node)
+            .build()
+    }
+
     #[inline]
     pub fn search_repo(&self) -> &dyn SearchRepository {
         self.es_base_harness.es_ctx().search_repo()
@@ -322,7 +330,7 @@ impl ElasticsearchDatasetBaseHarness {
         collaborator_account_ids: &[&odf::AccountID],
     ) {
         let apply_relations_uc = self
-            .no_subject_catalog()
+            .node_catalog()
             .get_one::<dyn ApplyAccountDatasetRelationsUseCase>()
             .unwrap();
 
@@ -344,7 +352,7 @@ impl ElasticsearchDatasetBaseHarness {
         collaborator_account_ids: &[&odf::AccountID],
     ) {
         let apply_relations_uc = self
-            .no_subject_catalog()
+            .node_catalog()
             .get_one::<dyn ApplyAccountDatasetRelationsUseCase>()
             .unwrap();
 
