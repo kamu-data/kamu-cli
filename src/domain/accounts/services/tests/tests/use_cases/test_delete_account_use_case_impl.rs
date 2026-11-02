@@ -158,7 +158,7 @@ impl DeleteAccountUseCaseImplHarness {
 
         b.add_value(outbox);
         b.bind::<dyn Outbox, MockOutbox>();
-        b.add_value(current_account_subject);
+        b.add_current_account_subject(current_account_subject);
 
         database_common::NoOpDatabasePlugin::init_database_components(&mut b);
 

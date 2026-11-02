@@ -15,6 +15,7 @@ use kamu_accounts::testing::CurrentAccountSubjectTestHelper;
 use kamu_accounts::{
     AccountConfig,
     CurrentAccountSubject,
+    CurrentAccountSubjectCatalogExt as _,
     DidSecretEncryptionConfig,
     PredefinedAccountsConfig,
 };
@@ -290,7 +291,7 @@ impl OperationGuardHarness {
 
             kamu_datasets_inmem::register_dependencies(&mut b);
             b.add::<SystemTimeSourceDefault>()
-                .add_value(current_account_subject)
+                .add_current_account_subject(current_account_subject)
                 .add_value(predefined_accounts_config)
                 .add::<PredefinedAccountsRegistrator>()
                 .add::<RebacServiceImpl>()

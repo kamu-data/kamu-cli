@@ -14,7 +14,12 @@ use database_common::NoOpDatabasePlugin;
 use indoc::indoc;
 use kamu::domain::*;
 use kamu::*;
-use kamu_accounts::{CurrentAccountSubject, DidSecretEncryptionConfig, PredefinedAccountsConfig};
+use kamu_accounts::{
+    CurrentAccountSubject,
+    CurrentAccountSubjectCatalogExt as _,
+    DidSecretEncryptionConfig,
+    PredefinedAccountsConfig,
+};
 use kamu_accounts_inmem::{
     InMemoryAccountQuotaEventStore,
     InMemoryAccountRepository,
@@ -397,7 +402,7 @@ impl TestHarness {
                 .add::<ObjectStoreRegistryImpl>()
                 .add::<ObjectStoreBuilderLocalFs>()
                 .add::<DataFormatRegistryImpl>()
-                .add_value(CurrentAccountSubject::new_test())
+                .add_current_account_subject(CurrentAccountSubject::new_test())
                 .add_value(dataset_permission_checker)
                 .bind::<dyn DatasetPermissionChecker, TDatasetPermissionChecker>()
                 .add_value(TenancyConfig::SingleTenant)

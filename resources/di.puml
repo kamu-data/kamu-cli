@@ -356,6 +356,7 @@ class "PollingIngestServiceImpl"
 class "Pool" <<singleton>>
 class "PredefinedAccountsConfig" <<singleton>>
 class "PredefinedAccountsRegistrator"
+class "Principal" <<singleton>>
 class "ProvenanceServiceImpl"
 class "PullDatasetUseCaseImpl"
 class "PullRequestPlannerImpl"

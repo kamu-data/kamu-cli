@@ -17,7 +17,7 @@ use indoc::indoc;
 use kamu::domain::*;
 use kamu::testing::*;
 use kamu::*;
-use kamu_accounts::CurrentAccountSubject;
+use kamu_accounts::{CurrentAccountSubject, CurrentAccountSubjectCatalogExt as _};
 use kamu_accounts_inmem::{InMemoryAccountQuotaEventStore, InMemoryAccountRepository};
 use kamu_accounts_services::{AccountQuotaServiceImpl, AccountServiceImpl};
 use kamu_auth_rebac_inmem::InMemoryRebacRepository;
@@ -1348,7 +1348,7 @@ impl IngestTestHarness {
             .add::<DidGeneratorDefault>()
             .add_value(RunInfoDir::new(run_info_dir))
             .add_value(CacheDir::new(cache_dir))
-            .add_value(CurrentAccountSubject::new_test())
+            .add_current_account_subject(CurrentAccountSubject::new_test())
             .add::<AlwaysHappyDatasetPermissionChecker>()
             .add_value(TenancyConfig::SingleTenant)
             .add_builder(odf::dataset::DatasetStorageUnitLocalFs::builder(

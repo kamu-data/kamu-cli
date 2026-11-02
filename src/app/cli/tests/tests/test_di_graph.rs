@@ -12,7 +12,11 @@ use std::path::Path;
 use database_common::{DatabaseConnectionSettings, SqlitePoolOptions, TransactionRef};
 use dill::CatalogBuilder;
 use kamu::domain::{KamuBackgroundCatalog, ServerUrlConfig, TenancyConfig};
-use kamu_accounts::{CurrentAccountSubject, JwtAuthenticationConfig};
+use kamu_accounts::{
+    CurrentAccountSubject,
+    CurrentAccountSubjectCatalogExt as _,
+    JwtAuthenticationConfig,
+};
 use kamu_adapter_http::AccessToken;
 use kamu_adapter_oauth::GithubAuthenticationConfig;
 use kamu_cli::config::CLIConfig;
@@ -99,7 +103,7 @@ fn test_di_cli_graph_validates(
 
     let mut cli_catalog_builder = kamu_cli::configure_cli_catalog(&base_catalog, tenancy_config);
 
-    cli_catalog_builder.add_value(CurrentAccountSubject::new_test());
+    cli_catalog_builder.add_current_account_subject(CurrentAccountSubject::new_test());
     cli_catalog_builder.add_value(JwtAuthenticationConfig::default());
     cli_catalog_builder.add_value(GithubAuthenticationConfig::default());
     cli_catalog_builder.add_value(kamu_adapter_flight_sql::SessionId(String::new()));
@@ -161,7 +165,7 @@ fn test_di_server_graph_validates(
     let server_catalog = server_catalog_builder.build();
 
     let mut cli_catalog_builder = dill::CatalogBuilder::new_chained(&server_catalog);
-    cli_catalog_builder.add_value(system_user_subject);
+    cli_catalog_builder.add_current_account_subject(system_user_subject);
 
     // TODO: We should ensure this test covers parameters requested by commands and
     // types needed for GQL/HTTP adapter that are currently being constructed
@@ -207,7 +211,7 @@ async fn update_di_graph() {
 
     let mut cli_catalog_builder = kamu_cli::configure_cli_catalog(&base_catalog, tenancy_config);
 
-    cli_catalog_builder.add_value(CurrentAccountSubject::new_test());
+    cli_catalog_builder.add_current_account_subject(CurrentAccountSubject::new_test());
     cli_catalog_builder.add_value(JwtAuthenticationConfig::default());
     cli_catalog_builder.add_value(GithubAuthenticationConfig::default());
     cli_catalog_builder.add_value(kamu_adapter_flight_sql::SessionId(String::new()));

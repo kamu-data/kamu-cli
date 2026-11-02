@@ -421,7 +421,7 @@ impl ServerHarness {
             .unwrap();
 
         let catalog_system = dill::CatalogBuilder::new_chained(&base_catalog)
-            .add_value(CurrentAccountSubject::new_test())
+            .add_current_account_subject(CurrentAccountSubject::new_test())
             .build();
 
         let create_dataset = catalog_system
@@ -442,7 +442,7 @@ impl ServerHarness {
             .unwrap();
 
         let catalog_test = dill::CatalogBuilder::new_chained(&base_catalog)
-            .add_value(current_account_subject)
+            .add_current_account_subject(current_account_subject)
             .build();
 
         let app = axum::Router::new()

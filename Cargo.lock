@@ -7515,6 +7515,7 @@ dependencies = [
  "crc32fast",
  "crypto-utils",
  "database-common",
+ "dill",
  "email-utils",
  "event-sourcing",
  "futures",

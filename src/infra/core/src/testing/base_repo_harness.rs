@@ -12,7 +12,7 @@ use std::sync::Arc;
 
 use bon::bon;
 use chrono::{DateTime, Utc};
-use kamu_accounts::CurrentAccountSubject;
+use kamu_accounts::{CurrentAccountSubject, CurrentAccountSubjectCatalogExt as _};
 use kamu_core::{DidGenerator, DidGeneratorDefault, MockDidGenerator, RunInfoDir, TenancyConfig};
 use kamu_datasets::{CreateDatasetResult, DatasetRegistry, DatasetRegistryExt, ResolvedDataset};
 use odf::dataset::DatasetStorageUnitLocalFs;
@@ -60,9 +60,9 @@ impl BaseRepoHarness {
                 .add::<DatasetRegistrySoloUnitBridge>();
 
             if let Some(current_account_subject) = current_account_subject {
-                b.add_value(current_account_subject);
+                b.add_current_account_subject(current_account_subject);
             } else {
-                b.add_value(CurrentAccountSubject::new_test());
+                b.add_current_account_subject(CurrentAccountSubject::new_test());
             }
 
             if let Some(mock_did_generator) = mock_did_generator {

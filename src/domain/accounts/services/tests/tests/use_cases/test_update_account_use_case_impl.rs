@@ -356,7 +356,7 @@ impl UpdateAccountUseCaseImplHarness {
         b.add_value(mock_outbox).bind::<dyn Outbox, MockOutbox>();
 
         if let Some(current_account_subject) = current_account_subject {
-            b.add_value(current_account_subject);
+            b.add_current_account_subject(current_account_subject);
         }
 
         NoOpDatabasePlugin::init_database_components(&mut b);

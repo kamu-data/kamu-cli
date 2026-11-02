@@ -18,7 +18,7 @@ use internal_error::ResultIntoInternal;
 use kamu::domain::*;
 use kamu::testing::*;
 use kamu::*;
-use kamu_accounts::CurrentAccountSubject;
+use kamu_accounts::{CurrentAccountSubject, CurrentAccountSubjectCatalogExt as _};
 use kamu_datasets::*;
 use kamu_datasets_services::DatasetKeyValueServiceSysEnv;
 use kamu_ingest_datafusion::DataWriterDataFusion;
@@ -1601,7 +1601,7 @@ impl IngestTestHarness {
             .add::<ContainerRuntime>()
             .add::<ObjectStoreRegistryImpl>()
             .add::<ObjectStoreBuilderLocalFs>()
-            .add_value(CurrentAccountSubject::new_test())
+            .add_current_account_subject(CurrentAccountSubject::new_test())
             .add_value(TenancyConfig::SingleTenant)
             .add_builder(odf::dataset::DatasetStorageUnitLocalFs::builder(
                 datasets_dir,

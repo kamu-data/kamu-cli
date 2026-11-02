@@ -1254,7 +1254,7 @@ impl DatasetIndexingHarness {
         {
             let user_specific_catalog = {
                 let mut b = dill::CatalogBuilder::new_chained(self.no_subject_catalog());
-                b.add_value(CurrentAccountSubject::new_test_with(&old_name));
+                b.add_current_account_subject(CurrentAccountSubject::new_test_with(&old_name));
                 b.add::<AccountAuthorizationHelperImpl>();
                 b.add::<UpdateAccountUseCaseImpl>();
                 b.build()
@@ -1285,7 +1285,7 @@ impl DatasetIndexingHarness {
         {
             let user_specific_catalog = {
                 let mut b = dill::CatalogBuilder::new_chained(self.no_subject_catalog());
-                b.add_value(CurrentAccountSubject::new_test_with(&account_name));
+                b.add_current_account_subject(CurrentAccountSubject::new_test_with(&account_name));
                 b.add::<AccountAuthorizationHelperImpl>();
                 b.add::<DeleteAccountUseCaseImpl>();
                 b.build()

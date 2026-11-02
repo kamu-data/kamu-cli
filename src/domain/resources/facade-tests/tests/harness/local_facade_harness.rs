@@ -15,6 +15,7 @@ use dill::CatalogBuilder;
 use kamu_accounts::{
     AccountConfig,
     CurrentAccountSubject,
+    CurrentAccountSubjectCatalogExt as _,
     DidSecretEncryptionConfig,
     JOB_KAMU_ACCOUNTS_PREDEFINED_ACCOUNTS_REGISTRATOR,
     PredefinedAccountsConfig,
@@ -240,7 +241,7 @@ impl LocalFacadeHarness {
         );
 
         dill::CatalogBuilder::new_chained(&self.base_catalog)
-            .add_value(subject)
+            .add_current_account_subject(subject)
             .build()
     }
 }

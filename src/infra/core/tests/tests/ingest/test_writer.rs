@@ -13,7 +13,7 @@ use std::path::PathBuf;
 use chrono::{DateTime, TimeZone, Utc};
 use datafusion::prelude::*;
 use indoc::indoc;
-use kamu_accounts::CurrentAccountSubject;
+use kamu_accounts::{CurrentAccountSubject, CurrentAccountSubjectCatalogExt as _};
 use kamu_core::*;
 use kamu_datasets::*;
 use kamu_ingest_datafusion::*;
@@ -2653,7 +2653,7 @@ impl Harness {
         let catalog = dill::CatalogBuilder::new()
             .add::<DidGeneratorDefault>()
             .add::<SystemTimeSourceDefault>()
-            .add_value(CurrentAccountSubject::new_test())
+            .add_current_account_subject(CurrentAccountSubject::new_test())
             .add_value(TenancyConfig::SingleTenant)
             .add_builder(odf::dataset::DatasetStorageUnitLocalFs::builder(
                 datasets_dir,

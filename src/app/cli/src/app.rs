@@ -708,7 +708,7 @@ fn build_cli_catalog(
     let cli_base_catalog = maybe_server_catalog.unwrap_or(base_catalog);
 
     configure_cli_catalog(cli_base_catalog, tenancy_config)
-        .add_value(cli_account_subject)
+        .add_current_account_subject(cli_account_subject)
         .build()
 }
 

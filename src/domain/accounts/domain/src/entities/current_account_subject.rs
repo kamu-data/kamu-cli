@@ -9,7 +9,7 @@
 
 #[cfg(any(feature = "testing", test))]
 use crate::TEST_ACCOUNT_ID;
-use crate::{AccountHandle, DEFAULT_ACCOUNT_NAME};
+use crate::{AccountHandle, DEFAULT_ACCOUNT_NAME, Principal};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -139,6 +139,21 @@ impl CurrentAccountSubject {
             }
             CurrentAccountSubject::Logged(l) => &l.account_handle,
         }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Registers the caller of a request or command together with the
+/// [`Principal`] it authenticates
+pub trait CurrentAccountSubjectCatalogExt {
+    fn add_current_account_subject(&mut self, subject: CurrentAccountSubject) -> &mut Self;
+}
+
+impl CurrentAccountSubjectCatalogExt for dill::CatalogBuilder {
+    fn add_current_account_subject(&mut self, subject: CurrentAccountSubject) -> &mut Self {
+        self.add_value(Principal::from(&subject));
+        self.add_value(subject)
     }
 }
 

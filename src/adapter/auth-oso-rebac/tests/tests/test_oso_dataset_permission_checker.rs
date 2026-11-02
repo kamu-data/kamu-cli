@@ -17,6 +17,7 @@ use kamu_accounts::{
     AccountConfig,
     AccountPropertyName,
     CurrentAccountSubject,
+    CurrentAccountSubjectCatalogExt as _,
     DEFAULT_ACCOUNT_NAME,
     PredefinedAccountsConfig,
 };
@@ -728,7 +729,7 @@ impl DatasetPermissionCheckerHarness {
 
             kamu_datasets_inmem::register_dependencies(&mut b);
             b.add::<SystemTimeSourceDefault>()
-                .add_value(current_account_subject)
+                .add_current_account_subject(current_account_subject)
                 .add_value(predefined_accounts_config)
                 .add::<PredefinedAccountsRegistrator>()
                 .add::<kamu_auth_rebac_services::RebacServiceImpl>()
