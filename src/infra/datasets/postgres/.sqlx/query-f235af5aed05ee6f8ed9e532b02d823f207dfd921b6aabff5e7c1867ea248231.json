@@ -1,0 +1,69 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n                    WITH page AS (\n                        SELECT sequence_number\n                        FROM dataset_key_blocks\n                        WHERE dataset_id = $1 AND block_ref_name = $2\n                            AND ($3::text[] IS NULL OR event_type = ANY($3::text[]::metadata_event_type[]))\n                        UNION ALL\n                        SELECT sequence_number\n                        FROM dataset_data_blocks\n                        WHERE dataset_id = $1 AND block_ref_name = $2\n                            AND ($3::text[] IS NULL OR event_type = ANY($3::text[]::metadata_event_type[]))\n                        ORDER BY sequence_number DESC\n                        LIMIT $4 OFFSET $5\n                    )\n                    SELECT\n                        event_type as \"event_type!: MetadataEventType\",\n                        sequence_number as \"sequence_number!\",\n                        block_hash_bin as \"block_hash_bin!\",\n                        block_payload as \"block_payload!\"\n                    FROM (\n                        SELECT event_type, sequence_number, block_hash_bin, block_payload\n                        FROM dataset_key_blocks\n                        WHERE dataset_id = $1 AND block_ref_name = $2\n                            AND sequence_number IN (SELECT sequence_number FROM page)\n                        UNION ALL\n                        SELECT event_type, sequence_number, block_hash_bin, block_payload\n                        FROM dataset_data_blocks\n                        WHERE dataset_id = $1 AND block_ref_name = $2\n                            AND sequence_number IN (SELECT sequence_number FROM page)\n                    ) AS blocks\n                    ORDER BY sequence_number DESC\n                    ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "event_type!: MetadataEventType",
+        "type_info": {
+          "Custom": {
+            "name": "metadata_event_type",
+            "kind": {
+              "Enum": [
+                "AddData",
+                "ExecuteTransform",
+                "Seed",
+                "SetPollingSource",
+                "SetTransform",
+                "SetVocab",
+                "SetAttachments",
+                "SetInfo",
+                "SetLicense",
+                "SetDataSchema",
+                "AddPushSource",
+                "DisablePushSource",
+                "DisablePollingSource"
+              ]
+            }
+          }
+        },
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 1,
+        "name": "sequence_number!",
+        "type_info": "Int8",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 2,
+        "name": "block_hash_bin!",
+        "type_info": "Bytea",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 3,
+        "name": "block_payload!",
+        "type_info": "Bytea",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text",
+        "TextArray",
+        "Int8",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      null,
+      null,
+      null,
+      null
+    ]
+  },
+  "hash": "f235af5aed05ee6f8ed9e532b02d823f207dfd921b6aabff5e7c1867ea248231"
+}

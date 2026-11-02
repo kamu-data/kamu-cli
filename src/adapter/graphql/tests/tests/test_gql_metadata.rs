@@ -958,7 +958,7 @@ impl DatasetMetadataHarness {
     ) -> async_graphql::Request {
         async_graphql::Request::new(indoc!(
             r#"
-            query ($datasetId: DatasetID!, $eventTypes: [MetadataEventType!], $head: Multihash) {
+            query ($datasetId: DatasetID!, $eventTypes: [MetadataProjectionEventType!], $head: Multihash) {
                 datasets {
                     byId(
                         datasetId: $datasetId

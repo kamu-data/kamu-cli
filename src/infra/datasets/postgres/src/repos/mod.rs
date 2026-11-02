@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+mod postgres_dataset_block_query_repository;
 mod postgres_dataset_data_blocks_repository;
 mod postgres_dataset_dependency_repository;
 mod postgres_dataset_entry_repository;
@@ -14,6 +15,7 @@ mod postgres_dataset_key_blocks_repository;
 mod postgres_dataset_reference_repository;
 mod postgres_dataset_statistics_repository;
 
+pub use postgres_dataset_block_query_repository::*;
 pub use postgres_dataset_data_blocks_repository::*;
 pub use postgres_dataset_dependency_repository::*;
 pub use postgres_dataset_entry_repository::*;

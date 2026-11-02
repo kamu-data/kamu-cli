@@ -16,6 +16,7 @@ use kamu_accounts::DEFAULT_ACCOUNT_NAME;
 use kamu_core::*;
 use kamu_datasets::*;
 use kamu_datasets_services::*;
+use messaging_outbox::OutboxProvider;
 use odf::metadata::testing::MetadataFactory;
 use pretty_assertions::assert_eq;
 
@@ -872,6 +873,177 @@ async fn test_metadata_chain_set_transform_event() {
     );
 }
 
+#[test_log::test(tokio::test)]
+async fn test_metadata_chain_blocks_filtered_by_event_types() {
+    let harness = GraphQLMetadataChainHarness::new_indexed(TenancyConfig::SingleTenant).await;
+    let (dataset_id, _) = harness.create_dataset_with_mixed_blocks().await;
+
+    assert_eq!(
+        harness
+            .query_filtered_blocks(&dataset_id, 1, 2, "{ eventTypes: [ADD_DATA] }")
+            .await,
+        serde_json::json!({
+            "totalCount": 3,
+            "pageInfo": { "hasNextPage": false, "currentPage": 1, "totalPages": 2 },
+            "nodes": [{ "sequenceNumber": 3, "event": { "__typename": "AddData" } }],
+        })
+    );
+
+    assert_eq!(
+        harness
+            .query_filtered_blocks(
+                &dataset_id,
+                0,
+                10,
+                "{ eventTypes: [SEED, SET_DATA_SCHEMA, ADD_PUSH_SOURCE, SET_INFO] }"
+            )
+            .await,
+        serde_json::json!({
+            "totalCount": 4,
+            "pageInfo": { "hasNextPage": false, "currentPage": 0, "totalPages": 1 },
+            "nodes": [
+                { "sequenceNumber": 4, "event": { "__typename": "SetInfo" } },
+                { "sequenceNumber": 2, "event": { "__typename": "AddPushSource" } },
+                { "sequenceNumber": 1, "event": { "__typename": "SetDataSchema" } },
+                { "sequenceNumber": 0, "event": { "__typename": "Seed" } },
+            ],
+        })
+    );
+
+    assert_eq!(
+        harness
+            .query_filtered_blocks(&dataset_id, 0, 3, "{ eventTypes: [SET_INFO, ADD_DATA] }")
+            .await,
+        serde_json::json!({
+            "totalCount": 4,
+            "pageInfo": { "hasNextPage": true, "currentPage": 0, "totalPages": 2 },
+            "nodes": [
+                { "sequenceNumber": 6, "event": { "__typename": "AddData" } },
+                { "sequenceNumber": 5, "event": { "__typename": "AddData" } },
+                { "sequenceNumber": 4, "event": { "__typename": "SetInfo" } },
+            ],
+        })
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_metadata_chain_blocks_filtered_by_hash_prefix() {
+    let harness = GraphQLMetadataChainHarness::new_indexed(TenancyConfig::SingleTenant).await;
+    let (dataset_id, block_hashes) = harness.create_dataset_with_mixed_blocks().await;
+
+    // Prefixes are matched case-insensitively
+    let prefix = block_hashes[5].to_string()[..24].to_ascii_uppercase();
+
+    assert_eq!(
+        harness
+            .query_filtered_blocks(
+                &dataset_id,
+                0,
+                10,
+                &format!("{{ blockHashPrefix: \"{prefix}\" }}")
+            )
+            .await,
+        serde_json::json!({
+            "totalCount": 1,
+            "pageInfo": { "hasNextPage": false, "currentPage": 0, "totalPages": 1 },
+            "nodes": [{ "sequenceNumber": 5, "event": { "__typename": "AddData" } }],
+        })
+    );
+
+    assert_eq!(
+        harness
+            .query_filtered_blocks(
+                &dataset_id,
+                0,
+                10,
+                &format!("{{ eventTypes: [SEED], blockHashPrefix: \"{prefix}\" }}")
+            )
+            .await,
+        serde_json::json!({
+            "totalCount": 0,
+            "pageInfo": { "hasNextPage": false, "currentPage": 0, "totalPages": 0 },
+            "nodes": [],
+        })
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_metadata_chain_blocks_empty_filter_lists_all_blocks() {
+    let harness = GraphQLMetadataChainHarness::new_indexed(TenancyConfig::SingleTenant).await;
+    let (dataset_id, _) = harness.create_dataset_with_mixed_blocks().await;
+
+    let filtered = harness
+        .query_filtered_blocks(
+            &dataset_id,
+            0,
+            3,
+            "{ eventTypes: [], blockHashPrefix: \"\" }",
+        )
+        .await;
+
+    assert_eq!(filtered["totalCount"], 7);
+    assert_eq!(
+        filtered,
+        harness
+            .query_filtered_blocks(&dataset_id, 0, 3, "null")
+            .await
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_metadata_chain_blocks_filtered_without_index() {
+    let harness = GraphQLMetadataChainHarness::new_indexed(TenancyConfig::SingleTenant).await;
+    let (dataset_id, _) = harness.create_dataset_with_mixed_blocks().await;
+
+    let filter = "{ eventTypes: [SET_INFO, ADD_DATA] }";
+    let indexed = harness
+        .query_filtered_blocks(&dataset_id, 1, 2, filter)
+        .await;
+
+    harness.drop_block_index(&dataset_id).await;
+
+    assert_eq!(
+        harness
+            .query_filtered_blocks(&dataset_id, 1, 2, filter)
+            .await,
+        indexed
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_metadata_chain_blocks_invalid_hash_prefix() {
+    let harness = GraphQLMetadataChainHarness::new_indexed(TenancyConfig::SingleTenant).await;
+    let (dataset_id, _) = harness.create_dataset_with_mixed_blocks().await;
+
+    let res = harness
+        .execute_authorized_query(GraphQLMetadataChainHarness::filtered_blocks_request(
+            &dataset_id,
+            0,
+            10,
+            "{ blockHashPrefix: \"f1620%\" }",
+        ))
+        .await;
+
+    assert_eq!(
+        res.errors
+            .into_iter()
+            .map(|e| e.message)
+            .collect::<Vec<_>>(),
+        vec![
+            "Invalid block hash prefix 'f1620%': expected base16 multibase form, e.g. 'f1620a3c9'"
+                .to_string()
+        ]
+    );
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[oop::extend(BaseGQLDatasetHarness, base_gql_harness)]
@@ -884,8 +1056,24 @@ struct GraphQLMetadataChainHarness {
 
 impl GraphQLMetadataChainHarness {
     async fn new(tenancy_config: TenancyConfig) -> Self {
+        Self::with_outbox(tenancy_config, OutboxProvider::default()).await
+    }
+
+    /// Delivers outbox messages immediately, so metadata blocks get indexed
+    async fn new_indexed(tenancy_config: TenancyConfig) -> Self {
+        Self::with_outbox(
+            tenancy_config,
+            OutboxProvider::Immediate {
+                force_immediate: true,
+            },
+        )
+        .await
+    }
+
+    async fn with_outbox(tenancy_config: TenancyConfig, outbox_provider: OutboxProvider) -> Self {
         let base_gql_harness = BaseGQLDatasetHarness::builder()
             .tenancy_config(tenancy_config)
+            .outbox_provider(outbox_provider)
             .build();
 
         let base_catalog = {
@@ -977,6 +1165,137 @@ impl GraphQLMetadataChainHarness {
             )
             .await
             .unwrap()
+    }
+
+    /// Root dataset with the chain: `Seed`, `SetDataSchema`, `AddPushSource`,
+    /// `AddData`, `SetInfo`, `AddData`, `AddData`. Returns block hashes
+    /// indexed by sequence number.
+    async fn create_dataset_with_mixed_blocks(&self) -> (odf::DatasetID, Vec<odf::Multihash>) {
+        let create_result = self
+            .catalog_authorized
+            .get_one::<dyn CreateDatasetUseCase>()
+            .unwrap()
+            .execute(
+                &"foo".try_into().unwrap(),
+                odf::dataset::make_seed_block(
+                    self.did_generator.generate_dataset_id().0,
+                    odf::DatasetKind::Root,
+                    Utc::now(),
+                ),
+                Default::default(),
+            )
+            .await
+            .unwrap();
+
+        let events: Vec<odf::MetadataEvent> = vec![
+            MetadataFactory::set_data_schema().build().into(),
+            MetadataFactory::add_push_source().build().into(),
+            MetadataFactory::add_data()
+                .some_new_data_with_offset(0, 9)
+                .build()
+                .into(),
+            MetadataFactory::set_info()
+                .description("Test")
+                .build()
+                .into(),
+            MetadataFactory::add_data()
+                .prev_offset(Some(9))
+                .some_new_data_with_offset(10, 19)
+                .build()
+                .into(),
+            MetadataFactory::add_data()
+                .prev_offset(Some(19))
+                .some_new_data_with_offset(20, 29)
+                .build()
+                .into(),
+        ];
+
+        let mut block_hashes = vec![create_result.head.clone()];
+        for event in events {
+            let commit_result = create_result
+                .dataset
+                .commit_event(
+                    event,
+                    odf::dataset::CommitOpts {
+                        check_object_refs: false,
+                        ..odf::dataset::CommitOpts::default()
+                    },
+                )
+                .await
+                .unwrap();
+            block_hashes.push(commit_result.new_head);
+        }
+
+        (create_result.dataset_handle.id, block_hashes)
+    }
+
+    /// Removes the indexed blocks, as if the dataset was never indexed
+    async fn drop_block_index(&self, dataset_id: &odf::DatasetID) {
+        self.catalog_authorized
+            .get_one::<dyn DatasetKeyBlockRepository>()
+            .unwrap()
+            .delete_all_key_blocks_for_ref(dataset_id, &odf::BlockRef::Head)
+            .await
+            .unwrap();
+        self.catalog_authorized
+            .get_one::<dyn DatasetDataBlockRepository>()
+            .unwrap()
+            .delete_all_data_blocks_for_ref(dataset_id, &odf::BlockRef::Head)
+            .await
+            .unwrap();
+    }
+
+    fn filtered_blocks_request(
+        dataset_id: &odf::DatasetID,
+        page: usize,
+        per_page: usize,
+        filter: &str,
+    ) -> String {
+        indoc!(
+            r#"
+            {
+                datasets {
+                    byId (datasetId: "<id>") {
+                        metadata {
+                            chain {
+                                blocks (page: <page>, perPage: <perPage>, filter: <filter>) {
+                                    totalCount
+                                    pageInfo { hasNextPage currentPage totalPages }
+                                    nodes {
+                                        sequenceNumber
+                                        event { __typename }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            "#
+        )
+        .replace("<id>", &dataset_id.to_string())
+        .replace("<page>", &page.to_string())
+        .replace("<perPage>", &per_page.to_string())
+        .replace("<filter>", filter)
+    }
+
+    /// Returns the `blocks` connection of the response
+    async fn query_filtered_blocks(
+        &self,
+        dataset_id: &odf::DatasetID,
+        page: usize,
+        per_page: usize,
+        filter: &str,
+    ) -> serde_json::Value {
+        let res = self
+            .execute_authorized_query(Self::filtered_blocks_request(
+                dataset_id, page, per_page, filter,
+            ))
+            .await;
+        assert!(res.is_ok(), "{res:?}");
+
+        let mut data = res.data.into_json().unwrap();
+        data["datasets"]["byId"]["metadata"]["chain"]["blocks"].take()
     }
 
     pub async fn get_dataset(&self, hdl: &odf::DatasetHandle) -> ResolvedDataset {

@@ -10,7 +10,7 @@
 use std::borrow::Cow;
 
 use chrono::{DateTime, Utc};
-use kamu_datasets::DatasetRegistry;
+use kamu_datasets::{BlockHashPrefix, DatasetBlocksFilter, DatasetRegistry};
 
 use crate::prelude::*;
 use crate::queries::Account;
@@ -267,9 +267,9 @@ impl MetadataEvent {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Type of a metadata event
+/// Type of a metadata event that `metadataProjection` can project
 #[derive(Enum, Debug, Copy, Clone, Eq, PartialEq)]
-pub enum MetadataEventType {
+pub enum MetadataProjectionEventType {
     /// Event that establishes the identity of a dataset
     Seed,
     /// Event that defines a source polled for new data
@@ -289,3 +289,89 @@ pub enum MetadataEventType {
     /// Event that adds a source data can be pushed into
     AddPushSource,
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Type of a metadata event, covering every member of the `MetadataEvent`
+/// union
+#[derive(Enum, Debug, Copy, Clone, Eq, PartialEq)]
+#[graphql(remote = "odf::MetadataEventType")]
+pub enum MetadataEventType {
+    /// Event that adds a new slice of data
+    AddData,
+    /// Event that records a transformation run of a derivative dataset
+    ExecuteTransform,
+    /// Event that establishes the identity of a dataset
+    Seed,
+    /// Event that defines a source polled for new data
+    SetPollingSource,
+    /// Event that defines how a derivative dataset is computed
+    SetTransform,
+    /// Event that defines column names with special meaning
+    SetVocab,
+    /// Event that sets attached files
+    SetAttachments,
+    /// Event that sets the description, keywords and similar info
+    SetInfo,
+    /// Event that sets the license
+    SetLicense,
+    /// Event that sets the schema of the data
+    SetDataSchema,
+    /// Event that adds a source data can be pushed into
+    AddPushSource,
+    /// Event that disables a push source (reserved, not fully supported yet)
+    DisablePushSource,
+    /// Event that disables the polling source (reserved, not fully supported
+    /// yet)
+    DisablePollingSource,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Conditions selecting metadata blocks. Conditions combine with AND.
+#[derive(InputObject, Debug, Default)]
+pub struct MetadataBlocksFilter {
+    /// Only blocks whose event is one of these types. Null or empty means all
+    /// types.
+    pub event_types: Option<Vec<MetadataEventType>>,
+    /// Only blocks whose hash starts with this prefix, in the multibase form
+    /// the API returns (`f1620…`)
+    pub block_hash_prefix: Option<String>,
+}
+
+impl MetadataBlocksFilter {
+    /// Returns `None` when the filter imposes no condition
+    pub fn into_domain(self) -> Result<Option<DatasetBlocksFilter>, GqlError> {
+        let event_types = self
+            .event_types
+            .filter(|event_types| !event_types.is_empty())
+            .map(|event_types| {
+                event_types
+                    .into_iter()
+                    .map(|event_type| {
+                        odf::MetadataEventTypeFlags::from(odf::MetadataEventType::from(event_type))
+                    })
+                    .collect::<odf::MetadataEventTypeFlags>()
+            });
+
+        let block_hash_prefix = self
+            .block_hash_prefix
+            .as_deref()
+            .map(str::trim)
+            .filter(|prefix| !prefix.is_empty())
+            .map(BlockHashPrefix::parse)
+            .transpose()
+            .map_err(|e| GqlError::gql(e.to_string()))?;
+
+        if event_types.is_none() && block_hash_prefix.is_none() {
+            return Ok(None);
+        }
+
+        Ok(Some(DatasetBlocksFilter {
+            event_types,
+            block_hash_prefix,
+        }))
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

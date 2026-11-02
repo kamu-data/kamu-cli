@@ -7,10 +7,12 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+mod block_hash_prefix;
 mod collection_entry;
 mod collection_path;
 mod collection_path_v2;
 mod dataset_block;
+mod dataset_blocks_filter;
 #[cfg(feature = "sqlx")]
 mod dataset_dependency_entry;
 mod dataset_entry;
@@ -21,10 +23,12 @@ mod resolved_dataset;
 mod resolved_datasets_map;
 mod versioned_file_entry;
 
+pub use block_hash_prefix::*;
 pub use collection_entry::*;
 pub use collection_path::*;
 pub use collection_path_v2::*;
 pub use dataset_block::*;
+pub use dataset_blocks_filter::*;
 #[cfg(feature = "sqlx")]
 pub use dataset_dependency_entry::*;
 pub use dataset_entry::*;

@@ -17,7 +17,14 @@ Recommendation: for ease of reading, use the following format:
 ### Added
 - `/ui-config` returns `webhooks.loopbackTargetsOnly`, so the Web UI validates webhook target URLs by
   the same rule as the node
+- GraphQL: `MetadataChain.blocks` takes an optional `filter` that selects blocks by event type and by
+  block hash prefix. `totalCount` and `pageInfo` count only the matching blocks, so clients can page
+  through filtered results
 ### Changed
+- GraphQL (breaking): the enum taken by `DatasetMetadata.metadataProjection` is renamed from
+  `MetadataEventType` to `MetadataProjectionEventType`. `MetadataEventType` now lists every metadata
+  event type and is used by the `MetadataChain.blocks` filter. Queries that declare
+  `[MetadataEventType!]` variables for `metadataProjection` need the new type name
 - Tests: the FTP ingest test runs against an in-process FTP server instead of a container, and is
   enabled again
 ### Fixed
