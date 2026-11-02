@@ -17,6 +17,8 @@ Recommendation: for ease of reading, use the following format:
 ### Added
 - `/ui-config` returns `webhooks.loopbackTargetsOnly`, so the Web UI validates webhook target URLs by
   the same rule as the node
+- GraphQL: `DatasetMetadata.currentWatermark` accepts an optional `head` and returns the watermark as
+  of that block, so a dataset's metadata can be viewed as of an earlier commit
 ### Changed
 - Tests: the FTP ingest test runs against an in-process FTP server instead of a container, and is
   enabled again
