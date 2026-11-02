@@ -877,6 +877,144 @@ async fn test_delete_non_existent_dataset_env_var() {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_create_dataset_env_var_rejects_existing_key() {
+    let harness = DatasetEnvVarsHarness::new().await;
+    let created_dataset = harness.create_dataset().await;
+    let dataset_id = &created_dataset.dataset_handle.id;
+
+    let res = harness
+        .execute_authorized_query(DatasetEnvVarsHarness::create_dataset_env(
+            dataset_id, "my_var", "first", false,
+        ))
+        .await;
+    assert_eq!(
+        res.data,
+        DatasetEnvVarsHarness::create_result("CreateDatasetEnvVarResultCreated", "Created")
+    );
+
+    harness
+        .execute_authorized_query(DatasetEnvVarsHarness::upsert_dataset_env(
+            dataset_id,
+            "my_secret",
+            "s3cr3t",
+            true,
+        ))
+        .await;
+
+    // Taken as a variable or as a secret, either way the create is refused
+    for (key, is_secret) in [("my_var", false), ("my_var", true), ("my_secret", false)] {
+        let res = harness
+            .execute_authorized_query(DatasetEnvVarsHarness::create_dataset_env(
+                dataset_id, key, "second", is_secret,
+            ))
+            .await;
+        assert_eq!(
+            res.data,
+            DatasetEnvVarsHarness::create_result(
+                "CreateDatasetEnvVarResultAlreadyExists",
+                &format!("Environment variable with '{key}' key already exists"),
+            )
+        );
+    }
+
+    let res = harness
+        .execute_authorized_query(DatasetEnvVarsHarness::get_dataset_env_vars(dataset_id))
+        .await;
+    assert_eq!(
+        res.data,
+        value!({
+            "datasets": {
+                "byId": {
+                    "envVars": {
+                        "listEnvVariables": {
+                            "totalCount": 2,
+                            "nodes": [
+                                {
+                                    "key": "my_secret",
+                                    "value": null,
+                                    "isSecret": true
+                                },
+                                {
+                                    "key": "my_var",
+                                    "value": "first",
+                                    "isSecret": false
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        })
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_dataset_env_var_validation_errors_are_typed() {
+    let harness = DatasetEnvVarsHarness::new().await;
+    let created_dataset = harness.create_dataset().await;
+    let dataset_id = &created_dataset.dataset_handle.id;
+
+    let too_long = "x".repeat(16 * 1024 + 1);
+
+    for (key, value, typename, message) in [
+        (
+            "a-b",
+            "value",
+            "DatasetEnvVarInvalidKey",
+            "Invalid environment variable key 'a-b': expected regex ^[A-Za-z_][A-Za-z0-9_]*$",
+        ),
+        (
+            "my_var",
+            "",
+            "DatasetEnvVarEmptyValue",
+            "Environment variable 'my_var' has empty value",
+        ),
+        (
+            "my_var",
+            too_long.as_str(),
+            "DatasetEnvVarValueTooLong",
+            "Environment variable 'my_var' value is too long: got 16385, max is 16384",
+        ),
+    ] {
+        let res = harness
+            .execute_authorized_query(DatasetEnvVarsHarness::create_dataset_env(
+                dataset_id, key, value, false,
+            ))
+            .await;
+        assert!(res.errors.is_empty(), "{:?}", res.errors);
+        assert_eq!(
+            res.data,
+            DatasetEnvVarsHarness::create_result(typename, message)
+        );
+
+        let res = harness
+            .execute_authorized_query(DatasetEnvVarsHarness::upsert_dataset_env(
+                dataset_id, key, value, true,
+            ))
+            .await;
+        assert!(res.errors.is_empty(), "{:?}", res.errors);
+        assert_eq!(
+            res.data,
+            value!({
+                "datasets": {
+                    "byId": {
+                        "envVars": {
+                            "upsertEnvVariable": {
+                                "message": message
+                            }
+                        }
+                    }
+                }
+            })
+        );
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Read-after-write: the UI re-reads immediately after every mutation, so these
 // must hold before reconciliation has run.
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1295,6 +1433,52 @@ impl DatasetEnvVarsHarness {
             "value": env_var_value,
             "isSecret": is_secret,
         })))
+    }
+
+    fn create_dataset_env(
+        dataset_id: &odf::DatasetID,
+        env_var_key: &str,
+        env_var_value: &str,
+        is_secret: bool,
+    ) -> async_graphql::Request {
+        async_graphql::Request::new(indoc!(
+            r#"
+            mutation ($datasetId: DatasetID!, $key: String!, $value: String!, $isSecret: Boolean!) {
+                datasets {
+                    byId(datasetId: $datasetId) {
+                        envVars {
+                            createEnvVariable(key: $key, value: $value, isSecret: $isSecret) {
+                                __typename
+                                message
+                            }
+                        }
+                    }
+                }
+            }
+            "#
+        ))
+        .variables(async_graphql::Variables::from_json(serde_json::json!({
+            "datasetId": dataset_id,
+            "key": env_var_key,
+            "value": env_var_value,
+            "isSecret": is_secret,
+        })))
+    }
+
+    /// Expected response of [`Self::create_dataset_env`]
+    fn create_result(typename: &str, message: &str) -> async_graphql::Value {
+        value!({
+            "datasets": {
+                "byId": {
+                    "envVars": {
+                        "createEnvVariable": {
+                            "__typename": typename,
+                            "message": message
+                        }
+                    }
+                }
+            }
+        })
     }
 
     fn delete_dataset_env(

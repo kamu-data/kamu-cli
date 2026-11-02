@@ -13,6 +13,7 @@ use database_common::PaginationOpts;
 use dill::*;
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu_datasets::{
+    CreateDatasetEnvVarError,
     DatasetEnvVar,
     DatasetEnvVarListing,
     DatasetEnvVarMutationAdapter,
@@ -23,6 +24,7 @@ use kamu_datasets::{
     DeleteDatasetEnvVarError,
     GetDatasetEnvVarError,
     SecretsEncryptionConfig,
+    UpsertDatasetEnvVarError,
 };
 use secrecy::{ExposeSecret, SecretString};
 
@@ -128,9 +130,20 @@ impl DatasetEnvVarService for DatasetEnvVarCompatServiceImpl {
         dataset_id: &odf::DatasetID,
         dataset_env_var_key: &str,
         dataset_env_var_value: &DatasetEnvVarValue,
-    ) -> Result<DatasetEnvVarUpsertResult, InternalError> {
+    ) -> Result<DatasetEnvVarUpsertResult, UpsertDatasetEnvVarError> {
         self.mutation_adapter
             .upsert_env_var(dataset_id, dataset_env_var_key, dataset_env_var_value)
+            .await
+    }
+
+    async fn create_dataset_env_var(
+        &self,
+        dataset_id: &odf::DatasetID,
+        dataset_env_var_key: &str,
+        dataset_env_var_value: &DatasetEnvVarValue,
+    ) -> Result<DatasetEnvVar, CreateDatasetEnvVarError> {
+        self.mutation_adapter
+            .create_env_var(dataset_id, dataset_env_var_key, dataset_env_var_value)
             .await
     }
 
