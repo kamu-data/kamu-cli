@@ -335,7 +335,7 @@ pub struct MetadataBlocksFilter {
     /// types.
     pub event_types: Option<Vec<MetadataEventType>>,
     /// Only blocks whose hash starts with this prefix, in the multibase form
-    /// the API returns (`f1620…`)
+    /// the API returns (`f1620…`). Null or blank means any hash.
     pub block_hash_prefix: Option<String>,
 }
 

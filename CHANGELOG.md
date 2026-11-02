@@ -13,28 +13,25 @@ Recommendation: for ease of reading, use the following format:
 ### Fixed
 -->
 
-## [Unreleased]
+## [0.272.0] - 2026-11-02
 ### Added
 - `/ui-config` returns `webhooks.loopbackTargetsOnly`, so the Web UI validates webhook target URLs by
   the same rule as the node
 - GraphQL: `MetadataChain.blocks` takes an optional `filter` that selects blocks by event type and by
   block hash prefix. `totalCount` and `pageInfo` count only the matching blocks, so clients can page
   through filtered results
-### Changed
-- GraphQL (breaking): the enum taken by `DatasetMetadata.metadataProjection` is renamed from
-  `MetadataEventType` to `MetadataProjectionEventType`. `MetadataEventType` now lists every metadata
-  event type and is used by the `MetadataChain.blocks` filter. Queries that declare
-  `[MetadataEventType!]` variables for `metadataProjection` need the new type name
 - GraphQL: `DatasetMetadata.currentWatermark` accepts an optional `head` and returns the watermark as
   of that block, so a dataset's metadata can be viewed as of an earlier commit
 - GraphQL: `DatasetEnvVarsMut.createEnvVariable` adds a dataset environment variable or secret, and
   returns `CreateDatasetEnvVarResultAlreadyExists` instead of overwriting a key that is already taken
 ### Changed
-- Tests: the FTP ingest test runs against an in-process FTP server instead of a container, and is
-  enabled again
+- GraphQL (breaking): the enum taken by `DatasetMetadata.metadataProjection` is renamed from
+  `MetadataEventType` to `MetadataProjectionEventType`. `MetadataEventType` now lists every metadata
+  event type and is used by the `MetadataChain.blocks` filter. Queries that declare
+  `[MetadataEventType!]` variables for `metadataProjection` need the new type name
 ### Fixed
-- `POST /query` no longer fails with "Response signing is not enabled" on nodes without a signing key.
-  Only queries that request a `Proof` need the key
+- `/query` and `/verify` no longer fail with "Response signing is not enabled" on nodes without a
+  signing key. Only queries that request a `Proof` need the key
 - GraphQL: `AccountFlowRuns.listDatasetsWithFlow` now includes datasets whose only flows are webhook
   deliveries, so it covers every dataset that `listFlows` returns flows for
 - GraphQL: `AccountFlowRuns.listFlows` returns no flows for an account without datasets, instead of the
@@ -44,8 +41,8 @@ Recommendation: for ease of reading, use the following format:
   `DatasetEnvVarValueTooLong`, `DatasetEnvVarTooManyEntries`) instead of "Internal error"
 - Dataset environment variables with keys the current naming rules reject, such as `key-1`, no longer
   block adding, editing or deleting the dataset's other variables, and can themselves still be edited
-- Dataset environment variables: two concurrent writes to the same dataset no longer silently overwrite
-  each other; the later one fails and can be retried
+- Dataset environment variables: two concurrent additions or edits of a dataset's variables, or of its
+  secrets, no longer silently overwrite each other; the later one fails and can be retried
 
 ## [0.271.0] - 2026-10-21
 ### Added
