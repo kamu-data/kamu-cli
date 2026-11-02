@@ -24,8 +24,10 @@ use kamu_adapter_flow_dataset::{
     compaction_dataset_binding,
     ingest_dataset_binding,
 };
+use kamu_adapter_flow_webhook::{FLOW_TYPE_WEBHOOK_DELIVER, FlowScopeSubscription};
 use kamu_flow_system::*;
 use kamu_task_system::{TaskError, TaskID, TaskOutcome, TaskResult};
+use kamu_webhooks::{WebhookEventTypeCatalog, WebhookSubscriptionID};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -2468,30 +2470,47 @@ pub async fn test_get_flows_for_multiple_datasets(catalog: &Catalog) {
     assert_eq!(total_flow_ids.len(), expected_flow_ids.len());
     assert_eq!(total_flow_ids, expected_flow_ids);
 
-    // Test dataset having flows
-    let mut flow_scopes = Vec::new();
-    for dataset_id in &dataset_ids {
-        flow_scopes.push(FlowScopeDataset::make_scope(dataset_id));
-    }
-    flow_scopes.push(FlowScopeDataset::make_scope(
-        &odf::DatasetID::new_seeded_ed25519(b"empty"),
-    ));
+    // A dataset having only a webhook delivery flow
+    let webhook_only_dataset_id = odf::DatasetID::new_seeded_ed25519(b"webhook-only");
+    let webhook_flow_scope = FlowScopeSubscription::make_scope(
+        WebhookSubscriptionID::new(uuid::Uuid::new_v4()),
+        &WebhookEventTypeCatalog::dataset_ref_updated(),
+        Some(&webhook_only_dataset_id),
+    );
+    let mut webhook_flow = Flow::new(
+        Utc::now(),
+        flow_event_store.new_flow_id().await.unwrap(),
+        FlowBinding::new(FLOW_TYPE_WEBHOOK_DELIVER, webhook_flow_scope.clone()),
+        FlowActivationCause::AutoPolling(FlowActivationCauseAutoPolling {
+            activation_time: Utc::now(),
+        }),
+        None,
+        None,
+    );
+    webhook_flow.save(flow_event_store.as_ref()).await.unwrap();
 
-    let filtered_flow_scopes = flow_event_store
-        .filter_flow_scopes_having_flows(&flow_scopes)
+    // Test distinct scopes of flows matching the datasets
+    let empty_dataset_id = odf::DatasetID::new_seeded_ed25519(b"empty");
+    let mut scope_dataset_ids = dataset_ids.clone();
+    scope_dataset_ids.push(&webhook_only_dataset_id);
+    scope_dataset_ids.push(&empty_dataset_id);
+
+    let mut flow_scopes = flow_event_store
+        .list_flow_scopes_matching_scope_query(FlowScopeDataset::query_for_multiple_datasets(
+            &scope_dataset_ids,
+        ))
         .await
         .unwrap();
+    flow_scopes.sort_by_key(FlowScopeDataset::maybe_dataset_id_in_scope);
 
-    let mut result: Vec<odf::DatasetID> = filtered_flow_scopes
+    let mut expected_flow_scopes = dataset_ids
         .iter()
-        .map(|scope| FlowScopeDataset::new(scope).dataset_id())
-        .collect();
-    result.sort();
+        .map(|dataset_id| FlowScopeDataset::make_scope(dataset_id))
+        .chain([webhook_flow_scope])
+        .collect::<Vec<_>>();
+    expected_flow_scopes.sort_by_key(FlowScopeDataset::maybe_dataset_id_in_scope);
 
-    assert_eq!(result.len(), dataset_ids.len());
-    for (i, dataset_id) in dataset_ids.iter().enumerate() {
-        assert_eq!(result[i], **dataset_id);
-    }
+    assert_eq!(flow_scopes, expected_flow_scopes);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

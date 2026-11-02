@@ -325,12 +325,9 @@ async fn test_list_all_datasets_with_flow() {
 
     let all_datasets_with_flow: Vec<_> = harness
         .flow_query_service
-        .filter_flow_scopes_having_flows(
-            &foo_datasets
-                .iter()
-                .map(FlowScopeDataset::make_scope)
-                .collect::<Vec<_>>(),
-        )
+        .list_flow_scopes_matching_scope_query(FlowScopeDataset::query_for_multiple_datasets(
+            &foo_datasets.iter().collect::<Vec<_>>(),
+        ))
         .await
         .unwrap()
         .into_iter()
@@ -347,12 +344,9 @@ async fn test_list_all_datasets_with_flow() {
 
     let all_datasets_with_flow: Vec<_> = harness
         .flow_query_service
-        .filter_flow_scopes_having_flows(
-            &bar_datasets
-                .iter()
-                .map(FlowScopeDataset::make_scope)
-                .collect::<Vec<_>>(),
-        )
+        .list_flow_scopes_matching_scope_query(FlowScopeDataset::query_for_multiple_datasets(
+            &bar_datasets.iter().collect::<Vec<_>>(),
+        ))
         .await
         .unwrap()
         .into_iter()

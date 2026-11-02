@@ -68,10 +68,10 @@ pub trait FlowEventStore: EventStore<FlowState> {
     /// Returns IDs of the flow initiators, where flow scope matches the pattern
     fn list_scoped_flow_initiators(&self, scope_query: FlowScopeQuery) -> InitiatorIDStream<'_>;
 
-    /// Returns scopes having any flows associated with them
-    async fn filter_flow_scopes_having_flows(
+    /// Returns distinct scopes of the flows, where scope matches the pattern
+    async fn list_flow_scopes_matching_scope_query(
         &self,
-        flow_scopes: &[FlowScope],
+        flow_scope_query: FlowScopeQuery,
     ) -> Result<Vec<FlowScope>, InternalError>;
 
     /// Returns IDs of the flows of any type matching the given filters in

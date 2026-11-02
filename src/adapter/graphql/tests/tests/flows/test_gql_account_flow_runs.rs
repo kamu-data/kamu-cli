@@ -7,6 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::collections::HashSet;
+
 use async_graphql::value;
 use indoc::indoc;
 use kamu_accounts::{DEFAULT_ACCOUNT_NAME, DEFAULT_ACCOUNT_NAME_STR};
@@ -171,9 +173,36 @@ async fn test_list_datasets_with_flow() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[test_log::test(tokio::test)]
+async fn test_list_datasets_with_flow_includes_datasets_with_only_webhook_flows() {
+    let harness = AccountFlowRunsHarness::new().await;
+
+    let foo_id = harness.create_owned_root_dataset("foo").await;
+    let bar_id = harness.create_owned_root_dataset("bar").await;
+    let _baz_id = harness.create_owned_root_dataset("baz").await;
+
+    harness
+        .trigger_ingest_flow_mutation(&foo_id)
+        .execute(&harness.schema, &harness.catalog_authorized)
+        .await;
+
+    let subscription_id = harness
+        .create_webhook_for_dataset_updates(&bar_id, "bar-hook")
+        .await;
+    harness.trigger_webhook_flow(&bar_id, subscription_id).await;
+
+    assert_eq!(
+        harness.list_dataset_ids_with_flow().await,
+        HashSet::from([foo_id.to_string(), bar_id.to_string()])
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[oop::extend(BaseGQLFlowRunsHarness, base_gql_flow_runs_harness)]
 struct AccountFlowRunsHarness {
     base_gql_flow_runs_harness: BaseGQLFlowRunsHarness,
+    schema: kamu_adapter_graphql::Schema,
 }
 
 impl AccountFlowRunsHarness {
@@ -182,7 +211,56 @@ impl AccountFlowRunsHarness {
             BaseGQLFlowRunsHarness::with_overrides(Default::default()).await;
         Self {
             base_gql_flow_runs_harness,
+            schema: kamu_adapter_graphql::schema_quiet(),
         }
+    }
+
+    async fn create_owned_root_dataset(&self, dataset_name: &str) -> odf::DatasetID {
+        self.create_root_dataset(odf::DatasetAlias::new(
+            Some(DEFAULT_ACCOUNT_NAME.clone()),
+            odf::DatasetName::new_unchecked(dataset_name),
+        ))
+        .await
+        .dataset_handle
+        .id
+    }
+
+    /// IDs of datasets listed by `listDatasetsWithFlow` of the default account
+    async fn list_dataset_ids_with_flow(&self) -> HashSet<String> {
+        let response = GraphQLQueryRequest::new(
+            indoc!(
+                r#"
+                query($accountName: String!) {
+                    accounts {
+                        byName (name: $accountName) {
+                            flows {
+                                runs {
+                                    listDatasetsWithFlow {
+                                        nodes {
+                                            id
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                "#
+            ),
+            async_graphql::Variables::from_json(serde_json::json!({
+                "accountName": DEFAULT_ACCOUNT_NAME_STR,
+            })),
+        )
+        .execute(&self.schema, &self.catalog_authorized)
+        .await;
+
+        let json = response.data.into_json().unwrap();
+        json["accounts"]["byName"]["flows"]["runs"]["listDatasetsWithFlow"]["nodes"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|node| node["id"].as_str().unwrap().to_string())
+            .collect()
     }
 
     fn list_flows_query(&self, account_name: &odf::AccountName) -> GraphQLQueryRequest {
