@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use internal_error::InternalError;
-use kamu_accounts::CurrentAccountSubject;
+use kamu_accounts::Principal;
 
 use crate::{DatasetPermission, DatasetPermissionError};
 
@@ -41,14 +41,14 @@ use crate::{DatasetPermission, DatasetPermissionError};
 pub trait DatasetOperationGuard: Send + Sync {
     async fn check_operation(
         &self,
-        principal: &CurrentAccountSubject,
+        principal: &Principal,
         request: &DatasetOperationRequest,
     ) -> Result<(), DatasetPermissionError>;
 
     /// One result per request, in request order
     async fn check_operations(
         &self,
-        principal: &CurrentAccountSubject,
+        principal: &Principal,
         requests: &[DatasetOperationRequest],
     ) -> Result<Vec<Result<(), DatasetPermissionError>>, InternalError>;
 }

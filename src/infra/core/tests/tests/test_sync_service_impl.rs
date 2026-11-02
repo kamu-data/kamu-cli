@@ -16,7 +16,7 @@ use kamu::testing::*;
 use kamu::utils::ipfs_wrapper::IpfsClient;
 use kamu::utils::simple_transfer_protocol::SimpleTransferProtocol;
 use kamu::*;
-use kamu_accounts::CurrentAccountSubject;
+use kamu_accounts::{CurrentAccountSubject, CurrentAccountSubjectCatalogExt as _};
 use kamu_datasets::*;
 use kamu_datasets_services::utils::CreateDatasetUseCaseHelper;
 use kamu_datasets_services::*;
@@ -74,7 +74,7 @@ async fn do_test_sync(
         .add::<SystemTimeSourceDefault>()
         .add_value(ipfs_gateway.clone())
         .add_value(ipfs_client.clone())
-        .add_value(CurrentAccountSubject::new_test())
+        .add_current_account_subject(CurrentAccountSubject::new_test())
         .add_value(TenancyConfig::SingleTenant)
         .add_builder(odf::dataset::DatasetStorageUnitLocalFs::builder(
             datasets_dir_foo,
@@ -135,7 +135,7 @@ async fn do_test_sync(
         .add::<SystemTimeSourceDefault>()
         .add_value(ipfs_gateway.clone())
         .add_value(ipfs_client.clone())
-        .add_value(CurrentAccountSubject::new_test())
+        .add_current_account_subject(CurrentAccountSubject::new_test())
         .add_value(TenancyConfig::SingleTenant)
         .add_builder(odf::dataset::DatasetStorageUnitLocalFs::builder(
             datasets_dir_bar,

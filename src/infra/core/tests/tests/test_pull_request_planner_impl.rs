@@ -19,7 +19,7 @@ use kamu::testing::{BaseRepoHarness, *};
 use kamu::utils::ipfs_wrapper::IpfsClient;
 use kamu::utils::simple_transfer_protocol::SimpleTransferProtocol;
 use kamu::*;
-use kamu_accounts::CurrentAccountSubject;
+use kamu_accounts::{CurrentAccountSubject, CurrentAccountSubjectCatalogExt as _};
 use kamu_datasets::{
     DatasetReferenceMessage,
     DatasetRegistry,
@@ -170,7 +170,7 @@ async fn create_graph_remote(
             ))
             .add::<odf::dataset::DatasetLfsBuilderDefault>()
             .add::<DatasetRegistrySoloUnitBridge>()
-            .add_value(CurrentAccountSubject::new_test())
+            .add_current_account_subject(CurrentAccountSubject::new_test())
             .add_value(TenancyConfig::SingleTenant)
             .build();
 

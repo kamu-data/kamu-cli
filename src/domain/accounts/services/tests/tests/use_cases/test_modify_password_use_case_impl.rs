@@ -19,6 +19,7 @@ use kamu_accounts::{
     ModifyAccountPasswordUseCase,
     ModifyAccountPasswordWithConfirmationError,
     Password,
+    Principal,
     TEST_PASSWORD,
     VerifyPasswordError,
 };
@@ -279,6 +280,8 @@ impl ModifyAccountPasswordUseCaseImplHarness {
 
         let mut b = dill::CatalogBuilder::new_chained(account_base_harness.intermediate_catalog());
         b.add_value(mock_outbox).bind::<dyn Outbox, MockOutbox>();
+        // The mocked authorization helper decides, whoever the principal is
+        b.add_value(Principal::new_test());
         b.add::<ModifyAccountPasswordUseCaseImpl>();
 
         let catalog = b.build();

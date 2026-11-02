@@ -19,7 +19,7 @@ use indoc::indoc;
 use kamu::domain::*;
 use kamu::testing::DatasetDataHelper;
 use kamu::*;
-use kamu_accounts::CurrentAccountSubject;
+use kamu_accounts::{CurrentAccountSubject, CurrentAccountSubjectCatalogExt as _, Principal};
 use kamu_accounts_inmem::{InMemoryAccountQuotaEventStore, InMemoryAccountRepository};
 use kamu_accounts_services::{AccountQuotaServiceImpl, AccountServiceImpl};
 use kamu_auth_rebac_inmem::InMemoryRebacRepository;
@@ -1599,7 +1599,7 @@ impl CompactTestHarness {
         let catalog = b
             .add::<DidGeneratorDefault>()
             .add_value(RunInfoDir::new(run_info_dir))
-            .add_value(CurrentAccountSubject::new_test())
+            .add_current_account_subject(CurrentAccountSubject::new_test())
             .add_value(TenancyConfig::SingleTenant)
             .add_builder(odf::dataset::DatasetStorageUnitLocalFs::builder(
                 datasets_dir,
@@ -1715,7 +1715,7 @@ impl CompactTestHarness {
             .add::<QueryServiceImpl>()
             .add::<SessionContextBuilder>()
             .add_value(EngineConfigDatafusionEmbeddedBatchQuery::default())
-            .add_value(CurrentAccountSubject::new_test())
+            .add_current_account_subject(CurrentAccountSubject::new_test())
             .build();
 
         let transform_helper = TransformTestHelper::from_catalog(&catalog);
@@ -1884,7 +1884,7 @@ impl CompactTestHarness {
     async fn records(&self, sql: &str) -> String {
         let df = self
             .query_svc
-            .sql_statement(sql, QueryOptions::default())
+            .sql_statement(&Principal::new_test(), sql, QueryOptions::default())
             .await
             .unwrap()
             .df;

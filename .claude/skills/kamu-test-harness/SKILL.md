@@ -156,7 +156,7 @@ impl MyHarness {
     // Build a fresh chained catalog for this account. Cheap — call freely.
     fn catalog_for(&self, account_name: &str) -> dill::Catalog {
         CatalogBuilder::new_chained(&self.base_catalog)
-            .add_value(CurrentAccountSubject::new_test_with(account_name))
+            .add_current_account_subject(CurrentAccountSubject::new_test_with(&account_name))
             .add::<FooRegistryService>()
             .add::<FooStateService>()
             .build()

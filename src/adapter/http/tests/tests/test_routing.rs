@@ -14,7 +14,12 @@ use ::serde::Deserialize;
 use axum::extract::{FromRequestParts, Path};
 use database_common::{DatabaseTransactionRunner, NoOpDatabasePlugin};
 use kamu::domain::*;
-use kamu_accounts::{CurrentAccountSubject, DidSecretEncryptionConfig, PredefinedAccountsConfig};
+use kamu_accounts::{
+    CurrentAccountSubject,
+    CurrentAccountSubjectCatalogExt as _,
+    DidSecretEncryptionConfig,
+    PredefinedAccountsConfig,
+};
 use kamu_accounts_inmem::{InMemoryAccountRepository, InMemoryDidSecretKeyRepository};
 use kamu_accounts_services::{
     AccountServiceImpl,
@@ -70,7 +75,7 @@ async fn setup_repo() -> RepoFixture {
         ))
         .add::<DatasetLfsBuilderDatabaseBackedImpl>()
         .add_value(MetadataChainDbBackedConfig::default())
-        .add_value(CurrentAccountSubject::new_test())
+        .add_current_account_subject(CurrentAccountSubject::new_test())
         .add::<AlwaysHappyDatasetPermissionChecker>()
         .add::<CreateDatasetFromSnapshotUseCaseImpl>()
         .add::<CreateDatasetUseCaseImpl>()

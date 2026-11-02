@@ -73,7 +73,7 @@ async fn run_server() -> FlightServer {
     let mut query_svc: kamu_core::MockQueryService = kamu_core::MockQueryService::new();
     query_svc
         .expect_create_session()
-        .return_once(move || Ok(ctx));
+        .return_once(move |_| Ok(ctx));
 
     let mut b = dill::Catalog::builder();
 

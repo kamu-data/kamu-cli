@@ -12,6 +12,7 @@ use std::collections::HashSet;
 use std::sync::Arc;
 
 use internal_error::{ErrorIntoInternal, ResultIntoInternal};
+use kamu_accounts::Principal;
 use kamu_auth_rebac::{
     AccountDatasetRelationOperation,
     ApplyAccountDatasetRelationsUseCase,
@@ -38,6 +39,7 @@ use messaging_outbox::{Outbox, OutboxExt};
 pub struct ApplyAccountDatasetRelationsUseCaseImpl {
     rebac_service: Arc<dyn RebacService>,
     dataset_permission_checker: Arc<dyn DatasetPermissionChecker>,
+    principal: Arc<Principal>,
     outbox: Arc<dyn Outbox>,
 }
 
@@ -50,7 +52,7 @@ impl ApplyAccountDatasetRelationsUseCaseImpl {
 
         let unauthorized_ids_with_errors = self
             .dataset_permission_checker
-            .classify_dataset_ids_by_allowance(dataset_ids, EXPECTED_ACCESS)
+            .classify_dataset_ids_by_allowance(&self.principal, dataset_ids, EXPECTED_ACCESS)
             .await?
             .unauthorized_ids_with_errors;
 

@@ -12,6 +12,7 @@ use std::sync::Arc;
 
 use dill::{component, interface};
 use internal_error::{InternalError, ResultIntoInternal};
+use kamu_accounts::Principal;
 use kamu_core::TenancyConfig;
 use kamu_datasets::*;
 
@@ -23,6 +24,7 @@ pub struct GetDatasetDownstreamDependenciesUseCaseImpl {
     tenancy_config: Arc<TenancyConfig>,
     dependency_graph_service: Arc<dyn DependencyGraphService>,
     dataset_permission_checker: Arc<dyn DatasetPermissionChecker>,
+    principal: Arc<Principal>,
     dataset_entry_service: Arc<dyn DatasetEntryService>,
 }
 
@@ -30,7 +32,7 @@ impl GetDatasetDownstreamDependenciesUseCaseImpl {
     async fn can_maintain(&self, dataset_id: &odf::DatasetID) -> Result<bool, InternalError> {
         match self
             .dataset_permission_checker
-            .check_permission(dataset_id, DatasetPermission::Maintain)
+            .check_permission(&self.principal, dataset_id, DatasetPermission::Maintain)
             .await
         {
             Ok(()) => Ok(true),
@@ -78,7 +80,11 @@ impl GetDatasetDownstreamDependenciesUseCase for GetDatasetDownstreamDependencie
         // Cut off datasets that we don't have access to
         let authorized_ids = self
             .dataset_permission_checker
-            .classify_dataset_ids_by_allowance(&downstream_dependency_ids, DatasetPermission::Read)
+            .classify_dataset_ids_by_allowance(
+                &self.principal,
+                &downstream_dependency_ids,
+                DatasetPermission::Read,
+            )
             .await?
             .authorized_ids
             .into_iter()
@@ -143,7 +149,11 @@ impl GetDatasetDownstreamDependenciesUseCase for GetDatasetDownstreamDependencie
 
         let readable_count = self
             .dataset_permission_checker
-            .classify_dataset_ids_by_allowance(&downstream_dependency_ids, DatasetPermission::Read)
+            .classify_dataset_ids_by_allowance(
+                &self.principal,
+                &downstream_dependency_ids,
+                DatasetPermission::Read,
+            )
             .await?
             .authorized_ids
             .len();

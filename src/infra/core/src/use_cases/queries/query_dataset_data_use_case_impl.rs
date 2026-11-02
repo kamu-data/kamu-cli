@@ -10,6 +10,7 @@
 use std::sync::Arc;
 
 use internal_error::ErrorIntoInternal;
+use kamu_accounts::Principal;
 use kamu_auth_rebac::RebacDatasetRegistryFacade;
 use kamu_core::{
     GetDataOptions,
@@ -30,6 +31,7 @@ pub struct QueryDatasetDataUseCaseImpl {
     query_service: Arc<dyn QueryService>,
     dataset_registry: Arc<dyn DatasetRegistry>,
     rebac_dataset_registry_facade: Arc<dyn RebacDatasetRegistryFacade>,
+    principal: Arc<Principal>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -43,7 +45,7 @@ impl QueryDatasetDataUseCaseImpl {
         let refs: Vec<&odf::DatasetRef> = dataset_refs.iter().collect();
         let classified = self
             .rebac_dataset_registry_facade
-            .classify_dataset_refs_by_allowance(&refs, DatasetPermission::Read)
+            .classify_dataset_refs_by_allowance(&self.principal, &refs, DatasetPermission::Read)
             .await?;
 
         if !skip_if_missing_or_inaccessible
@@ -84,6 +86,7 @@ impl QueryDatasetDataUseCase for QueryDatasetDataUseCaseImpl {
         // Resolve source dataset with ReBAC check
         let source = helpers::resolve_dataset_for_querying(
             self.rebac_dataset_registry_facade.as_ref(),
+            &self.principal,
             dataset_ref,
         )
         .await?;
@@ -101,6 +104,7 @@ impl QueryDatasetDataUseCase for QueryDatasetDataUseCaseImpl {
         // Resolve source dataset with ReBAC check
         let source = helpers::resolve_dataset_for_querying(
             self.rebac_dataset_registry_facade.as_ref(),
+            &self.principal,
             dataset_ref,
         )
         .await?;

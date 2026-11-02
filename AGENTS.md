@@ -174,6 +174,7 @@ change invalidates what it says.
 | Hard compaction: `kamu system compact`, the compaction planner and executor, merged slices, what is (not) deleted | [`docs/internal/dataset-hard-compaction.md`](docs/internal/dataset-hard-compaction.md) |
 | Dataset reset: `kamu reset`, reset to a block, reset to metadata, how block indexes, statistics, search and the dependency graph react to any history rewrite | [`docs/internal/dataset-reset.md`](docs/internal/dataset-reset.md) |
 | Webhooks: subscriptions and their statuses, secrets, delivery signing and payload, the receiver contract, how subscriptions drive flow triggers | [`docs/internal/webhooks.md`](docs/internal/webhooks.md) |
+| Caller vs principal: `CurrentAccountSubject` and `Principal`, who registers and reads each, background work as `Principal::Node` | [`docs/internal/identity.md`](docs/internal/identity.md) |
 | The declarative resources subsystem | [`docs/internal/resources-framework.md`](docs/internal/resources-framework.md) |
 | Authored vs generated fields of a resource | [`docs/internal/resources-anatomy.md`](docs/internal/resources-anatomy.md) |
 | Resource label selectors and filtering | [`docs/internal/resources-label-filtering.md`](docs/internal/resources-label-filtering.md) |

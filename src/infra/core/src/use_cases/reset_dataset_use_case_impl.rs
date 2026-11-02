@@ -11,7 +11,7 @@ use std::sync::Arc;
 
 use dill::{component, interface};
 use internal_error::ErrorIntoInternal;
-use kamu_accounts::CurrentAccountSubject;
+use kamu_accounts::Principal;
 use kamu_core::{ResetDatasetUseCase, ResetError, ResetExecutor, ResetPlanner, ResetResult};
 use kamu_datasets::{
     DatasetOperation,
@@ -30,7 +30,7 @@ pub struct ResetDatasetUseCaseImpl {
     reset_executor: Arc<dyn ResetExecutor>,
     dataset_operation_guard: Arc<dyn DatasetOperationGuard>,
     dataset_registry: Arc<dyn DatasetRegistry>,
-    current_account_subject: Arc<CurrentAccountSubject>,
+    principal: Arc<Principal>,
 }
 
 #[common_macros::method_names_consts]
@@ -50,7 +50,7 @@ impl ResetDatasetUseCase for ResetDatasetUseCaseImpl {
     ) -> Result<ResetResult, ResetError> {
         self.dataset_operation_guard
             .check_operation(
-                &self.current_account_subject,
+                &self.principal,
                 &DatasetOperationRequest::new(dataset_handle.clone(), DatasetOperation::Reset),
             )
             .await

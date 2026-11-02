@@ -19,6 +19,7 @@ use kamu_accounts::{
     CurrentAccountSubject,
     DEFAULT_ACCOUNT_NAME,
     PredefinedAccountsConfig,
+    Principal,
 };
 use kamu_accounts_inmem::{InMemoryAccountRepository, InMemoryDidSecretKeyRepository};
 use kamu_accounts_services::{
@@ -71,21 +72,21 @@ macro_rules! assert_single_dataset {
         assert_matches!(
             $harness
                 .dataset_permission_checker
-                .check_permission(&$dataset_id, DatasetPermission::Read)
+                .check_permission(&$harness.principal, &$dataset_id, DatasetPermission::Read)
                 .await,
             $( $expected_read_pattern )|+ $( if $expected_read_guard )?
         );
         assert_matches!(
             $harness
                 .dataset_permission_checker
-                .check_permission(&$dataset_id, DatasetPermission::Write)
+                .check_permission(&$harness.principal, &$dataset_id, DatasetPermission::Write)
                 .await,
             $( $expected_write_pattern )|+ $( if $expected_write_guard )?
         );
         assert_matches!(
             $harness
                 .dataset_permission_checker
-                .get_granted_permissions(&$dataset_id)
+                .get_granted_permissions(&$harness.principal, &$dataset_id)
                 .await,
             $( $expected_allowed_actions_pattern )|+ $( if $expected_allowed_actions_guard )?
         );
@@ -587,7 +588,11 @@ async fn test_multi_datasets_matrix() {
             {
                 let mut actual = harness
                     .dataset_permission_checker
-                    .filter_datasets_allowing(all_dataset_handles.clone(), DatasetPermission::Read)
+                    .filter_datasets_allowing(
+                        &harness.principal,
+                        all_dataset_handles.clone(),
+                        DatasetPermission::Read,
+                    )
                     .await
                     .unwrap();
                 actual.sort_by(|left, right| left.id.cmp(&right.id));
@@ -603,7 +608,11 @@ async fn test_multi_datasets_matrix() {
             {
                 let mut res = harness
                     .dataset_permission_checker
-                    .filter_datasets_allowing(all_dataset_handles.clone(), DatasetPermission::Write)
+                    .filter_datasets_allowing(
+                        &harness.principal,
+                        all_dataset_handles.clone(),
+                        DatasetPermission::Write,
+                    )
                     .await
                     .unwrap();
                 res.sort_by(|left, right| left.id.cmp(&right.id));
@@ -617,6 +626,7 @@ async fn test_multi_datasets_matrix() {
                 harness
                     .dataset_permission_checker
                     .classify_dataset_handles_by_allowance(
+                        &harness.principal,
                         all_dataset_handles.clone(),
                         DatasetPermission::Read
                     )
@@ -632,6 +642,7 @@ async fn test_multi_datasets_matrix() {
                 harness
                     .dataset_permission_checker
                     .classify_dataset_handles_by_allowance(
+                        &harness.principal,
                         all_dataset_handles.clone(),
                         DatasetPermission::Write
                     )
@@ -647,7 +658,11 @@ async fn test_multi_datasets_matrix() {
             ClassifyByAllowanceIdsResponseTestHelper::report(
                 harness
                     .dataset_permission_checker
-                    .classify_dataset_ids_by_allowance(&all_dataset_ids, DatasetPermission::Read)
+                    .classify_dataset_ids_by_allowance(
+                        &harness.principal,
+                        &all_dataset_ids,
+                        DatasetPermission::Read
+                    )
                     .await
                     .unwrap(),
                 &dataset_handle_map
@@ -658,13 +673,70 @@ async fn test_multi_datasets_matrix() {
             ClassifyByAllowanceIdsResponseTestHelper::report(
                 harness
                     .dataset_permission_checker
-                    .classify_dataset_ids_by_allowance(&all_dataset_ids, DatasetPermission::Write)
+                    .classify_dataset_ids_by_allowance(
+                        &harness.principal,
+                        &all_dataset_ids,
+                        DatasetPermission::Write
+                    )
                     .await
                     .unwrap(),
                 &dataset_handle_map
             ),
         );
     }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_node_can_do_everything_with_not_owned_private_dataset() {
+    let not_owned_private_dataset_handle =
+        odf::metadata::testing::handle(&"owner", &"private-dataset", odf::DatasetKind::Root);
+
+    let harness = DatasetPermissionCheckerHarness::new_node().await;
+
+    harness
+        .create_private_datasets(&[&not_owned_private_dataset_handle])
+        .await;
+
+    assert_single_dataset!(
+        setup:
+            harness,
+            dataset_id = not_owned_private_dataset_handle.id,
+        expected:
+            read_result = Ok(()),
+            write_result = Ok(()),
+            allowed_actions_result = Ok(actual_actions)
+                if actual_actions == [
+                    DatasetPermission::Read,
+                    DatasetPermission::Write,
+                    DatasetPermission::Maintain,
+                    DatasetPermission::Own
+                ].into()
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_node_cannot_read_not_found_dataset() {
+    let not_found_dataset_id = odf::DatasetID::new_seeded_ed25519(b"not_found_dataset_id");
+    let not_found_dataset_ref = not_found_dataset_id.as_local_ref();
+
+    let harness = DatasetPermissionCheckerHarness::new_node().await;
+
+    assert_single_dataset!(
+        setup:
+            harness,
+            dataset_id = not_found_dataset_id,
+        expected:
+            read_result = Err(DatasetPermissionError::NotFound(e))
+                if e.dataset_ref == not_found_dataset_ref,
+            write_result = Err(DatasetPermissionError::NotFound(e))
+                if e.dataset_ref == not_found_dataset_ref,
+            allowed_actions_result = Err(GetGrantedPermissionsError::NotFound(e))
+                if e.dataset_ref == not_found_dataset_ref
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -699,6 +771,7 @@ async fn test_nobody_cannot_read_not_found_dataset() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 struct DatasetPermissionCheckerHarness {
+    principal: Principal,
     dataset_permission_checker: Arc<dyn DatasetPermissionChecker>,
     dataset_entry_writer: Arc<dyn DatasetEntryWriter>,
     outbox: Arc<dyn Outbox>,
@@ -706,6 +779,25 @@ struct DatasetPermissionCheckerHarness {
 
 impl DatasetPermissionCheckerHarness {
     pub async fn new(current_account_subject: CurrentAccountSubject, is_admin: bool) -> Self {
+        let principal = Principal::from(&current_account_subject);
+        Self::build(current_account_subject, principal, is_admin).await
+    }
+
+    /// The node as the principal, while the catalog holds an anonymous caller
+    pub async fn new_node() -> Self {
+        Self::build(
+            CurrentAccountSubjectTestHelper::anonymous(),
+            Principal::Node,
+            false,
+        )
+        .await
+    }
+
+    async fn build(
+        current_account_subject: CurrentAccountSubject,
+        principal: Principal,
+        is_admin: bool,
+    ) -> Self {
         let mut predefined_accounts_config = PredefinedAccountsConfig::new();
 
         if let CurrentAccountSubject::Logged(logged_account) = &current_account_subject {
@@ -773,6 +865,7 @@ impl DatasetPermissionCheckerHarness {
         };
 
         Self {
+            principal,
             dataset_permission_checker: catalog.get_one().unwrap(),
             outbox: catalog.get_one().unwrap(),
             dataset_entry_writer: catalog.get_one().unwrap(),

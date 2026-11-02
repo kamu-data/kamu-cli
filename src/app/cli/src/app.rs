@@ -250,15 +250,25 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
             None
         };
 
-        let cli_catalog = build_cli_catalog(
-            &wrapped_base_catalog,
-            maybe_server_catalog.as_ref(),
-            cli_account_subject,
+        let cli_base_catalog = maybe_server_catalog
+            .as_ref()
+            .unwrap_or(&wrapped_base_catalog);
+
+        // System singletons are first resolved from here, so their background work runs as
+        // the node, not as the CLI user
+        let background_catalog = &configure_background_catalog(
+            cli_base_catalog,
+            cli_account_subject.clone(),
             tenancy_config,
-        );
+        )
+        .build();
+
+        let cli_catalog = configure_cli_catalog(cli_base_catalog, tenancy_config)
+            .add_current_account_subject(cli_account_subject)
+            .build();
 
         // Register metrics
-        maybe_metrics_registry = Some(observability::metrics::register_all(&cli_catalog));
+        maybe_metrics_registry = Some(observability::metrics::register_all(background_catalog));
 
         let is_workspace_upgrade_needed = workspace_svc.is_upgrade_needed()?;
 
@@ -288,14 +298,14 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
 
         if cli_commands::command_needs_startup_jobs(&args) {
             run_startup_initializations(
-                &cli_catalog,
+                background_catalog,
                 // Registrator was already called on base_catalog
                 JobSelector::NoneOf(HashSet::from([
                     JOB_KAMU_ACCOUNTS_PREDEFINED_ACCOUNTS_REGISTRATOR,
                 ])),
             )
             .instrument(tracing::debug_span!(
-                "app::run_startup_initializations(cli_catalog)"
+                "app::run_startup_initializations(background_catalog)"
             ))
             .await?;
         }
@@ -304,9 +314,6 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
             && cli_commands::command_needs_transaction(&args);
         let is_outbox_processing_required = maybe_db_connection_settings.is_some()
             && cli_commands::command_needs_outbox_processing(&args);
-        let work_catalog = maybe_server_catalog
-            .as_ref()
-            .unwrap_or(&wrapped_base_catalog);
 
         let tx_runner = DatabaseTransactionRunner::new(cli_catalog.clone());
 
@@ -315,8 +322,9 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
                 is_transactional,
                 |maybe_transactional_cli_catalog: dill::Catalog| async move {
                     let command_builder = cli_commands::get_command(
-                        work_catalog,
+                        cli_base_catalog,
                         &maybe_transactional_cli_catalog,
+                        background_catalog,
                         args,
                         current_account,
                     )?;
@@ -346,7 +354,7 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
         // transactions of its own, so the Outbox is processed either way
         if is_outbox_processing_required {
             let outbox_result = async {
-                let outbox_agent = cli_catalog
+                let outbox_agent = background_catalog
                     .get_one::<dyn messaging_outbox::OutboxAgent>()
                     .int_err()?;
                 outbox_agent
@@ -699,17 +707,19 @@ pub fn configure_cli_catalog(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-fn build_cli_catalog(
-    base_catalog: &dill::Catalog,
-    maybe_server_catalog: Option<&dill::Catalog>,
+/// Catalog of background work (agents, startup jobs, the outbox), a sibling of
+/// the CLI catalog acting as [`Principal::Node`]. It still holds the CLI
+/// subject, which name scope and ownership read.
+// Public only for tests
+pub fn configure_background_catalog(
+    cli_base_catalog: &dill::Catalog,
     cli_account_subject: CurrentAccountSubject,
     tenancy_config: TenancyConfig,
-) -> dill::Catalog {
-    let cli_base_catalog = maybe_server_catalog.unwrap_or(base_catalog);
-
-    configure_cli_catalog(cli_base_catalog, tenancy_config)
-        .add_value(cli_account_subject)
-        .build()
+) -> dill::CatalogBuilder {
+    let mut b = configure_cli_catalog(cli_base_catalog, tenancy_config);
+    b.add_value(cli_account_subject);
+    b.add_value(Principal::Node);
+    b
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

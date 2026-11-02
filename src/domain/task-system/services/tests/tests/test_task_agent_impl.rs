@@ -15,7 +15,7 @@ use database_common::NoOpDatabasePlugin;
 use dill::{Catalog, CatalogBuilder};
 use kamu::utils::ipfs_wrapper::IpfsClient;
 use kamu::*;
-use kamu_accounts::CurrentAccountSubject;
+use kamu_accounts::{CurrentAccountSubject, CurrentAccountSubjectCatalogExt as _};
 use kamu_core::{DidGeneratorDefault, TenancyConfig};
 use kamu_datasets::SecretsEncryptionConfig;
 use kamu_datasets_services::{DatasetEnvVarServiceNull, DependencyGraphServiceImpl};
@@ -401,7 +401,7 @@ impl TaskAgentHarness {
             ))
             .add::<DatasetRegistrySoloUnitBridge>()
             .add::<odf::dataset::DatasetLfsBuilderDefault>()
-            .add_value(CurrentAccountSubject::new_test())
+            .add_current_account_subject(CurrentAccountSubject::new_test())
             .add_value(TenancyConfig::SingleTenant)
             .add_value(WakeupListenerConfig {
                 min_debounce_interval: Duration::from_millis(10),

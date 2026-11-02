@@ -15,6 +15,7 @@ use std::sync::Arc;
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu::domain::*;
 use kamu::{DotStyle, DotVisitor};
+use kamu_accounts::Principal;
 use kamu_datasets::DatasetRegistry;
 
 use super::{CLIError, Command};
@@ -38,6 +39,7 @@ pub struct InspectLineageCommand {
     output_config: Arc<OutputConfig>,
     dataset_registry: Arc<dyn DatasetRegistry>,
     provenance_svc: Arc<dyn ProvenanceService>,
+    principal: Arc<Principal>,
     workspace_layout: Arc<WorkspaceLayout>,
 
     #[dill::component(explicit)]
@@ -103,6 +105,7 @@ impl Command for InspectLineageCommand {
         for dataset_handle in dataset_handles {
             self.provenance_svc
                 .get_dataset_lineage(
+                    &self.principal,
                     &dataset_handle.as_local_ref(),
                     visitor.as_mut(),
                     LineageOptions {},

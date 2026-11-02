@@ -42,10 +42,11 @@ impl Search {
     ) -> Result<SearchResultConnection> {
         use futures::TryStreamExt;
 
-        let (dataset_registry, dataset_permission_checker) = from_catalog_n!(
+        let (dataset_registry, dataset_permission_checker, principal) = from_catalog_n!(
             ctx,
             dyn kamu_datasets::DatasetRegistry,
-            dyn kamu_datasets::DatasetPermissionChecker
+            dyn kamu_datasets::DatasetPermissionChecker,
+            kamu_accounts::Principal
         );
 
         let page = page.unwrap_or(0);
@@ -73,7 +74,11 @@ impl Search {
                 id.contains(&query)
             });
         let mut readable_dataset_handles = dataset_permission_checker
-            .filtered_datasets_stream(filtered_all_dataset_handles_stream, DatasetPermission::Read)
+            .filtered_datasets_stream(
+                &principal,
+                filtered_all_dataset_handles_stream,
+                DatasetPermission::Read,
+            )
             .try_collect::<Vec<_>>()
             .await?;
         // Sort first by dataset name and for stability after by account name
@@ -386,29 +391,23 @@ impl Search {
         &self,
         ctx: &Context<'a>,
     ) -> Result<kamu_search::SearchContext<'a>> {
-        use kamu_accounts::CurrentAccountSubject;
-        let (current_account_subject, rebac_service) = from_catalog_n!(
-            ctx,
-            CurrentAccountSubject,
-            dyn kamu_auth_rebac::RebacService
-        );
+        use kamu_accounts::Principal;
+        let (principal, rebac_service) =
+            from_catalog_n!(ctx, Principal, dyn kamu_auth_rebac::RebacService);
 
         let catalog = ctx.data::<dill::Catalog>().unwrap();
 
-        let is_admin = match current_account_subject.as_ref() {
-            CurrentAccountSubject::Logged(a) => rebac_service
-                .is_account_admin(&a.account_handle.did)
+        let is_admin = match principal.as_ref() {
+            Principal::User(account_handle) => rebac_service
+                .is_account_admin(&account_handle.did)
                 .await
                 .int_err()?,
-            CurrentAccountSubject::Anonymous(_) => false,
+            Principal::Node | Principal::Anonymous => false,
         };
 
         Ok(kamu_search::SearchContext {
             catalog,
-            security: kamu_accounts::make_search_security_context(
-                current_account_subject.as_ref(),
-                is_admin,
-            ),
+            security: kamu_accounts::make_search_security_context(principal.as_ref(), is_admin),
         })
     }
 }

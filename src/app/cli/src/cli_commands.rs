@@ -21,6 +21,7 @@ use crate::{WorkspaceService, accounts, cli, odf_server, resource_context};
 pub fn get_command(
     base_catalog: &Catalog,
     cli_catalog: &Catalog,
+    background_catalog: &Catalog,
     args: cli::Cli,
     current_account_indication: CurrentAccountIndication,
 ) -> Result<Box<dyn TypedBuilder<dyn Command>>, CLIError> {
@@ -491,7 +492,7 @@ pub fn get_command(
                         sc.get_token,
                         args.e2e_output_data_path,
                         base_catalog.clone(),
-                        cli_catalog.clone(),
+                        background_catalog.clone(),
                     )
                     .cast(),
                 ),

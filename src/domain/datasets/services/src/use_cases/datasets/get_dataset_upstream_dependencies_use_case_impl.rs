@@ -12,6 +12,7 @@ use std::sync::Arc;
 
 use dill::{component, interface};
 use internal_error::ResultIntoInternal;
+use kamu_accounts::Principal;
 use kamu_core::TenancyConfig;
 use kamu_datasets::*;
 
@@ -23,6 +24,7 @@ pub struct GetDatasetUpstreamDependenciesUseCaseImpl {
     tenancy_config: Arc<TenancyConfig>,
     dependency_graph_service: Arc<dyn DependencyGraphService>,
     dataset_permission_checker: Arc<dyn DatasetPermissionChecker>,
+    principal: Arc<Principal>,
     dataset_entry_service: Arc<dyn DatasetEntryService>,
 }
 
@@ -63,7 +65,11 @@ impl GetDatasetUpstreamDependenciesUseCase for GetDatasetUpstreamDependenciesUse
             unauthorized_ids_with_errors,
         } = self
             .dataset_permission_checker
-            .classify_dataset_ids_by_allowance(&upstream_dependency_ids, DatasetPermission::Read)
+            .classify_dataset_ids_by_allowance(
+                &self.principal,
+                &upstream_dependency_ids,
+                DatasetPermission::Read,
+            )
             .await?;
 
         upstream_dependencies.extend(unauthorized_ids_with_errors.into_iter().map(

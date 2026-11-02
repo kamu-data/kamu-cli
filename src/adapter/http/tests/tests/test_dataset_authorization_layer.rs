@@ -421,7 +421,7 @@ impl ServerHarness {
             .unwrap();
 
         let catalog_system = dill::CatalogBuilder::new_chained(&base_catalog)
-            .add_value(CurrentAccountSubject::new_test())
+            .add_current_account_subject(CurrentAccountSubject::new_test())
             .build();
 
         let create_dataset = catalog_system
@@ -442,7 +442,7 @@ impl ServerHarness {
             .unwrap();
 
         let catalog_test = dill::CatalogBuilder::new_chained(&base_catalog)
-            .add_value(current_account_subject)
+            .add_current_account_subject(current_account_subject)
             .build();
 
         let app = axum::Router::new()
@@ -486,15 +486,16 @@ impl ServerHarness {
     pub fn mock_dataset_permission_checker(
         granted_permissions: HashSet<DatasetPermission>,
     ) -> MockDatasetPermissionChecker {
-        use mockall::predicate::function;
+        use mockall::predicate::{always, function};
 
         let mut mock_dataset_permission_checker = MockDatasetPermissionChecker::new();
         mock_dataset_permission_checker
             .expect_get_granted_permissions()
-            .with(function(|dataset_id: &odf::DatasetID| {
-                *dataset_id == Self::dataset_id()
-            }))
-            .returning(move |_dataset_id| Ok(granted_permissions.clone()));
+            .with(
+                always(),
+                function(|dataset_id: &odf::DatasetID| *dataset_id == Self::dataset_id()),
+            )
+            .returning(move |_, _| Ok(granted_permissions.clone()));
 
         mock_dataset_permission_checker
     }

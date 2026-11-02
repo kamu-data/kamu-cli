@@ -11,10 +11,10 @@ use std::sync::Arc;
 
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_accounts::{
-    CurrentAccountSubject,
     DeleteAccountError,
     ModifyAccountPasswordError,
     ModifyAccountPasswordWithConfirmationError,
+    Principal,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -23,28 +23,33 @@ use kamu_accounts::{
 //       please consider implementing it through OSO instead
 //       (similar to OsoDatasetPermissionChecker).
 
+/// Decides account-level permissions for the principal each call names
 #[cfg_attr(any(feature = "testing", test), mockall::automock)]
 #[async_trait::async_trait]
 pub trait AccountAuthorizationHelper: Send + Sync {
-    async fn is_admin(&self) -> Result<bool, InternalError>;
+    async fn is_admin(&self, principal: &Principal) -> Result<bool, InternalError>;
 
     async fn can_modify_account(
         &self,
+        principal: &Principal,
         account_name: &odf::AccountName,
     ) -> Result<bool, InternalError>;
 
     async fn ensure_account_password_can_be_modified(
         &self,
+        principal: &Principal,
         account_name: &odf::AccountName,
     ) -> Result<(), EnsureNotAuthorizedError>;
 
     async fn ensure_account_password_with_confirmation_can_be_modified(
         &self,
+        principal: &Principal,
         account_name: &odf::AccountName,
     ) -> Result<(), EnsureNotAuthorizedError>;
 
     async fn ensure_account_can_be_deleted(
         &self,
+        principal: &Principal,
         account_name: &odf::AccountName,
     ) -> Result<(), EnsureNotAuthorizedError>;
 }
@@ -81,20 +86,20 @@ impl AccountAuthorizationHelperTestProvider {
 #[dill::component(pub)]
 #[dill::interface(dyn AccountAuthorizationHelper)]
 pub struct AccountAuthorizationHelperImpl {
-    current_account_subject: Arc<CurrentAccountSubject>,
     rebac_service: Arc<dyn kamu_auth_rebac::RebacService>,
 }
 
 #[async_trait::async_trait]
 impl AccountAuthorizationHelper for AccountAuthorizationHelperImpl {
-    async fn is_admin(&self) -> Result<bool, InternalError> {
-        match self.current_account_subject.as_ref() {
-            CurrentAccountSubject::Anonymous(_) => Ok(false),
-            CurrentAccountSubject::Logged(l) => {
+    async fn is_admin(&self, principal: &Principal) -> Result<bool, InternalError> {
+        match principal {
+            Principal::Node => Ok(true),
+            Principal::Anonymous => Ok(false),
+            Principal::User(account_handle) => {
                 use kamu_auth_rebac::RebacServiceExt;
 
                 self.rebac_service
-                    .is_account_admin(&l.account_handle.did)
+                    .is_account_admin(&account_handle.did)
                     .await
                     .int_err()
             }
@@ -103,16 +108,18 @@ impl AccountAuthorizationHelper for AccountAuthorizationHelperImpl {
 
     async fn can_modify_account(
         &self,
+        principal: &Principal,
         account_name: &odf::AccountName,
     ) -> Result<bool, InternalError> {
-        match self.current_account_subject.as_ref() {
-            CurrentAccountSubject::Anonymous(_) => Ok(false),
-            CurrentAccountSubject::Logged(l) if l.account_handle.name == *account_name => Ok(true),
-            CurrentAccountSubject::Logged(l) => {
+        match principal {
+            Principal::Node => Ok(true),
+            Principal::Anonymous => Ok(false),
+            Principal::User(account_handle) if account_handle.name == *account_name => Ok(true),
+            Principal::User(account_handle) => {
                 use kamu_auth_rebac::RebacServiceExt;
 
                 self.rebac_service
-                    .is_account_admin(&l.account_handle.did)
+                    .is_account_admin(&account_handle.did)
                     .await
                     .int_err()
             }
@@ -121,13 +128,14 @@ impl AccountAuthorizationHelper for AccountAuthorizationHelperImpl {
 
     async fn ensure_account_password_can_be_modified(
         &self,
+        principal: &Principal,
         account_name: &odf::AccountName,
     ) -> Result<(), EnsureNotAuthorizedError> {
-        if !self.can_modify_account(account_name).await? {
+        if !self.can_modify_account(principal, account_name).await? {
             return Err(EnsureNotAuthorizedError::Access(
                 odf::AccessError::Unauthenticated(
                     NotAuthorizedError::modify_account_password(
-                        self.current_account_subject.maybe_account_name().cloned(),
+                        principal.maybe_account_name().cloned(),
                         account_name.clone(),
                     )
                     .into(),
@@ -140,13 +148,14 @@ impl AccountAuthorizationHelper for AccountAuthorizationHelperImpl {
 
     async fn ensure_account_password_with_confirmation_can_be_modified(
         &self,
+        principal: &Principal,
         account_name: &odf::AccountName,
     ) -> Result<(), EnsureNotAuthorizedError> {
-        if !self.can_modify_account(account_name).await? {
+        if !self.can_modify_account(principal, account_name).await? {
             return Err(EnsureNotAuthorizedError::Access(
                 odf::AccessError::Unauthenticated(
                     NotAuthorizedError::modify_account_password_with_confirmation(
-                        self.current_account_subject.maybe_account_name().cloned(),
+                        principal.maybe_account_name().cloned(),
                         account_name.clone(),
                     )
                     .into(),
@@ -159,13 +168,14 @@ impl AccountAuthorizationHelper for AccountAuthorizationHelperImpl {
 
     async fn ensure_account_can_be_deleted(
         &self,
+        principal: &Principal,
         account_name: &odf::AccountName,
     ) -> Result<(), EnsureNotAuthorizedError> {
-        if !self.can_modify_account(account_name).await? {
+        if !self.can_modify_account(principal, account_name).await? {
             return Err(EnsureNotAuthorizedError::Access(
                 odf::AccessError::Unauthenticated(
                     NotAuthorizedError::delete_account(
-                        self.current_account_subject.maybe_account_name().cloned(),
+                        principal.maybe_account_name().cloned(),
                         account_name.clone(),
                     )
                     .into(),
@@ -184,14 +194,14 @@ impl MockAccountAuthorizationHelper {
     pub fn allowing() -> Self {
         let mut mock = Self::new();
 
-        mock.expect_is_admin().returning(|| Ok(true));
-        mock.expect_can_modify_account().returning(|_| Ok(true));
+        mock.expect_is_admin().returning(|_| Ok(true));
+        mock.expect_can_modify_account().returning(|_, _| Ok(true));
         mock.expect_ensure_account_password_can_be_modified()
-            .returning(|_| Ok(()));
+            .returning(|_, _| Ok(()));
         mock.expect_ensure_account_password_with_confirmation_can_be_modified()
-            .returning(|_| Ok(()));
+            .returning(|_, _| Ok(()));
         mock.expect_ensure_account_can_be_deleted()
-            .returning(|_| Ok(()));
+            .returning(|_, _| Ok(()));
 
         mock
     }
@@ -201,12 +211,12 @@ impl MockAccountAuthorizationHelper {
 
         let mut mock = Self::new();
 
-        mock.expect_is_admin().returning(|| Ok(false));
-        mock.expect_can_modify_account().returning(|_| Ok(false));
+        mock.expect_is_admin().returning(|_| Ok(false));
+        mock.expect_can_modify_account().returning(|_, _| Ok(false));
 
         let subject_account_clone = subject_account.clone();
         mock.expect_ensure_account_password_can_be_modified()
-            .returning(move |account_name| {
+            .returning(move |_, account_name| {
                 Err(EnsureNotAuthorizedError::Access(
                     odf::AccessError::Unauthenticated(
                         NotAuthorizedError::modify_account_password(
@@ -220,7 +230,7 @@ impl MockAccountAuthorizationHelper {
 
         let subject_account_clone = subject_account.clone();
         mock.expect_ensure_account_password_with_confirmation_can_be_modified()
-            .returning(move |account_name| {
+            .returning(move |_, account_name| {
                 Err(EnsureNotAuthorizedError::Access(
                     odf::AccessError::Unauthenticated(
                         NotAuthorizedError::modify_account_password_with_confirmation(
@@ -234,7 +244,7 @@ impl MockAccountAuthorizationHelper {
 
         let subject_account_clone = subject_account.clone();
         mock.expect_ensure_account_can_be_deleted()
-            .returning(move |account_name| {
+            .returning(move |_, account_name| {
                 Err(EnsureNotAuthorizedError::Access(
                     odf::AccessError::Unauthenticated(
                         NotAuthorizedError::delete_account(

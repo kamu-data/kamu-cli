@@ -55,16 +55,21 @@ impl Datasets {
     ) -> Result<Vec<Dataset>> {
         // TODO: PERF: GQL: DataLoader?
 
-        let (rebac_dataset_registry_facade, account_service, current_account_subject) = from_catalog_n!(
+        let (rebac_dataset_registry_facade, account_service, current_account_subject, principal) = from_catalog_n!(
             ctx,
             dyn kamu_auth_rebac::RebacDatasetRegistryFacade,
             dyn kamu_accounts::AccountService,
-            kamu_accounts::CurrentAccountSubject
+            kamu_accounts::CurrentAccountSubject,
+            kamu_accounts::Principal
         );
 
         let dataset_refs_refs = dataset_refs.iter().collect::<Vec<_>>();
         let resolution = rebac_dataset_registry_facade
-            .classify_dataset_refs_by_allowance(&dataset_refs_refs, DatasetPermission::Read)
+            .classify_dataset_refs_by_allowance(
+                &principal,
+                &dataset_refs_refs,
+                DatasetPermission::Read,
+            )
             .await?;
 
         if !skip_missing && !resolution.inaccessible_refs.is_empty() {
@@ -217,10 +222,11 @@ impl Datasets {
         page: Option<usize>,
         per_page: Option<usize>,
     ) -> Result<DatasetConnection> {
-        let (dataset_registry, dataset_permission_checker) = from_catalog_n!(
+        let (dataset_registry, dataset_permission_checker, principal) = from_catalog_n!(
             ctx,
             dyn kamu_datasets::DatasetRegistry,
-            dyn kamu_datasets::DatasetPermissionChecker
+            dyn kamu_datasets::DatasetPermissionChecker,
+            kamu_accounts::Principal
         );
 
         let page = page.unwrap_or(0);
@@ -230,8 +236,11 @@ impl Datasets {
 
         let account_owned_datasets_stream =
             dataset_registry.all_dataset_handles_by_owner_id(account_ref.account_id_internal());
-        let readable_dataset_handles_stream = dataset_permission_checker
-            .filtered_datasets_stream(account_owned_datasets_stream, DatasetPermission::Read);
+        let readable_dataset_handles_stream = dataset_permission_checker.filtered_datasets_stream(
+            &principal,
+            account_owned_datasets_stream,
+            DatasetPermission::Read,
+        );
         let mut accessible_datasets_handles = readable_dataset_handles_stream
             .try_collect::<Vec<_>>()
             .await?;

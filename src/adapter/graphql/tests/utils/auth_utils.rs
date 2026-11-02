@@ -70,12 +70,12 @@ pub async fn authentication_catalogs_ext(
         .build();
 
     let catalog_anonymous = dill::CatalogBuilder::new_chained(&catalog_no_subject)
-        .add_value(CurrentAccountSubject::anonymous(
+        .add_current_account_subject(CurrentAccountSubject::anonymous(
             AnonymousAccountReason::NoAuthenticationProvided,
         ))
         .build();
     let catalog_authorized = dill::CatalogBuilder::new_chained(&catalog_no_subject)
-        .add_value(current_account_subject)
+        .add_current_account_subject(current_account_subject)
         .build();
 
     init_on_startup::run_startup_jobs_ex(

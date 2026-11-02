@@ -11,47 +11,44 @@ use std::borrow::Cow;
 use std::collections::HashSet;
 
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
-use kamu_accounts::CurrentAccountSubject;
+use kamu_accounts::Principal;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Decides dataset permissions for the principal each call names
 #[cfg_attr(feature = "testing", mockall::automock)]
 #[async_trait::async_trait]
 pub trait DatasetPermissionChecker: Sync + Send {
     async fn check_permission(
         &self,
+        principal: &Principal,
         dataset_id: &odf::DatasetID,
         permission: DatasetPermission,
     ) -> Result<(), DatasetPermissionError>;
 
     async fn get_granted_permissions(
         &self,
+        principal: &Principal,
         dataset_id: &odf::DatasetID,
     ) -> Result<HashSet<DatasetPermission>, GetGrantedPermissionsError>;
 
     async fn filter_datasets_allowing(
         &self,
+        principal: &Principal,
         dataset_handles: Vec<odf::DatasetHandle>,
         permission: DatasetPermission,
     ) -> Result<Vec<odf::DatasetHandle>, InternalError>;
 
     async fn classify_dataset_handles_by_allowance(
         &self,
-        dataset_handles: Vec<odf::DatasetHandle>,
-        permission: DatasetPermission,
-    ) -> Result<ClassifyByAllowanceResponse, InternalError>;
-
-    /// Same as [`Self::classify_dataset_handles_by_allowance`], for the given
-    /// principal instead of the current account
-    async fn classify_dataset_handles_by_allowance_for(
-        &self,
-        principal: &CurrentAccountSubject,
+        principal: &Principal,
         dataset_handles: Vec<odf::DatasetHandle>,
         permission: DatasetPermission,
     ) -> Result<ClassifyByAllowanceResponse, InternalError>;
 
     async fn classify_dataset_ids_by_allowance<'a>(
         &'a self,
+        principal: &Principal,
         dataset_ids: &[Cow<'a, odf::DatasetID>],
         permission: DatasetPermission,
     ) -> Result<ClassifyByAllowanceIdsResponse, InternalError>;
@@ -59,7 +56,9 @@ pub trait DatasetPermissionChecker: Sync + Send {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, strum::EnumString, strum::Display)]
+#[derive(
+    Debug, Clone, Copy, Eq, PartialEq, Hash, strum::EnumString, strum::Display, strum::EnumIter,
+)]
 #[strum(serialize_all = "snake_case")]
 pub enum DatasetPermission {
     Read,
@@ -369,17 +368,20 @@ pub struct ClassifyByAllowanceResponse {
 pub trait DatasetPermissionCheckerExt: DatasetPermissionChecker {
     async fn is_permission_granted(
         &self,
+        principal: &Principal,
         dataset_id: &odf::DatasetID,
         permission: DatasetPermission,
     ) -> Result<bool, InternalError>;
 
     async fn get_granted_permissions_for_existing_dataset(
         &self,
+        principal: &Principal,
         dataset_id: &odf::DatasetID,
     ) -> Result<HashSet<DatasetPermission>, InternalError>;
 
     fn filtered_datasets_stream<'a>(
         &'a self,
+        principal: &'a Principal,
         dataset_handles_stream: odf::dataset::DatasetHandleStream<'a>,
         permission: DatasetPermission,
     ) -> odf::dataset::DatasetHandleStream<'a>;
@@ -395,12 +397,16 @@ where
 {
     async fn is_permission_granted(
         &self,
+        principal: &Principal,
         dataset_id: &odf::DatasetID,
         permission: DatasetPermission,
     ) -> Result<bool, InternalError> {
         use DatasetPermissionError as E;
 
-        match self.check_permission(dataset_id, permission).await {
+        match self
+            .check_permission(principal, dataset_id, permission)
+            .await
+        {
             Ok(()) => Ok(true),
             Err(E::NotFound(_) | E::Access(_)) => Ok(false),
             Err(e @ E::Internal(_)) => Err(e.int_err()),
@@ -409,21 +415,25 @@ where
 
     async fn get_granted_permissions_for_existing_dataset(
         &self,
+        principal: &Principal,
         dataset_id: &odf::DatasetID,
     ) -> Result<HashSet<DatasetPermission>, InternalError> {
-        self.get_granted_permissions(dataset_id).await.map_err(|e| {
-            use GetGrantedPermissionsError as E;
+        self.get_granted_permissions(principal, dataset_id)
+            .await
+            .map_err(|e| {
+                use GetGrantedPermissionsError as E;
 
-            // NOTE: We checked for the presence of datasets earlier,
-            //       so if any are missing now, that would be unexpected.
-            match e {
-                e @ (E::NotFound(_) | E::Internal(_)) => e.int_err(),
-            }
-        })
+                // NOTE: We checked for the presence of datasets earlier,
+                //       so if any are missing now, that would be unexpected.
+                match e {
+                    e @ (E::NotFound(_) | E::Internal(_)) => e.int_err(),
+                }
+            })
     }
 
     fn filtered_datasets_stream<'a>(
         &'a self,
+        principal: &'a Principal,
         dataset_handles_stream: odf::dataset::DatasetHandleStream<'a>,
         permission: DatasetPermission,
     ) -> odf::dataset::DatasetHandleStream<'a> {
@@ -441,7 +451,7 @@ where
             {
                 // ... the datasets that are accessed.
                 let hdls = self
-                    .filter_datasets_allowing(dataset_handles_chunk, permission)
+                    .filter_datasets_allowing(principal, dataset_handles_chunk, permission)
                     .await?;
 
                 for hdl in hdls {
@@ -485,6 +495,7 @@ pub struct AlwaysHappyDatasetPermissionChecker {}
 impl DatasetPermissionChecker for AlwaysHappyDatasetPermissionChecker {
     async fn check_permission(
         &self,
+        _principal: &Principal,
         _dataset_id: &odf::DatasetID,
         _permission: DatasetPermission,
     ) -> Result<(), DatasetPermissionError> {
@@ -494,6 +505,7 @@ impl DatasetPermissionChecker for AlwaysHappyDatasetPermissionChecker {
 
     async fn get_granted_permissions(
         &self,
+        _principal: &Principal,
         _dataset_id: &odf::DatasetID,
     ) -> Result<HashSet<DatasetPermission>, GetGrantedPermissionsError> {
         let all_permissions = [
@@ -508,6 +520,7 @@ impl DatasetPermissionChecker for AlwaysHappyDatasetPermissionChecker {
 
     async fn filter_datasets_allowing(
         &self,
+        _principal: &Principal,
         dataset_handles: Vec<odf::DatasetHandle>,
         _permission: DatasetPermission,
     ) -> Result<Vec<odf::DatasetHandle>, InternalError> {
@@ -516,6 +529,7 @@ impl DatasetPermissionChecker for AlwaysHappyDatasetPermissionChecker {
 
     async fn classify_dataset_handles_by_allowance(
         &self,
+        _principal: &Principal,
         dataset_handles: Vec<odf::DatasetHandle>,
         _permission: DatasetPermission,
     ) -> Result<ClassifyByAllowanceResponse, InternalError> {
@@ -525,18 +539,9 @@ impl DatasetPermissionChecker for AlwaysHappyDatasetPermissionChecker {
         })
     }
 
-    async fn classify_dataset_handles_by_allowance_for(
-        &self,
-        _principal: &CurrentAccountSubject,
-        dataset_handles: Vec<odf::DatasetHandle>,
-        permission: DatasetPermission,
-    ) -> Result<ClassifyByAllowanceResponse, InternalError> {
-        self.classify_dataset_handles_by_allowance(dataset_handles, permission)
-            .await
-    }
-
     async fn classify_dataset_ids_by_allowance<'a>(
         &'a self,
+        _principal: &Principal,
         dataset_ids: &[Cow<'a, odf::DatasetID>],
         _permission: DatasetPermission,
     ) -> Result<ClassifyByAllowanceIdsResponse, InternalError> {

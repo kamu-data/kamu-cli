@@ -15,7 +15,7 @@ use axum::response::Response;
 use database_common::DatabaseTransactionRunner;
 use futures::Future;
 use internal_error::{ErrorIntoInternal, InternalError};
-use kamu_accounts::{AnonymousAccountReason, CurrentAccountSubject};
+use kamu_accounts::{AnonymousAccountReason, CurrentAccountSubject, Principal};
 use kamu_datasets::{
     DatasetPermission,
     DatasetPermissionAccess,
@@ -144,6 +144,7 @@ where
                         let dataset_permission_checker = transaction_catalog
                             .get_one::<dyn DatasetPermissionChecker>()
                             .unwrap();
+                        let principal = transaction_catalog.get_one::<Principal>().unwrap();
 
                         let dataset_handle = {
                             use odf::DatasetRefUnresolvedError as E;
@@ -164,7 +165,10 @@ where
                             }
                         };
                         let granted_permissions = dataset_permission_checker
-                            .get_granted_permissions_for_existing_dataset(&dataset_handle.id)
+                            .get_granted_permissions_for_existing_dataset(
+                                &principal,
+                                &dataset_handle.id,
+                            )
                             .await?;
 
                         match DatasetPermission::resolve_access(

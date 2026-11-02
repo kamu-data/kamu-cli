@@ -15,6 +15,7 @@ use kamu_accounts::{
     AccountConfig,
     AccountPropertyName,
     CurrentAccountSubject,
+    CurrentAccountSubjectCatalogExt as _,
     DidEntity,
     DidSecretEncryptionConfig,
     DidSecretKey,
@@ -650,7 +651,7 @@ impl SignEip712UseCaseHarness {
             b.add_value(identity_config);
         }
 
-        b.add_value(current_account_subject);
+        b.add_current_account_subject(current_account_subject);
 
         if let Some(mock_dataset_permission_checker) = maybe_mock_dataset_permission_checker {
             b.add_value(mock_dataset_permission_checker)

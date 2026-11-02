@@ -22,7 +22,7 @@ use kamu::{
     ObjectStoreRegistryImpl,
     SessionContextBuilder,
 };
-use kamu_accounts::CurrentAccountSubject;
+use kamu_accounts::{CurrentAccountSubject, CurrentAccountSubjectCatalogExt as _};
 use kamu_core::{DidGenerator, DidGeneratorDefault, TenancyConfig};
 use kamu_datasets::{
     DatasetPermissionChecker,
@@ -157,7 +157,7 @@ fn create_base_catalog(dataset_permission_checker: MockDatasetPermissionChecker)
         .add_value(EngineConfigDatafusionEmbeddedBatchQuery::default())
         .add::<SessionContextBuilder>()
         .add::<ObjectStoreRegistryImpl>()
-        .add_value(CurrentAccountSubject::new_test())
+        .add_current_account_subject(CurrentAccountSubject::new_test())
         .add_value(dataset_permission_checker)
         .bind::<dyn DatasetPermissionChecker, MockDatasetPermissionChecker>()
         .build()

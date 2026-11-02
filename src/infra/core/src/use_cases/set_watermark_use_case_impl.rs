@@ -12,7 +12,7 @@ use std::sync::Arc;
 use chrono::{DateTime, Utc};
 use dill::{component, interface};
 use internal_error::ErrorIntoInternal;
-use kamu_accounts::CurrentAccountSubject;
+use kamu_accounts::Principal;
 use kamu_core::*;
 use kamu_datasets::{
     DatasetOperation,
@@ -31,7 +31,7 @@ pub struct SetWatermarkUseCaseImpl {
     set_watermark_executor: Arc<dyn SetWatermarkExecutor>,
     dataset_operation_guard: Arc<dyn DatasetOperationGuard>,
     dataset_registry: Arc<dyn DatasetRegistry>,
-    current_account_subject: Arc<CurrentAccountSubject>,
+    principal: Arc<Principal>,
 }
 
 #[common_macros::method_names_consts]
@@ -50,7 +50,7 @@ impl SetWatermarkUseCase for SetWatermarkUseCaseImpl {
     ) -> Result<SetWatermarkResult, SetWatermarkError> {
         self.dataset_operation_guard
             .check_operation(
-                &self.current_account_subject,
+                &self.principal,
                 &DatasetOperationRequest::new(
                     dataset_handle.clone(),
                     DatasetOperation::SetWatermark,

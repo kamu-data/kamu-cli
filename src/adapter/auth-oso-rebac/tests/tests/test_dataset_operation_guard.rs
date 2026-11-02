@@ -15,8 +15,10 @@ use kamu_accounts::testing::CurrentAccountSubjectTestHelper;
 use kamu_accounts::{
     AccountConfig,
     CurrentAccountSubject,
+    CurrentAccountSubjectCatalogExt as _,
     DidSecretEncryptionConfig,
     PredefinedAccountsConfig,
+    Principal,
 };
 use kamu_accounts_inmem::{InMemoryAccountRepository, InMemoryDidSecretKeyRepository};
 use kamu_accounts_services::{
@@ -224,6 +226,60 @@ async fn test_principal_is_the_given_one_not_the_current_account() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
+async fn test_node_may_run_every_operation() {
+    let harness =
+        OperationGuardHarness::new(CurrentAccountSubjectTestHelper::logged("owner")).await;
+    let target = harness.create_private_dataset("owner", "target").await;
+    let input = harness.create_private_dataset("stranger", "input").await;
+
+    let operations = [
+        DatasetOperation::Transform {
+            inputs: vec![input.clone()],
+        },
+        DatasetOperation::PollingIngest,
+        DatasetOperation::PushIngest,
+        DatasetOperation::SyncFrom,
+        DatasetOperation::SetWatermark,
+        DatasetOperation::SyncTo,
+        DatasetOperation::Verify {
+            replayed_inputs: vec![input.clone()],
+        },
+        DatasetOperation::Compaction,
+        DatasetOperation::ResetToMetadata,
+        DatasetOperation::Reset,
+    ];
+
+    for operation in operations {
+        assert_matches!(
+            harness
+                .authorize_as(&Principal::Node, &target, operation.clone())
+                .await,
+            Ok(()),
+            "node running {operation:?}"
+        );
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_missing_target_is_not_found_for_node() {
+    let harness =
+        OperationGuardHarness::new(CurrentAccountSubjectTestHelper::logged("owner")).await;
+    let missing = odf::metadata::testing::handle(&"owner", &"missing", odf::DatasetKind::Root);
+
+    assert_matches!(
+        harness
+            .authorize_as(&Principal::Node, &missing, DatasetOperation::Compaction)
+            .await,
+        Err(DatasetPermissionError::NotFound(e))
+            if e.dataset_ref == missing.as_local_ref()
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
 async fn test_batch_keeps_request_order() {
     let harness =
         OperationGuardHarness::new(CurrentAccountSubjectTestHelper::logged("owner")).await;
@@ -290,7 +346,7 @@ impl OperationGuardHarness {
 
             kamu_datasets_inmem::register_dependencies(&mut b);
             b.add::<SystemTimeSourceDefault>()
-                .add_value(current_account_subject)
+                .add_current_account_subject(current_account_subject)
                 .add_value(predefined_accounts_config)
                 .add::<PredefinedAccountsRegistrator>()
                 .add::<RebacServiceImpl>()
@@ -396,9 +452,19 @@ impl OperationGuardHarness {
         target: &odf::DatasetHandle,
         operation: DatasetOperation,
     ) -> Result<(), DatasetPermissionError> {
+        self.authorize_as(&Self::user(principal), target, operation)
+            .await
+    }
+
+    async fn authorize_as(
+        &self,
+        principal: &Principal,
+        target: &odf::DatasetHandle,
+        operation: DatasetOperation,
+    ) -> Result<(), DatasetPermissionError> {
         self.operation_guard
             .check_operation(
-                &CurrentAccountSubjectTestHelper::logged(principal),
+                principal,
                 &DatasetOperationRequest::new(target.clone(), operation),
             )
             .await
@@ -410,12 +476,13 @@ impl OperationGuardHarness {
         requests: Vec<DatasetOperationRequest>,
     ) -> Vec<Result<(), DatasetPermissionError>> {
         self.operation_guard
-            .check_operations(
-                &CurrentAccountSubjectTestHelper::logged(principal),
-                &requests,
-            )
+            .check_operations(&Self::user(principal), &requests)
             .await
             .unwrap()
+    }
+
+    fn user(account_name: &str) -> Principal {
+        Principal::from(&CurrentAccountSubjectTestHelper::logged(account_name))
     }
 
     /// The dataset a permission denial names

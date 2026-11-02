@@ -10,38 +10,46 @@
 use std::collections::HashMap;
 
 use internal_error::{ErrorIntoInternal, InternalError};
+use kamu_accounts::Principal;
 use kamu_datasets::{DatasetPermission, DatasetPermissionMissingError, ResolvedDataset};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Resolves datasets for the principal each call names, checking its
+/// permissions
 #[async_trait::async_trait]
 pub trait RebacDatasetRegistryFacade: Send + Sync {
     async fn resolve_dataset_handle_by_ref(
         &self,
+        principal: &Principal,
         dataset_ref: &odf::DatasetRef,
         permission: DatasetPermission,
     ) -> Result<odf::DatasetHandle, RebacDatasetRefUnresolvedError>;
 
     async fn resolve_dataset_by_ref(
         &self,
+        principal: &Principal,
         dataset_ref: &odf::DatasetRef,
         permission: DatasetPermission,
     ) -> Result<ResolvedDataset, RebacDatasetRefUnresolvedError>;
 
     async fn resolve_dataset_by_handle(
         &self,
+        principal: &Principal,
         dataset_handle: &odf::DatasetHandle,
         permission: DatasetPermission,
     ) -> Result<ResolvedDataset, RebacDatasetIdUnresolvedError>;
 
     async fn classify_dataset_refs_by_allowance(
         &self,
+        principal: &Principal,
         dataset_refs: &[&odf::DatasetRef],
         permission: DatasetPermission,
     ) -> Result<ClassifyDatasetRefsByAllowanceResponse, InternalError>;
 
     async fn classify_dataset_refs_by_access(
         &self,
+        principal: &Principal,
         dataset_refs: &[&odf::DatasetRef],
         permission: DatasetPermission,
     ) -> Result<ClassifyDatasetRefsByAccessResponse, InternalError>;

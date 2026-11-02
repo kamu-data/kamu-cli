@@ -287,10 +287,11 @@ impl Account {
         page: Option<usize>,
         per_page: Option<usize>,
     ) -> Result<DatasetConnection> {
-        let (dataset_registry, dataset_permission_checker) = from_catalog_n!(
+        let (dataset_registry, dataset_permission_checker, principal) = from_catalog_n!(
             ctx,
             dyn kamu_datasets::DatasetRegistry,
-            dyn DatasetPermissionChecker
+            dyn DatasetPermissionChecker,
+            kamu_accounts::Principal
         );
 
         let page = page.unwrap_or(0);
@@ -300,8 +301,11 @@ impl Account {
 
         let account_owned_datasets_stream =
             dataset_registry.all_dataset_handles_by_owner_id(&self.account_id);
-        let readable_dataset_handles_stream = dataset_permission_checker
-            .filtered_datasets_stream(account_owned_datasets_stream, DatasetPermission::Read);
+        let readable_dataset_handles_stream = dataset_permission_checker.filtered_datasets_stream(
+            &principal,
+            account_owned_datasets_stream,
+            DatasetPermission::Read,
+        );
         let mut accessible_datasets_handles = readable_dataset_handles_stream
             .try_collect::<Vec<_>>()
             .await?;

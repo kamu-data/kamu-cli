@@ -549,10 +549,12 @@ Resolution + permission checks live in `ResourceAccountResolverImpl`
   `Default`) but is rejected by the resolver itself with `EmptySelector`. So is a selector with only
   `id`: lookup needs `did` or `name`.
 - **Remote calls.** For a remote context the CLI authenticates with an access token; the server then
-  resolves the *authenticated principal* into the current account subject exactly as above — the
-  client never asserts its own account id, the server derives it.
-- **Local workspace context.** The local facade uses the workspace's current account subject
-  (`CurrentAccountSubject`) as the caller; the same admin rule applies for cross-account targeting.
+  authenticates the token into the caller and its principal and resolves the account exactly as
+  above — the client never asserts its own account id, the server derives it.
+- **Local workspace context.** The local facade defaults `headers.account` to the workspace's
+  current account subject (`CurrentAccountSubject`) and checks access for the `Principal`
+  registered beside it ([identity](identity.md)); the same admin rule applies for cross-account
+  targeting, and `Principal::Node` may target any account.
 - **UID belonging to a different account.** Lookups are account-scoped (`find_account_snapshot`
   filters by `account_id`). A UID that exists but belongs to another account is reported as
   **not-found** (`ResourceIDNotFoundError`), not "forbidden" — so existence is not leaked across
@@ -1674,8 +1676,8 @@ grants nobody access to anything, and a dead link must not survive merely becaus
 someone else's namespace.
 
 *Authority.* The consumer runs below the facade, which is where authorization lives, so it resolves
-dispatchers from the message-scoped catalog and never touches `CurrentAccountSubject` — there is no
-system principal in this codebase and none is needed. The `account_id` it passes to
+dispatchers from the message-scoped catalog and checks no permissions. It runs as `Principal::Node`
+like all background work ([identity](identity.md)), but does not rely on it. The `account_id` it passes to
 `ResourceCrudDispatcherDeletionRequest` is an ownership **scope**, read back off each selected
 resource's own snapshot, not an actor claim: the use case feeds it to `find_owned_snapshots`, which
 hard-errors on ids owned by anyone else. Nothing in `ResourceEventDeleted` or

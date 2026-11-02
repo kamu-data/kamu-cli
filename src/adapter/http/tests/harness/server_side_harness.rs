@@ -14,7 +14,13 @@ use std::time::Duration;
 use chrono::Utc;
 use email_utils::Email;
 use internal_error::InternalError;
-use kamu_accounts::{Account, AccountProvider, AccountType, CurrentAccountSubject};
+use kamu_accounts::{
+    Account,
+    AccountProvider,
+    AccountType,
+    CurrentAccountSubject,
+    CurrentAccountSubjectCatalogExt as _,
+};
 use kamu_adapter_http::smart_protocol::SmartTransferProtocolServerConfig;
 use kamu_core::{CompactionExecutor, CompactionPlanner, TenancyConfig};
 use kamu_datasets::{
@@ -175,7 +181,7 @@ pub(crate) fn create_cli_user_catalog(
     };
 
     dill::CatalogBuilder::new_chained(base_catalog)
-        .add_value(current_account_subject)
+        .add_current_account_subject(current_account_subject)
         .add::<AlwaysHappyDatasetPermissionChecker>()
         .build()
 }
@@ -193,7 +199,7 @@ pub(crate) fn create_web_user_catalog(
         let mut mock_dataset_permission_checker = MockDatasetPermissionChecker::new();
         mock_dataset_permission_checker
             .expect_get_granted_permissions()
-            .returning(|_dataset_id| Ok(HashSet::new()));
+            .returning(|_, _| Ok(HashSet::new()));
         web_catalog_builder
             .add_value(mock_dataset_permission_checker)
             .bind::<dyn DatasetPermissionChecker, MockDatasetPermissionChecker>();
