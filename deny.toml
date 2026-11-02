@@ -139,14 +139,4 @@ ignore = [
     # Pulled via alloy -> k256 0.13 / elliptic-curve 0.13; no alloy release uses 0.14 yet
     # https://rustsec.org/advisories/RUSTSEC-2026-0387
     "RUSTSEC-2026-0387",
-    # zstd 0.13 / zstd-safe 7.x, used by Arrow, Parquet and DataFusion; fixed only in zstd 0.14
-    # and zstd-safe 8.2. Not reachable here: these crates use the bulk API and plain stream
-    # constructors, never `with_context`, and the `seekable` feature is off.
-    # Remove when the DataFusion stack moves to zstd 0.14
-    # https://rustsec.org/advisories/RUSTSEC-2026-0391
-    # https://rustsec.org/advisories/RUSTSEC-2026-0398
-    # https://rustsec.org/advisories/RUSTSEC-2026-0403
-    "RUSTSEC-2026-0391",
-    "RUSTSEC-2026-0398",
-    "RUSTSEC-2026-0403",
 ]
