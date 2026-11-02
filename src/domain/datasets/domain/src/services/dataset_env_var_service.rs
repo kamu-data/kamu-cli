@@ -95,6 +95,9 @@ pub enum UpsertDatasetEnvVarError {
     Validation(#[from] DatasetEnvVarValidationError),
 
     #[error(transparent)]
+    ConcurrentModification(#[from] DatasetEnvVarConcurrentModificationError),
+
+    #[error(transparent)]
     Internal(#[from] InternalError),
 }
 
@@ -107,6 +110,9 @@ pub enum CreateDatasetEnvVarError {
     Validation(#[from] DatasetEnvVarValidationError),
 
     #[error(transparent)]
+    ConcurrentModification(#[from] DatasetEnvVarConcurrentModificationError),
+
+    #[error(transparent)]
     Internal(#[from] InternalError),
 }
 
@@ -114,10 +120,17 @@ impl From<UpsertDatasetEnvVarError> for CreateDatasetEnvVarError {
     fn from(err: UpsertDatasetEnvVarError) -> Self {
         match err {
             UpsertDatasetEnvVarError::Validation(e) => Self::Validation(e),
+            UpsertDatasetEnvVarError::ConcurrentModification(e) => Self::ConcurrentModification(e),
             UpsertDatasetEnvVarError::Internal(e) => Self::Internal(e),
         }
     }
 }
+
+/// The dataset's variables or secrets changed between reading and writing
+/// them; nothing was written, and the request can be retried
+#[derive(Error, Debug)]
+#[error("Environment variables of the dataset were changed concurrently, retry the request")]
+pub struct DatasetEnvVarConcurrentModificationError;
 
 #[derive(Error, Debug)]
 #[error("Dataset environment variable already exists: '{dataset_env_var_key}'")]
@@ -152,6 +165,9 @@ pub enum DatasetEnvVarValidationError {
 pub enum DeleteDatasetEnvVarError {
     #[error(transparent)]
     NotFound(DatasetEnvVarNotFoundError),
+
+    #[error(transparent)]
+    ConcurrentModification(#[from] DatasetEnvVarConcurrentModificationError),
 
     #[error(transparent)]
     Internal(#[from] InternalError),

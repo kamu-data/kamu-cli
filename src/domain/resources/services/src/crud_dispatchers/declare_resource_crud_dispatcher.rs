@@ -72,9 +72,10 @@ macro_rules! declare_resource_crud_dispatcher {
                     .map_err(Into::into)
             }
 
-            async fn apply(
+            async fn apply_with_precondition(
                 &self,
                 request: $crate::ResourceCrudDispatcherApplyRequest,
+                precondition: kamu_resources::ApplyResourcePrecondition,
             ) -> Result<
                 kamu_resources::ApplyManifestApplicationDecision,
                 $crate::ApplyResourceCrudDispatcherError,
@@ -84,11 +85,14 @@ macro_rules! declare_resource_crud_dispatcher {
 
                 let result = self
                     .apply_resource_use_case
-                    .apply(kamu_resources::ApplyResourceParams {
-                        id: request.id,
-                        headers: request.headers,
-                        spec,
-                    })
+                    .apply_with_precondition(
+                        kamu_resources::ApplyResourceParams {
+                            id: request.id,
+                            headers: request.headers,
+                            spec,
+                        },
+                        precondition,
+                    )
                     .await
                     .map_err(kamu_resources::ApplyResourceCrudDispatcherError::from)?;
 

@@ -32,19 +32,24 @@ use kamu_datasets::{
     DatasetEntryRepository,
     DatasetEnvVar,
     DatasetEnvVarAlreadyExistsError,
+    DatasetEnvVarConcurrentModificationError,
     DatasetEnvVarMutationAdapter,
     DatasetEnvVarNotFoundError,
+    DatasetEnvVarSpecResolver,
     DatasetEnvVarUpsertResult,
     DatasetEnvVarValidationError,
     DatasetEnvVarValue,
     DeleteDatasetEnvVarError,
     GetDatasetEntryError,
+    GetDatasetEnvVarError,
     SecretsEncryptionConfig,
     UpsertDatasetEnvVarError,
     UpsertDatasetEnvVarStatus,
 };
 use kamu_resources::{
     ApplyManifestApplicationDecision,
+    ApplyResourceCrudDispatcherError,
+    ApplyResourcePrecondition,
     GenericResourceQueryService,
     ResourceCrudDispatcher,
     ResourceCrudDispatcherApplyRequest,
@@ -54,6 +59,7 @@ use kamu_resources::{
     ResourceID,
     ResourceName,
     ResourceSchemaProvider,
+    ResourceSnapshot,
     ResourceSpecFromInput,
     TypeUri,
 };
@@ -69,6 +75,7 @@ pub struct DatasetEnvVarMutationAdapterImpl {
     dataset_entry_repository: Arc<dyn DatasetEntryRepository>,
     account_service: Arc<dyn AccountService>,
     generic_resource_query_service: Arc<dyn GenericResourceQueryService>,
+    spec_resolver: Arc<dyn DatasetEnvVarSpecResolver>,
     secrets_encryption_config: Arc<SecretsEncryptionConfig>,
 }
 
@@ -94,20 +101,23 @@ impl DatasetEnvVarMutationAdapter for DatasetEnvVarMutationAdapterImpl {
         value: &DatasetEnvVarValue,
     ) -> Result<DatasetEnvVar, CreateDatasetEnvVarError> {
         let dataset_entry = self.get_dataset_entry(dataset_id).await?;
-        let owner_id = &dataset_entry.owner_id;
 
-        // A key is taken whichever class it is stored as
-        if self
-            .find_variable(dataset_id, owner_id, key)
-            .await?
-            .is_some()
-            || self.find_secret(dataset_id, owner_id, key).await?.is_some()
+        // A key is taken when the dataset's environment resolves it, from the
+        // legacy sets or from any other set targeting the dataset
+        match self
+            .spec_resolver
+            .get_env_var_by_entry_key(dataset_id, key)
+            .await
         {
-            return Err(CreateDatasetEnvVarError::AlreadyExists(
-                DatasetEnvVarAlreadyExistsError {
-                    dataset_env_var_key: key.to_string(),
-                },
-            ));
+            Ok(_) => {
+                return Err(CreateDatasetEnvVarError::AlreadyExists(
+                    DatasetEnvVarAlreadyExistsError {
+                        dataset_env_var_key: key.to_string(),
+                    },
+                ));
+            }
+            Err(GetDatasetEnvVarError::NotFound(_)) => {}
+            Err(GetDatasetEnvVarError::Internal(err)) => return Err(err.into()),
         }
 
         let upsert_result = self.write_env_var(&dataset_entry, key, value).await?;
@@ -170,22 +180,39 @@ impl DatasetEnvVarMutationAdapterImpl {
             .map_err(ErrorIntoInternal::int_err)
     }
 
-    async fn apply_and_handle_rejection<E>(
+    /// Writes a set read earlier, as long as it is still in the state
+    /// `precondition` describes, so a concurrent write is never overwritten
+    async fn apply_and_handle_rejection(
         &self,
         dispatcher: &Arc<dyn ResourceCrudDispatcher>,
         request: ResourceCrudDispatcherApplyRequest,
+        precondition: ApplyResourcePrecondition,
         resource_type_name: &str,
-    ) -> Result<ResourceID, E>
-    where
-        E: From<InternalError>,
-    {
-        let apply_decision = dispatcher.apply(request).await.int_err().map_err(E::from)?;
+    ) -> Result<ResourceID, EnvVarSetWriteError> {
+        let apply_decision = match dispatcher
+            .apply_with_precondition(request, precondition)
+            .await
+        {
+            Ok(apply_decision) => apply_decision,
+            Err(ApplyResourceCrudDispatcherError::ConcurrentModification(_)) => {
+                return Err(EnvVarSetWriteError::ConcurrentModification);
+            }
+            Err(
+                err @ (ApplyResourceCrudDispatcherError::InvalidSpec { .. }
+                | ApplyResourceCrudDispatcherError::NotFound(_)
+                | ApplyResourceCrudDispatcherError::TypeMismatch(_)
+                | ApplyResourceCrudDispatcherError::Internal(_)),
+            ) => return Err(err.int_err().into()),
+        };
 
         match apply_decision {
             ApplyManifestApplicationDecision::Applied(result) => Ok(result.resource.headers.id),
-            ApplyManifestApplicationDecision::Rejected(rejection) => Err(E::from(
-                format!("{resource_type_name} apply rejected: {}", rejection.message).int_err(),
-            )),
+            ApplyManifestApplicationDecision::Rejected(rejection) => Err(format!(
+                "{resource_type_name} apply rejected: {}",
+                rejection.message
+            )
+            .int_err()
+            .into()),
         }
     }
 
@@ -228,9 +255,11 @@ impl DatasetEnvVarMutationAdapterImpl {
         account_name: &odf::AccountName,
     ) -> Result<DatasetEnvVarUpsertResult, UpsertDatasetEnvVarError> {
         let resource_name = Self::legacy_variable_set_resource_name(dataset_id);
-        let (existing_id, mut variables) = self
-            .load_existing_variable_spec(account_did, &resource_name)
-            .await?;
+        let LoadedEnvVarSet {
+            id: existing_id,
+            precondition,
+            entries: mut variables,
+        } = self.load_variable_set(account_did, &resource_name).await?;
 
         EnvVarSetRules::VARIABLES.check_entry(&variables, key, plaintext)?;
 
@@ -270,13 +299,14 @@ impl DatasetEnvVarMutationAdapterImpl {
 
         let dispatcher = self.get_dispatcher(VariableSetResource::SCHEMA_STR)?;
 
-        self.apply_and_handle_rejection::<UpsertDatasetEnvVarError>(
+        self.apply_and_handle_rejection(
             &dispatcher,
             ResourceCrudDispatcherApplyRequest {
                 id: existing_id,
                 headers,
                 spec: new_spec,
             },
+            precondition,
             "VariableSet",
         )
         .await?;
@@ -309,9 +339,11 @@ impl DatasetEnvVarMutationAdapterImpl {
     ) -> Result<DatasetEnvVarUpsertResult, UpsertDatasetEnvVarError> {
         let resource_name = Self::legacy_secret_set_resource_name(dataset_id);
 
-        let (existing_id, mut secrets) = self
-            .load_existing_secret_spec_decrypted(account_did, &resource_name)
-            .await?;
+        let LoadedEnvVarSet {
+            id: existing_id,
+            precondition,
+            entries: mut secrets,
+        } = self.load_secret_set(account_did, &resource_name).await?;
 
         EnvVarSetRules::SECRETS.check_entry(&secrets, key, plaintext)?;
 
@@ -351,13 +383,14 @@ impl DatasetEnvVarMutationAdapterImpl {
 
         let dispatcher = self.get_dispatcher(SecretSetResource::SCHEMA_STR)?;
 
-        self.apply_and_handle_rejection::<UpsertDatasetEnvVarError>(
+        self.apply_and_handle_rejection(
             &dispatcher,
             ResourceCrudDispatcherApplyRequest {
                 id: existing_id,
                 headers,
                 spec: new_spec,
             },
+            precondition,
             "SecretSet",
         )
         .await?;
@@ -392,25 +425,14 @@ impl DatasetEnvVarMutationAdapterImpl {
         &self,
         resource_id: ResourceID,
         key: &str,
-    ) -> Result<(), DeleteDatasetEnvVarError> {
-        let snapshot = self
-            .generic_resource_query_service
-            .get_snapshot_by_id(&resource_id)
-            .await
-            .int_err()?
-            .ok_or_else(|| {
-                DeleteDatasetEnvVarError::Internal(
-                    format!("VariableSet resource {resource_id} not found in snapshot store")
-                        .int_err(),
-                )
-            })?;
+    ) -> Result<(), EnvVarSetWriteError> {
+        let snapshot = self.load_snapshot(&resource_id).await?;
+        let precondition = ApplyResourcePrecondition::Generation(snapshot.headers.generation);
 
         let mut spec: VariableSetSpec = serde_json::from_value(snapshot.spec).int_err()?;
         spec.variables.entries.remove(key);
 
-        let dispatcher = self
-            .get_dispatcher(VariableSetResource::SCHEMA_STR)
-            .map_err(DeleteDatasetEnvVarError::Internal)?;
+        let dispatcher = self.get_dispatcher(VariableSetResource::SCHEMA_STR)?;
 
         if spec.variables.entries.is_empty() {
             dispatcher
@@ -429,10 +451,10 @@ impl DatasetEnvVarMutationAdapterImpl {
                     headers,
                     spec: serde_json::to_value(spec.into_input()).int_err()?,
                 },
+                precondition,
                 "VariableSet",
             )
-            .await
-            .map_err(DeleteDatasetEnvVarError::Internal)?;
+            .await?;
         }
 
         Ok(())
@@ -442,25 +464,15 @@ impl DatasetEnvVarMutationAdapterImpl {
         &self,
         resource_id: ResourceID,
         key: &str,
-    ) -> Result<(), DeleteDatasetEnvVarError> {
-        let snapshot = self
-            .generic_resource_query_service
-            .get_snapshot_by_id(&resource_id)
-            .await
-            .int_err()?
-            .ok_or_else(|| {
-                DeleteDatasetEnvVarError::Internal(
-                    format!("SecretSet resource {resource_id} not found in snapshot store")
-                        .int_err(),
-                )
-            })?;
+    ) -> Result<(), EnvVarSetWriteError> {
+        let snapshot = self.load_snapshot(&resource_id).await?;
+        let precondition = ApplyResourcePrecondition::Generation(snapshot.headers.generation);
 
-        let mut decrypted = self.decrypt_secret_entries(&resource_id).await.int_err()?;
+        let spec: SecretSetSpec = serde_json::from_value(snapshot.spec).int_err()?;
+        let mut decrypted = self.decrypt_secret_entries(spec.into_dto())?;
         decrypted.remove(key);
 
-        let dispatcher = self
-            .get_dispatcher(SecretSetResource::SCHEMA_STR)
-            .map_err(DeleteDatasetEnvVarError::Internal)?;
+        let dispatcher = self.get_dispatcher(SecretSetResource::SCHEMA_STR)?;
 
         if decrypted.is_empty() {
             dispatcher
@@ -495,10 +507,10 @@ impl DatasetEnvVarMutationAdapterImpl {
                     headers,
                     spec: serde_json::to_value(new_spec).int_err()?,
                 },
+                precondition,
                 "SecretSet",
             )
-            .await
-            .map_err(DeleteDatasetEnvVarError::Internal)?;
+            .await?;
         }
 
         Ok(())
@@ -511,16 +523,9 @@ impl DatasetEnvVarMutationAdapterImpl {
         dataset_id: &odf::DatasetID,
         owner_id: &odf::AccountID,
         key: &str,
-    ) -> Result<bool, InternalError> {
+    ) -> Result<bool, EnvVarSetWriteError> {
         match self.find_secret(dataset_id, owner_id, key).await? {
-            Some((resource_id, key)) => self
-                .delete_secret(resource_id, &key)
-                .await
-                .map_err(|e| match e {
-                    DeleteDatasetEnvVarError::NotFound(e) => e.int_err(),
-                    DeleteDatasetEnvVarError::Internal(e) => e,
-                })
-                .map(|_| true),
+            Some((resource_id, key)) => self.delete_secret(resource_id, &key).await.map(|_| true),
             None => Ok(false),
         }
     }
@@ -532,16 +537,9 @@ impl DatasetEnvVarMutationAdapterImpl {
         dataset_id: &odf::DatasetID,
         owner_id: &odf::AccountID,
         key: &str,
-    ) -> Result<bool, InternalError> {
+    ) -> Result<bool, EnvVarSetWriteError> {
         match self.find_variable(dataset_id, owner_id, key).await? {
-            Some((resource_id, key)) => self
-                .delete_variable(resource_id, &key)
-                .await
-                .map_err(|e| match e {
-                    DeleteDatasetEnvVarError::NotFound(e) => e.int_err(),
-                    DeleteDatasetEnvVarError::Internal(e) => e,
-                })
-                .map(|_| true),
+            Some((resource_id, key)) => self.delete_variable(resource_id, &key).await.map(|_| true),
             None => Ok(false),
         }
     }
@@ -632,49 +630,48 @@ impl DatasetEnvVarMutationAdapterImpl {
             .await
     }
 
-    // Returns (existing_id, variables_map, existing_entry_id_for_key)
-    async fn load_existing_variable_spec(
+    async fn load_variable_set(
         &self,
         account_id: &odf::AccountID,
         resource_name: &ResourceName,
-    ) -> Result<(Option<ResourceID>, BTreeMap<String, Variable>), InternalError> {
-        let id = self
-            .generic_resource_query_service
-            .find_resource_id_by_name(account_id, VariableSetResource::schema(), resource_name)
-            .await?;
-
-        let Some(id) = id else {
-            return Ok((None, BTreeMap::new()));
+    ) -> Result<LoadedEnvVarSet<Variable>, InternalError> {
+        let Some(id) = self
+            .find_legacy_resource_id(account_id, VariableSetResource::schema(), resource_name)
+            .await?
+        else {
+            return Ok(LoadedEnvVarSet::absent());
         };
 
-        let snapshot = self
-            .generic_resource_query_service
-            .get_snapshot_by_id(&id)
-            .await?
-            .ok_or_else(|| format!("VariableSet {id} missing snapshot").int_err())?;
-
+        let snapshot = self.load_snapshot(&id).await?;
+        let generation = snapshot.headers.generation;
         let spec: VariableSetSpec = serde_json::from_value(snapshot.spec).int_err()?;
-        Ok((Some(id), spec.into_dto().variables.entries))
+
+        Ok(LoadedEnvVarSet {
+            id: Some(id),
+            precondition: ApplyResourcePrecondition::Generation(generation),
+            entries: spec.into_dto().variables.entries,
+        })
     }
 
-    // Returns (existing_id, decrypted_secrets_map)
-    async fn load_existing_secret_spec_decrypted(
+    /// Like [`Self::load_variable_set`], with the secrets decrypted
+    async fn load_secret_set(
         &self,
         account_id: &odf::AccountID,
         resource_name: &ResourceName,
-    ) -> Result<(Option<ResourceID>, BTreeMap<String, Secret>), InternalError> {
-        let id = self
-            .generic_resource_query_service
-            .find_resource_id_by_name(account_id, SecretSetResource::schema(), resource_name)
-            .await?;
-
-        let Some(id) = id else {
-            return Ok((None, BTreeMap::new()));
+    ) -> Result<LoadedEnvVarSet<Secret>, InternalError> {
+        let Some(id) = self
+            .find_legacy_resource_id(account_id, SecretSetResource::schema(), resource_name)
+            .await?
+        else {
+            return Ok(LoadedEnvVarSet::absent());
         };
 
-        let decrypted = self.decrypt_secret_entries(&id).await?;
+        let snapshot = self.load_snapshot(&id).await?;
+        let generation = snapshot.headers.generation;
+        let spec: SecretSetSpec = serde_json::from_value(snapshot.spec).int_err()?;
 
-        let secrets = decrypted
+        let entries = self
+            .decrypt_secret_entries(spec.into_dto())?
             .into_iter()
             .map(|(k, v)| {
                 (
@@ -687,19 +684,33 @@ impl DatasetEnvVarMutationAdapterImpl {
             })
             .collect();
 
-        Ok((Some(id), secrets))
+        Ok(LoadedEnvVarSet {
+            id: Some(id),
+            precondition: ApplyResourcePrecondition::Generation(generation),
+            entries,
+        })
+    }
+
+    /// The set as stored in its spec.
+    ///
+    /// Not the projection: this feeds read-modify-write applies, so a
+    /// pre-reconcile read would rebuild the spec without any entry added since
+    /// and silently retract it.
+    async fn load_snapshot(
+        &self,
+        resource_id: &ResourceID,
+    ) -> Result<ResourceSnapshot, InternalError> {
+        self.generic_resource_query_service
+            .get_snapshot_by_id(resource_id)
+            .await?
+            .ok_or_else(|| format!("Resource {resource_id} missing snapshot").int_err())
     }
 
     async fn load_variable_spec(
         &self,
         resource_id: &ResourceID,
     ) -> Result<odf::metadata::config::VariableSetSpec, InternalError> {
-        let snapshot = self
-            .generic_resource_query_service
-            .get_snapshot_by_id(resource_id)
-            .await?
-            .ok_or_else(|| format!("VariableSet {resource_id} missing snapshot").int_err())?;
-
+        let snapshot = self.load_snapshot(resource_id).await?;
         let spec: VariableSetSpec = serde_json::from_value(snapshot.spec).int_err()?;
         Ok(spec.into_dto())
     }
@@ -708,28 +719,17 @@ impl DatasetEnvVarMutationAdapterImpl {
         &self,
         resource_id: &ResourceID,
     ) -> Result<odf::metadata::config::SecretSetSpec, InternalError> {
-        let snapshot = self
-            .generic_resource_query_service
-            .get_snapshot_by_id(resource_id)
-            .await?
-            .ok_or_else(|| format!("SecretSet {resource_id} missing snapshot").int_err())?;
-
+        let snapshot = self.load_snapshot(resource_id).await?;
         let spec: SecretSetSpec = serde_json::from_value(snapshot.spec).int_err()?;
         Ok(spec.into_dto())
     }
 
-    /// The set's secrets as plaintext, from the stored spec.
-    ///
-    /// Not the projection: this feeds read-modify-write applies, so a
-    /// pre-reconcile read would rebuild the spec without any secret added since
-    /// and silently retract it.
-    async fn decrypt_secret_entries(
+    /// The set's secrets as plaintext
+    fn decrypt_secret_entries(
         &self,
-        resource_id: &ResourceID,
+        spec: odf::metadata::config::SecretSetSpec,
     ) -> Result<BTreeMap<String, String>, InternalError> {
         let cryptor = self.secrets_encryption_config.new_secret_cryptor()?;
-
-        let spec = self.load_secret_spec(resource_id).await?;
 
         let mut decrypted = BTreeMap::new();
         for (key, secret) in spec.secrets.entries {
@@ -780,6 +780,62 @@ impl DatasetEnvVarMutationAdapterImpl {
             }),
             owner_references: None,
         })
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// A legacy set read for a read-modify-write, with the precondition its write
+/// must carry
+struct LoadedEnvVarSet<T> {
+    id: Option<ResourceID>,
+    precondition: ApplyResourcePrecondition,
+    entries: BTreeMap<String, T>,
+}
+
+impl<T> LoadedEnvVarSet<T> {
+    fn absent() -> Self {
+        Self {
+            id: None,
+            precondition: ApplyResourcePrecondition::Absent,
+            entries: BTreeMap::new(),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+enum EnvVarSetWriteError {
+    /// The set changed since it was read; nothing was written
+    ConcurrentModification,
+    Internal(InternalError),
+}
+
+impl From<InternalError> for EnvVarSetWriteError {
+    fn from(err: InternalError) -> Self {
+        Self::Internal(err)
+    }
+}
+
+impl From<EnvVarSetWriteError> for UpsertDatasetEnvVarError {
+    fn from(err: EnvVarSetWriteError) -> Self {
+        match err {
+            EnvVarSetWriteError::ConcurrentModification => {
+                Self::ConcurrentModification(DatasetEnvVarConcurrentModificationError)
+            }
+            EnvVarSetWriteError::Internal(err) => Self::Internal(err),
+        }
+    }
+}
+
+impl From<EnvVarSetWriteError> for DeleteDatasetEnvVarError {
+    fn from(err: EnvVarSetWriteError) -> Self {
+        match err {
+            EnvVarSetWriteError::ConcurrentModification => {
+                Self::ConcurrentModification(DatasetEnvVarConcurrentModificationError)
+            }
+            EnvVarSetWriteError::Internal(err) => Self::Internal(err),
+        }
     }
 }
 

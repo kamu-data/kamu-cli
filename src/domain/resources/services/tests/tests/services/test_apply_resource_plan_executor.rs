@@ -10,9 +10,13 @@
 use std::sync::Arc;
 
 use dill::CatalogBuilder;
+use std::assert_matches;
+
 use kamu_resources::{
     ApplyResourceOutcome,
     ApplyResourceParams,
+    ApplyResourcePrecondition,
+    ApplyResourceUseCaseError,
     ResourceAggregateLoader,
     ResourceLifecycleMessageOutcome,
     ResourcePersistenceService,
@@ -64,7 +68,7 @@ async fn test_execute_create_returns_applied_created() {
         )
         .await;
 
-    let result = harness.make_executor().execute(plan).await.unwrap();
+    let result = harness.make_executor().execute(plan, ApplyResourcePrecondition::None).await.unwrap();
 
     let applied = result.expect_applied();
     assert_eq!(applied.outcome, ApplyResourceOutcome::Created);
@@ -100,7 +104,7 @@ async fn test_execute_update_returns_applied_updated() {
             },
         )
         .await;
-    harness.make_executor().execute(create_plan).await.unwrap();
+    harness.make_executor().execute(create_plan, ApplyResourcePrecondition::None).await.unwrap();
 
     // Then update
     let update_plan = harness
@@ -113,7 +117,7 @@ async fn test_execute_update_returns_applied_updated() {
         )
         .await;
 
-    let result = harness.make_executor().execute(update_plan).await.unwrap();
+    let result = harness.make_executor().execute(update_plan, ApplyResourcePrecondition::None).await.unwrap();
 
     let applied = result.expect_applied();
     assert_eq!(applied.outcome, ApplyResourceOutcome::Updated);
@@ -145,7 +149,7 @@ async fn test_execute_untouched_returns_applied_no_outbox_call() {
             },
         )
         .await;
-    harness.make_executor().execute(create_plan).await.unwrap();
+    harness.make_executor().execute(create_plan, ApplyResourcePrecondition::None).await.unwrap();
 
     // Re-plan with identical spec — action = Untouched, no outbox call
     let untouched_plan = harness
@@ -160,7 +164,7 @@ async fn test_execute_untouched_returns_applied_no_outbox_call() {
 
     let result = harness
         .make_executor()
-        .execute(untouched_plan)
+        .execute(untouched_plan, ApplyResourcePrecondition::None)
         .await
         .unwrap();
 
@@ -212,11 +216,46 @@ async fn test_execute_create_duplicate_retries_as_update() {
         )
         .await;
 
-    let result = harness.make_executor().execute(create_plan).await.unwrap();
+    let result = harness.make_executor().execute(create_plan, ApplyResourcePrecondition::None).await.unwrap();
 
     let applied = result.expect_applied();
     assert_eq!(applied.outcome, ApplyResourceOutcome::Updated);
 }
+
+#[test_log::test(tokio::test)]
+async fn test_execute_create_duplicate_fails_when_absence_required() {
+    // No message expected: nothing is written
+    let harness = ApplyResourcePlanExecutorHarness::new(MockOutbox::new());
+    let account_handle = odf::ResourceOwnerHandle::new_test("test");
+
+    // Another writer creates the resource after the plan was made
+    let create_plan = harness
+        .make_plan(
+            account_handle.clone(),
+            "res-a",
+            TestResourceSpec {
+                value: "new-value".to_string(),
+            },
+        )
+        .await;
+    let (_, mut existing_agg) = make_fresh_aggregate(account_handle, "res-a");
+    harness
+        .persistence_svc
+        .create(&mut existing_agg)
+        .await
+        .unwrap();
+
+    // Retrying as an update would overwrite what that writer created
+    assert_matches!(
+        harness
+            .make_executor()
+            .execute(create_plan, ApplyResourcePrecondition::Absent)
+            .await,
+        Err(ApplyResourceUseCaseError::ConcurrentModification(_))
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Harness
@@ -288,7 +327,7 @@ impl ApplyResourcePlanExecutorHarness {
             spec,
         };
 
-        match self.make_planner().plan_internal(params).await.unwrap() {
+        match self.make_planner().plan_internal(params, ApplyResourcePrecondition::None).await.unwrap() {
             PlannedApplyResourceDecision::Planned(plan) => plan,
             PlannedApplyResourceDecision::Rejected(r) => {
                 panic!("plan rejected: {:?}", r.message)

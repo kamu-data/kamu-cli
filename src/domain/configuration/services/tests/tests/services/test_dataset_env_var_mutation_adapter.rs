@@ -839,11 +839,38 @@ async fn test_create_rejects_existing_key() {
         ))
     );
 
+    // Keys from any set targeting the dataset count, not only the legacy ones
+    harness
+        .apply_variable_set_targeting(
+            &account_handle,
+            &dataset_id,
+            "team-vars",
+            [("TEAM_VAR", "team")],
+            [],
+        )
+        .await;
+    harness
+        .apply_secret_set_targeting(
+            &account_handle,
+            &dataset_id,
+            "team-secrets",
+            [("TEAM_SECRET", "team")],
+            [],
+        )
+        .await;
+    for key in ["TEAM_VAR", "TEAM_SECRET"] {
+        assert_matches!(
+            harness.create_variable(&dataset_id, key, "shadow").await,
+            Err(CreateDatasetEnvVarError::AlreadyExists(e)) if e.dataset_env_var_key == key
+        );
+    }
+
     // Neither rejected create touched the stored values
     pretty_assertions::assert_eq!(
         harness.variable_values(&dataset_id).await,
-        [("FOO".to_string(), "first".to_string())]
+        [("FOO", "first"), ("TEAM_VAR", "team")]
             .into_iter()
+            .map(|(key, value)| (key.to_string(), value.to_string()))
             .collect()
     );
 }

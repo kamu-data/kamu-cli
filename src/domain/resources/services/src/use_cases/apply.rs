@@ -190,6 +190,21 @@ macro_rules! declare_apply_resource_use_case {
                 kamu_resources::ApplyResourceApplicationDecision<$resource>,
                 kamu_resources::ApplyResourceUseCaseError<$resource>,
             > {
+                self.apply_with_precondition(
+                    params,
+                    kamu_resources::ApplyResourcePrecondition::None,
+                )
+                .await
+            }
+
+            async fn apply_with_precondition(
+                &self,
+                params: kamu_resources::ApplyResourceParams<$resource>,
+                precondition: kamu_resources::ApplyResourcePrecondition,
+            ) -> Result<
+                kamu_resources::ApplyResourceApplicationDecision<$resource>,
+                kamu_resources::ApplyResourceUseCaseError<$resource>,
+            > {
                 Self::ensure_params_account_resolved(&params)?;
                 let params = match self.sanitize_params(params).await? {
                     kamu_resources::SanitizeParamsOutcome::Sanitized(params) => params,
@@ -206,7 +221,7 @@ macro_rules! declare_apply_resource_use_case {
                     self.resource_aggregate_loader.as_ref(),
                     self.time_source.as_ref(),
                 );
-                let plan = planner.plan_internal(params).await?;
+                let plan = planner.plan_internal(params, precondition).await?;
 
                 let plan = match plan {
                     $crate::PlannedApplyResourceDecision::Planned(plan) => plan,
@@ -226,7 +241,7 @@ macro_rules! declare_apply_resource_use_case {
                     self.time_source.as_ref(),
                 );
 
-                executor.execute(plan).await
+                executor.execute(plan, precondition).await
             }
         }
     };

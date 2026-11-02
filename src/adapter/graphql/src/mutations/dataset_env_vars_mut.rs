@@ -72,6 +72,10 @@ impl<'a> DatasetEnvVarsMut<'a> {
                 ))
             }
             Err(CreateDatasetEnvVarError::Validation(err)) => Ok(err.into()),
+            // An error, not a result: the transaction must roll back
+            Err(CreateDatasetEnvVarError::ConcurrentModification(err)) => {
+                Err(GqlError::gql(err.to_string()))
+            }
             Err(CreateDatasetEnvVarError::Internal(err)) => Err(GqlError::Internal(err)),
         }
     }
@@ -94,6 +98,11 @@ impl<'a> DatasetEnvVarsMut<'a> {
         {
             Ok(upsert_result) => upsert_result,
             Err(UpsertDatasetEnvVarError::Validation(err)) => return Ok(err.into()),
+            // An error, not a result: a key conversion may have written the
+            // other set already, so the transaction must roll back
+            Err(UpsertDatasetEnvVarError::ConcurrentModification(err)) => {
+                return Err(GqlError::gql(err.to_string()));
+            }
             Err(UpsertDatasetEnvVarError::Internal(err)) => return Err(GqlError::Internal(err)),
         };
 
@@ -136,6 +145,9 @@ impl<'a> DatasetEnvVarsMut<'a> {
                 DeleteDatasetEnvVarError::NotFound(_) => Ok(DeleteDatasetEnvVarResult::NotFound(
                     DeleteDatasetEnvVarResultNotFound { env_var_key: key },
                 )),
+                DeleteDatasetEnvVarError::ConcurrentModification(err) => {
+                    Err(GqlError::gql(err.to_string()))
+                }
                 DeleteDatasetEnvVarError::Internal(internal_err) => {
                     Err(GqlError::Internal(internal_err))
                 }

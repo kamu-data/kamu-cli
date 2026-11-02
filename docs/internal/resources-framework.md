@@ -639,7 +639,12 @@ pub enum ApplyResourceAction { Create, Update, Untouched }
 pub enum ApplyResourceOutcome { Created, Updated, Untouched }
 ```
 
-The `--dry-run` path uses `plan`; a live apply uses `apply`. Use-case implementations are generated
+The `--dry-run` path uses `plan`; a live apply uses `apply`. A read-modify-write caller uses
+`apply_with_precondition`, passing the state it read (`ApplyResourcePrecondition::Absent` or
+`Generation(n)`). If the stored resource no longer matches, the apply fails with
+`ConcurrentModification`. That includes a create that hits an existing name, which is otherwise
+retried as an update. The planner checks the generation of the aggregate it loads, and saving
+checks that no event was appended since, so the check and the write are atomic. Use-case implementations are generated
 by **`declare_*_use_case!`** macros so each type gets a fully-wired instance without boilerplate.
 
 **Dispatchers + registry.** Each type registers a `ResourceCrudDispatcher` via
