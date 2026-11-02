@@ -904,6 +904,13 @@ impl datasets::MetadataEventTypeFlags {
     pub fn has_key_block_flags(&self) -> bool {
         !(*self & Self::KEY_BLOCK).is_empty()
     }
+
+    /// Event types whose flags are set
+    pub fn event_types(self) -> impl Iterator<Item = MetadataEventType> {
+        use strum::IntoEnumIterator;
+
+        MetadataEventType::iter().filter(move |event_type| self.contains((*event_type).into()))
+    }
 }
 
 impl From<crate::datasets::MetadataEventType> for datasets::MetadataEventTypeFlags {

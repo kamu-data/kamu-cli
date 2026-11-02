@@ -17,6 +17,14 @@ Recommendation: for ease of reading, use the following format:
 ### Added
 - `/ui-config` returns `webhooks.loopbackTargetsOnly`, so the Web UI validates webhook target URLs by
   the same rule as the node
+- GraphQL: `MetadataChain.blocks` takes an optional `filter` that selects blocks by event type and by
+  block hash prefix. `totalCount` and `pageInfo` count only the matching blocks, so clients can page
+  through filtered results
+### Changed
+- GraphQL (breaking): the enum taken by `DatasetMetadata.metadataProjection` is renamed from
+  `MetadataEventType` to `MetadataProjectionEventType`. `MetadataEventType` now lists every metadata
+  event type and is used by the `MetadataChain.blocks` filter. Queries that declare
+  `[MetadataEventType!]` variables for `metadataProjection` need the new type name
 - GraphQL: `DatasetMetadata.currentWatermark` accepts an optional `head` and returns the watermark as
   of that block, so a dataset's metadata can be viewed as of an earlier commit
 - GraphQL: `DatasetEnvVarsMut.createEnvVariable` adds a dataset environment variable or secret, and

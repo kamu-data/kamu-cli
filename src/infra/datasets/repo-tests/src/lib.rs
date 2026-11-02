@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+mod dataset_block_query_repository_test_suite;
 mod dataset_data_blocks_repository_test_suite;
 mod dataset_dependencies_repository_test_suite;
 mod dataset_entry_repository_test_suite;
@@ -33,4 +34,7 @@ pub mod dataset_key_blocks_repo {
 }
 pub mod dataset_data_blocks_repo {
     pub use crate::dataset_data_blocks_repository_test_suite::*;
+}
+pub mod dataset_block_query_repo {
+    pub use crate::dataset_block_query_repository_test_suite::*;
 }

@@ -1,0 +1,62 @@
+{
+  "db_name": "SQLite",
+  "query": "\n                    WITH page AS (\n                        SELECT sequence_number\n                        FROM dataset_key_blocks\n                        WHERE dataset_id = $1 AND block_ref_name = $2\n                            AND ($3 IS NULL OR event_type IN (SELECT value FROM json_each($3)))\n                            AND block_hash_bin >= $6 AND block_hash_bin < $7\n                        UNION ALL\n                        SELECT sequence_number\n                        FROM dataset_data_blocks\n                        WHERE dataset_id = $1 AND block_ref_name = $2\n                            AND ($3 IS NULL OR event_type IN (SELECT value FROM json_each($3)))\n                            AND block_hash_bin >= $6 AND block_hash_bin < $7\n                        ORDER BY sequence_number DESC\n                        LIMIT $4 OFFSET $5\n                    )\n                    SELECT\n                        event_type as \"event_type!\",\n                        sequence_number as \"sequence_number!\",\n                        block_hash_bin as \"block_hash_bin!\",\n                        block_payload as \"block_payload!\"\n                    FROM (\n                        SELECT event_type, sequence_number, block_hash_bin, block_payload\n                        FROM dataset_key_blocks\n                        WHERE dataset_id = $1 AND block_ref_name = $2\n                            AND sequence_number IN (SELECT sequence_number FROM page)\n                        UNION ALL\n                        SELECT event_type, sequence_number, block_hash_bin, block_payload\n                        FROM dataset_data_blocks\n                        WHERE dataset_id = $1 AND block_ref_name = $2\n                            AND sequence_number IN (SELECT sequence_number FROM page)\n                    )\n                    ORDER BY sequence_number DESC\n                    ",
+  "describe": {
+    "columns": [
+      {
+        "name": "event_type!",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "dataset_data_blocks",
+            "name": "event_type"
+          }
+        }
+      },
+      {
+        "name": "sequence_number!",
+        "ordinal": 1,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "dataset_data_blocks",
+            "name": "sequence_number"
+          }
+        }
+      },
+      {
+        "name": "block_hash_bin!",
+        "ordinal": 2,
+        "type_info": "Blob",
+        "origin": {
+          "Table": {
+            "table": "dataset_data_blocks",
+            "name": "block_hash_bin"
+          }
+        }
+      },
+      {
+        "name": "block_payload!",
+        "ordinal": 3,
+        "type_info": "Blob",
+        "origin": {
+          "Table": {
+            "table": "dataset_data_blocks",
+            "name": "block_payload"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 7
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "ddf2223dcbbe62363494e847600c31a733c97aa8d84554913405e82996b5f3a8"
+}
