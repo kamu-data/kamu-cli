@@ -58,7 +58,7 @@ pub struct APIServerRunCommand {
     #[dill::component(explicit)]
     base_catalog: dill::Catalog,
     #[dill::component(explicit)]
-    cli_catalog: dill::Catalog,
+    background_catalog: dill::Catalog,
 }
 
 impl APIServerRunCommand {
@@ -130,7 +130,7 @@ impl Command for APIServerRunCommand {
     async fn run(&self) -> Result<(), CLIError> {
         let api_server = crate::explore::APIServer::new(
             &self.base_catalog,
-            &self.cli_catalog,
+            &self.background_catalog,
             self.tenancy_config,
             self.address,
             self.port,

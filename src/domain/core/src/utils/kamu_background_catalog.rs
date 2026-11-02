@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_accounts::CurrentAccountSubject;
+use kamu_accounts::{CurrentAccountSubject, Principal};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -33,6 +33,7 @@ impl KamuBackgroundCatalog {
     pub fn system_user_catalog(&self) -> dill::Catalog {
         let mut b = dill::CatalogBuilder::new_chained(&self.base_catalog);
         b.add_value(self.system_user_subject.clone());
+        b.add_value(Principal::Node);
         b.add_value(self.clone());
         b.build()
     }
