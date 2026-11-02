@@ -7,8 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::collections::HashSet;
-
 use async_graphql::value;
 use indoc::indoc;
 use kamu_accounts::{DEFAULT_ACCOUNT_NAME, DEFAULT_ACCOUNT_NAME_STR};
@@ -193,7 +191,7 @@ async fn test_list_datasets_with_flow_includes_datasets_with_only_webhook_flows(
 
     assert_eq!(
         harness.list_dataset_ids_with_flow().await,
-        HashSet::from([foo_id.to_string(), bar_id.to_string()])
+        [bar_id.to_string(), foo_id.to_string()]
     );
 }
 
@@ -226,7 +224,7 @@ impl AccountFlowRunsHarness {
     }
 
     /// IDs of datasets listed by `listDatasetsWithFlow` of the default account
-    async fn list_dataset_ids_with_flow(&self) -> HashSet<String> {
+    async fn list_dataset_ids_with_flow(&self) -> Vec<String> {
         let response = GraphQLQueryRequest::new(
             indoc!(
                 r#"

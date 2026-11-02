@@ -2511,6 +2511,33 @@ pub async fn test_get_flows_for_multiple_datasets(catalog: &Catalog) {
     expected_flow_scopes.sort_by_key(FlowScopeDataset::maybe_dataset_id_in_scope);
 
     assert_eq!(flow_scopes, expected_flow_scopes);
+
+    // No datasets match no flows
+    let no_datasets_query = FlowScopeDataset::query_for_multiple_datasets(&[]);
+
+    let no_datasets_count = flow_event_store
+        .get_count_flows_matching_scope_query(&no_datasets_query, &FlowFilters::default())
+        .await
+        .unwrap();
+    assert_eq!(no_datasets_count, 0);
+
+    let no_datasets_flow_ids: Vec<_> = flow_event_store
+        .get_all_flow_ids_matching_scope_query(
+            no_datasets_query.clone(),
+            &FlowFilters::default(),
+            &FlowOrder::default(),
+            PaginationOpts::from_max_results(100),
+        )
+        .try_collect()
+        .await
+        .unwrap();
+    assert_eq!(no_datasets_flow_ids, vec![]);
+
+    let no_datasets_flow_scopes = flow_event_store
+        .list_flow_scopes_matching_scope_query(no_datasets_query)
+        .await
+        .unwrap();
+    assert_eq!(no_datasets_flow_scopes, vec![]);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

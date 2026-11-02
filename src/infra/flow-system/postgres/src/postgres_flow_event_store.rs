@@ -671,7 +671,7 @@ impl FlowEventStore for PostgresFlowEventStore {
             .bind(filters.by_flow_statuses.clone())
             .bind(maybe_initiators as Option<Vec<String>>);
 
-        for (_, values) in &flow_scope_query.attributes {
+        for values in form_scope_query_condition_values(flow_scope_query.clone()) {
             query = query.bind(values);
         }
 

@@ -176,11 +176,16 @@ impl DatasetEntryRepository for InMemoryDatasetEntryRepository {
             let readable_state = self.state.read().await;
 
             if let Some(dataset_ids) = readable_state.rows_by_owner.get(owner_id) {
-                dataset_ids
+                let mut owner_entries = dataset_ids
                     .iter()
+                    .map(|dataset_id| readable_state.rows.get(dataset_id).unwrap())
+                    .collect::<Vec<_>>();
+                owner_entries.sort_by(|a, b| a.name.as_str().cmp(b.name.as_str()));
+
+                owner_entries
+                    .into_iter()
                     .skip(pagination.offset)
                     .take(pagination.limit)
-                    .map(|dataset_id| readable_state.rows.get(dataset_id).unwrap())
                     .cloned()
                     .map(Ok)
                     .collect::<Vec<_>>()

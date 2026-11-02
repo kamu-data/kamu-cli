@@ -38,10 +38,6 @@ pub(crate) async fn list_accessible_datasets_with_flows(
         .await
         .int_err()?;
 
-    if owned_dataset_ids.is_empty() {
-        return Ok((vec![], 0));
-    }
-
     // Match flows by dataset across all scope types, as `listFlows` does,
     // so that datasets having only webhook delivery flows are included too
     let owned_dataset_id_refs = owned_dataset_ids.iter().collect::<Vec<_>>();
