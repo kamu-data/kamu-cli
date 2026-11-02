@@ -39,7 +39,16 @@ pub trait DatasetEnvVarService: Sync + Send {
         dataset_id: &odf::DatasetID,
         dataset_env_var_key: &str,
         dataset_env_var_value: &DatasetEnvVarValue,
-    ) -> Result<DatasetEnvVarUpsertResult, InternalError>;
+    ) -> Result<DatasetEnvVarUpsertResult, UpsertDatasetEnvVarError>;
+
+    /// Like `upsert_dataset_env_var`, but fails instead of replacing a key
+    /// that already exists as a variable or a secret
+    async fn create_dataset_env_var(
+        &self,
+        dataset_id: &odf::DatasetID,
+        dataset_env_var_key: &str,
+        dataset_env_var_value: &DatasetEnvVarValue,
+    ) -> Result<DatasetEnvVar, CreateDatasetEnvVarError>;
 
     async fn delete_dataset_env_var(
         &self,
@@ -76,6 +85,65 @@ pub enum GetDatasetEnvVarError {
 #[error("Dataset environment variable not found: '{dataset_env_var_key}'")]
 pub struct DatasetEnvVarNotFoundError {
     pub dataset_env_var_key: String,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Error, Debug)]
+pub enum UpsertDatasetEnvVarError {
+    #[error(transparent)]
+    Validation(#[from] DatasetEnvVarValidationError),
+
+    #[error(transparent)]
+    Internal(#[from] InternalError),
+}
+
+#[derive(Error, Debug)]
+pub enum CreateDatasetEnvVarError {
+    #[error(transparent)]
+    AlreadyExists(DatasetEnvVarAlreadyExistsError),
+
+    #[error(transparent)]
+    Validation(#[from] DatasetEnvVarValidationError),
+
+    #[error(transparent)]
+    Internal(#[from] InternalError),
+}
+
+impl From<UpsertDatasetEnvVarError> for CreateDatasetEnvVarError {
+    fn from(err: UpsertDatasetEnvVarError) -> Self {
+        match err {
+            UpsertDatasetEnvVarError::Validation(e) => Self::Validation(e),
+            UpsertDatasetEnvVarError::Internal(e) => Self::Internal(e),
+        }
+    }
+}
+
+#[derive(Error, Debug)]
+#[error("Dataset environment variable already exists: '{dataset_env_var_key}'")]
+pub struct DatasetEnvVarAlreadyExistsError {
+    pub dataset_env_var_key: String,
+}
+
+/// A key or value the write is rejected for. Only the entry being written is
+/// checked: entries stored before a rule existed keep passing.
+#[derive(Error, Debug)]
+pub enum DatasetEnvVarValidationError {
+    #[error("Invalid environment variable key '{key}': expected regex ^[A-Za-z_][A-Za-z0-9_]*$")]
+    InvalidKey { key: String },
+
+    #[error("Environment variable '{key}' has empty value")]
+    EmptyValue { key: String },
+
+    #[error("Environment variable '{key}' value is too long: got {actual}, max is {max}")]
+    ValueTooLong {
+        key: String,
+        actual: usize,
+        max: usize,
+    },
+
+    #[error("Too many environment variables: max is {max}")]
+    TooManyEntries { max: usize },
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

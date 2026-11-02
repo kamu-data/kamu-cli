@@ -15,7 +15,14 @@ use kamu_configuration::{
     VariableSetResource,
 };
 use kamu_configuration_services::DatasetEnvVarMutationAdapterImpl;
-use kamu_datasets::{DatasetEnvVarValue, DeleteDatasetEnvVarError};
+use kamu_datasets::{
+    CreateDatasetEnvVarError,
+    DatasetEnvVarValidationError,
+    DatasetEnvVarValue,
+    DeleteDatasetEnvVarError,
+    UpsertDatasetEnvVarError,
+    UpsertDatasetEnvVarStatus,
+};
 use kamu_resources::ResourceSchemaProvider;
 use secrecy::SecretString;
 
@@ -605,6 +612,239 @@ async fn test_target_dataset_label_survives_an_update() {
             .len(),
         1,
         "the label must survive an update"
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_legacy_key_does_not_block_writes() {
+    let harness = DatasetEnvVarServiceHarness::new();
+
+    let (_, dataset_id) = odf::DatasetID::new_generated_ed25519();
+    let account_handle = harness.ensure_test_account("test-owner").await;
+    harness
+        .seed_dataset_entry(&dataset_id, &account_handle.did)
+        .await;
+    harness
+        .seed_legacy_variable_set(
+            &account_handle,
+            &dataset_id,
+            [("key-1", "legacy"), ("API_URL", "a")],
+        )
+        .await;
+
+    let added = harness
+        .upsert_variable(&dataset_id, "NEW_VAR", "1")
+        .await
+        .unwrap();
+    pretty_assertions::assert_eq!(added.status, UpsertDatasetEnvVarStatus::Created);
+
+    let updated = harness
+        .upsert_variable(&dataset_id, "API_URL", "b")
+        .await
+        .unwrap();
+    pretty_assertions::assert_eq!(updated.status, UpsertDatasetEnvVarStatus::Updated);
+
+    // The legacy key itself stays editable: templates may reference it
+    let edited = harness
+        .upsert_variable(&dataset_id, "key-1", "edited")
+        .await
+        .unwrap();
+    pretty_assertions::assert_eq!(edited.status, UpsertDatasetEnvVarStatus::Updated);
+
+    harness
+        .mutation_adapter()
+        .delete_env_var(&dataset_id, "API_URL")
+        .await
+        .unwrap();
+
+    pretty_assertions::assert_eq!(
+        harness.variable_values(&dataset_id).await,
+        [("NEW_VAR", "1"), ("key-1", "edited")]
+            .into_iter()
+            .map(|(key, value)| (key.to_string(), value.to_string()))
+            .collect()
+    );
+
+    // A new key still has to follow the grammar
+    assert_matches!(
+        harness.upsert_variable(&dataset_id, "key-2", "new").await,
+        Err(UpsertDatasetEnvVarError::Validation(
+            DatasetEnvVarValidationError::InvalidKey { key }
+        )) if key == "key-2"
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_legacy_secret_key_does_not_block_writes() {
+    let harness = DatasetEnvVarServiceHarness::new();
+
+    let (_, dataset_id) = odf::DatasetID::new_generated_ed25519();
+    let account_handle = harness.ensure_test_account("test-owner").await;
+    harness
+        .seed_dataset_entry(&dataset_id, &account_handle.did)
+        .await;
+    harness
+        .seed_legacy_secret_set(
+            &account_handle,
+            &dataset_id,
+            [("key-1", "legacy"), ("API_TOKEN", "a")],
+        )
+        .await;
+
+    let added = harness
+        .upsert_secret(&dataset_id, "NEW_SECRET", "1")
+        .await
+        .unwrap();
+    pretty_assertions::assert_eq!(added.status, UpsertDatasetEnvVarStatus::Created);
+
+    let edited = harness
+        .upsert_secret(&dataset_id, "key-1", "edited")
+        .await
+        .unwrap();
+    pretty_assertions::assert_eq!(edited.status, UpsertDatasetEnvVarStatus::Updated);
+
+    harness
+        .mutation_adapter()
+        .delete_env_var(&dataset_id, "API_TOKEN")
+        .await
+        .unwrap();
+
+    pretty_assertions::assert_eq!(
+        harness.secret_keys(&dataset_id).await,
+        ["NEW_SECRET", "key-1"]
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_upsert_rejects_invalid_entry_with_typed_error() {
+    let harness = DatasetEnvVarServiceHarness::new();
+
+    let (_, dataset_id) = odf::DatasetID::new_generated_ed25519();
+    let account_handle = harness.ensure_test_account("test-owner").await;
+    harness
+        .seed_dataset_entry(&dataset_id, &account_handle.did)
+        .await;
+
+    let too_long = "x".repeat(16 * 1024 + 1);
+
+    assert_matches!(
+        harness.upsert_variable(&dataset_id, "a-b", "value").await,
+        Err(UpsertDatasetEnvVarError::Validation(
+            DatasetEnvVarValidationError::InvalidKey { key }
+        )) if key == "a-b"
+    );
+    assert_matches!(
+        harness.upsert_secret(&dataset_id, "a-b", "value").await,
+        Err(UpsertDatasetEnvVarError::Validation(
+            DatasetEnvVarValidationError::InvalidKey { .. }
+        ))
+    );
+    assert_matches!(
+        harness.upsert_variable(&dataset_id, "FOO", "").await,
+        Err(UpsertDatasetEnvVarError::Validation(
+            DatasetEnvVarValidationError::EmptyValue { .. }
+        ))
+    );
+    assert_matches!(
+        harness.upsert_variable(&dataset_id, "FOO", &too_long).await,
+        Err(UpsertDatasetEnvVarError::Validation(
+            DatasetEnvVarValidationError::ValueTooLong { actual, max, .. }
+        )) if actual == max + 1
+    );
+    assert_matches!(
+        harness.upsert_secret(&dataset_id, "FOO", &too_long).await,
+        Err(UpsertDatasetEnvVarError::Validation(
+            DatasetEnvVarValidationError::ValueTooLong { .. }
+        ))
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_upsert_rejects_entry_over_limit() {
+    let harness = DatasetEnvVarServiceHarness::new();
+
+    let (_, dataset_id) = odf::DatasetID::new_generated_ed25519();
+    let account_handle = harness.ensure_test_account("test-owner").await;
+    harness
+        .seed_dataset_entry(&dataset_id, &account_handle.did)
+        .await;
+
+    harness
+        .seed_legacy_variable_set(
+            &account_handle,
+            &dataset_id,
+            (0..256).map(|i| (format!("VAR_{i}"), "value")),
+        )
+        .await;
+
+    assert_matches!(
+        harness
+            .upsert_variable(&dataset_id, "ONE_MORE", "value")
+            .await,
+        Err(UpsertDatasetEnvVarError::Validation(
+            DatasetEnvVarValidationError::TooManyEntries { max: 256 }
+        ))
+    );
+
+    // A full set still accepts edits of its keys
+    harness
+        .upsert_variable(&dataset_id, "VAR_0", "edited")
+        .await
+        .unwrap();
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_create_rejects_existing_key() {
+    let harness = DatasetEnvVarServiceHarness::new();
+
+    let (_, dataset_id) = odf::DatasetID::new_generated_ed25519();
+    let account_handle = harness.ensure_test_account("test-owner").await;
+    harness
+        .seed_dataset_entry(&dataset_id, &account_handle.did)
+        .await;
+
+    harness
+        .create_variable(&dataset_id, "FOO", "first")
+        .await
+        .unwrap();
+    harness
+        .upsert_secret(&dataset_id, "MY_SECRET", "s3cr3t")
+        .await
+        .unwrap();
+
+    assert_matches!(
+        harness.create_variable(&dataset_id, "FOO", "second").await,
+        Err(CreateDatasetEnvVarError::AlreadyExists(e)) if e.dataset_env_var_key == "FOO"
+    );
+    assert_matches!(
+        harness
+            .create_variable(&dataset_id, "MY_SECRET", "plain")
+            .await,
+        Err(CreateDatasetEnvVarError::AlreadyExists(_))
+    );
+    assert_matches!(
+        harness.create_variable(&dataset_id, "a-b", "value").await,
+        Err(CreateDatasetEnvVarError::Validation(
+            DatasetEnvVarValidationError::InvalidKey { .. }
+        ))
+    );
+
+    // Neither rejected create touched the stored values
+    pretty_assertions::assert_eq!(
+        harness.variable_values(&dataset_id).await,
+        [("FOO".to_string(), "first".to_string())]
+            .into_iter()
+            .collect()
     );
 }
 

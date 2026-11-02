@@ -7,9 +7,14 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use internal_error::InternalError;
-
-use crate::{DatasetEnvVarUpsertResult, DatasetEnvVarValue, DeleteDatasetEnvVarError};
+use crate::{
+    CreateDatasetEnvVarError,
+    DatasetEnvVar,
+    DatasetEnvVarUpsertResult,
+    DatasetEnvVarValue,
+    DeleteDatasetEnvVarError,
+    UpsertDatasetEnvVarError,
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -20,7 +25,14 @@ pub trait DatasetEnvVarMutationAdapter: Send + Sync {
         dataset_id: &odf::DatasetID,
         key: &str,
         value: &DatasetEnvVarValue,
-    ) -> Result<DatasetEnvVarUpsertResult, InternalError>;
+    ) -> Result<DatasetEnvVarUpsertResult, UpsertDatasetEnvVarError>;
+
+    async fn create_env_var(
+        &self,
+        dataset_id: &odf::DatasetID,
+        key: &str,
+        value: &DatasetEnvVarValue,
+    ) -> Result<DatasetEnvVar, CreateDatasetEnvVarError>;
 
     async fn delete_env_var(
         &self,

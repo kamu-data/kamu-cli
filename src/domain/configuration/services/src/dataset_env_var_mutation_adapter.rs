@@ -27,16 +27,20 @@ use kamu_configuration::{
     VariableSetSpecInput,
 };
 use kamu_datasets::{
+    CreateDatasetEnvVarError,
     DatasetEntry,
     DatasetEntryRepository,
     DatasetEnvVar,
+    DatasetEnvVarAlreadyExistsError,
     DatasetEnvVarMutationAdapter,
     DatasetEnvVarNotFoundError,
     DatasetEnvVarUpsertResult,
+    DatasetEnvVarValidationError,
     DatasetEnvVarValue,
     DeleteDatasetEnvVarError,
     GetDatasetEntryError,
     SecretsEncryptionConfig,
+    UpsertDatasetEnvVarError,
     UpsertDatasetEnvVarStatus,
 };
 use kamu_resources::{
@@ -77,31 +81,37 @@ impl DatasetEnvVarMutationAdapter for DatasetEnvVarMutationAdapterImpl {
         dataset_id: &odf::DatasetID,
         key: &str,
         value: &DatasetEnvVarValue,
-    ) -> Result<DatasetEnvVarUpsertResult, InternalError> {
+    ) -> Result<DatasetEnvVarUpsertResult, UpsertDatasetEnvVarError> {
         let dataset_entry = self.get_dataset_entry(dataset_id).await?;
 
-        match value {
-            DatasetEnvVarValue::Regular(plaintext) => {
-                self.upsert_variable(
-                    dataset_id,
-                    key,
-                    plaintext,
-                    &dataset_entry.owner_id,
-                    &dataset_entry.owner_name,
-                )
-                .await
-            }
-            DatasetEnvVarValue::Secret(secret) => {
-                self.upsert_secret(
-                    dataset_id,
-                    key,
-                    secret.expose_secret(),
-                    &dataset_entry.owner_id,
-                    &dataset_entry.owner_name,
-                )
-                .await
-            }
+        self.write_env_var(&dataset_entry, key, value).await
+    }
+
+    async fn create_env_var(
+        &self,
+        dataset_id: &odf::DatasetID,
+        key: &str,
+        value: &DatasetEnvVarValue,
+    ) -> Result<DatasetEnvVar, CreateDatasetEnvVarError> {
+        let dataset_entry = self.get_dataset_entry(dataset_id).await?;
+        let owner_id = &dataset_entry.owner_id;
+
+        // A key is taken whichever class it is stored as
+        if self
+            .find_variable(dataset_id, owner_id, key)
+            .await?
+            .is_some()
+            || self.find_secret(dataset_id, owner_id, key).await?.is_some()
+        {
+            return Err(CreateDatasetEnvVarError::AlreadyExists(
+                DatasetEnvVarAlreadyExistsError {
+                    dataset_env_var_key: key.to_string(),
+                },
+            ));
         }
+
+        let upsert_result = self.write_env_var(&dataset_entry, key, value).await?;
+        Ok(upsert_result.dataset_env_var)
     }
 
     async fn delete_env_var(
@@ -179,6 +189,36 @@ impl DatasetEnvVarMutationAdapterImpl {
         }
     }
 
+    async fn write_env_var(
+        &self,
+        dataset_entry: &DatasetEntry,
+        key: &str,
+        value: &DatasetEnvVarValue,
+    ) -> Result<DatasetEnvVarUpsertResult, UpsertDatasetEnvVarError> {
+        match value {
+            DatasetEnvVarValue::Regular(plaintext) => {
+                self.upsert_variable(
+                    &dataset_entry.id,
+                    key,
+                    plaintext,
+                    &dataset_entry.owner_id,
+                    &dataset_entry.owner_name,
+                )
+                .await
+            }
+            DatasetEnvVarValue::Secret(secret) => {
+                self.upsert_secret(
+                    &dataset_entry.id,
+                    key,
+                    secret.expose_secret(),
+                    &dataset_entry.owner_id,
+                    &dataset_entry.owner_name,
+                )
+                .await
+            }
+        }
+    }
+
     async fn upsert_variable(
         &self,
         dataset_id: &odf::DatasetID,
@@ -186,11 +226,13 @@ impl DatasetEnvVarMutationAdapterImpl {
         plaintext: &str,
         account_did: &odf::AccountID,
         account_name: &odf::AccountName,
-    ) -> Result<DatasetEnvVarUpsertResult, InternalError> {
+    ) -> Result<DatasetEnvVarUpsertResult, UpsertDatasetEnvVarError> {
         let resource_name = Self::legacy_variable_set_resource_name(dataset_id);
         let (existing_id, mut variables) = self
             .load_existing_variable_spec(account_did, &resource_name)
             .await?;
+
+        EnvVarSetRules::VARIABLES.check_entry(&variables, key, plaintext)?;
 
         let exists_as_variable = variables.contains_key(key);
 
@@ -228,7 +270,7 @@ impl DatasetEnvVarMutationAdapterImpl {
 
         let dispatcher = self.get_dispatcher(VariableSetResource::SCHEMA_STR)?;
 
-        self.apply_and_handle_rejection::<InternalError>(
+        self.apply_and_handle_rejection::<UpsertDatasetEnvVarError>(
             &dispatcher,
             ResourceCrudDispatcherApplyRequest {
                 id: existing_id,
@@ -264,12 +306,14 @@ impl DatasetEnvVarMutationAdapterImpl {
         plaintext: &str,
         account_did: &odf::AccountID,
         account_name: &odf::AccountName,
-    ) -> Result<DatasetEnvVarUpsertResult, InternalError> {
+    ) -> Result<DatasetEnvVarUpsertResult, UpsertDatasetEnvVarError> {
         let resource_name = Self::legacy_secret_set_resource_name(dataset_id);
 
         let (existing_id, mut secrets) = self
             .load_existing_secret_spec_decrypted(account_did, &resource_name)
             .await?;
+
+        EnvVarSetRules::SECRETS.check_entry(&secrets, key, plaintext)?;
 
         let exists_as_secret = secrets.contains_key(key);
 
@@ -307,7 +351,7 @@ impl DatasetEnvVarMutationAdapterImpl {
 
         let dispatcher = self.get_dispatcher(SecretSetResource::SCHEMA_STR)?;
 
-        self.apply_and_handle_rejection::<InternalError>(
+        self.apply_and_handle_rejection::<UpsertDatasetEnvVarError>(
             &dispatcher,
             ResourceCrudDispatcherApplyRequest {
                 id: existing_id,
@@ -736,6 +780,69 @@ impl DatasetEnvVarMutationAdapterImpl {
             }),
             owner_references: None,
         })
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// The rules `validate()` of a variable or secret set applies to an entry
+/// being written. Checked up front so a rejected key or value reaches the
+/// caller as a typed error rather than as an apply rejection, and only for
+/// the written entry, so legacy entries of the set do not block the write.
+struct EnvVarSetRules {
+    is_valid_key: fn(&str) -> bool,
+    max_entries: usize,
+    max_value_len: usize,
+}
+
+impl EnvVarSetRules {
+    const VARIABLES: Self = Self {
+        is_valid_key: VariableSetSpecInput::is_valid_variable_name,
+        max_entries: VariableSetSpecInput::MAX_VARIABLES,
+        max_value_len: VariableSetSpecInput::MAX_VARIABLE_VALUE_LEN,
+    };
+
+    const SECRETS: Self = Self {
+        is_valid_key: SecretSetSpecInput::is_valid_secret_name,
+        max_entries: SecretSetSpecInput::MAX_SECRETS,
+        max_value_len: SecretSetSpecInput::MAX_SECRET_VALUE_LEN,
+    };
+
+    fn check_entry<T>(
+        &self,
+        entries: &BTreeMap<String, T>,
+        key: &str,
+        value: &str,
+    ) -> Result<(), DatasetEnvVarValidationError> {
+        let is_new_key = !entries.contains_key(key);
+
+        if is_new_key && !(self.is_valid_key)(key) {
+            return Err(DatasetEnvVarValidationError::InvalidKey {
+                key: key.to_string(),
+            });
+        }
+
+        if value.is_empty() {
+            return Err(DatasetEnvVarValidationError::EmptyValue {
+                key: key.to_string(),
+            });
+        }
+
+        if value.len() > self.max_value_len {
+            return Err(DatasetEnvVarValidationError::ValueTooLong {
+                key: key.to_string(),
+                actual: value.len(),
+                max: self.max_value_len,
+            });
+        }
+
+        if is_new_key && entries.len() >= self.max_entries {
+            return Err(DatasetEnvVarValidationError::TooManyEntries {
+                max: self.max_entries,
+            });
+        }
+
+        Ok(())
     }
 }
 
