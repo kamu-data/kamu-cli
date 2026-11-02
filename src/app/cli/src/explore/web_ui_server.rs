@@ -26,6 +26,7 @@ use kamu_accounts::{
 };
 use kamu_accounts_services::{PasswordLoginCredentials, PasswordPolicyConfig};
 use kamu_adapter_http::DatasetAuthorizationLayer;
+use kamu_webhooks::WebhooksConfig;
 use observability::axum::panic_handler;
 use rust_embed::RustEmbed;
 use serde::Serialize;
@@ -33,7 +34,7 @@ use tower_http::catch_panic::CatchPanicLayer;
 use url::Url;
 use utoipa_axum::router::OpenApiRouter;
 
-use super::{UIConfiguration, UIFeatureFlags, graphql_handler};
+use super::{UIConfiguration, UIFeatureFlags, UIWebhooksConfiguration, graphql_handler};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -80,6 +81,7 @@ impl WebUIServer {
         address: Option<IpAddr>,
         port: Option<u16>,
         password_policy_config: &PasswordPolicyConfig,
+        webhooks_config: &WebhooksConfig,
     ) -> Result<Self, InternalError> {
         let addr = SocketAddr::from((
             address.unwrap_or(IpAddr::V4(Ipv4Addr::LOCALHOST)),
@@ -126,6 +128,9 @@ impl WebUIServer {
                 enable_dataset_env_vars_management,
                 allow_anonymous,
                 enable_terms_of_service: true,
+            },
+            webhooks: UIWebhooksConfiguration {
+                loopback_targets_only: webhooks_config.loopback_targets_only,
             },
         };
 

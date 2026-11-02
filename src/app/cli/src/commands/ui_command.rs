@@ -27,6 +27,7 @@ use kamu::domain::{FileUploadLimitConfig, TenancyConfig};
 use kamu_accounts::{AuthConfig, PredefinedAccountsConfig};
 use kamu_accounts_services::PasswordPolicyConfig;
 use kamu_datasets::SecretsEncryptionConfig;
+use kamu_webhooks::WebhooksConfig;
 
 use super::{CLIError, Command};
 use crate::OutputConfig;
@@ -43,6 +44,7 @@ pub struct UICommand {
     auth_config: Arc<AuthConfig>,
     output_config: Arc<OutputConfig>,
     password_policy_config: Arc<PasswordPolicyConfig>,
+    webhooks_config: Arc<WebhooksConfig>,
 
     #[dill::component(explicit)]
     current_account_name: odf::AccountName,
@@ -76,6 +78,7 @@ impl Command for UICommand {
             self.address,
             self.port,
             self.password_policy_config.as_ref(),
+            self.webhooks_config.as_ref(),
         )
         .await?;
 
