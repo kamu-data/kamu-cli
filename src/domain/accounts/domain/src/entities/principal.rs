@@ -58,6 +58,14 @@ impl Principal {
         }
     }
 
+    /// The account name of a [`Principal::User`]
+    pub fn maybe_account_name(&self) -> Option<&odf::AccountName> {
+        match self {
+            Self::User(account_handle) => Some(&account_handle.name),
+            Self::Node | Self::Anonymous => None,
+        }
+    }
+
     #[cfg(any(feature = "testing", test))]
     pub fn new_test() -> Self {
         Self::from(&CurrentAccountSubject::new_test())

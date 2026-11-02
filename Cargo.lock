@@ -7716,6 +7716,7 @@ dependencies = [
  "oso",
  "pretty_assertions",
  "rayon",
+ "strum 0.28.0",
  "test-log",
  "thiserror 2.0.21",
  "time-source",

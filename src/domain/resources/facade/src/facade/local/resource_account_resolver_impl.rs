@@ -10,7 +10,7 @@
 use std::sync::Arc;
 
 use internal_error::ResultIntoInternal;
-use kamu_accounts::{AccountHandle, AccountService, CurrentAccountSubject};
+use kamu_accounts::{AccountHandle, AccountService, CurrentAccountSubject, Principal};
 use kamu_auth_rebac::{RebacService, RebacServiceExt};
 use kamu_resources::ResourceOwnerRef;
 
@@ -22,6 +22,7 @@ use crate::{ResolveManifestAccountError, ResourceAccountAccessError, ResourceAcc
 #[dill::interface(dyn ResourceAccountResolver)]
 pub(crate) struct ResourceAccountResolverImpl {
     current_account_subject: Arc<CurrentAccountSubject>,
+    principal: Arc<Principal>,
     account_service: Arc<dyn AccountService>,
     rebac_service: Arc<dyn RebacService>,
 }
@@ -104,16 +105,13 @@ impl ResourceAccountResolverImpl {
         &self,
         target_account: &odf::ResourceOwnerHandle,
     ) -> Result<(), ResolveManifestAccountError> {
-        match self.current_account_subject.as_ref() {
-            CurrentAccountSubject::Logged(current)
-                if current.account_handle.did == target_account.did =>
-            {
-                Ok(())
-            }
-            CurrentAccountSubject::Logged(current) => {
+        match self.principal.as_ref() {
+            Principal::Node => Ok(()),
+            Principal::User(account_handle) if account_handle.did == target_account.did => Ok(()),
+            Principal::User(account_handle) => {
                 let is_admin = self
                     .rebac_service
-                    .is_account_admin(&current.account_handle.did)
+                    .is_account_admin(&account_handle.did)
                     .await
                     .int_err()?;
                 if is_admin {
@@ -131,9 +129,7 @@ impl ResourceAccountResolverImpl {
                     )
                 }
             }
-            CurrentAccountSubject::Anonymous(_) => {
-                Err(ResourceAccountAccessError::AnonymousSubject.into())
-            }
+            Principal::Anonymous => Err(ResourceAccountAccessError::AnonymousSubject.into()),
         }
     }
 }

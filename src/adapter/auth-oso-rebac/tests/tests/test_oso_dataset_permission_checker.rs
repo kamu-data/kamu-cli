@@ -17,9 +17,9 @@ use kamu_accounts::{
     AccountConfig,
     AccountPropertyName,
     CurrentAccountSubject,
-    CurrentAccountSubjectCatalogExt as _,
     DEFAULT_ACCOUNT_NAME,
     PredefinedAccountsConfig,
+    Principal,
 };
 use kamu_accounts_inmem::{InMemoryAccountRepository, InMemoryDidSecretKeyRepository};
 use kamu_accounts_services::{
@@ -671,6 +671,59 @@ async fn test_multi_datasets_matrix() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
+async fn test_node_can_do_everything_with_not_owned_private_dataset() {
+    let not_owned_private_dataset_handle =
+        odf::metadata::testing::handle(&"owner", &"private-dataset", odf::DatasetKind::Root);
+
+    let harness = DatasetPermissionCheckerHarness::new_node().await;
+
+    harness
+        .create_private_datasets(&[&not_owned_private_dataset_handle])
+        .await;
+
+    assert_single_dataset!(
+        setup:
+            harness,
+            dataset_id = not_owned_private_dataset_handle.id,
+        expected:
+            read_result = Ok(()),
+            write_result = Ok(()),
+            allowed_actions_result = Ok(actual_actions)
+                if actual_actions == [
+                    DatasetPermission::Read,
+                    DatasetPermission::Write,
+                    DatasetPermission::Maintain,
+                    DatasetPermission::Own
+                ].into()
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_node_cannot_read_not_found_dataset() {
+    let not_found_dataset_id = odf::DatasetID::new_seeded_ed25519(b"not_found_dataset_id");
+    let not_found_dataset_ref = not_found_dataset_id.as_local_ref();
+
+    let harness = DatasetPermissionCheckerHarness::new_node().await;
+
+    assert_single_dataset!(
+        setup:
+            harness,
+            dataset_id = not_found_dataset_id,
+        expected:
+            read_result = Err(DatasetPermissionError::NotFound(e))
+                if e.dataset_ref == not_found_dataset_ref,
+            write_result = Err(DatasetPermissionError::NotFound(e))
+                if e.dataset_ref == not_found_dataset_ref,
+            allowed_actions_result = Err(GetGrantedPermissionsError::NotFound(e))
+                if e.dataset_ref == not_found_dataset_ref
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
 async fn test_nobody_cannot_read_not_found_dataset() {
     let not_found_dataset_id = odf::DatasetID::new_seeded_ed25519(b"not_found_dataset_id");
     let not_found_dataset_ref = not_found_dataset_id.as_local_ref();
@@ -707,6 +760,25 @@ struct DatasetPermissionCheckerHarness {
 
 impl DatasetPermissionCheckerHarness {
     pub async fn new(current_account_subject: CurrentAccountSubject, is_admin: bool) -> Self {
+        let principal = Principal::from(&current_account_subject);
+        Self::build(current_account_subject, principal, is_admin).await
+    }
+
+    /// The node as the principal, under an anonymous caller
+    pub async fn new_node() -> Self {
+        Self::build(
+            CurrentAccountSubjectTestHelper::anonymous(),
+            Principal::Node,
+            false,
+        )
+        .await
+    }
+
+    async fn build(
+        current_account_subject: CurrentAccountSubject,
+        principal: Principal,
+        is_admin: bool,
+    ) -> Self {
         let mut predefined_accounts_config = PredefinedAccountsConfig::new();
 
         if let CurrentAccountSubject::Logged(logged_account) = &current_account_subject {
@@ -729,7 +801,8 @@ impl DatasetPermissionCheckerHarness {
 
             kamu_datasets_inmem::register_dependencies(&mut b);
             b.add::<SystemTimeSourceDefault>()
-                .add_current_account_subject(current_account_subject)
+                .add_value(current_account_subject)
+                .add_value(principal)
                 .add_value(predefined_accounts_config)
                 .add::<PredefinedAccountsRegistrator>()
                 .add::<kamu_auth_rebac_services::RebacServiceImpl>()

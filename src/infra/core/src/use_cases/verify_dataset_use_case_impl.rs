@@ -11,7 +11,7 @@ use std::sync::Arc;
 
 use dill::{component, interface};
 use internal_error::ErrorIntoInternal;
-use kamu_accounts::CurrentAccountSubject;
+use kamu_accounts::Principal;
 use kamu_core::{
     TransformPlanner,
     VerificationError,
@@ -41,7 +41,7 @@ pub struct VerifyDatasetUseCaseImpl {
     dataset_operation_guard: Arc<dyn DatasetOperationGuard>,
     dataset_registry: Arc<dyn DatasetRegistry>,
     transform_planner: Arc<dyn TransformPlanner>,
-    current_account_subject: Arc<CurrentAccountSubject>,
+    principal: Arc<Principal>,
 }
 
 impl VerifyDatasetUseCaseImpl {
@@ -81,7 +81,7 @@ impl VerifyDatasetUseCaseImpl {
     ) -> Result<(), VerificationError> {
         self.dataset_operation_guard
             .check_operation(
-                &self.current_account_subject,
+                &self.principal,
                 &DatasetOperationRequest::new(
                     target.clone(),
                     DatasetOperation::Verify { replayed_inputs },

@@ -9,25 +9,63 @@
 
 use kamu_search::SearchSecurityContext;
 
-use crate::CurrentAccountSubject;
+use crate::Principal;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// `is_admin` matters only for [`Principal::User`]
 pub fn make_search_security_context(
-    current_account_subject: &CurrentAccountSubject,
+    principal: &Principal,
     is_admin: bool,
 ) -> SearchSecurityContext {
-    match current_account_subject {
-        CurrentAccountSubject::Logged(logged_account) => {
+    match principal {
+        Principal::User(account_handle) => {
             if is_admin {
                 SearchSecurityContext::Unrestricted
             } else {
                 SearchSecurityContext::Restricted {
-                    current_principal_ids: vec![logged_account.account_handle.id.to_string()],
+                    current_principal_ids: vec![account_handle.id.to_string()],
                 }
             }
         }
-        CurrentAccountSubject::Anonymous(_) => SearchSecurityContext::Anonymous,
+        Principal::Node => SearchSecurityContext::Unrestricted,
+        Principal::Anonymous => SearchSecurityContext::Anonymous,
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[cfg(test)]
+mod tests {
+    use pretty_assertions::assert_matches;
+
+    use super::*;
+
+    #[test]
+    fn test_search_security_context_per_principal() {
+        let user = Principal::new_test_with(&"alice");
+        let Principal::User(account_handle) = &user else {
+            unreachable!()
+        };
+        let account_resource_id = account_handle.id.to_string();
+
+        assert_matches!(
+            make_search_security_context(&user, false),
+            SearchSecurityContext::Restricted { current_principal_ids }
+                if current_principal_ids == [account_resource_id]
+        );
+        assert_matches!(
+            make_search_security_context(&user, true),
+            SearchSecurityContext::Unrestricted
+        );
+        assert_matches!(
+            make_search_security_context(&Principal::Node, false),
+            SearchSecurityContext::Unrestricted
+        );
+        assert_matches!(
+            make_search_security_context(&Principal::Anonymous, true),
+            SearchSecurityContext::Anonymous
+        );
     }
 }
 

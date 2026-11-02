@@ -14,7 +14,7 @@ use std::sync::Arc;
 
 use dill::*;
 use internal_error::{ErrorIntoInternal, InternalError};
-use kamu_accounts::CurrentAccountSubject;
+use kamu_accounts::Principal;
 use kamu_datasets::{
     ClassifyByAllowanceDatasetPermissionError,
     DatasetOperationGuard,
@@ -43,7 +43,7 @@ impl DatasetOperationGuardImpl {
     /// call per permission
     async fn classify(
         &self,
-        principal: &CurrentAccountSubject,
+        principal: &Principal,
         requests: &[DatasetOperationRequest],
     ) -> Result<HashMap<(DatasetPermission, odf::DatasetID), Verdict>, InternalError> {
         let mut handles_by_permission: HashMap<
@@ -138,7 +138,7 @@ impl DatasetOperationGuardImpl {
 impl DatasetOperationGuard for DatasetOperationGuardImpl {
     async fn check_operation(
         &self,
-        principal: &CurrentAccountSubject,
+        principal: &Principal,
         request: &DatasetOperationRequest,
     ) -> Result<(), DatasetPermissionError> {
         let verdicts = self.classify(principal, slice::from_ref(request)).await?;
@@ -147,7 +147,7 @@ impl DatasetOperationGuard for DatasetOperationGuardImpl {
 
     async fn check_operations(
         &self,
-        principal: &CurrentAccountSubject,
+        principal: &Principal,
         requests: &[DatasetOperationRequest],
     ) -> Result<Vec<Result<(), DatasetPermissionError>>, InternalError> {
         let verdicts = self.classify(principal, requests).await?;

@@ -12,7 +12,7 @@ use std::sync::Arc;
 use chrono::{DateTime, Utc};
 use dill::{component, interface};
 use internal_error::{ErrorIntoInternal, ResultIntoInternal};
-use kamu_accounts::CurrentAccountSubject;
+use kamu_accounts::Principal;
 use kamu_core::*;
 use kamu_datasets::{
     DatasetExternallyChangedMessage,
@@ -35,7 +35,7 @@ pub struct PushIngestDataUseCaseImpl {
     push_ingest_executor: Arc<dyn PushIngestExecutor>,
     dataset_head_committer: Arc<dyn DatasetHeadCommitter>,
     dataset_operation_guard: Arc<dyn DatasetOperationGuard>,
-    current_account_subject: Arc<CurrentAccountSubject>,
+    principal: Arc<Principal>,
     outbox: Arc<dyn Outbox>,
 }
 
@@ -43,7 +43,7 @@ impl PushIngestDataUseCaseImpl {
     async fn authorize(&self, target: &ResolvedDataset) -> Result<(), PushIngestDataError> {
         self.dataset_operation_guard
             .check_operation(
-                &self.current_account_subject,
+                &self.principal,
                 &DatasetOperationRequest::new(
                     target.get_handle().clone(),
                     DatasetOperation::PushIngest,

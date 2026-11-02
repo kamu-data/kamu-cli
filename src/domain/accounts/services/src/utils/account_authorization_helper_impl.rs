@@ -11,10 +11,10 @@ use std::sync::Arc;
 
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_accounts::{
-    CurrentAccountSubject,
     DeleteAccountError,
     ModifyAccountPasswordError,
     ModifyAccountPasswordWithConfirmationError,
+    Principal,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -81,20 +81,21 @@ impl AccountAuthorizationHelperTestProvider {
 #[dill::component(pub)]
 #[dill::interface(dyn AccountAuthorizationHelper)]
 pub struct AccountAuthorizationHelperImpl {
-    current_account_subject: Arc<CurrentAccountSubject>,
+    principal: Arc<Principal>,
     rebac_service: Arc<dyn kamu_auth_rebac::RebacService>,
 }
 
 #[async_trait::async_trait]
 impl AccountAuthorizationHelper for AccountAuthorizationHelperImpl {
     async fn is_admin(&self) -> Result<bool, InternalError> {
-        match self.current_account_subject.as_ref() {
-            CurrentAccountSubject::Anonymous(_) => Ok(false),
-            CurrentAccountSubject::Logged(l) => {
+        match self.principal.as_ref() {
+            Principal::Node => Ok(true),
+            Principal::Anonymous => Ok(false),
+            Principal::User(account_handle) => {
                 use kamu_auth_rebac::RebacServiceExt;
 
                 self.rebac_service
-                    .is_account_admin(&l.account_handle.did)
+                    .is_account_admin(&account_handle.did)
                     .await
                     .int_err()
             }
@@ -105,14 +106,15 @@ impl AccountAuthorizationHelper for AccountAuthorizationHelperImpl {
         &self,
         account_name: &odf::AccountName,
     ) -> Result<bool, InternalError> {
-        match self.current_account_subject.as_ref() {
-            CurrentAccountSubject::Anonymous(_) => Ok(false),
-            CurrentAccountSubject::Logged(l) if l.account_handle.name == *account_name => Ok(true),
-            CurrentAccountSubject::Logged(l) => {
+        match self.principal.as_ref() {
+            Principal::Node => Ok(true),
+            Principal::Anonymous => Ok(false),
+            Principal::User(account_handle) if account_handle.name == *account_name => Ok(true),
+            Principal::User(account_handle) => {
                 use kamu_auth_rebac::RebacServiceExt;
 
                 self.rebac_service
-                    .is_account_admin(&l.account_handle.did)
+                    .is_account_admin(&account_handle.did)
                     .await
                     .int_err()
             }
@@ -127,7 +129,7 @@ impl AccountAuthorizationHelper for AccountAuthorizationHelperImpl {
             return Err(EnsureNotAuthorizedError::Access(
                 odf::AccessError::Unauthenticated(
                     NotAuthorizedError::modify_account_password(
-                        self.current_account_subject.maybe_account_name().cloned(),
+                        self.principal.maybe_account_name().cloned(),
                         account_name.clone(),
                     )
                     .into(),
@@ -146,7 +148,7 @@ impl AccountAuthorizationHelper for AccountAuthorizationHelperImpl {
             return Err(EnsureNotAuthorizedError::Access(
                 odf::AccessError::Unauthenticated(
                     NotAuthorizedError::modify_account_password_with_confirmation(
-                        self.current_account_subject.maybe_account_name().cloned(),
+                        self.principal.maybe_account_name().cloned(),
                         account_name.clone(),
                     )
                     .into(),
@@ -165,7 +167,7 @@ impl AccountAuthorizationHelper for AccountAuthorizationHelperImpl {
             return Err(EnsureNotAuthorizedError::Access(
                 odf::AccessError::Unauthenticated(
                     NotAuthorizedError::delete_account(
-                        self.current_account_subject.maybe_account_name().cloned(),
+                        self.principal.maybe_account_name().cloned(),
                         account_name.clone(),
                     )
                     .into(),

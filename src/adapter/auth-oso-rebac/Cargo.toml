@@ -41,6 +41,7 @@ oso = { version = "0.27", default-features = false, features = [
     "derive",
 ] }
 rayon = { version = "1", default-features = false }
+strum = { version = "0.28", default-features = false }
 thiserror = { version = "2", default-features = false }
 tokio = { version = "1", default-features = false, features = [
     "macros",

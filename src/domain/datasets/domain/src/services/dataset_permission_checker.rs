@@ -11,7 +11,7 @@ use std::borrow::Cow;
 use std::collections::HashSet;
 
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
-use kamu_accounts::CurrentAccountSubject;
+use kamu_accounts::Principal;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -45,7 +45,7 @@ pub trait DatasetPermissionChecker: Sync + Send {
     /// principal instead of the current account
     async fn classify_dataset_handles_by_allowance_for(
         &self,
-        principal: &CurrentAccountSubject,
+        principal: &Principal,
         dataset_handles: Vec<odf::DatasetHandle>,
         permission: DatasetPermission,
     ) -> Result<ClassifyByAllowanceResponse, InternalError>;
@@ -59,7 +59,9 @@ pub trait DatasetPermissionChecker: Sync + Send {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, strum::EnumString, strum::Display)]
+#[derive(
+    Debug, Clone, Copy, Eq, PartialEq, Hash, strum::EnumString, strum::Display, strum::EnumIter,
+)]
 #[strum(serialize_all = "snake_case")]
 pub enum DatasetPermission {
     Read,
@@ -527,7 +529,7 @@ impl DatasetPermissionChecker for AlwaysHappyDatasetPermissionChecker {
 
     async fn classify_dataset_handles_by_allowance_for(
         &self,
-        _principal: &CurrentAccountSubject,
+        _principal: &Principal,
         dataset_handles: Vec<odf::DatasetHandle>,
         permission: DatasetPermission,
     ) -> Result<ClassifyByAllowanceResponse, InternalError> {

@@ -12,7 +12,7 @@ use std::sync::Arc;
 use database_common_macros::{transactional_method2, transactional_method3};
 use dill::{component, interface};
 use internal_error::ErrorIntoInternal;
-use kamu_accounts::CurrentAccountSubject;
+use kamu_accounts::Principal;
 use kamu_core::{
     CompactDatasetUseCase,
     CompactionError,
@@ -45,7 +45,7 @@ use kamu_datasets::{
 pub struct CompactDatasetUseCaseImpl {
     catalog: dill::Catalog,
     compaction_executor: Arc<dyn CompactionExecutor>,
-    current_account_subject: Arc<CurrentAccountSubject>,
+    principal: Arc<Principal>,
 }
 
 impl CompactDatasetUseCaseImpl {
@@ -63,7 +63,7 @@ impl CompactDatasetUseCaseImpl {
         };
         dataset_operation_guard
             .check_operation(
-                &self.current_account_subject,
+                &self.principal,
                 &DatasetOperationRequest::new(dataset_handle.clone(), operation),
             )
             .await

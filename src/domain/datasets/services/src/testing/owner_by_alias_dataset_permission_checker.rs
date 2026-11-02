@@ -13,7 +13,7 @@ use std::sync::Arc;
 
 use dill::*;
 use internal_error::{InternalError, ResultIntoInternal};
-use kamu_accounts::CurrentAccountSubject;
+use kamu_accounts::Principal;
 use kamu_datasets::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -124,14 +124,20 @@ impl DatasetPermissionChecker for OwnerByAliasDatasetPermissionChecker {
 
     async fn classify_dataset_handles_by_allowance_for(
         &self,
-        principal: &CurrentAccountSubject,
+        principal: &Principal,
         dataset_handles: Vec<odf::DatasetHandle>,
         permission: DatasetPermission,
     ) -> Result<ClassifyByAllowanceResponse, InternalError> {
         let (allowed, not_allowed): (Vec<_>, Vec<_>) =
-            dataset_handles.into_iter().partition(|dataset_handle| {
-                dataset_handle.alias.account_name.as_ref() == principal.maybe_account_name()
-            });
+            dataset_handles
+                .into_iter()
+                .partition(|dataset_handle| match principal {
+                    Principal::User(account_handle) => {
+                        dataset_handle.alias.account_name.as_ref() == Some(&account_handle.name)
+                    }
+                    Principal::Node => true,
+                    Principal::Anonymous => dataset_handle.alias.account_name.is_none(),
+                });
 
         Ok(Self::classify_response(allowed, not_allowed, permission))
     }

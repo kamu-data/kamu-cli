@@ -11,7 +11,7 @@ use std::sync::Arc;
 
 use database_common_macros::{transactional_method1, transactional_method2};
 use internal_error::{ErrorIntoInternal, InternalError};
-use kamu_accounts::CurrentAccountSubject;
+use kamu_accounts::Principal;
 use kamu_core::*;
 use kamu_datasets::{
     DatasetOperation,
@@ -172,7 +172,7 @@ impl PullTransformJob {
     /// The pull authorized reading the inputs of the transform it planned.
     /// Another writer may change the transform before the job elaborates it,
     /// so inputs the pull did not plan are authorized here, before any is read
-    #[transactional_method2(dataset_operation_guard: Arc<dyn DatasetOperationGuard>, current_account_subject: Arc<CurrentAccountSubject>)]
+    #[transactional_method2(dataset_operation_guard: Arc<dyn DatasetOperationGuard>, principal: Arc<Principal>)]
     async fn authorize_unplanned_inputs(
         &self,
         plan: &TransformExecutionPlan,
@@ -194,7 +194,7 @@ impl PullTransformJob {
         // already granted it, unless its permissions changed since
         dataset_operation_guard
             .check_operation(
-                &current_account_subject,
+                &principal,
                 &DatasetOperationRequest::new(
                     plan.request.dataset_handle.clone(),
                     DatasetOperation::Transform {

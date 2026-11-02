@@ -12,7 +12,7 @@ use std::sync::Arc;
 use database_common_macros::{transactional_method1, transactional_method2};
 use dill::{component, interface};
 use internal_error::InternalError;
-use kamu_accounts::CurrentAccountSubject;
+use kamu_accounts::Principal;
 use kamu_core::{
     PushDatasetUseCase,
     PushError,
@@ -50,7 +50,7 @@ pub struct PushDatasetUseCaseImpl {
 
 #[common_macros::method_names_consts]
 impl PushDatasetUseCaseImpl {
-    #[transactional_method2(dataset_operation_guard: Arc<dyn DatasetOperationGuard>, current_account_subject: Arc<CurrentAccountSubject>)]
+    #[transactional_method2(dataset_operation_guard: Arc<dyn DatasetOperationGuard>, principal: Arc<Principal>)]
     #[tracing::instrument(level = "debug", name = PushDatasetUseCaseImpl_make_authorization_checks, skip_all, fields(num_datasets = dataset_handles.len(), ?push_target))]
     async fn make_authorization_checks(
         &self,
@@ -62,7 +62,7 @@ impl PushDatasetUseCaseImpl {
             .map(|hdl| DatasetOperationRequest::new(hdl, DatasetOperation::SyncTo))
             .collect();
         let verdicts = dataset_operation_guard
-            .check_operations(&current_account_subject, &requests)
+            .check_operations(&principal, &requests)
             .await?;
 
         let mut authorized_handles = Vec::with_capacity(requests.len());
