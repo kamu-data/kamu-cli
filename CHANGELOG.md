@@ -14,6 +14,9 @@ Recommendation: for ease of reading, use the following format:
 -->
 
 ## [Unreleased]
+### Added
+- `/ui-config` returns `webhooks.loopbackTargetsOnly`, so the Web UI validates webhook target URLs by
+  the same rule as the node
 ### Changed
 - Tests: the FTP ingest test runs against an in-process FTP server instead of a container, and is
   enabled again

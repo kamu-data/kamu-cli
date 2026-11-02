@@ -21,13 +21,14 @@ use kamu::domain::{FileUploadLimitConfig, Protocols, ServerUrlConfig, TenancyCon
 use kamu_accounts_services::PasswordPolicyConfig;
 use kamu_adapter_http::DatasetAuthorizationLayer;
 use kamu_adapter_http::e2e::e2e_router;
+use kamu_webhooks::WebhooksConfig;
 use observability::axum::{panic_handler, unknown_fallback_handler};
 use tokio::sync::Notify;
 use tower_http::catch_panic::CatchPanicLayer;
 use url::Url;
 use utoipa_axum::router::OpenApiRouter;
 
-use super::{UIConfiguration, UIFeatureFlags, graphql_handler};
+use super::{UIConfiguration, UIFeatureFlags, UIWebhooksConfiguration, graphql_handler};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -51,6 +52,7 @@ impl APIServer {
         external_address: Option<IpAddr>,
         e2e_output_data_path: Option<&PathBuf>,
         password_policy_config: &PasswordPolicyConfig,
+        webhooks_config: &WebhooksConfig,
     ) -> Result<Self, InternalError> {
         // Background task executor must run with server privileges to execute tasks on
         // behalf of the system, as they are automatically scheduled
@@ -99,6 +101,9 @@ impl APIServer {
                 enable_dataset_env_vars_management,
                 allow_anonymous,
                 enable_terms_of_service: true,
+            },
+            webhooks: UIWebhooksConfiguration {
+                loopback_targets_only: webhooks_config.loopback_targets_only,
             },
         };
 
