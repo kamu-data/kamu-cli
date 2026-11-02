@@ -78,8 +78,7 @@ impl EventStore<FlowConfigurationState> for SqliteFlowConfigurationEventStore {
 
         let flow_type = flow_binding.flow_type.clone();
 
-        let scope_json = serde_json::to_value(&flow_binding.scope).unwrap();
-        let scope_json_str = canonical_json::to_string(&scope_json).unwrap();
+        let scope_json_str = serde_jcs::to_string(&flow_binding.scope).unwrap();
 
         Box::pin(async_stream::stream! {
             let mut tr = self.transaction.lock().await;
@@ -169,8 +168,7 @@ impl EventStore<FlowConfigurationState> for SqliteFlowConfigurationEventStore {
             return Err(SaveEventsError::NothingToSave);
         }
 
-        let scope_json = serde_json::to_value(&flow_binding.scope).int_err()?;
-        let scope_json_str = canonical_json::to_string(&scope_json).unwrap();
+        let scope_json_str = serde_jcs::to_string(&flow_binding.scope).int_err()?;
         let flow_type = flow_binding.flow_type.as_str();
 
         let mut tr = self.transaction.lock().await;
@@ -297,8 +295,7 @@ impl EventStore<FlowConfigurationState> for SqliteFlowConfigurationEventStore {
         let mut item_event_counts = Vec::with_capacity(items.len());
 
         for item in items {
-            let scope_json = serde_json::to_value(&item.query.scope).int_err()?;
-            let scope_json_str = canonical_json::to_string(&scope_json).unwrap();
+            let scope_json_str = serde_jcs::to_string(&item.query.scope).int_err()?;
             let batch_prev_event_id = item
                 .maybe_prev_stored_event_id
                 .map_or(0, EventID::into_inner);
@@ -437,8 +434,7 @@ impl FlowConfigurationEventStore for SqliteFlowConfigurationEventStore {
 
         let connection_mut = tr.connection_mut().await?;
 
-        let scope_json = serde_json::to_value(flow_scope).int_err()?;
-        let scope_json_str = canonical_json::to_string(&scope_json).unwrap();
+        let scope_json_str = serde_jcs::to_string(flow_scope).int_err()?;
 
         let flow_bindings = sqlx::query!(
             r#"

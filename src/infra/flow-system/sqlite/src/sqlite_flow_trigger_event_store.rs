@@ -78,8 +78,7 @@ impl EventStore<FlowTriggerState> for SqliteFlowTriggerEventStore {
 
         let flow_type = flow_binding.flow_type.clone();
 
-        let scope_json = serde_json::to_value(&flow_binding.scope).unwrap();
-        let scope_json_str = canonical_json::to_string(&scope_json).unwrap();
+        let scope_json_str = serde_jcs::to_string(&flow_binding.scope).unwrap();
 
         Box::pin(async_stream::stream! {
             let mut tr = self.transaction.lock().await;
@@ -169,8 +168,7 @@ impl EventStore<FlowTriggerState> for SqliteFlowTriggerEventStore {
             return Err(SaveEventsError::NothingToSave);
         }
 
-        let scope_json = serde_json::to_value(&flow_binding.scope).int_err()?;
-        let scope_json_str = canonical_json::to_string(&scope_json).unwrap();
+        let scope_json_str = serde_jcs::to_string(&flow_binding.scope).int_err()?;
         let flow_type = flow_binding.flow_type.as_str();
 
         let mut tr = self.transaction.lock().await;
@@ -298,8 +296,7 @@ impl EventStore<FlowTriggerState> for SqliteFlowTriggerEventStore {
         let mut item_event_counts = Vec::with_capacity(items.len());
 
         for item in items {
-            let scope_json = serde_json::to_value(&item.query.scope).int_err()?;
-            let scope_json_str = canonical_json::to_string(&scope_json).unwrap();
+            let scope_json_str = serde_jcs::to_string(&item.query.scope).int_err()?;
             let batch_prev_event_id = item
                 .maybe_prev_stored_event_id
                 .map_or(0, EventID::into_inner);
@@ -453,10 +450,7 @@ impl FlowTriggerEventStore for SqliteFlowTriggerEventStore {
 
         let scope_json_strs = flow_scopes
             .iter()
-            .map(|flow_scope| {
-                let scope_json = serde_json::to_value(flow_scope).int_err()?;
-                canonical_json::to_string(&scope_json).int_err()
-            })
+            .map(|flow_scope| serde_jcs::to_string(flow_scope).int_err())
             .collect::<Result<Vec<_>, InternalError>>()?;
         let scopes_json = serde_json::to_string(&scope_json_strs).int_err()?;
 

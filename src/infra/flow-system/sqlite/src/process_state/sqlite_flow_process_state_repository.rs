@@ -32,12 +32,11 @@ impl SqliteFlowProcessStateRepository {
         &self,
         process_state: &FlowProcessState,
     ) -> Result<(), FlowProcessSaveError> {
-        let scope_json = serde_json::to_value(&process_state.flow_binding().scope).int_err()?;
-        let scope_data_json = canonical_json::to_string(&scope_json).int_err()?;
+        let scope_data_json =
+            serde_jcs::to_string(&process_state.flow_binding().scope).int_err()?;
 
         let stop_policy_kind: &str = process_state.stop_policy().into();
-        let stop_policy_json = serde_json::to_value(process_state.stop_policy()).int_err()?;
-        let stop_policy_data = canonical_json::to_string(&stop_policy_json).int_err()?;
+        let stop_policy_data = serde_jcs::to_string(&process_state.stop_policy()).int_err()?;
 
         let effective_state_str = process_state.effective_state().to_string();
 
@@ -130,15 +129,13 @@ impl SqliteFlowProcessStateRepository {
         state: &FlowProcessState,
         expected_last_event_id: EventID,
     ) -> Result<(), FlowProcessSaveError> {
-        let scope_json = serde_json::to_value(&state.flow_binding().scope).int_err()?;
-        let scope_data_json = canonical_json::to_string(&scope_json).int_err()?;
+        let scope_data_json = serde_jcs::to_string(&state.flow_binding().scope).int_err()?;
 
         let effective_state_str = state.effective_state().to_string();
 
         let user_intent_str = state.user_intent().to_string();
         let stop_policy_kind: &str = state.stop_policy().into();
-        let stop_policy_json = serde_json::to_value(state.stop_policy()).int_err()?;
-        let stop_policy_data = canonical_json::to_string(&stop_policy_json).int_err()?;
+        let stop_policy_data = serde_jcs::to_string(&state.stop_policy()).int_err()?;
         let consecutive_failures = i32::try_from(state.consecutive_failures()).unwrap();
         let last_success_at = state.last_success_at();
         let last_failure_at = state.last_failure_at();
@@ -403,8 +400,7 @@ impl FlowProcessStateRepository for SqliteFlowProcessStateRepository {
         let mut tr = self.transaction.lock().await;
         let connection_mut = tr.connection_mut().await?;
 
-        let scope_json = serde_json::to_value(scope).int_err()?;
-        let scope_data_json = canonical_json::to_string(&scope_json).int_err()?;
+        let scope_data_json = serde_jcs::to_string(scope).int_err()?;
 
         sqlx::query!(
             r#"

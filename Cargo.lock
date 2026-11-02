@@ -2885,19 +2885,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "canonical_json"
-version = "0.7.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "15c64d9e1338e26dbd60233afe97d1f03de2227bdf33b0cfef12d59736054ec8"
-dependencies = [
- "hex",
- "regex",
- "serde",
- "serde_json",
- "thiserror 2.0.21",
-]
-
-[[package]]
 name = "cap-primitives"
 version = "4.0.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -9212,7 +9199,6 @@ version = "0.272.0"
 dependencies = [
  "async-stream",
  "async-trait",
- "canonical_json",
  "chrono",
  "database-common",
  "database-common-macros",
@@ -9224,6 +9210,7 @@ dependencies = [
  "kamu-task-system",
  "kamu-wakeup-listener-sqlite",
  "opendatafabric",
+ "serde_jcs 0.2.0",
  "serde_json",
  "sqlx",
  "test-group",
@@ -9680,7 +9667,6 @@ name = "kamu-search-elasticsearch"
 version = "0.272.0"
 dependencies = [
  "async-trait",
- "canonical_json",
  "chrono",
  "common-macros",
  "container-runtime",
@@ -9698,6 +9684,7 @@ dependencies = [
  "random-strings",
  "reqwest",
  "serde",
+ "serde_jcs 0.2.0",
  "serde_json",
  "sha2 0.11.1",
  "test-group",

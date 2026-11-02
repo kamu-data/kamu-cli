@@ -35,10 +35,10 @@ wakeup-listener = { workspace = true }
 
 async-stream = "0.3"
 async-trait = { version = "0.1", default-features = false }
-canonical_json = { version = "0.7", default-features = false }
 chrono = { version = "0.4", default-features = false }
 dill = { version = "0.17", default-features = false }
 futures = "0.3"
+serde_jcs = "0.2"
 serde_json = "1"
 sqlx = { version = "0.9", default-features = false, features = [
     "chrono",

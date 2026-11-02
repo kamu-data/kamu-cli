@@ -48,7 +48,6 @@ random-strings = { workspace = true, optional = true }
 time-source = { workspace = true, optional = true }
 
 async-trait = { version = "0.1", default-features = false }
-canonical_json = { version = "0.7", default-features = false }
 chrono = { version = "0.4", default-features = false, optional = true }
 dill = { version = "0.17", default-features = false }
 flate2 = { version = "1", default-features = false, features = [
@@ -62,6 +61,7 @@ reqwest = { version = "0.12", default-features = false, features = [
 serde = { version = "1", features = [
     "derive",
 ] }
+serde_jcs = "0.2"
 serde_json = { version = "1", default-features = false }
 sha2 = { version = "0.11", default-features = false }
 thiserror = { version = "2", default-features = false }

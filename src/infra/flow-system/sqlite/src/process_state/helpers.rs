@@ -18,8 +18,7 @@ pub(crate) async fn load_process_state(
     connection_mut: &mut SqliteConnection,
     flow_binding: &FlowBinding,
 ) -> Result<FlowProcessState, FlowProcessLoadError> {
-    let scope_json = serde_json::to_value(&flow_binding.scope).int_err()?;
-    let scope_data_json = canonical_json::to_string(&scope_json).int_err()?;
+    let scope_data_json = serde_jcs::to_string(&flow_binding.scope).int_err()?;
 
     let maybe_row = sqlx::query_as!(
         SqliteFlowProcessStateRowModel,

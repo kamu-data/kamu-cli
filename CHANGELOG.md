@@ -13,6 +13,14 @@ Recommendation: for ease of reading, use the following format:
 ### Fixed
 -->
 
+## [Unreleased]
+### Fixed
+- `/query` (breaking): commitment hashes and signatures are computed over RFC 8785 (JCS) canonical
+  JSON, as the ODF spec requires, so standard JCS clients can reproduce them. Commitments signed by
+  earlier versions fail `/verify`
+- `POST /query` no longer fails with "Response signing is not enabled" on nodes without a signing key.
+  Only queries that request a `Proof` need the key
+
 ## [0.272.0] - 2026-11-02
 ### Added
 - `/ui-config` returns `webhooks.loopbackTargetsOnly`, so the Web UI validates webhook target URLs by
