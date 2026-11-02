@@ -42,14 +42,15 @@ impl InMemoryDatasetEntryRepository {
         }
     }
 
-    /// The owner's entries, ordered by dataset ID
+    /// The owner's entries, ordered by dataset name as the database
+    /// repositories list them
     fn owned_entries<'a>(rows: &Rows<'a>, owner_id: &odf::AccountID) -> Vec<&'a DatasetEntry> {
         let mut entries: Vec<_> = rows
             .iter()
             .map(|(_, entry)| entry)
             .filter(|entry| &entry.owner_id == owner_id)
             .collect();
-        entries.sort_by(|a, b| a.id.cmp(&b.id));
+        entries.sort_by(|a, b| a.name.as_str().cmp(b.name.as_str()));
         entries
     }
 

@@ -19,7 +19,9 @@ pub(crate) fn generate_scope_query_condition_clauses(
 
     let mut scope_clauses = Vec::new();
     for (key, values) in &flow_scope_query.attributes {
+        // No accepted values match no scope, as `FlowScope::matches_query` does
         if values.is_empty() {
+            scope_clauses.push("FALSE".to_string());
             continue;
         }
 

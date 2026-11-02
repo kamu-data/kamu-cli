@@ -33,6 +33,8 @@ pub fn register_dependencies(b: &mut CatalogBuilder) {
 
     b.add::<InMemoryDatasetStatisticsState>();
     b.add::<InMemoryDatasetStatisticsRepository>();
+
+    b.add::<InMemoryDatasetBlockQueryRepository>();
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

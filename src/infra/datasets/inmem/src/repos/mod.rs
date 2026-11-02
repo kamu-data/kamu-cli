@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+mod inmem_dataset_block_query_repository;
 mod inmem_dataset_data_blocks_repository;
 mod inmem_dataset_dependency_repository;
 mod inmem_dataset_entry_repository;
@@ -15,6 +16,7 @@ mod inmem_dataset_reference_repository;
 mod inmem_dataset_statistics_repository;
 mod states;
 
+pub use inmem_dataset_block_query_repository::*;
 pub use inmem_dataset_data_blocks_repository::*;
 pub use inmem_dataset_dependency_repository::*;
 pub use inmem_dataset_entry_repository::*;

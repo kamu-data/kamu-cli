@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+mod dataset_blocks_query_service;
 mod dataset_entry_service;
 mod dataset_env_var_mutation_adapter;
 mod dataset_env_var_resolver;
@@ -21,6 +22,7 @@ mod dataset_registry;
 mod dataset_statistics_service;
 mod dependency_graph_service;
 
+pub use dataset_blocks_query_service::*;
 pub use dataset_entry_service::*;
 pub use dataset_env_var_mutation_adapter::*;
 pub use dataset_env_var_resolver::*;

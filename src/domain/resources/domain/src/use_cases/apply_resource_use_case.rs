@@ -41,6 +41,28 @@ pub trait ApplyResourceUseCase<R: EventSourcedResource>: Send + Sync {
         &self,
         params: ApplyResourceParams<R>,
     ) -> Result<ApplyResourceApplicationDecision<R>, ApplyResourceUseCaseError<R>>;
+
+    /// Applies only while the stored resource still matches `precondition`,
+    /// failing with `ConcurrentModification` otherwise. The check and the
+    /// write are atomic: a change committed in between fails the save.
+    async fn apply_with_precondition(
+        &self,
+        params: ApplyResourceParams<R>,
+        precondition: ApplyResourcePrecondition,
+    ) -> Result<ApplyResourceApplicationDecision<R>, ApplyResourceUseCaseError<R>>;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// The state of the stored resource an apply was computed from, for a
+/// read-modify-write that must not overwrite a concurrent change
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ApplyResourcePrecondition {
+    None,
+    /// No resource with the applied name exists
+    Absent,
+    /// The resource exists at this generation
+    Generation(u64),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

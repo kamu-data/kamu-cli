@@ -118,6 +118,7 @@ pub fn configure_database_components(
             b.add::<kamu_datasets_postgres::PostgresDatasetStatisticsRepository>();
             b.add::<kamu_datasets_postgres::PostgresDatasetKeyBlockRepository>();
             b.add::<kamu_datasets_postgres::PostgresDatasetDataBlockRepository>();
+            b.add::<kamu_datasets_postgres::PostgresDatasetBlockQueryRepository>();
 
             b.add::<kamu_resources_postgres::PostgresRawResourceEventStore>();
             b.add::<kamu_resources_postgres::PostgresResourceRepository>();
@@ -166,6 +167,7 @@ pub fn configure_database_components(
             b.add::<kamu_datasets_sqlite::SqliteDatasetStatisticsRepository>();
             b.add::<kamu_datasets_sqlite::SqliteDatasetKeyBlockRepository>();
             b.add::<kamu_datasets_sqlite::SqliteDatasetDataBlockRepository>();
+            b.add::<kamu_datasets_sqlite::SqliteDatasetBlockQueryRepository>();
 
             b.add::<kamu_resources_sqlite::SqliteResourceRawEventStore>();
             b.add::<kamu_resources_sqlite::SqliteResourceRepository>();

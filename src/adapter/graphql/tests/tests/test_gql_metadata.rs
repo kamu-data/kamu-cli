@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use async_graphql::value;
+use chrono::{DateTime, TimeZone, Utc};
 use indoc::indoc;
 use kamu::*;
 use kamu_accounts::{
@@ -599,6 +600,71 @@ async fn test_metadata_blocks_in_range() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
+async fn test_current_watermark_as_of_head() {
+    let harness = DatasetMetadataHarness::new().await;
+
+    let create_result = harness.create_root_dataset().await;
+    let dataset = create_result.dataset.as_ref();
+    let dataset_id = &create_result.dataset_handle.id;
+
+    let watermark_1 = Utc.with_ymd_and_hms(2050, 1, 1, 12, 0, 0).unwrap();
+    let watermark_2 = Utc.with_ymd_and_hms(2050, 1, 2, 12, 0, 0).unwrap();
+
+    let schema_head = harness
+        .commit_event(dataset, MetadataFactory::set_data_schema().build().into())
+        .await;
+    let data_head = harness
+        .commit_event(
+            dataset,
+            MetadataFactory::add_data()
+                .some_new_data_with_offset(0, 9)
+                .new_watermark(Some(watermark_1))
+                .build()
+                .into(),
+        )
+        .await;
+    // Watermark-only block, as written by `kamu set-watermark`
+    harness
+        .commit_event(
+            dataset,
+            MetadataFactory::add_data()
+                .prev_offset(Some(9))
+                .new_watermark(Some(watermark_2))
+                .build()
+                .into(),
+        )
+        .await;
+    harness
+        .commit_event(
+            dataset,
+            MetadataFactory::set_info()
+                .description("foo")
+                .build()
+                .into(),
+        )
+        .await;
+
+    assert_eq!(
+        harness.current_watermark(dataset_id, None).await,
+        Some(watermark_2)
+    );
+    assert_eq!(
+        harness
+            .current_watermark(dataset_id, Some(&data_head))
+            .await,
+        Some(watermark_1)
+    );
+    assert_eq!(
+        harness
+            .current_watermark(dataset_id, Some(&schema_head))
+            .await,
+        None
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
 async fn test_current_downstream_dependencies_count_hides_private_from_readers() {
     let harness = DatasetMetadataHarness::new().await;
 
@@ -824,6 +890,58 @@ impl DatasetMetadataHarness {
             .unwrap()
     }
 
+    /// Commits the event, skipping the check of referenced data objects
+    async fn commit_event(
+        &self,
+        dataset: &dyn odf::Dataset,
+        event: odf::MetadataEvent,
+    ) -> odf::Multihash {
+        dataset
+            .commit_event(
+                event,
+                odf::dataset::CommitOpts {
+                    check_object_refs: false,
+                    ..odf::dataset::CommitOpts::default()
+                },
+            )
+            .await
+            .unwrap()
+            .new_head
+    }
+
+    async fn current_watermark(
+        &self,
+        dataset_id: &odf::DatasetID,
+        head: Option<&odf::Multihash>,
+    ) -> Option<DateTime<Utc>> {
+        let request = async_graphql::Request::new(indoc!(
+            r#"
+            query ($datasetId: DatasetID!, $head: Multihash) {
+                datasets {
+                    byId(datasetId: $datasetId) {
+                        metadata {
+                            currentWatermark(head: $head)
+                        }
+                    }
+                }
+            }
+            "#
+        ))
+        .variables(async_graphql::Variables::from_json(json!({
+            "datasetId": dataset_id.to_string(),
+            "head": head.map(ToString::to_string),
+        })));
+
+        let res = self.execute_authorized_query(request).await;
+        assert!(res.is_ok(), "{res:?}");
+
+        let json = res.data.into_json().unwrap();
+
+        json["datasets"]["byId"]["metadata"]["currentWatermark"]
+            .as_str()
+            .map(|s| DateTime::parse_from_rfc3339(s).unwrap().to_utc())
+    }
+
     /// Returns sorted names of the listed downstreams and the downstreams count
     async fn get_downstream_dependencies(
         &self,
@@ -959,7 +1077,7 @@ impl DatasetMetadataHarness {
     ) -> async_graphql::Request {
         async_graphql::Request::new(indoc!(
             r#"
-            query ($datasetId: DatasetID!, $eventTypes: [MetadataEventType!], $head: Multihash) {
+            query ($datasetId: DatasetID!, $eventTypes: [MetadataProjectionEventType!], $head: Multihash) {
                 datasets {
                     byId(
                         datasetId: $datasetId

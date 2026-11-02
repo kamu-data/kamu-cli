@@ -396,7 +396,7 @@ impl BaseConfigurationServiceHarness {
             .len()
     }
 
-    fn make_targeting_headers_input(
+    pub fn make_targeting_headers_input(
         account: &odf::ResourceOwnerHandle,
         dataset_id: &odf::DatasetID,
         name: &str,

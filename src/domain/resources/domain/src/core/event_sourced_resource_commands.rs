@@ -158,12 +158,12 @@ pub fn try_update_resource_spec<R>(
 where
     R: EventSourcedResource,
     R::SpecInput: ResourceValidateSpec + Clone,
-    R::Spec: ResourceSpecFromInput<R::SpecInput> + PartialEq,
+    R::Spec: ResourceSpecFromInput<R::SpecInput> + PartialEq + Clone,
     R::LifecycleError: From<<R::SpecInput as ResourceValidateSpec>::ValidationError>
         + InvariantViolationOf<R::ResourceState>,
 {
     ensure_not_being_deleted(resource)?;
-    new_spec.validate()?;
+    new_spec.validate_update(&resource.spec().clone().into_input())?;
 
     // Compare after normalizing (not the raw input) so a resubmitted-but-equivalent
     // input is correctly detected as unchanged, even if its written form differs.

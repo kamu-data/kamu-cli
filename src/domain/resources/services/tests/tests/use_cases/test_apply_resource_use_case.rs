@@ -7,12 +7,16 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::assert_matches;
+
 use kamu_resources::{
     ApplyResourceAction,
     ApplyResourceApplicationDecision,
     ApplyResourceOutcome,
     ApplyResourceParams,
     ApplyResourcePlanningDecision,
+    ApplyResourcePrecondition,
+    ApplyResourceUseCaseError,
     ResourcePhase,
 };
 use kamu_resources_services::testing::{
@@ -35,7 +39,8 @@ use crate::tests::utils::TestResourceSpec;
 // The planner and executor are each tested in isolation in their own test
 // modules. Here we only test behaviour that is exclusive to the use-case layer:
 // a basic end-to-end wiring smoke test, sanitizer integration (all code-paths),
-// and the boundary where a sanitizer produces an invalid spec.
+// the boundary where a sanitizer produces an invalid spec, and preconditions,
+// which span both.
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -288,6 +293,69 @@ async fn test_apply_update_resets_status_to_pending() {
         Some(1),
         "observedGeneration must keep the last reconciled generation after spec update"
     );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_apply_with_precondition() {
+    let harness = ResourceUseCaseBaseHarness::new();
+    let account_handle = odf::ResourceOwnerHandle::new_test("test-owner");
+    let apply_uc = harness.apply_test_uc();
+
+    // `Absent` creates a missing resource, and refuses once it exists
+    let id = apply_uc
+        .apply_with_precondition(
+            make_params(&account_handle, "res-a", "v1"),
+            ApplyResourcePrecondition::Absent,
+        )
+        .await
+        .unwrap()
+        .expect_applied()
+        .id;
+    assert_matches!(
+        apply_uc
+            .apply_with_precondition(
+                make_params(&account_handle, "res-a", "lost"),
+                ApplyResourcePrecondition::Absent,
+            )
+            .await,
+        Err(ApplyResourceUseCaseError::ConcurrentModification(_))
+    );
+
+    // `Generation` updates at the current generation only
+    apply_uc
+        .apply_with_precondition(
+            make_params(&account_handle, "res-a", "v2"),
+            ApplyResourcePrecondition::Generation(1),
+        )
+        .await
+        .unwrap()
+        .expect_applied();
+    assert_matches!(
+        apply_uc
+            .apply_with_precondition(
+                make_params(&account_handle, "res-a", "lost"),
+                ApplyResourcePrecondition::Generation(1),
+            )
+            .await,
+        Err(ApplyResourceUseCaseError::ConcurrentModification(_))
+    );
+
+    // ... and refuses a resource that does not exist
+    assert_matches!(
+        apply_uc
+            .apply_with_precondition(
+                make_params(&account_handle, "res-b", "lost"),
+                ApplyResourcePrecondition::Generation(1),
+            )
+            .await,
+        Err(ApplyResourceUseCaseError::ConcurrentModification(_))
+    );
+
+    let snapshot = harness.get_snapshot_by_id(&id).await.unwrap();
+    pretty_assertions::assert_eq!(snapshot.spec, serde_json::json!({ "value": "v2" }));
+    assert_eq!(snapshot.headers.generation, 2);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

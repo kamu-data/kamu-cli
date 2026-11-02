@@ -25,12 +25,15 @@ pub(crate) fn generate_scope_query_condition_clauses(
     let mut scope_clauses = Vec::new();
     // keys are &'static str from code; safe to inline
     for (key, values) in &flow_scope_query.attributes {
-        if values.len() == 1 {
+        if values.is_empty() {
+            // No accepted values match no scope, as `FlowScope::matches_query` does
+            scope_clauses.push("0".to_string());
+        } else if values.len() == 1 {
             scope_clauses.push(format!(
                 "json_extract(scope_data, '$.{key}') = ${parameter_index}",
             ));
             parameter_index += 1;
-        } else if !values.is_empty() {
+        } else {
             scope_clauses.push(format!(
                 "json_extract(scope_data, '$.{key}') IN ({})",
                 sqlite_generate_placeholders_list(

@@ -751,7 +751,7 @@ kind: ingest and hard compaction need a root dataset, transform a derivative one
 | `Dataset.flows.processes.primary` | `queries/datasets/dataset_flow_processes.rs` | `FlowProcessStateQuery::try_get_process_state` for the ingest (root) or transform (derivative) binding; synthesizes an `Unconfigured` state if none |
 | `Dataset.flows.processes.webhooks { rollup, subprocesses }` | `queries/webhooks/webhook_flow_subprocess_group.rs` | `FlowProcessStateQuery::rollup` / `list_processes` over the dataset's subscription scopes |
 | `Account.flows.runs.listFlows(…)` | `queries/accounts/account_flow_runs.rs` | `list_scoped_flows` over the account's owned datasets |
-| `Account.flows.runs.listDatasetsWithFlow` | same | `FlowQueryService::filter_flow_scopes_having_flows` |
+| `Account.flows.runs.listDatasetsWithFlow` | same | `FlowQueryService::list_flow_scopes_matching_scope_query` with the scope query `listFlows` uses unfiltered |
 | `Account.flows.processes.{primaryRollup, webhookRollup, fullRollup}` | `queries/accounts/account_flow_processes.rs` | `FlowProcessStateQuery::rollup` |
 | `Account.flows.processes.{primaryCards, webhookCards, allCards}` | same | `FlowProcessStateQuery::list_processes`; `allCards` returns the union `AccountFlowProcessCard = Dataset \| Webhook` |
 
@@ -762,7 +762,8 @@ or `accounts`), `byProcessType` (one of `primary { byFlowTypes }` or
 `webhooks { subscriptionIds }`), and for accounts a required `byDatasetIds`; ordering
 `FlowRunOrder`. The scope query is chosen in
 `queries/flows/flow_query_utils.rs`: with no process type filter, a dataset query also matches the
-dataset's webhook subscription scopes. Process filters (`FlowProcessFilters`) mirror
+dataset's webhook subscription scopes. An attribute with no accepted values matches no scope, so
+an account without datasets lists no flows. Process filters (`FlowProcessFilters`) mirror
 `FlowProcessListFilter` ([§9](#queries)); without `effectiveStateIn`, unconfigured processes are
 excluded. Pagination is page-based, 15 per page by default.
 

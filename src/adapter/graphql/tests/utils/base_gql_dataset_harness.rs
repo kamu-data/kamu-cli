@@ -89,6 +89,7 @@ impl BaseGQLDatasetHarness {
                 .add::<InMemoryAccountQuotaEventStore>()
                 .add::<AccountQuotaServiceImpl>()
                 .add::<DatasetStatisticsServiceImpl>()
+                .add::<DatasetBlocksQueryServiceImpl>()
                 .add::<AccountQuotaCheckerStorageImpl>()
                 .add_value(QuotaDefaultsConfig::default())
                 .add_value(RunInfoDir::new(run_info_dir));

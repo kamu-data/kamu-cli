@@ -28,6 +28,7 @@ use crate::MetadataEvent;
     Serialize,
     Deserialize,
     strum::Display,
+    strum::EnumIter,
     strum::EnumString,
 )]
 #[serde(rename_all = "camelCase")]

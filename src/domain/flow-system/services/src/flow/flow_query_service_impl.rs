@@ -102,13 +102,13 @@ impl FlowQueryService for FlowQueryServiceImpl {
         })
     }
 
-    #[tracing::instrument(level = "debug", name = FlowQueryServiceImpl_filter_flow_scopes_having_flows, skip_all)]
-    async fn filter_flow_scopes_having_flows(
+    #[tracing::instrument(level = "debug", name = FlowQueryServiceImpl_list_flow_scopes_matching_scope_query, skip_all)]
+    async fn list_flow_scopes_matching_scope_query(
         &self,
-        scopes: &[FlowScope],
+        scope_query: FlowScopeQuery,
     ) -> Result<Vec<FlowScope>, InternalError> {
         self.flow_event_store
-            .filter_flow_scopes_having_flows(scopes)
+            .list_flow_scopes_matching_scope_query(scope_query)
             .await
     }
 
