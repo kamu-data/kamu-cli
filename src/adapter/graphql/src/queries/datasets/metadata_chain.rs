@@ -7,7 +7,9 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use database_common::PaginationOpts;
 use futures::{StreamExt, TryStreamExt};
+use kamu_datasets::{DatasetBlocksFilter, DatasetBlocksQueryService, ResolvedDataset};
 use odf::dataset::MetadataChainExt as _;
 
 use crate::prelude::*;
@@ -116,18 +118,32 @@ impl<'a> MetadataChain<'a> {
 
     // TODO: Add ref parameter (defaulting to "head")
     // TODO: Support before/after style iteration
-    /// Iterates all metadata blocks in the reverse chronological order
-    #[tracing::instrument(level = "info", name = MetadataChain_blocks, skip_all, fields(?page, ?per_page))]
+    /// Iterates metadata blocks, optionally filtered, in the reverse
+    /// chronological order
+    #[tracing::instrument(level = "info", name = MetadataChain_blocks, skip_all, fields(?page, ?per_page, ?filter))]
     async fn blocks(
         &self,
         ctx: &Context<'_>,
         page: Option<usize>,
         per_page: Option<usize>,
+        #[graphql(desc = "Counts and pages only the matching blocks")] filter: Option<
+            MetadataBlocksFilter,
+        >,
     ) -> Result<MetadataBlockConnection> {
         let resolved_dataset = self.dataset_request_state.resolved_dataset(ctx).await?;
 
         let page = page.unwrap_or(0);
         let per_page = per_page.unwrap_or(Self::DEFAULT_BLOCKS_PER_PAGE);
+
+        if let Some(filter) = filter
+            .map(MetadataBlocksFilter::into_domain)
+            .transpose()?
+            .flatten()
+        {
+            return self
+                .filtered_blocks(ctx, resolved_dataset, &filter, page, per_page)
+                .await;
+        }
 
         let chain = resolved_dataset.as_metadata_chain();
 
@@ -168,6 +184,42 @@ impl<'a> MetadataChain<'a> {
                 total_count,
             ))
         }
+    }
+
+    #[graphql(skip)]
+    async fn filtered_blocks(
+        &self,
+        ctx: &Context<'_>,
+        resolved_dataset: &ResolvedDataset,
+        filter: &DatasetBlocksFilter,
+        page: usize,
+        per_page: usize,
+    ) -> Result<MetadataBlockConnection> {
+        let blocks_query_service = from_catalog_n!(ctx, dyn DatasetBlocksQueryService);
+
+        let listing = blocks_query_service
+            .list_blocks(
+                resolved_dataset,
+                filter,
+                PaginationOpts::from_page(page, per_page),
+            )
+            .await?;
+
+        let account = Account::from_dataset_alias(ctx, self.dataset_request_state.dataset_alias())
+            .await?
+            .expect("Account must exist");
+
+        let mut nodes = Vec::with_capacity(listing.blocks.len());
+        for (hash, block) in listing.blocks {
+            nodes.push(MetadataBlockExtended::new(ctx, hash, block, account.clone()).await?);
+        }
+
+        Ok(MetadataBlockConnection::new(
+            nodes,
+            page,
+            per_page,
+            listing.total_count,
+        ))
     }
 }
 

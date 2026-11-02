@@ -1,0 +1,27 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n                    SELECT\n                        (\n                            SELECT COUNT(*)\n                            FROM dataset_key_blocks\n                            WHERE dataset_id = $1 AND block_ref_name = $2\n                                AND ($3::text[] IS NULL OR event_type = ANY($3::text[]::metadata_event_type[]))\n                                AND block_hash_bin >= $4 AND block_hash_bin < $5\n                        ) + (\n                            SELECT COUNT(*)\n                            FROM dataset_data_blocks\n                            WHERE dataset_id = $1 AND block_ref_name = $2\n                                AND ($3::text[] IS NULL OR event_type = ANY($3::text[]::metadata_event_type[]))\n                                AND block_hash_bin >= $4 AND block_hash_bin < $5\n                        ) AS \"count!\"\n                    ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "count!",
+        "type_info": "Int8",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text",
+        "TextArray",
+        "Bytea",
+        "Bytea"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "929f2cf4abf776f41bd7895f0bc465a4414dfc506f643888f5415b007dd58870"
+}

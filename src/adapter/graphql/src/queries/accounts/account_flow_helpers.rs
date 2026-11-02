@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use std::borrow::Cow;
+use std::collections::HashSet;
 
 use kamu_adapter_flow_dataset::FlowScopeDataset;
 use kamu_datasets::{DatasetEntryService, DatasetEntryServiceExt, DatasetRegistry};
@@ -37,22 +38,31 @@ pub(crate) async fn list_accessible_datasets_with_flows(
         .await
         .int_err()?;
 
-    let input_flow_scopes = owned_dataset_ids
-        .iter()
-        .map(FlowScopeDataset::make_scope)
-        .collect::<Vec<_>>();
-
-    let filtered_flow_scopes = flow_query_service
-        .filter_flow_scopes_having_flows(&input_flow_scopes)
+    // Match flows by dataset across all scope types, as `listFlows` does,
+    // so that datasets having only webhook delivery flows are included too
+    let owned_dataset_id_refs = owned_dataset_ids.iter().collect::<Vec<_>>();
+    let flow_scopes = flow_query_service
+        .list_flow_scopes_matching_scope_query(FlowScopeDataset::query_for_multiple_datasets(
+            &owned_dataset_id_refs,
+        ))
         .await?;
 
-    let total_count = filtered_flow_scopes.len();
+    let dataset_ids_with_flows = flow_scopes
+        .iter()
+        .filter_map(FlowScopeDataset::maybe_dataset_id_in_scope)
+        .collect::<HashSet<_>>();
 
-    let dataset_ids = filtered_flow_scopes
+    let filtered_dataset_ids = owned_dataset_ids
+        .into_iter()
+        .filter(|dataset_id| dataset_ids_with_flows.contains(dataset_id))
+        .collect::<Vec<_>>();
+
+    let total_count = filtered_dataset_ids.len();
+
+    let dataset_ids = filtered_dataset_ids
         .into_iter()
         .skip(page * per_page)
         .take(per_page)
-        .filter_map(|flow_scope| FlowScopeDataset::maybe_dataset_id_in_scope(&flow_scope))
         .map(Cow::Owned)
         .collect::<Vec<_>>();
 

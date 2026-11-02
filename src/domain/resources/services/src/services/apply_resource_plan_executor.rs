@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use chrono::{DateTime, Utc};
+use event_sourcing::ConcurrentModificationError;
 use internal_error::ErrorIntoInternal;
 use messaging_outbox::{Outbox, OutboxExt};
 use serde::Serialize;
@@ -17,6 +18,7 @@ use crate::domain::{
     ApplyResourceAction,
     ApplyResourceApplicationDecision,
     ApplyResourceParams,
+    ApplyResourcePrecondition,
     ApplyResourceResult,
     ApplyResourceUseCaseError,
     DeclarativeResource,
@@ -86,9 +88,10 @@ where
     pub async fn execute(
         &self,
         plan: PlannedApplyResource<R>,
+        precondition: ApplyResourcePrecondition,
     ) -> Result<ApplyResourceApplicationDecision<R>, ApplyResourceUseCaseError<R>> {
         match plan.action {
-            ApplyResourceAction::Create => self.execute_create(plan).await,
+            ApplyResourceAction::Create => self.execute_create(plan, precondition).await,
             ApplyResourceAction::Update => self.execute_update(plan).await,
             ApplyResourceAction::Untouched => Ok(ApplyResourceApplicationDecision::Applied(
                 self.make_apply_result(plan),
@@ -99,6 +102,7 @@ where
     async fn execute_create(
         &self,
         mut plan: PlannedApplyResource<R>,
+        precondition: ApplyResourcePrecondition,
     ) -> Result<ApplyResourceApplicationDecision<R>, ApplyResourceUseCaseError<R>> {
         match self
             .resource_persistence_service
@@ -106,6 +110,15 @@ where
             .await
         {
             Ok(()) => {}
+            // Someone created the resource first; replanning as an update would
+            // overwrite what they wrote
+            Err(ResourcePersistenceError::Duplicate(_))
+                if precondition == ApplyResourcePrecondition::Absent =>
+            {
+                return Err(ApplyResourceUseCaseError::ConcurrentModification(
+                    ConcurrentModificationError {},
+                ));
+            }
             Err(ResourcePersistenceError::Duplicate(_)) => {
                 return self.retry_apply_after_duplicate_create(plan).await;
             }

@@ -39,6 +39,8 @@ interface "DataFormatRegistry" <<i>>
 interface "DatabasePasswordProvider" <<i>>
 interface "DatabaseTransactionManager" <<i>>
 interface "DatasetActionAuthorizer" <<i>>
+interface "DatasetBlockQueryRepository" <<i>>
+interface "DatasetBlocksQueryService" <<i>>
 interface "DatasetDataBlockRepository" <<i>>
 interface "DatasetDependencyRepository" <<i>>
 interface "DatasetEntryRemovalListener" <<i>>
@@ -234,6 +236,7 @@ class "DatasetAccountLifecycleHandler"
 class "DatasetAliasUpdateHandler"
 class "DatasetBlockIndexer"
 class "DatasetBlockUpdateHandler"
+class "DatasetBlocksQueryServiceImpl"
 class "DatasetEntryIndexer"
 class "DatasetEntryServiceImpl"
 class "DatasetEnvVarMutationAdapterImpl"
@@ -423,6 +426,7 @@ class "SqlInfoData" <<singleton>>
 class "SqliteAccessTokenRepository"
 class "SqliteAccountQuotaEventStore"
 class "SqliteAccountRepository"
+class "SqliteDatasetBlockQueryRepository"
 class "SqliteDatasetDataBlockRepository"
 class "SqliteDatasetDependencyRepository"
 class "SqliteDatasetEntryRepository"
@@ -861,6 +865,7 @@ class "WsSmartTransferProtocolClient"
 "DatasetEnvVarMutationAdapter" <|-- "DatasetEnvVarMutationAdapterImpl"
 "DatasetEnvVarMutationAdapterImpl"  --> "AccountService"
 "DatasetEnvVarMutationAdapterImpl"  --> "DatasetEntryRepository"
+"DatasetEnvVarMutationAdapterImpl"  --> "DatasetEnvVarSpecResolver"
 "DatasetEnvVarMutationAdapterImpl"  --> "GenericResourceQueryService"
 "DatasetEnvVarMutationAdapterImpl"  --> "SecretsEncryptionConfig"
 "DatasetEnvVarMutationAdapterImpl"  --> "ResourceDispatcherFactory"
@@ -996,6 +1001,9 @@ class "WsSmartTransferProtocolClient"
 "DatasetBlockUpdateHandler"  --> "DatasetKeyBlockRepository"
 "DatasetBlockUpdateHandler"  --> "DatasetRegistry"
 "DatasetBlockUpdateHandler"  --> "Outbox"
+"DatasetBlocksQueryService" <|-- "DatasetBlocksQueryServiceImpl"
+"DatasetBlocksQueryServiceImpl"  --> "DatasetBlockQueryRepository"
+"DatasetBlocksQueryServiceImpl"  --> "DatasetKeyBlockRepository"
 "MessageConsumer" <|-- "DatasetAccountLifecycleHandler"
 "MessageConsumerT" <|-- "DatasetAccountLifecycleHandler"
 "DatasetAccountLifecycleHandler"  --> "DatasetRegistry"
@@ -1123,6 +1131,8 @@ class "WsSmartTransferProtocolClient"
 "CreateDatasetUseCaseHelper"  --> "DatasetStorageUnitWriter"
 "CreateDatasetUseCaseHelper"  --> "SystemTimeSource"
 "CreateDatasetUseCaseHelper"  --> "TenancyConfig"
+"DatasetBlockQueryRepository" <|-- "SqliteDatasetBlockQueryRepository"
+"SqliteDatasetBlockQueryRepository"  --> "TransactionRefT"
 "DatasetDataBlockRepository" <|-- "SqliteDatasetDataBlockRepository"
 "SqliteDatasetDataBlockRepository"  --> "TransactionRefT"
 "DatasetDependencyRepository" <|-- "SqliteDatasetDependencyRepository"

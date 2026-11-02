@@ -1627,6 +1627,44 @@ type CreateAccountSuccess implements CreateAccountResult {
 }
 
 """
+Outcome of creating an environment variable
+"""
+interface CreateDatasetEnvVarResult {
+	"""
+	Human-readable outcome message
+	"""
+	message: String!
+}
+
+"""
+Environment variable or secret with the given key already exists
+"""
+type CreateDatasetEnvVarResultAlreadyExists implements CreateDatasetEnvVarResult {
+	"""
+	Key that already exists
+	"""
+	envVarKey: String!
+	"""
+	Human-readable error message
+	"""
+	message: String!
+}
+
+"""
+Environment variable was created
+"""
+type CreateDatasetEnvVarResultCreated implements CreateDatasetEnvVarResult {
+	"""
+	Created environment variable
+	"""
+	envVar: ViewDatasetEnvVar!
+	"""
+	Human-readable outcome message
+	"""
+	message: String!
+}
+
+"""
 Outcome of creating a dataset from a snapshot
 """
 interface CreateDatasetFromSnapshotResult {
@@ -2340,6 +2378,70 @@ type DatasetEndpoints {
 }
 
 """
+Environment variable value is empty
+"""
+type DatasetEnvVarEmptyValue implements CreateDatasetEnvVarResult & UpsertDatasetEnvVarResult {
+	"""
+	Key of the rejected environment variable
+	"""
+	envVarKey: String!
+	"""
+	Human-readable error message
+	"""
+	message: String!
+}
+
+"""
+Environment variable key does not match `^[A-Za-z_][A-Za-z0-9_]*$`
+"""
+type DatasetEnvVarInvalidKey implements CreateDatasetEnvVarResult & UpsertDatasetEnvVarResult {
+	"""
+	Rejected key
+	"""
+	envVarKey: String!
+	"""
+	Human-readable error message
+	"""
+	message: String!
+}
+
+"""
+Dataset already has the maximum number of variables or of secrets
+"""
+type DatasetEnvVarTooManyEntries implements CreateDatasetEnvVarResult & UpsertDatasetEnvVarResult {
+	"""
+	Maximum number of variables, or of secrets, per dataset
+	"""
+	maxEntries: Int!
+	"""
+	Human-readable error message
+	"""
+	message: String!
+}
+
+"""
+Environment variable value is longer than allowed
+"""
+type DatasetEnvVarValueTooLong implements CreateDatasetEnvVarResult & UpsertDatasetEnvVarResult {
+	"""
+	Key of the rejected environment variable
+	"""
+	envVarKey: String!
+	"""
+	Length of the rejected value in bytes
+	"""
+	actualLength: Int!
+	"""
+	Maximum value length in bytes
+	"""
+	maxLength: Int!
+	"""
+	Human-readable error message
+	"""
+	message: String!
+}
+
+"""
 Environment variables of a dataset
 """
 type DatasetEnvVars {
@@ -2357,6 +2459,10 @@ type DatasetEnvVars {
 Mutations that manage environment variables of a dataset
 """
 type DatasetEnvVarsMut {
+	"""
+	Creates an environment variable, unless its key is already taken
+	"""
+	createEnvVariable(key: String!, value: String!, isSecret: Boolean!): CreateDatasetEnvVarResult!
 	"""
 	Creates or updates an environment variable, optionally as a secret
 	"""
@@ -2694,9 +2800,9 @@ type DatasetMetadata {
 	"""
 	chain: MetadataChain!
 	"""
-	Last recorded watermark
+	Last recorded watermark, as of the given head or the latest block
 	"""
-	currentWatermark: DateTime
+	currentWatermark(head: Multihash): DateTime
 	"""
 	Latest data schema
 	"""
@@ -2751,7 +2857,7 @@ type DatasetMetadata {
 	Blocks holding the currently effective events of the requested types,
 	as of the given head or the latest block
 	"""
-	metadataProjection(eventTypes: [MetadataEventType!]!, head: Multihash): [MetadataBlockExtended!]!
+	metadataProjection(eventTypes: [MetadataProjectionEventType!]!, head: Multihash): [MetadataBlockExtended!]!
 	"""
 	Experimental: Current archetype as per `kamu.dev/archetype` annotation,
 	if any
@@ -5642,6 +5748,22 @@ type MetadataBlockExtended {
 }
 
 """
+Conditions selecting metadata blocks. Conditions combine with AND.
+"""
+input MetadataBlocksFilter {
+	"""
+	Only blocks whose event is one of these types. Null or empty means all
+	types.
+	"""
+	eventTypes: [MetadataEventType!]
+	"""
+	Only blocks whose hash starts with this prefix, in the multibase form
+	the API returns (`f1620…`). Null or blank means any hash.
+	"""
+	blockHashPrefix: String
+}
+
+"""
 Chain of metadata blocks of a dataset
 """
 type MetadataChain {
@@ -5659,9 +5781,15 @@ type MetadataChain {
 	"""
 	blockByHashEncoded(hash: Multihash!, format: MetadataManifestFormat!): String
 	"""
-	Iterates all metadata blocks in the reverse chronological order
+	Iterates metadata blocks, optionally filtered, in the reverse
+	chronological order
 	"""
-	blocks(page: Int, perPage: Int): MetadataBlockConnection!
+	blocks(		page: Int,		perPage: Int,
+		"""
+		Counts and pages only the matching blocks
+		"""
+		filter: MetadataBlocksFilter
+	): MetadataBlockConnection!
 }
 
 """
@@ -5682,9 +5810,18 @@ Schema: https://opendatafabric.org/schemas/datasets/v1alpha1/MetadataEvent
 union MetadataEvent = AddData | ExecuteTransform | Seed | SetPollingSource | SetTransform | SetVocab | SetAttachments | SetInfo | SetLicense | SetDataSchema | AddPushSource | DisablePushSource | DisablePollingSource
 
 """
-Type of a metadata event
+Type of a metadata event, covering every member of the `MetadataEvent`
+union
 """
 enum MetadataEventType {
+	"""
+	Event that adds a new slice of data
+	"""
+	ADD_DATA
+	"""
+	Event that records a transformation run of a derivative dataset
+	"""
+	EXECUTE_TRANSFORM
 	"""
 	Event that establishes the identity of a dataset
 	"""
@@ -5693,6 +5830,10 @@ enum MetadataEventType {
 	Event that defines a source polled for new data
 	"""
 	SET_POLLING_SOURCE
+	"""
+	Event that defines how a derivative dataset is computed
+	"""
+	SET_TRANSFORM
 	"""
 	Event that defines column names with special meaning
 	"""
@@ -5714,13 +5855,18 @@ enum MetadataEventType {
 	"""
 	SET_DATA_SCHEMA
 	"""
-	Event that defines how a derivative dataset is computed
-	"""
-	SET_TRANSFORM
-	"""
 	Event that adds a source data can be pushed into
 	"""
 	ADD_PUSH_SOURCE
+	"""
+	Event that disables a push source (reserved, not fully supported yet)
+	"""
+	DISABLE_PUSH_SOURCE
+	"""
+	Event that disables the polling source (reserved, not fully supported
+	yet)
+	"""
+	DISABLE_POLLING_SOURCE
 }
 
 """
@@ -5759,6 +5905,48 @@ type MetadataManifestUnsupportedVersion implements CommitResult & CreateDatasetF
 	Description of the problem with the supported version range
 	"""
 	message: String!
+}
+
+"""
+Type of a metadata event that `metadataProjection` can project
+"""
+enum MetadataProjectionEventType {
+	"""
+	Event that establishes the identity of a dataset
+	"""
+	SEED
+	"""
+	Event that defines a source polled for new data
+	"""
+	SET_POLLING_SOURCE
+	"""
+	Event that defines column names with special meaning
+	"""
+	SET_VOCAB
+	"""
+	Event that sets attached files
+	"""
+	SET_ATTACHMENTS
+	"""
+	Event that sets the description, keywords and similar info
+	"""
+	SET_INFO
+	"""
+	Event that sets the license
+	"""
+	SET_LICENSE
+	"""
+	Event that sets the schema of the data
+	"""
+	SET_DATA_SCHEMA
+	"""
+	Event that defines how a derivative dataset is computed
+	"""
+	SET_TRANSFORM
+	"""
+	Event that adds a source data can be pushed into
+	"""
+	ADD_PUSH_SOURCE
 }
 
 """

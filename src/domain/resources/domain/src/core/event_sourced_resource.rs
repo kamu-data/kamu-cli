@@ -184,7 +184,7 @@ pub trait EventSourcedResource:
     where
         Self: Sized,
         Self::SpecInput: crate::ResourceValidateSpec + Clone,
-        Self::Spec: crate::ResourceSpecFromInput<Self::SpecInput> + PartialEq,
+        Self::Spec: crate::ResourceSpecFromInput<Self::SpecInput> + PartialEq + Clone,
         Self::LifecycleError: From<<Self::SpecInput as crate::ResourceValidateSpec>::ValidationError>
             + InvariantViolationOf<Self::ResourceState>,
     {

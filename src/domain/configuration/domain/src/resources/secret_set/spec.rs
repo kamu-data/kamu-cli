@@ -182,7 +182,7 @@ impl SecretSetSpecInput {
     pub const WARNING_CODE_SUSPICIOUS_VALUE_WHITESPACE: &str = "suspicious_value_whitespace";
     pub const WARNING_CODE_UNEXPANDED_INTERPOLATION: &str = "unexpanded_interpolation";
 
-    fn is_valid_secret_name(name: &str) -> bool {
+    pub fn is_valid_secret_name(name: &str) -> bool {
         let mut chars = name.chars();
 
         match chars.next() {
@@ -243,13 +243,34 @@ impl ResourceValidateSpec for SecretSetSpecInput {
     type ValidationError = SecretSetSpecValidationError;
 
     fn validate(&self) -> Result<(), Self::ValidationError> {
+        self.validate_against(None)
+    }
+
+    fn validate_update(&self, current: &Self) -> Result<(), Self::ValidationError> {
+        self.validate_against(Some(&current.secrets))
+    }
+}
+
+impl SecretSetSpecInput {
+    /// Entries of `current` written before a rule existed stay valid: a kept
+    /// name skips the name rule, an unchanged entry skips the value rules, and
+    /// a set already over the limit may shrink but not grow. The sanitizer
+    /// reuses the stored ciphertext of a secret whose plaintext is unchanged,
+    /// so such a secret compares equal here.
+    fn validate_against(
+        &self,
+        current: Option<&odf::metadata::config::Secrets>,
+    ) -> Result<(), SecretSetSpecValidationError> {
         let entries = &self.secrets.entries;
 
         if entries.is_empty() {
             return Err(SecretSetSpecValidationError::EmptySecrets);
         }
 
-        if entries.len() > Self::MAX_SECRETS {
+        let max_entries = current.map_or(Self::MAX_SECRETS, |current| {
+            current.entries.len().max(Self::MAX_SECRETS)
+        });
+        if entries.len() > max_entries {
             return Err(SecretSetSpecValidationError::TooManySecrets {
                 actual: entries.len(),
                 max: Self::MAX_SECRETS,
@@ -257,8 +278,14 @@ impl ResourceValidateSpec for SecretSetSpecInput {
         }
 
         for (name, secret) in entries {
-            if !Self::is_valid_secret_name(name) {
+            let current_secret = current.and_then(|current| current.entries.get(name));
+
+            if current_secret.is_none() && !Self::is_valid_secret_name(name) {
                 return Err(SecretSetSpecValidationError::InvalidSecretName { name: name.clone() });
+            }
+
+            if current_secret == Some(secret) {
+                continue;
             }
 
             if let Some(content_encoding) = &secret.content_encoding {
@@ -840,6 +867,47 @@ mod tests {
         let mut combined = nonce;
         combined.extend_from_slice(&ciphertext);
         hex::encode(combined)
+    }
+
+    #[test]
+    fn validate_update_keeps_legacy_name() {
+        use kamu_resources::ResourceValidateSpec;
+
+        let legacy = jwe_secret("legacy");
+        let current = make_spec_input([("key-1", legacy.clone())]);
+
+        let added = make_spec_input([
+            ("key-1", legacy.clone()),
+            ("NEW_SECRET", plaintext_value("new")),
+        ]);
+        assert_matches!(added.validate_update(&current), Ok(()));
+
+        let edited = make_spec_input([("key-1", jwe_secret("edited"))]);
+        assert_matches!(edited.validate_update(&current), Ok(()));
+
+        let bad_new_name = make_spec_input([("key-1", legacy), ("key-2", plaintext_value("new"))]);
+        assert_matches!(
+            bad_new_name.validate_update(&current),
+            Err(SecretSetSpecValidationError::InvalidSecretName { name }) if name == "key-2"
+        );
+    }
+
+    #[test]
+    fn validate_update_lets_oversized_set_shrink_but_not_grow() {
+        use kamu_resources::ResourceValidateSpec;
+
+        let over_limit = SecretSetSpecInput::MAX_SECRETS + 2;
+        let entries = |n: usize| (0..n).map(|i| (format!("SECRET_{i}"), plaintext_value("value")));
+        let current = make_spec_input(entries(over_limit));
+
+        assert_matches!(
+            make_spec_input(entries(over_limit - 1)).validate_update(&current),
+            Ok(())
+        );
+        assert_matches!(
+            make_spec_input(entries(over_limit + 1)).validate_update(&current),
+            Err(SecretSetSpecValidationError::TooManySecrets { .. })
+        );
     }
 }
 

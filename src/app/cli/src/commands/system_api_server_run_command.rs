@@ -19,6 +19,7 @@ use kamu_accounts::*;
 use kamu_accounts_services::{PasswordLoginCredentials, PasswordPolicyConfig};
 use kamu_adapter_oauth::*;
 use kamu_datasets::SecretsEncryptionConfig;
+use kamu_webhooks::WebhooksConfig;
 use tracing::Instrument;
 
 use super::{CLIError, Command};
@@ -38,6 +39,7 @@ pub struct APIServerRunCommand {
     account_subject: Arc<CurrentAccountSubject>,
     github_auth_config: Arc<GithubAuthenticationConfig>,
     password_policy_config: Arc<PasswordPolicyConfig>,
+    webhooks_config: Arc<WebhooksConfig>,
 
     #[dill::component(explicit)]
     address: Option<IpAddr>,
@@ -140,6 +142,7 @@ impl Command for APIServerRunCommand {
             self.external_address,
             self.e2e_output_data_path.as_ref(),
             self.password_policy_config.as_ref(),
+            self.webhooks_config.as_ref(),
         )
         .await?;
 

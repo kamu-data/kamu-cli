@@ -105,16 +105,28 @@ impl<'a> DatasetMetadata<'a> {
         MetadataChain::new(self.readable_state)
     }
 
-    /// Last recorded watermark
+    /// Last recorded watermark, as of the given head or the latest block
     #[tracing::instrument(level = "info", name = DatasetMetadata_current_watermark, skip_all)]
-    async fn current_watermark(&self, ctx: &Context<'_>) -> Result<Option<DateTime<Utc>>> {
+    async fn current_watermark(
+        &self,
+        ctx: &Context<'_>,
+        head: Option<Multihash<'_>>,
+    ) -> Result<Option<DateTime<Utc>>> {
         let resolved_dataset = self.readable_state.resolved_dataset(ctx).await?;
+        let metadata_chain = resolved_dataset.as_metadata_chain();
 
-        Ok(resolved_dataset
-            .as_metadata_chain()
-            .last_data_block()
-            .await
-            .int_err()?
+        let last_data_block_visitor = match head {
+            Some(h) => metadata_chain
+                .accept_one_by_hash(
+                    &h.into(),
+                    odf::dataset::SearchSingleDataBlockVisitor::next(),
+                )
+                .await
+                .int_err()?,
+            None => metadata_chain.last_data_block().await.int_err()?,
+        };
+
+        Ok(last_data_block_visitor
             .into_block()
             .and_then(|b| b.event.new_watermark))
     }
@@ -342,7 +354,7 @@ impl<'a> DatasetMetadata<'a> {
     async fn metadata_projection(
         &self,
         ctx: &Context<'_>,
-        event_types: Vec<MetadataEventType>,
+        event_types: Vec<MetadataProjectionEventType>,
         head: Option<Multihash<'_>>,
     ) -> Result<Vec<MetadataBlockExtended>> {
         let account = Account::from_dataset_alias(ctx, self.readable_state.dataset_alias())
@@ -351,31 +363,31 @@ impl<'a> DatasetMetadata<'a> {
         let dataset_kind = self.readable_state.dataset_kind();
 
         let mut attachments_visitor = event_types
-            .contains(&MetadataEventType::SetAttachments)
+            .contains(&MetadataProjectionEventType::SetAttachments)
             .then(odf::dataset::SearchSetAttachmentsVisitor::new);
         let mut info_visitor = event_types
-            .contains(&MetadataEventType::SetInfo)
+            .contains(&MetadataProjectionEventType::SetInfo)
             .then(odf::dataset::SearchSetInfoVisitor::new);
         let mut license_visitor = event_types
-            .contains(&MetadataEventType::SetLicense)
+            .contains(&MetadataProjectionEventType::SetLicense)
             .then(odf::dataset::SearchSetLicenseVisitor::new);
         let mut schema_visitor = event_types
-            .contains(&MetadataEventType::SetDataSchema)
+            .contains(&MetadataProjectionEventType::SetDataSchema)
             .then(odf::dataset::SearchSetDataSchemaVisitor::new);
         let mut seed_visitor = event_types
-            .contains(&MetadataEventType::Seed)
+            .contains(&MetadataProjectionEventType::Seed)
             .then(odf::dataset::SearchSeedVisitor::new);
         let mut vocab_visitor = event_types
-            .contains(&MetadataEventType::SetVocab)
+            .contains(&MetadataProjectionEventType::SetVocab)
             .then(odf::dataset::SearchSetVocabVisitor::new);
         let mut active_polling_source_visitor = event_types
-            .contains(&MetadataEventType::SetPollingSource)
+            .contains(&MetadataProjectionEventType::SetPollingSource)
             .then(|| odf::dataset::SearchActivePollingSourceVisitor::new(dataset_kind));
         let mut transform_visitor = event_types
-            .contains(&MetadataEventType::SetTransform)
+            .contains(&MetadataProjectionEventType::SetTransform)
             .then(|| odf::dataset::SearchSetTransformVisitor::new(dataset_kind));
         let mut active_push_sources_visitor = event_types
-            .contains(&MetadataEventType::AddPushSource)
+            .contains(&MetadataProjectionEventType::AddPushSource)
             .then(|| odf::dataset::SearchActivePushSourcesVisitor::new(dataset_kind));
 
         let resolved_dataset = self.readable_state.resolved_dataset(ctx).await?;
