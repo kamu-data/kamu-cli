@@ -25,6 +25,7 @@ use datafusion_odata::error::ODataError;
 use dill::Catalog;
 use http_common::{ApiError, IntoApiError};
 use internal_error::ErrorIntoInternal;
+use kamu_accounts::Principal;
 use kamu_auth_rebac::{RebacDatasetRefUnresolvedError, RebacDatasetRegistryFacade};
 use kamu_datasets::DatasetPermission;
 
@@ -221,10 +222,12 @@ pub async fn odata_collection_handler_common(
 
     let rebac_dataset_registry_facade: Arc<dyn RebacDatasetRegistryFacade> =
         catalog.get_one().unwrap();
+    let principal: Arc<Principal> = catalog.get_one().unwrap();
 
     let requested_dataset_alias = odf::DatasetAlias::new(account_name, dataset_name);
     let resolved_dataset = rebac_dataset_registry_facade
         .resolve_dataset_by_ref(
+            &principal,
             &requested_dataset_alias.into_local_ref(),
             DatasetPermission::Read,
         )

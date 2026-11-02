@@ -74,7 +74,7 @@ fn prepare_schema_test_catalog() -> (TempDir, dill::Catalog) {
     let mut permission_checker = MockDatasetPermissionChecker::new();
     permission_checker
         .expect_filter_datasets_allowing()
-        .returning(|_, _| Ok(vec![]));
+        .returning(|_, _, _| Ok(vec![]));
 
     let tempdir = tempfile::tempdir().unwrap();
     let catalog = create_catalog_with_local_workspace(tempdir.path(), permission_checker);
@@ -87,7 +87,7 @@ async fn prepare_schema_test_s3_catalog() -> (LocalS3Server, dill::Catalog) {
     let mut permission_checker = MockDatasetPermissionChecker::new();
     permission_checker
         .expect_filter_datasets_allowing()
-        .returning(|_, _| Ok(vec![]));
+        .returning(|_, _, _| Ok(vec![]));
 
     let s3 = LocalS3Server::new().await;
     let catalog = create_catalog_with_s3_workspace(&s3, permission_checker);

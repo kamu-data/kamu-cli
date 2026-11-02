@@ -199,7 +199,7 @@ pub(crate) fn create_web_user_catalog(
         let mut mock_dataset_permission_checker = MockDatasetPermissionChecker::new();
         mock_dataset_permission_checker
             .expect_get_granted_permissions()
-            .returning(|_dataset_id| Ok(HashSet::new()));
+            .returning(|_, _| Ok(HashSet::new()));
         web_catalog_builder
             .add_value(mock_dataset_permission_checker)
             .bind::<dyn DatasetPermissionChecker, MockDatasetPermissionChecker>();

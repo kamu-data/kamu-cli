@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use internal_error::ErrorIntoInternal;
+use kamu_accounts::Principal;
 use kamu_core::QueryError;
 use kamu_datasets::{DatasetPermission, ResolvedDataset};
 
@@ -15,10 +16,11 @@ use kamu_datasets::{DatasetPermission, ResolvedDataset};
 
 pub(crate) async fn resolve_dataset_for_querying(
     rebac_dataset_registry_facade: &dyn kamu_auth_rebac::RebacDatasetRegistryFacade,
+    principal: &Principal,
     dataset_ref: &odf::DatasetRef,
 ) -> Result<ResolvedDataset, QueryError> {
     let resolved_dataset = rebac_dataset_registry_facade
-        .resolve_dataset_by_ref(dataset_ref, DatasetPermission::Read)
+        .resolve_dataset_by_ref(principal, dataset_ref, DatasetPermission::Read)
         .await
         .map_err(|e| {
             use kamu_auth_rebac::RebacDatasetRefUnresolvedError as E;

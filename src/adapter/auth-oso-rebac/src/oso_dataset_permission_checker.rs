@@ -28,7 +28,6 @@ use crate::{GetDatasetResourceError, KamuAuthOso, OsoResourceServiceImpl};
 #[dill::interface(dyn DatasetPermissionChecker)]
 pub struct OsoDatasetPermissionChecker {
     kamu_auth_oso: Arc<KamuAuthOso>,
-    principal: Arc<Principal>,
     oso_resource_service: Arc<OsoResourceServiceImpl>,
 }
 
@@ -44,10 +43,6 @@ enum DatasetActor {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl OsoDatasetPermissionChecker {
-    async fn actor(&self) -> Result<DatasetActor, InternalError> {
-        self.actor_for(&self.principal).await
-    }
-
     async fn actor_for(&self, principal: &Principal) -> Result<DatasetActor, InternalError> {
         let maybe_account_id = match principal {
             Principal::Node => return Ok(DatasetActor::Node),
@@ -104,11 +99,12 @@ impl DatasetPermissionChecker for OsoDatasetPermissionChecker {
     #[tracing::instrument(level = "debug", skip_all, fields(%dataset_id, ?permission))]
     async fn check_permission(
         &self,
+        principal: &Principal,
         dataset_id: &odf::DatasetID,
         permission: DatasetPermission,
     ) -> Result<(), DatasetPermissionError> {
         let (actor, maybe_dataset_resource) =
-            try_join!(self.actor(), self.dataset_resource(dataset_id))?;
+            try_join!(self.actor_for(principal), self.dataset_resource(dataset_id))?;
 
         let Some(dataset_resource) = maybe_dataset_resource else {
             return Err(DatasetPermissionError::NotFound(
@@ -129,10 +125,11 @@ impl DatasetPermissionChecker for OsoDatasetPermissionChecker {
     #[tracing::instrument(level = "debug", skip_all, fields(%dataset_id))]
     async fn get_granted_permissions(
         &self,
+        principal: &Principal,
         dataset_id: &odf::DatasetID,
     ) -> Result<HashSet<DatasetPermission>, GetGrantedPermissionsError> {
         let (actor, maybe_dataset_resource) =
-            try_join!(self.actor(), self.dataset_resource(dataset_id))?;
+            try_join!(self.actor_for(principal), self.dataset_resource(dataset_id))?;
 
         let Some(dataset_resource) = maybe_dataset_resource else {
             return Err(GetGrantedPermissionsError::NotFound(
@@ -154,10 +151,11 @@ impl DatasetPermissionChecker for OsoDatasetPermissionChecker {
     #[tracing::instrument(level = "debug", skip_all, fields(datasets_count=%dataset_handles.len(), %permission))]
     async fn filter_datasets_allowing(
         &self,
+        principal: &Principal,
         dataset_handles: Vec<odf::DatasetHandle>,
         permission: DatasetPermission,
     ) -> Result<Vec<odf::DatasetHandle>, InternalError> {
-        let actor = self.actor().await?;
+        let actor = self.actor_for(principal).await?;
 
         let dataset_ids = dataset_handles
             .iter()
@@ -201,17 +199,8 @@ impl DatasetPermissionChecker for OsoDatasetPermissionChecker {
         Ok(matched_dataset_handles)
     }
 
-    async fn classify_dataset_handles_by_allowance(
-        &self,
-        dataset_handles: Vec<odf::DatasetHandle>,
-        permission: DatasetPermission,
-    ) -> Result<ClassifyByAllowanceResponse, InternalError> {
-        self.classify_dataset_handles_by_allowance_for(&self.principal, dataset_handles, permission)
-            .await
-    }
-
     #[tracing::instrument(level = "debug", skip_all, fields(datasets_count = %dataset_handles.len(), %permission))]
-    async fn classify_dataset_handles_by_allowance_for(
+    async fn classify_dataset_handles_by_allowance(
         &self,
         principal: &Principal,
         dataset_handles: Vec<odf::DatasetHandle>,
@@ -313,10 +302,11 @@ impl DatasetPermissionChecker for OsoDatasetPermissionChecker {
     #[tracing::instrument(level = "debug", skip_all, fields(?dataset_ids, %permission))]
     async fn classify_dataset_ids_by_allowance<'a>(
         &'a self,
+        principal: &Principal,
         dataset_ids: &[Cow<'a, odf::DatasetID>],
         permission: DatasetPermission,
     ) -> Result<ClassifyByAllowanceIdsResponse, InternalError> {
-        let actor = self.actor().await?;
+        let actor = self.actor_for(principal).await?;
 
         let dataset_resources_resolution = self
             .oso_resource_service

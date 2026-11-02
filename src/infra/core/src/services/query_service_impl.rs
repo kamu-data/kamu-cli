@@ -26,6 +26,7 @@ use datafusion::sql::sqlparser::ast::{
 };
 use futures::TryStreamExt;
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
+use kamu_accounts::Principal;
 use kamu_core::*;
 use kamu_datasets::{
     DatasetPermission,
@@ -64,6 +65,7 @@ impl QueryServiceImpl {
     )]
     async fn resolve_query_state(
         &self,
+        principal: &Principal,
         sql: &str,
         options: QueryOptions,
     ) -> Result<(QueryState, QueryOptions), QueryError> {
@@ -85,7 +87,11 @@ impl QueryServiceImpl {
                 .collect::<Vec<_>>();
             let by_access = self
                 .dataset_permission_checker
-                .classify_dataset_ids_by_allowance(&dataset_id_refs, DatasetPermission::Read)
+                .classify_dataset_ids_by_allowance(
+                    principal,
+                    &dataset_id_refs,
+                    DatasetPermission::Read,
+                )
                 .await?;
 
             for (id, _) in by_access.unauthorized_ids_with_errors {
@@ -193,6 +199,7 @@ impl QueryServiceImpl {
                 let handles: Vec<odf::DatasetHandle> = self
                     .dataset_permission_checker
                     .filtered_datasets_stream(
+                        principal,
                         self.dataset_registry.all_dataset_handles(),
                         DatasetPermission::Read,
                     )
@@ -266,7 +273,7 @@ impl QueryServiceImpl {
 
                     if !self
                         .dataset_permission_checker
-                        .is_permission_granted(&hdl.id, DatasetPermission::Read)
+                        .is_permission_granted(principal, &hdl.id, DatasetPermission::Read)
                         .await?
                     {
                         // Ignore this alias and let the query fail with the "not found" error
@@ -471,13 +478,17 @@ impl QueryServiceImpl {
 #[async_trait::async_trait]
 impl QueryService for QueryServiceImpl {
     #[tracing::instrument(level = "info", name = QueryServiceImpl_create_session, skip_all)]
-    async fn create_session(&self) -> Result<SessionContext, CreateSessionError> {
+    async fn create_session(
+        &self,
+        principal: &Principal,
+    ) -> Result<SessionContext, CreateSessionError> {
         // TODO: PERF: Avoid pre-registering all datasets
         // Use DataFusion remote catalog pattern instead:
         // https://github.com/apache/datafusion/blob/main/datafusion-examples/examples/remote_catalog.rs
         let handles: Vec<odf::DatasetHandle> = self
             .dataset_permission_checker
             .filtered_datasets_stream(
+                principal,
                 self.dataset_registry.all_dataset_handles(),
                 DatasetPermission::Read,
             )
@@ -660,12 +671,15 @@ impl QueryService for QueryServiceImpl {
     #[tracing::instrument(level = "info", name = QueryServiceImpl_sql_statement, skip_all)]
     async fn sql_statement(
         &self,
+        principal: &Principal,
         statement: &str,
         options: QueryOptions,
     ) -> Result<QueryResponse, QueryError> {
         tracing::info!(statement, ?options, "Executing SQL query");
 
-        let (state, new_options) = self.resolve_query_state(statement, options).await?;
+        let (state, new_options) = self
+            .resolve_query_state(principal, statement, options)
+            .await?;
         tracing::info!(?state, ?new_options, "Resolved SQL query state");
 
         let ctx = self.session_context(new_options).await?;

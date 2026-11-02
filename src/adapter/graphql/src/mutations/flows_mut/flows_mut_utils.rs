@@ -146,10 +146,11 @@ pub(crate) async fn ensure_flow_preconditions(
         }
 
         DatasetFlowType::ExecuteTransform => {
-            let (metadata_query_service, rebac_dataset_registry_facade) = from_catalog_n!(
+            let (metadata_query_service, rebac_dataset_registry_facade, principal) = from_catalog_n!(
                 ctx,
                 dyn kamu_core::MetadataQueryService,
-                dyn RebacDatasetRegistryFacade
+                dyn RebacDatasetRegistryFacade,
+                kamu_accounts::Principal
             );
             let source_res = metadata_query_service
                 .get_active_transform(resolved_dataset)
@@ -166,6 +167,7 @@ pub(crate) async fn ensure_flow_preconditions(
 
                     let classify_response = rebac_dataset_registry_facade
                         .classify_dataset_refs_by_allowance(
+                            &principal,
                             &inputs_dataset_refs,
                             DatasetPermission::Read,
                         )

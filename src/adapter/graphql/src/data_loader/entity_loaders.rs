@@ -12,7 +12,7 @@ use std::sync::Arc;
 
 use async_graphql::dataloader::Loader;
 use internal_error::{InternalError, ResultIntoInternal};
-use kamu_accounts::{Account, AccountService};
+use kamu_accounts::{Account, AccountService, Principal};
 use kamu_auth_rebac::RebacDatasetRegistryFacade;
 use kamu_datasets::{DatasetPermission, DatasetRegistry, ResolvedDataset};
 
@@ -130,10 +130,11 @@ impl Loader<odf::DatasetRef> for DatasetHandleLoader {
     ) -> Result<HashMap<odf::DatasetRef, Self::Value>, Self::Error> {
         let catalog = self.catalog.upgrade();
         let rebac_facade = catalog.get_one::<dyn RebacDatasetRegistryFacade>().unwrap();
+        let principal = catalog.get_one::<Principal>().unwrap();
         let dataset_refs: Vec<&odf::DatasetRef> = keys.iter().collect();
 
         let resolution = rebac_facade
-            .classify_dataset_refs_by_allowance(&dataset_refs, DatasetPermission::Read)
+            .classify_dataset_refs_by_allowance(&principal, &dataset_refs, DatasetPermission::Read)
             .await
             .int_err()
             .map_err(Arc::new)?;

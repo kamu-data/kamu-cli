@@ -42,10 +42,11 @@ impl Search {
     ) -> Result<SearchResultConnection> {
         use futures::TryStreamExt;
 
-        let (dataset_registry, dataset_permission_checker) = from_catalog_n!(
+        let (dataset_registry, dataset_permission_checker, principal) = from_catalog_n!(
             ctx,
             dyn kamu_datasets::DatasetRegistry,
-            dyn kamu_datasets::DatasetPermissionChecker
+            dyn kamu_datasets::DatasetPermissionChecker,
+            kamu_accounts::Principal
         );
 
         let page = page.unwrap_or(0);
@@ -73,7 +74,11 @@ impl Search {
                 id.contains(&query)
             });
         let mut readable_dataset_handles = dataset_permission_checker
-            .filtered_datasets_stream(filtered_all_dataset_handles_stream, DatasetPermission::Read)
+            .filtered_datasets_stream(
+                &principal,
+                filtered_all_dataset_handles_stream,
+                DatasetPermission::Read,
+            )
             .try_collect::<Vec<_>>()
             .await?;
         // Sort first by dataset name and for stability after by account name

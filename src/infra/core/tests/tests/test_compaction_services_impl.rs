@@ -19,7 +19,7 @@ use indoc::indoc;
 use kamu::domain::*;
 use kamu::testing::DatasetDataHelper;
 use kamu::*;
-use kamu_accounts::{CurrentAccountSubject, CurrentAccountSubjectCatalogExt as _};
+use kamu_accounts::{CurrentAccountSubject, CurrentAccountSubjectCatalogExt as _, Principal};
 use kamu_accounts_inmem::{InMemoryAccountQuotaEventStore, InMemoryAccountRepository};
 use kamu_accounts_services::{AccountQuotaServiceImpl, AccountServiceImpl};
 use kamu_auth_rebac_inmem::InMemoryRebacRepository;
@@ -1884,7 +1884,7 @@ impl CompactTestHarness {
     async fn records(&self, sql: &str) -> String {
         let df = self
             .query_svc
-            .sql_statement(sql, QueryOptions::default())
+            .sql_statement(&Principal::new_test(), sql, QueryOptions::default())
             .await
             .unwrap()
             .df;

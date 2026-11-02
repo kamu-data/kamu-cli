@@ -129,11 +129,17 @@ impl DatasetRequestState {
             .get_or_try_init(|| async {
                 use kamu_datasets::DatasetPermissionCheckerExt;
 
-                let dataset_permission_checker =
-                    from_catalog_n!(ctx, dyn kamu_datasets::DatasetPermissionChecker);
+                let (dataset_permission_checker, principal) = from_catalog_n!(
+                    ctx,
+                    dyn kamu_datasets::DatasetPermissionChecker,
+                    kamu_accounts::Principal
+                );
 
                 let allowed_actions = dataset_permission_checker
-                    .get_granted_permissions_for_existing_dataset(&self.dataset_handle.id)
+                    .get_granted_permissions_for_existing_dataset(
+                        &principal,
+                        &self.dataset_handle.id,
+                    )
                     .await?;
 
                 Ok(allowed_actions)

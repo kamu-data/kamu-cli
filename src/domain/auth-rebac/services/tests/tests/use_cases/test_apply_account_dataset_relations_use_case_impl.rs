@@ -12,6 +12,7 @@ use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
 use dill::CatalogBuilder;
+use kamu_accounts::Principal;
 use kamu_auth_rebac::{
     AccountDatasetRelationOperation,
     AccountToDatasetRelation as Role,
@@ -833,6 +834,8 @@ impl ApplyAccountDatasetRelationsUseCaseImplHarness {
         b.add::<InMemoryRebacRepository>();
         b.add_value(mock_dataset_permission_checker)
             .bind::<dyn DatasetPermissionChecker, MockDatasetPermissionChecker>();
+        // The mocked checker ignores the principal
+        b.add_value(Principal::Node);
     }
 
     pub fn register_id_pseudonyms(

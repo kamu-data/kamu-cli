@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use internal_error::{ErrorIntoInternal, InternalError};
+use kamu_accounts::Principal;
 use kamu_datasets::DatasetPermissionError;
 use thiserror::Error;
 
@@ -15,10 +16,12 @@ use thiserror::Error;
 
 #[async_trait::async_trait]
 pub trait ProvenanceService: Sync + Send {
-    /// Passes the visitor through the dependency graph of a dataset
+    /// Passes the visitor through the dependency graph of a dataset, as far as
+    /// the principal may read it.
     /// Some predefined visitors are available.
     async fn get_dataset_lineage(
         &self,
+        principal: &Principal,
         dataset_ref: &odf::DatasetRef,
         visitor: &mut dyn LineageVisitor,
         options: LineageOptions,

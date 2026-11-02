@@ -71,7 +71,7 @@ impl DatasetOperationGuardImpl {
         for (permission, handles) in handles_by_permission {
             let response = self
                 .dataset_permission_checker
-                .classify_dataset_handles_by_allowance_for(
+                .classify_dataset_handles_by_allowance(
                     principal,
                     handles.into_values().collect(),
                     permission,

@@ -357,6 +357,9 @@ impl UpdateAccountUseCaseImplHarness {
 
         if let Some(current_account_subject) = current_account_subject {
             b.add_current_account_subject(current_account_subject);
+        } else {
+            // The mocked authorization helper decides, whoever the principal is
+            b.add_value(Principal::new_test());
         }
 
         NoOpDatabasePlugin::init_database_components(&mut b);

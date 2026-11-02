@@ -64,7 +64,7 @@ impl SignEip712UseCaseImpl {
 
         let has_read_access = self
             .dataset_permission_checker
-            .is_permission_granted(&dataset_id, DatasetPermission::Read)
+            .is_permission_granted(&self.principal, &dataset_id, DatasetPermission::Read)
             .await?;
 
         if !has_read_access {
@@ -116,7 +116,11 @@ impl SignEip712UseCaseImpl {
 
     async fn has_access_for_account(&self, account: &Account) -> Result<bool, InternalError> {
         // Admin can access any account
-        if self.account_authorization_helper.is_admin().await? {
+        if self
+            .account_authorization_helper
+            .is_admin(&self.principal)
+            .await?
+        {
             return Ok(true);
         }
 

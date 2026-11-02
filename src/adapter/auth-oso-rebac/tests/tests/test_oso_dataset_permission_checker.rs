@@ -72,21 +72,21 @@ macro_rules! assert_single_dataset {
         assert_matches!(
             $harness
                 .dataset_permission_checker
-                .check_permission(&$dataset_id, DatasetPermission::Read)
+                .check_permission(&$harness.principal, &$dataset_id, DatasetPermission::Read)
                 .await,
             $( $expected_read_pattern )|+ $( if $expected_read_guard )?
         );
         assert_matches!(
             $harness
                 .dataset_permission_checker
-                .check_permission(&$dataset_id, DatasetPermission::Write)
+                .check_permission(&$harness.principal, &$dataset_id, DatasetPermission::Write)
                 .await,
             $( $expected_write_pattern )|+ $( if $expected_write_guard )?
         );
         assert_matches!(
             $harness
                 .dataset_permission_checker
-                .get_granted_permissions(&$dataset_id)
+                .get_granted_permissions(&$harness.principal, &$dataset_id)
                 .await,
             $( $expected_allowed_actions_pattern )|+ $( if $expected_allowed_actions_guard )?
         );
@@ -588,7 +588,11 @@ async fn test_multi_datasets_matrix() {
             {
                 let mut actual = harness
                     .dataset_permission_checker
-                    .filter_datasets_allowing(all_dataset_handles.clone(), DatasetPermission::Read)
+                    .filter_datasets_allowing(
+                        &harness.principal,
+                        all_dataset_handles.clone(),
+                        DatasetPermission::Read,
+                    )
                     .await
                     .unwrap();
                 actual.sort_by(|left, right| left.id.cmp(&right.id));
@@ -604,7 +608,11 @@ async fn test_multi_datasets_matrix() {
             {
                 let mut res = harness
                     .dataset_permission_checker
-                    .filter_datasets_allowing(all_dataset_handles.clone(), DatasetPermission::Write)
+                    .filter_datasets_allowing(
+                        &harness.principal,
+                        all_dataset_handles.clone(),
+                        DatasetPermission::Write,
+                    )
                     .await
                     .unwrap();
                 res.sort_by(|left, right| left.id.cmp(&right.id));
@@ -618,6 +626,7 @@ async fn test_multi_datasets_matrix() {
                 harness
                     .dataset_permission_checker
                     .classify_dataset_handles_by_allowance(
+                        &harness.principal,
                         all_dataset_handles.clone(),
                         DatasetPermission::Read
                     )
@@ -633,6 +642,7 @@ async fn test_multi_datasets_matrix() {
                 harness
                     .dataset_permission_checker
                     .classify_dataset_handles_by_allowance(
+                        &harness.principal,
                         all_dataset_handles.clone(),
                         DatasetPermission::Write
                     )
@@ -648,7 +658,11 @@ async fn test_multi_datasets_matrix() {
             ClassifyByAllowanceIdsResponseTestHelper::report(
                 harness
                     .dataset_permission_checker
-                    .classify_dataset_ids_by_allowance(&all_dataset_ids, DatasetPermission::Read)
+                    .classify_dataset_ids_by_allowance(
+                        &harness.principal,
+                        &all_dataset_ids,
+                        DatasetPermission::Read
+                    )
                     .await
                     .unwrap(),
                 &dataset_handle_map
@@ -659,7 +673,11 @@ async fn test_multi_datasets_matrix() {
             ClassifyByAllowanceIdsResponseTestHelper::report(
                 harness
                     .dataset_permission_checker
-                    .classify_dataset_ids_by_allowance(&all_dataset_ids, DatasetPermission::Write)
+                    .classify_dataset_ids_by_allowance(
+                        &harness.principal,
+                        &all_dataset_ids,
+                        DatasetPermission::Write
+                    )
                     .await
                     .unwrap(),
                 &dataset_handle_map
@@ -753,6 +771,7 @@ async fn test_nobody_cannot_read_not_found_dataset() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 struct DatasetPermissionCheckerHarness {
+    principal: Principal,
     dataset_permission_checker: Arc<dyn DatasetPermissionChecker>,
     dataset_entry_writer: Arc<dyn DatasetEntryWriter>,
     outbox: Arc<dyn Outbox>,
@@ -764,7 +783,7 @@ impl DatasetPermissionCheckerHarness {
         Self::build(current_account_subject, principal, is_admin).await
     }
 
-    /// The node as the principal, under an anonymous caller
+    /// The node as the principal, while the catalog holds an anonymous caller
     pub async fn new_node() -> Self {
         Self::build(
             CurrentAccountSubjectTestHelper::anonymous(),
@@ -802,7 +821,6 @@ impl DatasetPermissionCheckerHarness {
             kamu_datasets_inmem::register_dependencies(&mut b);
             b.add::<SystemTimeSourceDefault>()
                 .add_value(current_account_subject)
-                .add_value(principal)
                 .add_value(predefined_accounts_config)
                 .add::<PredefinedAccountsRegistrator>()
                 .add::<kamu_auth_rebac_services::RebacServiceImpl>()
@@ -847,6 +865,7 @@ impl DatasetPermissionCheckerHarness {
         };
 
         Self {
+            principal,
             dataset_permission_checker: catalog.get_one().unwrap(),
             outbox: catalog.get_one().unwrap(),
             dataset_entry_writer: catalog.get_one().unwrap(),
