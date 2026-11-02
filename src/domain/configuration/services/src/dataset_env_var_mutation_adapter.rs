@@ -68,8 +68,6 @@ use secrecy::ExposeSecret;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[dill::component(pub)]
-#[dill::interface(dyn DatasetEnvVarMutationAdapter)]
 pub struct DatasetEnvVarMutationAdapterImpl {
     dispatcher_factory: Arc<ResourceDispatcherFactory>,
     dataset_entry_repository: Arc<dyn DatasetEntryRepository>,
@@ -77,6 +75,28 @@ pub struct DatasetEnvVarMutationAdapterImpl {
     generic_resource_query_service: Arc<dyn GenericResourceQueryService>,
     spec_resolver: Arc<dyn DatasetEnvVarSpecResolver>,
     secrets_encryption_config: Arc<SecretsEncryptionConfig>,
+}
+
+#[dill::component(pub)]
+#[dill::interface(dyn DatasetEnvVarMutationAdapter)]
+impl DatasetEnvVarMutationAdapterImpl {
+    pub fn new(
+        dispatcher_factory: Arc<ResourceDispatcherFactory>,
+        dataset_entry_repository: Arc<dyn DatasetEntryRepository>,
+        account_service: Arc<dyn AccountService>,
+        generic_resource_query_service: Arc<dyn GenericResourceQueryService>,
+        spec_resolver: Arc<dyn DatasetEnvVarSpecResolver>,
+        secrets_encryption_config: Arc<SecretsEncryptionConfig>,
+    ) -> Self {
+        Self {
+            dispatcher_factory,
+            dataset_entry_repository,
+            account_service,
+            generic_resource_query_service,
+            spec_resolver,
+            secrets_encryption_config,
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -91,7 +111,19 @@ impl DatasetEnvVarMutationAdapter for DatasetEnvVarMutationAdapterImpl {
     ) -> Result<DatasetEnvVarUpsertResult, UpsertDatasetEnvVarError> {
         let dataset_entry = self.get_dataset_entry(dataset_id).await?;
 
-        self.write_env_var(&dataset_entry, key, value).await
+        self.write_env_var(&dataset_entry, key, value, EnvVarWriteMode::Upsert)
+            .await
+            .map_err(|err| match err {
+                // Only a create refuses an existing key
+                CreateDatasetEnvVarError::AlreadyExists(e) => {
+                    UpsertDatasetEnvVarError::Internal(e.int_err())
+                }
+                CreateDatasetEnvVarError::Validation(e) => UpsertDatasetEnvVarError::Validation(e),
+                CreateDatasetEnvVarError::ConcurrentModification(e) => {
+                    UpsertDatasetEnvVarError::ConcurrentModification(e)
+                }
+                CreateDatasetEnvVarError::Internal(e) => UpsertDatasetEnvVarError::Internal(e),
+            })
     }
 
     async fn create_env_var(
@@ -103,24 +135,22 @@ impl DatasetEnvVarMutationAdapter for DatasetEnvVarMutationAdapterImpl {
         let dataset_entry = self.get_dataset_entry(dataset_id).await?;
 
         // A key is taken when the dataset's environment resolves it, from the
-        // legacy sets or from any other set targeting the dataset
+        // legacy sets or from any other set targeting the dataset. The write
+        // re-checks the legacy sets under its precondition, so a key created in
+        // them after this lookup is still refused.
         match self
             .spec_resolver
             .get_env_var_by_entry_key(dataset_id, key)
             .await
         {
-            Ok(_) => {
-                return Err(CreateDatasetEnvVarError::AlreadyExists(
-                    DatasetEnvVarAlreadyExistsError {
-                        dataset_env_var_key: key.to_string(),
-                    },
-                ));
-            }
+            Ok(_) => return Err(Self::already_exists(key)),
             Err(GetDatasetEnvVarError::NotFound(_)) => {}
             Err(GetDatasetEnvVarError::Internal(err)) => return Err(err.into()),
         }
 
-        let upsert_result = self.write_env_var(&dataset_entry, key, value).await?;
+        let upsert_result = self
+            .write_env_var(&dataset_entry, key, value, EnvVarWriteMode::Create)
+            .await?;
         Ok(upsert_result.dataset_env_var)
     }
 
@@ -221,7 +251,8 @@ impl DatasetEnvVarMutationAdapterImpl {
         dataset_entry: &DatasetEntry,
         key: &str,
         value: &DatasetEnvVarValue,
-    ) -> Result<DatasetEnvVarUpsertResult, UpsertDatasetEnvVarError> {
+        mode: EnvVarWriteMode,
+    ) -> Result<DatasetEnvVarUpsertResult, CreateDatasetEnvVarError> {
         match value {
             DatasetEnvVarValue::Regular(plaintext) => {
                 self.upsert_variable(
@@ -230,6 +261,7 @@ impl DatasetEnvVarMutationAdapterImpl {
                     plaintext,
                     &dataset_entry.owner_id,
                     &dataset_entry.owner_name,
+                    mode,
                 )
                 .await
             }
@@ -240,6 +272,7 @@ impl DatasetEnvVarMutationAdapterImpl {
                     secret.expose_secret(),
                     &dataset_entry.owner_id,
                     &dataset_entry.owner_name,
+                    mode,
                 )
                 .await
             }
@@ -253,7 +286,8 @@ impl DatasetEnvVarMutationAdapterImpl {
         plaintext: &str,
         account_did: &odf::AccountID,
         account_name: &odf::AccountName,
-    ) -> Result<DatasetEnvVarUpsertResult, UpsertDatasetEnvVarError> {
+        mode: EnvVarWriteMode,
+    ) -> Result<DatasetEnvVarUpsertResult, CreateDatasetEnvVarError> {
         let resource_name = Self::legacy_variable_set_resource_name(dataset_id);
         let LoadedEnvVarSet {
             id: existing_id,
@@ -261,16 +295,32 @@ impl DatasetEnvVarMutationAdapterImpl {
             entries: mut variables,
         } = self.load_variable_set(account_did, &resource_name).await?;
 
-        EnvVarSetRules::VARIABLES.check_entry(&variables, key, plaintext)?;
-
         let exists_as_variable = variables.contains_key(key);
 
-        // If key is new to variables, it may be a class conversion from secret →
-        // variable
-        let existed_as_secret = if !exists_as_variable {
-            self.delete_if_secret(dataset_id, account_did, key).await?
-        } else {
-            false
+        let existed_as_secret = match mode {
+            EnvVarWriteMode::Upsert => {
+                EnvVarSetRules::VARIABLES.check_entry(&variables, key, plaintext)?;
+
+                // If key is new to variables, it may be a class conversion from
+                // secret → variable
+                if exists_as_variable {
+                    false
+                } else {
+                    self.delete_if_secret(dataset_id, account_did, key).await?
+                }
+            }
+            EnvVarWriteMode::Create => {
+                if exists_as_variable
+                    || self
+                        .find_secret(dataset_id, account_did, key)
+                        .await?
+                        .is_some()
+                {
+                    return Err(Self::already_exists(key));
+                }
+                EnvVarSetRules::VARIABLES.check_entry(&variables, key, plaintext)?;
+                false
+            }
         };
 
         let is_new_key = !exists_as_variable && !existed_as_secret;
@@ -336,7 +386,8 @@ impl DatasetEnvVarMutationAdapterImpl {
         plaintext: &str,
         account_did: &odf::AccountID,
         account_name: &odf::AccountName,
-    ) -> Result<DatasetEnvVarUpsertResult, UpsertDatasetEnvVarError> {
+        mode: EnvVarWriteMode,
+    ) -> Result<DatasetEnvVarUpsertResult, CreateDatasetEnvVarError> {
         let resource_name = Self::legacy_secret_set_resource_name(dataset_id);
 
         let LoadedEnvVarSet {
@@ -345,16 +396,33 @@ impl DatasetEnvVarMutationAdapterImpl {
             entries: mut secrets,
         } = self.load_secret_set(account_did, &resource_name).await?;
 
-        EnvVarSetRules::SECRETS.check_entry(&secrets, key, plaintext)?;
-
         let exists_as_secret = secrets.contains_key(key);
 
-        // If key is new to secrets, it may be a class conversion from variable → secret
-        let existed_as_variable = if !exists_as_secret {
-            self.delete_if_variable(dataset_id, account_did, key)
-                .await?
-        } else {
-            false
+        let existed_as_variable = match mode {
+            EnvVarWriteMode::Upsert => {
+                EnvVarSetRules::SECRETS.check_entry(&secrets, key, plaintext)?;
+
+                // If key is new to secrets, it may be a class conversion from
+                // variable → secret
+                if exists_as_secret {
+                    false
+                } else {
+                    self.delete_if_variable(dataset_id, account_did, key)
+                        .await?
+                }
+            }
+            EnvVarWriteMode::Create => {
+                if exists_as_secret
+                    || self
+                        .find_variable(dataset_id, account_did, key)
+                        .await?
+                        .is_some()
+                {
+                    return Err(Self::already_exists(key));
+                }
+                EnvVarSetRules::SECRETS.check_entry(&secrets, key, plaintext)?;
+                false
+            }
         };
         let is_new_key = !exists_as_secret && !existed_as_variable;
 
@@ -418,6 +486,12 @@ impl DatasetEnvVarMutationAdapterImpl {
                 dataset_id: dataset_id.clone(),
             },
             status,
+        })
+    }
+
+    fn already_exists(key: &str) -> CreateDatasetEnvVarError {
+        CreateDatasetEnvVarError::AlreadyExists(DatasetEnvVarAlreadyExistsError {
+            dataset_env_var_key: key.to_string(),
         })
     }
 
@@ -805,6 +879,17 @@ impl<T> LoadedEnvVarSet<T> {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[derive(Debug, Clone, Copy)]
+enum EnvVarWriteMode {
+    /// Adds the key, or replaces it, converting it between variable and
+    /// secret when its class changes
+    Upsert,
+    /// Adds the key, refusing one that either legacy set already holds
+    Create,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 enum EnvVarSetWriteError {
     /// The set changed since it was read; nothing was written
     ConcurrentModification,
@@ -825,6 +910,12 @@ impl From<EnvVarSetWriteError> for UpsertDatasetEnvVarError {
             }
             EnvVarSetWriteError::Internal(err) => Self::Internal(err),
         }
+    }
+}
+
+impl From<EnvVarSetWriteError> for CreateDatasetEnvVarError {
+    fn from(err: EnvVarSetWriteError) -> Self {
+        UpsertDatasetEnvVarError::from(err).into()
     }
 }
 

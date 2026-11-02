@@ -7,11 +7,12 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 use chrono::Utc;
 use dill::CatalogBuilder;
 use event_sourcing::Aggregate;
+use internal_error::InternalError;
 use kamu_accounts_services::AccountServiceImpl;
 use kamu_configuration::{
     Secret,
@@ -31,6 +32,7 @@ use kamu_datasets::{
     DatasetEnvVarSpecResolver,
     DatasetEnvVarUpsertResult,
     DatasetEnvVarValue,
+    GetDatasetEnvVarError,
     UpsertDatasetEnvVarError,
     UpsertDatasetEnvVarStatus,
 };
@@ -63,6 +65,30 @@ impl DatasetEnvVarServiceHarness {
 
     pub fn mutation_adapter(&self) -> Arc<dyn DatasetEnvVarMutationAdapter> {
         self.catalog.get_one().unwrap()
+    }
+
+    /// An adapter whose key lookups are each followed by one write of another
+    /// request, `racing_write`, before the lookup answers: the window between
+    /// a create's duplicate check and its write
+    pub fn mutation_adapter_with_racing_write(
+        &self,
+        racing_write: (&str, DatasetEnvVarValue),
+    ) -> Arc<dyn DatasetEnvVarMutationAdapter> {
+        let (key, value) = racing_write;
+        let racing_spec_resolver = RacingSpecResolver {
+            inner: self.spec_resolver(),
+            other_request_adapter: self.mutation_adapter(),
+            racing_write: Mutex::new(Some((key.to_string(), value))),
+        };
+
+        Arc::new(DatasetEnvVarMutationAdapterImpl::new(
+            self.catalog.get_one().unwrap(),
+            self.catalog.get_one().unwrap(),
+            self.catalog.get_one().unwrap(),
+            self.catalog.get_one().unwrap(),
+            Arc::new(racing_spec_resolver),
+            self.catalog.get_one().unwrap(),
+        ))
     }
 
     /// The projection-backed resolver, as ingest resolves it.
@@ -264,6 +290,47 @@ impl DatasetEnvVarServiceHarness {
 
     pub fn assert_upsert_updated(result: &kamu_datasets::DatasetEnvVarUpsertResult) {
         pretty_assertions::assert_eq!(result.status, UpsertDatasetEnvVarStatus::Updated);
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Answers a key lookup, then runs one write of another request through the
+/// regular adapter, before returning the now stale answer
+struct RacingSpecResolver {
+    inner: Arc<dyn DatasetEnvVarSpecResolver>,
+    other_request_adapter: Arc<dyn DatasetEnvVarMutationAdapter>,
+    racing_write: Mutex<Option<(String, DatasetEnvVarValue)>>,
+}
+
+#[async_trait::async_trait]
+impl DatasetEnvVarSpecResolver for RacingSpecResolver {
+    async fn resolve_effective_env_vars(
+        &self,
+        dataset_id: &odf::DatasetID,
+    ) -> Result<std::collections::HashMap<String, DatasetEnvVar>, InternalError> {
+        self.inner.resolve_effective_env_vars(dataset_id).await
+    }
+
+    async fn get_env_var_by_entry_key(
+        &self,
+        dataset_id: &odf::DatasetID,
+        entry_key: &str,
+    ) -> Result<DatasetEnvVar, GetDatasetEnvVarError> {
+        let answer = self
+            .inner
+            .get_env_var_by_entry_key(dataset_id, entry_key)
+            .await;
+
+        let racing_write = self.racing_write.lock().unwrap().take();
+        if let Some((key, value)) = racing_write {
+            self.other_request_adapter
+                .upsert_env_var(dataset_id, &key, &value)
+                .await
+                .unwrap();
+        }
+
+        answer
     }
 }
 

@@ -876,3 +876,47 @@ async fn test_create_rejects_existing_key() {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_create_refuses_key_written_after_its_lookup() {
+    for (racing_value, racing_is_secret) in [
+        (DatasetEnvVarValue::Regular("other".into()), false),
+        (
+            DatasetEnvVarValue::Secret(SecretString::from("other".to_string())),
+            true,
+        ),
+    ] {
+        let harness = DatasetEnvVarServiceHarness::new();
+
+        let (_, dataset_id) = odf::DatasetID::new_generated_ed25519();
+        let account_handle = harness.ensure_test_account("test-owner").await;
+        harness
+            .seed_dataset_entry(&dataset_id, &account_handle.did)
+            .await;
+
+        // The other request commits `FOO` after this create found it free
+        let racing_adapter = harness.mutation_adapter_with_racing_write(("FOO", racing_value));
+        assert_matches!(
+            racing_adapter
+                .create_env_var(&dataset_id, "FOO", &DatasetEnvVarValue::Regular("mine".into()))
+                .await,
+            Err(CreateDatasetEnvVarError::AlreadyExists(e)) if e.dataset_env_var_key == "FOO",
+            "racing write as secret: {racing_is_secret}"
+        );
+
+        // ... and keeps its value
+        if racing_is_secret {
+            pretty_assertions::assert_eq!(harness.secret_keys(&dataset_id).await, ["FOO"]);
+            assert!(harness.variable_values(&dataset_id).await.is_empty());
+        } else {
+            pretty_assertions::assert_eq!(
+                harness.variable_values(&dataset_id).await,
+                [("FOO".to_string(), "other".to_string())]
+                    .into_iter()
+                    .collect()
+            );
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
