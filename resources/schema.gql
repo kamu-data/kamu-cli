@@ -2694,9 +2694,9 @@ type DatasetMetadata {
 	"""
 	chain: MetadataChain!
 	"""
-	Last recorded watermark
+	Last recorded watermark, as of the given head or the latest block
 	"""
-	currentWatermark: DateTime
+	currentWatermark(head: Multihash): DateTime
 	"""
 	Latest data schema
 	"""
