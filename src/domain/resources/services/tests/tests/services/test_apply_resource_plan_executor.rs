@@ -7,11 +7,10 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::assert_matches;
 use std::sync::Arc;
 
 use dill::CatalogBuilder;
-use std::assert_matches;
-
 use kamu_resources::{
     ApplyResourceOutcome,
     ApplyResourceParams,
@@ -68,7 +67,11 @@ async fn test_execute_create_returns_applied_created() {
         )
         .await;
 
-    let result = harness.make_executor().execute(plan, ApplyResourcePrecondition::None).await.unwrap();
+    let result = harness
+        .make_executor()
+        .execute(plan, ApplyResourcePrecondition::None)
+        .await
+        .unwrap();
 
     let applied = result.expect_applied();
     assert_eq!(applied.outcome, ApplyResourceOutcome::Created);
@@ -104,7 +107,11 @@ async fn test_execute_update_returns_applied_updated() {
             },
         )
         .await;
-    harness.make_executor().execute(create_plan, ApplyResourcePrecondition::None).await.unwrap();
+    harness
+        .make_executor()
+        .execute(create_plan, ApplyResourcePrecondition::None)
+        .await
+        .unwrap();
 
     // Then update
     let update_plan = harness
@@ -117,7 +124,11 @@ async fn test_execute_update_returns_applied_updated() {
         )
         .await;
 
-    let result = harness.make_executor().execute(update_plan, ApplyResourcePrecondition::None).await.unwrap();
+    let result = harness
+        .make_executor()
+        .execute(update_plan, ApplyResourcePrecondition::None)
+        .await
+        .unwrap();
 
     let applied = result.expect_applied();
     assert_eq!(applied.outcome, ApplyResourceOutcome::Updated);
@@ -149,7 +160,11 @@ async fn test_execute_untouched_returns_applied_no_outbox_call() {
             },
         )
         .await;
-    harness.make_executor().execute(create_plan, ApplyResourcePrecondition::None).await.unwrap();
+    harness
+        .make_executor()
+        .execute(create_plan, ApplyResourcePrecondition::None)
+        .await
+        .unwrap();
 
     // Re-plan with identical spec — action = Untouched, no outbox call
     let untouched_plan = harness
@@ -216,7 +231,11 @@ async fn test_execute_create_duplicate_retries_as_update() {
         )
         .await;
 
-    let result = harness.make_executor().execute(create_plan, ApplyResourcePrecondition::None).await.unwrap();
+    let result = harness
+        .make_executor()
+        .execute(create_plan, ApplyResourcePrecondition::None)
+        .await
+        .unwrap();
 
     let applied = result.expect_applied();
     assert_eq!(applied.outcome, ApplyResourceOutcome::Updated);
@@ -254,8 +273,6 @@ async fn test_execute_create_duplicate_fails_when_absence_required() {
         Err(ApplyResourceUseCaseError::ConcurrentModification(_))
     );
 }
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Harness
@@ -327,7 +344,12 @@ impl ApplyResourcePlanExecutorHarness {
             spec,
         };
 
-        match self.make_planner().plan_internal(params, ApplyResourcePrecondition::None).await.unwrap() {
+        match self
+            .make_planner()
+            .plan_internal(params, ApplyResourcePrecondition::None)
+            .await
+            .unwrap()
+        {
             PlannedApplyResourceDecision::Planned(plan) => plan,
             PlannedApplyResourceDecision::Rejected(r) => {
                 panic!("plan rejected: {:?}", r.message)

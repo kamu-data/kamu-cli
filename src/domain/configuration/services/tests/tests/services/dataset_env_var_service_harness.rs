@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::collections::{BTreeMap, HashMap};
 use std::sync::{Arc, Mutex};
 
 use chrono::Utc;
@@ -270,10 +271,7 @@ impl DatasetEnvVarServiceHarness {
 
     /// Plaintext values of the dataset's regular variables, read from the
     /// stored specs, by key
-    pub async fn variable_values(
-        &self,
-        dataset_id: &odf::DatasetID,
-    ) -> std::collections::BTreeMap<String, String> {
+    pub async fn variable_values(&self, dataset_id: &odf::DatasetID) -> BTreeMap<String, String> {
         self.spec_resolver()
             .resolve_effective_env_vars(dataset_id)
             .await
@@ -308,7 +306,7 @@ impl DatasetEnvVarSpecResolver for RacingSpecResolver {
     async fn resolve_effective_env_vars(
         &self,
         dataset_id: &odf::DatasetID,
-    ) -> Result<std::collections::HashMap<String, DatasetEnvVar>, InternalError> {
+    ) -> Result<HashMap<String, DatasetEnvVar>, InternalError> {
         self.inner.resolve_effective_env_vars(dataset_id).await
     }
 
