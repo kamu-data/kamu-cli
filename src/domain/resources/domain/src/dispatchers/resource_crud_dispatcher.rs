@@ -15,6 +15,7 @@ use crate::{
     ApplyManifestApplicationDecision,
     ApplyManifestPlanningDecision,
     ApplyManifestRejection,
+    ApplyResourcePrecondition,
     ApplyResourceUseCaseError,
     RequestResourcesDeletionError,
     ResourceHeadersInput,
@@ -39,6 +40,16 @@ pub trait ResourceCrudDispatcher: Send + Sync {
     async fn apply(
         &self,
         request: ResourceCrudDispatcherApplyRequest,
+    ) -> Result<ApplyManifestApplicationDecision, ApplyResourceCrudDispatcherError> {
+        self.apply_with_precondition(request, ApplyResourcePrecondition::None)
+            .await
+    }
+
+    /// See [`crate::ApplyResourceUseCase::apply_with_precondition`].
+    async fn apply_with_precondition(
+        &self,
+        request: ResourceCrudDispatcherApplyRequest,
+        precondition: ApplyResourcePrecondition,
     ) -> Result<ApplyManifestApplicationDecision, ApplyResourceCrudDispatcherError>;
 
     async fn request_deletion(

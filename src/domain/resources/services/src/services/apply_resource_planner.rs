@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use chrono::{DateTime, Utc};
+use event_sourcing::ConcurrentModificationError;
 use kamu_resources::{
     ResourceVisibility,
     ResourceWarning,
@@ -22,6 +23,7 @@ use crate::domain::{
     ApplyResourceParams,
     ApplyResourcePlan,
     ApplyResourcePlanningDecision,
+    ApplyResourcePrecondition,
     ApplyResourceRejection,
     ApplyResourceUseCaseError,
     DeclarativeResource,
@@ -82,7 +84,9 @@ where
         &self,
         params: ApplyResourceParams<R>,
     ) -> Result<ApplyResourcePlanningDecision<R>, ApplyResourceUseCaseError<R>> {
-        let plan = self.plan_internal(params).await?;
+        let plan = self
+            .plan_internal(params, ApplyResourcePrecondition::None)
+            .await?;
         Ok(match plan {
             PlannedApplyResourceDecision::Planned(plan) => {
                 ApplyResourcePlanningDecision::Planned(plan.into_public_plan())
@@ -96,6 +100,7 @@ where
     pub async fn plan_internal(
         &self,
         params: ApplyResourceParams<R>,
+        precondition: ApplyResourcePrecondition,
     ) -> Result<PlannedApplyResourceDecision<R>, ApplyResourceUseCaseError<R>> {
         let now = self.time_source.now();
 
@@ -104,7 +109,16 @@ where
             .await?;
 
         let Some(id) = maybe_existing_id else {
-            return self.plan_create_resource(params, now).await;
+            return match precondition {
+                ApplyResourcePrecondition::None | ApplyResourcePrecondition::Absent => {
+                    self.plan_create_resource(params, now).await
+                }
+                ApplyResourcePrecondition::Generation(_) => {
+                    Err(ApplyResourceUseCaseError::ConcurrentModification(
+                        ConcurrentModificationError {},
+                    ))
+                }
+            };
         };
 
         self.ensure_resource_id_matches_type(&id).await?;
@@ -115,6 +129,19 @@ where
             .await
             .map_err(ResourceLoadError)
             .map_err(ApplyResourceUseCaseError::LoadFailed)?;
+
+        let precondition_holds = match precondition {
+            ApplyResourcePrecondition::None => true,
+            ApplyResourcePrecondition::Absent => false,
+            ApplyResourcePrecondition::Generation(generation) => {
+                resource.headers().generation == generation
+            }
+        };
+        if !precondition_holds {
+            return Err(ApplyResourceUseCaseError::ConcurrentModification(
+                ConcurrentModificationError {},
+            ));
+        }
 
         self.plan_update_resource(resource, params, now)
     }

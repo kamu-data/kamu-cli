@@ -105,16 +105,28 @@ impl<'a> DatasetMetadata<'a> {
         MetadataChain::new(self.readable_state)
     }
 
-    /// Last recorded watermark
+    /// Last recorded watermark, as of the given head or the latest block
     #[tracing::instrument(level = "info", name = DatasetMetadata_current_watermark, skip_all)]
-    async fn current_watermark(&self, ctx: &Context<'_>) -> Result<Option<DateTime<Utc>>> {
+    async fn current_watermark(
+        &self,
+        ctx: &Context<'_>,
+        head: Option<Multihash<'_>>,
+    ) -> Result<Option<DateTime<Utc>>> {
         let resolved_dataset = self.readable_state.resolved_dataset(ctx).await?;
+        let metadata_chain = resolved_dataset.as_metadata_chain();
 
-        Ok(resolved_dataset
-            .as_metadata_chain()
-            .last_data_block()
-            .await
-            .int_err()?
+        let last_data_block_visitor = match head {
+            Some(h) => metadata_chain
+                .accept_one_by_hash(
+                    &h.into(),
+                    odf::dataset::SearchSingleDataBlockVisitor::next(),
+                )
+                .await
+                .int_err()?,
+            None => metadata_chain.last_data_block().await.int_err()?,
+        };
+
+        Ok(last_data_block_visitor
             .into_block()
             .and_then(|b| b.event.new_watermark))
     }

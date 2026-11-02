@@ -11,6 +11,7 @@ use database_common::PaginationOpts;
 use dill::*;
 use internal_error::InternalError;
 use kamu_datasets::{
+    CreateDatasetEnvVarError,
     DatasetEnvVar,
     DatasetEnvVarListing,
     DatasetEnvVarService,
@@ -18,6 +19,7 @@ use kamu_datasets::{
     DatasetEnvVarValue,
     DeleteDatasetEnvVarError,
     GetDatasetEnvVarError,
+    UpsertDatasetEnvVarError,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -69,7 +71,16 @@ impl DatasetEnvVarService for DatasetEnvVarServiceNull {
         _dataset_id: &odf::DatasetID,
         _dataset_env_var_key: &str,
         _dataset_env_var_value: &DatasetEnvVarValue,
-    ) -> Result<DatasetEnvVarUpsertResult, InternalError> {
+    ) -> Result<DatasetEnvVarUpsertResult, UpsertDatasetEnvVarError> {
+        unreachable!()
+    }
+
+    async fn create_dataset_env_var(
+        &self,
+        _dataset_id: &odf::DatasetID,
+        _dataset_env_var_key: &str,
+        _dataset_env_var_value: &DatasetEnvVarValue,
+    ) -> Result<DatasetEnvVar, CreateDatasetEnvVarError> {
         unreachable!()
     }
 

@@ -1627,6 +1627,44 @@ type CreateAccountSuccess implements CreateAccountResult {
 }
 
 """
+Outcome of creating an environment variable
+"""
+interface CreateDatasetEnvVarResult {
+	"""
+	Human-readable outcome message
+	"""
+	message: String!
+}
+
+"""
+Environment variable or secret with the given key already exists
+"""
+type CreateDatasetEnvVarResultAlreadyExists implements CreateDatasetEnvVarResult {
+	"""
+	Key that already exists
+	"""
+	envVarKey: String!
+	"""
+	Human-readable error message
+	"""
+	message: String!
+}
+
+"""
+Environment variable was created
+"""
+type CreateDatasetEnvVarResultCreated implements CreateDatasetEnvVarResult {
+	"""
+	Created environment variable
+	"""
+	envVar: ViewDatasetEnvVar!
+	"""
+	Human-readable outcome message
+	"""
+	message: String!
+}
+
+"""
 Outcome of creating a dataset from a snapshot
 """
 interface CreateDatasetFromSnapshotResult {
@@ -2340,6 +2378,70 @@ type DatasetEndpoints {
 }
 
 """
+Environment variable value is empty
+"""
+type DatasetEnvVarEmptyValue implements CreateDatasetEnvVarResult & UpsertDatasetEnvVarResult {
+	"""
+	Key of the rejected environment variable
+	"""
+	envVarKey: String!
+	"""
+	Human-readable error message
+	"""
+	message: String!
+}
+
+"""
+Environment variable key does not match `^[A-Za-z_][A-Za-z0-9_]*$`
+"""
+type DatasetEnvVarInvalidKey implements CreateDatasetEnvVarResult & UpsertDatasetEnvVarResult {
+	"""
+	Rejected key
+	"""
+	envVarKey: String!
+	"""
+	Human-readable error message
+	"""
+	message: String!
+}
+
+"""
+Dataset already has the maximum number of variables or of secrets
+"""
+type DatasetEnvVarTooManyEntries implements CreateDatasetEnvVarResult & UpsertDatasetEnvVarResult {
+	"""
+	Maximum number of variables, or of secrets, per dataset
+	"""
+	maxEntries: Int!
+	"""
+	Human-readable error message
+	"""
+	message: String!
+}
+
+"""
+Environment variable value is longer than allowed
+"""
+type DatasetEnvVarValueTooLong implements CreateDatasetEnvVarResult & UpsertDatasetEnvVarResult {
+	"""
+	Key of the rejected environment variable
+	"""
+	envVarKey: String!
+	"""
+	Length of the rejected value in bytes
+	"""
+	actualLength: Int!
+	"""
+	Maximum value length in bytes
+	"""
+	maxLength: Int!
+	"""
+	Human-readable error message
+	"""
+	message: String!
+}
+
+"""
 Environment variables of a dataset
 """
 type DatasetEnvVars {
@@ -2357,6 +2459,10 @@ type DatasetEnvVars {
 Mutations that manage environment variables of a dataset
 """
 type DatasetEnvVarsMut {
+	"""
+	Creates an environment variable, unless its key is already taken
+	"""
+	createEnvVariable(key: String!, value: String!, isSecret: Boolean!): CreateDatasetEnvVarResult!
 	"""
 	Creates or updates an environment variable, optionally as a secret
 	"""
@@ -2694,9 +2800,9 @@ type DatasetMetadata {
 	"""
 	chain: MetadataChain!
 	"""
-	Last recorded watermark
+	Last recorded watermark, as of the given head or the latest block
 	"""
-	currentWatermark: DateTime
+	currentWatermark(head: Multihash): DateTime
 	"""
 	Latest data schema
 	"""

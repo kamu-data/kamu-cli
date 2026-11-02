@@ -69,7 +69,7 @@ impl VariableSetSpecInput {
     pub const WARNING_CODE_SUSPICIOUS_VALUE_WHITESPACE: &str = "suspicious_value_whitespace";
     pub const WARNING_CODE_UNEXPANDED_INTERPOLATION: &str = "unexpanded_interpolation";
 
-    fn is_valid_variable_name(name: &str) -> bool {
+    pub fn is_valid_variable_name(name: &str) -> bool {
         let mut chars = name.chars();
 
         match chars.next() {
@@ -87,13 +87,32 @@ impl ResourceValidateSpec for VariableSetSpecInput {
     type ValidationError = VariableSetSpecValidationError;
 
     fn validate(&self) -> Result<(), Self::ValidationError> {
+        self.validate_against(None)
+    }
+
+    fn validate_update(&self, current: &Self) -> Result<(), Self::ValidationError> {
+        self.validate_against(Some(&current.variables))
+    }
+}
+
+impl VariableSetSpecInput {
+    /// Entries of `current` written before a rule existed stay valid: a kept
+    /// name skips the name rule, an unchanged entry skips the value rules, and
+    /// a set already over the limit may shrink but not grow.
+    fn validate_against(
+        &self,
+        current: Option<&odf::metadata::config::Variables>,
+    ) -> Result<(), VariableSetSpecValidationError> {
         let entries = &self.variables.entries;
 
         if entries.is_empty() {
             return Err(VariableSetSpecValidationError::EmptyVariables);
         }
 
-        if entries.len() > Self::MAX_VARIABLES {
+        let max_entries = current.map_or(Self::MAX_VARIABLES, |current| {
+            current.entries.len().max(Self::MAX_VARIABLES)
+        });
+        if entries.len() > max_entries {
             return Err(VariableSetSpecValidationError::TooManyVariables {
                 actual: entries.len(),
                 max: Self::MAX_VARIABLES,
@@ -101,13 +120,19 @@ impl ResourceValidateSpec for VariableSetSpecInput {
         }
 
         for (name, variable) in entries {
-            let value = variable.value.as_str();
+            let current_variable = current.and_then(|current| current.entries.get(name));
 
-            if !Self::is_valid_variable_name(name) {
+            if current_variable.is_none() && !Self::is_valid_variable_name(name) {
                 return Err(VariableSetSpecValidationError::InvalidVariableName {
                     name: name.clone(),
                 });
             }
+
+            if current_variable == Some(variable) {
+                continue;
+            }
+
+            let value = variable.value.as_str();
 
             if value.is_empty() {
                 return Err(VariableSetSpecValidationError::EmptyVariableValue {
@@ -247,7 +272,9 @@ pub enum VariableSetSpecValidationError {
 
 #[cfg(test)]
 mod tests {
-    use super::{Variable, VariableSetSpec, VariableSetSpecInput};
+    use std::assert_matches;
+
+    use super::{Variable, VariableSetSpec, VariableSetSpecInput, VariableSetSpecValidationError};
 
     fn make_spec(
         entries: impl IntoIterator<Item = (impl Into<String>, impl Into<String>)>,
@@ -503,6 +530,79 @@ mod tests {
 
         let warnings = spec.lint_warnings();
         assert_eq!(warnings.len(), 0);
+    }
+
+    #[test]
+    fn validate_rejects_invalid_name() {
+        use kamu_resources::ResourceValidateSpec;
+
+        let spec = make_spec_input([("key-1", "value")]);
+
+        assert_matches!(
+            spec.validate(),
+            Err(VariableSetSpecValidationError::InvalidVariableName { name }) if name == "key-1"
+        );
+    }
+
+    #[test]
+    fn validate_update_keeps_legacy_name() {
+        use kamu_resources::ResourceValidateSpec;
+
+        let current = make_spec_input([("key-1", "legacy"), ("API_URL", "a")]);
+
+        // Adding, editing, and removing other entries leaves the legacy entry alone
+        for new in [
+            make_spec_input([("key-1", "legacy"), ("API_URL", "a"), ("NEW_VAR", "1")]),
+            make_spec_input([("key-1", "legacy"), ("API_URL", "b")]),
+            make_spec_input([("key-1", "legacy")]),
+        ] {
+            assert_matches!(new.validate_update(&current), Ok(()), "new: {new:?}");
+        }
+
+        // The legacy entry's value can be edited, but still has to be valid
+        let edited = make_spec_input([("key-1", "edited"), ("API_URL", "a")]);
+        assert_matches!(edited.validate_update(&current), Ok(()));
+
+        let emptied = make_spec_input([("key-1", ""), ("API_URL", "a")]);
+        assert_matches!(
+            emptied.validate_update(&current),
+            Err(VariableSetSpecValidationError::EmptyVariableValue { .. })
+        );
+    }
+
+    #[test]
+    fn validate_update_rejects_new_invalid_name() {
+        use kamu_resources::ResourceValidateSpec;
+
+        let current = make_spec_input([("key-1", "legacy")]);
+        let new = make_spec_input([("key-1", "legacy"), ("key-2", "new")]);
+
+        assert_matches!(
+            new.validate_update(&current),
+            Err(VariableSetSpecValidationError::InvalidVariableName { name }) if name == "key-2"
+        );
+    }
+
+    #[test]
+    fn validate_update_lets_oversized_set_shrink_but_not_grow() {
+        use kamu_resources::ResourceValidateSpec;
+
+        let over_limit = VariableSetSpecInput::MAX_VARIABLES + 2;
+        let entries = |n: usize| (0..n).map(|i| (format!("VAR_{i}"), "value".to_string()));
+        let current = make_spec_input(entries(over_limit));
+
+        assert_matches!(
+            make_spec_input(entries(over_limit - 1)).validate_update(&current),
+            Ok(())
+        );
+        assert_matches!(
+            make_spec_input(entries(over_limit + 1)).validate_update(&current),
+            Err(VariableSetSpecValidationError::TooManyVariables { .. })
+        );
+        assert_matches!(
+            make_spec_input(entries(over_limit)).validate(),
+            Err(VariableSetSpecValidationError::TooManyVariables { .. })
+        );
     }
 }
 

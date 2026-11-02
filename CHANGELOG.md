@@ -25,6 +25,11 @@ Recommendation: for ease of reading, use the following format:
   `MetadataEventType` to `MetadataProjectionEventType`. `MetadataEventType` now lists every metadata
   event type and is used by the `MetadataChain.blocks` filter. Queries that declare
   `[MetadataEventType!]` variables for `metadataProjection` need the new type name
+- GraphQL: `DatasetMetadata.currentWatermark` accepts an optional `head` and returns the watermark as
+  of that block, so a dataset's metadata can be viewed as of an earlier commit
+- GraphQL: `DatasetEnvVarsMut.createEnvVariable` adds a dataset environment variable or secret, and
+  returns `CreateDatasetEnvVarResultAlreadyExists` instead of overwriting a key that is already taken
+### Changed
 - Tests: the FTP ingest test runs against an in-process FTP server instead of a container, and is
   enabled again
 ### Fixed
@@ -34,6 +39,13 @@ Recommendation: for ease of reading, use the following format:
   deliveries, so it covers every dataset that `listFlows` returns flows for
 - GraphQL: `AccountFlowRuns.listFlows` returns no flows for an account without datasets, instead of the
   flows of all accounts
+- Dataset environment variables: an invalid key, an empty value, a value over 16 KiB, or more than 256
+  entries is now reported as a typed result (`DatasetEnvVarInvalidKey`, `DatasetEnvVarEmptyValue`,
+  `DatasetEnvVarValueTooLong`, `DatasetEnvVarTooManyEntries`) instead of "Internal error"
+- Dataset environment variables with keys the current naming rules reject, such as `key-1`, no longer
+  block adding, editing or deleting the dataset's other variables, and can themselves still be edited
+- Dataset environment variables: two concurrent writes to the same dataset no longer silently overwrite
+  each other; the later one fails and can be retried
 
 ## [0.271.0] - 2026-10-21
 ### Added

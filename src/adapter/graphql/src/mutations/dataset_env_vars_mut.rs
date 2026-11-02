@@ -8,9 +8,12 @@
 // by the Apache License, Version 2.0.
 
 use kamu_datasets::{
+    CreateDatasetEnvVarError,
     DatasetEnvVarService,
+    DatasetEnvVarValidationError,
     DatasetEnvVarValue,
     DeleteDatasetEnvVarError,
+    UpsertDatasetEnvVarError,
     UpsertDatasetEnvVarStatus,
 };
 use secrecy::SecretString;
@@ -42,6 +45,41 @@ impl<'a> DatasetEnvVarsMut<'a> {
         })
     }
 
+    /// Creates an environment variable, unless its key is already taken
+    #[tracing::instrument(level = "info", name = DatasetEnvVarsMut_create_env_variable, skip_all)]
+    async fn create_env_variable(
+        &self,
+        ctx: &Context<'_>,
+        key: String,
+        value: String,
+        is_secret: bool,
+    ) -> Result<CreateDatasetEnvVarResult> {
+        let dataset_id = self.dataset_request_state.dataset_id();
+
+        let dataset_env_var_service = from_catalog_n!(ctx, dyn DatasetEnvVarService);
+        match dataset_env_var_service
+            .create_dataset_env_var(dataset_id, &key, &Self::env_var_value(value, is_secret))
+            .await
+        {
+            Ok(dataset_env_var) => Ok(CreateDatasetEnvVarResult::Created(
+                CreateDatasetEnvVarResultCreated {
+                    env_var: ViewDatasetEnvVar::new(dataset_env_var),
+                },
+            )),
+            Err(CreateDatasetEnvVarError::AlreadyExists(_)) => {
+                Ok(CreateDatasetEnvVarResult::AlreadyExists(
+                    CreateDatasetEnvVarResultAlreadyExists { env_var_key: key },
+                ))
+            }
+            Err(CreateDatasetEnvVarError::Validation(err)) => Ok(err.into()),
+            // An error, not a result: the transaction must roll back
+            Err(CreateDatasetEnvVarError::ConcurrentModification(err)) => {
+                Err(GqlError::gql(err.to_string()))
+            }
+            Err(CreateDatasetEnvVarError::Internal(err)) => Err(GqlError::Internal(err)),
+        }
+    }
+
     /// Creates or updates an environment variable, optionally as a secret
     #[tracing::instrument(level = "info", name = DatasetEnvVarsMut_upsert_env_variable, skip_all)]
     async fn upsert_env_variable(
@@ -53,16 +91,20 @@ impl<'a> DatasetEnvVarsMut<'a> {
     ) -> Result<UpsertDatasetEnvVarResult> {
         let dataset_id = self.dataset_request_state.dataset_id();
 
-        let dataset_env_var_value = if is_secret {
-            DatasetEnvVarValue::Secret(SecretString::from(value))
-        } else {
-            DatasetEnvVarValue::Regular(value)
-        };
-
         let dataset_env_var_service = from_catalog_n!(ctx, dyn DatasetEnvVarService);
-        let upsert_result = dataset_env_var_service
-            .upsert_dataset_env_var(dataset_id, key.as_str(), &dataset_env_var_value)
-            .await?;
+        let upsert_result = match dataset_env_var_service
+            .upsert_dataset_env_var(dataset_id, &key, &Self::env_var_value(value, is_secret))
+            .await
+        {
+            Ok(upsert_result) => upsert_result,
+            Err(UpsertDatasetEnvVarError::Validation(err)) => return Ok(err.into()),
+            // An error, not a result: a key conversion may have written the
+            // other set already, so the transaction must roll back
+            Err(UpsertDatasetEnvVarError::ConcurrentModification(err)) => {
+                return Err(GqlError::gql(err.to_string()));
+            }
+            Err(UpsertDatasetEnvVarError::Internal(err)) => return Err(GqlError::Internal(err)),
+        };
 
         Ok(match upsert_result.status {
             UpsertDatasetEnvVarStatus::Created => {
@@ -103,11 +145,96 @@ impl<'a> DatasetEnvVarsMut<'a> {
                 DeleteDatasetEnvVarError::NotFound(_) => Ok(DeleteDatasetEnvVarResult::NotFound(
                     DeleteDatasetEnvVarResultNotFound { env_var_key: key },
                 )),
+                DeleteDatasetEnvVarError::ConcurrentModification(err) => {
+                    Err(GqlError::gql(err.to_string()))
+                }
                 DeleteDatasetEnvVarError::Internal(internal_err) => {
                     Err(GqlError::Internal(internal_err))
                 }
             },
         }
+    }
+
+    #[graphql(skip)]
+    fn env_var_value(value: String, is_secret: bool) -> DatasetEnvVarValue {
+        if is_secret {
+            DatasetEnvVarValue::Secret(SecretString::from(value))
+        } else {
+            DatasetEnvVarValue::Regular(value)
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Outcome of creating an environment variable
+#[derive(Interface, Debug)]
+#[graphql(field(
+    name = "message",
+    ty = "String",
+    desc = "Human-readable outcome message"
+))]
+pub enum CreateDatasetEnvVarResult {
+    Created(CreateDatasetEnvVarResultCreated),
+    AlreadyExists(CreateDatasetEnvVarResultAlreadyExists),
+    InvalidKey(DatasetEnvVarInvalidKey),
+    EmptyValue(DatasetEnvVarEmptyValue),
+    ValueTooLong(DatasetEnvVarValueTooLong),
+    TooManyEntries(DatasetEnvVarTooManyEntries),
+}
+
+impl From<DatasetEnvVarValidationError> for CreateDatasetEnvVarResult {
+    fn from(err: DatasetEnvVarValidationError) -> Self {
+        let message = err.to_string();
+        match err {
+            DatasetEnvVarValidationError::InvalidKey { key } => {
+                Self::InvalidKey(DatasetEnvVarInvalidKey::new(key, message))
+            }
+            DatasetEnvVarValidationError::EmptyValue { key } => {
+                Self::EmptyValue(DatasetEnvVarEmptyValue::new(key, message))
+            }
+            DatasetEnvVarValidationError::ValueTooLong { key, actual, max } => {
+                Self::ValueTooLong(DatasetEnvVarValueTooLong::new(key, actual, max, message))
+            }
+            DatasetEnvVarValidationError::TooManyEntries { max } => {
+                Self::TooManyEntries(DatasetEnvVarTooManyEntries::new(max, message))
+            }
+        }
+    }
+}
+
+/// Environment variable was created
+#[derive(SimpleObject, Debug)]
+#[graphql(complex)]
+pub struct CreateDatasetEnvVarResultCreated {
+    /// Created environment variable
+    pub env_var: ViewDatasetEnvVar,
+}
+
+#[ComplexObject]
+impl CreateDatasetEnvVarResultCreated {
+    /// Human-readable outcome message
+    async fn message(&self) -> String {
+        "Created".to_string()
+    }
+}
+
+/// Environment variable or secret with the given key already exists
+#[derive(SimpleObject, Debug)]
+#[graphql(complex)]
+pub struct CreateDatasetEnvVarResultAlreadyExists {
+    /// Key that already exists
+    pub env_var_key: String,
+}
+
+#[ComplexObject]
+impl CreateDatasetEnvVarResultAlreadyExists {
+    /// Human-readable error message
+    async fn message(&self) -> String {
+        format!(
+            "Environment variable with '{}' key already exists",
+            self.env_var_key
+        )
     }
 }
 
@@ -124,6 +251,30 @@ pub enum UpsertDatasetEnvVarResult {
     Created(UpsertDatasetEnvVarResultCreated),
     Updated(UpsertDatasetEnvVarResultUpdated),
     UpToDate(UpsertDatasetEnvVarUpToDate),
+    InvalidKey(DatasetEnvVarInvalidKey),
+    EmptyValue(DatasetEnvVarEmptyValue),
+    ValueTooLong(DatasetEnvVarValueTooLong),
+    TooManyEntries(DatasetEnvVarTooManyEntries),
+}
+
+impl From<DatasetEnvVarValidationError> for UpsertDatasetEnvVarResult {
+    fn from(err: DatasetEnvVarValidationError) -> Self {
+        let message = err.to_string();
+        match err {
+            DatasetEnvVarValidationError::InvalidKey { key } => {
+                Self::InvalidKey(DatasetEnvVarInvalidKey::new(key, message))
+            }
+            DatasetEnvVarValidationError::EmptyValue { key } => {
+                Self::EmptyValue(DatasetEnvVarEmptyValue::new(key, message))
+            }
+            DatasetEnvVarValidationError::ValueTooLong { key, actual, max } => {
+                Self::ValueTooLong(DatasetEnvVarValueTooLong::new(key, actual, max, message))
+            }
+            DatasetEnvVarValidationError::TooManyEntries { max } => {
+                Self::TooManyEntries(DatasetEnvVarTooManyEntries::new(max, message))
+            }
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -167,6 +318,86 @@ impl UpsertDatasetEnvVarResultUpdated {
     /// Human-readable outcome message
     async fn message(&self) -> String {
         "Updated".to_string()
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Environment variable key does not match `^[A-Za-z_][A-Za-z0-9_]*$`
+#[derive(SimpleObject, Debug)]
+pub struct DatasetEnvVarInvalidKey {
+    /// Rejected key
+    pub env_var_key: String,
+    /// Human-readable error message
+    pub message: String,
+}
+
+impl DatasetEnvVarInvalidKey {
+    fn new(env_var_key: String, message: String) -> Self {
+        Self {
+            env_var_key,
+            message,
+        }
+    }
+}
+
+/// Environment variable value is empty
+#[derive(SimpleObject, Debug)]
+pub struct DatasetEnvVarEmptyValue {
+    /// Key of the rejected environment variable
+    pub env_var_key: String,
+    /// Human-readable error message
+    pub message: String,
+}
+
+impl DatasetEnvVarEmptyValue {
+    fn new(env_var_key: String, message: String) -> Self {
+        Self {
+            env_var_key,
+            message,
+        }
+    }
+}
+
+/// Environment variable value is longer than allowed
+#[derive(SimpleObject, Debug)]
+pub struct DatasetEnvVarValueTooLong {
+    /// Key of the rejected environment variable
+    pub env_var_key: String,
+    /// Length of the rejected value in bytes
+    pub actual_length: usize,
+    /// Maximum value length in bytes
+    pub max_length: usize,
+    /// Human-readable error message
+    pub message: String,
+}
+
+impl DatasetEnvVarValueTooLong {
+    fn new(env_var_key: String, actual_length: usize, max_length: usize, message: String) -> Self {
+        Self {
+            env_var_key,
+            actual_length,
+            max_length,
+            message,
+        }
+    }
+}
+
+/// Dataset already has the maximum number of variables or of secrets
+#[derive(SimpleObject, Debug)]
+pub struct DatasetEnvVarTooManyEntries {
+    /// Maximum number of variables, or of secrets, per dataset
+    pub max_entries: usize,
+    /// Human-readable error message
+    pub message: String,
+}
+
+impl DatasetEnvVarTooManyEntries {
+    fn new(max_entries: usize, message: String) -> Self {
+        Self {
+            max_entries,
+            message,
+        }
     }
 }
 
