@@ -671,7 +671,7 @@ impl FlowEventStore for PostgresFlowEventStore {
             .bind(filters.by_flow_statuses.clone())
             .bind(maybe_initiators as Option<Vec<String>>);
 
-        for (_, values) in &flow_scope_query.attributes {
+        for values in form_scope_query_condition_values(flow_scope_query.clone()) {
             query = query.bind(values);
         }
 
@@ -815,33 +815,39 @@ impl FlowEventStore for PostgresFlowEventStore {
     }
 
     #[tracing::instrument(level = "debug", skip_all)]
-    async fn filter_flow_scopes_having_flows(
+    async fn list_flow_scopes_matching_scope_query(
         &self,
-        flow_scopes: &[FlowScope],
+        flow_scope_query: FlowScopeQuery,
     ) -> Result<Vec<FlowScope>, InternalError> {
         let mut tr = self.transaction.lock().await;
         let connection_mut = tr.connection_mut().await?;
 
-        let scope_json_parts = flow_scopes
-            .iter()
-            .map(|scope| serde_json::to_value(scope).unwrap())
-            .collect::<Vec<_>>();
+        let (scope_conditions, _) =
+            generate_scope_query_condition_clauses(&flow_scope_query, 1 /* no params + 1 */);
 
-        let filtered_flow_scopes = sqlx::query!(
+        let query_str = format!(
             r#"
             SELECT DISTINCT scope_data
             FROM flows
             WHERE
-                scope_data = ANY($1)
+                ({scope_conditions})
             "#,
-            &scope_json_parts,
-        )
-        .map(|flow_row| serde_json::from_value::<FlowScope>(flow_row.scope_data).unwrap())
-        .fetch_all(connection_mut)
-        .await
-        .int_err()?;
+        );
 
-        Ok(filtered_flow_scopes)
+        let mut query = sqlx::query_scalar::<_, serde_json::Value>(AssertSqlSafe(query_str));
+        for values in form_scope_query_condition_values(flow_scope_query) {
+            query = query.bind(values);
+        }
+
+        let flow_scopes = query
+            .fetch_all(connection_mut)
+            .await
+            .int_err()?
+            .into_iter()
+            .map(|scope_data| serde_json::from_value::<FlowScope>(scope_data).unwrap())
+            .collect();
+
+        Ok(flow_scopes)
     }
 }
 

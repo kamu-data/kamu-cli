@@ -585,14 +585,11 @@ pub async fn test_get_dataset_entries_by_owner_id(catalog: &dill::Catalog) {
             .await
             .try_collect::<Vec<_>>()
             .await;
-        let mut expected_dataset_entries = vec![dataset_entry_acc_1_1, dataset_entry_acc_1_2];
-
-        expected_dataset_entries.sort_by(|e1, e2| e1.id.cmp(&e2.id));
+        // Entries come ordered by dataset name
+        let expected_dataset_entries = vec![dataset_entry_acc_1_1, dataset_entry_acc_1_2];
 
         match get_res {
-            Ok(mut actual_dataset_entries) => {
-                actual_dataset_entries.sort_by(|e1, e2| e1.id.cmp(&e2.id));
-
+            Ok(actual_dataset_entries) => {
                 assert_eq!(expected_dataset_entries, actual_dataset_entries);
             }
             Err(e) => {

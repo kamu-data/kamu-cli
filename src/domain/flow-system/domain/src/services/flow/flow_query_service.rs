@@ -52,10 +52,10 @@ pub trait FlowQueryService: Sync + Send {
         scope_query: FlowScopeQuery,
     ) -> Result<FlowInitiatorListing<'a>, InternalError>;
 
-    /// Returns subset of input scopes that have at least one flow
-    async fn filter_flow_scopes_having_flows(
+    /// Returns distinct scopes of the flows, where scope matches the pattern
+    async fn list_flow_scopes_matching_scope_query(
         &self,
-        scopes: &[FlowScope],
+        scope_query: FlowScopeQuery,
     ) -> Result<Vec<FlowScope>, InternalError>;
 
     /// Returns current state of a given flow

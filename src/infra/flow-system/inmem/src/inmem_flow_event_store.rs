@@ -741,23 +741,22 @@ impl FlowEventStore for InMemoryFlowEventStore {
         })
     }
 
-    async fn filter_flow_scopes_having_flows(
+    async fn list_flow_scopes_matching_scope_query(
         &self,
-        flow_scopes: &[FlowScope],
+        flow_scope_query: FlowScopeQuery,
     ) -> Result<Vec<FlowScope>, InternalError> {
         let state = self.inner.as_state();
         let g = state.lock().unwrap();
 
-        let mut filtered_flow_scopes = HashSet::new();
-        for flow_id in &g.all_flows {
-            let flow_binding = g.flow_binding_by_flow_id.get(flow_id).unwrap();
-            if flow_scopes.contains(&flow_binding.scope)
-                && !filtered_flow_scopes.contains(&flow_binding.scope)
-            {
-                filtered_flow_scopes.insert(flow_binding.scope.clone());
-            }
-        }
-        Ok(filtered_flow_scopes.into_iter().collect())
+        let flow_scopes = g
+            .all_flows
+            .iter()
+            .map(|flow_id| &g.flow_binding_by_flow_id.get(flow_id).unwrap().scope)
+            .filter(|flow_scope| flow_scope.matches_query(&flow_scope_query))
+            .cloned()
+            .collect::<HashSet<_>>();
+
+        Ok(flow_scopes.into_iter().collect())
     }
 }
 

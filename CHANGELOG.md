@@ -23,6 +23,10 @@ Recommendation: for ease of reading, use the following format:
 ### Fixed
 - `POST /query` no longer fails with "Response signing is not enabled" on nodes without a signing key.
   Only queries that request a `Proof` need the key
+- GraphQL: `AccountFlowRuns.listDatasetsWithFlow` now includes datasets whose only flows are webhook
+  deliveries, so it covers every dataset that `listFlows` returns flows for
+- GraphQL: `AccountFlowRuns.listFlows` returns no flows for an account without datasets, instead of the
+  flows of all accounts
 
 ## [0.271.0] - 2026-10-21
 ### Added
