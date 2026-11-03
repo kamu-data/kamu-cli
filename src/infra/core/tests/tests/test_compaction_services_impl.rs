@@ -453,6 +453,184 @@ async fn test_dataset_compaction_watermark_only_blocks() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// The block without data keeps the watermark and source state a single
+/// slice cannot carry, so there is nothing to compact
+#[test_group::group(ingest, datafusion, compact)]
+#[tokio::test]
+async fn test_dataset_compaction_keeps_data_less_block_after_single_slice() {
+    let harness = CompactTestHarness::new();
+    let target = harness.create_test_root_dataset().await;
+
+    harness
+        .ingest_data(CITIES_1_TO_3.to_string(), target.clone())
+        .await;
+    harness
+        .commit_data_less_block(&target, 2, Some(CompactTestHarness::etag("e1")))
+        .await;
+
+    assert_matches!(
+        harness
+            .compact_dataset(target, CompactionOptions::default())
+            .await,
+        Ok(CompactionResult::NothingToDo)
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// A newer block without source state means there is none, so an older one
+/// must not come back
+#[test_group::group(ingest, datafusion, compact)]
+#[tokio::test]
+async fn test_dataset_compaction_keeps_absent_source_state_of_newest_block() {
+    let harness = CompactTestHarness::new();
+    let target = harness.create_test_root_dataset().await;
+    let dataset_ref = target.get_handle().as_local_ref();
+
+    harness
+        .ingest_data(CITIES_1_TO_3.to_string(), target.clone())
+        .await;
+    harness
+        .commit_data_less_block(&target, 2, Some(CompactTestHarness::etag("e1")))
+        .await;
+    harness
+        .ingest_data(CITIES_4_TO_6.to_string(), target.clone())
+        .await;
+    let newest_before = harness.add_data_at(&dataset_ref, 0).await;
+    assert_eq!(newest_before.new_source_state, None);
+
+    assert_matches!(
+        harness
+            .compact_dataset(target, CompactionOptions::default())
+            .await,
+        Ok(CompactionResult::Success { .. })
+    );
+
+    let merged = harness.add_data_at(&dataset_ref, 0).await;
+    assert_eq!(
+        merged.new_data.unwrap().offset_interval,
+        odf::metadata::OffsetInterval { start: 0, end: 5 }
+    );
+    assert_eq!(merged.new_source_state, None);
+    assert_eq!(merged.new_watermark, newest_before.new_watermark);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// The watermark set after a metadata event stays after it
+#[test_group::group(ingest, datafusion, compact)]
+#[tokio::test]
+async fn test_dataset_compaction_keeps_data_less_block_after_metadata_event() {
+    let harness = CompactTestHarness::new();
+    let target = harness.create_test_root_dataset().await;
+    let dataset_ref = target.get_handle().as_local_ref();
+
+    harness
+        .ingest_data(CITIES_1_TO_3.to_string(), target.clone())
+        .await;
+    harness
+        .ingest_data(CITIES_4_TO_6.to_string(), target.clone())
+        .await;
+    let newest_data_before = harness.add_data_at(&dataset_ref, 0).await;
+    harness
+        .commit_set_licence_block(&dataset_ref, &harness.get_dataset_head(&dataset_ref).await)
+        .await;
+    let watermark = harness.commit_data_less_block(&target, 5, None).await;
+
+    assert_matches!(
+        harness
+            .compact_dataset(target, CompactionOptions::default())
+            .await,
+        Ok(CompactionResult::Success { .. })
+    );
+
+    let blocks = harness.get_dataset_blocks(&dataset_ref).await;
+    let data_less = harness.add_data_at(&dataset_ref, 0).await;
+    assert_eq!(data_less.new_data, None);
+    assert_eq!(data_less.new_watermark, Some(watermark));
+    assert_matches!(blocks[1].event, odf::MetadataEvent::SetLicense(_));
+    let merged = harness.add_data_at(&dataset_ref, 2).await;
+    assert_eq!(
+        merged.new_data.unwrap().offset_interval,
+        odf::metadata::OffsetInterval { start: 0, end: 5 }
+    );
+    assert_eq!(merged.new_watermark, newest_data_before.new_watermark);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// The records of a batch past a metadata event do not count towards the next
+/// one
+#[test_group::group(ingest, datafusion, compact)]
+#[tokio::test]
+async fn test_dataset_compaction_limits_restart_after_metadata_event() {
+    let harness = CompactTestHarness::new();
+    let target = harness.create_test_root_dataset().await;
+    let dataset_ref = target.get_handle().as_local_ref();
+
+    harness.ingest_multiple_blocks(target.clone(), 3, 1).await;
+    harness
+        .commit_set_licence_block(&dataset_ref, &harness.get_dataset_head(&dataset_ref).await)
+        .await;
+    harness
+        .ingest_data(CITIES_1_TO_3.to_string(), target.clone())
+        .await;
+
+    assert_matches!(
+        harness
+            .compact_dataset(
+                target,
+                CompactionOptions {
+                    max_slice_records: Some(4),
+                    ..CompactionOptions::default()
+                },
+            )
+            .await,
+        Ok(CompactionResult::Success { .. })
+    );
+
+    let blocks = harness.get_dataset_blocks(&dataset_ref).await;
+    assert_matches!(blocks[1].event, odf::MetadataEvent::SetLicense(_));
+    let merged = harness.add_data_at(&dataset_ref, 2).await;
+    assert_eq!(
+        merged.new_data.unwrap().offset_interval,
+        odf::metadata::OffsetInterval { start: 0, end: 2 }
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_group::group(ingest, datafusion, compact)]
+#[tokio::test]
+async fn test_dataset_compaction_removes_its_run_directory() {
+    let harness = CompactTestHarness::new();
+    let target = harness.create_test_root_dataset().await;
+
+    harness
+        .ingest_data(CITIES_1_TO_3.to_string(), target.clone())
+        .await;
+    harness
+        .ingest_data(CITIES_4_TO_6.to_string(), target.clone())
+        .await;
+
+    assert_matches!(
+        harness
+            .compact_dataset(target, CompactionOptions::default())
+            .await,
+        Ok(CompactionResult::Success { .. })
+    );
+    pretty_assertions::assert_eq!(harness.run_dir_entries(), Vec::<std::path::PathBuf>::new());
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+const CITIES_1_TO_3: &str =
+    "date,city,population\n2020-01-01,A,1000\n2020-01-02,B,2000\n2020-01-03,C,3000\n";
+const CITIES_4_TO_6: &str =
+    "date,city,population\n2020-01-04,A,4000\n2020-01-05,B,5000\n2020-01-06,C,6000\n";
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[test_group::group(ingest, datafusion, compact)]
 #[tokio::test]
 async fn test_dataset_compaction_limits() {
@@ -1567,7 +1745,7 @@ async fn test_dataset_compaction_changelog_stream_keeps_state() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 struct CompactTestHarness {
-    _temp_dir: tempfile::TempDir,
+    temp_dir: tempfile::TempDir,
     did_generator: Arc<dyn DidGenerator>,
     dataset_registry: Arc<dyn DatasetRegistry>,
     dataset_storage_unit_writer: Arc<dyn odf::DatasetStorageUnitWriter>,
@@ -1646,7 +1824,7 @@ impl CompactTestHarness {
         let transform_helper = TransformTestHelper::from_catalog(&catalog);
 
         Self {
-            _temp_dir: temp_dir,
+            temp_dir,
             did_generator: catalog.get_one().unwrap(),
             dataset_registry: catalog.get_one().unwrap(),
             dataset_storage_unit_writer: catalog.get_one().unwrap(),
@@ -1721,7 +1899,7 @@ impl CompactTestHarness {
         let transform_helper = TransformTestHelper::from_catalog(&catalog);
 
         Self {
-            _temp_dir: temp_dir,
+            temp_dir,
             did_generator: catalog.get_one().unwrap(),
             dataset_registry: catalog.get_one().unwrap(),
             dataset_storage_unit_writer: catalog.get_one().unwrap(),
@@ -1996,6 +2174,68 @@ impl CompactTestHarness {
             )
             .await
             .unwrap();
+    }
+
+    /// Commits an `AddData` without data after the offset `prev_offset`, moving
+    /// the watermark a day past the harness time; returns the watermark
+    async fn commit_data_less_block(
+        &self,
+        target: &ResolvedDataset,
+        prev_offset: u64,
+        new_source_state: Option<odf::metadata::SourceState>,
+    ) -> DateTime<Utc> {
+        let new_watermark = self.current_date_time + chrono::Duration::days(1);
+        target
+            .commit_add_data(
+                odf::dataset::AddDataParams {
+                    prev_checkpoint: None,
+                    prev_offset: Some(prev_offset),
+                    new_offset_interval: None,
+                    new_linked_objects: None,
+                    new_watermark: Some(new_watermark),
+                    new_source_state,
+                },
+                None,
+                None,
+                odf::dataset::CommitOpts {
+                    system_time: Some(self.current_date_time),
+                    ..odf::dataset::CommitOpts::default()
+                },
+            )
+            .await
+            .unwrap();
+        new_watermark
+    }
+
+    /// What compaction runs left in the run directory
+    fn run_dir_entries(&self) -> Vec<std::path::PathBuf> {
+        std::fs::read_dir(self.temp_dir.path().join("run"))
+            .unwrap()
+            .map(|entry| entry.unwrap().path())
+            .collect()
+    }
+
+    fn etag(value: &str) -> odf::metadata::SourceState {
+        odf::metadata::SourceState {
+            source_name: odf::metadata::SourceState::DEFAULT_SOURCE_NAME.to_string(),
+            kind: "odf/etag".to_string(),
+            value: value.to_string(),
+        }
+    }
+
+    /// The `AddData` event of the block `index` blocks below `HEAD`
+    async fn add_data_at(
+        &self,
+        dataset_ref: &odf::DatasetRef,
+        index: usize,
+    ) -> odf::metadata::AddData {
+        use odf::metadata::EnumWithVariants;
+        let blocks = self.get_dataset_blocks(dataset_ref).await;
+        blocks[index]
+            .event
+            .as_variant::<odf::metadata::AddData>()
+            .unwrap_or_else(|| panic!("Block {index} is not AddData: {:#?}", blocks[index]))
+            .clone()
     }
 
     // Ensures that old an new blocks end with same watermark, source state, and

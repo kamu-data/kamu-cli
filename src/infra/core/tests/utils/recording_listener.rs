@@ -47,6 +47,20 @@ impl SyncListener for RecordingListener {
     }
 }
 
+impl CompactionListener for RecordingListener {
+    fn begin(&self) {
+        self.record("begin");
+    }
+
+    fn success(&self, _result: &CompactionResult) {
+        self.record("success");
+    }
+
+    fn error(&self, _error: &CompactionError) {
+        self.record("error");
+    }
+}
+
 impl PushIngestListener for RecordingListener {
     fn begin(&self) {
         self.record("begin");

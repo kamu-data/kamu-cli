@@ -74,6 +74,17 @@ Recommendation: for ease of reading, use the following format:
 - GraphQL: a transform flow that found nothing to do reports `FlowDescriptionUpdateResultUpToDate`,
   as ingest flows do, instead of no result
 ### Fixed
+- `kamu system compact` and compaction flows keep blocks that only set a watermark or source state
+  when they cannot be merged, and a merged block takes the source state of the newest block it
+  replaces, even when that block has none. Previously such a block could be dropped, moving the
+  watermark back and making the next poll re-ingest data, and a dataset that was already compacted
+  could be reported as compacted again, resetting its derivatives for nothing
+- `kamu system compact` splits data into fewer merged blocks after a metadata event, which no longer
+  counts the records before it towards the size limits
+- `kamu system compact` shows which dataset failed instead of leaving its spinner running, and no
+  longer shows a dataset as compacted before its new head is set
+- Compaction removes its temporary files when it ends, instead of leaving them until the node
+  restarts
 - `kamu pull` of a dataset whose pull alias names an unknown repository fails with "Repository …
   does not exist", and one whose pull alias names a remote dataset by ID fails with "Syncing remote
   dataset by ID is not yet supported: …", instead of an internal error

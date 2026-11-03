@@ -12,6 +12,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 
 use kamu::domain::{
+    CompactionError,
     CompactionListener,
     CompactionMultiListener,
     CompactionPhase,
@@ -103,10 +104,10 @@ impl CompactionProgress {
 impl CompactionListener for CompactionProgress {
     fn begin(&self) {
         self.curr_progress
-            .set_message(self.spinner_message("Compaction dataset"));
+            .set_message(self.spinner_message("Compacting dataset"));
     }
 
-    fn execute_success(&self, res: &CompactionResult) {
+    fn success(&self, res: &CompactionResult) {
         match res {
             CompactionResult::NothingToDo => {
                 self.curr_progress.finish_with_message(
@@ -133,13 +134,20 @@ impl CompactionListener for CompactionProgress {
         }
     }
 
+    fn error(&self, _err: &CompactionError) {
+        self.curr_progress.finish_with_message(
+            self.spinner_message(console::style("Failed to compact dataset").red()),
+        );
+    }
+
     fn begin_phase(&self, phase: CompactionPhase) {
         let message = match phase {
             CompactionPhase::GatherChainInfo => "Gathering chain information",
             CompactionPhase::MergeDataslices => "Merging dataslices",
             CompactionPhase::CommitNewBlocks => "Committing new blocks",
         };
-        self.curr_progress.set_message(message);
+        self.curr_progress
+            .set_message(self.spinner_message(message));
     }
 
     fn end_phase(&self, _phase: CompactionPhase) {}

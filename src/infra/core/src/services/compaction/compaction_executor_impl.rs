@@ -13,7 +13,7 @@ use std::sync::Arc;
 
 use datafusion::prelude::*;
 use dill::{component, interface};
-use file_utils::OwnedFile;
+use file_utils::{OwnedDir, OwnedFile};
 use internal_error::ResultIntoInternal;
 use kamu_core::*;
 use kamu_datasets::ResolvedDataset;
@@ -35,12 +35,17 @@ pub struct CompactionExecutorImpl {
 }
 
 impl CompactionExecutorImpl {
-    fn create_run_compaction_dir(&self) -> Result<PathBuf, CompactionExecutionError> {
+    /// Merged files are moved into the dataset as their blocks are committed,
+    /// so the directory and whatever a failed run left in it go when it drops
+    fn create_run_compaction_dir(&self) -> Result<OwnedDir, CompactionExecutionError> {
         let compaction_dir_path = self
             .run_info_dir
             .join(get_random_name(Some("compaction-"), 10));
         std::fs::create_dir_all(&compaction_dir_path).int_err()?;
-        Ok(compaction_dir_path)
+        Ok(OwnedDir::new(
+            compaction_dir_path,
+            "compaction run directory",
+        ))
     }
 
     fn new_session_context(&self) -> datafusion::prelude::SessionContext {
@@ -214,29 +219,27 @@ impl CompactionExecutor for CompactionExecutorImpl {
 
         let listener = maybe_listener.unwrap_or(Arc::new(NullCompactionListener {}));
 
-        let compaction_dir_path = self.create_run_compaction_dir()?;
+        let compaction_dir = self.create_run_compaction_dir()?;
 
         tracing::debug!("Merging data slices");
         listener.begin_phase(CompactionPhase::MergeDataslices);
-        let new_file_paths = self.merge_files(&plan, &compaction_dir_path).await?;
+        let new_file_paths = self.merge_files(&plan, compaction_dir.as_path()).await?;
+        listener.end_phase(CompactionPhase::MergeDataslices);
 
         tracing::debug!("Committing new compacted blocks");
         listener.begin_phase(CompactionPhase::CommitNewBlocks);
         let (_old_data_slices, new_head, new_num_blocks) = self
             .commit_new_blocks(&target, &plan, new_file_paths)
             .await?;
+        listener.end_phase(CompactionPhase::CommitNewBlocks);
 
-        let res = CompactionResult::Success {
+        Ok(CompactionResult::Success {
             old_head: plan.old_head,
             new_head,
             old_num_blocks: plan.old_num_blocks,
             new_num_blocks,
             breaking: true,
-        };
-
-        listener.execute_success(&res);
-
-        Ok(res)
+        })
     }
 }
 

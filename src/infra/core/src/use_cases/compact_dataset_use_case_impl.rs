@@ -24,6 +24,7 @@ use kamu_core::{
     CompactionPlanner,
     CompactionResponse,
     CompactionResult,
+    NullCompactionListener,
     NullCompactionMultiListener,
 };
 use kamu_datasets::{
@@ -88,6 +89,38 @@ impl CompactDatasetUseCaseImpl {
         Ok((target, compaction_plan))
     }
 
+    async fn compact_and_commit(
+        &self,
+        dataset_handle: &odf::DatasetHandle,
+        options: CompactionOptions,
+        listener: Arc<dyn CompactionListener>,
+    ) -> Result<CompactionResult, CompactionError> {
+        let (target, compaction_plan) = self
+            .plan_transactionally(dataset_handle, options, Some(listener.clone()))
+            .await?;
+
+        let compaction_result = self
+            .compaction_executor
+            .execute(target, compaction_plan, Some(listener))
+            .await?;
+
+        // Set proposed reference, if something got compacted
+        match &compaction_result {
+            CompactionResult::NothingToDo => {
+                tracing::debug!(%dataset_handle, "Skipping setting reference. Dataset was not compacted");
+            }
+            CompactionResult::Success {
+                old_head, new_head, ..
+            } => {
+                tracing::debug!(%dataset_handle, %new_head, "Setting new compacted head");
+                self.commit_head_transactionally(dataset_handle, old_head, new_head)
+                    .await?;
+            }
+        }
+
+        Ok(compaction_result)
+    }
+
     #[transactional_method2(dataset_registry: Arc<dyn DatasetRegistry>, dataset_head_committer: Arc<dyn DatasetHeadCommitter>)]
     async fn commit_head_transactionally(
         &self,
@@ -118,30 +151,17 @@ impl CompactDatasetUseCase for CompactDatasetUseCaseImpl {
         options: CompactionOptions,
         maybe_listener: Option<Arc<dyn CompactionListener>>,
     ) -> Result<CompactionResult, CompactionError> {
-        let (target, compaction_plan) = self
-            .plan_transactionally(dataset_handle, options, maybe_listener.clone())
-            .await?;
+        let listener = maybe_listener.unwrap_or_else(|| Arc::new(NullCompactionListener {}));
+        listener.begin();
 
-        let compaction_result = self
-            .compaction_executor
-            .execute(target, compaction_plan, maybe_listener)
-            .await?;
-
-        // Set proposed reference, if something got compacted
-        match &compaction_result {
-            CompactionResult::NothingToDo => {
-                tracing::debug!(%dataset_handle, "Skipping setting reference. Dataset was not compacted");
-            }
-            CompactionResult::Success {
-                old_head, new_head, ..
-            } => {
-                tracing::debug!(%dataset_handle, %new_head, "Setting new compacted head");
-                self.commit_head_transactionally(dataset_handle, old_head, new_head)
-                    .await?;
-            }
+        let result = self
+            .compact_and_commit(dataset_handle, options, listener.clone())
+            .await;
+        match &result {
+            Ok(compaction_result) => listener.success(compaction_result),
+            Err(e) => listener.error(e),
         }
-
-        Ok(compaction_result)
+        result
     }
 
     #[tracing::instrument(

@@ -17,6 +17,8 @@ use kamu_datasets::{DatasetPermission, MockDatasetPermissionChecker, ResolvedDat
 use kamu_datasets_services::DatasetHeadCommitterImpl;
 use pretty_assertions::assert_matches;
 
+use crate::utils::RecordingListener;
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[tokio::test]
@@ -241,10 +243,11 @@ async fn test_compact_dataset_commits_head_and_reports_breaking() {
     let compacted_head = harness.append_unreferenced_block(&foo, "compacted").await;
     reported_heads.set(&foo.head, &compacted_head);
 
+    let (result, events) = harness
+        .compact_dataset_recording(ResolvedDataset::from_created(&foo))
+        .await;
     assert_matches!(
-        harness
-            .compact_dataset(ResolvedDataset::from_created(&foo))
-            .await,
+        result,
         Ok(CompactionResult::Success {
             old_head,
             new_head,
@@ -253,6 +256,7 @@ async fn test_compact_dataset_commits_head_and_reports_breaking() {
         }) if old_head == foo.head && new_head == compacted_head
     );
     assert_eq!(harness.get_head(&foo).await, compacted_head);
+    assert_eq!(events, vec!["begin", "success"]);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -316,10 +320,11 @@ async fn test_compact_dataset_head_moved_concurrently() {
     reported_heads.set(&foo.head, &compacted_head);
     harness.move_head(&foo, &foo.head, &concurrent_head).await;
 
+    let (result, events) = harness
+        .compact_dataset_recording(ResolvedDataset::from_created(&foo))
+        .await;
     assert_matches!(
-        harness
-            .compact_dataset(ResolvedDataset::from_created(&foo))
-            .await,
+        result,
         Err(CompactionError::RefCASFailed(odf::dataset::RefCASError {
             expected: Some(expected),
             actual: Some(actual),
@@ -327,6 +332,9 @@ async fn test_compact_dataset_head_moved_concurrently() {
         })) if expected == foo.head && actual == concurrent_head
     );
     assert_eq!(harness.get_head(&foo).await, concurrent_head);
+    // The executor succeeded, but nothing is reported as compacted before the
+    // new `HEAD` is set
+    assert_eq!(events, vec!["begin", "error"]);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -421,6 +429,22 @@ impl CompactUseCaseHarness {
         self.use_case
             .execute(target.get_handle(), options, None)
             .await
+    }
+
+    async fn compact_dataset_recording(
+        &self,
+        target: ResolvedDataset,
+    ) -> (Result<CompactionResult, CompactionError>, Vec<&'static str>) {
+        let listener = Arc::new(RecordingListener::default());
+        let result = self
+            .use_case
+            .execute(
+                target.get_handle(),
+                CompactionOptions::default(),
+                Some(listener.clone()),
+            )
+            .await;
+        (result, listener.events())
     }
 
     async fn compact_datasets(&self, targets: Vec<ResolvedDataset>) -> Vec<CompactionResponse> {

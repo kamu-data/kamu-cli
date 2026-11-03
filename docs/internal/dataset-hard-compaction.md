@@ -146,20 +146,21 @@ output is just more `AddData` blocks.
 
 | Block | Planner action |
 | --- | --- |
-| `AddData` with data | added to the current batch; if adding it would exceed `max_slice_size` or `max_slice_records`, the current batch is closed first and this slice starts a new one |
-| `AddData` without data (watermark or source state only) | contributes its watermark, source state and checkpoint to the current batch's upper bound and is never kept as a block of its own; if the batch ends as a `SingleBlock`, those values are lost |
+| `AddData` with data | added to the current batch; if adding it would exceed `max_slice_size` or `max_slice_records` of a batch that already has data, the current batch is closed first and this slice starts a new one |
+| `AddData` without data (watermark, source state or checkpoint only) | added to the current batch without counting towards the limits |
 | `Seed` | recorded as the base of the new chain |
 | Any other event (`SetDataSchema`, `SetPollingSource`, `AddPushSource`, `SetVocab`, `SetInfo`, `ExecuteTransform`, …) | closes the current batch and is kept as a `SingleBlock` |
 
-Batches therefore never cross a schema change or any other metadata event. A closed batch becomes:
+Batches therefore never cross a schema change or any other metadata event, and each one starts
+with empty size and record counts. A closed batch becomes:
 
 - a **`CompactedBatch`** when it holds two or more slices: the slice URLs; a **lower bound** from
-  the oldest block (`start_offset`, `prev_offset`, `prev_checkpoint`); an **upper bound** from the
-  newest (`end_offset`, plus the newest non-empty `new_checkpoint`, `new_source_state` and
-  `new_watermark`); and the summed linked-object summaries;
-- a **`SingleBlock(hash)`** when it holds one slice: the original block is carried over and the
-  upper bound is not used;
-- nothing when it is empty.
+  the oldest block (`start_offset` from the oldest slice, `prev_offset`, `prev_checkpoint`); an
+  **upper bound** with `end_offset` from the newest slice and the `new_checkpoint`,
+  `new_source_state` and `new_watermark` of the newest block, with or without data, even when
+  absent, since every `AddData` carries them forward; and the summed linked-object summaries;
+- a **`SingleBlock(hash)`** for each of its blocks otherwise: one slice, or none, together with the
+  blocks without data around it are carried over as they are.
 
 `CompactionPlan` holds the batches newest first, the `Seed` hash, the old head and block count, and
 the offset column name from the oldest `SetVocab` in the chain (the default vocabulary if there is
@@ -184,7 +185,8 @@ count.
    block gets a new `system_time` and `prev_block_hash`, so every hash after the `Seed` changes.
    Blocks are written with `update_block_ref: false`.
 3. **Report.** `Success { old_head, new_head, old_num_blocks, new_num_blocks, breaking }`. The
-   executor never moves `HEAD`.
+   executor never moves `HEAD`. The run directory is removed when `execute` returns, with whatever
+   a failed run left in it.
 
 The caller moves `HEAD` with a compare-and-swap against `old_head`. A write that moved `HEAD`
 after planning (an ingest, a push, another compaction) makes the swap fail, and the new blocks and
@@ -192,9 +194,11 @@ merged files stay unreferenced. The use case returns `CompactionError::RefCASFai
 expected and actual heads; the task runners return the recoverable `DatasetCommitError`
 ([task-system.md](task-system.md#72-hard-compaction-and-reset-to-metadata)).
 
-`CompactionListener` receives the plan, the result, and the `GatherChainInfo`, `MergeDataslices`
-and `CommitNewBlocks` phases. In the CLI, `CompactionMultiProgress` (a
-`CompactionMultiListener`) hands each dataset a `CompactionProgress` listener.
+`CompactionListener` hears `begin`, the plan, the start and end of the `GatherChainInfo`,
+`MergeDataslices` and `CommitNewBlocks` phases, and then either `success`, once the use case has set
+the new `HEAD`, or `error` with the `CompactionError` of any step. In the CLI,
+`CompactionMultiProgress` (a `CompactionMultiListener`) hands each dataset a `CompactionProgress`
+listener.
 
 ---
 
@@ -204,7 +208,7 @@ and `CommitNewBlocks` phases. In the CLI, `CompactionMultiProgress` (a
 | --- | --- |
 | Old blocks, data files, checkpoints | kept, and nothing deletes them. From the new `HEAD` only the `Seed`, the data files and checkpoints of blocks re-committed unchanged (`SingleBlock`), and the newest checkpoint of each merged batch stay reachable; the other old blocks and the original data files of merged batches do not |
 | Merged files | moved into the dataset's data store on commit |
-| `compaction-*` run directories | left in place; every `kamu` invocation, the API server included, wipes the run directory at startup, so they accumulate only for the lifetime of a long-running process |
+| `compaction-*` run directories | removed when the executor returns, after a failure too |
 | Blocks and files from an attempt that lost the `HEAD` swap | kept, unreferenced |
 
 `kamu system gc` only purges the workspace cache; it does not collect unreferenced objects.
