@@ -13,6 +13,7 @@ use std::sync::Arc;
 use chrono::{DateTime, Utc};
 use datafusion::arrow::array::RecordBatch;
 use datafusion::prelude::SessionContext;
+use file_utils::OwnedDir;
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu_core::ingest::*;
 use kamu_core::*;
@@ -67,8 +68,11 @@ impl PollingIngestServiceImpl {
             *plan.into_metadata_state(),
         );
 
-        let operation_dir = self.run_info_dir.join(format!("ingest-{operation_id}"));
-        std::fs::create_dir_all(&operation_dir).int_err()?;
+        let operation_dir = OwnedDir::new(
+            self.run_info_dir.join(format!("ingest-{operation_id}")),
+            "ingest directory",
+        );
+        std::fs::create_dir_all(operation_dir.as_path()).int_err()?;
 
         let new_ctx = ingest_common::new_session_context(
             &self.engine_config,
@@ -79,7 +83,7 @@ impl PollingIngestServiceImpl {
         let iteration_args = IngestIterationArgs {
             target,
             operation_id: operation_id.to_string(),
-            operation_dir: operation_dir.clone(),
+            operation_dir: operation_dir.as_path().to_path_buf(),
             system_time: self.time_source.now(),
             options,
             env_vars,
@@ -89,14 +93,14 @@ impl PollingIngestServiceImpl {
             data_writer: &mut data_writer,
         };
 
-        let response = self.ingest_iteration(iteration_args).await?;
+        let response = self.ingest_iteration(iteration_args).await;
 
         // A failed attempt keeps its directory: errors point at the logs in it
-        if let Err(err) = std::fs::remove_dir_all(&operation_dir) {
-            tracing::warn!(error = %err, ?operation_dir, "Failed to remove the ingest directory");
+        if response.is_err() {
+            operation_dir.keep();
         }
 
-        Ok(response)
+        response
     }
 
     #[tracing::instrument(

@@ -11,6 +11,7 @@ use std::sync::Arc;
 
 use dill::*;
 use engine::{TransformRequestExt, TransformResponseExt};
+use file_utils::OwnedDir;
 use internal_error::{ErrorIntoInternal, ResultIntoInternal};
 use kamu_core::*;
 use kamu_datasets::{ResolvedDataset, ResolvedDatasetsMap};
@@ -102,17 +103,20 @@ impl TransformExecutorImpl {
             response.new_data.is_some()
         );
 
-        let maybe_run_dir = response.run_dir.clone();
-        let result = commit_fn(request, response).await?;
+        let run_dir = response
+            .run_dir
+            .clone()
+            .map(|dir| OwnedDir::new(dir, "engine run directory"));
+        let result = commit_fn(request, response).await;
 
         // A failed run keeps its directory, which holds the engine logs its error points at
-        if let Some(run_dir) = maybe_run_dir
-            && let Err(err) = std::fs::remove_dir_all(&run_dir)
+        if result.is_err()
+            && let Some(run_dir) = run_dir
         {
-            tracing::warn!(error = %err, ?run_dir, "Failed to remove the engine run directory");
+            run_dir.keep();
         }
 
-        Ok(result)
+        result
     }
 
     async fn commit_execute_transform(

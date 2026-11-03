@@ -12,6 +12,7 @@ use std::sync::Arc;
 
 use datafusion::arrow::array::RecordBatch;
 use datafusion::prelude::SessionContext;
+use file_utils::OwnedDir;
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_accounts::{AccountQuotaStorageChecker, AccountService};
 use kamu_core::ingest::*;
@@ -91,7 +92,7 @@ impl PushIngestExecutorImpl {
 
         listener.begin();
 
-        let operation_dir = plan.args.operation_dir.clone();
+        let operation_dir = OwnedDir::new(plan.args.operation_dir.clone(), "ingest directory");
 
         match self
             .do_ingest_inner(
@@ -106,19 +107,12 @@ impl PushIngestExecutorImpl {
         {
             Ok(res) => {
                 tracing::info!(result = ?res, "Ingest iteration successful");
-
-                // A failed attempt keeps its directory: errors point at the logs in it
-                if let Err(err) = std::fs::remove_dir_all(&operation_dir) {
-                    tracing::warn!(
-                        error = %err,
-                        ?operation_dir,
-                        "Failed to remove the ingest directory"
-                    );
-                }
-
                 Ok(res)
             }
             Err(err) => {
+                // A failed attempt keeps its directory: errors point at the logs in it
+                operation_dir.keep();
+
                 tracing::error!(error = ?err, error_msg = %err, "Ingest iteration failed");
                 Err(err)
             }
