@@ -11,10 +11,14 @@ use std::future::IntoFuture;
 use std::net::SocketAddr;
 use std::sync::{Arc, Mutex};
 
-use axum::extract::ws::{CloseFrame, Message, WebSocket, WebSocketUpgrade};
+use axum::extract::ws::{WebSocket, WebSocketUpgrade};
 use axum::routing::{get, put};
-use kamu_adapter_http::smart_protocol::PUSH_NOT_COMPLETED_CLOSE_CODE;
-use kamu_adapter_http::smart_protocol::axum_server_protocol_common::axum_read_payload;
+use kamu_adapter_http::smart_protocol::ErrorReplyClose;
+use kamu_adapter_http::smart_protocol::axum_server_protocol_common::{
+    axum_read_payload,
+    axum_write_error_close,
+    axum_write_payload,
+};
 use kamu_adapter_http::smart_protocol::messages::*;
 use serde::Serialize;
 use serde::de::DeserializeOwned;
@@ -248,26 +252,12 @@ impl ScriptedPushSession {
     }
 
     async fn send<T: Serialize>(socket: &mut WebSocket, payload: T) {
-        socket
-            .send(Message::Text(
-                serde_json::to_string(&payload).unwrap().into(),
-            ))
-            .await
-            .unwrap();
+        axum_write_payload(socket, payload).await.unwrap();
     }
 
-    /// Fails the completion as a real server does: in the reason of a close
-    /// with the code a client that predates typed completion replies reads
-    /// as a disconnect
+    /// Fails the completion as a real server does
     async fn close_with_completion_error(socket: &mut WebSocket, error: DatasetPushCompleteError) {
-        let reason = serde_json::to_string(&DatasetPushCompleteResponse::Err(error)).unwrap();
-        socket
-            .send(Message::Close(Some(CloseFrame {
-                code: PUSH_NOT_COMPLETED_CLOSE_CODE,
-                reason: reason.into(),
-            })))
-            .await
-            .unwrap();
+        axum_write_error_close(socket, ErrorReplyClose::push_not_completed(error)).await;
     }
 }
 

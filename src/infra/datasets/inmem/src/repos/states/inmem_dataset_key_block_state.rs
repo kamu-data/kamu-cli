@@ -13,14 +13,14 @@ use database_common::{
     in_memory_transaction_participant,
 };
 use dill::*;
-use kamu_datasets::DatasetBlock;
+
+use super::DatasetBlocksMap;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// The key blocks every `InMemoryDatasetKeyBlockRepository` reads and writes
 pub struct InMemoryDatasetKeyBlockState {
-    pub(crate) key_blocks:
-        InMemoryTransactionalMap<(odf::DatasetID, odf::BlockRef), Vec<DatasetBlock>>,
+    pub(crate) key_blocks: DatasetBlocksMap,
 }
 
 #[component(pub)]

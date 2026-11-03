@@ -7,7 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::collections::HashSet;
 use std::sync::Arc;
 
 use cheap_clone::CheapClone;
@@ -16,7 +15,7 @@ use dill::*;
 use internal_error::InternalError;
 use kamu_datasets::*;
 
-use super::InMemoryDatasetKeyBlockState;
+use super::{DatasetBlocksMapExt, InMemoryDatasetKeyBlockState};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -59,11 +58,7 @@ impl DatasetKeyBlockRepository for InMemoryDatasetKeyBlockRepository {
         Ok(self
             .state
             .key_blocks
-            .read(self.transaction_id, |key_blocks| {
-                key_blocks
-                    .get(&(dataset_id.clone(), block_ref.cheap_clone()))
-                    .is_some_and(|blocks| !blocks.is_empty())
-            }))
+            .has_blocks_for_ref(self.transaction_id, dataset_id, block_ref))
     }
 
     async fn save_key_blocks_batch(
@@ -72,31 +67,10 @@ impl DatasetKeyBlockRepository for InMemoryDatasetKeyBlockRepository {
         block_ref: &odf::BlockRef,
         blocks: &[DatasetBlock],
     ) -> Result<(), DatasetKeyBlockSaveError> {
-        if blocks.is_empty() {
-            return Ok(());
-        }
-
-        let key = (dataset_id.clone(), block_ref.cheap_clone());
         self.state
             .key_blocks
-            .write(self.transaction_id, |key_blocks| {
-                let mut saved = key_blocks.view().get(&key).cloned().unwrap_or_default();
-
-                let existing: HashSet<_> = saved.iter().map(|b| b.sequence_number).collect();
-                if let Some(dup) = blocks
-                    .iter()
-                    .find(|b| existing.contains(&b.sequence_number))
-                {
-                    return Err(DatasetKeyBlockSaveError::DuplicateSequenceNumber(vec![
-                        dup.sequence_number,
-                    ]));
-                }
-
-                saved.extend_from_slice(blocks);
-                saved.sort_by_key(|b| b.sequence_number);
-                key_blocks.put(key, saved);
-                Ok(())
-            })
+            .save_blocks_batch(self.transaction_id, dataset_id, block_ref, blocks)
+            .map_err(|dup| DatasetKeyBlockSaveError::DuplicateSequenceNumber(vec![dup]))
     }
 
     async fn get_all_key_blocks(
@@ -107,12 +81,7 @@ impl DatasetKeyBlockRepository for InMemoryDatasetKeyBlockRepository {
         Ok(self
             .state
             .key_blocks
-            .read(self.transaction_id, |key_blocks| {
-                key_blocks
-                    .get(&(dataset_id.clone(), block_ref.cheap_clone()))
-                    .cloned()
-                    .unwrap_or_default()
-            }))
+            .all_blocks_for_ref(self.transaction_id, dataset_id, block_ref))
     }
 
     async fn match_datasets_having_key_blocks(
@@ -146,9 +115,7 @@ impl DatasetKeyBlockRepository for InMemoryDatasetKeyBlockRepository {
     ) -> Result<(), InternalError> {
         self.state
             .key_blocks
-            .write(self.transaction_id, |key_blocks| {
-                key_blocks.delete((dataset_id.clone(), block_ref.cheap_clone()));
-            });
+            .delete_blocks_for_ref(self.transaction_id, dataset_id, block_ref);
         Ok(())
     }
 }
@@ -163,9 +130,7 @@ impl DatasetEntryRemovalListener for InMemoryDatasetKeyBlockRepository {
     ) -> Result<(), InternalError> {
         self.state
             .key_blocks
-            .write(self.transaction_id, |key_blocks| {
-                key_blocks.delete_where(|(id, _)| id == dataset_id);
-            });
+            .delete_dataset_blocks(self.transaction_id, dataset_id);
         Ok(())
     }
 }

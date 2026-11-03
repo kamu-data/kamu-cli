@@ -18,7 +18,7 @@ pub(crate) use axum_server_pull_protocol::*;
 pub(crate) use axum_server_push_protocol::*;
 
 pub(crate) mod error_close;
-pub use error_close::PUSH_NOT_COMPLETED_CLOSE_CODE;
+pub use error_close::ErrorReplyClose;
 mod errors;
 pub mod messages;
 pub(crate) mod phases;

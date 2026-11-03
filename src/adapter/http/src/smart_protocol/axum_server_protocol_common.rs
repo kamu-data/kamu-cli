@@ -45,7 +45,7 @@ pub async fn axum_read_payload<TMessagePayload: DeserializeOwned>(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub(crate) async fn axum_write_payload<TMessagePayload: Serialize>(
+pub async fn axum_write_payload<TMessagePayload: Serialize>(
     socket: &mut WebSocket,
     payload: TMessagePayload,
 ) -> Result<(), WriteMessageError> {
@@ -62,7 +62,7 @@ pub(crate) async fn axum_write_payload<TMessagePayload: Serialize>(
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// Ends the session with an error reply in the close frame
-pub(crate) async fn axum_write_error_close(
+pub async fn axum_write_error_close(
     socket: &mut WebSocket,
     close: Result<ErrorReplyClose, WriteMessageError>,
 ) {

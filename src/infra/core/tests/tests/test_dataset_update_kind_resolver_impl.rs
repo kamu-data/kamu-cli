@@ -34,7 +34,7 @@ async fn test_root_with_pull_alias_is_synced() {
     let harness = UpdateKindHarness::new();
     let root = harness.create_root("root").await;
     harness
-        .add_alias(&root, "kamu.dev/root", RemoteAliasKind::Pull)
+        .add_remote_alias(&root, "kamu.dev/root", RemoteAliasKind::Pull)
         .await;
 
     assert_eq!(
@@ -67,7 +67,7 @@ async fn test_derivative_with_pull_alias_is_synced() {
     harness.create_root("root").await;
     let derivative = harness.create_derivative("derivative", "root").await;
     harness
-        .add_alias(&derivative, "kamu.dev/derivative", RemoteAliasKind::Pull)
+        .add_remote_alias(&derivative, "kamu.dev/derivative", RemoteAliasKind::Pull)
         .await;
 
     assert_eq!(
@@ -85,10 +85,10 @@ async fn test_several_pull_aliases_are_ambiguous() {
     let harness = UpdateKindHarness::new();
     let root = harness.create_root("root").await;
     harness
-        .add_alias(&root, "kamu.dev/root", RemoteAliasKind::Pull)
+        .add_remote_alias(&root, "kamu.dev/root", RemoteAliasKind::Pull)
         .await;
     harness
-        .add_alias(&root, "other.dev/root", RemoteAliasKind::Pull)
+        .add_remote_alias(&root, "other.dev/root", RemoteAliasKind::Pull)
         .await;
 
     assert_matches!(
@@ -105,10 +105,10 @@ async fn test_push_aliases_are_ignored() {
     let root = harness.create_root("root").await;
     let derivative = harness.create_derivative("derivative", "root").await;
     harness
-        .add_alias(&root, "kamu.dev/root", RemoteAliasKind::Push)
+        .add_remote_alias(&root, "kamu.dev/root", RemoteAliasKind::Push)
         .await;
     harness
-        .add_alias(&derivative, "kamu.dev/derivative", RemoteAliasKind::Push)
+        .add_remote_alias(&derivative, "kamu.dev/derivative", RemoteAliasKind::Push)
         .await;
 
     assert_eq!(
@@ -132,7 +132,6 @@ fn remote_ref(remote_ref: &str) -> odf::DatasetRefRemote {
 #[oop::extend(BaseRepoHarness, base_repo_harness)]
 struct UpdateKindHarness {
     base_repo_harness: BaseRepoHarness,
-    remote_aliases_registry: Arc<dyn RemoteAliasesRegistry>,
     update_kind_resolver: Arc<dyn DatasetUpdateKindResolver>,
 }
 
@@ -155,7 +154,6 @@ impl UpdateKindHarness {
 
         Self {
             base_repo_harness,
-            remote_aliases_registry: catalog.get_one().unwrap(),
             update_kind_resolver: catalog.get_one().unwrap(),
         }
     }
@@ -179,16 +177,6 @@ impl UpdateKindHarness {
             )
             .await
             .dataset_handle
-    }
-
-    async fn add_alias(&self, target: &odf::DatasetHandle, alias: &str, kind: RemoteAliasKind) {
-        self.remote_aliases_registry
-            .get_remote_aliases(target)
-            .await
-            .unwrap()
-            .add(&remote_ref(alias), kind)
-            .await
-            .unwrap();
     }
 
     async fn resolve(

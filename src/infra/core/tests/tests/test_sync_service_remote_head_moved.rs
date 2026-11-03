@@ -12,19 +12,15 @@ use std::sync::{Arc, Mutex};
 
 use kamu::domain::*;
 use kamu::testing::*;
-use kamu::utils::ipfs_wrapper::IpfsClient;
-use kamu::utils::simple_transfer_protocol::SimpleTransferProtocol;
 use kamu::*;
-use kamu_accounts::{CurrentAccountSubject, CurrentAccountSubjectCatalogExt as _};
 use kamu_datasets::*;
-use kamu_datasets_services::utils::CreateDatasetUseCaseHelper;
-use kamu_datasets_services::*;
-use messaging_outbox::*;
 use odf::dataset::testing::create_test_dataset_from_snapshot;
 use odf::metadata::testing::MetadataFactory;
 use test_utils::LocalS3Server;
-use time_source::{SystemTimeSource, SystemTimeSourceDefault};
+use time_source::SystemTimeSource;
 use url::Url;
+
+use crate::utils::SyncWorkspaceCatalog;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -64,59 +60,11 @@ struct RemotePushHarness {
 impl RemotePushHarness {
     fn new() -> Self {
         let tmp_workspace_dir = tempfile::tempdir().unwrap();
-        let datasets_dir = tmp_workspace_dir.path().join("datasets");
-        std::fs::create_dir(&datasets_dir).unwrap();
-
-        let mut b = dill::CatalogBuilder::new();
-        kamu_datasets_inmem::register_dependencies(&mut b);
-        b.add::<DidGeneratorDefault>()
-            .add::<SystemTimeSourceDefault>()
-            .add_value(odf::dataset::IpfsGateway::default())
-            .add_value(IpfsClient::default())
-            .add_current_account_subject(CurrentAccountSubject::new_test())
-            .add_value(TenancyConfig::SingleTenant)
-            .add_builder(odf::dataset::DatasetStorageUnitLocalFs::builder(
-                datasets_dir,
-            ))
-            .add::<odf::dataset::DatasetLfsBuilderDefault>()
-            .add::<DatasetRegistrySoloUnitBridge>()
-            .add_value(RemoteReposDir::new_with_creation(
-                tmp_workspace_dir.path().join("repos"),
-            ))
-            .add::<RemoteRepositoryRegistryImpl>()
-            .add::<odf::dataset::DummyOdfServerAccessTokenResolver>()
-            .add::<odf::dataset::DatasetFactoryImpl>()
-            .add::<SyncServiceImpl>()
-            .add::<IpfsServiceImpl>()
-            .add::<RemoteAliasesRegistryImpl>()
-            .add::<RemoteAliasResolverImpl>()
-            .add::<RemoteDatasetUrlResolverImpl>()
-            .add::<SyncRequestBuilder>()
-            .add::<DummySmartTransferProtocolClient>()
-            .add::<SimpleTransferProtocol>()
-            .add::<CreateDatasetUseCaseImpl>()
-            .add::<CreateDatasetUseCaseHelper>()
-            .add_builder(OutboxImmediateImpl::builder(ConsumerFilter::AllConsumers))
-            .bind::<dyn Outbox, OutboxImmediateImpl>()
-            .add_value(MockDatasetEntryWriter::new())
-            .bind::<dyn DatasetEntryWriter, MockDatasetEntryWriter>()
-            .add::<DatasetReferenceServiceImpl>()
-            .add::<AppendDatasetMetadataBatchUseCaseImpl>()
-            .add::<DatasetHeadCommitterImpl>();
-
-        register_message_dispatcher::<DatasetLifecycleMessage>(
-            &mut b,
-            MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
-        );
-        register_message_dispatcher::<DatasetReferenceMessage>(
-            &mut b,
-            MESSAGE_PRODUCER_KAMU_DATASET_REFERENCE_SERVICE,
-        );
-        database_common::NoOpDatabasePlugin::init_database_components(&mut b);
+        let catalog = SyncWorkspaceCatalog::new(tmp_workspace_dir.path()).build();
 
         Self {
             _tmp_workspace_dir: tmp_workspace_dir,
-            catalog: b.build(),
+            catalog,
             dataset_alias: odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo")),
         }
     }

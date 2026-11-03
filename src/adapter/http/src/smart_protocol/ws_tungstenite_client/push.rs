@@ -11,7 +11,7 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicI32, Ordering};
 
 use futures::stream::{StreamExt, TryStreamExt};
-use internal_error::{InternalError, ResultIntoInternal};
+use internal_error::{ErrorIntoInternal, ResultIntoInternal};
 use kamu::utils::smart_transfer_protocol::TransferOptions;
 use kamu::utils::sync_increment::sync_increment;
 use kamu_core::*;
@@ -77,11 +77,9 @@ impl WsSmartTransferProtocolClient {
                 tracing::debug!("Push response accepted");
                 Ok(success)
             }
-            Err(DatasetPushRequestError::Internal(e)) => {
-                Err(PushClientError::Internal(InternalError::new(Box::new(
-                    ClientInternalError::new(e.error_message.as_str(), e.phase),
-                ))))
-            }
+            Err(DatasetPushRequestError::Internal(e)) => Err(PushClientError::Internal(
+                ClientInternalError::from(e).int_err(),
+            )),
             Err(DatasetPushRequestError::InvalidHead(e)) => {
                 Err(PushClientError::InvalidHead(e.into()))
             }
@@ -170,8 +168,7 @@ impl WsSmartTransferProtocolClient {
             false,
         )
         .await
-        .inspect_err(|e| tracing::debug!("Push process aborted with error: {e}"))
-        .int_err()?;
+        .inspect_err(|e| tracing::debug!("Push process aborted with error: {e}"))?;
 
         tracing::Span::current().record("num_objects", missing_objects.len());
 
@@ -224,9 +221,7 @@ impl WsSmartTransferProtocolClient {
                         })
                     }
                     DatasetPushObjectsTransferError::Internal(err) => {
-                        PushClientError::Internal(InternalError::new(Box::new(
-                            ClientInternalError::new(err.error_message.as_str(), err.phase),
-                        )))
+                        PushClientError::Internal(ClientInternalError::from(err).int_err())
                     }
                 })?;
 
@@ -399,9 +394,9 @@ impl WsSmartTransferProtocolClient {
                 DatasetPushCompleteReply::Response(Ok(DatasetPushCompleteConfirmed {}))
                 | DatasetPushCompleteReply::Legacy(DatasetPushCompleteLegacyConfirmed {}) => Ok(()),
                 DatasetPushCompleteReply::Response(Err(DatasetPushCompleteError::Internal(e))) => {
-                    Err(PushClientError::Internal(InternalError::new(Box::new(
-                        ClientInternalError::new(e.error_message.as_str(), e.phase),
-                    ))))
+                    Err(PushClientError::Internal(
+                        ClientInternalError::from(e).int_err(),
+                    ))
                 }
                 DatasetPushCompleteReply::Response(Err(
                     DatasetPushCompleteError::UpdatedConcurrently(
@@ -448,21 +443,11 @@ impl WsSmartTransferProtocolClient {
         {
             Ok(transfer_plan) => transfer_plan,
             Err(PrepareDatasetTransferEstimateError::InvalidInterval(e)) => {
-                // The destination head is missing from the source chain. Unless the
-                // datasets differ entirely, this means the chains diverged.
-                return Err(
-                    match self
-                        .find_push_dataset_id_mismatch(src.as_ref(), http_dst_url)
-                        .await
-                    {
-                        Some(mismatch) => mismatch.into(),
-                        None => SyncError::DatasetsDiverged(DatasetsDivergedError {
-                            src_head: e.head,
-                            dst_head: e.tail,
-                            detail: None,
-                        }),
-                    },
-                );
+                // The destination head is missing from the source chain
+                let maybe_mismatch = self
+                    .find_push_dataset_id_mismatch(src.as_ref(), http_dst_url)
+                    .await;
+                return Err(Self::diverged_or_id_mismatch(e, maybe_mismatch));
             }
             Err(PrepareDatasetTransferEstimateError::Internal(e)) => {
                 return Err(SyncError::Internal(e));

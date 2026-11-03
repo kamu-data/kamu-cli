@@ -62,6 +62,22 @@ impl WsSmartTransferProtocolClient {
             dst_dataset_id,
         })
     }
+
+    /// One side's head is missing from the other's chain: the chains diverged,
+    /// unless the IDs show these are different datasets
+    pub(super) fn diverged_or_id_mismatch(
+        e: odf::dataset::InvalidIntervalError,
+        maybe_mismatch: Option<DatasetIdMismatchError>,
+    ) -> SyncError {
+        match maybe_mismatch {
+            Some(mismatch) => mismatch.into(),
+            None => SyncError::DatasetsDiverged(DatasetsDivergedError {
+                src_head: e.head,
+                dst_head: e.tail,
+                detail: None,
+            }),
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

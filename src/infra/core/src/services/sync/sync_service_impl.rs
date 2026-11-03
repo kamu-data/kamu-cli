@@ -59,6 +59,14 @@ impl SyncServiceImpl {
         }
     }
 
+    fn smart_transfer_options(opts: SyncOptions) -> SmartTransferOptions {
+        SmartTransferOptions {
+            force_update_if_diverged: opts.force,
+            visibility_for_created_dataset: opts.dataset_visibility,
+            ..Default::default()
+        }
+    }
+
     #[tracing::instrument(level = "debug", name = SyncServiceImpl_push_generic, skip_all, fields(?src, ?dst, ?opts))]
     async fn push_generic(
         &self,
@@ -128,15 +136,7 @@ impl SyncServiceImpl {
         tracing::info!("Starting transfer using Smart Transfer Protocol (Pull flow)");
 
         self.smart_transfer_protocol
-            .pull_protocol_client_flow(
-                &http_src_url,
-                dst,
-                SmartTransferOptions {
-                    force_update_if_diverged: opts.force,
-                    visibility_for_created_dataset: opts.dataset_visibility,
-                    ..Default::default()
-                },
-            )
+            .pull_protocol_client_flow(&http_src_url, dst, Self::smart_transfer_options(opts))
             .await
     }
 
@@ -162,11 +162,7 @@ impl SyncServiceImpl {
                 (*src).clone(),
                 &http_dst_url,
                 maybe_dst_head.as_ref(),
-                SmartTransferOptions {
-                    force_update_if_diverged: opts.force,
-                    visibility_for_created_dataset: opts.dataset_visibility,
-                    ..Default::default()
-                },
+                Self::smart_transfer_options(opts),
             )
             .await
     }

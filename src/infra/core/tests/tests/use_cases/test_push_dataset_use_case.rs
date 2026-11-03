@@ -30,6 +30,8 @@ use odf::dataset::{DatasetFactoryImpl, IpfsGateway};
 use tempfile::TempDir;
 use url::Url;
 
+use crate::utils::RecordingListener;
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[tokio::test]
@@ -439,7 +441,7 @@ impl PushUseCaseHarness {
         &self,
         created: &CreateDatasetResult,
     ) -> (Vec<PushResponse>, Vec<&'static str>) {
-        let listener = Arc::new(RecordingSyncListener::default());
+        let listener = Arc::new(RecordingListener::default());
         let responses = self
             .use_case
             .execute_multi(
@@ -467,22 +469,7 @@ impl PushUseCaseHarness {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Default)]
-struct RecordingSyncListener {
-    events: std::sync::Mutex<Vec<&'static str>>,
-}
-
-impl RecordingSyncListener {
-    fn events(&self) -> Vec<&'static str> {
-        self.events.lock().unwrap().clone()
-    }
-
-    fn record(&self, event: &'static str) {
-        self.events.lock().unwrap().push(event);
-    }
-}
-
-struct RecordingSyncMultiListener(Arc<RecordingSyncListener>);
+struct RecordingSyncMultiListener(Arc<RecordingListener>);
 
 impl SyncMultiListener for RecordingSyncMultiListener {
     fn begin_sync(
@@ -491,20 +478,6 @@ impl SyncMultiListener for RecordingSyncMultiListener {
         _dst: &odf::DatasetRefAny,
     ) -> Option<Arc<dyn SyncListener>> {
         Some(self.0.clone())
-    }
-}
-
-impl SyncListener for RecordingSyncListener {
-    fn begin(&self) {
-        self.record("begin");
-    }
-
-    fn success(&self, _result: &SyncResult) {
-        self.record("success");
-    }
-
-    fn error(&self, _error: &SyncError) {
-        self.record("error");
     }
 }
 

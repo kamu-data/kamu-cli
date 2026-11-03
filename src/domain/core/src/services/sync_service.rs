@@ -9,7 +9,7 @@
 
 use std::sync::Arc;
 
-use internal_error::{BoxedError, InternalError};
+use internal_error::{BoxedError, ErrorIntoInternal, InternalError};
 use kamu_datasets::{CreateDatasetError, NameCollisionError, ResolvedDataset};
 use thiserror::Error;
 use url::Url;
@@ -394,6 +394,17 @@ impl SyncError {
             | Self::Access(_) => false,
 
             Self::HeadMoved(_) | Self::Internal(_) => true,
+        }
+    }
+}
+
+impl From<odf::dataset::SetChainRefError> for SyncError {
+    fn from(v: odf::dataset::SetChainRefError) -> Self {
+        match v {
+            odf::dataset::SetChainRefError::CASFailed(e) => Self::HeadMoved(e.into()),
+            odf::dataset::SetChainRefError::Access(e) => Self::Access(e),
+            odf::dataset::SetChainRefError::Internal(e) => Self::Internal(e),
+            odf::dataset::SetChainRefError::BlockNotFound(_) => Self::Internal(v.int_err()),
         }
     }
 }

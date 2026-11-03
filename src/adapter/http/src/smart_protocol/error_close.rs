@@ -23,13 +23,13 @@ pub(crate) const ERROR_REPLY_CLOSE_CODE: u16 = 1011;
 /// `DatasetPushCompleteResponse` reads the reason of an
 /// [`ERROR_REPLY_CLOSE_CODE`] close as its confirmation, but this code as a
 /// disconnect, so it reports the push as failed
-pub const PUSH_NOT_COMPLETED_CLOSE_CODE: u16 = 1013;
+pub(crate) const PUSH_NOT_COMPLETED_CLOSE_CODE: u16 = 1013;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// A close frame that carries an error reply as its reason
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct ErrorReplyClose {
+pub struct ErrorReplyClose {
     pub code: u16,
     pub reason: String,
 }

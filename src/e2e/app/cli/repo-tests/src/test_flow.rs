@@ -14,6 +14,7 @@ use chrono::{Duration, TimeZone, Utc};
 use kamu_cli_e2e_common::{
     CreateDatasetResponse,
     DATASET_DERIVATIVE_CITY_POPULATION_SNAPSHOT,
+    DATASET_DERIVATIVE_LEADERBOARD_QUERY,
     DATASET_DERIVATIVE_LEADERBOARD_SNAPSHOT_STR,
     DATASET_ROOT_CITY_POPULATION_SNAPSHOT,
     DATASET_ROOT_PLAYER_NAME,
@@ -1651,7 +1652,10 @@ pub async fn test_trigger_flow_execute_transform_after_inputs_changed_fails(
         .dataset()
         .commit_event(
             &derivative_dataset_id,
-            &leaderboard_set_transform_event(&other_dataset_id, LEADERBOARD_QUERY),
+            &leaderboard_set_transform_event(
+                &other_dataset_id,
+                DATASET_DERIVATIVE_LEADERBOARD_QUERY,
+            ),
         )
         .await;
 
@@ -1739,12 +1743,6 @@ pub async fn test_trigger_flow_execute_transform_with_unknown_engine_fails(
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// The leaderboard's own query, on one line
-const LEADERBOARD_QUERY: &str = "SELECT ROW_NUMBER() OVER (PARTITION BY 1 ORDER BY score DESC) AS \
-                                 place, match_time, match_id, player_id, score FROM player_scores \
-                                 LIMIT 2";
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 /// Triggers a transform flow and waits for it to finish
 async fn run_transform_flow(
     kamu_api_server_client: &KamuApiServerClient,

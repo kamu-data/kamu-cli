@@ -23,7 +23,7 @@ async fn test_dataset_without_pull_alias_has_no_source() {
     let harness = PullSourceHarness::new();
     let foo = harness.create_root("foo").await;
     harness
-        .add_alias(&foo, "repo/foo", RemoteAliasKind::Push)
+        .add_remote_alias(&foo, "repo/foo", RemoteAliasKind::Push)
         .await;
 
     assert_eq!(harness.find_pull_alias(&foo).await.unwrap(), None);
@@ -37,7 +37,7 @@ async fn test_url_pull_alias_is_the_source() {
     let harness = PullSourceHarness::new();
     let foo = harness.create_root("foo").await;
     harness
-        .add_alias(&foo, "https://example.com/foo", RemoteAliasKind::Pull)
+        .add_remote_alias(&foo, "https://example.com/foo", RemoteAliasKind::Pull)
         .await;
 
     assert_eq!(
@@ -61,7 +61,7 @@ async fn test_repository_pull_alias_resolves_to_the_repository_url() {
     harness.add_repository("repo", "https://example.com/repo/");
     let foo = harness.create_root("foo").await;
     harness
-        .add_alias(&foo, "repo/bar", RemoteAliasKind::Pull)
+        .add_remote_alias(&foo, "repo/bar", RemoteAliasKind::Pull)
         .await;
 
     assert_eq!(
@@ -80,7 +80,7 @@ async fn test_pull_alias_in_unknown_repository_is_reported() {
     let harness = PullSourceHarness::new();
     let foo = harness.create_root("foo").await;
     harness
-        .add_alias(&foo, "missing/foo", RemoteAliasKind::Pull)
+        .add_remote_alias(&foo, "missing/foo", RemoteAliasKind::Pull)
         .await;
 
     assert_matches!(
@@ -96,10 +96,10 @@ async fn test_several_pull_aliases_are_ambiguous() {
     let harness = PullSourceHarness::new();
     let foo = harness.create_root("foo").await;
     harness
-        .add_alias(&foo, "https://example.com/a", RemoteAliasKind::Pull)
+        .add_remote_alias(&foo, "https://example.com/a", RemoteAliasKind::Pull)
         .await;
     harness
-        .add_alias(&foo, "https://example.com/b", RemoteAliasKind::Pull)
+        .add_remote_alias(&foo, "https://example.com/b", RemoteAliasKind::Pull)
         .await;
 
     assert_matches!(
@@ -120,18 +120,18 @@ async fn test_any_pull_alias_is_a_pull_source() {
     let unaliased = harness.create_root("unaliased").await;
     let pushed = harness.create_root("pushed").await;
     harness
-        .add_alias(&pushed, "https://example.com/pushed", RemoteAliasKind::Push)
+        .add_remote_alias(&pushed, "https://example.com/pushed", RemoteAliasKind::Push)
         .await;
     let pulled = harness.create_root("pulled").await;
     harness
-        .add_alias(&pulled, "https://example.com/pulled", RemoteAliasKind::Pull)
+        .add_remote_alias(&pulled, "https://example.com/pulled", RemoteAliasKind::Pull)
         .await;
     let ambiguous = harness.create_root("ambiguous").await;
     harness
-        .add_alias(&ambiguous, "https://example.com/a", RemoteAliasKind::Pull)
+        .add_remote_alias(&ambiguous, "https://example.com/a", RemoteAliasKind::Pull)
         .await;
     harness
-        .add_alias(&ambiguous, "https://example.com/b", RemoteAliasKind::Pull)
+        .add_remote_alias(&ambiguous, "https://example.com/b", RemoteAliasKind::Pull)
         .await;
 
     assert!(!harness.has_pull_source(&unaliased).await);
@@ -149,10 +149,10 @@ async fn test_dataset_is_found_by_its_pull_alias() {
     let bar = harness.create_root("bar").await;
     let baz = harness.create_root("baz").await;
     harness
-        .add_alias(&bar, "repo/bar", RemoteAliasKind::Pull)
+        .add_remote_alias(&bar, "repo/bar", RemoteAliasKind::Pull)
         .await;
     harness
-        .add_alias(&baz, "repo/other", RemoteAliasKind::Pull)
+        .add_remote_alias(&baz, "repo/other", RemoteAliasKind::Pull)
         .await;
 
     assert_eq!(
@@ -172,7 +172,7 @@ async fn test_no_dataset_is_found_by_unknown_or_push_alias() {
     let harness = PullSourceHarness::new();
     let foo = harness.create_root("foo").await;
     harness
-        .add_alias(&foo, "repo/foo", RemoteAliasKind::Push)
+        .add_remote_alias(&foo, "repo/foo", RemoteAliasKind::Push)
         .await;
 
     assert_eq!(harness.find_dataset_by_pull_alias("repo/foo").await, None);
@@ -186,7 +186,7 @@ async fn test_dataset_of_another_account_is_not_found_by_its_pull_alias() {
     let harness = PullSourceHarness::multi_tenant("bob");
     let alice_foo = harness.create_root_owned_by("alice", "foo").await;
     harness
-        .add_alias(
+        .add_remote_alias(
             &alice_foo,
             "odf+https://example.com/foo",
             RemoteAliasKind::Pull,
@@ -194,7 +194,7 @@ async fn test_dataset_of_another_account_is_not_found_by_its_pull_alias() {
         .await;
     let bob_bar = harness.create_root_owned_by("bob", "bar").await;
     harness
-        .add_alias(
+        .add_remote_alias(
             &bob_bar,
             "odf+https://example.com/bar",
             RemoteAliasKind::Pull,
@@ -239,7 +239,6 @@ fn test_pull_source_endpoint_carries_the_url_without_credentials() {
 struct PullSourceHarness {
     base_repo_harness: BaseRepoHarness,
     remote_repo_registry: Arc<dyn RemoteRepositoryRegistry>,
-    remote_aliases_registry: Arc<dyn RemoteAliasesRegistry>,
     pull_source_resolver: Arc<dyn DatasetPullSourceResolver>,
 }
 
@@ -282,7 +281,6 @@ impl PullSourceHarness {
         Self {
             base_repo_harness,
             remote_repo_registry: catalog.get_one().unwrap(),
-            remote_aliases_registry: catalog.get_one().unwrap(),
             pull_source_resolver: catalog.get_one().unwrap(),
         }
     }
@@ -313,16 +311,6 @@ impl PullSourceHarness {
                 &odf::RepoName::new_unchecked(name),
                 Url::parse(url).unwrap(),
             )
-            .unwrap();
-    }
-
-    async fn add_alias(&self, target: &odf::DatasetHandle, alias: &str, kind: RemoteAliasKind) {
-        self.remote_aliases_registry
-            .get_remote_aliases(target)
-            .await
-            .unwrap()
-            .add(&Self::remote_ref(alias), kind)
-            .await
             .unwrap();
     }
 

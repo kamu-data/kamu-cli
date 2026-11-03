@@ -25,7 +25,6 @@ use kamu::{
 use kamu_core::{
     MetadataQueryService,
     RemoteAliasKind,
-    RemoteAliasesRegistry,
     SetWatermarkError,
     SetWatermarkExecutionError,
     SetWatermarkExecutor,
@@ -35,7 +34,7 @@ use kamu_core::{
     SetWatermarkResult,
     TenancyConfig,
 };
-use kamu_datasets::{CreateDatasetResult, ResolvedDataset};
+use kamu_datasets::ResolvedDataset;
 use kamu_datasets_services::DatasetHeadCommitterImpl;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -218,7 +217,11 @@ async fn test_set_watermark_rejects_on_dataset_pulled_from_remote() {
         ))
         .await;
     harness
-        .add_pull_alias(&foo, "odf+http://example.com/foo")
+        .add_remote_alias(
+            &foo.dataset_handle,
+            "odf+http://example.com/foo",
+            RemoteAliasKind::Pull,
+        )
         .await;
 
     assert_matches!(
@@ -294,7 +297,6 @@ struct WatermarkTestHarness {
     set_watermark_planner: Arc<dyn SetWatermarkPlanner>,
     set_watermark_executor: Arc<dyn SetWatermarkExecutor>,
     metadata_query_svc: Arc<dyn MetadataQueryService>,
-    remote_aliases_registry: Arc<dyn RemoteAliasesRegistry>,
 }
 
 impl WatermarkTestHarness {
@@ -323,18 +325,7 @@ impl WatermarkTestHarness {
             set_watermark_planner: catalog.get_one().unwrap(),
             set_watermark_executor: catalog.get_one().unwrap(),
             metadata_query_svc: catalog.get_one().unwrap(),
-            remote_aliases_registry: catalog.get_one().unwrap(),
         }
-    }
-
-    async fn add_pull_alias(&self, created: &CreateDatasetResult, remote_ref: &str) {
-        self.remote_aliases_registry
-            .get_remote_aliases(&created.dataset_handle)
-            .await
-            .unwrap()
-            .add(&remote_ref.parse().unwrap(), RemoteAliasKind::Pull)
-            .await
-            .unwrap();
     }
 
     async fn plan_set_watermark(

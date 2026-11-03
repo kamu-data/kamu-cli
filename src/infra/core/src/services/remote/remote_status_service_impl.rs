@@ -112,8 +112,7 @@ impl RemoteStatusService for RemoteStatusServiceImpl {
         let aliases = self
             .remote_alias_reg
             .get_remote_aliases(dataset_handle)
-            .await
-            .int_err()?;
+            .await?;
         let push_aliases: Vec<&odf::DatasetRefRemote> =
             aliases.get_by_kind(RemoteAliasKind::Push).collect();
 

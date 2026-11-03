@@ -135,8 +135,7 @@ impl PushDatasetUseCaseImpl {
     ) -> Result<bool, InternalError> {
         remote_alias_registry
             .get_remote_aliases(local_handle)
-            .await
-            .unwrap()
+            .await?
             .add(remote_ref, RemoteAliasKind::Push)
             .await
     }

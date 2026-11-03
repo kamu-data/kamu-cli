@@ -10,12 +10,11 @@
 use kamu::testing::{BaseUseCaseHarness, BaseUseCaseHarnessOptions};
 use kamu::{CompactionPlannerImpl, ResetPlannerImpl};
 use kamu_adapter_task_dataset::{
-    HardCompactDatasetTaskPlanner,
+    CompactionDatasetTaskPlanner,
     LogicalPlanDatasetHardCompact,
     LogicalPlanDatasetReset,
     LogicalPlanDatasetResetToMetadata,
     ResetDatasetTaskPlanner,
-    ResetToMetadataDatasetTaskPlanner,
     TaskDefinitionDatasetHardCompact,
 };
 use kamu_datasets::CreateDatasetResult;
@@ -136,9 +135,8 @@ impl CompactionAndResetTaskPlannersHarness {
         let base_use_case_harness = BaseUseCaseHarness::new(BaseUseCaseHarnessOptions::new());
 
         let mut b = dill::CatalogBuilder::new_chained(base_use_case_harness.catalog());
-        b.add::<HardCompactDatasetTaskPlanner>()
+        b.add::<CompactionDatasetTaskPlanner>()
             .add::<ResetDatasetTaskPlanner>()
-            .add::<ResetToMetadataDatasetTaskPlanner>()
             .add::<CompactionPlannerImpl>()
             .add::<ResetPlannerImpl>();
 
@@ -148,15 +146,6 @@ impl CompactionAndResetTaskPlannersHarness {
             base_use_case_harness,
             catalog: b.build(),
         }
-    }
-
-    /// Deletes the dataset's storage, as if it was deleted after the task was
-    /// scheduled
-    async fn delete_dataset(&self, created: &CreateDatasetResult) {
-        self.dataset_storage_unit_writer()
-            .delete_dataset(&created.dataset_handle.id)
-            .await
-            .unwrap();
     }
 
     async fn plan_hard_compaction(
@@ -169,7 +158,7 @@ impl CompactionAndResetTaskPlannersHarness {
             max_slice_records: None,
         }
         .into_logical_plan();
-        self.prepare::<HardCompactDatasetTaskPlanner>(&logical_plan)
+        self.prepare::<CompactionDatasetTaskPlanner>(&logical_plan)
             .await
     }
 
@@ -197,7 +186,7 @@ impl CompactionAndResetTaskPlannersHarness {
             dataset_id: created.dataset_handle.id.clone(),
         }
         .into_logical_plan();
-        self.prepare::<ResetToMetadataDatasetTaskPlanner>(&logical_plan)
+        self.prepare::<CompactionDatasetTaskPlanner>(&logical_plan)
             .await
     }
 

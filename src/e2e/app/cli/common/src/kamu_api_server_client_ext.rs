@@ -122,6 +122,12 @@ pub static DATASET_DERIVATIVE_LEADERBOARD_SNAPSHOT: LazyLock<String> = LazyLock:
 pub static DATASET_DERIVATIVE_LEADERBOARD_NAME: LazyLock<odf::DatasetName> =
     LazyLock::new(|| odf::DatasetName::new_unchecked("leaderboard"));
 
+/// The query of `DATASET_DERIVATIVE_LEADERBOARD_SNAPSHOT_STR`, for a
+/// `SetTransform` that changes only the leaderboard's input
+pub const DATASET_DERIVATIVE_LEADERBOARD_QUERY: &str =
+    "SELECT ROW_NUMBER() OVER (PARTITION BY 1 ORDER BY score DESC) AS place, match_time, \
+     match_id, player_id, score FROM player_scores LIMIT 2";
+
 /// `SetTransform` event that replaces the leaderboard's transform with
 /// `query`, reading `input_id` as `player_scores`
 pub fn leaderboard_set_transform_event(input_id: &odf::DatasetID, query: &str) -> String {
@@ -1993,17 +1999,10 @@ impl FlowApi<'_> {
         dataset_id: &odf::DatasetID,
         condition: impl Fn(&FlowSummary) -> bool,
     ) -> FlowSummary {
-        let retry_strategy = FixedInterval::from_millis(500).take(60); // 30s
-
-        Retry::start(retry_strategy, || async {
-            self.list_flows(dataset_id)
-                .await
-                .into_iter()
-                .find(|flow| flow.status == "WAITING" && condition(flow))
-                .ok_or(())
+        self.wait_for_flow(dataset_id, |flow| {
+            flow.status == "WAITING" && condition(flow)
         })
         .await
-        .unwrap()
     }
 
     // Method to wait for a flow to finish

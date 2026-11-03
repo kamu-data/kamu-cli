@@ -1169,15 +1169,6 @@ impl UpdateDatasetTaskRunnerHarness {
         harness.run_transform_update(&bar).await
     }
 
-    /// Deletes the dataset's storage, as if it was deleted after the task was
-    /// scheduled
-    async fn delete_dataset(&self, created: &CreateDatasetResult) {
-        self.dataset_storage_unit_writer()
-            .delete_dataset(&created.dataset_handle.id)
-            .await
-            .unwrap();
-    }
-
     fn move_head_before_next_commit(&self, concurrent_head: odf::Multihash) {
         self.racing_committer
             .move_head_before_next_commit(&self.catalog, concurrent_head);

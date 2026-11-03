@@ -13,14 +13,22 @@ use std::sync::Arc;
 use bon::bon;
 use chrono::{DateTime, Utc};
 use kamu_accounts::{CurrentAccountSubject, CurrentAccountSubjectCatalogExt as _};
-use kamu_core::{DidGenerator, DidGeneratorDefault, MockDidGenerator, RunInfoDir, TenancyConfig};
+use kamu_core::{
+    DidGenerator,
+    DidGeneratorDefault,
+    MockDidGenerator,
+    RemoteAliasKind,
+    RemoteAliasesRegistry,
+    RunInfoDir,
+    TenancyConfig,
+};
 use kamu_datasets::{CreateDatasetResult, DatasetRegistry, DatasetRegistryExt, ResolvedDataset};
 use odf::dataset::DatasetStorageUnitLocalFs;
 use odf::dataset::testing::create_test_dataset_from_snapshot;
 use odf::metadata::testing::{DatasetSnapshotBuilder, MetadataFactory};
 use time_source::{SystemTimeSource, SystemTimeSourceDefault, SystemTimeSourceStub};
 
-use crate::DatasetRegistrySoloUnitBridge;
+use crate::{DatasetRegistrySoloUnitBridge, RemoteAliasesRegistryImpl};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -321,6 +329,37 @@ impl BaseRepoHarness {
                     check_ref_is: Some(Some(old_head)),
                 },
             )
+            .await
+            .unwrap();
+    }
+
+    /// Adds a remote alias to the dataset; `false` when it already has it
+    pub async fn add_remote_alias(
+        &self,
+        target: &odf::DatasetHandle,
+        remote_ref: &str,
+        kind: RemoteAliasKind,
+    ) -> bool {
+        let remote_aliases_registry = dill::CatalogBuilder::new_chained(&self.catalog)
+            .add::<RemoteAliasesRegistryImpl>()
+            .build()
+            .get_one::<dyn RemoteAliasesRegistry>()
+            .unwrap();
+
+        remote_aliases_registry
+            .get_remote_aliases(target)
+            .await
+            .unwrap()
+            .add(&odf::DatasetRefRemote::try_from(remote_ref).unwrap(), kind)
+            .await
+            .unwrap()
+    }
+
+    /// Deletes the dataset's storage, as if it was deleted after a task or
+    /// pull was planned
+    pub async fn delete_dataset(&self, created: &CreateDatasetResult) {
+        self.dataset_storage_unit_writer
+            .delete_dataset(&created.dataset_handle.id)
             .await
             .unwrap();
     }

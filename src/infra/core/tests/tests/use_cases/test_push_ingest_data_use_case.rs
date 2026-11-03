@@ -39,6 +39,8 @@ use kamu_datasets_services::{
 use messaging_outbox::{DummyOutboxImpl, register_message_dispatcher};
 use odf::metadata::testing::MetadataFactory;
 
+use crate::utils::RecordingListener;
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[tokio::test]
@@ -677,7 +679,7 @@ impl PushIngestDataUseCaseHarness {
         Result<PushIngestResult, PushIngestDataError>,
         Vec<&'static str>,
     ) {
-        let listener = Arc::new(RecordingPushIngestListener::default());
+        let listener = Arc::new(RecordingListener::default());
         let result = self
             .use_case
             .execute(
@@ -779,37 +781,6 @@ impl PushIngestDataUseCaseHarness {
         self.use_case
             .execute_multi(target, data_sources, options, None)
             .await
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Default)]
-struct RecordingPushIngestListener {
-    events: std::sync::Mutex<Vec<&'static str>>,
-}
-
-impl RecordingPushIngestListener {
-    fn events(&self) -> Vec<&'static str> {
-        self.events.lock().unwrap().clone()
-    }
-
-    fn record(&self, event: &'static str) {
-        self.events.lock().unwrap().push(event);
-    }
-}
-
-impl PushIngestListener for RecordingPushIngestListener {
-    fn begin(&self) {
-        self.record("begin");
-    }
-
-    fn success(&self, _result: &PushIngestResult) {
-        self.record("success");
-    }
-
-    fn error(&self, _error: &PushIngestDataError) {
-        self.record("error");
     }
 }
 

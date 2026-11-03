@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use futures::stream::{StreamExt, TryStreamExt};
-use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
+use internal_error::{ErrorIntoInternal, ResultIntoInternal};
 use kamu::utils::local_sync_writes::{
     TransferTarget,
     append_transferred_blocks,
@@ -89,11 +89,9 @@ impl WsSmartTransferProtocolClient {
                 );
                 Ok(success)
             }
-            Err(DatasetPullRequestError::Internal(e)) => {
-                Err(PullClientError::Internal(InternalError::new(Box::new(
-                    ClientInternalError::new(e.error_message.as_str(), e.phase),
-                ))))
-            }
+            Err(DatasetPullRequestError::Internal(e)) => Err(PullClientError::Internal(
+                ClientInternalError::from(e).int_err(),
+            )),
             Err(DatasetPullRequestError::SeedBlockOverwriteRestricted(_)) => Err(
                 PullClientError::OverwriteSeedBlock(OverwriteSeedBlockError {}),
             ),
@@ -298,24 +296,19 @@ impl WsSmartTransferProtocolClient {
                 Err(e) => {
                     let e = match e {
                         PullClientError::InvalidInterval(e) => {
-                            // The server could not find our head in its chain. Unless the
-                            // datasets differ entirely, this means the chains diverged.
-                            if let Some(dst_dataset) = dst_dataset
-                                && let Some(mismatch) = Self::find_pull_dataset_id_mismatch(
-                                    http_src_url,
-                                    maybe_access_token.as_deref(),
-                                    dst_dataset,
-                                )
-                                .await
-                            {
-                                mismatch.into()
-                            } else {
-                                SyncError::DatasetsDiverged(DatasetsDivergedError {
-                                    src_head: e.head,
-                                    dst_head: e.tail,
-                                    detail: None,
-                                })
-                            }
+                            // The server could not find our head in its chain
+                            let maybe_mismatch = match dst_dataset {
+                                Some(dst_dataset) => {
+                                    Self::find_pull_dataset_id_mismatch(
+                                        http_src_url,
+                                        maybe_access_token.as_deref(),
+                                        dst_dataset,
+                                    )
+                                    .await
+                                }
+                                None => None,
+                            };
+                            Self::diverged_or_id_mismatch(e, maybe_mismatch)
                         }
                         PullClientError::OverwriteSeedBlock(e) => SyncError::OverwriteSeedBlock(e),
                         PullClientError::ReadFailed(_)
@@ -403,12 +396,8 @@ impl WsSmartTransferProtocolClient {
                 )
                 .await?;
 
-                let old_head = match dst {
-                    LocalSyncTarget::Existing { expected_head, .. } => expected_head.as_ref(),
-                    LocalSyncTarget::New(_) => None,
-                };
                 let increment =
-                    sync_increment(dst_storage.as_metadata_chain(), old_head, &new_head).await?;
+                    sync_increment(dst_storage.as_metadata_chain(), dst_head, &new_head).await?;
 
                 SyncTransfer::Transferred(TransferredSync {
                     target,

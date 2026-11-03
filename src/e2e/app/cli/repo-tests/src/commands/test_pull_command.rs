@@ -11,6 +11,7 @@ use std::ffi::OsStr;
 
 use kamu_cli_e2e_common::{
     DATASET_DERIVATIVE_LEADERBOARD_NAME,
+    DATASET_DERIVATIVE_LEADERBOARD_QUERY,
     DATASET_DERIVATIVE_LEADERBOARD_SNAPSHOT_STR,
     DATASET_ROOT_PLAYER_NAME,
     DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_1,
@@ -783,8 +784,7 @@ pub async fn test_pull_derivative_after_inputs_changed_fails(kamu: KamuCliPuppet
         &DATASET_DERIVATIVE_LEADERBOARD_NAME,
         &leaderboard_set_transform_event(
             &dataset_id(&kamu, &other_name).await,
-            "SELECT ROW_NUMBER() OVER (PARTITION BY 1 ORDER BY score DESC) AS place, match_time, \
-             match_id, player_id, score FROM player_scores LIMIT 2",
+            DATASET_DERIVATIVE_LEADERBOARD_QUERY,
         ),
     )
     .await;

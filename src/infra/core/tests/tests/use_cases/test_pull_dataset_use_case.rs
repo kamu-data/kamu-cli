@@ -40,6 +40,8 @@ use odf::dataset::{DatasetFactoryImpl, IpfsGateway};
 use tempfile::TempDir;
 use url::Url;
 
+use crate::utils::RecordingListener;
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[tokio::test]
@@ -2164,70 +2166,6 @@ impl DatasetEnvVarResolver for ConstDatasetEnvVarResolver {
         _entry_key: &str,
     ) -> Result<DatasetEnvVar, GetDatasetEnvVarError> {
         Ok(Self::env_var(dataset_id))
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-/// Records the ingest and transform listener calls of a pull, in order
-#[derive(Default)]
-struct RecordingListener {
-    events: std::sync::Mutex<Vec<&'static str>>,
-}
-
-impl RecordingListener {
-    fn events(&self) -> Vec<&'static str> {
-        self.events.lock().unwrap().clone()
-    }
-
-    fn record(&self, event: &'static str) {
-        self.events.lock().unwrap().push(event);
-    }
-}
-
-impl PullListener for RecordingListener {
-    fn get_ingest_listener(self: Arc<Self>) -> Option<Arc<dyn PollingIngestListener>> {
-        Some(self)
-    }
-
-    fn get_transform_listener(self: Arc<Self>) -> Option<Arc<dyn TransformListener>> {
-        Some(self)
-    }
-
-    fn get_sync_listener(self: Arc<Self>) -> Option<Arc<dyn SyncListener>> {
-        None
-    }
-}
-
-impl TransformListener for RecordingListener {
-    fn begin(&self) {
-        self.record("begin");
-    }
-
-    fn success(&self, _result: &TransformResult) {
-        self.record("success");
-    }
-
-    fn error(&self, _error: &PullError) {
-        self.record("error");
-    }
-}
-
-impl PollingIngestListener for RecordingListener {
-    fn begin(&self) {
-        self.record("begin");
-    }
-
-    fn success(&self, _result: &PollingIngestResult) {
-        self.record("success");
-    }
-
-    fn error(&self, _error: &PullError) {
-        self.record("error");
-    }
-
-    fn no_polling_source(&self) {
-        self.record("no_polling_source");
     }
 }
 

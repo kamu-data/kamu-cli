@@ -60,10 +60,11 @@ impl DatasetUpdateStepsImpl {
                 .resolve_dataset_handle_by_ref(&local_ref)
                 .await
                 .int_err()?;
-            match remote_alias_registry.get_remote_aliases(&handle).await {
-                Ok(mut aliases) => aliases.add(pull_alias, RemoteAliasKind::Pull).await?,
-                Err(GetAliasesError::Internal(e)) => return Err(e.into()),
-            };
+            remote_alias_registry
+                .get_remote_aliases(&handle)
+                .await?
+                .add(pull_alias, RemoteAliasKind::Pull)
+                .await?;
         }
 
         Ok(sync_result)

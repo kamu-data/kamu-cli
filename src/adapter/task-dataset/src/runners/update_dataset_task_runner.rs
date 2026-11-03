@@ -175,24 +175,8 @@ impl UpdateDatasetTaskRunner {
                 increment,
                 ..
             }) => {
-                if let Some(failed) = self
-                    .update_steps
-                    .commit_head(target.get_handle(), &old_head, &new_head)
-                    .await?
-                    .into_failed_task_outcome(target.get_handle())
-                {
-                    return Ok(failed);
-                }
-
-                Ok(TaskOutcome::Success(
-                    TaskResultDatasetUpdate::Updated {
-                        old_head: Some(old_head),
-                        new_head,
-                        has_more,
-                        increment,
-                    }
-                    .into_task_result(),
-                ))
+                self.commit_updated(target.get_handle(), old_head, new_head, has_more, increment)
+                    .await
             }
             Ok(PollingIngestResult::UpToDate { uncacheable }) => Ok(TaskOutcome::Success(
                 TaskResultDatasetUpdate::UpToDate(PullResultUpToDate::PollingIngest(
@@ -205,6 +189,36 @@ impl UpdateDatasetTaskRunner {
                 Ok(Self::failed(e.is_recoverable()))
             }
         }
+    }
+
+    /// Moves `HEAD` to an iteration's result and reports the update, or the
+    /// outcome of a failed commit
+    async fn commit_updated(
+        &self,
+        target_handle: &odf::DatasetHandle,
+        old_head: odf::Multihash,
+        new_head: odf::Multihash,
+        has_more: bool,
+        increment: odf::dataset::MetadataChainIncrementInterval,
+    ) -> Result<TaskOutcome, InternalError> {
+        if let Some(failed) = self
+            .update_steps
+            .commit_head(target_handle, &old_head, &new_head)
+            .await?
+            .into_failed_task_outcome(target_handle)
+        {
+            return Ok(failed);
+        }
+
+        Ok(TaskOutcome::Success(
+            TaskResultDatasetUpdate::Updated {
+                old_head: Some(old_head),
+                new_head,
+                has_more,
+                increment,
+            }
+            .into_task_result(),
+        ))
     }
 
     fn transform_up_to_date() -> TaskOutcome {
@@ -279,24 +293,8 @@ impl UpdateDatasetTaskRunner {
                 increment,
                 ..
             }) => {
-                if let Some(failed) = self
-                    .update_steps
-                    .commit_head(target.get_handle(), &old_head, &new_head)
-                    .await?
-                    .into_failed_task_outcome(target.get_handle())
-                {
-                    return Ok(failed);
-                }
-
-                Ok(TaskOutcome::Success(
-                    TaskResultDatasetUpdate::Updated {
-                        old_head: Some(old_head),
-                        new_head,
-                        has_more: false,
-                        increment,
-                    }
-                    .into_task_result(),
-                ))
+                self.commit_updated(target.get_handle(), old_head, new_head, false, increment)
+                    .await
             }
             Ok(TransformResult::UpToDate) => Ok(Self::transform_up_to_date()),
             Err(e) => {

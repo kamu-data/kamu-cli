@@ -341,9 +341,9 @@ records it.
 | Logical plan (`plan_type`) | Definition (`task_type`) | Planner → Runner | Created by flow controller |
 | --- | --- | --- | --- |
 | `LogicalPlanDatasetUpdate` (`UpdateDataset`) | `dev.kamu.tasks.dataset.update` | `UpdateDatasetTaskPlanner` → `UpdateDatasetTaskRunner` | ingest and transform |
-| `LogicalPlanDatasetHardCompact` (`HardCompactDataset`) | `dev.kamu.tasks.dataset.hard_compact` | `HardCompactDatasetTaskPlanner` → `CompactionDatasetTaskRunner` | compact |
+| `LogicalPlanDatasetHardCompact` (`HardCompactDataset`) | `dev.kamu.tasks.dataset.hard_compact` | `CompactionDatasetTaskPlanner` → `CompactionDatasetTaskRunner` | compact |
 | `LogicalPlanDatasetReset` (`ResetDataset`) | `dev.kamu.tasks.dataset.reset` | `ResetDatasetTaskPlanner` → `ResetDatasetTaskRunner` | reset |
-| `LogicalPlanDatasetResetToMetadata` (`ResetDatasetToMetadata`) | `dev.kamu.tasks.dataset.reset_to_metadata` | `ResetToMetadataDatasetTaskPlanner` → `CompactionDatasetTaskRunner` | reset to metadata |
+| `LogicalPlanDatasetResetToMetadata` (`ResetDatasetToMetadata`) | `dev.kamu.tasks.dataset.reset_to_metadata` | `CompactionDatasetTaskPlanner` → `CompactionDatasetTaskRunner` | reset to metadata |
 | `LogicalPlanWebhookDeliver` (`DeliverWebhook`) | `dev.kamu.tasks.webhook.deliver` | `DeliverWebhookTaskPlanner` → `DeliverWebhookTaskRunner` | webhook deliver |
 | `LogicalPlanProbe` (`Probe`) | `dev.kamu.tasks.probe` | `ProbeTaskPlanner` → `ProbeTaskRunner` | system GC (a no-op placeholder), tests |
 
@@ -458,7 +458,7 @@ planner and executor do is owned by
 [dataset-hard-compaction.md](dataset-hard-compaction.md#5-planning); what reset to metadata keeps,
 by [dataset-reset.md](dataset-reset.md#6-reset-to-metadata).
 
-**Planning** (`HardCompactDatasetTaskPlanner` / `ResetToMetadataDatasetTaskPlanner`, one
+**Planning** (`CompactionDatasetTaskPlanner`, one
 transaction): resolves the dataset, calls `CompactionPlanner::plan_compaction` with the limits from
 the logical plan (planner defaults when absent; reset to metadata passes none, and they do not
 matter when no data is kept), and stores the detached dataset and the `CompactionPlan` in the

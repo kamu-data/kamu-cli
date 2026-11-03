@@ -94,7 +94,7 @@ history and treats the metadata chain as append-only. The pieces compaction work
 | Services | `kamu` — [`src/infra/core/src/services/compaction/`](../../src/infra/core/src/services/compaction) | `CompactionPlannerImpl`, `CompactionExecutorImpl` |
 | DataFusion session config | `kamu` — [`engine_config_embedded.rs`](../../src/infra/core/src/engine/engine_config_embedded.rs) | `EngineConfigDatafusionEmbeddedCompaction` |
 | CLI | `kamu-cli` — [`compact_command.rs`](../../src/app/cli/src/commands/compact_command.rs) | `kamu system compact` |
-| Task adapter | `kamu-adapter-task-dataset` | `HardCompactDatasetTaskPlanner`, `CompactionDatasetTaskRunner` (shared with reset to metadata) |
+| Task adapter | `kamu-adapter-task-dataset` | `CompactionDatasetTaskPlanner`, `CompactionDatasetTaskRunner` (both shared with reset to metadata) |
 | Flow adapter | `kamu-adapter-flow-dataset` | `FlowControllerCompact`, `FlowConfigRuleCompact` |
 
 ---

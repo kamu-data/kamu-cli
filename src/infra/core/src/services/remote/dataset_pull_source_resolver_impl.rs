@@ -33,10 +33,10 @@ impl DatasetPullSourceResolverImpl {
         handle: &odf::DatasetHandle,
         remote_ref: &odf::DatasetRefRemote,
     ) -> Result<bool, InternalError> {
-        let remote_aliases = match self.remote_alias_registry.get_remote_aliases(handle).await {
-            Ok(remote_aliases) => remote_aliases,
-            Err(GetAliasesError::Internal(e)) => return Err(e),
-        };
+        let remote_aliases = self
+            .remote_alias_registry
+            .get_remote_aliases(handle)
+            .await?;
         Ok(remote_aliases.contains(remote_ref, RemoteAliasKind::Pull))
     }
 }
@@ -47,10 +47,10 @@ impl DatasetPullSourceResolverImpl {
 impl DatasetPullSourceResolver for DatasetPullSourceResolverImpl {
     #[tracing::instrument(level = "debug", skip_all, fields(?target))]
     async fn has_pull_source(&self, target: &odf::DatasetHandle) -> Result<bool, InternalError> {
-        let remote_aliases = match self.remote_alias_registry.get_remote_aliases(target).await {
-            Ok(remote_aliases) => remote_aliases,
-            Err(GetAliasesError::Internal(e)) => return Err(e),
-        };
+        let remote_aliases = self
+            .remote_alias_registry
+            .get_remote_aliases(target)
+            .await?;
         Ok(!remote_aliases.is_empty(RemoteAliasKind::Pull))
     }
 
@@ -59,10 +59,10 @@ impl DatasetPullSourceResolver for DatasetPullSourceResolverImpl {
         &self,
         target: &odf::DatasetHandle,
     ) -> Result<Option<odf::DatasetRefRemote>, FindPullAliasError> {
-        let remote_aliases = match self.remote_alias_registry.get_remote_aliases(target).await {
-            Ok(remote_aliases) => remote_aliases,
-            Err(GetAliasesError::Internal(e)) => return Err(e.into()),
-        };
+        let remote_aliases = self
+            .remote_alias_registry
+            .get_remote_aliases(target)
+            .await?;
 
         match remote_aliases.single_by_kind(RemoteAliasKind::Pull) {
             Ok(maybe_alias) => Ok(maybe_alias.cloned()),

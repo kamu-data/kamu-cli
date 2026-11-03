@@ -79,26 +79,12 @@ pub async fn prepare_pull_object_transfer_strategy(
     dataset_url: &Url,
     maybe_bearer_header: Option<&BearerHeader>,
 ) -> Result<PullObjectTransferStrategy, InternalError> {
-    let get_download_url_result = match object_file_ref.object_type {
-        ObjectType::DataSlice => {
-            dataset
-                .as_data_repo()
-                .get_external_download_url(
-                    &object_file_ref.physical_hash,
-                    odf::storage::ExternalTransferOpts::default(),
-                )
-                .await
-        }
-        ObjectType::Checkpoint => {
-            dataset
-                .as_checkpoint_repo()
-                .get_external_download_url(
-                    &object_file_ref.physical_hash,
-                    odf::storage::ExternalTransferOpts::default(),
-                )
-                .await
-        }
-    };
+    let get_download_url_result = object_repo(dataset, &object_file_ref.object_type)
+        .get_external_download_url(
+            &object_file_ref.physical_hash,
+            odf::storage::ExternalTransferOpts::default(),
+        )
+        .await;
 
     let download_from = external_or_simple_transfer_url(
         get_download_url_result,
@@ -227,10 +213,7 @@ pub async fn prepare_push_object_transfer_strategy(
     dataset_url: &Url,
     maybe_bearer_header: Option<&BearerHeader>,
 ) -> Result<PushObjectTransferStrategy, InternalError> {
-    let object_repo = match object_file_ref.object_type {
-        ObjectType::DataSlice => dataset.as_data_repo(),
-        ObjectType::Checkpoint => dataset.as_checkpoint_repo(),
-    };
+    let object_repo = object_repo(dataset, &object_file_ref.object_type);
 
     let contains = object_repo
         .contains(&object_file_ref.physical_hash)
@@ -306,10 +289,7 @@ pub async fn dataset_import_object_file(
         .into_async_read()
         .compat();
 
-    let target_object_repository = match object_file_reference.object_type {
-        ObjectType::DataSlice => dataset.as_data_repo(),
-        ObjectType::Checkpoint => dataset.as_checkpoint_repo(),
-    };
+    let target_object_repository = object_repo(dataset, &object_file_reference.object_type);
 
     let res = target_object_repository
         .insert_stream(
@@ -363,10 +343,7 @@ pub(crate) async fn dataset_export_object_file(
 
     let object_file_reference = &object_transfer_strategy.object_file;
 
-    let source_object_repository = match object_file_reference.object_type {
-        ObjectType::DataSlice => dataset.as_data_repo(),
-        ObjectType::Checkpoint => dataset.as_checkpoint_repo(),
-    };
+    let source_object_repository = object_repo(dataset, &object_file_reference.object_type);
 
     let size = source_object_repository
         .get_size(&object_file_reference.physical_hash)
@@ -418,6 +395,19 @@ pub(crate) fn url_without_query(url: &Url) -> Url {
     let mut url = url.clone();
     url.set_query(None);
     url
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// The repository that stores objects of this type
+fn object_repo<'a>(
+    dataset: &'a dyn odf::Dataset,
+    object_type: &ObjectType,
+) -> &'a dyn odf::storage::ObjectRepository {
+    match object_type {
+        ObjectType::DataSlice => dataset.as_data_repo(),
+        ObjectType::Checkpoint => dataset.as_checkpoint_repo(),
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

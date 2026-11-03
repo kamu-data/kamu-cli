@@ -153,7 +153,11 @@ async fn test_push_remote_no_target_presaved_push_alias() {
         .remote_repo_url
         .clone();
     harness
-        .add_push_alias(&foo.dataset_handle, &remote_repo_url)
+        .add_remote_alias(
+            &foo.dataset_handle,
+            remote_repo_url.as_str(),
+            RemoteAliasKind::Push,
+        )
         .await;
 
     let (items, errors) = harness
@@ -189,7 +193,7 @@ async fn test_push_remote_no_target_several_push_aliases_is_ambiguous() {
 
     for url in ["http://example.com/a", "http://example.com/b"] {
         harness
-            .add_push_alias(&foo.dataset_handle, &Url::parse(url).unwrap())
+            .add_remote_alias(&foo.dataset_handle, url, RemoteAliasKind::Push)
             .await;
     }
 
@@ -312,7 +316,6 @@ async fn test_push_remote_no_target_no_alias_no_repositories() {
 struct PushTestHarness {
     base_repo_harness: BaseRepoHarness,
     push_request_planner: Arc<dyn PushRequestPlanner>,
-    remote_aliases_registry: Arc<dyn RemoteAliasesRegistry>,
     remote_repo_registry: Arc<dyn RemoteRepositoryRegistry>,
     maybe_remote_repo_data: Option<RemoteRepoData>,
 }
@@ -364,23 +367,9 @@ impl PushTestHarness {
         Self {
             base_repo_harness,
             push_request_planner: catalog.get_one().unwrap(),
-            remote_aliases_registry: catalog.get_one().unwrap(),
             remote_repo_registry: catalog.get_one().unwrap(),
             maybe_remote_repo_data,
         }
-    }
-
-    async fn add_push_alias(&self, target: &odf::DatasetHandle, url: &Url) {
-        self.remote_aliases_registry
-            .get_remote_aliases(target)
-            .await
-            .unwrap()
-            .add(
-                &odf::DatasetRefRemote::Url(Arc::new(url.clone())),
-                RemoteAliasKind::Push,
-            )
-            .await
-            .unwrap();
     }
 }
 

@@ -9,7 +9,7 @@
 
 use std::sync::Arc;
 
-use internal_error::{ErrorIntoInternal, ResultIntoInternal};
+use internal_error::ResultIntoInternal;
 use kamu_core::*;
 use kamu_datasets::{
     CreateDatasetUseCase,
@@ -47,8 +47,6 @@ impl LocalSyncCommitter for LocalSyncCommitterImpl {
                 dataset,
                 expected_head,
             } => {
-                use odf::dataset::SetChainRefError as E;
-
                 // The transfer ran detached; the commit needs this transaction, and
                 // the dataset may have been deleted meanwhile
                 let dataset = self
@@ -58,14 +56,7 @@ impl LocalSyncCommitter for LocalSyncCommitterImpl {
 
                 self.dataset_head_committer
                     .commit_head(&dataset, expected_head.as_ref(), &new_head)
-                    .await
-                    .map_err(|e| match e {
-                        E::CASFailed(e) => SyncError::HeadMoved(e.into()),
-                        E::Access(e) => SyncError::Access(e),
-                        e @ (E::BlockNotFound(_) | E::Internal(_)) => {
-                            SyncError::Internal(e.int_err())
-                        }
-                    })?;
+                    .await?;
 
                 Ok(SyncResult::Updated {
                     old_head: expected_head,

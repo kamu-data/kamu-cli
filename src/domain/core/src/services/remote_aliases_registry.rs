@@ -20,19 +20,7 @@ pub trait RemoteAliasesRegistry: Send + Sync {
     async fn get_remote_aliases(
         &self,
         dataset_handle: &odf::DatasetHandle,
-    ) -> Result<Box<dyn RemoteAliases>, GetAliasesError>;
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Error, Debug)]
-pub enum GetAliasesError {
-    #[error(transparent)]
-    Internal(
-        #[from]
-        #[backtrace]
-        InternalError,
-    ),
+    ) -> Result<Box<dyn RemoteAliases>, InternalError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

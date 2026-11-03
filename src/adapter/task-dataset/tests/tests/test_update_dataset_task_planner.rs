@@ -28,7 +28,7 @@ use kamu_adapter_task_dataset::{
     TaskDefinitionDatasetUpdate,
     UpdateDatasetTaskPlanner,
 };
-use kamu_core::{RemoteAliasKind, RemoteAliasesRegistry};
+use kamu_core::RemoteAliasKind;
 use kamu_datasets::CreateDatasetResult;
 use kamu_datasets_services::DependencyGraphServiceImpl;
 use kamu_task_system::{PrepareTaskDefinitionError, TaskDefinitionPlanner, TaskError, TaskID};
@@ -72,7 +72,11 @@ async fn test_dataset_with_one_pull_alias_plans_a_sync() {
     let harness = UpdateDatasetTaskPlannerHarness::new();
     let foo = harness.create_root_dataset(&alias_foo).await;
     harness
-        .add_pull_alias(&foo, "odf+http://example.com/foo")
+        .add_remote_alias(
+            &foo.dataset_handle,
+            "odf+http://example.com/foo",
+            RemoteAliasKind::Pull,
+        )
         .await;
 
     let job = harness.plan_update(&foo).await.unwrap();
@@ -106,10 +110,18 @@ async fn test_dataset_with_several_pull_aliases_fails_unrecoverably() {
     let harness = UpdateDatasetTaskPlannerHarness::new();
     let foo = harness.create_root_dataset(&alias_foo).await;
     harness
-        .add_pull_alias(&foo, "odf+http://example.com/foo")
+        .add_remote_alias(
+            &foo.dataset_handle,
+            "odf+http://example.com/foo",
+            RemoteAliasKind::Pull,
+        )
         .await;
     harness
-        .add_pull_alias(&foo, "odf+http://example.org/foo")
+        .add_remote_alias(
+            &foo.dataset_handle,
+            "odf+http://example.org/foo",
+            RemoteAliasKind::Pull,
+        )
         .await;
 
     let failure = harness.plan_update(&foo).await.unwrap_err();
@@ -123,7 +135,6 @@ async fn test_dataset_with_several_pull_aliases_fails_unrecoverably() {
 struct UpdateDatasetTaskPlannerHarness {
     base_use_case_harness: BaseUseCaseHarness,
     planner: Arc<UpdateDatasetTaskPlanner>,
-    remote_aliases_registry: Arc<dyn RemoteAliasesRegistry>,
 }
 
 impl UpdateDatasetTaskPlannerHarness {
@@ -157,27 +168,7 @@ impl UpdateDatasetTaskPlannerHarness {
         Self {
             base_use_case_harness,
             planner: catalog.get_one().unwrap(),
-            remote_aliases_registry: catalog.get_one().unwrap(),
         }
-    }
-
-    /// Deletes the dataset's storage, as if it was deleted after the task was
-    /// scheduled
-    async fn delete_dataset(&self, created: &CreateDatasetResult) {
-        self.dataset_storage_unit_writer()
-            .delete_dataset(&created.dataset_handle.id)
-            .await
-            .unwrap();
-    }
-
-    async fn add_pull_alias(&self, created: &CreateDatasetResult, remote_ref: &str) {
-        self.remote_aliases_registry
-            .get_remote_aliases(&created.dataset_handle)
-            .await
-            .unwrap()
-            .add(&remote_ref.parse().unwrap(), RemoteAliasKind::Pull)
-            .await
-            .unwrap();
     }
 
     /// Plans an update of `created`, returning the planned job or the error

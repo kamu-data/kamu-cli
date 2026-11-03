@@ -12,6 +12,7 @@ use kamu_core::{OverwriteSeedBlockError, SyncError, SyncHeadMovedError};
 use kamu_datasets::NameCollisionError;
 use thiserror::Error;
 
+use super::messages::TransferInternalError;
 use super::phases::*;
 use crate::ws_common::{ReadMessageError, WriteMessageError};
 
@@ -226,11 +227,11 @@ pub struct ClientInternalError {
     details: String,
 }
 
-impl ClientInternalError {
-    pub fn new(msg: &str, phase: TransferPhase) -> Self {
+impl From<TransferInternalError> for ClientInternalError {
+    fn from(e: TransferInternalError) -> Self {
         Self {
-            phase,
-            details: msg.to_string(),
+            phase: e.phase,
+            details: e.error_message,
         }
     }
 }

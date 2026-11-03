@@ -14,21 +14,17 @@ use std::str::FromStr;
 use kamu::domain::*;
 use kamu::testing::*;
 use kamu::utils::ipfs_wrapper::IpfsClient;
-use kamu::utils::simple_transfer_protocol::SimpleTransferProtocol;
 use kamu::*;
-use kamu_accounts::{CurrentAccountSubject, CurrentAccountSubjectCatalogExt as _};
 use kamu_datasets::*;
-use kamu_datasets_services::utils::CreateDatasetUseCaseHelper;
 use kamu_datasets_services::*;
-use messaging_outbox::*;
+use odf::dataset::IpfsGateway;
 use odf::dataset::testing::create_test_dataset_from_snapshot;
-use odf::dataset::{DatasetFactoryImpl, IpfsGateway};
 use odf::metadata::testing::MetadataFactory;
 use test_utils::{HttpFileServer, LocalS3Server};
-use time_source::{SystemTimeSource, SystemTimeSourceDefault};
+use time_source::SystemTimeSource;
 use url::Url;
 
-use crate::utils::IpfsDaemon;
+use crate::utils::{IpfsDaemon, SyncWorkspaceCatalog};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -62,65 +58,9 @@ async fn do_test_sync(
 
     let (ipfs_gateway, ipfs_client) = ipfs.unwrap_or_default();
 
-    let datasets_dir_foo = tmp_workspace_dir_foo.join("datasets");
-    let datasets_dir_bar = tmp_workspace_dir_bar.join("datasets");
-    std::fs::create_dir(&datasets_dir_foo).unwrap();
-    std::fs::create_dir(&datasets_dir_bar).unwrap();
-
-    let mut catalog_foo_builder = dill::CatalogBuilder::new();
-    kamu_datasets_inmem::register_dependencies(&mut catalog_foo_builder);
-    catalog_foo_builder
-        .add::<DidGeneratorDefault>()
-        .add::<SystemTimeSourceDefault>()
-        .add_value(ipfs_gateway.clone())
-        .add_value(ipfs_client.clone())
-        .add_current_account_subject(CurrentAccountSubject::new_test())
-        .add_value(TenancyConfig::SingleTenant)
-        .add_builder(odf::dataset::DatasetStorageUnitLocalFs::builder(
-            datasets_dir_foo,
-        ))
-        .add::<odf::dataset::DatasetLfsBuilderDefault>()
-        .add::<DatasetRegistrySoloUnitBridge>()
-        .add_value(RemoteReposDir::new_with_creation(
-            tmp_workspace_dir_foo.join("repos"),
-        ))
-        .add::<RemoteRepositoryRegistryImpl>()
-        .add::<odf::dataset::DummyOdfServerAccessTokenResolver>()
-        .add::<DatasetFactoryImpl>()
-        .add::<SyncServiceImpl>()
-        .add::<IpfsServiceImpl>()
-        .add::<LocalSyncCommitterImpl>()
-        .add::<RemoteAliasesRegistryImpl>()
-        .add::<RemoteAliasResolverImpl>()
-        .add::<RemoteDatasetUrlResolverImpl>()
-        .add::<SyncRequestBuilder>()
-        .add::<DummySmartTransferProtocolClient>()
-        .add::<SimpleTransferProtocol>()
-        .add::<CreateDatasetUseCaseImpl>()
-        .add::<CreateDatasetUseCaseHelper>()
-        .add_builder(messaging_outbox::OutboxImmediateImpl::builder(
-            messaging_outbox::ConsumerFilter::AllConsumers,
-        ))
-        .bind::<dyn Outbox, OutboxImmediateImpl>()
-        .add_value(MockDatasetEntryWriter::new())
-        .bind::<dyn DatasetEntryWriter, MockDatasetEntryWriter>()
-        .add::<DatasetReferenceServiceImpl>()
-        .add::<AppendDatasetMetadataBatchUseCaseImpl>()
-        .add::<DatasetHeadCommitterImpl>();
-
-    register_message_dispatcher::<DatasetLifecycleMessage>(
-        &mut catalog_foo_builder,
-        MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
-    );
-
-    register_message_dispatcher::<DatasetReferenceMessage>(
-        &mut catalog_foo_builder,
-        MESSAGE_PRODUCER_KAMU_DATASET_REFERENCE_SERVICE,
-    );
-
-    database_common::NoOpDatabasePlugin::init_database_components(&mut catalog_foo_builder);
-
-    let catalog_foo = catalog_foo_builder.build();
+    let catalog_foo = SyncWorkspaceCatalog::new(tmp_workspace_dir_foo)
+        .with_ipfs(ipfs_gateway.clone(), ipfs_client.clone())
+        .build();
 
     let mut mock_dataset_entry_writer_bar = MockDatasetEntryWriter::new();
     mock_dataset_entry_writer_bar
@@ -128,60 +68,10 @@ async fn do_test_sync(
         .times(1)
         .returning(|_, _, _, _, _| Ok(()));
 
-    let mut catalog_bar_builder = dill::CatalogBuilder::new();
-    kamu_datasets_inmem::register_dependencies(&mut catalog_bar_builder);
-    catalog_bar_builder
-        .add::<DidGeneratorDefault>()
-        .add::<SystemTimeSourceDefault>()
-        .add_value(ipfs_gateway.clone())
-        .add_value(ipfs_client.clone())
-        .add_current_account_subject(CurrentAccountSubject::new_test())
-        .add_value(TenancyConfig::SingleTenant)
-        .add_builder(odf::dataset::DatasetStorageUnitLocalFs::builder(
-            datasets_dir_bar,
-        ))
-        .add::<odf::dataset::DatasetLfsBuilderDefault>()
-        .add::<DatasetRegistrySoloUnitBridge>()
-        .add_value(RemoteReposDir::new_with_creation(
-            tmp_workspace_dir_bar.join("repos"),
-        ))
-        .add::<RemoteRepositoryRegistryImpl>()
-        .add::<odf::dataset::DummyOdfServerAccessTokenResolver>()
-        .add::<DatasetFactoryImpl>()
-        .add::<SyncServiceImpl>()
-        .add::<IpfsServiceImpl>()
-        .add::<LocalSyncCommitterImpl>()
-        .add::<RemoteAliasesRegistryImpl>()
-        .add::<RemoteAliasResolverImpl>()
-        .add::<RemoteDatasetUrlResolverImpl>()
-        .add::<SyncRequestBuilder>()
-        .add::<DummySmartTransferProtocolClient>()
-        .add::<SimpleTransferProtocol>()
-        .add::<CreateDatasetUseCaseImpl>()
-        .add::<CreateDatasetUseCaseHelper>()
-        .add::<AppendDatasetMetadataBatchUseCaseImpl>()
-        .add::<DatasetHeadCommitterImpl>()
-        .add_builder(messaging_outbox::OutboxImmediateImpl::builder(
-            messaging_outbox::ConsumerFilter::AllConsumers,
-        ))
-        .bind::<dyn Outbox, OutboxImmediateImpl>()
-        .add_value(mock_dataset_entry_writer_bar)
-        .bind::<dyn DatasetEntryWriter, MockDatasetEntryWriter>()
-        .add::<DatasetReferenceServiceImpl>();
-
-    register_message_dispatcher::<DatasetLifecycleMessage>(
-        &mut catalog_bar_builder,
-        MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
-    );
-
-    register_message_dispatcher::<DatasetReferenceMessage>(
-        &mut catalog_bar_builder,
-        MESSAGE_PRODUCER_KAMU_DATASET_REFERENCE_SERVICE,
-    );
-
-    database_common::NoOpDatabasePlugin::init_database_components(&mut catalog_bar_builder);
-
-    let catalog_bar = catalog_bar_builder.build();
+    let catalog_bar = SyncWorkspaceCatalog::new(tmp_workspace_dir_bar)
+        .with_ipfs(ipfs_gateway, ipfs_client)
+        .with_dataset_entry_writer(mock_dataset_entry_writer_bar)
+        .build();
 
     let sync_svc_foo = catalog_foo.get_one::<dyn SyncService>().unwrap();
     let sync_request_builder_foo = catalog_foo.get_one::<SyncRequestBuilder>().unwrap();

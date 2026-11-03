@@ -10,42 +10,11 @@
 use std::collections::VecDeque;
 
 use futures::TryStreamExt;
-use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
-use thiserror::Error;
+use internal_error::{InternalError, ResultIntoInternal};
 
 use crate::smart_protocol::messages::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Error, Debug)]
-pub enum CollectMissingObjectReferencesFromIntervalError {
-    #[error(transparent)]
-    InvalidInterval(
-        #[from]
-        #[backtrace]
-        odf::dataset::InvalidIntervalError,
-    ),
-    #[error(transparent)]
-    Internal(
-        #[from]
-        #[backtrace]
-        InternalError,
-    ),
-}
-
-impl From<odf::IterBlocksError> for CollectMissingObjectReferencesFromIntervalError {
-    fn from(v: odf::IterBlocksError) -> Self {
-        match v {
-            odf::IterBlocksError::InvalidInterval(e) => Self::InvalidInterval(e),
-            odf::IterBlocksError::RefNotFound(_)
-            | odf::IterBlocksError::BlockNotFound(_)
-            | odf::IterBlocksError::BlockVersion(_)
-            | odf::IterBlocksError::BlockMalformed(_)
-            | odf::IterBlocksError::Access(_)
-            | odf::IterBlocksError::Internal(_) => Self::Internal(v.int_err()),
-        }
-    }
-}
 
 pub async fn collect_object_references_from_interval(
     dataset: &dyn odf::Dataset,
@@ -53,7 +22,7 @@ pub async fn collect_object_references_from_interval(
     tail: Option<&odf::Multihash>,
     ignore_missing_tail: bool,
     missing_files_only: bool,
-) -> Result<Vec<ObjectFileReference>, CollectMissingObjectReferencesFromIntervalError> {
+) -> Result<Vec<ObjectFileReference>, InternalError> {
     let mut res_references: Vec<ObjectFileReference> = Vec::new();
 
     let mut block_stream = dataset.as_metadata_chain().iter_blocks_interval(
@@ -61,7 +30,7 @@ pub async fn collect_object_references_from_interval(
         tail.map(Into::into),
         ignore_missing_tail,
     );
-    while let Some((_, block)) = block_stream.try_next().await? {
+    while let Some((_, block)) = block_stream.try_next().await.int_err()? {
         collect_object_references_from_block(
             dataset,
             &block,
@@ -103,67 +72,9 @@ async fn collect_object_references_from_block(
     target_references: &mut Vec<ObjectFileReference>,
     missing_files_only: bool,
 ) -> Result<(), InternalError> {
-    let data_repo = dataset.as_data_repo();
-    let checkpoint_repo = dataset.as_checkpoint_repo();
-
-    match &block.event {
-        odf::MetadataEvent::AddData(e) => {
-            if let Some(new_data) = &e.new_data
-                && (!missing_files_only
-                    || !data_repo
-                        .contains(&new_data.physical_hash)
-                        .await
-                        .int_err()?)
-            {
-                target_references.push(ObjectFileReference {
-                    object_type: ObjectType::DataSlice,
-                    physical_hash: new_data.physical_hash.clone(),
-                    size: new_data.size,
-                });
-            }
-            if let Some(new_checkpoint) = &e.new_checkpoint
-                && (!missing_files_only
-                    || !checkpoint_repo
-                        .contains(&new_checkpoint.physical_hash)
-                        .await
-                        .int_err()?)
-            {
-                target_references.push(ObjectFileReference {
-                    object_type: ObjectType::Checkpoint,
-                    physical_hash: new_checkpoint.physical_hash.clone(),
-                    size: new_checkpoint.size,
-                });
-            }
-        }
-        odf::MetadataEvent::ExecuteTransform(e) => {
-            if let Some(new_data) = &e.new_data
-                && (!missing_files_only
-                    || !data_repo
-                        .contains(&new_data.physical_hash)
-                        .await
-                        .int_err()?)
-            {
-                target_references.push(ObjectFileReference {
-                    object_type: ObjectType::DataSlice,
-                    physical_hash: new_data.physical_hash.clone(),
-                    size: new_data.size,
-                });
-            }
-            if let Some(new_checkpoint) = &e.new_checkpoint
-                && (!missing_files_only
-                    || !checkpoint_repo
-                        .contains(&new_checkpoint.physical_hash)
-                        .await
-                        .int_err()?)
-            {
-                target_references.push(ObjectFileReference {
-                    object_type: ObjectType::Checkpoint,
-                    physical_hash: new_checkpoint.physical_hash.clone(),
-                    size: new_checkpoint.size,
-                });
-            }
-        }
-
+    let (new_data, new_checkpoint) = match &block.event {
+        odf::MetadataEvent::AddData(e) => (e.new_data.as_ref(), e.new_checkpoint.as_ref()),
+        odf::MetadataEvent::ExecuteTransform(e) => (e.new_data.as_ref(), e.new_checkpoint.as_ref()),
         odf::MetadataEvent::Seed(_)
         | odf::MetadataEvent::SetDataSchema(_)
         | odf::MetadataEvent::SetPollingSource(_)
@@ -174,7 +85,36 @@ async fn collect_object_references_from_block(
         | odf::MetadataEvent::SetVocab(_)
         | odf::MetadataEvent::SetAttachments(_)
         | odf::MetadataEvent::SetInfo(_)
-        | odf::MetadataEvent::SetLicense(_) => (),
+        | odf::MetadataEvent::SetLicense(_) => return Ok(()),
+    };
+
+    if let Some(new_data) = new_data
+        && (!missing_files_only
+            || !dataset
+                .as_data_repo()
+                .contains(&new_data.physical_hash)
+                .await
+                .int_err()?)
+    {
+        target_references.push(ObjectFileReference {
+            object_type: ObjectType::DataSlice,
+            physical_hash: new_data.physical_hash.clone(),
+            size: new_data.size,
+        });
+    }
+    if let Some(new_checkpoint) = new_checkpoint
+        && (!missing_files_only
+            || !dataset
+                .as_checkpoint_repo()
+                .contains(&new_checkpoint.physical_hash)
+                .await
+                .int_err()?)
+    {
+        target_references.push(ObjectFileReference {
+            object_type: ObjectType::Checkpoint,
+            physical_hash: new_checkpoint.physical_hash.clone(),
+            size: new_checkpoint.size,
+        });
     }
 
     Ok(())

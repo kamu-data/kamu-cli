@@ -9,7 +9,6 @@
 
 use std::sync::Arc;
 
-use internal_error::ErrorIntoInternal;
 use kamu_core::utils::metadata_chain_comparator::ChainWithHead;
 use kamu_core::*;
 use odf::dataset::MetadataChainExt as _;
@@ -234,7 +233,7 @@ impl SimpleTransferProtocol {
         append_opts: odf::dataset::AppendBatchOpts,
         expected_head: Option<&odf::Multihash>,
     ) -> Result<(), SyncError> {
-        use odf::dataset::{AppendBatchAndSetHeadError as E, SetChainRefError};
+        use odf::dataset::AppendBatchAndSetHeadError as E;
 
         dst.as_metadata_chain()
             .append_batch_and_set_head(
@@ -245,11 +244,7 @@ impl SimpleTransferProtocol {
             .await
             .map_err(|e| match e {
                 E::Append(e) => map_append_batch_error(e),
-                E::SetHead(SetChainRefError::CASFailed(e)) => SyncError::HeadMoved(e.into()),
-                E::SetHead(SetChainRefError::Access(e)) => SyncError::Access(e),
-                E::SetHead(
-                    e @ (SetChainRefError::Internal(_) | SetChainRefError::BlockNotFound(_)),
-                ) => SyncError::Internal(e.int_err()),
+                E::SetHead(e) => e.into(),
             })?;
 
         Ok(())
