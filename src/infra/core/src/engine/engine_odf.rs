@@ -294,6 +294,9 @@ impl Engine for ODFEngine {
         let target = datasets_map.get_by_handle(&request.dataset_handle);
         let io_strategy = self.get_io_strategy(target.as_ref());
 
+        // Declared before the container, so on every exit the container stops first
+        let _input_dir = InputDirGuard(operation_dir.join("in"));
+
         let materialized_request = io_strategy
             .materialize_request(request, datasets_map, &operation_dir)
             .await
@@ -328,6 +331,23 @@ impl Engine for ODFEngine {
         .into_response(engine_response?)?;
         response.run_dir = Some(operation_dir);
         Ok(response)
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Removes the engine's input directory when dropped. Copies of the inputs are
+/// not needed once the engine stopped; a run that failed at any step keeps only
+/// its logs and output for the error to point at
+struct InputDirGuard(PathBuf);
+
+impl Drop for InputDirGuard {
+    fn drop(&mut self) {
+        if let Err(err) = std::fs::remove_dir_all(&self.0)
+            && err.kind() != std::io::ErrorKind::NotFound
+        {
+            tracing::warn!(error = %err, path = ?self.0, "Failed to remove the engine input directory");
+        }
     }
 }
 

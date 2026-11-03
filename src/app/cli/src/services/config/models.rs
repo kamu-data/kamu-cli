@@ -115,7 +115,8 @@ pub struct QuotaDefaults {
 
 #[derive(setty::Config, setty::Default)]
 pub struct EngineConfig {
-    /// Maximum number of engine operations that can be performed concurrently
+    /// Maximum number of engine operations that can be performed concurrently.
+    /// Defaults to the number of CPU cores, and is always one with host networking
     pub max_concurrency: Option<u32>,
 
     /// Type of the runtime to use when running the data processing engines

@@ -164,7 +164,9 @@ impl EngineProvisionerLocal {
         ) {
             (None | Some(0), NetworkNamespaceType::Host) | (Some(1), _) => 1,
             // TODO: Use available memory to determine the optimal limit
-            (None | Some(0), NetworkNamespaceType::Private) => outstanding_handles + 1,
+            (None | Some(0), NetworkNamespaceType::Private) => {
+                (outstanding_handles + 1).min(Self::default_max_concurrency())
+            }
             (Some(multi), NetworkNamespaceType::Private) => multi,
             (Some(multi), NetworkNamespaceType::Host) => {
                 tracing::warn!(
@@ -175,6 +177,12 @@ impl EngineProvisionerLocal {
                 1
             }
         }
+    }
+
+    /// One engine per CPU core when no limit is configured
+    fn default_max_concurrency() -> u32 {
+        std::thread::available_parallelism()
+            .map_or(1, |n| u32::try_from(n.get()).unwrap_or(u32::MAX))
     }
 
     /// Called when `EngineHandle` is dropped

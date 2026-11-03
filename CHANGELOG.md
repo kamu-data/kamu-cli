@@ -62,6 +62,8 @@ Recommendation: for ease of reading, use the following format:
 - A slow or unreachable remote repository no longer delays other writers to the node's database
   while `kamu pull` or an update task prepares to pull from it
 - Engine names in a transform are case-insensitive (`Spark` works like `spark`)
+- Without `engine.maxConcurrency`, at most one engine per CPU core runs at a time, instead of one
+  per transform or preprocess step that is ready to run
 - GraphQL (breaking): `FlowDescriptionUpdateResultUnknown` is removed from
   `FlowDescriptionUpdateResult`; a flow that updated a dataset always reports the blocks and
   records it added
@@ -116,7 +118,9 @@ Recommendation: for ease of reading, use the following format:
 - A transform whose engine output adds nothing no longer crashes the process; it is reported as up
   to date
 - Transform, polling ingest and push ingest runs no longer leave their working files behind after
-  success, and a failed fetch no longer leaves its partial download in the cache
+  success, and a failed fetch no longer leaves its partial download in the cache. A failed
+  transform keeps only its logs and output, not its copies of the input data
+- `kamu verify` checks the checkpoint of a block that adds no data, which it skipped before
 - An ingest flow of a root dataset without a polling source fails instead of reporting success on
   every run
 - `kamu pull` and `kamu ingest` report a CSV or JSON value that does not parse with its own message

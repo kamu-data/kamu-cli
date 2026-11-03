@@ -17,7 +17,7 @@ use file_utils::OwnedFile;
 use kamu::domain::*;
 use kamu::testing::{BaseRepoHarness, ParquetWriterHelper};
 use kamu::*;
-use kamu_datasets::ResolvedDataset;
+use kamu_datasets::{CreateDatasetResult, ResolvedDataset};
 use odf::metadata::testing::MetadataFactory;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -186,6 +186,68 @@ async fn test_verify_data_consistency() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[tokio::test]
+async fn test_verify_checkpoint_of_block_without_data() {
+    let harness = VerifyHarness::new();
+
+    let foo_alias = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let foo = harness.create_root_dataset(&foo_alias).await;
+
+    let checkpoint_path = harness.temp_dir_path().join("checkpoint");
+    std::fs::write(&checkpoint_path, b"checkpoint").unwrap();
+    let checkpoint_hash = odf::utils::data::hash::get_file_physical_hash(&checkpoint_path).unwrap();
+
+    let head = foo
+        .dataset
+        .commit_add_data(
+            odf::dataset::AddDataParams {
+                prev_checkpoint: None,
+                prev_offset: None,
+                new_offset_interval: None,
+                new_linked_objects: None,
+                new_watermark: None,
+                new_source_state: None,
+            },
+            None,
+            Some(odf::dataset::CheckpointRef::New(OwnedFile::new(
+                checkpoint_path,
+            ))),
+            odf::dataset::CommitOpts::default(),
+        )
+        .await
+        .unwrap()
+        .new_head;
+
+    assert_matches!(
+        harness
+            .verify_integrity(ResolvedDataset::from_created(&foo))
+            .await,
+        VerificationResult {
+            outcome: Ok(()),
+            ..
+        }
+    );
+
+    harness
+        .overwrite_checkpoint(&foo, &checkpoint_hash, b"corrupted checkpoint")
+        .await;
+
+    assert_matches!(
+        harness.verify_integrity(ResolvedDataset::from_created(&foo)).await,
+        VerificationResult {
+            outcome: Err(VerificationError::CheckpointDoesNotMatchMetadata(
+                CheckpointDoesNotMatchMetadata {
+                    block_hash,
+                    error: CheckpointVerificationError::SizeMismatch { .. },
+                }
+            )),
+            ..
+        } if block_hash == head
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[oop::extend(BaseRepoHarness, base_repo_harness)]
 struct VerifyHarness {
     base_repo_harness: BaseRepoHarness,
@@ -209,6 +271,40 @@ impl VerifyHarness {
             base_repo_harness,
             verification_svc: catalog.get_one().unwrap(),
         }
+    }
+
+    async fn verify_integrity(&self, target: ResolvedDataset) -> VerificationResult {
+        self.verification_svc
+            .verify(
+                VerificationRequest {
+                    target,
+                    block_range: (None, None),
+                    options: VerificationOptions {
+                        check_integrity: true,
+                        check_logical_hashes: true,
+                        replay_transformations: false,
+                    },
+                },
+                None,
+            )
+            .await
+    }
+
+    async fn overwrite_checkpoint(
+        &self,
+        created: &CreateDatasetResult,
+        checkpoint_hash: &odf::Multihash,
+        contents: &[u8],
+    ) {
+        let path = odf::utils::data::local_url::into_local_path(
+            created
+                .dataset
+                .as_checkpoint_repo()
+                .get_internal_url(checkpoint_hash)
+                .await,
+        )
+        .unwrap();
+        std::fs::write(path, contents).unwrap();
     }
 }
 

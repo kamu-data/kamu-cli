@@ -830,7 +830,12 @@ Base type: `string`
 <td><code>maxConcurrency</code></td>
 <td><code>integer</code></td>
 <td><code class="language-json">null</code></td>
-<td>Maximum number of engine operations that can be performed concurrently</td>
+<td>
+
+Maximum number of engine operations that can be performed concurrently.
+Defaults to the number of CPU cores, and is always one with host networking
+
+</td>
 </tr>
 <tr>
 <td><code>networkNs</code></td>

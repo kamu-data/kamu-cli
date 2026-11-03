@@ -488,7 +488,7 @@
           "description": "UNSTABLE: Default engine images"
         },
         "maxConcurrency": {
-          "description": "Maximum number of engine operations that can be performed concurrently",
+          "description": "Maximum number of engine operations that can be performed concurrently.\nDefaults to the number of CPU cores, and is always one with host networking",
           "format": "uint32",
           "minimum": 0,
           "type": [

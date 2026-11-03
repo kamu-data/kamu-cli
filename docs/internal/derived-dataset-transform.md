@@ -262,7 +262,7 @@ Before handing out an engine it:
 - checks the image locally and pulls it once per process if missing;
 - waits for a concurrency slot. In host networking mode only one engine runs at a time, and a
   configured `max_concurrency` is ignored with a warning; with a private network namespace
-  `max_concurrency` applies, and when unset or `0` there is no limit.
+  `max_concurrency` applies, and when unset or `0` it is the number of CPU cores.
 
 The returned `EngineHandle` gives the slot back when it is dropped.
 
@@ -400,7 +400,7 @@ decides itself, such as `InputDatasetCompacted`, are in
 
 | Directory | Holds | Cleaned |
 | --- | --- | --- |
-| `RunInfoDir/transform-<operation_id>/in/` | input schema files; with the remote proxy, downloaded slices and checkpoint | after a successful commit, or when the process starts |
+| `RunInfoDir/transform-<operation_id>/in/` | input schema files; with the remote proxy, downloaded slices and checkpoint | as soon as the engine container stops, whether the run succeeded or not |
 | `RunInfoDir/transform-<operation_id>/out/` | `data` and `checkpoint` written by the engine | both move into the dataset's repos on commit; a data file with no offset interval is deleted |
 | `RunInfoDir/transform-<operation_id>/logs/` | engine stdout and stderr; on failure, the demultiplexed adapter logs | after a successful commit, or when the process starts |
 
