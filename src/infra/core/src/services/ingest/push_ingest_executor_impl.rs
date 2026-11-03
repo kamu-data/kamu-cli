@@ -91,6 +91,8 @@ impl PushIngestExecutorImpl {
 
         listener.begin();
 
+        let operation_dir = plan.args.operation_dir.clone();
+
         match self
             .do_ingest_inner(
                 target,
@@ -104,6 +106,16 @@ impl PushIngestExecutorImpl {
         {
             Ok(res) => {
                 tracing::info!(result = ?res, "Ingest iteration successful");
+
+                // A failed attempt keeps its directory: errors point at the logs in it
+                if let Err(err) = std::fs::remove_dir_all(&operation_dir) {
+                    tracing::warn!(
+                        error = %err,
+                        ?operation_dir,
+                        "Failed to remove the ingest directory"
+                    );
+                }
+
                 Ok(res)
             }
             Err(err) => {
@@ -189,7 +201,11 @@ impl PushIngestExecutorImpl {
             Ok(staged) => {
                 if !args.opts.skip_quota_check {
                     let estimated_size = Self::estimate_staged_size(&staged)?;
-                    self.ensure_quota(&target, estimated_size).await?;
+                    self.ensure_quota(
+                        &target,
+                        estimated_size.saturating_add(args.opts.uncommitted_bytes),
+                    )
+                    .await?;
                 }
 
                 listener.on_stage_progress(PushIngestStage::Commit, 0, TotalSteps::Exact(1));

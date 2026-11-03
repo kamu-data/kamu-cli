@@ -100,6 +100,7 @@ async fn test_ingest_push_url_stream() {
         )
         .await
         .unwrap();
+    assert_eq!(harness.ingest_dirs_left(), Vec::<String>::new());
 
     data_helper
         .assert_last_data_eq(
@@ -1405,6 +1406,14 @@ impl IngestTestHarness {
         )
         .await
         .unwrap()
+    }
+
+    fn ingest_dirs_left(&self) -> Vec<String> {
+        std::fs::read_dir(self.temp_dir.path().join("run"))
+            .unwrap()
+            .map(|entry| entry.unwrap().file_name().to_string_lossy().into_owned())
+            .filter(|name| name.starts_with("ingest-"))
+            .collect()
     }
 
     async fn dataset_data_helper(&self, dataset_alias: &odf::DatasetAlias) -> DatasetDataHelper {

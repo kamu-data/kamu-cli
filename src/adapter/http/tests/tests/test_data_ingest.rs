@@ -650,6 +650,52 @@ async fn test_data_push_ingest_into_dataset_without_push_source() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[test_group::group(engine, ingest, datafusion)]
+#[test_log::test(tokio::test)]
+async fn test_data_push_ingest_value_of_wrong_type_is_bad_request() {
+    let harness = DataIngestHarness::new().await;
+    let create_result = harness.create_population_dataset(true).await;
+    let ingest_url = harness.ingest_url(&create_result.dataset_handle.alias);
+
+    let client = async move {
+        let res = DataIngestHarness::push(
+            &ingest_url,
+            "application/x-ndjson",
+            r#"{"event_time": "2020-01-01T00:00:00", "city": "A", "population": "many"}"#,
+        )
+        .await;
+
+        pretty_assertions::assert_eq!(http::StatusCode::BAD_REQUEST, res.status());
+    };
+
+    await_client_server_flow!(harness.server_harness.api_server_run(), client);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_group::group(engine, ingest, datafusion)]
+#[test_log::test(tokio::test)]
+async fn test_data_push_ingest_content_type_not_text_is_bad_request() {
+    let harness = DataIngestHarness::new().await;
+    let create_result = harness.create_population_dataset(true).await;
+    let ingest_url = harness.ingest_url(&create_result.dataset_handle.alias);
+
+    let client = async move {
+        let res = DataIngestHarness::push_with_content_type(
+            &ingest_url,
+            http::HeaderValue::from_bytes(b"application/x-ndjson\xff").unwrap(),
+            r#"{"event_time": "2020-01-01T00:00:00", "city": "A", "population": 100}"#,
+        )
+        .await;
+
+        pretty_assertions::assert_eq!(http::StatusCode::BAD_REQUEST, res.status());
+    };
+
+    await_client_server_flow!(harness.server_harness.api_server_run(), client);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 struct DataIngestHarness {
     pub server_harness: ServerSideLocalFsHarness,
     pub system_time: DateTime<Utc>,
@@ -745,6 +791,19 @@ impl DataIngestHarness {
 
     /// Pushes a raw `body` as `content_type` without naming a source
     async fn push(ingest_url: &str, content_type: &str, body: &'static str) -> reqwest::Response {
+        Self::push_with_content_type(
+            ingest_url,
+            http::HeaderValue::from_str(content_type).unwrap(),
+            body,
+        )
+        .await
+    }
+
+    async fn push_with_content_type(
+        ingest_url: &str,
+        content_type: http::HeaderValue,
+        body: &'static str,
+    ) -> reqwest::Response {
         let cl = reqwest::Client::new();
         cl.execute(
             cl.post(ingest_url)

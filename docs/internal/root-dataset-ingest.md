@@ -160,7 +160,8 @@ stage(df?, opts)                                   commit(staged)
 
 `write` is `stage` followed by `commit`; `write_watermark` commits an `AddData` that carries no data,
 only a watermark and optionally a source state (used by `SetWatermarkExecutorImpl` on behalf of
-`SetWatermarkUseCase`, not by ingest). The executor moves `HEAD` through `DatasetHeadCommitter`; if
+`SetWatermarkUseCase`, not by ingest, which passes the previous source state on so the polling
+source resumes where it was). The executor moves `HEAD` through `DatasetHeadCommitter`; if
 `HEAD` moved after planning it fails with `SetWatermarkExecutionError::RefCASFailed`.
 
 ### 4.3 What `stage` decides
@@ -300,9 +301,10 @@ state is read from the latest `AddData` only, so any `AddData` written without o
 Fetching can be slow and expensive, while reading and merging can fail for reasons the user fixes
 by editing the source (a bad preprocess query, a schema mismatch). After a successful fetch the
 service writes a `FetchSavepoint` — creation time, new source state, event time, a reference to the
-fetched data, `has_more` — to `cache/fetch-savepoint-<hash>`, where the hash covers the
-flatbuffers form of the fetch step and the previous source state. The next iteration with the same
-fetch step and the same committed state resumes from the savepoint instead of fetching again.
+fetched data, `has_more` — to `cache/fetch-savepoint-<hash>`, where the hash covers the dataset
+ID and the flatbuffers form of the fetch step and the previous source state. The next iteration of
+the same dataset with the same fetch step and the same committed state resumes from the savepoint
+instead of fetching again; datasets with identical fetch steps never share savepoints.
 
 - A savepoint is ignored when the dataset has no source state and `fetch_uncacheable` is set, and
   always for MQTT.
@@ -343,11 +345,13 @@ Then:
 1. **Add a push source** (uploads through the HTTP endpoint only) —
    `PushIngestPlannerImpl::plan_push_source_creation` returns an
    `AddPushSource { source_name: "auto", merge: Append }`, with a read step guessed from the media
-   type, when the dataset has no source at all. The use case appends it on top of the current
-   `HEAD` and moves `HEAD` through `DatasetHeadCommitter`, comparing against the head it read at
-   that moment, separately from the data commit: the source stays even if the ingest that
-   follows fails. Without a media type the push fails with `SourceNotFound`.
-2. **Plan** — `PushIngestPlannerImpl::plan_ingest` builds the writer state at `HEAD` (or at
+   type, when the dataset has no source at all. The use case appends it on top of `expected_head`
+   when given, or of `HEAD` as it is then, and moves `HEAD` through `DatasetHeadCommitter`; the
+   data is then planned on top of the new source block. `POST /ingest` runs in one transaction,
+   so when the ingest that follows fails the reference move is rolled back and the source is not
+   kept. Without a media type the push fails with `SourceNotFound`.
+2. **Plan** — a derived dataset is rejected with `InvalidDatasetKind`.
+   `PushIngestPlannerImpl::plan_ingest` builds the writer state at `HEAD` (or at
    `expected_head` when given) for `source_name`. The planner writes nothing. A missing source is
    `SourceNotFound`; with no `source_name` and several push sources, `WriterSourceEventVisitor`
    reports the ambiguity as `SourceNotFound` too.
@@ -369,6 +373,8 @@ once, after step 4 or the failure ([dataset-pull.md](dataset-pull.md#63-listener
 
 `execute_multi` runs steps 1 to 3 for each data source in turn, threading the new head through
 `expected_head`, and moves `HEAD` once at the end from the first `old_head` to the last `new_head`.
+The account statistics count only data reachable from the committed `HEAD`, so each quota check
+adds the sizes of the files ingested earlier in the same call (`uncommitted_bytes`).
 
 Push ingest stores no source state (`new_source_state: None`), so `AddPushSource`'s capacity for
 exactly-once resume is unused.
@@ -445,29 +451,32 @@ Consequences:
 `Unreachable`, `ProcessError`, `ImagePull`, `PipeError`), `EngineProvisioningError`, and template
 and parameter errors. Only push has `UnsupportedMediaType`, `QuotaExceeded` and `Access`. Push
 planning fails separately with `PushIngestPlanningError` (`SourceNotFound`, `HeadNotFound`,
-`UnsupportedMediaType`, `Internal`).
+`InvalidDatasetKind`, `UnsupportedMediaType`, `Internal`).
 
 Each error type says whether a retry could succeed: `PollingIngestError::is_recoverable` and
 `PollingIngestPlanError::is_recoverable`, built on the same methods of `EngineError` and
 `EngineProvisioningError`. Errors caused by the source definition or by the fetched data are not
 recoverable: a retry resumes from the same savepoint and fails the same way. That covers template
-and parameter errors, read, schema, merge, execution and validation errors, an invalid preprocess
-query, an unsupported engine, and a dataset without a polling source. Fetch, process, image, commit
-and internal errors are recoverable. The update task maps the flag to its outcome
-([task-system.md](task-system.md#71-update-dataset)).
+and parameter errors, an invalid fetch step (a templated URL that does not parse, an event time
+that cannot be taken from the source), read, schema, merge, execution and validation errors, an
+invalid preprocess query, an unsupported engine, and a dataset without a polling source. Fetch,
+process, image, commit and internal errors are recoverable. The update task maps the flag to its
+outcome ([task-system.md](task-system.md#71-update-dataset)).
 
 The writer reports a value that does not parse or cast to its column's type as `ExecutionError`,
 including CSV and JSON values the readers decode only when the data is written. A CAS conflict when
 moving `HEAD` after a successful ingest becomes the recoverable task error `DatasetCommitError` →
 `HeadMoved`; any other failure to move `HEAD` is returned from the runner as an internal error,
 which the task agent also records as a recoverable failure. The retry plans from the new head. It
-reuses the fetch savepoint only if the winning commit left the source state unchanged; if the winner
-was a push or `set-watermark`, which write no source state, the source now looks uncacheable and the
-retry is skipped as up to date unless `fetch_uncacheable` is set.
+reuses the fetch savepoint only if the winning commit left the source state unchanged, as
+`set-watermark` does; if the winner was a push, which writes no source state, the source now looks
+uncacheable and the retry is skipped as up to date unless `fetch_uncacheable` is set.
 
-The HTTP handler maps push errors to status codes: `SourceNotFound` and `ReadError` → 400,
-unsupported media type → 415, `QuotaExceeded` → 403, `NotFound` and `Access` → 404 (a dataset the
-caller may not write looks missing), the rest → 500.
+The HTTP handler maps push errors to status codes: `SourceNotFound`, `InvalidDatasetKind`, a
+`Content-Type` that is not text, and the input errors (`ReadError`, `BadInputSchema`,
+`IncompatibleSchema`, `ExecutionError`, `DataValidation`) → 400, unsupported media type → 415, an
+exceeded quota → 403, `NotFound` and `Access` → 404 (a dataset the caller may not write looks
+missing), a `HEAD` CAS conflict → 409, the rest → 500.
 
 ---
 
@@ -475,7 +484,7 @@ caller may not write looks missing), the rest → 500.
 
 | Directory | Holds | Cleaned |
 | --- | --- | --- |
-| `RunInfoDir/ingest-<operation_id>/` | push input copies, reader temp files, `out/data.parquet` before commit | the staged Parquet file moves into the data repo on commit; a polling iteration removes the directory on success, and push leaves it; any left are cleared when the process starts |
+| `RunInfoDir/ingest-<operation_id>/` | push input copies, reader temp files, `out/data.parquet` before commit | the staged Parquet file moves into the data repo on commit; polling and push ingest remove the directory on success; any left are cleared when the process starts |
 | `RunInfoDir/fetch-<operation_id>/`, `RunInfoDir/raw-query-<operation_id>/` | container fetch output and logs; preprocess engine I/O and logs | cleared when the process starts |
 | `CacheDir/fetch-*`, `prepare-*` | fetched and prepared input | prepared files after staging, or when reading or preprocessing fails; a fetch target no savepoint refers to (failed, up-to-date or zero-copy fetch) right away; other fetched files by eviction |
 | `CacheDir/fetch-savepoint-<hash>` | savepoints | by eviction |

@@ -319,7 +319,8 @@ impl PollingIngestServiceImpl {
             .prev_source_state()
             .and_then(PollingSourceState::try_from_source_state);
 
-        let savepoint_path = self.get_savepoint_path(fetch_step, prev_source_state.as_ref());
+        let savepoint_path =
+            self.get_savepoint_path(args.target.get_id(), fetch_step, prev_source_state.as_ref());
         let savepoint = self.read_fetch_savepoint(&savepoint_path)?;
 
         if let Some(savepoint) = savepoint {
@@ -403,13 +404,15 @@ impl PollingIngestServiceImpl {
         }
     }
 
-    /// Savepoint is considered valid only when it corresponds to the identical
-    /// fetch step and the source state of the previous commit - this way
-    /// savepoint is always based on next state increment after the previous
-    /// run. We ensure validity by naming the savepoint based on a hash of the
-    /// fetch step and the source state in flatbuffers representation.
+    /// Savepoint is considered valid only when it corresponds to the same
+    /// dataset, the identical fetch step and the source state of the previous
+    /// commit - this way savepoint is always based on next state increment
+    /// after the previous run. We ensure validity by naming the savepoint
+    /// based on a hash of the dataset ID, the fetch step and the source state
+    /// in flatbuffers representation.
     fn get_savepoint_path(
         &self,
+        dataset_id: &odf::DatasetID,
         fetch_step: &odf::metadata::FetchStep,
         source_state: Option<&PollingSourceState>,
     ) -> PathBuf {
@@ -429,7 +432,9 @@ impl PollingIngestServiceImpl {
             fb.finish(offset, None);
         }
 
-        let hash = odf::Multihash::from_digest_sha3_256(fb.finished_data());
+        let mut hashed = dataset_id.to_string().into_bytes();
+        hashed.extend_from_slice(fb.finished_data());
+        let hash = odf::Multihash::from_digest_sha3_256(&hashed);
 
         self.cache_dir.join(format!("fetch-savepoint-{hash}"))
     }

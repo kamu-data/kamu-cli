@@ -9,7 +9,6 @@
 
 use std::sync::Arc;
 
-use chrono::{DateTime, Utc};
 use dill::{component, interface};
 use internal_error::{ErrorIntoInternal, ResultIntoInternal};
 use kamu_accounts::Principal;
@@ -25,6 +24,7 @@ use kamu_datasets::{
     ResolvedDataset,
 };
 use messaging_outbox::{Outbox, OutboxExt};
+use time_source::SystemTimeSource;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -37,6 +37,7 @@ pub struct PushIngestDataUseCaseImpl {
     dataset_operation_guard: Arc<dyn DatasetOperationGuard>,
     principal: Arc<Principal>,
     outbox: Arc<dyn Outbox>,
+    time_source: Arc<dyn SystemTimeSource>,
 }
 
 impl PushIngestDataUseCaseImpl {
@@ -66,6 +67,7 @@ impl PushIngestDataUseCaseImpl {
         target: ResolvedDataset,
         data_source: DataSource,
         options: PushIngestDataUseCaseOptions,
+        uncommitted_bytes: u64,
         listener_maybe: Option<Arc<dyn PushIngestListener>>,
     ) -> Result<PushIngestResult, PushIngestDataError> {
         let PushIngestDataUseCaseOptions {
@@ -77,12 +79,13 @@ impl PushIngestDataUseCaseImpl {
             skip_quota_check,
         } = options;
 
-        let opts = PushIngestOpts {
+        let mut opts = PushIngestOpts {
             media_type,
             source_event_time,
             schema_inference: SchemaInferenceOpts::default(),
             expected_head,
             skip_quota_check,
+            uncommitted_bytes,
         };
 
         if is_ingest_from_upload
@@ -91,8 +94,14 @@ impl PushIngestDataUseCaseImpl {
                 .plan_push_source_creation(target.clone(), source_name.as_deref(), &opts)
                 .await?
         {
-            self.add_push_source(&target, push_source, source_event_time)
+            let source_head = self
+                .add_push_source(&target, push_source, opts.expected_head.as_ref())
                 .await?;
+
+            // The data is planned on top of the new source block
+            if opts.expected_head.is_some() {
+                opts.expected_head = Some(source_head);
+            }
         }
 
         let ingest_plan = self
@@ -106,24 +115,28 @@ impl PushIngestDataUseCaseImpl {
             .map_err(Into::into)
     }
 
-    /// Commits the push source on top of `HEAD` as it is now
+    /// Commits the push source on top of `expected_head`, or of `HEAD` as it
+    /// is now, and returns the new head
     async fn add_push_source(
         &self,
         target: &ResolvedDataset,
         push_source: odf::metadata::AddPushSource,
-        system_time: Option<DateTime<Utc>>,
-    ) -> Result<(), PushIngestDataError> {
-        let old_head = target
-            .as_metadata_chain()
-            .resolve_ref(&odf::BlockRef::Head)
-            .await
-            .int_err()?;
+        expected_head: Option<&odf::Multihash>,
+    ) -> Result<odf::Multihash, PushIngestDataError> {
+        let old_head = match expected_head {
+            Some(expected_head) => expected_head.clone(),
+            None => target
+                .as_metadata_chain()
+                .resolve_ref(&odf::BlockRef::Head)
+                .await
+                .int_err()?,
+        };
 
         let commit_result = target
             .commit_event(
                 odf::MetadataEvent::AddPushSource(push_source),
                 odf::dataset::CommitOpts {
-                    system_time,
+                    system_time: Some(self.time_source.now()),
                     prev_block_hash: Some(Some(&old_head)),
                     update_block_ref: false,
                     ..Default::default()
@@ -135,7 +148,30 @@ impl PushIngestDataUseCaseImpl {
         self.dataset_head_committer
             .commit_head(target, Some(&old_head), &commit_result.new_head)
             .await
-            .map_err(|e| PushIngestDataError::Execution(odf::dataset::CommitError::from(e).into()))
+            .map_err(|e| {
+                PushIngestDataError::Execution(odf::dataset::CommitError::from(e).into())
+            })?;
+
+        Ok(commit_result.new_head)
+    }
+
+    /// Size of the data file the block adds, if any
+    async fn new_data_size(
+        &self,
+        target: &ResolvedDataset,
+        block_hash: &odf::Multihash,
+    ) -> Result<u64, PushIngestDataError> {
+        let block = target
+            .as_metadata_chain()
+            .get_block(block_hash)
+            .await
+            .int_err()?;
+
+        let odf::MetadataEvent::AddData(add_data) = block.event else {
+            return Ok(0);
+        };
+
+        Ok(add_data.new_data.map_or(0, |data| data.size))
     }
 
     async fn finalize_head_update(
@@ -179,7 +215,7 @@ impl PushIngestDataUseCaseImpl {
 
         let source_name = options.source_name.clone();
         let push_execute_result = self
-            .run_single_ingest(target.clone(), data_source, options, listener_maybe)
+            .run_single_ingest(target.clone(), data_source, options, 0, listener_maybe)
             .await?;
 
         if let PushIngestResult::Updated {
@@ -212,7 +248,8 @@ impl PushIngestDataUseCaseImpl {
         let source_name = base_options.source_name.clone();
         let mut next_expected_head = base_options.expected_head.clone();
         let mut total_blocks = 0usize;
-        let mut last_system_time = Utc::now();
+        let mut uncommitted_bytes = 0u64;
+        let mut last_system_time = self.time_source.now();
         let mut head_transition: Option<(odf::Multihash, odf::Multihash)> = None;
 
         for data_source in data_sources {
@@ -226,6 +263,7 @@ impl PushIngestDataUseCaseImpl {
                     target.clone(),
                     data_source,
                     iteration_options,
+                    uncommitted_bytes,
                     listener_maybe.clone(),
                 )
                 .await?;
@@ -239,6 +277,8 @@ impl PushIngestDataUseCaseImpl {
             {
                 total_blocks += num_blocks;
                 last_system_time = system_time;
+                uncommitted_bytes =
+                    uncommitted_bytes.saturating_add(self.new_data_size(&target, &new_head).await?);
 
                 match &mut head_transition {
                     None => head_transition = Some((old_head, new_head.clone())),

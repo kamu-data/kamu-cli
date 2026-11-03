@@ -13,7 +13,7 @@ use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
 use container_runtime::*;
-use internal_error::{ErrorIntoInternal, ResultIntoInternal};
+use internal_error::ErrorIntoInternal;
 use kamu_core::*;
 use kamu_datasets::{DatasetEnvVar, DatasetKeyValueService, FindDatasetEnvVarError};
 use odf::metadata::FetchStep;
@@ -187,7 +187,7 @@ impl FetchService {
         dataset_env_vars: &HashMap<String, DatasetEnvVar>,
     ) -> Result<Url, PollingIngestError> {
         let url = self.template_string(url_tpl, dataset_env_vars)?;
-        Ok(Url::parse(&url).int_err()?)
+        Url::parse(&url).map_err(|e| InvalidFetchStepError::new(e).into())
     }
 
     pub(super) fn template_headers(
@@ -321,7 +321,7 @@ pub struct EventTimeSourceExtractError {
 
 impl std::convert::From<EventTimeSourceError> for PollingIngestError {
     fn from(e: EventTimeSourceError) -> Self {
-        Self::Internal(e.int_err())
+        Self::InvalidFetchStep(InvalidFetchStepError::new(e))
     }
 }
 

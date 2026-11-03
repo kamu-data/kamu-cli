@@ -42,6 +42,9 @@ impl SetWatermarkExecutor for SetWatermarkExecutorImpl {
         target: ResolvedDataset,
         plan: SetWatermarkPlan,
     ) -> Result<SetWatermarkResult, SetWatermarkExecutionError> {
+        // The source state is carried over: an `AddData` without one resets it
+        let new_source_state = plan.metadata_state.prev_source_state.clone();
+
         let mut writer = DataWriterDataFusion::from_metadata_state(
             datafusion::prelude::SessionContext::new(),
             target.clone(),
@@ -53,7 +56,7 @@ impl SetWatermarkExecutor for SetWatermarkExecutorImpl {
                 plan.new_watermark,
                 WriteWatermarkOpts {
                     system_time: plan.system_time,
-                    new_source_state: None,
+                    new_source_state,
                 },
             )
             .await

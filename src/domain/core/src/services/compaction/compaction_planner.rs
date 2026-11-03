@@ -140,7 +140,7 @@ impl CompactionPlanningError {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Error, Debug)]
-#[error("Dataset '{dataset_alias}' in not root kind")]
+#[error("Dataset '{dataset_alias}' is not a root dataset")]
 pub struct InvalidDatasetKindError {
     pub dataset_alias: odf::DatasetAlias,
 }

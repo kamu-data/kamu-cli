@@ -15,7 +15,7 @@ use internal_error::InternalError;
 use kamu_datasets::ResolvedDataset;
 use thiserror::Error;
 
-use crate::{DataWriterMetadataState, SchemaInferenceOpts};
+use crate::{DataWriterMetadataState, InvalidDatasetKindError, SchemaInferenceOpts};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -54,6 +54,10 @@ pub struct PushIngestOpts {
     pub expected_head: Option<odf::Multihash>,
     /// Skip the account quota check after ingesting.
     pub skip_quota_check: bool,
+    /// Bytes ingested into the dataset that are not reachable from the
+    /// committed `HEAD` yet, so the account statistics do not count them;
+    /// the quota check adds them to the incoming size
+    pub uncommitted_bytes: u64,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -89,6 +93,13 @@ pub enum PushIngestPlanningError {
         #[from]
         #[backtrace]
         odf::storage::BlockNotFoundError,
+    ),
+
+    #[error(transparent)]
+    InvalidDatasetKind(
+        #[from]
+        #[backtrace]
+        InvalidDatasetKindError,
     ),
 
     #[error(transparent)]

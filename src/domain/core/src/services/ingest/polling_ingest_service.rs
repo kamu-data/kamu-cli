@@ -185,6 +185,23 @@ impl InvalidIngestParameterFormat {
     }
 }
 
+/// The fetch step cannot be carried out as written, so fetching again fails
+/// the same way
+#[derive(Error, Debug)]
+#[error("Invalid fetch step")]
+pub struct InvalidFetchStepError {
+    #[source]
+    pub source: BoxedError,
+}
+
+impl InvalidFetchStepError {
+    pub fn new(source: impl Into<BoxedError>) -> Self {
+        Self {
+            source: source.into(),
+        }
+    }
+}
+
 #[derive(Error, Debug)]
 pub enum TemplateError {
     #[error(transparent)]
@@ -345,6 +362,13 @@ pub enum PollingIngestError {
     ),
 
     #[error(transparent)]
+    InvalidFetchStep(
+        #[from]
+        #[backtrace]
+        InvalidFetchStepError,
+    ),
+
+    #[error(transparent)]
     Internal(
         #[from]
         #[backtrace]
@@ -375,6 +399,7 @@ impl PollingIngestError {
             Self::ParameterNotFound(_)
             | Self::InvalidParameterFormat(_)
             | Self::TemplateError(_)
+            | Self::InvalidFetchStep(_)
             | Self::ReadError(_)
             | Self::BadInputSchema(_)
             | Self::IncompatibleSchema(_)

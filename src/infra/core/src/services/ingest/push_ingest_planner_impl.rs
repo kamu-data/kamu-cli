@@ -43,6 +43,14 @@ impl PushIngestPlannerImpl {
         source_name: Option<&str>,
         expected_head: Option<odf::Multihash>,
     ) -> Result<DataWriterMetadataState, PushIngestPlanningError> {
+        if target.get_kind() != odf::DatasetKind::Root {
+            return Err(PushIngestPlanningError::InvalidDatasetKind(
+                InvalidDatasetKindError {
+                    dataset_alias: target.get_alias().clone(),
+                },
+            ));
+        }
+
         let metadata_state = DataWriterMetadataState::build(
             target,
             &odf::BlockRef::Head,

@@ -44,8 +44,9 @@ Recommendation: for ease of reading, use the following format:
     retried or crashed
   - transforms whose output schema is incompatible with the dataset's schema, or whose engine is
     unknown
-  - ingests whose data fails validation or does not parse as its column's type, and preprocess
-    steps that name an unsupported engine
+  - ingests whose data fails validation or does not parse as its column's type, preprocess
+    steps that name an unsupported engine, fetch URLs that are not valid once variables are
+    substituted, and event times that cannot be taken from the fetched source
 
   Network and other transient failures are still retried
 - `kamu verify` with transform replay requires read permission on every input it replays; an
@@ -114,8 +115,8 @@ Recommendation: for ease of reading, use the following format:
   internal engine error: the input data of later transforms was skipped when they were replayed
 - A transform whose engine output adds nothing no longer crashes the process; it is reported as up
   to date
-- Transform and polling ingest runs no longer leave their working files behind after success, and
-  a failed fetch no longer leaves its partial download in the cache
+- Transform, polling ingest and push ingest runs no longer leave their working files behind after
+  success, and a failed fetch no longer leaves its partial download in the cache
 - An ingest flow of a root dataset without a polling source fails instead of reporting success on
   every run
 - `kamu pull` and `kamu ingest` report a CSV or JSON value that does not parse with its own message
@@ -132,6 +133,17 @@ Recommendation: for ease of reading, use the following format:
   longer ingested a second time on the next poll
 - A fetch savepoint left truncated by a crash or a full disk is fetched again instead of failing
   every later run until the cache is cleared
+- Two datasets with the same fetch step no longer share fetched data: on a node where tenants'
+  datasets polled the same URL, one dataset's first ingest could commit the data another had
+  fetched with its own secrets instead of fetching
+- Setting a watermark (`kamu pull --set-watermark`, GraphQL `setWatermark`) keeps the polling
+  source's progress: the next poll no longer skips the source as uncacheable, or ingests again the
+  files a `FilesGlob` source had already read
+- Pushing data over HTTP (`POST /ingest`) returns 400 for a derived dataset, for data that does not
+  match the dataset's schema or does not parse, and for a `Content-Type` that is not plain text, and
+  409 when the dataset's head moved concurrently, instead of a server error or a crash
+- The first upload into a dataset without a source no longer fails when its `odf-event-time` is
+  earlier than the dataset's last change
 
 ## [0.272.0] - 2026-11-02
 ### Added

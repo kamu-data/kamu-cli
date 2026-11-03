@@ -301,6 +301,91 @@ async fn test_push_ingest_data_upload_adds_push_source() {
 
 #[tokio::test]
 #[test_group::group(engine, ingest, datafusion)]
+async fn test_push_ingest_data_upload_with_expected_head_adds_push_source() {
+    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let (_, dataset_id_foo) = odf::DatasetID::new_generated_ed25519();
+
+    let harness = PushIngestDataUseCaseHarness::new(
+        MockDatasetPermissionChecker::allowing(),
+        MockDidGenerator::predefined_dataset_ids(vec![dataset_id_foo]),
+    );
+
+    let foo = harness.create_root_dataset_without_source(&alias_foo).await;
+    let seed_head = harness.get_head(&foo).await;
+
+    assert_matches!(
+        harness.ingest_ndjson(&foo, Some(seed_head.clone()), true).await,
+        Ok(PushIngestResult::Updated { old_head, .. }) if old_head != seed_head
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[tokio::test]
+#[test_group::group(engine, ingest, datafusion)]
+async fn test_push_ingest_data_upload_with_old_event_time_adds_push_source() {
+    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let (_, dataset_id_foo) = odf::DatasetID::new_generated_ed25519();
+
+    let harness = PushIngestDataUseCaseHarness::new(
+        MockDatasetPermissionChecker::allowing(),
+        MockDidGenerator::predefined_dataset_ids(vec![dataset_id_foo]),
+    );
+
+    let foo = harness.create_root_dataset_without_source(&alias_foo).await;
+
+    // The event time predates the dataset; the source block takes the server clock
+    assert_matches!(
+        harness
+            .ingest_data(
+                ResolvedDataset::from_created(&foo),
+                PushIngestDataUseCaseHarness::ndjson_source(),
+                PushIngestDataUseCaseOptions {
+                    source_event_time: Some("2000-01-01T00:00:00Z".parse().unwrap()),
+                    ..PushIngestDataUseCaseHarness::ndjson_options(None, true)
+                },
+            )
+            .await,
+        Ok(PushIngestResult::Updated { .. })
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[tokio::test]
+async fn test_push_ingest_data_into_derivative_rejected() {
+    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let alias_bar = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("bar"));
+    let (_, dataset_id_foo) = odf::DatasetID::new_generated_ed25519();
+    let (_, dataset_id_bar) = odf::DatasetID::new_generated_ed25519();
+
+    let harness = PushIngestDataUseCaseHarness::new(
+        MockDatasetPermissionChecker::allowing(),
+        MockDidGenerator::predefined_dataset_ids(vec![dataset_id_foo, dataset_id_bar]),
+    );
+
+    harness.create_root_dataset(&alias_foo).await;
+    let bar = harness
+        .create_derived_dataset(&alias_bar, vec![alias_foo.as_local_ref()])
+        .await;
+
+    for is_ingest_from_upload in [false, true] {
+        assert_matches!(
+            harness
+                .ingest_ndjson(&bar, None, is_ingest_from_upload)
+                .await,
+            Err(PushIngestDataError::Planning(
+                PushIngestPlanningError::InvalidDatasetKind(_)
+            ))
+        );
+    }
+    assert_eq!(harness.get_head(&bar).await, bar.head);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[tokio::test]
+#[test_group::group(engine, ingest, datafusion)]
 async fn test_push_ingest_data_head_moved_concurrently() {
     let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
     let (_, dataset_id_foo) = odf::DatasetID::new_generated_ed25519();

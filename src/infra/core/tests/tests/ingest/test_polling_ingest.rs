@@ -1431,6 +1431,47 @@ async fn test_ingest_polling_resumes_from_savepoint_without_downloading() {
 
 #[test_group::group(engine, ingest, datafusion)]
 #[test_log::test(tokio::test)]
+async fn test_ingest_polling_savepoints_are_not_shared_between_datasets() {
+    let harness = IngestTestHarness::new();
+    let url = harness
+        .serve_file("data.csv", "city,population\nA,not-a-number\n")
+        .await;
+    let fetch_step = odf::metadata::FetchStep::Url(odf::metadata::FetchStepUrl {
+        url: url.to_string(),
+        event_time: Some(odf::metadata::EventTimeSourceFromSystemTime {}.into()),
+        cache: None,
+        headers: None,
+    });
+    let foo = harness
+        .create_named_csv_dataset_fetching("foo", fetch_step.clone(), None)
+        .await;
+    let bar = harness
+        .create_named_csv_dataset_fetching("bar", fetch_step, None)
+        .await;
+
+    assert_matches!(
+        harness.ingest(foo).await,
+        Err(PollingIngestError::ExecutionError(_))
+    );
+    assert_eq!(harness.savepoints_left(), 1);
+
+    // The same fetch step of another dataset fetches for itself
+    harness.write_served_file("data.csv", "city,population\nA,1000\n");
+    let res = harness.ingest(bar).await.unwrap();
+
+    assert_matches!(
+        res,
+        PollingIngestResult::Updated {
+            increment: odf::dataset::MetadataChainIncrementInterval { num_records: 1, .. },
+            ..
+        }
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_group::group(engine, ingest, datafusion)]
+#[test_log::test(tokio::test)]
 async fn test_ingest_polling_savepoint_without_its_data_downloads_again() {
     let harness = IngestTestHarness::new();
     let url = harness
@@ -1679,6 +1720,16 @@ impl IngestTestHarness {
         fetch_step: odf::metadata::FetchStep,
         preprocess: Option<odf::metadata::TransformSql>,
     ) -> ResolvedDataset {
+        self.create_named_csv_dataset_fetching("foo", fetch_step, preprocess)
+            .await
+    }
+
+    async fn create_named_csv_dataset_fetching(
+        &self,
+        name: &str,
+        fetch_step: odf::metadata::FetchStep,
+        preprocess: Option<odf::metadata::TransformSql>,
+    ) -> ResolvedDataset {
         let mut source = MetadataFactory::set_polling_source()
             .fetch(fetch_step)
             .read(odf::metadata::ReadStep::Csv(odf::metadata::ReadStepCsv {
@@ -1694,7 +1745,7 @@ impl IngestTestHarness {
         }
 
         let dataset_snapshot = MetadataFactory::dataset_snapshot()
-            .name("foo")
+            .name(name)
             .kind(odf::DatasetKind::Root)
             .push_event(source.build())
             .build();
