@@ -221,7 +221,7 @@ impl MockDatasetPermissionChecker {
         )
     }
 
-    pub fn expect_check_permission_unauthorized_internal<P>(
+    fn expect_check_permission_unauthorized_internal<P>(
         self,
         dataset_id_predicate: P,
         permission: DatasetPermission,
