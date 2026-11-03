@@ -28,7 +28,37 @@ impl SimpleTransferProtocol {
         arc_stats: Arc<Mutex<SyncStats>>,
     ) -> Result<(), SyncError> {
         let hash = object.physical_hash();
-        tracing::info!(?hash, "Transferring {} file", object.name());
+
+        // Objects are stored by hash, so one the destination has, such as from a sync that failed
+        // later, needs no download
+        let already_stored = match object.repo(dst).contains(hash).await {
+            Ok(contains) => contains,
+            Err(odf::storage::ContainsError::Access(e)) => return Err(SyncError::Access(e)),
+            Err(odf::storage::ContainsError::Internal(e)) => return Err(SyncError::Internal(e)),
+        };
+        if already_stored {
+            tracing::info!(?hash, "Destination already has the {} file", object.name());
+        } else {
+            tracing::info!(?hash, "Transferring {} file", object.name());
+            self.download_object(src, dst, object, trust_source_hashes)
+                .await?;
+        }
+
+        let mut stats = arc_stats.lock().unwrap();
+        object.count(&mut stats);
+        listener.on_status(SyncStage::TransferData, &stats);
+
+        Ok(())
+    }
+
+    async fn download_object(
+        &self,
+        src: &dyn odf::Dataset,
+        dst: &dyn odf::Dataset,
+        object: BlockObject<'_>,
+        trust_source_hashes: bool,
+    ) -> Result<(), SyncError> {
+        let hash = object.physical_hash();
 
         let stream = match object.repo(src).get_stream(hash).await {
             Ok(s) => Ok(s),
@@ -66,13 +96,7 @@ impl SimpleTransferProtocol {
             .into()),
             Err(odf::storage::InsertError::Access(e)) => Err(SyncError::Access(e)),
             Err(odf::storage::InsertError::Internal(e)) => Err(SyncError::Internal(e)),
-        }?;
-
-        let mut stats = arc_stats.lock().unwrap();
-        object.count(&mut stats);
-        listener.on_status(SyncStage::TransferData, &stats);
-
-        Ok(())
+        }
     }
 
     /// Copies the data and checkpoint files the new blocks reference, before

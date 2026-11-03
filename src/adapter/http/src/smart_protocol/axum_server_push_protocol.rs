@@ -633,6 +633,26 @@ impl AxumServerPushProtocolInstance {
                         .get_dataset_by_handle(&dataset_handle)
                         .await;
 
+                    // The client chooses which objects to upload; the blocks must not be
+                    // committed without any of the files they reference
+                    let missing_objects = collect_object_references_from_metadata(
+                        resolved_dataset.as_ref(),
+                        &new_blocks,
+                        true,
+                    )
+                    .await?;
+                    if let Some(missing) = missing_objects.first() {
+                        return Err(format!(
+                            "Client did not upload {} file(s) the pushed blocks reference, such \
+                             as {:?} {}",
+                            missing_objects.len(),
+                            missing.object_type,
+                            missing.physical_hash,
+                        )
+                        .int_err()
+                        .into());
+                    }
+
                     append_dataset_metadata_batch
                         .execute(
                             &resolved_dataset,

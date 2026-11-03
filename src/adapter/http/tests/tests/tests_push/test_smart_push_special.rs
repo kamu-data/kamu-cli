@@ -14,6 +14,7 @@ use kamu::domain::{PushError, SyncError, SyncHeadMovedError, SyncResult};
 use kamu_adapter_http::smart_protocol::SmartTransferProtocolServerConfig;
 use kamu_adapter_http::smart_protocol::messages::{
     DatasetPushCompleteConfirmed,
+    DatasetPushCompleteError,
     DatasetPushRequest,
     DatasetPushRequestError,
     ObjectsUploadProgressDetails,
@@ -602,6 +603,66 @@ async fn test_smart_push_forced_head_moved_after_initiation() {
             stored_heads.get(&server_dataset_handle.id).await,
             concurrent_head
         );
+    };
+
+    await_client_server_flow!(api_server_handle, client_handle);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_smart_push_without_uploading_referenced_objects_is_not_committed() {
+    let scenario = SmartPushExistingUpToDateDatasetScenario::prepare(
+        ClientSideHarness::new(ClientSideHarnessOptions {
+            tenancy_config: TenancyConfig::SingleTenant,
+            authenticated_remotely: true,
+        })
+        .await,
+        ServerSideLocalFsHarness::new(ServerSideHarnessOptions {
+            tenancy_config: TenancyConfig::MultiTenant,
+            authorized_writes: true,
+            ..ServerSideHarnessOptions::default()
+        })
+        .await,
+    )
+    .await;
+
+    let dataset_handle = &scenario.client_dataset_handle;
+    let server_head = scenario
+        .client_harness
+        .stored_head(&dataset_handle.id)
+        .await;
+    scenario
+        .client_harness
+        .commit_add_data(dataset_handle, server_head.clone())
+        .await;
+    let (push_request, metadata_request) = scenario
+        .client_harness
+        .raw_push_requests(dataset_handle, &server_head)
+        .await;
+    let stored_heads = scenario.server_harness.stored_heads();
+
+    let api_server_handle = scenario.server_harness.api_server_run();
+
+    let client_handle = async {
+        let mut session = scenario
+            .client_harness
+            .open_raw_push_session(scenario.server_dataset_ref.url().unwrap())
+            .await;
+        // The new block references a data file and a checkpoint, and neither is uploaded
+        session
+            .begin_metadata_only_push(push_request, metadata_request)
+            .await;
+        session.next_progress_request().await;
+        session
+            .report_progress(ObjectsUploadProgressDetails::Complete)
+            .await;
+
+        assert_matches!(
+            session.complete().await,
+            Err(DatasetPushCompleteError::Internal(_))
+        );
+        pretty_assertions::assert_eq!(stored_heads.get(&dataset_handle.id).await, server_head);
     };
 
     await_client_server_flow!(api_server_handle, client_handle);

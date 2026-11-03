@@ -279,7 +279,7 @@ async fn test_push_remote_no_target_no_alias_multiple_repos_exist() {
         PushResponse {
             local_handle: Some(a_local_handle),
             target: None,
-            result: Err(PushError::AmbiguousTarget),
+            result: Err(PushError::AmbiguousRepository),
         } if *a_local_handle == foo.dataset_handle
     );
 }

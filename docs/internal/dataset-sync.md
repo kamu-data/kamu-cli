@@ -229,7 +229,8 @@ sequenceDiagram
    `DatasetIdMismatch`, `force` or not.
 2. **Seed.** For a local destination to create, the source's `Seed` block is stored without
    `HEAD` or entry ([§4](#4-sync-requests)); its computed hash must equal the source's.
-3. **Objects.** Every data slice and checkpoint referenced by the new blocks is streamed from the
+3. **Objects.** Every data slice and checkpoint referenced by the new blocks that the destination
+   does not have yet (an earlier sync that failed later may have copied it) is streamed from the
    source's object repo to the destination's, `max_parallel_transfers` at a time (default 10,
    `SIMPLE_PROTOCOL_MAX_PARALLEL_TRANSFERS`). With a trusted source the declared hash is passed as
    precomputed; otherwise the local filesystem repo recomputes and checks it. The S3 repo requires
@@ -405,6 +406,11 @@ time (default: the machine's available parallelism). On pull the client verifies
 hash as it inserts it. On push the server's `PUT` endpoint verifies the hash; a presigned S3
 upload is not re-hashed by the server.
 
+Before the blocks are committed, the side that receives them checks that every object they
+reference is present: the pull client fails with `CorruptedSource` when the server did not offer
+one, and the push server fails the commit with an internal error when the client did not upload
+one, so `HEAD` never points at a block whose objects are missing.
+
 ---
 
 ## 8. Push
@@ -413,14 +419,17 @@ upload is not re-hashed by the server.
 
 1. **Authorization:** `SyncTo` on every dataset to push, which needs Read
    ([`DatasetOperationGuard`](../../src/domain/datasets/domain/src/services/dataset_operation_guard.rs),
-   [§10](#10-authorization)); any failure returns only those failures.
+   [§10](#10-authorization)).
 2. **Plan:** `PushRequestPlanner::collect_plan` resolves each dataset's target with
    `RemoteAliasResolver::resolve_push_target` ([§9](#9-remote-repositories-and-aliases)).
 3. **Sync requests:** source = the local dataset, destination = the target URL.
 4. **Sync:** all requests run concurrently (`join_all`) through `SyncService` with the push's
    `SyncOptions`.
-5. **Aliases:** if every push succeeded and `add_aliases` is on (the default; `--no-alias` turns it
-   off), a push alias with the target URL is stored on each dataset.
+5. **Aliases:** with `add_aliases` on (the default; `--no-alias` turns it off), a push alias with
+   the target URL is stored on each dataset that was pushed.
+
+A dataset that fails a step, from authorization to the sync itself, gets an error response and the
+others go on, so every dataset is reported.
 
 `--recursive` and `--all` are accepted by the CLI but `unimplemented!` in the use case. `--to`
 names the target (a URL, a `repo/name` alias, or a repository); `--force` and `--visibility` map

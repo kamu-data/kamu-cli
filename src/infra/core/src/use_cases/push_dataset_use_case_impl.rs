@@ -89,6 +89,7 @@ impl PushDatasetUseCaseImpl {
         Ok((authorized_handles, unauthorized_responses))
     }
 
+    /// Pairs each sync request with the index of its plan item
     #[transactional_method1(sync_request_builder: Arc<SyncRequestBuilder>)]
     #[tracing::instrument(
         level = "debug",
@@ -101,11 +102,11 @@ impl PushDatasetUseCaseImpl {
         plan: &[PushItem],
         sync_options: SyncOptions,
         push_target: Option<&odf::DatasetPushTarget>,
-    ) -> Result<(Vec<SyncRequest>, Vec<PushResponse>), InternalError> {
+    ) -> Result<(Vec<(usize, SyncRequest)>, Vec<PushResponse>), InternalError> {
         let mut sync_requests = Vec::new();
         let mut errors = Vec::new();
 
-        for pi in plan {
+        for (index, pi) in plan.iter().enumerate() {
             let src_ref = pi.local_handle.as_local_ref();
             let dst_ref = (&pi.remote_target.url).into();
             match sync_request_builder
@@ -114,7 +115,7 @@ impl PushDatasetUseCaseImpl {
             {
                 Ok(sync_request) => {
                     sync_request.src.detach_from_transaction();
-                    sync_requests.push(sync_request);
+                    sync_requests.push((index, sync_request));
                 }
                 Err(e) => errors.push(PushResponse {
                     local_handle: Some(pi.local_handle.clone()),
@@ -196,13 +197,14 @@ impl PushDatasetUseCase for PushDatasetUseCaseImpl {
             unimplemented!("Pushing all datasets is not yet supported")
         }
 
+        // A dataset that fails a step is reported and the others go on
+        let mut responses = Vec::new();
+
         // Authorization checks upon all datasets come first
         let (authorized_handles, unauthorized_responses) = self
             .make_authorization_checks(dataset_handles, options.remote_target.as_ref())
             .await?;
-        if !unauthorized_responses.is_empty() {
-            return Ok(unauthorized_responses);
-        }
+        responses.extend(unauthorized_responses);
 
         // Prepare a push plan
         let (plan, errors) = self
@@ -211,9 +213,7 @@ impl PushDatasetUseCase for PushDatasetUseCaseImpl {
                 options.remote_target.as_ref(),
             )
             .await?;
-        if !errors.is_empty() {
-            return Ok(errors);
-        }
+        responses.extend(errors);
 
         tracing::debug!(?plan, "Obtained push plan");
 
@@ -221,11 +221,10 @@ impl PushDatasetUseCase for PushDatasetUseCaseImpl {
         let (sync_requests, errors) = self
             .build_sync_requests(&plan, options.sync_options, options.remote_target.as_ref())
             .await?;
-        if !errors.is_empty() {
-            return Ok(errors);
-        }
+        responses.extend(errors);
 
         // Run sync process
+        let (plan_indices, sync_requests): (Vec<_>, Vec<_>) = sync_requests.into_iter().unzip();
         let futures: Vec<_> = sync_requests
             .into_iter()
             .map(|sync_request| {
@@ -241,25 +240,21 @@ impl PushDatasetUseCase for PushDatasetUseCaseImpl {
         // TODO: PERF: use tokio-tasks?
         let sync_results = futures::future::join_all(futures).await;
 
-        // Convert results
-        assert_eq!(plan.len(), sync_results.len());
-        let results: Vec<_> = std::iter::zip(&plan, sync_results)
-            .map(|(pi, res)| pi.as_response(res))
-            .collect();
-
-        // If no errors - add aliases to initial items
-        if options.add_aliases && results.iter().all(|r| r.result.is_ok()) {
-            for push_item in &plan {
-                // TODO: Improve error handling
+        // Convert results, adding a push alias for each dataset pushed
+        assert_eq!(plan_indices.len(), sync_results.len());
+        for (index, sync_result) in std::iter::zip(plan_indices, sync_results) {
+            let push_item = &plan[index];
+            if options.add_aliases && sync_result.is_ok() {
                 self.save_dataset_alias_transactional(
                     &push_item.local_handle,
                     &((&push_item.remote_target.url).into()),
                 )
                 .await?;
             }
+            responses.push(push_item.as_response(sync_result));
         }
 
-        Ok(results)
+        Ok(responses)
     }
 }
 

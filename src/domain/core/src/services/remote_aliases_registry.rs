@@ -99,9 +99,8 @@ impl From<GetRepoError> for ResolveAliasError {
 impl From<ResolveAliasError> for PushError {
     fn from(val: ResolveAliasError) -> Self {
         match val {
-            ResolveAliasError::AmbiguousAlias | ResolveAliasError::AmbiguousRepository => {
-                Self::AmbiguousTarget
-            }
+            ResolveAliasError::AmbiguousAlias => Self::AmbiguousTarget,
+            ResolveAliasError::AmbiguousRepository => Self::AmbiguousRepository,
             ResolveAliasError::EmptyRepositoryList => Self::NoTarget,
             ResolveAliasError::RepositoryNotFound(e) => Self::DestinationNotFound(e),
             ResolveAliasError::Internal(e) => Self::Internal(e),

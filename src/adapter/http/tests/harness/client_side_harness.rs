@@ -526,6 +526,22 @@ impl ClientSideHarness {
         alias.as_local_ref()
     }
 
+    /// Commits a data block on top of the data block `prev_data_block_hash`,
+    /// with its data and checkpoint files
+    pub async fn commit_add_data(
+        &self,
+        dataset_handle: &odf::DatasetHandle,
+        prev_data_block_hash: odf::Multihash,
+    ) -> odf::Multihash {
+        commit_add_data_event(
+            self.dataset_registry().as_ref(),
+            dataset_handle,
+            Some(prev_data_block_hash),
+        )
+        .await
+        .new_head
+    }
+
     /// Commits a metadata-only block, which references no objects
     pub async fn commit_set_info(&self, dataset_handle: &odf::DatasetHandle) -> odf::Multihash {
         commit_set_info(self.commit_dataset_event().as_ref(), dataset_handle).await

@@ -36,13 +36,16 @@ impl RawProtocolSocket {
             .unwrap();
     }
 
-    /// Receives the next message, which must be a text message of type `T`
+    /// Receives the next reply of type `T`: a text message, or the reason of
+    /// a close frame, which carries the errors that end a session
     pub async fn receive<T: DeserializeOwned>(&mut self) -> T {
         let message = self.socket.next().await;
-        let Some(Ok(Message::Text(message))) = message else {
-            panic!("The server must reply with a message, got {message:?}");
+        let payload = match &message {
+            Some(Ok(Message::Text(text))) => text.as_str(),
+            Some(Ok(Message::Close(Some(frame)))) => frame.reason.as_str(),
+            _ => panic!("The server must reply with a message, got {message:?}"),
         };
-        serde_json::from_str(&message).unwrap()
+        serde_json::from_str(payload).unwrap()
     }
 }
 

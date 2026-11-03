@@ -108,6 +108,16 @@ async fn test_first_pull_continues_after_uncommitted_transfer_s3() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
+async fn test_pull_retry_reuses_objects_of_an_uncommitted_transfer() {
+    let tmp_repo_dir = tempfile::tempdir().unwrap();
+    LocalPullHarness::new(Url::from_directory_path(tmp_repo_dir.path()).unwrap())
+        .assert_retry_reuses_objects_of_uncommitted_transfer(tmp_repo_dir.path())
+        .await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
 async fn test_commit_into_dataset_deleted_during_transfer_fails() {
     let tmp_repo_dir = tempfile::tempdir().unwrap();
     let harness = LocalPullHarness::new(Url::from_directory_path(tmp_repo_dir.path()).unwrap());
@@ -394,6 +404,36 @@ impl LocalPullHarness {
             Ok(SyncResult::Updated { old_head: None, new_head, .. }) if new_head == source_head
         );
         assert_eq!(self.destination_head().await, Some(source_head));
+    }
+
+    /// A retry after an uncommitted transfer takes the data and checkpoint
+    /// files the destination already has instead of downloading them: with
+    /// the repository's copies removed, a download would fail
+    async fn assert_retry_reuses_objects_of_uncommitted_transfer(&self, repo_dir: &Path) {
+        self.create_source_dataset().await;
+        let source_head = self.append_source_data().await;
+        self.push_source().await;
+
+        let _abandoned = self.transfer().await;
+        self.remove_repository_objects(repo_dir);
+
+        let transferred = self.transfer().await;
+        assert_matches!(
+            self.commit(transferred).await,
+            Ok(SyncResult::Updated { new_head, .. }) if new_head == source_head
+        );
+    }
+
+    /// Deletes the data and checkpoint files of the dataset in a local
+    /// repository, keeping its metadata
+    fn remove_repository_objects(&self, repo_dir: &Path) {
+        let dataset_dir = repo_dir.join(self.dataset_alias.dataset_name.as_str());
+        for objects_dir in ["data", "checkpoints"] {
+            let objects_dir = dataset_dir.join(objects_dir);
+            assert!(objects_dir.exists(), "{} is missing", objects_dir.display());
+            std::fs::remove_dir_all(&objects_dir).unwrap();
+            std::fs::create_dir(&objects_dir).unwrap();
+        }
     }
 
     /// Another writer moves the destination `HEAD` while a pull transfers.

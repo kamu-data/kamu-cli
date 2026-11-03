@@ -389,6 +389,28 @@ impl WsSmartTransferProtocolClient {
                 )
                 .await?;
 
+                // The server chooses which objects to send; the blocks must not be
+                // committed without any of the files they reference
+                let missing_objects = collect_object_references_from_metadata(
+                    dst_storage.as_ref(),
+                    &new_blocks,
+                    true,
+                )
+                .await?;
+                if let Some(missing) = missing_objects.first() {
+                    return Err(CorruptedSourceError {
+                        message: format!(
+                            "Server did not send {} file(s) the pulled blocks reference, such as \
+                             {:?} {}",
+                            missing_objects.len(),
+                            missing.object_type,
+                            missing.physical_hash,
+                        ),
+                        source: None,
+                    }
+                    .into());
+                }
+
                 append_transferred_blocks(
                     dst_storage.as_ref(),
                     Box::new(new_blocks.into_iter()),

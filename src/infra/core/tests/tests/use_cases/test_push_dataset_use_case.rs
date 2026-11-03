@@ -280,7 +280,7 @@ async fn test_push_multiple_success() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[tokio::test]
-async fn test_push_multiple_mixed_authorization_issues() {
+async fn test_push_multiple_mixed_authorization_pushes_allowed_datasets() {
     let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
     let alias_bar = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("bar"));
     let alias_baz = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("baz"));
@@ -318,7 +318,16 @@ async fn test_push_multiple_mixed_authorization_issues() {
         .await
         .unwrap();
 
-    assert_eq!(responses.len(), 2);
+    assert_eq!(responses.len(), 3);
+    assert_matches!(
+        responses.remove(2),
+         PushResponse {
+            local_handle: Some(local_handle),
+            target: Some(odf::DatasetPushTarget::Repository(repo_name)),
+            result: Ok(SyncResult::Updated { .. }),
+        } if local_handle == bar.dataset_handle &&
+            repo_name == harness.remote_repo_name
+    );
     assert_matches!(
         responses.remove(1),
          PushResponse {
@@ -337,6 +346,12 @@ async fn test_push_multiple_mixed_authorization_issues() {
         } if local_handle == foo.dataset_handle &&
             repo_name == harness.remote_repo_name
     );
+
+    // The pushed dataset gets its alias, the denied ones do not
+    let bar_aliases = harness.get_remote_aliases(&bar).await;
+    assert!(!bar_aliases.is_empty(RemoteAliasKind::Push));
+    let foo_aliases = harness.get_remote_aliases(&foo).await;
+    assert!(foo_aliases.is_empty(RemoteAliasKind::Push));
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
