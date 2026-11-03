@@ -61,7 +61,8 @@ kamu_cli_execute_command_e2e_test!(
     storage = sqlite,
     fixture = kamu_cli_e2e_repo_tests::commands::test_ingest_into_derivative_fails,
     options = Options::default().with_frozen_system_time(),
-    extra_test_groups = "engine, ingest, datafusion"
+    extra_test_groups = "engine, ingest, datafusion",
+    sqlite_only = "checks a CLI error message; the repository type cannot change it"
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -81,7 +82,8 @@ kamu_cli_execute_command_e2e_test!(
     storage = sqlite,
     fixture = kamu_cli_e2e_repo_tests::commands::test_ingest_without_files_or_stdin_fails,
     options = Options::default().with_frozen_system_time(),
-    extra_test_groups = "engine, ingest, datafusion"
+    extra_test_groups = "engine, ingest, datafusion",
+    sqlite_only = "checks a CLI error message; the repository type cannot change it"
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -90,7 +92,8 @@ kamu_cli_execute_command_e2e_test!(
     storage = sqlite,
     fixture = kamu_cli_e2e_repo_tests::commands::test_ingest_with_unknown_source_name_fails,
     options = Options::default().with_frozen_system_time(),
-    extra_test_groups = "engine, ingest, datafusion"
+    extra_test_groups = "engine, ingest, datafusion",
+    sqlite_only = "checks a CLI error message; the repository type cannot change it"
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -99,7 +102,8 @@ kamu_cli_execute_command_e2e_test!(
     storage = sqlite,
     fixture = kamu_cli_e2e_repo_tests::commands::test_ingest_of_unparsable_value_fails,
     options = Options::default().with_frozen_system_time(),
-    extra_test_groups = "engine, ingest, datafusion"
+    extra_test_groups = "engine, ingest, datafusion",
+    sqlite_only = "checks a CLI error message; the repository type cannot change it"
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

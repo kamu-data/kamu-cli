@@ -11,9 +11,11 @@ use kamu_cli_e2e_common::prelude::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-kamu_cli_execute_command_e2e_test!(
+kamu_cli_run_api_server_e2e_test!(
     storage = postgres,
-    fixture = kamu_cli_e2e_repo_tests::commands::test_system_info
+    fixture =
+        kamu_cli_e2e_repo_tests::rest_api::test_gql_dataset_adapter_versioned_file_direct_upload_download_mt,
+    options = Options::default().with_multi_tenant()
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

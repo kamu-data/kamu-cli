@@ -14,7 +14,8 @@ use kamu_cli_e2e_common::prelude::*;
 kamu_cli_execute_command_e2e_test!(
     storage = sqlite,
     fixture = kamu_cli_e2e_repo_tests::commands::test_complete_subcommand,
-    options = Options::default().with_no_workspace()
+    options = Options::default().with_no_workspace(),
+    sqlite_only = "shell completion reads no repository"
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -22,42 +23,47 @@ kamu_cli_execute_command_e2e_test!(
 kamu_cli_execute_command_e2e_test!(
     storage = sqlite,
     fixture = kamu_cli_e2e_repo_tests::commands::test_complete_config,
-    options = Options::default().with_no_workspace()
+    options = Options::default().with_no_workspace(),
+    sqlite_only = "shell completion reads no repository"
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 kamu_cli_execute_command_e2e_test!(
     storage = sqlite,
-    fixture = kamu_cli_e2e_repo_tests::commands::test_complete_dataset_name
+    fixture = kamu_cli_e2e_repo_tests::commands::test_complete_dataset_name,
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 kamu_cli_execute_command_e2e_test!(
     storage = sqlite,
-    fixture = kamu_cli_e2e_repo_tests::commands::test_complete_resource_type
+    fixture = kamu_cli_e2e_repo_tests::commands::test_complete_resource_type,
+    sqlite_only = "shell completion reads no repository"
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 kamu_cli_execute_command_e2e_test!(
     storage = sqlite,
-    fixture = kamu_cli_e2e_repo_tests::commands::test_complete_resource_type_extra_targets
+    fixture = kamu_cli_e2e_repo_tests::commands::test_complete_resource_type_extra_targets,
+    sqlite_only = "shell completion reads no repository"
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 kamu_cli_execute_command_e2e_test!(
     storage = sqlite,
-    fixture = kamu_cli_e2e_repo_tests::commands::test_complete_context_name
+    fixture = kamu_cli_e2e_repo_tests::commands::test_complete_context_name,
+    sqlite_only = "shell completion reads no repository"
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 kamu_cli_execute_command_e2e_test!(
     storage = sqlite,
-    fixture = kamu_cli_e2e_repo_tests::commands::test_complete_context_option_value
+    fixture = kamu_cli_e2e_repo_tests::commands::test_complete_context_option_value,
+    sqlite_only = "shell completion reads no repository"
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -65,7 +71,8 @@ kamu_cli_execute_command_e2e_test!(
 kamu_cli_execute_command_e2e_test!(
     storage = sqlite,
     fixture = kamu_cli_e2e_repo_tests::commands::test_complete_outside_workspace_does_not_crash,
-    options = Options::default().with_no_workspace()
+    options = Options::default().with_no_workspace(),
+    sqlite_only = "shell completion reads no repository"
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

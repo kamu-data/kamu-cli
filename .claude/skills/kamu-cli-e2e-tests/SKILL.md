@@ -150,9 +150,22 @@ kamu_cli_execute_command_e2e_test!(
 `storage = postgres`** (the Postgres macros add a `sqlx::test(migrator = …)`
 pool arg; SQLite creates its own DB).
 
-> **Lockstep rule:** every fixture must be listed in *each* DB directory you want
-> it to run on. Adding a test to `sqlite/` but not `postgres/` silently drops
-> Postgres coverage. Keep the mirror files in sync.
+> **Which databases a fixture runs on:** wire it for Postgres only when the
+> repository type can change the result — server flows, accounts and access,
+> anything read back from the database. A fixture that checks CLI messages or
+> workspace files runs on SQLite alone, and its wiring says why with
+> `sqlite_only = "<reason>"` (`postgres_only` for the opposite case). A fixture
+> wired to both stays in lockstep: the two wiring files list it with the same
+> options and test groups. The `e2e_storage_wiring` lint in `kamu-repo-tools`
+> (`make lint-repo`) checks all three rules.
+>
+> ```rust
+> kamu_cli_execute_command_e2e_test!(
+>     storage = sqlite,
+>     fixture = kamu_cli_e2e_repo_tests::commands::test_delete_args_validation,
+>     sqlite_only = "checks a CLI error message; the repository type cannot change it"
+> );
+> ```
 
 Use `run_api_server` form for server-backed fixtures:
 
@@ -279,8 +292,9 @@ investigating further. See DEVELOPER.md for details.
 1. Write the scenario body in `repo-tests/src/commands/test_<area>.rs` (or
    `repo-tests/src/rest_api/` for API-server-mode scenarios).
 2. Register it in `commands/mod.rs` (`mod` + `pub use`).
-3. Add wiring in `sqlite/.../test_<area>.rs` **and** `postgres/.../test_<area>.rs`
-   (lockstep) with the correct macro for its fixture signature.
+3. Add wiring in `sqlite/.../test_<area>.rs`, and in `postgres/.../test_<area>.rs`
+   when the repository type can change the result (see "Which databases a fixture
+   runs on"), with the correct macro for its fixture signature.
 4. For server-backed/remote scenarios, use `run_api_server` + the combined login
    pattern.
 5. Build the repo-tests crate, then run the SQLite permutation green before

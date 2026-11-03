@@ -13,12 +13,16 @@ use kamu_cli_e2e_common::prelude::*;
 
 kamu_cli_execute_command_e2e_test!(
     storage = sqlite,
-    fixture = scenarios::test_database_from_newer_version_is_reported
+    fixture = scenarios::test_database_from_newer_version_is_reported,
+    sqlite_only = "checks the version of the workspace's own SQLite database"
 );
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 kamu_cli_execute_command_e2e_test!(
     storage = sqlite,
-    fixture = scenarios::test_workspace_layout_from_newer_version_is_reported
+    fixture = scenarios::test_workspace_layout_from_newer_version_is_reported,
+    sqlite_only = "the layout version is checked before any repository is opened"
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

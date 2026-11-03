@@ -72,7 +72,8 @@ kamu_cli_run_api_server_e2e_test!(
               flowActivations: 4
         "#
         )),
-    extra_test_groups = "containerized, engine, datafusion"
+    extra_test_groups = "containerized, engine, datafusion",
+    postgres_only = "a burst of flows activated in parallel by the Postgres flow agent"
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
