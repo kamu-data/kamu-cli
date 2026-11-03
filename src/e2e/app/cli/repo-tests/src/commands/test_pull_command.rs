@@ -22,6 +22,8 @@ use kamu_cli_e2e_common::{
 use kamu_cli_puppet::KamuCliPuppet;
 use kamu_cli_puppet::extensions::{KamuCliPuppetExt, RepoAlias};
 use url::Url;
+use wiremock::matchers::{method, path};
+use wiremock::{Mock, MockServer, ResponseTemplate};
 
 use crate::utils::{commit_event, dataset_id};
 
@@ -616,7 +618,15 @@ async fn test_pull_set_watermark(kamu: KamuCliPuppet) {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_pull_uncacheable_source(kamu: KamuCliPuppet) {
-    let data_path = kamu.workspace_path().join("data.csv");
+    // A source without `ETag` or `Last-Modified` records no source state, so
+    // once it has data it is uncacheable
+    let source = MockServer::start().await;
+    Mock::given(method("GET"))
+        .and(path("/data.csv"))
+        .respond_with(ResponseTemplate::new(200).set_body_string("city,population\nA,1000\n"))
+        .mount(&source)
+        .await;
+
     let snapshot = indoc::formatdoc!(
         r#"
         kind: DatasetSnapshot
@@ -628,7 +638,7 @@ pub async fn test_pull_uncacheable_source(kamu: KamuCliPuppet) {
             - kind: SetPollingSource
               fetch:
                 kind: Url
-                url: file://{data_path}
+                url: {source_uri}/data.csv
               read:
                 kind: Csv
                 header: true
@@ -641,13 +651,12 @@ pub async fn test_pull_uncacheable_source(kamu: KamuCliPuppet) {
               merge:
                 kind: append
         "#,
-        data_path = data_path.display(),
+        source_uri = source.uri(),
     );
     kamu.execute_with_input(["add", "--stdin"], snapshot)
         .await
         .success();
 
-    std::fs::write(&data_path, "city,population\nA,1000\n").unwrap();
     kamu.assert_success_command_execution(
         ["pull", "test.pull-uncacheable"],
         None,
@@ -655,21 +664,12 @@ pub async fn test_pull_uncacheable_source(kamu: KamuCliPuppet) {
     )
     .await;
 
-    // The watermark block records no source state, so the source becomes
-    // uncacheable
-    kamu.assert_success_command_execution(
-        [
-            "pull",
-            "test.pull-uncacheable",
-            "--set-watermark",
-            "2050-01-01T00:00:00Z",
-        ],
-        None,
-        Some(["Committed new block"]),
-    )
-    .await;
-
-    std::fs::write(&data_path, "city,population\nB,2000\n").unwrap();
+    source.reset().await;
+    Mock::given(method("GET"))
+        .and(path("/data.csv"))
+        .respond_with(ResponseTemplate::new(200).set_body_string("city,population\nB,2000\n"))
+        .mount(&source)
+        .await;
     kamu.assert_success_command_execution(
         ["pull", "test.pull-uncacheable"],
         None,

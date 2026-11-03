@@ -257,5 +257,5 @@ unchanged, the Smart protocol accepts a forced push of the compacted chain.
 | Executor | [`compaction_executor_impl.rs`](../../src/infra/core/src/services/compaction/compaction_executor_impl.rs) |
 | Use case | [`compact_dataset_use_case_impl.rs`](../../src/infra/core/src/use_cases/compact_dataset_use_case_impl.rs) |
 | CLI command, arguments, progress | [`compact_command.rs`](../../src/app/cli/src/commands/compact_command.rs), `SystemCompact` in [`cli.rs`](../../src/app/cli/src/cli.rs), [`compact_progress.rs`](../../src/app/cli/src/output/compact_progress.rs) |
-| Task planner and runner | [`hard_compact_dataset_task_planner.rs`](../../src/adapter/task-dataset/src/planners/hard_compact_dataset_task_planner.rs), [`compaction_dataset_task_runner.rs`](../../src/adapter/task-dataset/src/runners/compaction_dataset_task_runner.rs) |
+| Task planner and runner | [`compaction_dataset_task_planner.rs`](../../src/adapter/task-dataset/src/planners/compaction_dataset_task_planner.rs), [`compaction_dataset_task_runner.rs`](../../src/adapter/task-dataset/src/runners/compaction_dataset_task_runner.rs) |
 | Flow controller and rule | [`flow_controller_compact.rs`](../../src/adapter/flow-dataset/src/flow_controllers/flow_controller_compact.rs), [`flow_config_rule_compact.rs`](../../src/adapter/flow-dataset/src/entities/flow_config_rules/flow_config_rule_compact.rs) |

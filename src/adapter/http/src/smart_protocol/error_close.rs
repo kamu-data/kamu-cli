@@ -123,6 +123,12 @@ mod tests {
                 Replies::internal_error(r#"{"Push":"CompleteRequest"}"#),
             ))
             .unwrap(),
+            ErrorReplyClose::push_not_completed(DatasetPushCompleteError::ObjectsNotUploaded(
+                DatasetPushObjectsNotUploadedError {
+                    num_objects: usize::MAX,
+                },
+            ))
+            .unwrap(),
         ] {
             assert_matches!(ClientBeforeTypedReply::read_completion(&close), Err(_));
 
@@ -138,17 +144,22 @@ mod tests {
 
     #[test]
     fn test_failed_completion_is_read_as_a_typed_error() {
-        let close = ErrorReplyClose::push_not_completed(
+        for error in [
             DatasetPushCompleteError::UpdatedConcurrently(DatasetPushUpdatedConcurrentlyError {}),
-        )
-        .unwrap();
+            DatasetPushCompleteError::ObjectsNotUploaded(DatasetPushObjectsNotUploadedError {
+                num_objects: usize::MAX,
+            }),
+        ] {
+            let close = ErrorReplyClose::push_not_completed(error.clone()).unwrap();
 
-        assert_matches!(
-            ErrorReplyClose::read::<DatasetPushCompleteReply>(close.code, &close.reason),
-            Ok(DatasetPushCompleteReply::Response(Err(
-                DatasetPushCompleteError::UpdatedConcurrently(_)
-            )))
-        );
+            // A close frame reason is limited to 123 bytes
+            assert!(close.reason.len() <= 123, "{}", close.reason);
+            assert_eq!(
+                ErrorReplyClose::read::<DatasetPushCompleteReply>(close.code, &close.reason)
+                    .unwrap(),
+                DatasetPushCompleteReply::Response(Err(error))
+            );
+        }
     }
 
     #[test]

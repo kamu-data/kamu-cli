@@ -9,13 +9,21 @@
 
 use std::assert_matches;
 
-use kamu::domain::{DatasetIdMismatchError, PullError, PullResult, SyncError, SyncResult};
+use kamu::domain::{
+    CorruptedSourceError,
+    DatasetIdMismatchError,
+    PullError,
+    PullResult,
+    SyncError,
+    SyncResult,
+};
 use kamu_adapter_http::smart_protocol::messages::DatasetPullRequest;
 use kamu_core::TenancyConfig;
 
 use crate::harness::{
     ClientSideHarness,
     ClientSideHarnessOptions,
+    ScriptedPullServer,
     ServerSideHarness,
     ServerSideHarnessOptions,
     ServerSideLocalFsHarness,
@@ -150,6 +158,27 @@ async fn test_smart_pull_of_missing_dataset_fails() {
     };
 
     await_client_server_flow!(api_server_handle, client_handle);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_smart_pull_without_referenced_objects_is_not_committed() {
+    // The new data block references a data file and a checkpoint, and neither is sent
+    MissingObjectsCase { mislabeled: false }
+        .assert_pull_fails()
+        .await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// The object type picks the repository a file is stored in, so a file sent
+/// as the other type does not count as sent
+#[test_log::test(tokio::test)]
+async fn test_smart_pull_with_mislabeled_objects_is_not_committed() {
+    MissingObjectsCase { mislabeled: true }
+        .assert_pull_fails()
+        .await;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -404,6 +433,72 @@ impl HeadMovedConcurrentlyCase {
         };
 
         await_client_server_flow!(api_server_handle, client_handle);
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// A server that sends the blocks of a new data block, but none of the files
+/// they reference as the type the client asked for
+struct MissingObjectsCase {
+    mislabeled: bool,
+}
+
+impl MissingObjectsCase {
+    async fn assert_pull_fails(self) {
+        let scenario = SmartPullNewDatasetScenario::prepare(
+            ClientSideHarness::new(ClientSideHarnessOptions {
+                tenancy_config: TenancyConfig::SingleTenant,
+                authenticated_remotely: false,
+            })
+            .await,
+            ServerSideLocalFsHarness::new(ServerSideHarnessOptions {
+                tenancy_config: TenancyConfig::SingleTenant,
+                authorized_writes: true,
+                ..ServerSideHarnessOptions::default()
+            })
+            .await,
+        )
+        .await;
+        let dataset_registry = scenario.server_harness.cli_dataset_registry();
+        let server = if self.mislabeled {
+            ScriptedPullServer::mislabeling_objects(
+                dataset_registry.as_ref(),
+                &scenario.server_dataset_handle,
+            )
+            .await
+        } else {
+            ScriptedPullServer::omitting_objects(
+                dataset_registry.as_ref(),
+                &scenario.server_dataset_handle,
+            )
+            .await
+        };
+        let server_dataset_url = server.dataset_url("foo");
+
+        let server_handle = server.run();
+
+        let client_handle = async {
+            let pull_responses = scenario
+                .client_harness
+                .pull_datasets(odf::DatasetRefAny::from(server_dataset_url), false)
+                .await;
+
+            assert_matches!(
+                &pull_responses[0].result,
+                Err(PullError::SyncError(SyncError::Corrupted(CorruptedSourceError { message, .. })))
+                    if message.starts_with("Server did not send 2 file(s)")
+            );
+            pretty_assertions::assert_eq!(
+                scenario
+                    .client_harness
+                    .find_stored_head(&scenario.server_dataset_handle.id)
+                    .await,
+                None
+            );
+        };
+
+        await_client_server_flow!(server_handle, client_handle);
     }
 }
 

@@ -31,6 +31,8 @@ use kamu_cli_e2e_common::{
     leaderboard_set_transform_event,
 };
 use kamu_cli_puppet::KamuCliPuppet;
+use wiremock::matchers::{method, path};
+use wiremock::{Mock, MockServer, ResponseTemplate};
 
 use crate::resources::ResourceCtx;
 
@@ -1262,9 +1264,14 @@ pub async fn test_trigger_flow_ingest_fetches_next_iterations(
 pub async fn test_trigger_flow_ingest_fetching_uncacheable(
     mut kamu_api_server_client: KamuApiServerClient,
 ) {
-    let temp_dir = tempfile::tempdir().unwrap();
-    let src_path = temp_dir.path().join("data.csv");
-    std::fs::write(&src_path, "city,population\nA,1000\n").unwrap();
+    // A source without `ETag` or `Last-Modified` records no source state, so
+    // once it has data it is uncacheable
+    let source = MockServer::start().await;
+    Mock::given(method("GET"))
+        .and(path("/data.csv"))
+        .respond_with(ResponseTemplate::new(200).set_body_string("city,population\nA,1000\n"))
+        .mount(&source)
+        .await;
 
     kamu_api_server_client.auth().login_as_kamu().await;
     let CreateDatasetResponse { dataset_id, .. } = kamu_api_server_client
@@ -1272,7 +1279,7 @@ pub async fn test_trigger_flow_ingest_fetching_uncacheable(
         .create_dataset(&city_population_snapshot(
             "Url",
             "url",
-            &format!("file://{}", src_path.display()),
+            &format!("{}/data.csv", source.uri()),
         ))
         .await;
 
@@ -1285,16 +1292,12 @@ pub async fn test_trigger_flow_ingest_fetching_uncacheable(
     );
     kamu_api_server_client.flow().wait(&dataset_id, 1).await;
 
-    // The watermark block records no source state, so the source becomes
-    // uncacheable
-    kamu_api_server_client
-        .dataset()
-        .set_watermark(
-            &dataset_id,
-            Utc.with_ymd_and_hms(2050, 1, 1, 0, 0, 0).unwrap(),
-        )
+    source.reset().await;
+    Mock::given(method("GET"))
+        .and(path("/data.csv"))
+        .respond_with(ResponseTemplate::new(200).set_body_string("city,population\nB,2000\n"))
+        .mount(&source)
         .await;
-    std::fs::write(&src_path, "city,population\nB,2000\n").unwrap();
 
     // Past the throttling period of the previous flow
     advance_time(&kamu_api_server_client, 1).await;

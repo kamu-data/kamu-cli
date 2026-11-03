@@ -11,7 +11,7 @@ use std::sync::Arc;
 
 use database_common_macros::{transactional_method1, transactional_method2};
 use dill::{component, interface};
-use internal_error::InternalError;
+use internal_error::{ErrorIntoInternal, InternalError};
 use kamu_accounts::Principal;
 use kamu_core::{
     PushDatasetUseCase,
@@ -244,18 +244,29 @@ impl PushDatasetUseCase for PushDatasetUseCaseImpl {
         assert_eq!(plan_indices.len(), sync_results.len());
         for (index, sync_result) in std::iter::zip(plan_indices, sync_results) {
             let push_item = &plan[index];
-            if options.add_aliases && sync_result.is_ok() {
-                self.save_dataset_alias_transactional(
-                    &push_item.local_handle,
-                    &((&push_item.remote_target.url).into()),
-                )
-                .await?;
-            }
+            let sync_result = match sync_result {
+                Ok(sync_result) if options.add_aliases => self
+                    .save_dataset_alias_transactional(
+                        &push_item.local_handle,
+                        &((&push_item.remote_target.url).into()),
+                    )
+                    .await
+                    .map(|_| sync_result)
+                    .map_err(|e| SyncError::Internal(PushAliasNotSavedError(e).int_err())),
+                sync_result => sync_result,
+            };
             responses.push(push_item.as_response(sync_result));
         }
 
         Ok(responses)
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// The push itself succeeded
+#[derive(thiserror::Error, Debug)]
+#[error("Dataset was pushed, but its push alias was not saved")]
+struct PushAliasNotSavedError(#[source] InternalError);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

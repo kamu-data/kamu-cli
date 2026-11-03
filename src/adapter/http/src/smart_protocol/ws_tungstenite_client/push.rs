@@ -405,6 +405,13 @@ impl WsSmartTransferProtocolClient {
                 )) => Err(PushClientError::UpdatedConcurrently(
                     DestinationUpdatedConcurrentlyError,
                 )),
+                DatasetPushCompleteReply::Response(Err(
+                    DatasetPushCompleteError::ObjectsNotUploaded(
+                        DatasetPushObjectsNotUploadedError { num_objects },
+                    ),
+                )) => Err(PushClientError::ObjectsNotUploaded(
+                    DestinationMissingObjectsError { num_objects },
+                )),
             };
         }
     }

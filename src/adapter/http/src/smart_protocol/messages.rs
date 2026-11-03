@@ -337,6 +337,7 @@ pub type DatasetPushCompleteResponse =
 pub enum DatasetPushCompleteError {
     Internal(TransferInternalError),
     UpdatedConcurrently(DatasetPushUpdatedConcurrentlyError),
+    ObjectsNotUploaded(DatasetPushObjectsNotUploadedError),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -350,6 +351,16 @@ pub enum DatasetPushCompleteError {
 /// confirmation.
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
 pub struct DatasetPushUpdatedConcurrentlyError {}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Some data or checkpoint files the pushed blocks reference were not
+/// uploaded; nothing was committed. Like every error of this phase, it
+/// travels as the close frame reason, so it carries only their number
+#[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
+pub struct DatasetPushObjectsNotUploadedError {
+    pub num_objects: usize,
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -415,7 +426,7 @@ pub struct ObjectFileReference {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// Object type enumeration
-#[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
+#[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Hash, Debug)]
 pub enum ObjectType {
     DataSlice,
     Checkpoint,

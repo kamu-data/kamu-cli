@@ -7,6 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::collections::HashSet;
+
 use futures::stream::{StreamExt, TryStreamExt};
 use internal_error::{ErrorIntoInternal, ResultIntoInternal};
 use kamu::utils::local_sync_writes::{
@@ -230,11 +232,19 @@ impl WsSmartTransferProtocolClient {
                 stage_object_files.len()
             );
 
+            let requested_objects = stage_object_files.clone();
             let dataset_objects_pull_response = self
                 .pull_send_objects_request(socket, stage_object_files)
                 .await
                 .inspect_err(|e| tracing::debug!("Pull process aborted with error: {e}"))
                 .int_err()?;
+
+            // The server chooses which objects to send; the blocks must not be
+            // committed without any of the files they reference
+            Self::ensure_all_objects_offered(
+                requested_objects,
+                &dataset_objects_pull_response.object_transfer_strategies,
+            )?;
 
             futures::stream::iter(dataset_objects_pull_response.object_transfer_strategies)
                 .map(Ok)
@@ -245,6 +255,41 @@ impl WsSmartTransferProtocolClient {
         }
 
         Ok(())
+    }
+
+    /// Fails unless the server offered every requested object with its type,
+    /// which picks the repository it is stored in; one it offered but could
+    /// not deliver fails its download
+    fn ensure_all_objects_offered(
+        requested_objects: Vec<ObjectFileReference>,
+        strategies: &[PullObjectTransferStrategy],
+    ) -> Result<(), CorruptedSourceError> {
+        let offered: HashSet<(&ObjectType, &odf::Multihash)> = strategies
+            .iter()
+            .map(|strategy| {
+                (
+                    &strategy.object_file.object_type,
+                    &strategy.object_file.physical_hash,
+                )
+            })
+            .collect();
+        let missing: Vec<ObjectFileReference> = requested_objects
+            .into_iter()
+            .filter(|object| !offered.contains(&(&object.object_type, &object.physical_hash)))
+            .collect();
+
+        match missing.first() {
+            None => Ok(()),
+            Some(first_missing) => Err(CorruptedSourceError {
+                message: format!(
+                    "Server did not send {} file(s) the pulled blocks reference, such as {:?} {}",
+                    missing.len(),
+                    first_missing.object_type,
+                    first_missing.physical_hash,
+                ),
+                source: None,
+            }),
+        }
     }
 
     pub(super) async fn pull_flow(
@@ -388,28 +433,6 @@ impl WsSmartTransferProtocolClient {
                     transfer_options.max_parallel_transfers,
                 )
                 .await?;
-
-                // The server chooses which objects to send; the blocks must not be
-                // committed without any of the files they reference
-                let missing_objects = collect_object_references_from_metadata(
-                    dst_storage.as_ref(),
-                    &new_blocks,
-                    true,
-                )
-                .await?;
-                if let Some(missing) = missing_objects.first() {
-                    return Err(CorruptedSourceError {
-                        message: format!(
-                            "Server did not send {} file(s) the pulled blocks reference, such as \
-                             {:?} {}",
-                            missing_objects.len(),
-                            missing.object_type,
-                            missing.physical_hash,
-                        ),
-                        source: None,
-                    }
-                    .into());
-                }
 
                 append_transferred_blocks(
                     dst_storage.as_ref(),

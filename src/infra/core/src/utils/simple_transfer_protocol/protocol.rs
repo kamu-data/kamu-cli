@@ -26,26 +26,36 @@ const DEFAULT_SIMPLE_PROTOCOL_MAX_PARALLEL_TRANSFERS: usize = 10;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Eq, PartialEq)]
-pub struct SimpleProtocolTransferOptions {
+/// Settings of the simple protocol that hold for every transfer
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub struct SimpleTransferProtocolConfig {
+    /// Files copied at a time; 0 lifts the limit
     pub max_parallel_transfers: usize,
-    pub visibility_for_created_dataset: odf::DatasetVisibility,
 }
 
-impl Default for SimpleProtocolTransferOptions {
-    fn default() -> Self {
+impl SimpleTransferProtocolConfig {
+    /// Reads [`ENV_VAR_SIMPLE_PROTOCOL_MAX_PARALLEL_TRANSFERS`], falling back to
+    /// the default when it is unset or not a number
+    pub fn from_env() -> Self {
         let max_parallel_transfers =
             match std::env::var(ENV_VAR_SIMPLE_PROTOCOL_MAX_PARALLEL_TRANSFERS) {
                 Ok(string_value) => string_value
                     .parse::<usize>()
                     .unwrap_or(DEFAULT_SIMPLE_PROTOCOL_MAX_PARALLEL_TRANSFERS),
-                _ => DEFAULT_SIMPLE_PROTOCOL_MAX_PARALLEL_TRANSFERS,
+                Err(_) => DEFAULT_SIMPLE_PROTOCOL_MAX_PARALLEL_TRANSFERS,
             };
         Self {
             max_parallel_transfers,
-            visibility_for_created_dataset: odf::DatasetVisibility::Private,
         }
     }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Eq, PartialEq)]
+pub struct SimpleProtocolTransferOptions {
+    pub max_parallel_transfers: usize,
+    pub visibility_for_created_dataset: odf::DatasetVisibility,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

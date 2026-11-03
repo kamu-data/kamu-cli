@@ -12,7 +12,7 @@ use std::path::{Path, PathBuf};
 use kamu::domain::*;
 use kamu::testing::DummySmartTransferProtocolClient;
 use kamu::utils::ipfs_wrapper::IpfsClient;
-use kamu::utils::simple_transfer_protocol::SimpleTransferProtocol;
+use kamu::utils::simple_transfer_protocol::{SimpleTransferProtocol, SimpleTransferProtocolConfig};
 use kamu::*;
 use kamu_accounts::{CurrentAccountSubject, CurrentAccountSubjectCatalogExt as _};
 use kamu_datasets::*;
@@ -30,6 +30,7 @@ pub struct SyncWorkspaceCatalog {
     ipfs_gateway: odf::dataset::IpfsGateway,
     ipfs_client: IpfsClient,
     dataset_entry_writer: MockDatasetEntryWriter,
+    maybe_simple_transfer_config: Option<SimpleTransferProtocolConfig>,
 }
 
 impl SyncWorkspaceCatalog {
@@ -41,6 +42,7 @@ impl SyncWorkspaceCatalog {
             ipfs_gateway: odf::dataset::IpfsGateway::default(),
             ipfs_client: IpfsClient::default(),
             dataset_entry_writer: MockDatasetEntryWriter::new(),
+            maybe_simple_transfer_config: None,
         }
     }
 
@@ -53,6 +55,12 @@ impl SyncWorkspaceCatalog {
     /// Expectations for creating dataset entries; none are expected by default
     pub fn with_dataset_entry_writer(mut self, writer: MockDatasetEntryWriter) -> Self {
         self.dataset_entry_writer = writer;
+        self
+    }
+
+    /// Without it, the simple protocol reads its settings from the environment
+    pub fn with_simple_transfer_config(mut self, config: SimpleTransferProtocolConfig) -> Self {
+        self.maybe_simple_transfer_config = Some(config);
         self
     }
 
@@ -97,6 +105,10 @@ impl SyncWorkspaceCatalog {
             .bind::<dyn DatasetEntryWriter, MockDatasetEntryWriter>()
             .add::<DatasetReferenceServiceImpl>()
             .add::<DatasetHeadCommitterImpl>();
+
+        if let Some(config) = self.maybe_simple_transfer_config {
+            b.add_value(config);
+        }
 
         register_message_dispatcher::<DatasetLifecycleMessage>(
             &mut b,

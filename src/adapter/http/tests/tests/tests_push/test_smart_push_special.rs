@@ -15,6 +15,7 @@ use kamu_adapter_http::smart_protocol::SmartTransferProtocolServerConfig;
 use kamu_adapter_http::smart_protocol::messages::{
     DatasetPushCompleteConfirmed,
     DatasetPushCompleteError,
+    DatasetPushObjectsNotUploadedError,
     DatasetPushRequest,
     DatasetPushRequestError,
     ObjectsUploadProgressDetails,
@@ -658,9 +659,11 @@ async fn test_smart_push_without_uploading_referenced_objects_is_not_committed()
             .report_progress(ObjectsUploadProgressDetails::Complete)
             .await;
 
-        assert_matches!(
+        pretty_assertions::assert_eq!(
             session.complete().await,
-            Err(DatasetPushCompleteError::Internal(_))
+            Err(DatasetPushCompleteError::ObjectsNotUploaded(
+                DatasetPushObjectsNotUploadedError { num_objects: 2 }
+            ))
         );
         pretty_assertions::assert_eq!(stored_heads.get(&dataset_handle.id).await, server_head);
     };

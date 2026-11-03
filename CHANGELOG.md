@@ -90,14 +90,14 @@ Recommendation: for ease of reading, use the following format:
 - A malformed reply during a smart protocol transfer fails the transfer instead of crashing the
   client or the server's connection
 - `kamu push` over the smart protocol to a dataset ID that does not exist fails with "not found"
-- `kamu push` of several datasets pushes the ones it can when others fail authorization, planning
-  or target resolution, reports every dataset, and stores a push alias for each one pushed
+- `kamu push` of several datasets pushes the ones it can when others fail authorization or target
+  resolution, reports every dataset, and stores a push alias for each one pushed
 - `kamu push` with several repositories configured and no target says so ("Cannot choose between
   multiple repositories"), instead of blaming multiple push aliases
 - A smart protocol push or pull no longer commits blocks whose data or checkpoint files were not
   transferred; the push or pull fails with nothing committed
 - `kamu pull` over the simple protocol retried after a failure no longer downloads again the files
-  it already copied
+  it already copied, and its progress counts only the files it copies
 - In a multi-tenant workspace, `kamu pull` from a remote no longer picks another account's dataset
   that has the same pull alias, which failed the pull and revealed that dataset's name
 - `kamu pull` of a remote dataset by ID without a local name fails with an error asking for the

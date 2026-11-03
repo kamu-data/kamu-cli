@@ -12,7 +12,7 @@ use kamu_core::{OverwriteSeedBlockError, SyncError, SyncHeadMovedError};
 use kamu_datasets::NameCollisionError;
 use thiserror::Error;
 
-use super::messages::TransferInternalError;
+use super::messages::{ObjectFileReference, TransferInternalError};
 use super::phases::*;
 use crate::ws_common::{ReadMessageError, WriteMessageError};
 
@@ -154,8 +154,26 @@ pub enum PushServerError {
     #[error(transparent)]
     UpdatedConcurrently(odf::dataset::RefCASError),
 
+    /// The client completed the push without uploading every file the pushed
+    /// blocks reference; nothing was committed
+    #[error(transparent)]
+    ObjectsNotUploaded(ObjectsNotUploadedError),
+
     #[error(transparent)]
     Internal(PhaseInternalError),
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Error, Debug)]
+#[error(
+    "Client did not upload {num_missing} file(s) the pushed blocks reference, such as {:?} {}",
+    first_missing.object_type,
+    first_missing.physical_hash
+)]
+pub struct ObjectsNotUploadedError {
+    pub num_missing: usize,
+    pub first_missing: ObjectFileReference,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -184,6 +202,9 @@ pub enum PushClientError {
     UpdatedConcurrently(DestinationUpdatedConcurrentlyError),
 
     #[error(transparent)]
+    ObjectsNotUploaded(DestinationMissingObjectsError),
+
+    #[error(transparent)]
     Internal(
         #[from]
         #[backtrace]
@@ -205,6 +226,7 @@ impl From<PushClientError> for SyncError {
             }
             e @ (PushClientError::ReadFailed(_)
             | PushClientError::WriteFailed(_)
+            | PushClientError::ObjectsNotUploaded(_)
             | PushClientError::Internal(_)) => Self::Internal(e.int_err()),
         }
     }
@@ -217,6 +239,19 @@ impl From<PushClientError> for SyncError {
 #[derive(Error, Debug)]
 #[error("Destination dataset head was updated concurrently, nothing was committed")]
 pub struct DestinationUpdatedConcurrentlyError;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// The destination refused to commit the pushed blocks, because some files
+/// they reference were not uploaded; nothing was committed
+#[derive(Error, Debug)]
+#[error(
+    "Destination refused the commit: {num_objects} file(s) the pushed blocks reference were not \
+     uploaded"
+)]
+pub struct DestinationMissingObjectsError {
+    pub num_objects: usize,
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

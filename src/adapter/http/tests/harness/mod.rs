@@ -40,6 +40,9 @@ pub(crate) use raw_pull_session::*;
 mod raw_push_session;
 pub(crate) use raw_push_session::*;
 
+mod scripted_pull_server;
+pub(crate) use scripted_pull_server::*;
+
 mod scripted_push_server;
 pub(crate) use scripted_push_server::*;
 

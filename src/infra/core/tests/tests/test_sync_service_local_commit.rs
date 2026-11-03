@@ -13,6 +13,7 @@ use std::sync::{Arc, Mutex};
 
 use kamu::domain::*;
 use kamu::testing::*;
+use kamu::utils::simple_transfer_protocol::SimpleTransferProtocolConfig;
 use kamu::*;
 use kamu_datasets::*;
 use kamu_datasets_services::*;
@@ -113,6 +114,27 @@ async fn test_pull_retry_reuses_objects_of_an_uncommitted_transfer() {
     LocalPullHarness::new(Url::from_directory_path(tmp_repo_dir.path()).unwrap())
         .assert_retry_reuses_objects_of_uncommitted_transfer(tmp_repo_dir.path())
         .await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Zero lifts the limit on parallel transfers
+#[test_log::test(tokio::test)]
+async fn test_pull_with_zero_max_parallel_transfers() {
+    let tmp_repo_dir = tempfile::tempdir().unwrap();
+    let harness = LocalPullHarness::with_max_parallel_transfers(
+        Url::from_directory_path(tmp_repo_dir.path()).unwrap(),
+        0,
+    );
+
+    harness.create_source_dataset().await;
+    let source_head = harness.append_source_data().await;
+    harness.push_source().await;
+
+    assert_matches!(
+        harness.pull(SyncOptions::default(), None).await,
+        Ok(SyncResult::Updated { new_head, .. }) if new_head == source_head
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -324,23 +346,43 @@ struct LocalPullHarness {
 
 impl LocalPullHarness {
     fn new(repo_url: Url) -> Self {
-        Self::build(repo_url, false)
+        Self::build(repo_url, false, None)
     }
 
     /// Another dataset takes the destination's name when a first pull creates
     /// it
     fn with_destination_alias_taken(repo_url: Url) -> Self {
-        Self::build(repo_url, true)
+        Self::build(repo_url, true, None)
     }
 
-    fn build(repo_url: Url, destination_alias_taken: bool) -> Self {
+    /// The destination copies at most `limit` files at a time
+    fn with_max_parallel_transfers(repo_url: Url, limit: usize) -> Self {
+        Self::build(
+            repo_url,
+            false,
+            Some(SimpleTransferProtocolConfig {
+                max_parallel_transfers: limit,
+            }),
+        )
+    }
+
+    fn build(
+        repo_url: Url,
+        destination_alias_taken: bool,
+        maybe_destination_transfer_config: Option<SimpleTransferProtocolConfig>,
+    ) -> Self {
         let tmp_dir = tempfile::tempdir().unwrap();
 
         Self {
-            source_catalog: Self::build_workspace_catalog(&tmp_dir.path().join("source"), false),
+            source_catalog: Self::build_workspace_catalog(
+                &tmp_dir.path().join("source"),
+                false,
+                None,
+            ),
             destination_catalog: Self::build_workspace_catalog(
                 &tmp_dir.path().join("destination"),
                 destination_alias_taken,
+                maybe_destination_transfer_config,
             ),
             _tmp_dir: tmp_dir,
             repo_url,
@@ -348,7 +390,11 @@ impl LocalPullHarness {
         }
     }
 
-    fn build_workspace_catalog(workspace_dir: &Path, alias_taken: bool) -> dill::Catalog {
+    fn build_workspace_catalog(
+        workspace_dir: &Path,
+        alias_taken: bool,
+        maybe_transfer_config: Option<SimpleTransferProtocolConfig>,
+    ) -> dill::Catalog {
         let mut dataset_entry_writer = MockDatasetEntryWriter::new();
         dataset_entry_writer
             .expect_create_entry()
@@ -360,9 +406,13 @@ impl LocalPullHarness {
                 }
             });
 
-        SyncWorkspaceCatalog::new(workspace_dir)
-            .with_dataset_entry_writer(dataset_entry_writer)
-            .build()
+        let workspace_catalog = SyncWorkspaceCatalog::new(workspace_dir)
+            .with_dataset_entry_writer(dataset_entry_writer);
+        match maybe_transfer_config {
+            Some(config) => workspace_catalog.with_simple_transfer_config(config),
+            None => workspace_catalog,
+        }
+        .build()
     }
 
     /// A first pull creates the dataset with its `HEAD` at the last
@@ -417,7 +467,27 @@ impl LocalPullHarness {
         let _abandoned = self.transfer().await;
         self.remove_repository_objects(repo_dir);
 
-        let transferred = self.transfer().await;
+        let listener = Arc::new(StatsRecordingListener::default());
+        let transferred = self.transfer_with_listener(Some(listener.clone())).await;
+
+        // Nothing copied is counted or estimated
+        let stats = listener.last_stats();
+        for party in [
+            &stats.src,
+            &stats.src_estimated,
+            &stats.dst,
+            &stats.dst_estimated,
+        ] {
+            assert_eq!(
+                (
+                    party.data_slices_read + party.data_slices_written,
+                    party.checkpoints_read + party.checkpoints_written,
+                    party.bytes_read + party.bytes_written
+                ),
+                (0, 0, 0),
+                "{stats:?}"
+            );
+        }
         assert_matches!(
             self.commit(transferred).await,
             Ok(SyncResult::Updated { new_head, .. }) if new_head == source_head
@@ -573,13 +643,20 @@ impl LocalPullHarness {
     }
 
     async fn transfer(&self) -> TransferredSync {
+        self.transfer_with_listener(None).await
+    }
+
+    async fn transfer_with_listener(
+        &self,
+        listener: Option<Arc<dyn SyncListener>>,
+    ) -> TransferredSync {
         let request = self.build_request(self.remote_ref()).await.unwrap();
 
         let transfer = self
             .destination_catalog
             .get_one::<dyn SyncService>()
             .unwrap()
-            .transfer_into_local(request, SyncOptions::default(), None)
+            .transfer_into_local(request, SyncOptions::default(), listener)
             .await
             .unwrap();
         let SyncTransfer::Transferred(transferred) = transfer else {
@@ -714,6 +791,26 @@ struct DestinationHeadMovingListener {
     dataset_alias: odf::DatasetAlias,
     concurrent_head: Mutex<Option<odf::Multihash>>,
 }
+
+/// Keeps the last stats a sync reported
+#[derive(Default)]
+struct StatsRecordingListener {
+    last_stats: Mutex<Option<SyncStats>>,
+}
+
+impl StatsRecordingListener {
+    fn last_stats(&self) -> SyncStats {
+        self.last_stats.lock().unwrap().clone().unwrap()
+    }
+}
+
+impl SyncListener for StatsRecordingListener {
+    fn on_status(&self, _stage: SyncStage, stats: &SyncStats) {
+        *self.last_stats.lock().unwrap() = Some(stats.clone());
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl SyncListener for DestinationHeadMovingListener {
     fn on_status(&self, stage: SyncStage, _stats: &SyncStats) {

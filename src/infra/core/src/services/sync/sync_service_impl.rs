@@ -19,6 +19,7 @@ use url::Url;
 use crate::utils::simple_transfer_protocol::{
     SimpleProtocolTransferOptions,
     SimpleTransferProtocol,
+    SimpleTransferProtocolConfig,
 };
 use crate::utils::smart_transfer_protocol::{
     SmartTransferProtocolClient,
@@ -34,6 +35,7 @@ pub struct SyncServiceImpl {
     remote_dataset_url_resolver: Arc<dyn RemoteDatasetUrlResolver>,
     smart_transfer_protocol: Arc<dyn SmartTransferProtocolClient>,
     simple_transfer_protocol: Arc<SimpleTransferProtocol>,
+    simple_transfer_config: Arc<SimpleTransferProtocolConfig>,
     ipfs_service: Arc<dyn IpfsService>,
 }
 
@@ -48,6 +50,7 @@ impl SyncServiceImpl {
         remote_dataset_url_resolver: Arc<dyn RemoteDatasetUrlResolver>,
         smart_transfer_protocol: Arc<dyn SmartTransferProtocolClient>,
         simple_transfer_protocol: Arc<SimpleTransferProtocol>,
+        maybe_simple_transfer_config: Option<Arc<SimpleTransferProtocolConfig>>,
         ipfs_service: Arc<dyn IpfsService>,
     ) -> Self {
         Self {
@@ -55,7 +58,20 @@ impl SyncServiceImpl {
             remote_dataset_url_resolver,
             smart_transfer_protocol,
             simple_transfer_protocol,
+            // Without a registered config, the environment is read once
+            simple_transfer_config: maybe_simple_transfer_config
+                .unwrap_or_else(|| Arc::new(SimpleTransferProtocolConfig::from_env())),
             ipfs_service,
+        }
+    }
+
+    fn simple_transfer_options(
+        &self,
+        visibility_for_created_dataset: odf::DatasetVisibility,
+    ) -> SimpleProtocolTransferOptions {
+        SimpleProtocolTransferOptions {
+            max_parallel_transfers: self.simple_transfer_config.max_parallel_transfers,
+            visibility_for_created_dataset,
         }
     }
 
@@ -88,7 +104,7 @@ impl SyncServiceImpl {
                 trust.validation,
                 trust.trust_hashes,
                 opts.force,
-                SimpleProtocolTransferOptions::default(),
+                self.simple_transfer_options(odf::DatasetVisibility::Private),
                 listener,
             )
             .await
@@ -115,10 +131,7 @@ impl SyncServiceImpl {
                 trust.validation,
                 trust.trust_hashes,
                 opts.force,
-                SimpleProtocolTransferOptions {
-                    visibility_for_created_dataset: opts.dataset_visibility,
-                    ..Default::default()
-                },
+                self.simple_transfer_options(opts.dataset_visibility),
                 listener,
             )
             .await

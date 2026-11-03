@@ -232,10 +232,10 @@ sequenceDiagram
 3. **Objects.** Every data slice and checkpoint referenced by the new blocks that the destination
    does not have yet (an earlier sync that failed later may have copied it) is streamed from the
    source's object repo to the destination's, `max_parallel_transfers` at a time (default 10,
-   `SIMPLE_PROTOCOL_MAX_PARALLEL_TRANSFERS`). With a trusted source the declared hash is passed as
-   precomputed; otherwise the local filesystem repo recomputes and checks it. The S3 repo requires
-   a precomputed hash (it panics without one), so a sync into S3 storage works only from a trusted
-   source, and then stores the stream without checking it.
+   `SIMPLE_PROTOCOL_MAX_PARALLEL_TRANSFERS`; 0 lifts the limit). With a trusted source the
+   declared hash is passed as precomputed; otherwise the local filesystem repo recomputes and
+   checks it. The S3 repo requires a precomputed hash (it panics without one), so a sync into S3
+   storage works only from a trusted source, and then stores the stream without checking it.
 4. **Blocks.** All new blocks are appended at once. A local destination's `HEAD` is left to the
    caller's commit ([§4](#4-sync-requests)), a CAS on `expected_head`. A remote destination is
    written with
@@ -356,9 +356,10 @@ sequenceDiagram
 ```
 
 `DatasetPushCompleteResponse` is `Ok(DatasetPushCompleteConfirmed)`, or an error sent as the reason
-of a close with code 1013 ("try again later"): `Internal`, or `UpdatedConcurrently` when the CAS on
-`HEAD` fails. The conflict carries no heads, since a close frame reason holds at most 123 bytes; the
-server logs them. Progress requests carry `progress_requested: true`, so one still in flight is
+of a close with code 1013 ("try again later"): `Internal`, `UpdatedConcurrently` when the CAS on
+`HEAD` fails, or `ObjectsNotUploaded` when the client did not upload every file the blocks
+reference. The errors carry no heads or hashes, since a close frame reason holds at most 123 bytes;
+the server logs them. Progress requests carry `progress_requested: true`, so one still in flight is
 skipped rather than taken for the confirmation. Peers without these messages still interoperate:
 
 | Peer | Behaviour |
@@ -408,8 +409,8 @@ upload is not re-hashed by the server.
 
 Before the blocks are committed, the side that receives them checks that every object they
 reference is present: the pull client fails with `CorruptedSource` when the server did not offer
-one, and the push server fails the commit with an internal error when the client did not upload
-one, so `HEAD` never points at a block whose objects are missing.
+one, and the push server, before its commit transaction, fails the push with `ObjectsNotUploaded`
+when the client did not upload one, so `HEAD` never points at a block whose objects are missing.
 
 ---
 
@@ -426,7 +427,8 @@ one, so `HEAD` never points at a block whose objects are missing.
 4. **Sync:** all requests run concurrently (`join_all`) through `SyncService` with the push's
    `SyncOptions`.
 5. **Aliases:** with `add_aliases` on (the default; `--no-alias` turns it off), a push alias with
-   the target URL is stored on each dataset that was pushed.
+   the target URL is stored on each dataset that was pushed. A dataset whose alias cannot be
+   stored is reported with an internal error, though it was pushed.
 
 A dataset that fails a step, from authorization to the sync itself, gets an error response and the
 others go on, so every dataset is reported.

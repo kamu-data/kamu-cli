@@ -13,7 +13,7 @@ use std::time::Duration;
 
 use database_common::DatabaseTransactionRunner;
 use dill::Catalog;
-use internal_error::{ErrorIntoInternal, ResultIntoInternal};
+use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_accounts::AuthenticationService;
 use kamu_core::{CorruptedSourceError, OverwriteSeedBlockError};
 use kamu_datasets::{
@@ -181,6 +181,25 @@ impl AxumServerPushProtocolInstance {
                   error = ?err,
                   error_msg = %err,
                   "Push process aborted: dataset head was updated concurrently",
+                );
+            }
+            Err(PushServerError::ObjectsNotUploaded(err)) => {
+                axum_write_error_close(
+                    &mut self.socket,
+                    ErrorReplyClose::push_not_completed(
+                        DatasetPushCompleteError::ObjectsNotUploaded(
+                            DatasetPushObjectsNotUploadedError {
+                                num_objects: err.num_missing,
+                            },
+                        ),
+                    ),
+                )
+                .await;
+
+                tracing::warn!(
+                  error = ?err,
+                  error_msg = %err,
+                  "Push rejected: the client did not upload every referenced file",
                 );
             }
         }
@@ -560,6 +579,8 @@ impl AxumServerPushProtocolInstance {
             "The push completed with no blocks for a dataset that does not exist"
                 .protocol_int_err(PushPhase::CompleteRequest)
         })?;
+        self.ensure_objects_uploaded(&dataset_handle, &new_blocks)
+            .await?;
         self.commit_pushed_blocks(
             dataset_handle,
             new_blocks,
@@ -581,6 +602,41 @@ impl AxumServerPushProtocolInstance {
         })?;
 
         Ok(())
+    }
+
+    /// The client chooses which objects to upload, so the blocks must not be
+    /// committed until every file they reference is stored. Checked outside
+    /// the commit transaction, as each check may be a storage request
+    async fn ensure_objects_uploaded(
+        &mut self,
+        dataset_handle: &odf::DatasetHandle,
+        new_blocks: &VecDeque<odf::dataset::HashedMetadataBlockBytesDecoded>,
+    ) -> Result<(), PushServerError> {
+        let dataset_handle = dataset_handle.clone();
+        let resolved_dataset = DatabaseTransactionRunner::new(self.catalog.clone())
+            .transactional_with(|dataset_registry: Arc<dyn DatasetRegistry>| async move {
+                let resolved_dataset = dataset_registry
+                    .get_dataset_by_handle(&dataset_handle)
+                    .await;
+                resolved_dataset.detach_from_transaction();
+                Ok::<_, InternalError>(resolved_dataset)
+            })
+            .await
+            .protocol_int_err(PushPhase::CompleteRequest)?;
+
+        let missing =
+            collect_object_references_from_metadata(resolved_dataset.as_ref(), new_blocks, true)
+                .await
+                .protocol_int_err(PushPhase::CompleteRequest)?;
+        match missing.first() {
+            None => Ok(()),
+            Some(first_missing) => Err(PushServerError::ObjectsNotUploaded(
+                ObjectsNotUploadedError {
+                    num_missing: missing.len(),
+                    first_missing: first_missing.clone(),
+                },
+            )),
+        }
     }
 
     #[tracing::instrument(
@@ -632,26 +688,6 @@ impl AxumServerPushProtocolInstance {
                     let resolved_dataset = dataset_registry
                         .get_dataset_by_handle(&dataset_handle)
                         .await;
-
-                    // The client chooses which objects to upload; the blocks must not be
-                    // committed without any of the files they reference
-                    let missing_objects = collect_object_references_from_metadata(
-                        resolved_dataset.as_ref(),
-                        &new_blocks,
-                        true,
-                    )
-                    .await?;
-                    if let Some(missing) = missing_objects.first() {
-                        return Err(format!(
-                            "Client did not upload {} file(s) the pushed blocks reference, such \
-                             as {:?} {}",
-                            missing_objects.len(),
-                            missing.object_type,
-                            missing.physical_hash,
-                        )
-                        .int_err()
-                        .into());
-                    }
 
                     append_dataset_metadata_batch
                         .execute(
