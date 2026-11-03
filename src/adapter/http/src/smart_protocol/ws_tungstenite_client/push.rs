@@ -451,6 +451,12 @@ impl WsSmartTransferProtocolClient {
             Ok(transfer_plan) => transfer_plan,
             Err(PrepareDatasetTransferEstimateError::InvalidInterval(e)) => {
                 // The destination head is missing from the source chain
+                if let Some(err) = self
+                    .compare_heads_with_remote(src.as_metadata_chain(), http_dst_url, false, &e)
+                    .await
+                {
+                    return Err(err);
+                }
                 let maybe_mismatch = self
                     .find_push_dataset_id_mismatch(src.as_ref(), http_dst_url)
                     .await;

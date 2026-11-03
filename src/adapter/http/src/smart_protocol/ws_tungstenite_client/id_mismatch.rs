@@ -7,6 +7,13 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use internal_error::ResultIntoInternal;
+use kamu_core::utils::metadata_chain_comparator::{
+    ChainWithHead,
+    CompareChainsResult,
+    MetadataChainComparator,
+    NullCompareChainsListener,
+};
 use kamu_core::*;
 use kamu_datasets::ResolvedDataset;
 use odf::dataset::MetadataChainExt;
@@ -61,6 +68,80 @@ impl WsSmartTransferProtocolClient {
             src_dataset_id,
             dst_dataset_id,
         })
+    }
+
+    /// One side's head is missing from the other's chain, as `e` reports with
+    /// the source head as `head` and the destination head as `tail`. Compares
+    /// the chains, as the Simple protocol does, to tell a destination that is
+    /// ahead from diverged histories and from another dataset. `None` when the
+    /// remote chain cannot be read or the comparison finds no mismatch
+    pub(super) async fn compare_heads_with_remote(
+        &self,
+        local_chain: &dyn odf::MetadataChain,
+        remote_url: &Url,
+        remote_is_src: bool,
+        e: &odf::dataset::InvalidIntervalError,
+    ) -> Option<SyncError> {
+        let remote = match self
+            .catalog()
+            .get_one::<dyn odf::dataset::DatasetFactory>()
+            .int_err()
+        {
+            Ok(dataset_factory) => dataset_factory
+                .get_dataset(remote_url, false)
+                .await
+                .int_err(),
+            Err(err) => Err(err),
+        }
+        .inspect_err(|err| tracing::debug!(error = ?err, "Failed to open the remote dataset"))
+        .ok()?;
+
+        let (src_chain, dst_chain) = if remote_is_src {
+            (remote.as_metadata_chain(), local_chain)
+        } else {
+            (local_chain, remote.as_metadata_chain())
+        };
+        let comparison = MetadataChainComparator::compare_chains(
+            src_chain,
+            &e.head,
+            Some(ChainWithHead {
+                chain: dst_chain,
+                head: &e.tail,
+            }),
+            &NullCompareChainsListener,
+        )
+        .await
+        .inspect_err(|err| tracing::debug!(error = ?err, "Failed to compare the chains"))
+        .ok()?;
+
+        match comparison {
+            CompareChainsResult::LhsBehind { rhs_ahead_blocks } => {
+                Some(SyncError::DestinationAhead(DestinationAheadError {
+                    src_head: e.head.clone(),
+                    dst_head: e.tail.clone(),
+                    dst_ahead_size: rhs_ahead_blocks.len(),
+                }))
+            }
+            CompareChainsResult::Divergence {
+                uncommon_blocks_in_lhs,
+                uncommon_blocks_in_rhs,
+            } => Some(SyncError::DatasetsDiverged(DatasetsDivergedError {
+                src_head: e.head.clone(),
+                dst_head: e.tail.clone(),
+                detail: Some(DatasetsDivergedErrorDetail {
+                    uncommon_blocks_in_src: uncommon_blocks_in_lhs,
+                    uncommon_blocks_in_dst: uncommon_blocks_in_rhs,
+                }),
+            })),
+            CompareChainsResult::DifferentDatasets {
+                lhs_dataset_id,
+                rhs_dataset_id,
+            } => Some(SyncError::DatasetIdMismatch(DatasetIdMismatchError {
+                src_dataset_id: lhs_dataset_id,
+                dst_dataset_id: rhs_dataset_id,
+            })),
+            CompareChainsResult::Equal | CompareChainsResult::LhsAhead { .. } => None,
+        }
     }
 
     /// One side's head is missing from the other's chain: the chains diverged,

@@ -85,6 +85,12 @@ Recommendation: for ease of reading, use the following format:
   longer shows a dataset as compacted before its new head is set
 - Compaction removes its temporary files when it ends, instead of leaving them until the node
   restarts
+- GraphQL: triggering a reset flow with an expected old head that is not the current head fails
+  with `FlowPreconditionsNotMet`, and a reset task that fails because its old head no longer
+  matches says so instead of a generic failure
+- `kamu push` and `kamu pull` over the smart protocol report a destination that is ahead of the
+  source as ahead, and diverged histories with the number of blocks on each side, as the other
+  protocols do, instead of reporting any mismatch as diverged
 - `kamu pull` of a dataset whose pull alias names an unknown repository fails with "Repository …
   does not exist", and one whose pull alias names a remote dataset by ID fails with "Syncing remote
   dataset by ID is not yet supported: …", instead of an internal error

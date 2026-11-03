@@ -11,11 +11,13 @@ use kamu::testing::{BaseUseCaseHarness, BaseUseCaseHarnessOptions};
 use kamu::{CompactionPlannerImpl, ResetPlannerImpl};
 use kamu_adapter_task_dataset::{
     CompactionDatasetTaskPlanner,
+    DatasetResetOldHeadMismatch,
     LogicalPlanDatasetHardCompact,
     LogicalPlanDatasetReset,
     LogicalPlanDatasetResetToMetadata,
     ResetDatasetTaskPlanner,
     TaskDefinitionDatasetHardCompact,
+    TaskErrorDatasetReset,
 };
 use kamu_datasets::CreateDatasetResult;
 use kamu_task_system::{
@@ -83,15 +85,22 @@ async fn test_reset_with_mismatching_old_head_fails_unrecoverably() {
     let harness = CompactionAndResetTaskPlannersHarness::new();
     let foo = harness.create_root_dataset(&alias_foo).await;
 
+    let not_the_head = odf::Multihash::from_digest_sha3_256(b"not-the-head");
+
     let failure = harness
-        .plan_reset(
-            &foo,
-            Some(odf::Multihash::from_digest_sha3_256(b"not-the-head")),
-        )
+        .plan_reset(&foo, Some(not_the_head.clone()))
         .await
         .unwrap_err();
 
-    assert_eq!(TaskError::empty_unrecoverable(), failure);
+    assert_eq!(
+        TaskErrorDatasetReset::OldHeadMismatch(DatasetResetOldHeadMismatch {
+            expected_head: not_the_head,
+            actual_head: foo.head,
+        })
+        .into_task_error(),
+        failure
+    );
+    assert!(!failure.recoverable);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

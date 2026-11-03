@@ -133,7 +133,9 @@ head:
   `OldHeadMismatch`;
 - the result is `ResetPlan { old_head: current head, new_head }`.
 
-The planner does not check that the new head is an ancestor of the current one.
+The new head need not be an ancestor of the current one: any block in the dataset's block store is
+a target. That is how a breaking change is undone, since a compaction or an earlier reset leaves
+the blocks it replaced stored but outside the history of `HEAD`.
 
 **Execute.** `ResetExecutorImpl::execute` moves `HEAD` from the plan's `old_head` to its
 `new_head` through `DatasetHeadCommitter`, which checks that the new block is present. "Present"

@@ -342,18 +342,32 @@ impl WsSmartTransferProtocolClient {
                     let e = match e {
                         PullClientError::InvalidInterval(e) => {
                             // The server could not find our head in its chain
-                            let maybe_mismatch = match dst_dataset {
+                            match dst_dataset {
                                 Some(dst_dataset) => {
-                                    Self::find_pull_dataset_id_mismatch(
-                                        http_src_url,
-                                        maybe_access_token.as_deref(),
-                                        dst_dataset,
-                                    )
-                                    .await
+                                    match self
+                                        .compare_heads_with_remote(
+                                            dst_dataset.as_metadata_chain(),
+                                            http_src_url,
+                                            true,
+                                            &e,
+                                        )
+                                        .await
+                                    {
+                                        Some(err) => err,
+                                        None => {
+                                            let maybe_mismatch =
+                                                Self::find_pull_dataset_id_mismatch(
+                                                    http_src_url,
+                                                    maybe_access_token.as_deref(),
+                                                    dst_dataset,
+                                                )
+                                                .await;
+                                            Self::diverged_or_id_mismatch(e, maybe_mismatch)
+                                        }
+                                    }
                                 }
-                                None => None,
-                            };
-                            Self::diverged_or_id_mismatch(e, maybe_mismatch)
+                                None => Self::diverged_or_id_mismatch(e, None),
+                            }
                         }
                         PullClientError::OverwriteSeedBlock(e) => SyncError::OverwriteSeedBlock(e),
                         PullClientError::ReadFailed(_)

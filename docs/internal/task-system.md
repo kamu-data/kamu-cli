@@ -486,9 +486,10 @@ reports.
 the new and old heads from the logical plan
 ([dataset-reset.md](dataset-reset.md#5-reset-to-a-block)). The resulting
 `ResetPlan { old_head, new_head }` and the dataset handle form the definition. A dataset deleted
-since the task was scheduled fails unrecoverably, as does `OldHeadMismatch`: the expected old head
-is part of the request, so a retry fails the same way. An internal planning error fails
-recoverably.
+since the task was scheduled fails unrecoverably. `OldHeadMismatch` fails it with the typed,
+unrecoverable `TaskErrorDatasetReset::OldHeadMismatch`, which carries the expected and actual heads:
+the expected old head is part of the request, so a retry fails the same way. An internal planning
+error fails recoverably.
 
 **Running** (`ResetDatasetTaskRunner`, one transaction around the whole run): re-resolves the
 dataset and calls `ResetExecutor::execute`, which moves `HEAD` by CAS on the planned `old_head`,
@@ -665,6 +666,7 @@ straight from `TaskEventStore` (`utils::get_task`), not through `TaskScheduler`.
 | `UpdateDatasetError` → `InputDatasetCompacted` | `TaskFailureReasonInputDatasetCompacted { inputDataset: Dataset, message }` — resolves the input dataset and its owner |
 | `DatasetCommitError` → `HeadMoved` | `TaskFailureReasonGeneral { message: "Dataset head was moved by a concurrent update", recoverable }` |
 | `ResetDatasetError` → `ResetHeadNotFound` | `TaskFailureReasonGeneral { message: "New head hash to reset not found" }` |
+| `ResetDatasetError` → `OldHeadMismatch` | `TaskFailureReasonGeneral { message: "Dataset head is not the expected old head" }` |
 | `WebhookDeliveryError` | `TaskFailureReasonWebhookDeliveryProblem { targetUrl, message }` — timeout, connection failure, or the HTTP status and reason |
 | anything else | `TaskFailureReasonGeneral { message: "Unexpected task error type" }`, logged as an error |
 

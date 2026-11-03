@@ -224,9 +224,15 @@ pub(crate) async fn test_smart_pull_existing_diverged_dataset_fails_without_forc
             .pull_datasets(odf::DatasetRefAny::from(scenario.server_dataset_ref), false)
             .await;
 
+        // The chains are compared, as the Simple protocol does
         assert_matches!(
             &pull_responses[0].result,
-            Err(PullError::SyncError(SyncError::DatasetsDiverged(_)))
+            Err(PullError::SyncError(SyncError::DatasetsDiverged(
+                DatasetsDivergedError {
+                    detail: Some(_),
+                    ..
+                }
+            )))
         );
     };
 
@@ -252,8 +258,15 @@ pub(crate) async fn test_smart_pull_existing_advanced_dataset_fails<
             .pull_datasets(odf::DatasetRefAny::from(scenario.server_dataset_ref), false)
             .await;
 
-        // TODO: try expecting better error message
-        assert!(pull_responses[0].result.is_err());
+        assert_matches!(
+            &pull_responses[0].result,
+            Err(PullError::SyncError(SyncError::DestinationAhead(
+                DestinationAheadError {
+                    dst_ahead_size: 1,
+                    ..
+                }
+            )))
+        );
     };
 
     await_client_server_flow!(api_server_handle, client_handle);

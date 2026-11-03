@@ -36,23 +36,9 @@ impl ResetPlanner for ResetPlannerImpl {
         maybe_old_head: Option<&odf::Multihash>,
     ) -> Result<ResetPlan, ResetPlanningError> {
         use odf::dataset::MetadataChainExt;
-        let new_head = if let Some(new_head) = maybe_new_head {
-            new_head
-        } else {
-            &target
-                .as_metadata_chain()
-                .accept_one(odf::dataset::SearchSeedVisitor::new())
-                .await
-                .int_err()?
-                .into_hashed_block()
-                .unwrap()
-                .0
-        };
+        let chain = target.as_metadata_chain();
 
-        let current_head = target
-            .as_metadata_chain()
-            .try_get_ref(&odf::BlockRef::Head)
-            .await?;
+        let current_head = chain.try_get_ref(&odf::BlockRef::Head).await?;
 
         if let Some(old_head) = maybe_old_head
             && let Some(current_head) = current_head.as_ref()
@@ -66,9 +52,24 @@ impl ResetPlanner for ResetPlannerImpl {
             ));
         }
 
+        // Any stored block is a target, not only an ancestor of `HEAD`: moving back onto
+        // the blocks a compaction or another reset left behind undoes it
+        let new_head = match maybe_new_head {
+            Some(new_head) => new_head.clone(),
+            None => {
+                chain
+                    .accept_one(odf::dataset::SearchSeedVisitor::new())
+                    .await
+                    .int_err()?
+                    .into_hashed_block()
+                    .unwrap()
+                    .0
+            }
+        };
+
         Ok(ResetPlan {
             old_head: current_head,
-            new_head: new_head.clone(),
+            new_head,
         })
     }
 }

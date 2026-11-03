@@ -10,12 +10,17 @@
 use std::sync::Arc;
 
 use database_common_macros::transactional_method2;
-use kamu_core::ResetPlanner;
+use kamu_core::{ResetPlanner, ResetPlanningError};
 use kamu_datasets::DatasetRegistry;
 use kamu_task_system::*;
 
 use super::task_planning::{planning_failed, resolve_task_dataset};
-use crate::{LogicalPlanDatasetReset, TaskDefinitionDatasetReset};
+use crate::{
+    DatasetResetOldHeadMismatch,
+    LogicalPlanDatasetReset,
+    TaskDefinitionDatasetReset,
+    TaskErrorDatasetReset,
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -45,7 +50,19 @@ impl ResetDatasetTaskPlanner {
                 args.old_head_hash.as_ref(),
             )
             .await
-            .map_err(|e| planning_failed(&e, e.is_recoverable()))?;
+            .map_err(|e| match e {
+                ResetPlanningError::OldHeadMismatch(e) => {
+                    tracing::warn!(error = ?e, error_msg = %e, "Task planning failed");
+                    PrepareTaskDefinitionError::Failed(
+                        TaskErrorDatasetReset::OldHeadMismatch(DatasetResetOldHeadMismatch {
+                            expected_head: e.old_head,
+                            actual_head: e.current_head,
+                        })
+                        .into_task_error(),
+                    )
+                }
+                e @ ResetPlanningError::Internal(_) => planning_failed(&e, e.is_recoverable()),
+            })?;
 
         target.detach_from_transaction();
 

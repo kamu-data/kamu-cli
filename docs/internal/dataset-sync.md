@@ -318,11 +318,13 @@ sequenceDiagram
 
 The server builds the plan from the chain interval after `begin_after` up to its head, and the
 metadata batch ends at that same head even if it moves meanwhile. A `begin_after` that is not an
-ancestor of the head is `InvalidInterval`, which the client reports as `DatasetsDiverged`, even
-when the local copy is merely ahead of the server; with `force` the server sends the whole chain
-instead. When the chain it receives starts with a `Seed` and the target exists (with `force`, or
-without a `HEAD`), the client refuses a `Seed` of another dataset ID (`DatasetIdMismatch`) or of
-another kind (`OverwriteSeedBlock`).
+ancestor of the head is `InvalidInterval`; the client then reads the server's chain and compares it
+with the local one, as the Simple protocol does, to report `DestinationAhead` when the local copy
+is merely ahead, `DatasetsDiverged` with the uncommon block counts, or `DatasetIdMismatch`. When
+the remote chain cannot be read, it reports `DatasetsDiverged` unless the IDs differ. With `force`
+the server sends the whole chain instead. When the chain it receives starts with a `Seed` and the
+target exists (with `force`, or without a `HEAD`), the client refuses a `Seed` of another dataset
+ID (`DatasetIdMismatch`) or of another kind (`OverwriteSeedBlock`).
 
 ### 7.2 Push flow
 
@@ -511,14 +513,15 @@ The variants are in `SyncError` (`sync_service.rs`). A lost `HEAD` CAS is `HeadM
 destination, with a `SyncHeadMovedError` that carries the expected and actual heads when they are
 known: always for a local destination and the Simple protocol. The Smart push server reports the
 heads in `InvalidHead` when `HEAD` moved before the push began, and none in
-`DatasetPushCompleteResponse` when it moved during the commit. Two mappings are
-surprising: a Smart-protocol push onto a remote that is ahead fails with `DatasetsDiverged`, not
-`DestinationAhead`; and server-side internal failures reach the client as `Internal` with the
-generic message "Internal error", the cause staying in the server log (the one exception is a
-failure while computing the pull transfer plan, whose message is forwarded as is). When the server
+`DatasetPushCompleteResponse` when it moved during the commit. A Smart-protocol push whose
+destination head is not in the local chain compares the chains the same way as a pull, so a
+remote that is ahead fails with `DestinationAhead`. One mapping is surprising: server-side internal
+failures reach the client as `Internal` with the generic message "Internal error", the cause
+staying in the server log (the one exception is a failure while computing the pull transfer plan,
+whose message is forwarded as is). When the server
 fails in a phase whose reply has no `Internal` case, the client reads the close reason as an
 internal error and reports the phase it names, instead of failing to parse the reply. Of the typed
-protocol errors, `InvalidInterval` (→ `DatasetsDiverged` on pull), `SeedBlockOverwriteRestricted`
+protocol errors, `InvalidInterval` (→ a chain comparison on pull), `SeedBlockOverwriteRestricted`
 (→ `OverwriteSeedBlock` on push; on pull the client makes the `Seed` check itself), `RefCollision`
 and `NameCollision` keep their meaning. A metadata batch or an object download that cannot be read
 fails the transfer with an error; a download answered with an error status is `Internal`, so it is

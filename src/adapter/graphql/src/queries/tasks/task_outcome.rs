@@ -173,6 +173,12 @@ impl TaskFailureReason {
                             recoverable: e.recoverable,
                         })
                     }
+                    TaskErrorDatasetReset::OldHeadMismatch(_) => {
+                        TaskFailureReason::General(TaskFailureReasonGeneral {
+                            message: "Dataset head is not the expected old head".to_owned(),
+                            recoverable: e.recoverable,
+                        })
+                    }
                 }
             }
 

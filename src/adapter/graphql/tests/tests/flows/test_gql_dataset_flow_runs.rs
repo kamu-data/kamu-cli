@@ -614,6 +614,34 @@ async fn test_trigger_reset_root_dataset_flow_with_invalid_head() {
             }
         })
     );
+
+    // A stale expected old head is rejected before the flow is scheduled
+    let response = harness
+        .trigger_reset_flow_mutation(
+            &create_root_result.dataset_handle.id,
+            &root_dataset_blocks[1].0,
+            &old_invalid_head,
+        )
+        .execute(&schema, &harness.catalog_authorized)
+        .await;
+
+    assert_eq!(
+        response.data,
+        value!({
+            "datasets": {
+                "byId": {
+                    "flows": {
+                        "runs": {
+                            "triggerResetFlow": {
+                                "__typename": "FlowPreconditionsNotMet",
+                                "message": "Flow didn't met preconditions: 'Expected old head hash is not the current head'"
+                            }
+                        }
+                    }
+                }
+            }
+        })
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

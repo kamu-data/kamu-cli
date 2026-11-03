@@ -778,7 +778,7 @@ Dataset mutations live under `mutations/flows_mut/`. Each leaf requires a logged
 | `runs.triggerIngestFlow(ingestConfigInput?)` | `FlowRunService::run_flow_manually` | root dataset with a polling source |
 | `runs.triggerTransformFlow` | same | derivative with a transform, every input readable by the caller |
 | `runs.triggerCompactionFlow(compactionConfigInput?)` | same | root; config validated |
-| `runs.triggerResetFlow(resetConfigInput?)` | same | a custom new head must exist in the chain and differ from the current head; the old head defaults to the current one |
+| `runs.triggerResetFlow(resetConfigInput?)` | same | the dataset has a head; a custom new head must be a stored block and differ from the current head; an expected old head must be the current head (it defaults to the current one) |
 | `runs.triggerResetToMetadataFlow` | same | — |
 | `runs.cancelFlowRun(flowId)` | `FlowRunService::cancel_flow_run` | the flow belongs to this dataset |
 | `triggers.setTrigger(datasetFlowType, triggerRuleInput, triggerStopPolicyInput)` | `FlowTriggerService::set_trigger` | schedules only for ingest and hard compaction, reactive rules only for transform; dataset kind; valid cron or batching; valid stop policy; flow preconditions |

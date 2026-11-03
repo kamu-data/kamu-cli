@@ -324,9 +324,15 @@ pub(crate) async fn test_smart_push_existing_diverged_dataset_fails_without_forc
             )
             .await;
 
+        // The chains are compared, as the Simple protocol does
         assert_matches!(
             &push_responses[0].result,
-            Err(PushError::SyncError(SyncError::DatasetsDiverged(_)))
+            Err(PushError::SyncError(SyncError::DatasetsDiverged(
+                DatasetsDivergedError {
+                    detail: Some(_),
+                    ..
+                }
+            )))
         );
     };
 
@@ -359,8 +365,15 @@ pub(crate) async fn test_smart_push_existing_dataset_fails_as_server_advanced<
             )
             .await;
 
-        // TODO: try expecting better error message
-        assert!(push_responses[0].result.is_err());
+        assert_matches!(
+            &push_responses[0].result,
+            Err(PushError::SyncError(SyncError::DestinationAhead(
+                DestinationAheadError {
+                    dst_ahead_size: 1,
+                    ..
+                }
+            )))
+        );
     };
 
     await_client_server_flow!(api_server_handle, client_handle);
