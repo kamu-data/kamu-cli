@@ -68,6 +68,7 @@ impl PullRequestPlannerImpl {
             ),
             self.dependency_graph_service.as_ref(),
             self.update_kind_resolver.as_ref(),
+            options.recursive,
         )
     }
 
@@ -85,6 +86,7 @@ impl PullRequestPlannerImpl {
         let mut errors = Vec::new();
 
         let mut depth_first_traversal = self.new_traversal(options, tenancy_config);
+        depth_first_traversal.register_requests(requests).await;
 
         for pr in requests {
             match depth_first_traversal

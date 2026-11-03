@@ -59,6 +59,10 @@ Recommendation: for ease of reading, use the following format:
   the transform that follows the reset has no new data to process
 - `kamu pull` of several datasets no longer pulls none of them when the remote of one is unknown
   or cannot be reached; that dataset fails on its own
+- `kamu pull` of several datasets, some of which the account may not update, still pulls the
+  others and reports every dataset, instead of reporting only the denied ones and skipping the rest
+- `kamu pull` without `--recursive` no longer fails a requested derivative because one of its
+  inputs, which it does not pull, has an ambiguous or missing source
 - A slow or unreachable remote repository no longer delays other writers to the node's database
   while `kamu pull` or an update task prepares to pull from it
 - Engine names in a transform are case-insensitive (`Spark` works like `spark`)

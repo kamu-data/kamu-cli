@@ -859,6 +859,94 @@ async fn test_pull_dataset_with_several_pull_aliases_is_ambiguous() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[tokio::test]
+async fn test_pull_without_recursion_skips_upstream_that_cannot_be_planned() {
+    let harness = PullTestHarness::new(TenancyConfig::SingleTenant, MockDatasetEntryWriter::new());
+
+    // A - B, C
+    create_graph(
+        harness.dataset_registry(),
+        harness.dataset_storage_unit_writer(),
+        vec![
+            (n!("a"), names![]),
+            (n!("b"), names!["a"]),
+            (n!("c"), names![]),
+        ],
+    )
+    .await;
+    harness.index_dataset_dependencies().await;
+    harness
+        .add_pull_aliases(&rl!("a"), &["kamu.dev/a", "other.dev/a"])
+        .await;
+
+    assert_eq!(
+        harness
+            .pull(refs!["b", "c"], PullOptions::default())
+            .await
+            .unwrap(),
+        vec![vec![
+            PullJob::Transform(ar!["b"]),
+            PullJob::Ingest(ar!["c"])
+        ]],
+    );
+
+    let responses = harness
+        .pull(
+            refs!["b"],
+            PullOptions {
+                recursive: true,
+                ..PullOptions::default()
+            },
+        )
+        .await
+        .unwrap_err();
+    assert_matches!(responses[0].result, Err(PullError::AmbiguousSource(_)));
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[tokio::test]
+async fn test_pull_requested_upstream_is_planned_from_its_request_in_any_order() {
+    let harness = PullTestHarness::new(TenancyConfig::SingleTenant, MockDatasetEntryWriter::new());
+
+    // A - B, where A has two pull aliases and is requested from one of them
+    create_graph(
+        harness.dataset_registry(),
+        harness.dataset_storage_unit_writer(),
+        vec![(n!("a"), names![]), (n!("b"), names!["a"])],
+    )
+    .await;
+    harness.index_dataset_dependencies().await;
+    harness
+        .add_pull_aliases(&rl!("a"), &["kamu.dev/a", "other.dev/a"])
+        .await;
+
+    let expected = vec![
+        vec![PullJob::Sync((rr!("kamu.dev/a").into(), n!("a").into()))],
+        vec![PullJob::Transform(ar!["b"])],
+    ];
+    for refs in [refs!["b", "kamu.dev/a"], refs!["kamu.dev/a", "b"]] {
+        for recursive in [false, true] {
+            assert_eq!(
+                harness
+                    .pull(
+                        refs.clone(),
+                        PullOptions {
+                            recursive,
+                            ..PullOptions::default()
+                        },
+                    )
+                    .await
+                    .unwrap(),
+                expected,
+                "refs: {refs:?}, recursive: {recursive}",
+            );
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[tokio::test]
 async fn test_sync_from_unknown_repository_is_planned_without_resolving_it() {
     let harness = PullTestHarness::new(TenancyConfig::SingleTenant, MockDatasetEntryWriter::new());
 
@@ -1121,6 +1209,16 @@ impl PullTestHarness {
             .get_remote_aliases(&hdl)
             .await
             .unwrap()
+    }
+
+    async fn add_pull_aliases(&self, dataset_ref: &odf::DatasetRef, remote_refs: &[&str]) {
+        let mut aliases = self.get_remote_aliases(dataset_ref).await;
+        for remote_ref in remote_refs {
+            aliases
+                .add(&rr!(*remote_ref), RemoteAliasKind::Pull)
+                .await
+                .unwrap();
+        }
     }
 
     async fn create_derivative_without_transform(&self, alias: &odf::DatasetAlias) {

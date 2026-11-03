@@ -66,10 +66,10 @@ impl PullDatasetUseCaseImpl {
                     .authorize(iteration)
                     .await?;
 
-            if !denied.is_empty() {
-                results.extend(denied);
-                break;
-            }
+            // The allowed jobs still run; later iterations may depend on the denied ones, so the
+            // pull stops after this one, as after a failed job
+            let has_denied = !denied.is_empty();
+            results.extend(denied);
 
             // Run iteration jobs concurrently
             let mut tasks = tokio::task::JoinSet::new();
@@ -134,7 +134,7 @@ impl PullDatasetUseCaseImpl {
                 }
                 results.push(result);
             }
-            if has_errors {
+            if has_errors || has_denied {
                 break;
             }
         }

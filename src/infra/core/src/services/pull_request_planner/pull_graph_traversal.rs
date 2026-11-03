@@ -22,6 +22,8 @@ pub(super) struct PullGraphDepthFirstTraversal<'a> {
     target_resolver: PullTargetResolver<'a>,
     dependency_graph_service: &'a dyn DependencyGraphService,
     update_kind_resolver: &'a dyn DatasetUpdateKindResolver,
+    recursive: bool,
+    requested: HashMap<odf::DatasetAlias, PullRequest>,
     visited: HashMap<odf::DatasetAlias, PullItem>,
 }
 
@@ -32,12 +34,28 @@ impl<'a> PullGraphDepthFirstTraversal<'a> {
         target_resolver: PullTargetResolver<'a>,
         dependency_graph_service: &'a dyn DependencyGraphService,
         update_kind_resolver: &'a dyn DatasetUpdateKindResolver,
+        recursive: bool,
     ) -> Self {
         Self {
             target_resolver,
             dependency_graph_service,
             update_kind_resolver,
+            recursive,
+            requested: HashMap::new(),
             visited: HashMap::new(),
+        }
+    }
+
+    /// Resolves the requested datasets up front, so an upstream that is also
+    /// requested is planned from its request, whatever the order of requests
+    pub(super) async fn register_requests(&mut self, requests: &[PullRequest]) {
+        for request in requests {
+            // A request that cannot be resolved fails when it is traversed
+            if let Ok(target) = self.target_resolver.resolve(request).await {
+                self.requested
+                    .entry(target.local_alias().clone())
+                    .or_insert_with(|| request.clone());
+            }
         }
     }
 
@@ -117,6 +135,20 @@ impl<'a> PullGraphDepthFirstTraversal<'a> {
         Ok(depth)
     }
 
+    /// The request an upstream is planned from: its own request when it was
+    /// requested too, otherwise a local reference to it
+    async fn upstream_request(&self, dependency_id: &odf::DatasetID) -> PullRequest {
+        let local_request = PullRequest::local(dependency_id.as_local_ref());
+        match self.target_resolver.resolve(&local_request).await {
+            Ok(target) => self
+                .requested
+                .get(target.local_alias())
+                .cloned()
+                .unwrap_or(local_request),
+            Err(_) => local_request,
+        }
+    }
+
     async fn traverse_upstream_datasets(
         &mut self,
         dataset_id: &odf::DatasetID,
@@ -135,13 +167,18 @@ impl<'a> PullGraphDepthFirstTraversal<'a> {
         for dependency_id in upstream_dependencies {
             tracing::debug!(%dependency_id, "Descending into dependency");
 
-            let depth = self
-                .traverse_pull_graph(
-                    &PullRequest::local(dependency_id.as_local_ref()),
-                    false,
-                    true,
-                )
-                .await?;
+            let request = self.upstream_request(&dependency_id).await;
+            let depth = match self.traverse_pull_graph(&request, false, true).await {
+                Ok(depth) => depth,
+                // Without recursion upstreams only order the requested datasets and are never
+                // pulled, so one that cannot be planned is skipped. A requested upstream is planned
+                // from its own request, so it fails that request the same way
+                Err(error) if !self.recursive => {
+                    tracing::debug!(%dependency_id, %error, "Skipping an upstream that cannot be planned");
+                    continue;
+                }
+                Err(error) => return Err(error),
+            };
             max_dep_depth = std::cmp::max(max_dep_depth, depth);
         }
 

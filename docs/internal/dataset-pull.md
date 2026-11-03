@@ -176,7 +176,11 @@ explicit, the item becomes explicit.
 
 Without `--recursive`, the visited upstreams are dropped afterwards (only explicit items are
 kept), but the depths computed from them stay, so the requested datasets still run in dependency
-order.
+order. Before traversing, `collect_pull_graph` resolves every request to its local dataset, so an
+upstream that is also requested is planned from its request (for example a sync from the remote
+named), whatever the order of requests. An upstream that cannot be planned (an ambiguous pull
+alias, a missing dataset) is skipped without `--recursive` and adds no depth; with `--recursive`
+it fails the request that reached it.
 
 ### 5.3 Turning items into jobs
 
@@ -204,11 +208,11 @@ error: it fails only its own job.
 
 `PullDatasetUseCaseImpl::pull_by_plan` runs the iterations in depth order. For each one it:
 
-1. checks authorization for the whole iteration in one transaction ([§7](#7-authorization)); if
-   any job fails, it records those failures and stops — the iteration's other jobs and every later
-   iteration do not run;
-2. spawns every job of the iteration on a `JoinSet` and waits for all of them;
-3. records each job's `PullResponse`; if any job failed, it stops after this iteration.
+1. checks authorization for the whole iteration in one transaction ([§7](#7-authorization)) and
+   records a failed `PullResponse` for every denied job;
+2. spawns every allowed job of the iteration on a `JoinSet` and waits for all of them;
+3. records each job's `PullResponse`; if any job was denied or failed, it stops after this
+   iteration, since later iterations may depend on it.
 
 Jobs of one iteration run concurrently and independently: one job's failure does not cancel the
 others. Each job opens its own short transactions, and long work (fetching, engines, transfers)
@@ -272,7 +276,9 @@ needs:
 | Transform | `Transform { inputs }` | Write on the target, Read on every input (`PullTransformItem::input_handles`) |
 | Sync into an existing dataset | `SyncFrom` | Write on the target |
 
-Denied jobs are reported in job order; a job's target error comes before its input errors.
+Denied jobs are reported in job order; a job's target error comes before its input errors. The
+allowed jobs of the iteration still run, and a denial ends the pull after that iteration, as a
+failed job does.
 
 A transform job elaborates its transform again when it runs, and another writer may have changed
 the inputs meanwhile. Before executing, the job authorizes `Transform` again with the inputs the
@@ -341,7 +347,7 @@ reporting it, so the deferred consumers of the datasets that did update run in t
 
 | Area | What happens |
 | --- | --- |
-| Stop on error | The first depth with an error is the last one run; later depths, including datasets unrelated to the failure, are not attempted |
+| Stop on error | The first depth with an error or a denied job is the last one run; later depths, including datasets unrelated to the failure, are not attempted |
 | Planning errors | One unresolvable reference fails the whole command before anything runs |
 | Pull aliases | A dataset with a pull alias is synced, never ingested or transformed, even when it has a source or a transform ([`DatasetUpdateKindResolver`](#51-resolving-each-request)) |
 | Non-recursive multi-pull | Upstreams are traversed for ordering only; they are not pulled |

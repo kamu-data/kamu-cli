@@ -1444,27 +1444,33 @@ async fn test_pull_all_owned() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[tokio::test]
-async fn test_pull_authorization_issue() {
+async fn test_pull_authorization_denial_still_pulls_allowed_datasets() {
     let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
     let alias_bar = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("bar"));
     let alias_baz = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("baz"));
 
-    let mocks = PullUseCaseHarnessMocks::default().with_permission_checker_mock(
-        MockDatasetPermissionChecker::new().make_expect_classify_datasets_by_allowance(
-            DatasetPermission::Write,
-            1,
-            HashSet::from_iter([alias_foo.clone(), alias_baz.clone()]),
-        ),
-    );
+    let mocks = PullUseCaseHarnessMocks::default()
+        .with_permission_checker_mock(
+            MockDatasetPermissionChecker::new().make_expect_classify_datasets_by_allowance(
+                DatasetPermission::Write,
+                1,
+                HashSet::from_iter([alias_foo.clone(), alias_baz.clone()]),
+            ),
+        )
+        .with_polling_ingest_mock(
+            MockPollingIngestService::new()
+                .make_expect_ingest(alias_foo.clone())
+                .make_expect_ingest(alias_baz.clone()),
+        );
     let harness = PullUseCaseHarness::new(mocks);
 
-    let _foo = harness.create_root_dataset(&alias_foo).await;
+    let foo = harness.create_root_dataset(&alias_foo).await;
     let bar = harness.create_root_dataset(&alias_bar).await;
-    let _baz = harness.create_root_dataset(&alias_baz).await;
+    let baz = harness.create_root_dataset(&alias_baz).await;
 
     harness.index_dataset_dependencies().await;
 
-    let mut pull_responses = harness
+    let pull_responses = harness
         .use_case
         .execute_multi(
             vec![
@@ -1477,17 +1483,28 @@ async fn test_pull_authorization_issue() {
         )
         .await
         .unwrap();
-    assert_eq!(1, pull_responses.len());
+    assert_eq!(3, pull_responses.len());
+
+    let response_for = |handle: &odf::DatasetHandle| {
+        pull_responses
+            .iter()
+            .find(|r| r.maybe_local_ref == Some(handle.as_local_ref()))
+            .unwrap()
+    };
 
     assert_matches!(
-        pull_responses.remove(0),
+        response_for(&bar.dataset_handle),
         PullResponse {
-            maybe_original_request: Some(PullRequest::Local(_)),
-            maybe_local_ref: Some(a_local_ref),
-            maybe_remote_ref: None,
-            result: Err(PullError::Access(_))
-        } if a_local_ref == bar.dataset_handle.as_local_ref()
+            result: Err(PullError::Access(_)),
+            ..
+        }
     );
+    for allowed in [&foo, &baz] {
+        assert_matches!(
+            response_for(&allowed.dataset_handle),
+            PullResponse { result: Ok(_), .. }
+        );
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
