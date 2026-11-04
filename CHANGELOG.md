@@ -55,6 +55,12 @@ Recommendation: for ease of reading, use the following format:
   through the API does
 - `kamu pull` of a derivative fails with "Input dataset … has no data yet, pull it first" when an
   input has never received data, instead of reporting the derivative as up to date
+- `kamu pull --reset-derivatives-on-diverged-input` resets a derivative only for an account that
+  may maintain it, as `kamu system compact` and reset flows require; otherwise the pull fails with
+  an access error and leaves the derivative as it is
+- `${{ env.NAME }}` in a polling source no longer expands templates found inside a variable's
+  value, so a variable that refers to itself no longer hangs the node, and substituted values are
+  no longer written to the debug log
 - `kamu pull --reset-derivatives-on-diverged-input` reports a reset derivative as updated, even when
   the transform that follows the reset has no new data to process
 - `kamu pull` of several datasets no longer pulls none of them when the remote of one is unknown
@@ -74,6 +80,13 @@ Recommendation: for ease of reading, use the following format:
 - GraphQL: a transform flow that found nothing to do reports `FlowDescriptionUpdateResultUpToDate`,
   as ingest flows do, instead of no result
 ### Fixed
+- A polling source with an unsupported URL scheme (such as `s3://`) or fetch kind, an invalid
+  header, an MQTT port out of range, a files glob ordered by event time or matching a file name that
+  is not UTF-8, or an Ethereum source with neither a node URL nor a chain ID fails its ingest with
+  an invalid fetch step error that is not retried, instead of crashing the node. An HTTP source
+  whose `Last-Modified` header cannot be parsed is ingested as if the header were absent
+- A smart protocol push whose metadata unpacks to more than 256 MiB, or holds more blocks than it
+  declares, is rejected instead of exhausting the server's memory
 - `kamu system compact` and compaction flows keep blocks that only set a watermark or source state
   when they cannot be merged, and a merged block takes the source state of the newest block it
   replaces, even when that block has none. Previously such a block could be dropped, moving the

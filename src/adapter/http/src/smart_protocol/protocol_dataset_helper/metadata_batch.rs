@@ -25,6 +25,11 @@ use crate::smart_protocol::messages::*;
 const MEDIA_TAR_GZ: &str = "application/tar+gzip";
 const ENCODING_RAW: &str = "raw";
 
+/// Bounds the unpacked tarball of a received batch, so a small compressed
+/// payload cannot exhaust memory. Batches travel in one WebSocket message of
+/// at most 64 MiB of JSON, which holds a fraction of that in compressed bytes
+const MAX_UNPACKED_BATCH_SIZE: u64 = 256 * 1024 * 1024;
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn prepare_dataset_metadata_batch(
@@ -111,6 +116,12 @@ pub enum DecodeMetadataBatchError {
         encoding: String,
     },
 
+    #[error("Metadata batch unpacks to more than {max_size} bytes")]
+    TooLarge { max_size: u64 },
+
+    #[error("Metadata batch holds more blocks than the {num_blocks} it declares")]
+    TooManyBlocks { num_blocks: u32 },
+
     #[error("Malformed metadata batch")]
     Malformed(#[source] BoxedError),
 
@@ -140,14 +151,31 @@ fn unpack_dataset_metadata_batch(
         });
     }
 
-    let decoder = GzDecoder::new(blocks_batch.payload.as_slice());
-    let mut archive = Archive::new(decoder);
+    // Unpacked in full first, so the bound covers the tar headers and the GNU
+    // long-name entries that the tar reader buffers on its own
+    let mut tarball = Vec::new();
+    GzDecoder::new(blocks_batch.payload.as_slice())
+        .take(MAX_UNPACKED_BATCH_SIZE + 1)
+        .read_to_end(&mut tarball)
+        .map_err(DecodeMetadataBatchError::malformed)?;
+    if u64::try_from(tarball.len()).unwrap() > MAX_UNPACKED_BATCH_SIZE {
+        return Err(DecodeMetadataBatchError::TooLarge {
+            max_size: MAX_UNPACKED_BATCH_SIZE,
+        });
+    }
+
+    let mut archive = Archive::new(tarball.as_slice());
 
     let mut blocks_data = Vec::new();
     for entry in archive
         .entries()
         .map_err(DecodeMetadataBatchError::malformed)?
     {
+        if blocks_data.len() >= usize::try_from(blocks_batch.num_blocks).unwrap() {
+            return Err(DecodeMetadataBatchError::TooManyBlocks {
+                num_blocks: blocks_batch.num_blocks,
+            });
+        }
         let mut entry = entry.map_err(DecodeMetadataBatchError::malformed)?;
 
         let path = entry.path().map_err(DecodeMetadataBatchError::malformed)?;
@@ -219,6 +247,51 @@ mod tests {
         assert_matches!(
             decode_metadata_batch(&batch),
             Err(DecodeMetadataBatchError::Malformed(_))
+        );
+    }
+
+    #[test]
+    fn test_decode_metadata_batch_rejects_more_blocks_than_declared() {
+        let mut tarball = Builder::new(Vec::new());
+        for i in 0..2_u8 {
+            let mut header = Header::new_gnu();
+            header.set_size(5);
+            header.set_cksum();
+            let hash = odf::Multihash::from_digest_sha3_256(&[i]);
+            tarball
+                .append_data(
+                    &mut header,
+                    hash.as_multibase().to_stack_string(),
+                    b"block".as_slice(),
+                )
+                .unwrap();
+        }
+
+        let batch = tar_gz_batch(&tarball.into_inner().unwrap());
+
+        assert_matches!(
+            decode_metadata_batch(&batch),
+            Err(DecodeMetadataBatchError::TooManyBlocks { num_blocks: 1 })
+        );
+    }
+
+    #[test]
+    fn test_decode_metadata_batch_rejects_payload_unpacking_past_the_bound() {
+        let mut encoder = GzEncoder::new(Vec::new(), Compression::fast());
+        let chunk = vec![0_u8; 1024 * 1024];
+        for _ in 0..=(MAX_UNPACKED_BATCH_SIZE / 1024 / 1024) {
+            encoder.write_all(&chunk).unwrap();
+        }
+        let batch = MetadataBlocksBatch {
+            num_blocks: 1,
+            media_type: String::from(MEDIA_TAR_GZ),
+            encoding: String::from(ENCODING_RAW),
+            payload: encoder.finish().unwrap(),
+        };
+
+        assert_matches!(
+            decode_metadata_batch(&batch),
+            Err(DecodeMetadataBatchError::TooLarge { .. })
         );
     }
 

@@ -7,7 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::borrow::Cow;
 use std::sync::LazyLock;
 
 use kamu_core::{TemplateError, TemplateInvalidPatternError, TemplateValueNotFoundError};
@@ -21,6 +20,8 @@ static RE_ENV: LazyLock<Regex> = LazyLock::new(|| {
 static RE_NUM: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"^(-?[0-9]+(?:.[0-9]+)?)$").expect("Invalid template number regex")
 });
+static RE_TPL: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"\$\{\{([^}]*)\}\}").expect("Invalid template regex"));
 static RE_STR: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"^'([^']*)'$").expect("Invalid template string regex"));
 
@@ -84,52 +85,48 @@ fn parse_tokens(tokens_str: &str) -> Result<Vec<TemplateToken>, TemplateError> {
 
 /// Substitutes `${{ env.NAME || default }}` templates. A variable `lookup_fn`
 /// does not know is `Ok(None)`, and the next option of the template applies;
-/// a failed lookup fails the substitution.
-pub fn template_string<'a, E: From<TemplateError>>(
-    s: &'a str,
+/// a failed lookup fails the substitution. Substituted values are inserted as
+/// they are: a template inside a value is not expanded.
+pub fn template_string<E: From<TemplateError>>(
+    s: &str,
     lookup_fn: &dyn Fn(&str) -> Result<Option<String>, E>,
 ) -> Result<String, E> {
-    let mut s = Cow::from(s);
-    let re_tpl = Regex::new(r"\$\{\{([^}]*)\}\}").unwrap();
-    loop {
-        if let Some(ctpl) = re_tpl.captures(&s) {
-            let tpl = ctpl.get(0).expect("Missing template capture");
-            let tpl_range = tpl.range();
+    let mut result = String::with_capacity(s.len());
+    let mut copied_up_to = 0;
 
-            let tokens_str = ctpl
-                .get(1)
-                .expect("Missing variable capture")
-                .as_str()
-                .trim();
-            let tokens = parse_tokens(tokens_str)?;
+    for ctpl in RE_TPL.captures_iter(s) {
+        let tpl = ctpl.get(0).expect("Missing template capture");
+        let tokens_str = ctpl
+            .get(1)
+            .expect("Missing variable capture")
+            .as_str()
+            .trim();
+        let tokens = parse_tokens(tokens_str)?;
 
-            let mut value = None;
-            for token in &tokens {
-                value = match token {
-                    TemplateToken::EnvVar(v) => lookup_fn(v)?,
-                    TemplateToken::Literal(v) => Some(v.clone()),
-                };
-                if value.is_some() {
-                    break;
-                }
+        let mut value = None;
+        for token in &tokens {
+            value = match token {
+                TemplateToken::EnvVar(v) => lookup_fn(v)?,
+                TemplateToken::Literal(v) => Some(v.clone()),
+            };
+            if value.is_some() {
+                break;
             }
-
-            match value {
-                Some(v) => s.to_mut().replace_range(tpl_range, &v),
-                None => {
-                    return Err(
-                        TemplateError::ValueNotFound(TemplateValueNotFoundError::new(tokens_str))
-                            .into(),
-                    );
-                }
-            }
-        } else {
-            if let Cow::Owned(_) = &s {
-                tracing::debug!(%s, "String after template substitution");
-            }
-            return Ok(s.to_string());
         }
+
+        let Some(value) = value else {
+            return Err(
+                TemplateError::ValueNotFound(TemplateValueNotFoundError::new(tokens_str)).into(),
+            );
+        };
+
+        result.push_str(&s[copied_up_to..tpl.start()]);
+        result.push_str(&value);
+        copied_up_to = tpl.end();
     }
+
+    result.push_str(&s[copied_up_to..]);
+    Ok(result)
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -259,6 +256,24 @@ mod tests {
             &lookup_fn,
         );
         assert_matches!(result, Ok(val) if val.as_str() == "foo=val1");
+    }
+
+    #[test]
+    fn test_template_string_does_not_expand_templates_inside_values() {
+        let lookup_fn = |env_name: &str| -> Result<Option<String>, TemplateError> {
+            Ok(match env_name {
+                "outer" => Some(String::from("${{ env.secret }}")),
+                "self" => Some(String::from("${{ env.self }}")),
+                "secret" => Some(String::from("leaked")),
+                _ => None,
+            })
+        };
+
+        let result = template_string("a=${{ env.outer }}", &lookup_fn);
+        assert_matches!(result, Ok(val) if val.as_str() == "a=${{ env.secret }}");
+
+        let result = template_string("b=${{ env.self }}", &lookup_fn);
+        assert_matches!(result, Ok(val) if val.as_str() == "b=${{ env.self }}");
     }
 
     #[test]

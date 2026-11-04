@@ -120,12 +120,17 @@ impl FetchService {
                             if #[cfg(feature = "ingest-ftp")] {
                                 Self::fetch_ftp(url, target_path, system_time, &listener).await
                             } else {
-                                unimplemented!("Kamu was compiled without FTP support")
+                                Err(InvalidFetchStepError::new(
+                                    "Kamu was compiled without FTP support",
+                                )
+                                .into())
                             }
                         }
                     }
-                    // TODO: Replace with proper error type
-                    scheme => unimplemented!("Unsupported scheme: {}", scheme),
+                    scheme => Err(InvalidFetchStepError::new(format!(
+                        "Unsupported URL scheme: {scheme}"
+                    ))
+                    .into()),
                 }
             }
             FetchStep::Container(fetch) => {
@@ -158,7 +163,10 @@ impl FetchService {
                     )
                     .await
                 } else {
-                    unimplemented!("Kamu was compiled without MQTT support")
+                    Err(InvalidFetchStepError::new(
+                        "Kamu was compiled without MQTT support",
+                    )
+                    .into())
                 }}
             }
             FetchStep::EthereumLogs(fetch) => {
@@ -174,7 +182,10 @@ impl FetchService {
                         .await
                     }
                     else {
-                        unimplemented!("Kamu was compiled without Ethereum support")
+                        Err(InvalidFetchStepError::new(
+                            "Kamu was compiled without Ethereum support",
+                        )
+                        .into())
                     }
                 }
             }

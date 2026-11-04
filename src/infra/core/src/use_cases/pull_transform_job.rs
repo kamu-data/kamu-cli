@@ -9,7 +9,7 @@
 
 use std::sync::Arc;
 
-use database_common_macros::{transactional_method1, transactional_method2};
+use database_common_macros::{transactional_method2, transactional_method3};
 use internal_error::{ErrorIntoInternal, InternalError};
 use kamu_accounts::Principal;
 use kamu_core::*;
@@ -244,11 +244,27 @@ impl PullTransformJob {
         )
     }
 
-    #[transactional_method1(dataset_registry: Arc<dyn DatasetRegistry>)]
+    /// Resetting drops the derivative's data, so it needs the right to
+    /// maintain the dataset, beyond the write the pull was granted
+    #[transactional_method3(
+        dataset_registry: Arc<dyn DatasetRegistry>,
+        dataset_operation_guard: Arc<dyn DatasetOperationGuard>,
+        principal: Arc<Principal>
+    )]
     async fn plan_reset_to_metadata(
         &self,
         target_handle: &odf::DatasetHandle,
     ) -> Result<(ResolvedDataset, CompactionPlan), PullError> {
+        dataset_operation_guard
+            .check_operation(
+                &principal,
+                &DatasetOperationRequest::new(
+                    target_handle.clone(),
+                    DatasetOperation::ResetToMetadata,
+                ),
+            )
+            .await?;
+
         let target = dataset_registry
             .try_get_dataset_by_ref(&target_handle.as_local_ref())
             .await?

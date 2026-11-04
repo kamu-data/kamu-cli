@@ -751,7 +751,7 @@ async fn test_pull_transform_failing_after_reset_reports_reset_heads() {
     let reset_heads = ReportedHeads::default();
 
     let harness = PullUseCaseHarness::new(
-        PullUseCaseHarnessMocks::for_transform(&alias_foo, &alias_bar)
+        PullUseCaseHarnessMocks::for_transform_resetting(&alias_foo, &alias_bar, true)
             .with_transform_elaboration_mock(
                 MockTransformPlanner::new()
                     .make_expect_elaborate_transform_diverged(alias_bar.clone())
@@ -825,6 +825,33 @@ async fn test_pull_transform_diverged_input_fails_without_reset() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[tokio::test]
+async fn test_pull_transform_diverged_input_without_maintain_right_is_not_reset() {
+    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let alias_bar = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("bar"));
+
+    let harness = PullUseCaseHarness::new(
+        PullUseCaseHarnessMocks::for_transform_resetting(&alias_foo, &alias_bar, false)
+            .with_transform_elaboration_mock(
+                MockTransformPlanner::new()
+                    .make_expect_elaborate_transform_diverged(alias_bar.clone()),
+            ),
+    );
+    let foo = harness.create_root_dataset(&alias_foo).await;
+    let bar = harness
+        .create_derived_dataset(&alias_bar, vec![foo.dataset_handle.as_local_ref()])
+        .await;
+
+    let pull_response = harness
+        .pull_local_resetting_on_diverged_input(&alias_bar)
+        .await;
+
+    assert_matches!(pull_response.result, Err(PullError::Access(_)));
+    assert_eq!(harness.get_head(&bar).await, bar.head);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[tokio::test]
 async fn test_pull_transform_diverged_input_resets_and_retransforms() {
     let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
     let alias_bar = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("bar"));
@@ -832,7 +859,7 @@ async fn test_pull_transform_diverged_input_resets_and_retransforms() {
     let transform_heads = ReportedHeads::default();
 
     let harness = PullUseCaseHarness::new(
-        PullUseCaseHarnessMocks::for_transform(&alias_foo, &alias_bar)
+        PullUseCaseHarnessMocks::for_transform_resetting(&alias_foo, &alias_bar, true)
             .with_transform_elaboration_mock(
                 MockTransformPlanner::new()
                     .make_expect_elaborate_transform_diverged(alias_bar.clone())
@@ -877,7 +904,7 @@ async fn test_pull_transform_reset_then_up_to_date_reports_updated() {
     let reset_heads = ReportedHeads::default();
 
     let harness = PullUseCaseHarness::new(
-        PullUseCaseHarnessMocks::for_transform(&alias_foo, &alias_bar)
+        PullUseCaseHarnessMocks::for_transform_resetting(&alias_foo, &alias_bar, true)
             .with_transform_elaboration_mock(
                 MockTransformPlanner::new()
                     .make_expect_elaborate_transform_diverged(alias_bar.clone())
@@ -2015,6 +2042,38 @@ impl PullUseCaseHarnessMocks {
                     DatasetPermission::Read,
                     1,
                     HashSet::from_iter([alias_foo.clone()]),
+                ),
+        )
+    }
+
+    /// Like [`Self::for_transform`], for a pull that resets `bar` to metadata,
+    /// with the right to maintain `bar` granted or not
+    fn for_transform_resetting(
+        alias_foo: &odf::DatasetAlias,
+        alias_bar: &odf::DatasetAlias,
+        maintain_granted: bool,
+    ) -> Self {
+        let maintainable = if maintain_granted {
+            HashSet::from_iter([alias_bar.clone()])
+        } else {
+            HashSet::new()
+        };
+        Self::default().with_permission_checker_mock(
+            MockDatasetPermissionChecker::new()
+                .make_expect_classify_datasets_by_allowance(
+                    DatasetPermission::Write,
+                    1,
+                    HashSet::from_iter([alias_bar.clone()]),
+                )
+                .make_expect_classify_datasets_by_allowance(
+                    DatasetPermission::Read,
+                    1,
+                    HashSet::from_iter([alias_foo.clone()]),
+                )
+                .make_expect_classify_datasets_by_allowance(
+                    DatasetPermission::Maintain,
+                    1,
+                    maintainable,
                 ),
         )
     }

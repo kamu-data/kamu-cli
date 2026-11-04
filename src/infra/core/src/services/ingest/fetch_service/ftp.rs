@@ -67,10 +67,8 @@ impl FetchService {
             let mut transfer = h.transfer();
 
             transfer
-                .write_function(|data| {
-                    let written = target_file.write(data).unwrap();
-                    Ok(written)
-                })
+                // A short count makes curl fail the transfer with a write error
+                .write_function(|data| Ok(target_file.write_all(data).map_or(0, |()| data.len())))
                 .int_err()?;
 
             transfer
@@ -91,7 +89,7 @@ impl FetchService {
                 .int_err()?;
 
             transfer.perform().map_err(|e| {
-                std::fs::remove_file(&target_path_tmp).unwrap();
+                std::fs::remove_file(&target_path_tmp).ok();
                 match e.code() {
                     curl_sys::CURLE_COULDNT_RESOLVE_HOST | curl_sys::CURLE_COULDNT_CONNECT => {
                         PollingIngestError::unreachable(url.as_str(), Some(e.into()))

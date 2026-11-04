@@ -52,21 +52,29 @@ impl FetchService {
         let mut headers: HeaderMap = headers
             .into_iter()
             .map(|h| {
-                let name = HeaderName::try_from(h.name).unwrap();
-                let value = HeaderValue::try_from(h.value).unwrap();
-                (name, value)
+                // The value may hold a substituted secret, so only the name is reported
+                let name = HeaderName::try_from(h.name.as_str()).map_err(|_| {
+                    InvalidFetchStepError::new(format!("Invalid HTTP header name: {}", h.name))
+                })?;
+                let value = HeaderValue::try_from(h.value).map_err(|_| {
+                    InvalidFetchStepError::new(format!("Invalid value of HTTP header {name}"))
+                })?;
+                Ok((name, value))
             })
-            .collect();
+            .collect::<Result<_, InvalidFetchStepError>>()?;
 
         match prev_source_state {
             None => (),
             Some(PollingSourceState::ETag(etag)) => {
-                headers.insert(header::IF_NONE_MATCH, HeaderValue::try_from(etag).unwrap());
+                headers.insert(
+                    header::IF_NONE_MATCH,
+                    HeaderValue::try_from(etag).int_err()?,
+                );
             }
             Some(PollingSourceState::LastModified(last_modified)) => {
                 headers.insert(
                     header::IF_MODIFIED_SINCE,
-                    HeaderValue::try_from(last_modified.to_rfc2822()).unwrap(),
+                    HeaderValue::try_from(last_modified.to_rfc2822()).int_err()?,
                 );
             }
         }
@@ -102,8 +110,11 @@ impl FetchService {
             Some(PollingSourceState::ETag(
                 etag.to_str().int_err()?.to_string(),
             ))
-        } else if let Some(last_modified) = response.headers().get(reqwest::header::LAST_MODIFIED) {
-            let last_modified = Self::parse_http_date_time(last_modified.to_str().int_err()?);
+        } else if let Some(last_modified) = response
+            .headers()
+            .get(reqwest::header::LAST_MODIFIED)
+            .and_then(Self::parse_http_date_time)
+        {
             last_modified_time = Some(last_modified);
             Some(PollingSourceState::LastModified(last_modified))
         } else {
@@ -149,10 +160,19 @@ impl FetchService {
         }))
     }
 
-    fn parse_http_date_time(val: &str) -> DateTime<Utc> {
-        DateTime::parse_from_rfc2822(val)
-            .unwrap_or_else(|e| panic!("Failed to parse Last-Modified header {val}: {e}"))
-            .into()
+    /// A `Last-Modified` the server got wrong is treated as absent
+    fn parse_http_date_time(val: &HeaderValue) -> Option<DateTime<Utc>> {
+        val.to_str()
+            .ok()
+            .and_then(|val| DateTime::parse_from_rfc2822(val).ok())
+            .map(Into::into)
+            .or_else(|| {
+                tracing::warn!(
+                    ?val,
+                    "Ignoring a Last-Modified header that cannot be parsed"
+                );
+                None
+            })
     }
 }
 

@@ -274,16 +274,16 @@ and kept after a failed one, whose errors may point at logs in it. The service n
 `FetchService::fetch` dispatches on `FetchStep`. URL, headers, the container image, args and env
 values, the MQTT password and the EVM node URL pass through `${{ env.NAME || default }}` templating.
 A name that is not set falls through to the next option; a lookup that fails, such as a secret that
-cannot be decrypted, fails the fetch. With secrets encryption enabled
-(`DatasetKeyValueServiceImpl`), names resolve from the dataset's env vars only; without it
-(`DatasetKeyValueServiceSysEnv`), any supplied dataset env vars are checked first and the process
-environment is the fallback, which in practice means the process environment, since no dataset env
-var service is wired in that mode.
+cannot be decrypted, fails the fetch. A substituted value is inserted as it is: a template inside
+it is not expanded. With secrets encryption enabled (`DatasetKeyValueServiceImpl`), names resolve
+from the dataset's env vars only; without it (`DatasetKeyValueServiceSysEnv`), any supplied dataset
+env vars are checked first and the process environment is the fallback, which in practice means the
+process environment, since no dataset env var service is wired in that mode.
 
 | Fetch step | Source state written | `has_more` | Notes |
 | --- | --- | --- | --- |
 | `Url` `file://` | `LastModified` (file mtime) | never | Zero-copy: the original file is read in place ([§5.3](#53-savepoints)) |
-| `Url` `http(s)://` | `ETag` or `LastModified` from response headers, else none | never | Sends `If-None-Match` / `If-Modified-Since`; `304` is up to date |
+| `Url` `http(s)://` | `ETag` or `LastModified` from response headers, else none | never | Sends `If-None-Match` / `If-Modified-Since`; `304` is up to date; a `Last-Modified` that does not parse is ignored |
 | `Url` `ftp(s)://` | none | never | Uncacheable after the first ingest; behind the `ingest-ftp` feature |
 | `FilesGlob` | `ETag` = name of the file just ingested | when more files sort after it | One file per iteration, ordered by name; event time from system time or the file path |
 | `Container` | whatever the container writes to `ODF_NEW_ETAG_PATH` / `ODF_NEW_LAST_MODIFIED_PATH` | when it creates `ODF_NEW_HAS_MORE_DATA_PATH` | Receives `ODF_ETAG`, `ODF_LAST_MODIFIED`, `ODF_BATCH_SIZE`; same state as before means up to date |
@@ -457,10 +457,13 @@ Each error type says whether a retry could succeed: `PollingIngestError::is_reco
 `PollingIngestPlanError::is_recoverable`, built on the same methods of `EngineError` and
 `EngineProvisioningError`. Errors caused by the source definition or by the fetched data are not
 recoverable: a retry resumes from the same savepoint and fails the same way. That covers template
-and parameter errors, an invalid fetch step (a templated URL that does not parse, an event time
-that cannot be taken from the source), read, schema, merge, execution and validation errors, an
-invalid preprocess query, an unsupported engine, and a dataset without a polling source. Fetch,
-process, image, commit and internal errors are recoverable. The update task maps the flag to its
+and parameter errors, an invalid fetch step (a templated URL that does not parse, a URL scheme or
+fetch kind this build does not support, an invalid header or MQTT port, a files glob ordered other
+than by name or matching a file name that is not UTF-8, an Ethereum source with neither a node URL
+nor a chain ID, an event time that cannot be taken from the source), read, schema, merge,
+execution and validation errors, an invalid preprocess query, an unsupported engine, and a
+dataset without a polling source. Fetch, process, image, commit and internal errors are
+recoverable. The update task maps the flag to its
 outcome ([task-system.md](task-system.md#71-update-dataset)).
 
 The writer reports a value that does not parse or cast to its column's type as `ExecutionError`,

@@ -36,7 +36,10 @@ impl FetchService {
         // rentention is based
         let client_id = format!("kamu-ingest-{}", dataset_handle.id.as_multibase());
 
-        let mut opts = MqttOptions::new(client_id, &fetch.host, u16::try_from(fetch.port).unwrap());
+        let port = u16::try_from(fetch.port).map_err(|_| {
+            InvalidFetchStepError::new(format!("Invalid MQTT port: {}", fetch.port))
+        })?;
+        let mut opts = MqttOptions::new(client_id, &fetch.host, port);
         opts.set_clean_session(false);
 
         // TODO: Reconsider password propagation

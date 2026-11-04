@@ -282,7 +282,9 @@ failed job does.
 
 A transform job elaborates its transform again when it runs, and another writer may have changed
 the inputs meanwhile. Before executing, the job authorizes `Transform` again with the inputs the
-iteration did not check, and fails with `PullError::Access` if one is denied.
+iteration did not check, and fails with `PullError::Access` if one is denied. Resetting the
+derivative on a diverged input drops its data, so the job first checks `ResetToMetadata` (Maintain
+on the target) and fails with `PullError::Access` without resetting when it is denied.
 
 A sync target that does not exist yet has nothing to check; creating it is governed by the sync.
 `--all` only plans datasets the current account owns. Planning itself resolves datasets without

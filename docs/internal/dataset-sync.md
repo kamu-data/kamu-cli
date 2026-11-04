@@ -524,8 +524,9 @@ internal error and reports the phase it names, instead of failing to parse the r
 protocol errors, `InvalidInterval` (→ a chain comparison on pull), `SeedBlockOverwriteRestricted`
 (→ `OverwriteSeedBlock` on push; on pull the client makes the `Seed` check itself), `RefCollision`
 and `NameCollision` keep their meaning. A metadata batch or an object download that cannot be read
-fails the transfer with an error; a download answered with an error status is `Internal`, so it is
-recoverable.
+fails the transfer with an error; so does a batch that unpacks to more than
+`MAX_UNPACKED_BATCH_SIZE` (`metadata_batch.rs`) or holds more blocks than its `num_blocks`. A
+download answered with an error status is `Internal`, so it is recoverable.
 
 `SyncError::is_recoverable` says whether running the same sync again could succeed. A lost CAS
 (`HeadMoved`) and `Internal`, which also covers network failures, are

@@ -1434,6 +1434,112 @@ async fn test_fetch_container_has_more_data_is_more_than_a_batch() {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Invalid fetch steps
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[tokio::test]
+async fn test_fetch_url_unsupported_scheme_is_invalid_fetch_step() {
+    let harness = FetchTestHarness::new();
+
+    let res = harness
+        .fetch_once(&odf::metadata::FetchStep::Url(
+            odf::metadata::FetchStepUrl {
+                url: "s3://bucket/data.csv".to_owned(),
+                event_time: None,
+                cache: None,
+                headers: None,
+            },
+        ))
+        .await;
+
+    assert_matches!(res, Err(PollingIngestError::InvalidFetchStep(_)));
+}
+
+#[tokio::test]
+async fn test_fetch_url_http_invalid_header_is_invalid_fetch_step() {
+    let harness = FetchTestHarness::new();
+
+    let res = harness
+        .fetch_once(&odf::metadata::FetchStep::Url(
+            odf::metadata::FetchStepUrl {
+                url: "http://localhost:123/data.csv".to_owned(),
+                event_time: None,
+                cache: None,
+                headers: Some(vec![odf::metadata::RequestHeader {
+                    name: "not a header name".to_owned(),
+                    value: "value".to_owned(),
+                }]),
+            },
+        ))
+        .await;
+
+    assert_matches!(res, Err(PollingIngestError::InvalidFetchStep(_)));
+}
+
+#[tokio::test]
+async fn test_fetch_files_glob_ordered_by_event_time_is_invalid_fetch_step() {
+    let harness = FetchTestHarness::new();
+
+    let res = harness
+        .fetch_once(&odf::metadata::FetchStep::FilesGlob(
+            odf::metadata::FetchStepFilesGlob {
+                path: harness
+                    .temp_dir
+                    .path()
+                    .join("data-*.csv")
+                    .to_str()
+                    .unwrap()
+                    .to_owned(),
+                event_time: None,
+                cache: None,
+                order: Some(odf::metadata::SourceOrdering::ByEventTime),
+            },
+        ))
+        .await;
+
+    assert_matches!(res, Err(PollingIngestError::InvalidFetchStep(_)));
+}
+
+#[cfg(feature = "ingest-mqtt")]
+#[tokio::test]
+async fn test_fetch_mqtt_port_out_of_range_is_invalid_fetch_step() {
+    let harness = FetchTestHarness::new();
+
+    let res = harness
+        .fetch_once(&odf::metadata::FetchStep::Mqtt(
+            odf::metadata::FetchStepMqtt {
+                host: "localhost".to_owned(),
+                port: -5,
+                username: None,
+                password: None,
+                topics: vec![],
+            },
+        ))
+        .await;
+
+    assert_matches!(res, Err(PollingIngestError::InvalidFetchStep(_)));
+}
+
+#[cfg(feature = "ingest-evm")]
+#[tokio::test]
+async fn test_fetch_ethereum_logs_without_node_or_chain_is_invalid_fetch_step() {
+    let harness = FetchTestHarness::new();
+
+    let res = harness
+        .fetch_once(&odf::metadata::FetchStep::EthereumLogs(
+            odf::metadata::FetchStepEthereumLogs {
+                chain_id: None,
+                node_url: None,
+                filter: None,
+                signature: None,
+            },
+        ))
+        .await;
+
+    assert_matches!(res, Err(PollingIngestError::InvalidFetchStep(_)));
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Harness
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -1460,6 +1566,25 @@ impl FetchTestHarness {
             temp_dir,
             fetch_svc,
         }
+    }
+
+    /// Fetches once, with no previous state and no env vars
+    async fn fetch_once(
+        &self,
+        fetch_step: &odf::metadata::FetchStep,
+    ) -> Result<FetchResult, PollingIngestError> {
+        self.fetch_svc
+            .fetch(
+                &mock_dataset_handle(),
+                &generate_unique_operation_id(),
+                fetch_step,
+                None,
+                &self.temp_dir.path().join("fetched.bin"),
+                &Utc::now(),
+                &HashMap::new(),
+                None,
+            )
+            .await
     }
 }
 
