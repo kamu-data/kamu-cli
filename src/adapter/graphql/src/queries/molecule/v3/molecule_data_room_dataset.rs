@@ -15,13 +15,17 @@ use database_common::PaginationOpts;
 use file_utils::MediaType;
 use kamu_datasets::FileVersion;
 use kamu_molecule_domain::{
+    MoleculeActivitiesFilters,
     MoleculeConfig,
     MoleculeDataRoomActivity,
     MoleculeFindDataRoomEntryError,
     MoleculeFindDataRoomEntryUseCase,
+    MoleculeProjectActivity,
+    MoleculeViewDataRoomActivitiesError,
     MoleculeViewDataRoomEntriesError,
     MoleculeViewDataRoomEntriesMode,
     MoleculeViewDataRoomEntriesUseCase,
+    MoleculeViewProjectActivitiesUseCase,
 };
 
 use crate::molecule::molecule_subject;
@@ -32,9 +36,12 @@ use crate::queries::molecule::v3::{
     MoleculeAccessLevelRuleInput,
     MoleculeCategory,
     MoleculeChangeBy,
+    MoleculeDataRoomEntryActivityEvent,
+    MoleculeDataRoomEntryActivityEventConnection,
     MoleculeProject,
     MoleculeTag,
     MoleculeVersionedFile,
+    MoleculeVersionedFileActivityEvent,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -265,6 +272,8 @@ impl MoleculeDataRoomEntry {
 #[common_macros::method_names_consts(const_value_prefix = "Gql::")]
 #[Object]
 impl MoleculeDataRoomEntry {
+    const DEFAULT_ACTIVITY_EVENTS_PER_PAGE: usize = 15;
+
     /// Backlink to the project
     async fn project(&self) -> &MoleculeProject {
         self.project.as_ref()
@@ -310,6 +319,75 @@ impl MoleculeDataRoomEntry {
         Ok(MoleculeVersionedFile::new(
             Cow::Borrowed(&self.entity),
             self.is_latest_data_room_entry,
+        ))
+    }
+
+    /// Activity events of this entry in reverse chronological order, including
+    /// moves and renames
+    #[tracing::instrument(level = "info", name = MoleculeDataRoomEntry_activity, skip_all)]
+    async fn activity(
+        &self,
+        ctx: &Context<'_>,
+        page: Option<usize>,
+        per_page: Option<usize>,
+    ) -> Result<MoleculeDataRoomEntryActivityEventConnection> {
+        let page = page.unwrap_or(0);
+        let per_page = per_page.unwrap_or(Self::DEFAULT_ACTIVITY_EVENTS_PER_PAGE);
+
+        let view_project_activities_uc =
+            from_catalog_n!(ctx, dyn MoleculeViewProjectActivitiesUseCase);
+
+        let molecule_config = from_catalog_n!(ctx, MoleculeConfig);
+        let molecule_subject = molecule_subject(ctx)?;
+
+        let listing = view_project_activities_uc
+            .execute(
+                &molecule_subject,
+                &self.project.entity,
+                molecule_config.view_project_activities_mode(),
+                Some(MoleculeActivitiesFilters {
+                    by_tags: None,
+                    by_categories: None,
+                    by_access_levels: None,
+                    by_access_level_rules: None,
+                    by_kinds: None,
+                    by_refs: Some(vec![self.entity.reference.clone()]),
+                }),
+                Some(PaginationOpts {
+                    limit: per_page,
+                    offset: page * per_page,
+                }),
+            )
+            .await
+            .map_err(|e| {
+                use MoleculeViewDataRoomActivitiesError as E;
+                match e {
+                    E::Access(e) => GqlError::Access(e),
+                    E::Internal(_) => e.int_err().into(),
+                }
+            })?;
+
+        let nodes = listing
+            .list
+            .into_iter()
+            .map(|activity| match activity {
+                MoleculeProjectActivity::DataRoomActivity(data_room_activity) => {
+                    Ok(MoleculeDataRoomEntryActivityEvent::VersionedFile(
+                        MoleculeVersionedFileActivityEvent::from_data_room_activity(
+                            &self.project,
+                            data_room_activity,
+                        ),
+                    ))
+                }
+                MoleculeProjectActivity::Announcement(_) => Err(InternalError::new(
+                    "Announcement in the activity of a data room entry",
+                )
+                .into()),
+            })
+            .collect::<Result<Vec<_>>>()?;
+
+        Ok(MoleculeDataRoomEntryActivityEventConnection::new(
+            nodes, page, per_page,
         ))
     }
 }

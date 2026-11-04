@@ -145,6 +145,11 @@ impl MoleculeViewProjectActivitiesUseCaseImpl {
             return Ok(MoleculeProjectActivityListing::default());
         };
 
+        let by_refs = filters
+            .as_ref()
+            .and_then(|f| f.by_refs.clone())
+            .filter(|by_refs| !by_refs.is_empty());
+
         let df = if let Some(filters) = filters {
             utils::apply_molecule_filters_to_df(
                 df,
@@ -256,7 +261,11 @@ impl MoleculeViewProjectActivitiesUseCaseImpl {
                 }
             };
 
-            if !kind_selection.includes_data_room_activity_type(activity_type) {
+            if !kind_selection.includes_data_room_activity_type(activity_type)
+                || by_refs
+                    .as_ref()
+                    .is_some_and(|by_refs| !by_refs.contains(&entry.reference))
+            {
                 continue;
             }
 

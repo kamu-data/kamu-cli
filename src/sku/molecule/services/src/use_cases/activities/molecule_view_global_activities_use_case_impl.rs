@@ -148,6 +148,11 @@ impl MoleculeViewGlobalActivitiesUseCaseImpl {
             return Ok(MoleculeGlobalActivityListing::default());
         };
 
+        let by_refs = filters
+            .as_ref()
+            .and_then(|f| f.by_refs.clone())
+            .filter(|by_refs| !by_refs.is_empty());
+
         // Apply filters, if present
         let df = if let Some(filters) = filters {
             utils::apply_molecule_filters_to_df(
@@ -178,6 +183,23 @@ impl MoleculeViewGlobalActivitiesUseCaseImpl {
                 ),
             )
             .int_err()?
+        };
+
+        let df = if let Some(by_refs) = by_refs {
+            use datafusion::logical_expr::{col, lit};
+
+            df.filter(
+                col("ref").in_list(
+                    by_refs
+                        .iter()
+                        .map(|by_ref| lit(by_ref.to_string()))
+                        .collect(),
+                    false,
+                ),
+            )
+            .int_err()?
+        } else {
+            df
         };
 
         // Sorting will be done after merge

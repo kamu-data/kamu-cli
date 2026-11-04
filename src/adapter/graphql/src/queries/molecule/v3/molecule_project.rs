@@ -29,7 +29,7 @@ use crate::queries::molecule::v3::{
     MoleculeAnnouncementEntry,
     MoleculeAnnouncements,
     MoleculeDataRoom,
-    MoleculeDataRoomEntry,
+    MoleculeVersionedFileActivityEvent,
     OclId,
     Symbol,
 };
@@ -169,19 +169,12 @@ impl MoleculeProject {
             .into_iter()
             .map(|activity| match activity {
                 MoleculeProjectActivity::DataRoomActivity(data_room_activity_entity) => {
-                    let activity_type = data_room_activity_entity.activity_type;
-                    let entry = MoleculeDataRoomEntry::new_from_data_room_activity_entity(
-                        &self_arc,
-                        data_room_activity_entity,
-                    );
-
-                    use MoleculeDataRoomFileActivityType as Type;
-
-                    match activity_type {
-                        Type::Added => MoleculeActivityEvent::file_added(entry),
-                        Type::Updated => MoleculeActivityEvent::file_updated(entry),
-                        Type::Removed => MoleculeActivityEvent::file_removed(entry),
-                    }
+                    MoleculeActivityEvent::VersionedFile(
+                        MoleculeVersionedFileActivityEvent::from_data_room_activity(
+                            &self_arc,
+                            data_room_activity_entity,
+                        ),
+                    )
                 }
                 MoleculeProjectActivity::Announcement(announcement_activity_entity) => {
                     let entry = MoleculeAnnouncementEntry::new_from_announcement(
@@ -214,6 +207,9 @@ pub struct MoleculeProjectActivityFilters {
     pub by_access_levels: Option<Vec<String>>,
     pub by_access_level_rules: Option<Vec<MoleculeAccessLevelRuleInput>>,
     pub by_kinds: Option<Vec<MoleculeActivityKindInput>>,
+    /// Only activity of the data room entries that link these datasets;
+    /// leaves out announcements
+    pub by_refs: Option<Vec<DatasetID<'static>>>,
 }
 
 impl From<MoleculeProjectActivityFilters> for kamu_molecule_domain::MoleculeActivitiesFilters {
@@ -231,6 +227,9 @@ impl From<MoleculeProjectActivityFilters> for kamu_molecule_domain::MoleculeActi
                     .flat_map(MoleculeActivityKindInput::into_domain_kinds)
                     .collect()
             }),
+            by_refs: value
+                .by_refs
+                .map(|refs| refs.into_iter().map(Into::into).collect()),
         }
     }
 }

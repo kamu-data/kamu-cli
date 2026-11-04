@@ -13,7 +13,6 @@ use std::sync::Arc;
 use database_common::PaginationOpts;
 use kamu_molecule_domain::{
     MoleculeConfig,
-    MoleculeDataRoomFileActivityType,
     MoleculeFindProjectError,
     MoleculeFindProjectUseCase,
     MoleculeGlobalActivity,
@@ -39,6 +38,7 @@ use crate::queries::molecule::v3::{
     MoleculeProject,
     MoleculeProjectActivityFilters,
     MoleculeProjectConnection,
+    MoleculeVersionedFileActivityEvent,
     OclId,
 };
 
@@ -234,19 +234,12 @@ impl MoleculeV3 {
             })
             .map(|(activity, project)| match activity {
                 MoleculeGlobalActivity::DataRoomActivity(data_room_activity_entity) => {
-                    let activity_type = data_room_activity_entity.activity_type;
-                    let entry = MoleculeDataRoomEntry::new_from_data_room_activity_entity(
-                        project,
-                        data_room_activity_entity,
-                    );
-
-                    use MoleculeDataRoomFileActivityType as Type;
-
-                    match activity_type {
-                        Type::Added => MoleculeActivityEvent::file_added(entry),
-                        Type::Updated => MoleculeActivityEvent::file_updated(entry),
-                        Type::Removed => MoleculeActivityEvent::file_removed(entry),
-                    }
+                    MoleculeActivityEvent::VersionedFile(
+                        MoleculeVersionedFileActivityEvent::from_data_room_activity(
+                            project,
+                            data_room_activity_entity,
+                        ),
+                    )
                 }
                 MoleculeGlobalActivity::Announcement(announcement_activity_entity) => {
                     let entry = MoleculeAnnouncementEntry::new_from_global_announcement(

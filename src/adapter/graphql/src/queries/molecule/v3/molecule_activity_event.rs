@@ -8,31 +8,25 @@
 // by the Apache License, Version 2.0.
 
 use crate::prelude::*;
-use crate::queries::molecule::v3::{MoleculeAnnouncementEntry, MoleculeDataRoomEntry};
+use crate::queries::molecule::v3::{
+    MoleculeAnnouncementEntry,
+    MoleculeDataRoomEntry,
+    MoleculeVersionedFileActivityEvent,
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Activity event in the data room or announcements of a project
 #[derive(Union)]
 pub enum MoleculeActivityEvent {
-    FileAdded(MoleculeActivityFileAdded),
-    FileUpdated(MoleculeActivityFileUpdated),
-    FileRemoved(MoleculeActivityFileRemoved),
+    /// Activity of a versioned file
+    #[graphql(flatten)]
+    VersionedFile(MoleculeVersionedFileActivityEvent),
+    /// Announcement was published
     Announcement(MoleculeActivityAnnouncement),
 }
 
 impl MoleculeActivityEvent {
-    pub fn file_added(entry: MoleculeDataRoomEntry) -> Self {
-        Self::FileAdded(MoleculeActivityFileAdded { entry })
-    }
-
-    pub fn file_updated(entry: MoleculeDataRoomEntry) -> Self {
-        Self::FileUpdated(MoleculeActivityFileUpdated { entry })
-    }
-
-    pub fn file_removed(entry: MoleculeDataRoomEntry) -> Self {
-        Self::FileRemoved(MoleculeActivityFileRemoved { entry })
-    }
-
     pub fn announcement(announcement: MoleculeAnnouncementEntry) -> Self {
         Self::Announcement(MoleculeActivityAnnouncement { announcement })
     }
@@ -40,27 +34,18 @@ impl MoleculeActivityEvent {
     #[expect(dead_code, reason = "API completeness")]
     pub fn data_room_entry(&self) -> Option<&MoleculeDataRoomEntry> {
         match self {
-            Self::FileAdded(event) => Some(&event.entry),
-            Self::FileUpdated(event) => Some(&event.entry),
-            Self::FileRemoved(event) => Some(&event.entry),
+            Self::VersionedFile(MoleculeVersionedFileActivityEvent::Added(event)) => {
+                Some(&event.entry)
+            }
+            Self::VersionedFile(MoleculeVersionedFileActivityEvent::Updated(event)) => {
+                Some(&event.entry)
+            }
+            Self::VersionedFile(MoleculeVersionedFileActivityEvent::Removed(event)) => {
+                Some(&event.entry)
+            }
             Self::Announcement(_) => None,
         }
     }
-}
-
-#[derive(SimpleObject)]
-pub struct MoleculeActivityFileAdded {
-    pub entry: MoleculeDataRoomEntry,
-}
-
-#[derive(SimpleObject)]
-pub struct MoleculeActivityFileUpdated {
-    pub entry: MoleculeDataRoomEntry,
-}
-
-#[derive(SimpleObject)]
-pub struct MoleculeActivityFileRemoved {
-    pub entry: MoleculeDataRoomEntry,
 }
 
 #[derive(SimpleObject)]

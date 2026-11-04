@@ -5860,6 +5860,9 @@ type MoleculeActivityAnnouncement {
 	announcement: MoleculeAnnouncementEntry!
 }
 
+"""
+Activity event in the data room or announcements of a project
+"""
 union MoleculeActivityEvent = MoleculeActivityFileAdded | MoleculeActivityFileUpdated | MoleculeActivityFileRemoved | MoleculeActivityAnnouncement
 
 """
@@ -5890,15 +5893,34 @@ type MoleculeActivityEventEdge {
 	node: MoleculeActivityEvent!
 }
 
+"""
+File was added to the data room
+"""
 type MoleculeActivityFileAdded {
+	"""
+	Data room entry as recorded by this event
+	"""
 	entry: MoleculeDataRoomEntry!
 }
 
+"""
+File was removed from the data room
+"""
 type MoleculeActivityFileRemoved {
+	"""
+	Data room entry as recorded by this event
+	"""
 	entry: MoleculeDataRoomEntry!
 }
 
+"""
+New version of a file was uploaded, or a file was moved or its metadata
+changed
+"""
 type MoleculeActivityFileUpdated {
+	"""
+	Data room entry as recorded by this event
+	"""
 	entry: MoleculeDataRoomEntry!
 }
 
@@ -6038,6 +6060,44 @@ type MoleculeDataRoomEntry {
 	changeBy: String!
 	accessLevel: String!
 	asVersionedFile: MoleculeVersionedFile!
+	"""
+	Activity events of this entry in reverse chronological order, including
+	moves and renames
+	"""
+	activity(page: Int, perPage: Int): MoleculeDataRoomEntryActivityEventConnection!
+}
+
+"""
+Activity event of a single data room entry
+"""
+union MoleculeDataRoomEntryActivityEvent = MoleculeActivityFileAdded | MoleculeActivityFileUpdated | MoleculeActivityFileRemoved
+
+"""
+A page of `MoleculeDataRoomEntryActivityEvent` items
+"""
+type MoleculeDataRoomEntryActivityEventConnection {
+	"""
+	A shorthand for `edges { node { ... } }`
+	"""
+	nodes: [MoleculeDataRoomEntryActivityEvent!]!
+	"""
+	Page information
+	"""
+	pageInfo: PageBasedInfo!
+	"""
+	Items of this page, each wrapped in an edge
+	"""
+	edges: [MoleculeDataRoomEntryActivityEventEdge!]!
+}
+
+"""
+An edge wrapping a single `MoleculeDataRoomEntryActivityEvent` item
+"""
+type MoleculeDataRoomEntryActivityEventEdge {
+	"""
+	The item itself
+	"""
+	node: MoleculeDataRoomEntryActivityEvent!
 }
 
 """
@@ -6296,6 +6356,11 @@ input MoleculeProjectActivityFilters {
 	byAccessLevels: [String!]
 	byAccessLevelRules: [MoleculeAccessLevelRuleInput!]
 	byKinds: [MoleculeActivityKindInput!]
+	"""
+	Only activity of the data room entries that link these datasets;
+	leaves out announcements
+	"""
+	byRefs: [DatasetID!]
 }
 
 """

@@ -140,6 +140,15 @@ pub(crate) fn map_molecule_activities_filters_to_search(
         )));
     }
 
+    if let Some(by_refs) = &filters.by_refs
+        && !by_refs.is_empty()
+    {
+        search_filters.push(field_in_str(
+            molecule_schema::fields::REF,
+            by_refs.iter().map(ToString::to_string),
+        ));
+    }
+
     if let Some(by_access_levels) = filters.by_access_levels
         && !by_access_levels.is_empty()
     {

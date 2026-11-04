@@ -281,6 +281,55 @@ const LIST_PROJECT_ACTIVITY_QUERY: &str = indoc!(
     }
     "#
 );
+const LIST_DATA_ROOM_ENTRY_ACTIVITY_QUERY: &str = indoc!(
+    r#"
+    query ($oclId: String!, $path: CollectionPathV2!, $page: Int, $perPage: Int) {
+      molecule {
+        v3 {
+          project(oclId: $oclId) {
+            dataRoom {
+              latest {
+                entry(path: $path) {
+                  activity(page: $page, perPage: $perPage) {
+                    nodes {
+                      ... on MoleculeActivityFileAdded {
+                        __typename
+                        entry {
+                          path
+                          ref
+                          accessLevel
+                          changeBy
+                        }
+                      }
+                      ... on MoleculeActivityFileUpdated {
+                        __typename
+                        entry {
+                          path
+                          ref
+                          accessLevel
+                          changeBy
+                        }
+                      }
+                      ... on MoleculeActivityFileRemoved {
+                        __typename
+                        entry {
+                          path
+                          ref
+                          accessLevel
+                          changeBy
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+    "#
+);
 const CREATE_VERSIONED_FILE: &str = indoc!(
     r#"
     mutation ($oclId: String!, $path: CollectionPathV2!, $content: Base64Usnp!, $contentType: String!, $changeBy: String!, $accessLevel: String!, $description: String, $categories: [String!], $tags: [String!], $contentText: String, $encryptionMetadata: MoleculeEncryptionMetadataInput) {
@@ -11092,6 +11141,205 @@ async fn test_molecule_activity(search_variant: GraphQLMoleculeHarnessSearchVari
                             //     }
                             // },
                         ]
+                    }
+                }
+            }
+        })
+    );
+
+    // Entry activity: includes the rename and the activity before it
+    pretty_assertions::assert_eq!(
+        GraphQLQueryRequest::new(
+            LIST_DATA_ROOM_ENTRY_ACTIVITY_QUERY,
+            async_graphql::Variables::from_json(json!({
+                "oclId": OCL_ID_1,
+                "path": "/foo_renamed.txt",
+            })),
+        )
+        .execute(&harness.schema, &harness.catalog_authorized)
+        .await
+        .data,
+        value!({
+            "molecule": {
+                "v3": {
+                    "project": {
+                        "dataRoom": {
+                            "latest": {
+                                "entry": {
+                                    "activity": {
+                                        "nodes": [
+                                        {
+                                            "__typename": "MoleculeActivityFileUpdated",
+                                            "entry": {
+                                                "path": "/foo_renamed.txt",
+                                                "ref": project_1_file_1_dataset_id,
+                                                "accessLevel": "public",
+                                                "changeBy": USER_1,
+                                            }
+                                        },
+                                        {
+                                            "__typename": "MoleculeActivityFileUpdated",
+                                            "entry": {
+                                                "path": "/foo_renamed.txt",
+                                                "ref": project_1_file_1_dataset_id,
+                                                "accessLevel": "public",
+                                                "changeBy": USER_1,
+                                            }
+                                        },
+                                        {
+                                            "__typename": "MoleculeActivityFileUpdated",
+                                            "entry": {
+                                                "path": "/foo.txt",
+                                                "ref": project_1_file_1_dataset_id,
+                                                "accessLevel": "public",
+                                                "changeBy": USER_1,
+                                            }
+                                        },
+                                        {
+                                            "__typename": "MoleculeActivityFileAdded",
+                                            "entry": {
+                                                "path": "/foo.txt",
+                                                "ref": project_1_file_1_dataset_id,
+                                                "accessLevel": "public",
+                                                "changeBy": USER_1,
+                                            }
+                                        },
+                                        ]
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        })
+    );
+
+    // Entry activity: pagination
+    pretty_assertions::assert_eq!(
+        GraphQLQueryRequest::new(
+            LIST_DATA_ROOM_ENTRY_ACTIVITY_QUERY,
+            async_graphql::Variables::from_json(json!({
+                "oclId": OCL_ID_1,
+                "path": "/foo_renamed.txt",
+                "page": 1,
+                "perPage": 2,
+            })),
+        )
+        .execute(&harness.schema, &harness.catalog_authorized)
+        .await
+        .data,
+        value!({
+            "molecule": {
+                "v3": {
+                    "project": {
+                        "dataRoom": {
+                            "latest": {
+                                "entry": {
+                                    "activity": {
+                                        "nodes": [
+                                        {
+                                            "__typename": "MoleculeActivityFileUpdated",
+                                            "entry": {
+                                                "path": "/foo.txt",
+                                                "ref": project_1_file_1_dataset_id,
+                                                "accessLevel": "public",
+                                                "changeBy": USER_1,
+                                            }
+                                        },
+                                        {
+                                            "__typename": "MoleculeActivityFileAdded",
+                                            "entry": {
+                                                "path": "/foo.txt",
+                                                "ref": project_1_file_1_dataset_id,
+                                                "accessLevel": "public",
+                                                "changeBy": USER_1,
+                                            }
+                                        },
+                                        ]
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        })
+    );
+
+    // Filters: byRefs -> activity of a removed entry
+    pretty_assertions::assert_eq!(
+        GraphQLQueryRequest::new(
+            LIST_GLOBAL_ACTIVITY_QUERY,
+            async_graphql::Variables::from_json(json!({
+                "filters": {
+                    "byRefs": [project_1_file_2_dataset_id],
+                },
+            })),
+        )
+        .execute(&harness.schema, &harness.catalog_authorized)
+        .await
+        .data,
+        value!({
+            "molecule": {
+                "v3": {
+                    "activity": {
+                        "nodes": [
+                        {
+                            "__typename": "MoleculeActivityFileRemoved",
+                            "entry": {
+                                "path": "/bar.txt",
+                                "ref": project_1_file_2_dataset_id,
+                                "accessLevel": "holders",
+                                "changeBy": USER_2,
+                            }
+                        },
+                        {
+                            "__typename": "MoleculeActivityFileUpdated",
+                            "entry": {
+                                "path": "/bar.txt",
+                                "ref": project_1_file_2_dataset_id,
+                                "accessLevel": "holders",
+                                "changeBy": USER_2,
+                            }
+                        },
+                        {
+                            "__typename": "MoleculeActivityFileAdded",
+                            "entry": {
+                                "path": "/bar.txt",
+                                "ref": project_1_file_2_dataset_id,
+                                "accessLevel": "holders",
+                                "changeBy": USER_2,
+                            }
+                        },
+                        ]
+                    }
+                }
+            }
+        })
+    );
+
+    // Filters: byRefs -> activity of several entries, without announcements
+    pretty_assertions::assert_eq!(
+        GraphQLQueryRequest::new(
+            LIST_PROJECT_ACTIVITY_QUERY,
+            async_graphql::Variables::from_json(json!({
+                "oclId": OCL_ID_1,
+                "filters": {
+                    "byRefs": [project_1_file_1_dataset_id, project_1_file_2_dataset_id],
+                },
+            })),
+        )
+        .execute(&harness.schema, &harness.catalog_authorized)
+        .await
+        .data,
+        value!({
+            "molecule": {
+                "v3": {
+                    "project": {
+                        "activity": {
+                            "nodes": expected_project_file_activity_nodes
+                        }
                     }
                 }
             }

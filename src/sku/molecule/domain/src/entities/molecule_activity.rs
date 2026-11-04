@@ -30,12 +30,15 @@ pub struct MoleculeActivitiesFilters {
     pub by_access_levels: Option<Vec<String>>,
     pub by_access_level_rules: Option<Vec<MoleculeAccessLevelRule>>,
     pub by_kinds: Option<Vec<MoleculeActivityKind>>,
+    /// Only activity of the data room entries that link these datasets; leaves
+    /// out announcements, which are not linked to an entry
+    pub by_refs: Option<Vec<odf::DatasetID>>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// Activity kinds a listing includes; an absent or empty `by_kinds` filter
-/// includes every kind
+/// includes every kind, except announcements when `by_refs` is not empty
 #[derive(Clone, Debug)]
 pub struct MoleculeActivityKindSelection {
     data_room_activity_types: HashSet<MoleculeDataRoomFileActivityType>,
@@ -45,11 +48,14 @@ pub struct MoleculeActivityKindSelection {
 impl MoleculeActivityKindSelection {
     pub fn from_filters(filters: Option<&MoleculeActivitiesFilters>) -> Self {
         let by_kinds = filters.and_then(|f| f.by_kinds.as_deref()).unwrap_or(&[]);
+        let by_refs = filters
+            .and_then(|f| f.by_refs.as_deref())
+            .is_some_and(|by_refs| !by_refs.is_empty());
 
         if by_kinds.is_empty() {
             return Self {
                 data_room_activity_types: MoleculeDataRoomFileActivityType::iter().collect(),
-                announcements: true,
+                announcements: !by_refs,
             };
         }
 
@@ -62,7 +68,7 @@ impl MoleculeActivityKindSelection {
                 MoleculeActivityKind::DataRoomActivity(activity_type) => {
                     selection.data_room_activity_types.insert(*activity_type);
                 }
-                MoleculeActivityKind::Announcement => selection.announcements = true,
+                MoleculeActivityKind::Announcement => selection.announcements = !by_refs,
             }
         }
         selection
