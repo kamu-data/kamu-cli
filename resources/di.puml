@@ -124,6 +124,7 @@ interface "MoleculeViewGlobalAnnouncementsUseCase" <<i>>
 interface "MoleculeViewProjectActivitiesUseCase" <<i>>
 interface "MoleculeViewProjectAnnouncementsUseCase" <<i>>
 interface "MoleculeViewProjectsUseCase" <<i>>
+interface "MoleculeViewVersionedFileHistoryUseCase" <<i>>
 interface "OAuthDeviceCodeGenerator" <<i>>
 interface "OAuthDeviceCodeRepository" <<i>>
 interface "OAuthDeviceCodeService" <<i>>
@@ -386,6 +387,7 @@ class "MoleculeViewGlobalAnnouncementsUseCaseImpl"
 class "MoleculeViewProjectActivitiesUseCaseImpl"
 class "MoleculeViewProjectAnnouncementsUseCaseImpl"
 class "MoleculeViewProjectsUseCaseImpl"
+class "MoleculeViewVersionedFileHistoryUseCaseImpl"
 class "MqttSourceConfig" <<singleton>>
 class "NotebookServerFactory"
 class "OAuthDeviceCodeGeneratorDefault"
@@ -1348,6 +1350,9 @@ class "WsSmartTransferProtocolClient"
 "MoleculeUploadVersionedFileVersionUseCase" <|-- "MoleculeUploadVersionedFileVersionUseCaseImpl"
 "MoleculeUploadVersionedFileVersionUseCaseImpl"  --> "RebacDatasetRegistryFacade"
 "MoleculeUploadVersionedFileVersionUseCaseImpl"  --> "UpdateVersionedFileUseCase"
+"MoleculeViewVersionedFileHistoryUseCase" <|-- "MoleculeViewVersionedFileHistoryUseCaseImpl"
+"MoleculeViewVersionedFileHistoryUseCaseImpl"  --> "RebacDatasetRegistryFacade"
+"MoleculeViewVersionedFileHistoryUseCaseImpl"  --> "ViewVersionedFileHistoryUseCase"
 "ResourceFacade" <|-- "LocalResourceFacadeImpl"
 "LocalResourceFacadeImpl"  --> "GenericResourceQueryService"
 "LocalResourceFacadeImpl"  --> "ResourceAccountResolver"
