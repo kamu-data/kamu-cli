@@ -871,6 +871,70 @@ pub fn database_transactional_test(input: TokenStream) -> TokenStream {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// #[database_concurrent_transactions_test]
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Like `database_transactional_test!`, but the fixture runs outside any
+/// transaction and gets the harness catalog with its transaction manager, to
+/// open several transactions itself. `storage = inmem` builds the harness with
+/// `new_transactional()`.
+#[proc_macro]
+pub fn database_concurrent_transactions_test(input: TokenStream) -> TokenStream {
+    let DatabaseTransactionalTestInputArgs {
+        storage,
+        fixture,
+        harness,
+        extra_test_groups,
+    } = parse_macro_input!(input as DatabaseTransactionalTestInputArgs);
+
+    let test_function_name = fixture.segments.last().unwrap().ident.clone();
+
+    let extra_test_groups = if let Some(extra_test_groups) = extra_test_groups {
+        parse_str(extra_test_groups.value().as_str()).unwrap()
+    } else {
+        quote! {}
+    };
+
+    let output = match storage.to_string().as_str() {
+        "inmem" => quote! {
+            #[test_group::group(#extra_test_groups)]
+            #[test_log::test(tokio::test)]
+            async fn #test_function_name () {
+                let harness = #harness ::new_transactional();
+
+                #fixture (&harness.catalog).await;
+            }
+        },
+        "postgres" => quote! {
+            #[test_group::group(database, postgres, #extra_test_groups)]
+            #[test_log::test(sqlx::test(migrations = "../../../../migrations/postgres"))]
+            async fn #test_function_name (pg_pool: sqlx::PgPool) {
+                let harness = #harness ::new(pg_pool);
+
+                #fixture (&harness.catalog).await;
+            }
+        },
+        "sqlite" => quote! {
+            #[test_group::group(sqlite, #extra_test_groups)]
+            #[test_log::test(sqlx::test(migrations = "../../../../migrations/sqlite"))]
+            async fn #test_function_name (sqlite_pool: sqlx::SqlitePool) {
+                let harness = #harness ::new(sqlite_pool);
+
+                #fixture (&harness.catalog).await;
+            }
+        },
+        unexpected => {
+            panic!(
+                "Unexpected storage: \"{unexpected}\"!\nAllowable values: \"inmem\", \
+                 \"postgres\", and \"sqlite\"."
+            );
+        }
+    };
+
+    output.into()
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 struct DatabaseTransactionalTestInputArgs {
     pub storage: Ident,

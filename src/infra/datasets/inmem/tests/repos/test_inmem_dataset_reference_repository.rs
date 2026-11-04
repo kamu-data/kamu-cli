@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use database_common_macros::database_transactional_test;
+use database_common_macros::{database_concurrent_transactions_test, database_transactional_test};
 use kamu_datasets_repo_tests::dataset_reference_repo;
 
 use super::InMemoryDatasetRepositoriesHarness;
@@ -73,6 +73,22 @@ database_transactional_test!(
 database_transactional_test!(
     storage = inmem_with_transaction,
     fixture = dataset_reference_repo::test_reacts_to_dataset_removals,
+    harness = InMemoryDatasetRepositoriesHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_concurrent_transactions_test!(
+    storage = inmem,
+    fixture = dataset_reference_repo::test_update_reference_in_concurrent_transactions,
+    harness = InMemoryDatasetRepositoriesHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_concurrent_transactions_test!(
+    storage = inmem,
+    fixture = dataset_reference_repo::test_set_initial_reference_in_concurrent_transactions,
     harness = InMemoryDatasetRepositoriesHarness
 );
 

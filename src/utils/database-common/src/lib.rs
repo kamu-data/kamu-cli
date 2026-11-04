@@ -23,6 +23,8 @@ mod helpers;
 mod in_memory;
 mod password;
 mod plugins;
+#[cfg(feature = "testing")]
+pub mod testing;
 mod transactions;
 
 pub use db_connection_settings::*;

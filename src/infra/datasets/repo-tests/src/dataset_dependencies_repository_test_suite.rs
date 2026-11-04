@@ -9,6 +9,11 @@
 
 use std::assert_matches;
 
+use database_common::testing::{
+    RacingTransactionOutcome,
+    in_committed_transaction,
+    race_transactions,
+};
 use dill::Catalog;
 use itertools::{assert_equal, sorted};
 use kamu_accounts::AccountRepository;
@@ -623,6 +628,129 @@ pub async fn test_remove_orphan_dependencies(catalog: &Catalog) {
         .unwrap();
 
     assert_eq!(dependencies, []);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Two transactions add the same edge: the one that commits first adds it, the
+/// other never commits
+pub async fn test_add_same_dependency_in_concurrent_transactions(catalog: &Catalog) {
+    let (_, entries) = init_committed_entries(
+        catalog,
+        &[
+            ("foo", odf::DatasetKind::Root),
+            ("bar", odf::DatasetKind::Derivative),
+        ],
+    )
+    .await;
+    let (foo, bar) = (entries[0].id.clone(), entries[1].id.clone());
+
+    let outcome = race_dependency_additions(catalog, &bar, &foo, &foo).await;
+
+    assert_matches!(
+        outcome,
+        RacingTransactionOutcome::FailedAtWrite(AddDependenciesError::Duplicate(_))
+            | RacingTransactionOutcome::FailedAtCommit(_)
+    );
+    pretty_assertions::assert_eq!(
+        committed_dependencies(catalog).await,
+        vec![DatasetDependencies {
+            downstream_dataset_id: bar,
+            upstream_dataset_ids: vec![foo],
+        }]
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Two transactions add different upstreams of one dataset: both commit
+pub async fn test_add_different_dependencies_in_concurrent_transactions(catalog: &Catalog) {
+    let (_, entries) = init_committed_entries(
+        catalog,
+        &[
+            ("foo", odf::DatasetKind::Root),
+            ("baz", odf::DatasetKind::Root),
+            ("bar", odf::DatasetKind::Derivative),
+        ],
+    )
+    .await;
+    let (foo, baz, bar) = (
+        entries[0].id.clone(),
+        entries[1].id.clone(),
+        entries[2].id.clone(),
+    );
+
+    let outcome = race_dependency_additions(catalog, &bar, &foo, &baz).await;
+
+    assert_matches!(outcome, RacingTransactionOutcome::Committed);
+    pretty_assertions::assert_eq!(
+        committed_dependencies(catalog).await,
+        vec![DatasetDependencies {
+            downstream_dataset_id: bar,
+            upstream_dataset_ids: sorted([foo, baz]).collect(),
+        }]
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+async fn race_dependency_additions(
+    catalog: &Catalog,
+    downstream: &odf::DatasetID,
+    first_upstream: &odf::DatasetID,
+    second_upstream: &odf::DatasetID,
+) -> RacingTransactionOutcome<AddDependenciesError> {
+    let second_downstream = downstream.clone();
+    let second_upstream = second_upstream.clone();
+
+    race_transactions(
+        catalog,
+        |catalog| async move {
+            add_dependency(&catalog, downstream, first_upstream)
+                .await
+                .unwrap();
+        },
+        move |catalog| async move {
+            add_dependency(&catalog, &second_downstream, &second_upstream).await
+        },
+    )
+    .await
+}
+
+async fn add_dependency(
+    catalog: &Catalog,
+    downstream: &odf::DatasetID,
+    upstream: &odf::DatasetID,
+) -> Result<(), AddDependenciesError> {
+    catalog
+        .get_one::<dyn DatasetDependencyRepository>()
+        .unwrap()
+        .add_upstream_dependencies(downstream, &[upstream])
+        .await
+}
+
+/// Each downstream with its upstreams in ID order
+async fn committed_dependencies(catalog: &Catalog) -> Vec<DatasetDependencies> {
+    use futures::TryStreamExt;
+
+    in_committed_transaction(catalog, |catalog| async move {
+        let dependencies: Vec<DatasetDependencies> = catalog
+            .get_one::<dyn DatasetDependencyRepository>()
+            .unwrap()
+            .list_all_dependencies()
+            .try_collect()
+            .await
+            .unwrap();
+
+        dependencies
+            .into_iter()
+            .map(|d| DatasetDependencies {
+                downstream_dataset_id: d.downstream_dataset_id,
+                upstream_dataset_ids: sorted(d.upstream_dataset_ids).collect(),
+            })
+            .collect()
+    })
+    .await
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

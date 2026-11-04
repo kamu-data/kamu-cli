@@ -23,6 +23,8 @@ doctest = false
 
 [features]
 testing = [
+    "tokio/rt",
+    "tokio/time",
 ]
 
 

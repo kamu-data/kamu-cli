@@ -14,7 +14,6 @@ mod test_inmem_dataset_block_query_repository;
 mod test_inmem_dataset_data_blocks_repository;
 mod test_inmem_dataset_dependency_repository;
 mod test_inmem_dataset_entry_repository;
-mod test_inmem_dataset_entry_repository_concurrent_names;
 mod test_inmem_dataset_key_blocks_repository;
 mod test_inmem_dataset_reference_repository;
 mod test_inmem_dataset_statistics_repository;

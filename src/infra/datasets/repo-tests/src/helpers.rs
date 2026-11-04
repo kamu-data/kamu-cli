@@ -221,3 +221,27 @@ fn make_block(
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Commits a new account with one entry per `(name, kind)`, for fixtures that
+/// race their own transactions
+pub(crate) async fn init_committed_entries(
+    catalog: &dill::Catalog,
+    entries: &[(&str, odf::DatasetKind)],
+) -> (Account, Vec<DatasetEntry>) {
+    database_common::testing::in_committed_transaction(catalog, |catalog| async move {
+        let account = new_account(&catalog.get_one::<dyn AccountRepository>().unwrap()).await;
+        let entry_repo = catalog.get_one::<dyn DatasetEntryRepository>().unwrap();
+
+        let mut saved = Vec::new();
+        for (name, kind) in entries {
+            let entry = new_dataset_entry_with(&account, name, *kind);
+            entry_repo.save_dataset_entry(&entry).await.unwrap();
+            saved.push(entry);
+        }
+
+        (account, saved)
+    })
+    .await
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

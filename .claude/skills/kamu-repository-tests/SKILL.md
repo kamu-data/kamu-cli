@@ -57,6 +57,17 @@ Use `database_common_macros::database_transactional_test`.
   `InMemoryTransactionalMap`.
 - `storage = postgres` and `storage = sqlite` emit an `sqlx::test`, receive a pool, run migrations, and wrap the fixture in a transaction runner.
 
+A fixture that needs several transactions, such as a race between two writers, is wired with
+`database_concurrent_transactions_test!` instead. It takes the same arguments, with `storage` one
+of `inmem`, `postgres` and `sqlite`, and passes the harness catalog with its transaction manager,
+outside any transaction; `inmem` builds the harness with `new_transactional()`. The fixture opens
+transactions through `database_common::testing` (`race_transactions`, `in_committed_transaction`),
+which the repo-tests crate gets through `database-common`'s `testing` feature.
+
+A race fixture belongs in the shared suite only where every storage rejects the second writer.
+Where a database lets the last writer win (an upsert, an unconditional `UPDATE`), the in-memory map
+still fails the second commit, so the storages disagree.
+
 Example:
 
 ```rust

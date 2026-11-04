@@ -22,7 +22,9 @@ doctest = false
 
 
 [dependencies]
-database-common = { workspace = true }
+database-common = { workspace = true, features = [
+    "testing",
+] }
 email-utils = { workspace = true }
 kamu-accounts = { workspace = true, default-features = false, features = [
     "testing",

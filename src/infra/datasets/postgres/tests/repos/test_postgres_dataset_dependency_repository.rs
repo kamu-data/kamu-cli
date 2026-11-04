@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use database_common::PostgresTransactionManager;
-use database_common_macros::database_transactional_test;
+use database_common_macros::{database_concurrent_transactions_test, database_transactional_test};
 use dill::{Catalog, CatalogBuilder};
 use kamu_accounts_postgres::PostgresAccountRepository;
 use kamu_datasets_postgres::{PostgresDatasetDependencyRepository, PostgresDatasetEntryRepository};
@@ -100,6 +100,22 @@ database_transactional_test!(
 database_transactional_test!(
     storage = postgres,
     fixture = dataset_dependency_repo::test_remove_orphan_dependencies,
+    harness = PostgresDatasetDependencyRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_concurrent_transactions_test!(
+    storage = postgres,
+    fixture = dataset_dependency_repo::test_add_same_dependency_in_concurrent_transactions,
+    harness = PostgresDatasetDependencyRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_concurrent_transactions_test!(
+    storage = postgres,
+    fixture = dataset_dependency_repo::test_add_different_dependencies_in_concurrent_transactions,
     harness = PostgresDatasetDependencyRepositoryHarness
 );
 
