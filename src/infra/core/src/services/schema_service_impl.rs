@@ -15,7 +15,7 @@ use datafusion::parquet::arrow::async_reader::ParquetObjectReader;
 use datafusion::parquet::file::metadata::ParquetMetaData;
 use datafusion::prelude::ParquetReadOptions;
 use internal_error::ResultIntoInternal;
-use kamu_core::{QueryError, QueryOptions, SchemaService};
+use kamu_core::{QueryError, QueryOptions, SchemaService, SqlPolicy};
 use kamu_datasets::ResolvedDataset;
 
 use crate::SessionContextBuilder;
@@ -79,9 +79,12 @@ impl SchemaService for SchemaServiceImpl {
 
         let ctx = self
             .session_context_builder
-            .session_context(QueryOptions {
-                input_datasets: Some(BTreeMap::new()),
-            })
+            .session_context(
+                QueryOptions {
+                    input_datasets: Some(BTreeMap::new()),
+                },
+                SqlPolicy::READ_ONLY,
+            )
             .await?;
 
         let df = ctx
@@ -135,9 +138,12 @@ impl SchemaService for SchemaServiceImpl {
 
         let ctx = self
             .session_context_builder
-            .session_context(QueryOptions {
-                input_datasets: Some(BTreeMap::new()),
-            })
+            .session_context(
+                QueryOptions {
+                    input_datasets: Some(BTreeMap::new()),
+                },
+                SqlPolicy::READ_ONLY,
+            )
             .await?;
 
         let object_store = ctx.runtime_env().object_store(&data_url)?;

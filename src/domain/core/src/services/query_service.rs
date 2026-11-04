@@ -11,7 +11,6 @@ use std::backtrace::Backtrace;
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
-use datafusion::execution::context::SQLOptions;
 use datafusion::prelude::SessionContext;
 use internal_error::*;
 use kamu_datasets::{DatasetActionUnauthorizedError, ResolvedDataset};
@@ -98,17 +97,6 @@ pub struct GetDataOptions {
     /// as no matter what updates happen in the datasets - the query will
     /// only consider a specific subset of the data ledger.
     pub block_hash: Option<odf::Multihash>,
-}
-
-/// SQL options for statements submitted by API callers: only read-only plans
-/// are allowed. DDL, DML (including `COPY ... TO`) and session statements are
-/// rejected with a planning error, as they can write to or probe the server's
-/// file system and object stores.
-pub fn read_only_sql_options() -> SQLOptions {
-    SQLOptions::new()
-        .with_allow_ddl(false)
-        .with_allow_dml(false)
-        .with_allow_statements(false)
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -12,7 +12,7 @@ use std::sync::Arc;
 use datafusion::execution::runtime_env::RuntimeEnvBuilder;
 use datafusion::prelude::SessionContext;
 use internal_error::InternalError;
-use kamu_core::{ObjectStoreRegistry, QueryOptions};
+use kamu_core::{ObjectStoreRegistry, QueryOptions, SqlPolicy};
 use kamu_datasets::DatasetRegistry;
 
 use crate::EngineConfigDatafusionEmbeddedBatchQuery;
@@ -31,6 +31,7 @@ impl SessionContextBuilder {
     pub(crate) async fn session_context(
         &self,
         options: QueryOptions,
+        policy: SqlPolicy,
     ) -> Result<SessionContext, InternalError> {
         assert!(
             options.input_datasets.is_some(),
@@ -43,7 +44,8 @@ impl SessionContextBuilder {
             );
         }
 
-        let config = self.datafusion_engine_config.0.clone();
+        let mut config = self.datafusion_engine_config.0.clone();
+        policy.attach_to(&mut config);
 
         let runtime = Arc::new(
             RuntimeEnvBuilder::new()

@@ -27,6 +27,8 @@ use kamu_cli_e2e_common::{
     E2E_USER_ACCOUNT_NAME,
     KamuApiServerClient,
     KamuApiServerClientExt,
+    QueryError,
+    QueryExecutionError,
     RequestBody,
 };
 use serde_json::json;
@@ -252,6 +254,21 @@ async fn test_dataset_metadata(
                 && vocab.event_time_column() == "match_time"
                 && refs == expected_refs
                 && dataset_id == expected_dataset_id
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_sql_query_rejects_session_views(kamu_api_server_client: KamuApiServerClient) {
+    pretty_assertions::assert_eq!(
+        kamu_api_server_client
+            .odf_query()
+            .query("CREATE TEMP VIEW x AS (SELECT 42 AS answer)")
+            .await,
+        Err(QueryError::ExecutionError(QueryExecutionError {
+            error_kind: "INVALID_SQL".to_string(),
+            error_message: "DDL not supported: CreateView".to_string(),
+        }))
     );
 }
 

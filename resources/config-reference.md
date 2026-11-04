@@ -63,6 +63,10 @@
     &quot;ingest&quot;: {
       &quot;datafusion.execution.target_partitions&quot;: &quot;1&quot;
     },
+    &quot;sqlPolicy&quot;: {
+      &quot;api&quot;: {},
+      &quot;local&quot;: {}
+    },
     &quot;useLegacyArrowBufferEncoding&quot;: false
   },
   &quot;images&quot;: {
@@ -808,6 +812,10 @@ Base type: `string`
   &quot;ingest&quot;: {
     &quot;datafusion.execution.target_partitions&quot;: &quot;1&quot;
   },
+  &quot;sqlPolicy&quot;: {
+    &quot;api&quot;: {},
+    &quot;local&quot;: {}
+  },
   &quot;useLegacyArrowBufferEncoding&quot;: false
 }</code></pre></td>
 <td>Embedded Datafusion engine configuration</td>
@@ -903,6 +911,15 @@ See: `<https://datafusion.apache.org/user-guide/configs.html>`
   &quot;datafusion.execution.target_partitions&quot;: &quot;1&quot;
 }</code></pre></td>
 <td>Ingest-specific overrides to the base config</td>
+</tr>
+<tr>
+<td><code>sqlPolicy</code></td>
+<td><a href="#sqlpolicyconfig"><code>SqlPolicyConfig</code></a></td>
+<td><pre><code class="language-json">{
+  &quot;api&quot;: {},
+  &quot;local&quot;: {}
+}</code></pre></td>
+<td>Statements that SQL sessions accept besides queries</td>
 </tr>
 <tr>
 <td><code>useLegacyArrowBufferEncoding</code></td>
@@ -1710,6 +1727,79 @@ tr -dc 'A-Za-z0-9' < /dev/urandom | head -c 32; echo
 Target number of records after which we will stop consuming from the
 resumable source and commit data, leaving the rest for the next
 iteration. This ensures that one data slice doesn't become too big.
+
+</td>
+</tr>
+</tbody>
+</table>
+
+## `SqlPolicyConfig`
+
+<table>
+<thead><tr><th>Field</th><th>Type</th><th>Default</th><th>Description</th></tr></thead>
+<tbody>
+<tr>
+<td><code>api</code></td>
+<td><a href="#sqlpolicyrulesconfig"><code>SqlPolicyRulesConfig</code></a></td>
+<td><code class="language-json">{}</code></td>
+<td>
+
+Sessions of API callers: HTTP, GraphQL and `FlightSQL`. Unset rules
+deny everything but queries
+
+</td>
+</tr>
+<tr>
+<td><code>local</code></td>
+<td><a href="#sqlpolicyrulesconfig"><code>SqlPolicyRulesConfig</code></a></td>
+<td><code class="language-json">{}</code></td>
+<td>
+
+Sessions of the local user's `kamu sql` shell, including `--command`
+and exports. Unset rules allow session views and session statements,
+and deny writes
+
+</td>
+</tr>
+</tbody>
+</table>
+
+## `SqlPolicyRulesConfig`
+
+Rules default per scope, so a config can set only some of them
+
+<table>
+<thead><tr><th>Field</th><th>Type</th><th>Default</th><th>Description</th></tr></thead>
+<tbody>
+<tr>
+<td><code>allowSessionStatements</code></td>
+<td><code>boolean</code></td>
+<td><code class="language-json">null</code></td>
+<td>
+
+Allows session statements such as `SET`, `PREPARE` and transactions
+
+</td>
+</tr>
+<tr>
+<td><code>allowSessionViews</code></td>
+<td><code>boolean</code></td>
+<td><code class="language-json">null</code></td>
+<td>
+
+Allows `CREATE [TEMP] VIEW` and `DROP VIEW`. Views live only as long
+as the session and cannot replace a dataset
+
+</td>
+</tr>
+<tr>
+<td><code>allowWrites</code></td>
+<td><code>boolean</code></td>
+<td><code class="language-json">null</code></td>
+<td>
+
+Allows statements that write or register data sources, such as
+`COPY ... TO`, `INSERT` and `CREATE EXTERNAL TABLE`
 
 </td>
 </tr>

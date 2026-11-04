@@ -45,6 +45,88 @@ pub async fn test_datafusion_cli(kamu: KamuCliPuppet) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+pub async fn test_datafusion_cli_session_views(kamu: KamuCliPuppet) {
+    let assert = kamu
+        .execute_with_input(
+            ["sql"],
+            indoc::indoc!(
+                r#"
+                create temp view x as (select 42 as answer);
+                select * from x;
+                copy (select 1) to 'out.csv' stored as csv;
+                "#
+            ),
+        )
+        .await
+        .success();
+
+    let stdout = std::str::from_utf8(&assert.get_output().stdout).unwrap();
+    let stderr = std::str::from_utf8(&assert.get_output().stderr).unwrap();
+
+    assert!(
+        stdout.contains(
+            indoc::indoc!(
+                r#"
+                +--------+
+                | answer |
+                +--------+
+                | 42     |
+                +--------+
+                "#
+            )
+            .trim()
+        ),
+        "Unexpected output:\n{stdout}",
+    );
+    assert!(
+        stderr.contains("DML not supported: COPY"),
+        "Unexpected errors:\n{stderr}",
+    );
+    assert!(!kamu.workspace_path().join("out.csv").exists());
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_datafusion_cli_with_writes(kamu: KamuCliPuppet) {
+    let input = kamu.workspace_path().join("in.csv");
+    let output = kamu.workspace_path().join("out.csv");
+    std::fs::write(&input, "answer\n42\n").unwrap();
+
+    let assert = kamu
+        .execute_with_input(
+            ["sql"],
+            format!(
+                "create external table e stored as csv location '{}' options ('format.has_header' \
+                 'true');\nselect * from e;\ncopy (select * from e) to '{}' stored as csv;\n",
+                input.display(),
+                output.display(),
+            ),
+        )
+        .await
+        .success();
+
+    let stdout = std::str::from_utf8(&assert.get_output().stdout).unwrap();
+
+    assert!(
+        stdout.contains(
+            indoc::indoc!(
+                r#"
+                +--------+
+                | answer |
+                +--------+
+                | 42     |
+                +--------+
+                "#
+            )
+            .trim()
+        ),
+        "Unexpected output:\n{stdout}",
+    );
+    assert!(output.exists());
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 pub async fn test_datafusion_cli_not_launched_in_root_ws(kamu: KamuCliPuppet) {
     // This test checks that workspace was not created in root (kamu-cli) directory.
     //

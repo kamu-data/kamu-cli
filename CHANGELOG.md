@@ -14,7 +14,25 @@ Recommendation: for ease of reading, use the following format:
 -->
 
 ## [Unreleased]
+### Added
+- `kamu sql`: views. `CREATE [TEMP] VIEW` and `DROP VIEW` work in the SQL shell; a view lasts until
+  the session ends and cannot take the name of a dataset
+- Config: `engine.datafusionEmbedded.sqlPolicy` sets which statements SQL sessions accept besides
+  queries, separately for `kamu sql` (`local`: views and `SET` allowed) and for API callers (`api`:
+  queries only). Statements that write data, such as `COPY ... TO`, stay off in both by default
+### Changed
+- SQL over the API (breaking): HTTP `/query`, GraphQL `data.query` and `FlightSQL` accept only
+  queries. `SET`, DDL such as `CREATE VIEW` or `CREATE EXTERNAL TABLE`, `COPY ... TO` and `INSERT`
+  fail with a "not supported" error. Transformation queries and Ethereum log filters must be queries too
 ### Fixed
+- Anonymous callers can no longer read public datasets that their owner closed to anonymous readers.
+  Public datasets created before this release stay open to anonymous readers
+- `kamu sql`: `COPY ... TO` in the SQL shell is reported as not supported instead of crashing the shell
+- `/ingest`: an invalid preprocess query in a dataset's push source is a bad request instead of an
+  internal error
+- `/verify` no longer fails with an internal error when the query's `to_table()` names a missing
+  dataset by alias
+- A dataset's `read.ddlSchema` must contain only column definitions; any other SQL is rejected
 - `/query` (breaking): commitment hashes and signatures are computed over RFC 8785 (JCS) canonical
   JSON, as the ODF spec requires, so standard JCS clients can reproduce them. Commitments signed by
   earlier versions fail `/verify`

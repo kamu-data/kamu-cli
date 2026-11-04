@@ -9,6 +9,7 @@
 
 use std::collections::BTreeMap;
 
+use kamu::domain::SqlPolicy;
 use kamu_cli::WorkspaceLayout;
 use kamu_cli::config::{CLIConfig, ConfigService};
 
@@ -274,6 +275,60 @@ fn test_config_merging_of_engine_options() {
             ..Default::default()
         }
     );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test]
+fn test_config_sql_policy_partial_override_keeps_scope_defaults() {
+    let tmp_dir = tempfile::tempdir().unwrap();
+    let cfg_path = tmp_dir.path().join("1.yaml");
+
+    std::fs::write(
+        &cfg_path,
+        indoc::indoc!(
+            r#"
+            kind: CLIConfig
+            version: 1
+            content:
+                engine:
+                    datafusionEmbedded:
+                        sqlPolicy:
+                            local:
+                                allowWrites: true
+                            api:
+                                allowSessionViews: true
+            "#
+        ),
+    )
+    .unwrap();
+
+    let cfg = ConfigService::new(&WorkspaceLayout::new("."))
+        .load_from(&[cfg_path])
+        .unwrap();
+    let sql_policy = &cfg.engine.datafusion_embedded.sql_policy;
+
+    pretty_assertions::assert_eq!(
+        sql_policy.policy(true),
+        SqlPolicy {
+            allow_session_views: true,
+            allow_session_statements: true,
+            allow_writes: true,
+        }
+    );
+    pretty_assertions::assert_eq!(
+        sql_policy.policy(false),
+        SqlPolicy {
+            allow_session_views: true,
+            allow_session_statements: false,
+            allow_writes: false,
+        }
+    );
+
+    let defaults = CLIConfig::default();
+    let sql_policy = &defaults.engine.datafusion_embedded.sql_policy;
+    pretty_assertions::assert_eq!(sql_policy.policy(true), SqlPolicy::LOCAL_INTERACTIVE);
+    pretty_assertions::assert_eq!(sql_policy.policy(false), SqlPolicy::READ_ONLY);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

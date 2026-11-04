@@ -473,6 +473,10 @@
             "ingest": {
               "datafusion.execution.target_partitions": "1"
             },
+            "sqlPolicy": {
+              "api": {},
+              "local": {}
+            },
             "useLegacyArrowBufferEncoding": false
           },
           "description": "Embedded Datafusion engine configuration"
@@ -566,6 +570,14 @@
           },
           "description": "Ingest-specific overrides to the base config",
           "type": "object"
+        },
+        "sqlPolicy": {
+          "$ref": "#/$defs/SqlPolicyConfig",
+          "default": {
+            "api": {},
+            "local": {}
+          },
+          "description": "Statements that SQL sessions accept besides queries"
         },
         "useLegacyArrowBufferEncoding": {
           "default": false,
@@ -1144,6 +1156,50 @@
       },
       "type": "object"
     },
+    "SqlPolicyConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "api": {
+          "$ref": "#/$defs/SqlPolicyRulesConfig",
+          "default": {},
+          "description": "Sessions of API callers: HTTP, GraphQL and `FlightSQL`. Unset rules\ndeny everything but queries"
+        },
+        "local": {
+          "$ref": "#/$defs/SqlPolicyRulesConfig",
+          "default": {},
+          "description": "Sessions of the local user's `kamu sql` shell, including `--command`\nand exports. Unset rules allow session views and session statements,\nand deny writes"
+        }
+      },
+      "type": "object"
+    },
+    "SqlPolicyRulesConfig": {
+      "additionalProperties": false,
+      "description": "Rules default per scope, so a config can set only some of them",
+      "properties": {
+        "allowSessionStatements": {
+          "description": "Allows session statements such as `SET`, `PREPARE` and transactions",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "allowSessionViews": {
+          "description": "Allows `CREATE [TEMP] VIEW` and `DROP VIEW`. Views live only as long\nas the session and cannot replace a dataset",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "allowWrites": {
+          "description": "Allows statements that write or register data sources, such as\n`COPY ... TO`, `INSERT` and `CREATE EXTERNAL TABLE`",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        }
+      },
+      "type": "object"
+    },
     "UploadsConfig": {
       "additionalProperties": false,
       "properties": {
@@ -1249,6 +1305,10 @@
           },
           "ingest": {
             "datafusion.execution.target_partitions": "1"
+          },
+          "sqlPolicy": {
+            "api": {},
+            "local": {}
           },
           "useLegacyArrowBufferEncoding": false
         },

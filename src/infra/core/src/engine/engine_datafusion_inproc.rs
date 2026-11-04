@@ -11,8 +11,8 @@ use std::sync::Arc;
 
 use datafusion::prelude::*;
 use internal_error::*;
+use kamu_core::SqlPolicy;
 use kamu_core::engine::*;
-use kamu_core::read_only_sql_options;
 use kamu_datasets::ResolvedDatasetsMap;
 
 /// An in-process engine using Apache Arrow Datafusion framework.
@@ -48,7 +48,7 @@ impl EngineDatafusionInproc {
             .state()
             .create_logical_plan(query)
             .await
-            .and_then(|plan| read_only_sql_options().verify_plan(&plan).map(|()| plan))
+            .and_then(|plan| SqlPolicy::READ_ONLY.check_plan(plan))
         {
             Ok(plan) => plan,
             Err(error) => {

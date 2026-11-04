@@ -194,6 +194,7 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
                 workspace_status,
                 args.password_hashing_mode,
                 is_e2e_testing,
+                cli_commands::command_runs_local_sql_session(&args),
             )?;
 
             let base_catalog = base_catalog_builder.build();
@@ -792,6 +793,7 @@ pub fn register_config_in_catalog(
     workspace_status: WorkspaceStatus,
     password_hashing_mode: Option<cli::PasswordHashingMode>,
     is_e2e_testing: bool,
+    is_local_sql_session: bool,
 ) -> Result<(), CLIError> {
     // Extra
     catalog_builder.add_value(config.extra.graphql.clone());
@@ -820,6 +822,13 @@ pub fn register_config_in_catalog(
             datafusion_image: images_config.datafusion,
             risingwave_image: images_config.risingwave,
         });
+
+        catalog_builder.add_value(
+            engine_config
+                .datafusion_embedded
+                .sql_policy
+                .policy(is_local_sql_session),
+        );
 
         let (ingest_config, batch_query_config, compaction_config) =
             engine_config.datafusion_embedded.into_system()?;

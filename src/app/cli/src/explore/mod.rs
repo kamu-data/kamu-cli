@@ -14,6 +14,7 @@ mod graphql_handler;
 mod notebook_server_factory;
 mod spark_livy_server_factory;
 mod sql_shell_impl;
+mod sql_shell_session_context;
 mod trace_server;
 mod ui_configuration;
 #[cfg(feature = "web-ui")]
@@ -26,6 +27,7 @@ pub(crate) use graphql_handler::*;
 pub use notebook_server_factory::*;
 pub use spark_livy_server_factory::*;
 pub use sql_shell_impl::*;
+pub use sql_shell_session_context::*;
 pub use trace_server::*;
 pub(crate) use ui_configuration::*;
 #[cfg(feature = "web-ui")]

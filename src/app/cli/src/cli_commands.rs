@@ -853,6 +853,16 @@ pub fn command_needs_server_components(args: &cli::Cli) -> bool {
     }
 }
 
+/// Whether the command is the local user's own `kamu sql` session (shell,
+/// `--command` or export), as opposed to a server that answers other callers
+pub fn command_runs_local_sql_session(args: &cli::Cli) -> bool {
+    if let cli::Command::Sql(c) = &args.command {
+        c.subcommand.is_none()
+    } else {
+        false
+    }
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Dataset reference validation
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
