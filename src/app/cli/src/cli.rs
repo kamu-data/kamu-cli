@@ -12,10 +12,12 @@ use std::path::PathBuf;
 
 use clap::{ArgAction, Parser};
 use kamu::domain::ExportFormat;
+use kamu_datafusion_cli::print_options::MaxRows;
 
 use crate::cli_value_parser::{self as parsers};
 use crate::config::{ConfigObjectFormat, ConfigScope};
 use crate::{
+    DEFAULT_MAX_ROWS_FOR_OUTPUT,
     LineageOutputFormat,
     MetadataLogOutputFormat,
     OutputFormat,
@@ -2077,6 +2079,14 @@ Execute SQL command and return its output in CSV format:
 
     kamu sql -c 'SELECT * FROM `org.example.data` LIMIT 10' -o csv
 
+Execute SQL script and save its output to a file:
+
+    kamu sql --script query.sql -o table > output.txt
+
+Show up to 100 rows per result in the SQL shell (change it in the shell with `\pset maxrows 100`):
+
+    kamu sql --max-rows 100
+
 Run SQL server to use with external data processing tools:
 
     kamu sql server --address 0.0.0.0 --port 8080
@@ -2109,9 +2119,21 @@ pub struct Sql {
     #[arg(long, short = 'c', value_name = "CMD")]
     pub command: Option<String>,
 
-    /// SQL script file to execute
-    #[arg(long, value_name = "FILE")]
+    /// SQL script file to execute, stopping at the first statement that fails
+    #[arg(long, value_name = "FILE", conflicts_with_all = ["command", "url", "output_path"])]
     pub script: Option<PathBuf>,
+
+    #[arg(
+        long,
+        value_name = "N",
+        conflicts_with_all = ["command", "url", "output_path"],
+        help = format!(
+            "Maximum number of rows the shell and scripts show in table format: a number or \
+             `none`. Defaults to {DEFAULT_MAX_ROWS_FOR_OUTPUT} when printing to a terminal and to \
+             no limit otherwise"
+        ),
+    )]
+    pub max_rows: Option<MaxRows>,
 
     /// When set, result will be stored to a given path instead of being printed
     /// to stdout.

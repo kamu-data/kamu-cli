@@ -461,6 +461,8 @@ pub fn get_command(
                     c.engine,
                     c.output_path,
                     c.records_per_file,
+                    c.script,
+                    c.max_rows,
                 )
                 .cast(),
             ),

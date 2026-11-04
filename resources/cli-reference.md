@@ -1794,7 +1794,8 @@ Executes an SQL query or drops you into an SQL shell
 
 * `--url <URL>` — URL of a running JDBC server (e.g. jdbc:hive2://example.com:10000)
 * `-c`, `--command <CMD>` — SQL command to run
-* `--script <FILE>` — SQL script file to execute
+* `--script <FILE>` — SQL script file to execute, stopping at the first statement that fails
+* `--max-rows <N>` — Maximum number of rows the shell and scripts show in table format: a number or `none`. Defaults to 40 when printing to a terminal and to no limit otherwise
 * `--output-path <OUTPUT_PATH>` — When set, result will be stored to a given path instead of being printed to stdout
 * `--records-per-file <RECORDS_PER_FILE>` — Number of records per file, if stored into a directory. It's a soft limit. For the sake of export performance the actual number records may be slightly different
 
@@ -1817,6 +1818,14 @@ Drop into SQL shell:
 Execute SQL command and return its output in CSV format:
 
     kamu sql -c 'SELECT * FROM `org.example.data` LIMIT 10' -o csv
+
+Execute SQL script and save its output to a file:
+
+    kamu sql --script query.sql -o table > output.txt
+
+Show up to 100 rows per result in the SQL shell (change it in the shell with `\pset maxrows 100`):
+
+    kamu sql --max-rows 100
 
 Run SQL server to use with external data processing tools:
 

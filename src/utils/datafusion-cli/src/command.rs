@@ -17,8 +17,6 @@
 
 //! Command within CLI
 
-use std::fs::File;
-use std::io::BufReader;
 use std::str::FromStr;
 use std::sync::Arc;
 
@@ -31,10 +29,10 @@ use datafusion::common::{exec_datafusion_err, exec_err};
 use datafusion::error::Result;
 
 use crate::cli_context::CliSessionContext;
-use crate::exec::{exec_and_print, exec_from_lines};
+use crate::exec::{exec_and_print, exec_from_script};
 use crate::functions::{Function, display_all_functions};
 use crate::print_format::PrintFormat;
-use crate::print_options::PrintOptions;
+use crate::print_options::{MaxRows, PrintOptions};
 
 /// Command
 #[derive(Debug)]
@@ -53,6 +51,7 @@ pub enum Command {
 
 pub enum OutputFormat {
     ChangeFormat(String),
+    ChangeMaxRows(String),
 }
 
 impl Command {
@@ -77,10 +76,9 @@ impl Command {
             }
             Self::Include(filename) => {
                 if let Some(filename) = filename {
-                    let file = File::open(filename)
-                        .map_err(|e| exec_datafusion_err!("Error opening {filename:?} {e}"))?;
-                    exec_from_lines(ctx, &mut BufReader::new(file), print_options).await?;
-                    Ok(())
+                    let script = std::fs::read_to_string(filename)
+                        .map_err(|e| exec_datafusion_err!("Error reading {filename:?} {e}"))?;
+                    exec_from_script(ctx, &script, print_options).await
                 } else {
                     exec_err!("Required filename argument is missing")
                 }
@@ -151,7 +149,10 @@ impl Command {
             Self::ListFunctions => ("\\h", "function list"),
             Self::SearchFunctions(_) => ("\\h function", "search function"),
             Self::QuietMode(_) => ("\\quiet (true|false)?", "print or set quiet mode"),
-            Self::OutputFormat(_) => ("\\pset [NAME [VALUE]]", "set table output option\n(format)"),
+            Self::OutputFormat(_) => (
+                "\\pset [NAME [VALUE]]",
+                "set table output option\n(format, maxrows)",
+            ),
             Self::ObjectStoreProfileMode(_) => (
                 "\\object_store_profiling (disabled|summary|trace)",
                 "print or set object store profile mode",
@@ -235,6 +236,7 @@ impl FromStr for OutputFormat {
         };
         Ok(match (c, arg) {
             ("format", Some(format)) => Self::ChangeFormat(format.to_string()),
+            ("maxrows", Some(maxrows)) => Self::ChangeMaxRows(maxrows.to_string()),
             _ => return Err(()),
         })
     }
@@ -255,6 +257,13 @@ impl OutputFormat {
                         PrintFormat::value_variants()
                     )
                 }
+            }
+            Self::ChangeMaxRows(maxrows) => {
+                print_options.maxrows = maxrows
+                    .parse::<MaxRows>()
+                    .map_err(|e| exec_datafusion_err!("{e}"))?;
+                println!("{}", print_options.maxrows_status());
+                Ok(())
             }
         }
     }

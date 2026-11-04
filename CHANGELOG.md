@@ -14,7 +14,20 @@ Recommendation: for ease of reading, use the following format:
 -->
 
 ## [Unreleased]
+### Added
+- `kamu sql --max-rows <N|none>` sets how many rows the SQL shell and scripts show in table format,
+  and `\pset maxrows <N|none>` changes it during a shell session
+### Changed
+- `kamu sql` shows all rows when its output is not a terminal, such as a file or a pipe. On a
+  terminal it still shows the first 40 rows by default
+- `kamu sql`: `\i` stops at the first statement that fails
 ### Fixed
+- `kamu sql --script FILE` runs the script instead of opening the SQL shell. It prints results in the
+  `--output-format` format and stops with an error at the first statement that fails
+- `kamu sql`: the row limit hint points at `\pset maxrows` and `--max-rows` instead of the missing
+  `--maxrows` flag
+- `kamu sql`: `\pset format` CSV, TSV and JSON output shows every row instead of cutting it at the
+  row limit
 - `/query` (breaking): commitment hashes and signatures are computed over RFC 8785 (JCS) canonical
   JSON, as the ODF spec requires, so standard JCS clients can reproduce them. Commitments signed by
   earlier versions fail `/verify`

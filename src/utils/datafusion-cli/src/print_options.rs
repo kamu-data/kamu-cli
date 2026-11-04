@@ -94,7 +94,7 @@ fn get_execution_details_formatted(
 ) -> String {
     let nrows_shown_msg = match maxrows {
         MaxRows::Limited(nrows) if nrows < row_count => {
-            format!("(First {nrows} displayed. Use --maxrows to adjust)")
+            format!("(First {nrows} displayed. Use \\pset maxrows or --max-rows to adjust)")
         }
         _ => String::new(),
     };
@@ -108,6 +108,14 @@ fn get_execution_details_formatted(
 }
 
 impl PrintOptions {
+    /// Describes the row limit of the table format, as `\pset` reports it
+    pub fn maxrows_status(&self) -> String {
+        match self.maxrows {
+            MaxRows::Unlimited => "Max rows is none.".to_string(),
+            MaxRows::Limited(n) => format!("Max rows is {n}."),
+        }
+    }
+
     /// Print the batches to stdout using the specified format
     pub fn print_batches(
         &self,
