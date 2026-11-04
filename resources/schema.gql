@@ -6514,6 +6514,16 @@ type MoleculeV3 {
 
 type MoleculeVersionedFile {
 	"""
+	Returns list of versions in reverse chronological order, regardless of
+	data room version
+	"""
+	versions(
+		"""
+		Upper version bound (inclusive)
+		"""
+		maxVersion: Int,		page: Int,		perPage: Int
+	): MoleculeVersionedFileEntryConnection!
+	"""
 	Returns the latest versioned file entry, regardless of data room version
 	"""
 	latest: MoleculeVersionedFileEntry
@@ -6550,6 +6560,38 @@ type MoleculeVersionedFileEntry {
 	Returns a direct download URL
 	"""
 	contentUrl: VersionedFileContentDownload!
+}
+
+"""
+A page of `MoleculeVersionedFileEntry` items
+"""
+type MoleculeVersionedFileEntryConnection {
+	"""
+	A shorthand for `edges { node { ... } }`
+	"""
+	nodes: [MoleculeVersionedFileEntry!]!
+	"""
+	Approximate number of total nodes
+	"""
+	totalCount: Int!
+	"""
+	Page information
+	"""
+	pageInfo: PageBasedInfo!
+	"""
+	Items of this page, each wrapped in an edge
+	"""
+	edges: [MoleculeVersionedFileEntryEdge!]!
+}
+
+"""
+An edge wrapping a single `MoleculeVersionedFileEntry` item
+"""
+type MoleculeVersionedFileEntryEdge {
+	"""
+	The item itself
+	"""
+	node: MoleculeVersionedFileEntry!
 }
 
 """

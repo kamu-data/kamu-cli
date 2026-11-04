@@ -10,11 +10,15 @@
 use std::borrow::Cow;
 
 use chrono::{DateTime, Utc};
+use database_common::PaginationOpts;
+use kamu_datasets::FileVersion;
 use kamu_molecule_domain::{
     MoleculeReadVersionedFileEntryError,
     MoleculeReadVersionedFileEntryUseCase,
     MoleculeVersionedFileContentProvider,
     MoleculeVersionedFileContentProviderError,
+    MoleculeViewVersionedFileHistoryError,
+    MoleculeViewVersionedFileHistoryUseCase,
 };
 
 use crate::prelude::*;
@@ -50,6 +54,55 @@ impl<'a> MoleculeVersionedFile<'a> {
 #[common_macros::method_names_consts(const_value_prefix = "Gql::")]
 #[Object]
 impl MoleculeVersionedFile<'_> {
+    const DEFAULT_VERSIONS_PER_PAGE: usize = 100;
+
+    /// Returns list of versions in reverse chronological order, regardless of
+    /// data room version
+    #[tracing::instrument(level = "info", name = MoleculeVersionedFile_versions, skip_all)]
+    pub async fn versions(
+        &self,
+        ctx: &Context<'_>,
+        #[graphql(desc = "Upper version bound (inclusive)")] max_version: Option<FileVersion>,
+        page: Option<usize>,
+        per_page: Option<usize>,
+    ) -> Result<MoleculeVersionedFileEntryConnection> {
+        let page = page.unwrap_or(0);
+        let per_page = per_page.unwrap_or(Self::DEFAULT_VERSIONS_PER_PAGE);
+
+        let view_versioned_file_history_uc =
+            from_catalog_n!(ctx, dyn MoleculeViewVersionedFileHistoryUseCase);
+
+        let history_page = view_versioned_file_history_uc
+            .execute(
+                &self.data_room_entry.reference,
+                max_version,
+                Some(PaginationOpts::from_page(page, per_page)),
+            )
+            .await
+            .map_err(|e| match e {
+                MoleculeViewVersionedFileHistoryError::Access(e) => GqlError::Access(e),
+                MoleculeViewVersionedFileHistoryError::Internal(e) => e.into(),
+            })?;
+
+        let nodes = history_page
+            .list
+            .into_iter()
+            .map(|versioned_file_entry| {
+                MoleculeVersionedFileEntry::new_prefetched_owned(
+                    self.data_room_entry.reference.clone(),
+                    versioned_file_entry,
+                )
+            })
+            .collect();
+
+        Ok(MoleculeVersionedFileEntryConnection::new(
+            nodes,
+            page,
+            per_page,
+            history_page.total_count,
+        ))
+    }
+
     /// Returns the latest versioned file entry, regardless of data room version
     pub async fn latest(
         &self,
@@ -132,7 +185,7 @@ enum MoleculeVersionedFileEntrySource<'a> {
     },
 
     FullyPrefetched {
-        versioned_file_dataset_id: &'a odf::DatasetID,
+        versioned_file_dataset_id: Cow<'a, odf::DatasetID>,
         versioned_file_entry: kamu_molecule_domain::MoleculeVersionedFileEntry,
     },
 }
@@ -148,7 +201,7 @@ impl<'a> MoleculeVersionedFileEntrySource<'a> {
     }
 
     fn new_prefetched(
-        versioned_file_dataset_id: &'a odf::DatasetID,
+        versioned_file_dataset_id: Cow<'a, odf::DatasetID>,
         versioned_file_entry: kamu_molecule_domain::MoleculeVersionedFileEntry,
     ) -> Self {
         Self::FullyPrefetched {
@@ -166,7 +219,7 @@ impl<'a> MoleculeVersionedFileEntrySource<'a> {
             Self::FullyPrefetched {
                 versioned_file_dataset_id,
                 ..
-            } => versioned_file_dataset_id,
+            } => versioned_file_dataset_id.as_ref(),
         }
     }
 
@@ -401,7 +454,21 @@ impl<'a> MoleculeVersionedFileEntry<'a> {
     ) -> Self {
         Self {
             source: MoleculeVersionedFileEntrySource::new_prefetched(
-                versioned_file_dataset_id,
+                Cow::Borrowed(versioned_file_dataset_id),
+                versioned_file_entry,
+            ),
+        }
+    }
+}
+
+impl MoleculeVersionedFileEntry<'static> {
+    pub fn new_prefetched_owned(
+        versioned_file_dataset_id: odf::DatasetID,
+        versioned_file_entry: kamu_molecule_domain::MoleculeVersionedFileEntry,
+    ) -> Self {
+        Self {
+            source: MoleculeVersionedFileEntrySource::new_prefetched(
+                Cow::Owned(versioned_file_dataset_id),
                 versioned_file_entry,
             ),
         }
@@ -512,6 +579,14 @@ impl MoleculeVersionedFileEntry<'_> {
         Ok(VersionedFileContentDownload::from(download_data))
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+page_based_connection!(
+    MoleculeVersionedFileEntry<'static>,
+    MoleculeVersionedFileEntryConnection,
+    MoleculeVersionedFileEntryEdge
+);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

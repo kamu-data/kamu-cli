@@ -65,6 +65,7 @@ pub fn register_dependencies(
 
     b.add::<MoleculeCreateVersionedFileDatasetUseCaseImpl>();
     b.add::<MoleculeReadVersionedFileEntryUseCaseImpl>();
+    b.add::<MoleculeViewVersionedFileHistoryUseCaseImpl>();
     b.add::<MoleculeUploadVersionedFileVersionUseCaseImpl>();
     b.add::<MoleculeUpdateVersionedFileMetadataUseCaseImpl>();
 

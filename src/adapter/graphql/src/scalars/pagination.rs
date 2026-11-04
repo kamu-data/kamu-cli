@@ -16,13 +16,13 @@ use crate::prelude::*;
 // Public only for tests
 #[macro_export]
 macro_rules! page_based_connection {
-    ($node_type:ident, $connection_type:ident, $edge_type:ident) => {
+    ($node_type:ident $(<$node_lifetime:lifetime>)?, $connection_type:ident, $edge_type:ident) => {
         #[doc = concat!("A page of `", stringify!($node_type), "` items")]
         #[derive(async_graphql::SimpleObject)]
         #[graphql(complex)]
         pub struct $connection_type {
             /// A shorthand for `edges { node { ... } }`
-            pub nodes: Vec<$node_type>,
+            pub nodes: Vec<$node_type $(<$node_lifetime>)?>,
 
             /// Approximate number of total nodes
             pub total_count: usize,
@@ -35,7 +35,7 @@ macro_rules! page_based_connection {
         impl $connection_type {
             #[graphql(skip)]
             pub fn new(
-                nodes: Vec<$node_type>,
+                nodes: Vec<$node_type $(<$node_lifetime>)?>,
                 current_page: usize,
                 per_page: usize,
                 total_count: usize,
@@ -76,7 +76,7 @@ macro_rules! page_based_connection {
         #[derive(async_graphql::SimpleObject)]
         pub struct $edge_type<'a> {
             /// The item itself
-            pub node: &'a $node_type,
+            pub node: &'a $node_type $(<$node_lifetime>)?,
         }
     };
 }

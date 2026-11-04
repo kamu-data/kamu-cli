@@ -4529,6 +4529,168 @@ async fn test_molecule_data_room_as_of_block_hash(
             }
         })
     );
+
+    const VERSIONS_QUERY: &str = indoc!(
+        r#"
+        query ($oclId: String!, $maxVersion: Int, $page: Int, $perPage: Int) {
+          molecule {
+            v3 {
+              project(oclId: $oclId) {
+                dataRoom {
+                  latest {
+                    entry(path: "/foo.txt") {
+                      asVersionedFile {
+                        versions(maxVersion: $maxVersion, page: $page, perPage: $perPage) {
+                          totalCount
+                          pageInfo {
+                            hasNextPage
+                          }
+                          nodes {
+                            version
+                            description
+                            tags
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+        "#
+    );
+
+    // Versions: all of them, newest first
+    pretty_assertions::assert_eq!(
+        GraphQLQueryRequest::new(
+            VERSIONS_QUERY,
+            async_graphql::Variables::from_json(json!({
+                "oclId": OCL_ID,
+            })),
+        )
+        .execute(&harness.schema, &harness.catalog_authorized)
+        .await
+        .data,
+        value!({
+            "molecule": {
+                "v3": {
+                    "project": {
+                        "dataRoom": {
+                            "latest": {
+                                "entry": {
+                                    "asVersionedFile": {
+                                        "versions": {
+                                            "totalCount": 2,
+                                            "pageInfo": {
+                                                "hasNextPage": false,
+                                            },
+                                            "nodes": [
+                                                {
+                                                    "version": 2,
+                                                    "description": "Plain text file updated",
+                                                    "tags": ["tag-new"],
+                                                },
+                                                {
+                                                    "version": 1,
+                                                    "description": "Plain text file",
+                                                    "tags": ["tag-old"],
+                                                },
+                                            ],
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        })
+    );
+
+    // Versions: up to `maxVersion`
+    pretty_assertions::assert_eq!(
+        GraphQLQueryRequest::new(
+            VERSIONS_QUERY,
+            async_graphql::Variables::from_json(json!({
+                "oclId": OCL_ID,
+                "maxVersion": 1,
+            })),
+        )
+        .execute(&harness.schema, &harness.catalog_authorized)
+        .await
+        .data,
+        value!({
+            "molecule": {
+                "v3": {
+                    "project": {
+                        "dataRoom": {
+                            "latest": {
+                                "entry": {
+                                    "asVersionedFile": {
+                                        "versions": {
+                                            "totalCount": 1,
+                                            "pageInfo": {
+                                                "hasNextPage": false,
+                                            },
+                                            "nodes": [{
+                                                "version": 1,
+                                                "description": "Plain text file",
+                                                "tags": ["tag-old"],
+                                            }],
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        })
+    );
+
+    // Versions: pagination
+    pretty_assertions::assert_eq!(
+        GraphQLQueryRequest::new(
+            VERSIONS_QUERY,
+            async_graphql::Variables::from_json(json!({
+                "oclId": OCL_ID,
+                "page": 0,
+                "perPage": 1,
+            })),
+        )
+        .execute(&harness.schema, &harness.catalog_authorized)
+        .await
+        .data,
+        value!({
+            "molecule": {
+                "v3": {
+                    "project": {
+                        "dataRoom": {
+                            "latest": {
+                                "entry": {
+                                    "asVersionedFile": {
+                                        "versions": {
+                                            "totalCount": 2,
+                                            "pageInfo": {
+                                                "hasNextPage": true,
+                                            },
+                                            "nodes": [{
+                                                "version": 2,
+                                                "description": "Plain text file updated",
+                                                "tags": ["tag-new"],
+                                            }],
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        })
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -11168,42 +11330,42 @@ async fn test_molecule_activity(search_variant: GraphQLMoleculeHarnessSearchVari
                                 "entry": {
                                     "activity": {
                                         "nodes": [
-                                        {
-                                            "__typename": "MoleculeActivityFileUpdated",
-                                            "entry": {
-                                                "path": "/foo_renamed.txt",
-                                                "ref": project_1_file_1_dataset_id,
-                                                "accessLevel": "public",
-                                                "changeBy": USER_1,
-                                            }
-                                        },
-                                        {
-                                            "__typename": "MoleculeActivityFileUpdated",
-                                            "entry": {
-                                                "path": "/foo_renamed.txt",
-                                                "ref": project_1_file_1_dataset_id,
-                                                "accessLevel": "public",
-                                                "changeBy": USER_1,
-                                            }
-                                        },
-                                        {
-                                            "__typename": "MoleculeActivityFileUpdated",
-                                            "entry": {
-                                                "path": "/foo.txt",
-                                                "ref": project_1_file_1_dataset_id,
-                                                "accessLevel": "public",
-                                                "changeBy": USER_1,
-                                            }
-                                        },
-                                        {
-                                            "__typename": "MoleculeActivityFileAdded",
-                                            "entry": {
-                                                "path": "/foo.txt",
-                                                "ref": project_1_file_1_dataset_id,
-                                                "accessLevel": "public",
-                                                "changeBy": USER_1,
-                                            }
-                                        },
+                                            {
+                                                "__typename": "MoleculeActivityFileUpdated",
+                                                "entry": {
+                                                    "path": "/foo_renamed.txt",
+                                                    "ref": project_1_file_1_dataset_id,
+                                                    "accessLevel": "public",
+                                                    "changeBy": USER_1,
+                                                }
+                                            },
+                                            {
+                                                "__typename": "MoleculeActivityFileUpdated",
+                                                "entry": {
+                                                    "path": "/foo_renamed.txt",
+                                                    "ref": project_1_file_1_dataset_id,
+                                                    "accessLevel": "public",
+                                                    "changeBy": USER_1,
+                                                }
+                                            },
+                                            {
+                                                "__typename": "MoleculeActivityFileUpdated",
+                                                "entry": {
+                                                    "path": "/foo.txt",
+                                                    "ref": project_1_file_1_dataset_id,
+                                                    "accessLevel": "public",
+                                                    "changeBy": USER_1,
+                                                }
+                                            },
+                                            {
+                                                "__typename": "MoleculeActivityFileAdded",
+                                                "entry": {
+                                                    "path": "/foo.txt",
+                                                    "ref": project_1_file_1_dataset_id,
+                                                    "accessLevel": "public",
+                                                    "changeBy": USER_1,
+                                                }
+                                            },
                                         ]
                                     }
                                 }
@@ -11238,24 +11400,24 @@ async fn test_molecule_activity(search_variant: GraphQLMoleculeHarnessSearchVari
                                 "entry": {
                                     "activity": {
                                         "nodes": [
-                                        {
-                                            "__typename": "MoleculeActivityFileUpdated",
-                                            "entry": {
-                                                "path": "/foo.txt",
-                                                "ref": project_1_file_1_dataset_id,
-                                                "accessLevel": "public",
-                                                "changeBy": USER_1,
-                                            }
-                                        },
-                                        {
-                                            "__typename": "MoleculeActivityFileAdded",
-                                            "entry": {
-                                                "path": "/foo.txt",
-                                                "ref": project_1_file_1_dataset_id,
-                                                "accessLevel": "public",
-                                                "changeBy": USER_1,
-                                            }
-                                        },
+                                            {
+                                                "__typename": "MoleculeActivityFileUpdated",
+                                                "entry": {
+                                                    "path": "/foo.txt",
+                                                    "ref": project_1_file_1_dataset_id,
+                                                    "accessLevel": "public",
+                                                    "changeBy": USER_1,
+                                                }
+                                            },
+                                            {
+                                                "__typename": "MoleculeActivityFileAdded",
+                                                "entry": {
+                                                    "path": "/foo.txt",
+                                                    "ref": project_1_file_1_dataset_id,
+                                                    "accessLevel": "public",
+                                                    "changeBy": USER_1,
+                                                }
+                                            },
                                         ]
                                     }
                                 }
@@ -11285,33 +11447,33 @@ async fn test_molecule_activity(search_variant: GraphQLMoleculeHarnessSearchVari
                 "v3": {
                     "activity": {
                         "nodes": [
-                        {
-                            "__typename": "MoleculeActivityFileRemoved",
-                            "entry": {
-                                "path": "/bar.txt",
-                                "ref": project_1_file_2_dataset_id,
-                                "accessLevel": "holders",
-                                "changeBy": USER_2,
-                            }
-                        },
-                        {
-                            "__typename": "MoleculeActivityFileUpdated",
-                            "entry": {
-                                "path": "/bar.txt",
-                                "ref": project_1_file_2_dataset_id,
-                                "accessLevel": "holders",
-                                "changeBy": USER_2,
-                            }
-                        },
-                        {
-                            "__typename": "MoleculeActivityFileAdded",
-                            "entry": {
-                                "path": "/bar.txt",
-                                "ref": project_1_file_2_dataset_id,
-                                "accessLevel": "holders",
-                                "changeBy": USER_2,
-                            }
-                        },
+                            {
+                                "__typename": "MoleculeActivityFileRemoved",
+                                "entry": {
+                                    "path": "/bar.txt",
+                                    "ref": project_1_file_2_dataset_id,
+                                    "accessLevel": "holders",
+                                    "changeBy": USER_2,
+                                }
+                            },
+                            {
+                                "__typename": "MoleculeActivityFileUpdated",
+                                "entry": {
+                                    "path": "/bar.txt",
+                                    "ref": project_1_file_2_dataset_id,
+                                    "accessLevel": "holders",
+                                    "changeBy": USER_2,
+                                }
+                            },
+                            {
+                                "__typename": "MoleculeActivityFileAdded",
+                                "entry": {
+                                    "path": "/bar.txt",
+                                    "ref": project_1_file_2_dataset_id,
+                                    "accessLevel": "holders",
+                                    "changeBy": USER_2,
+                                }
+                            },
                         ]
                     }
                 }
