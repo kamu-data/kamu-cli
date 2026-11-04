@@ -86,7 +86,7 @@ pub async fn prepare_dataset_metadata_batch(
 pub fn decode_metadata_batch(
     blocks_batch: &MetadataBlocksBatch,
 ) -> Result<VecDeque<odf::dataset::HashedMetadataBlockBytesDecoded>, DecodeMetadataBatchError> {
-    let blocks_data = unpack_dataset_metadata_batch(blocks_batch)?;
+    let blocks_data = unpack_dataset_metadata_batch(blocks_batch, MAX_UNPACKED_BATCH_SIZE)?;
 
     let blocks = blocks_data
         .into_iter()
@@ -143,6 +143,7 @@ impl DecodeMetadataBatchError {
 
 fn unpack_dataset_metadata_batch(
     blocks_batch: &MetadataBlocksBatch,
+    max_unpacked_size: u64,
 ) -> Result<Vec<(odf::Multihash, odf::MetadataBlockBytes)>, DecodeMetadataBatchError> {
     if blocks_batch.media_type != MEDIA_TAR_GZ || blocks_batch.encoding != ENCODING_RAW {
         return Err(DecodeMetadataBatchError::UnsupportedFormat {
@@ -155,12 +156,12 @@ fn unpack_dataset_metadata_batch(
     // long-name entries that the tar reader buffers on its own
     let mut tarball = Vec::new();
     GzDecoder::new(blocks_batch.payload.as_slice())
-        .take(MAX_UNPACKED_BATCH_SIZE + 1)
+        .take(max_unpacked_size + 1)
         .read_to_end(&mut tarball)
         .map_err(DecodeMetadataBatchError::malformed)?;
-    if u64::try_from(tarball.len()).unwrap() > MAX_UNPACKED_BATCH_SIZE {
+    if u64::try_from(tarball.len()).unwrap() > max_unpacked_size {
         return Err(DecodeMetadataBatchError::TooLarge {
-            max_size: MAX_UNPACKED_BATCH_SIZE,
+            max_size: max_unpacked_size,
         });
     }
 
@@ -277,22 +278,16 @@ mod tests {
 
     #[test]
     fn test_decode_metadata_batch_rejects_payload_unpacking_past_the_bound() {
-        let mut encoder = GzEncoder::new(Vec::new(), Compression::fast());
-        let chunk = vec![0_u8; 1024 * 1024];
-        for _ in 0..=(MAX_UNPACKED_BATCH_SIZE / 1024 / 1024) {
-            encoder.write_all(&chunk).unwrap();
-        }
-        let batch = MetadataBlocksBatch {
-            num_blocks: 1,
-            media_type: String::from(MEDIA_TAR_GZ),
-            encoding: String::from(ENCODING_RAW),
-            payload: encoder.finish().unwrap(),
-        };
+        let batch = tar_gz_batch(&[0_u8; 1025]);
 
         assert_matches!(
-            decode_metadata_batch(&batch),
-            Err(DecodeMetadataBatchError::TooLarge { .. })
+            unpack_dataset_metadata_batch(&batch, 1024),
+            Err(DecodeMetadataBatchError::TooLarge { max_size: 1024 })
         );
+
+        // An empty tarball of exactly the bound passes
+        let batch = tar_gz_batch(&[0_u8; 1024]);
+        assert_matches!(unpack_dataset_metadata_batch(&batch, 1024), Ok(blocks) if blocks.is_empty());
     }
 
     fn tar_gz_batch(tarball: &[u8]) -> MetadataBlocksBatch {
