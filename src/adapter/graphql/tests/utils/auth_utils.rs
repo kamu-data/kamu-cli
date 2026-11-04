@@ -17,6 +17,7 @@ use kamu_accounts_services::{
     PredefinedAccountsRegistrator,
 };
 use kamu_adapter_graphql::ANONYMOUS_ACCESS_FORBIDDEN_MESSAGE;
+use kamu_auth_rebac::DatasetDefaultsConfig;
 use kamu_auth_rebac_inmem::InMemoryRebacRepository;
 use kamu_auth_rebac_services::*;
 
@@ -62,7 +63,7 @@ pub async fn authentication_catalogs_ext(
         .add::<RebacDatasetLifecycleMessageConsumer>()
         .add::<InMemoryRebacRepository>()
         .add_value(DefaultAccountProperties::default())
-        .add_value(DefaultDatasetProperties::default())
+        .add_value(DatasetDefaultsConfig::default().dataset_properties())
         .add::<InMemoryAccountRepository>()
         .add::<AccountServiceImpl>()
         .add_value(DidSecretEncryptionConfig::sample())

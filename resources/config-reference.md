@@ -38,6 +38,14 @@
 <td>Database connection configuration</td>
 </tr>
 <tr>
+<td><code>datasetDefaults</code></td>
+<td><a href="#datasetdefaultsconfig"><code>DatasetDefaultsConfig</code></a></td>
+<td><pre><code class="language-json">{
+  &quot;allowsAnonymousRead&quot;: true
+}</code></pre></td>
+<td>Access of datasets whose owner has not set it</td>
+</tr>
+<tr>
 <td><code>didEncryption</code></td>
 <td><a href="#didsecretencryptionconfig"><code>DidSecretEncryptionConfig</code></a></td>
 <td><pre><code class="language-json">{
@@ -647,6 +655,25 @@ the next flow activation moment regardless of it.
 <td><a href="#databasecredentialsourceconfig"><code>DatabaseCredentialSourceConfig</code></a></td>
 <td></td>
 <td></td>
+</tr>
+</tbody>
+</table>
+
+## `DatasetDefaultsConfig`
+
+Access properties of every dataset whose owner has not set them.
+
+Only properties that differ from these are stored, so changing a default
+applies to all datasets that do not override it, existing ones included.
+
+<table>
+<thead><tr><th>Field</th><th>Type</th><th>Default</th><th>Description</th></tr></thead>
+<tbody>
+<tr>
+<td><code>allowsAnonymousRead</code></td>
+<td><code>boolean</code></td>
+<td><code class="language-json">true</code></td>
+<td>Whether anonymous callers can read a public dataset</td>
 </tr>
 </tbody>
 </table>
@@ -1734,6 +1761,8 @@ iteration. This ensures that one data slice doesn't become too big.
 </table>
 
 ## `SqlPolicyConfig`
+
+Statements that SQL sessions accept besides queries, per kind of caller
 
 <table>
 <thead><tr><th>Field</th><th>Type</th><th>Default</th><th>Description</th></tr></thead>

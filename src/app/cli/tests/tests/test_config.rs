@@ -309,7 +309,7 @@ fn test_config_sql_policy_partial_override_keeps_scope_defaults() {
     let sql_policy = &cfg.engine.datafusion_embedded.sql_policy;
 
     pretty_assertions::assert_eq!(
-        sql_policy.policy(true),
+        sql_policy.local_policy(),
         SqlPolicy {
             allow_session_views: true,
             allow_session_statements: true,
@@ -317,7 +317,7 @@ fn test_config_sql_policy_partial_override_keeps_scope_defaults() {
         }
     );
     pretty_assertions::assert_eq!(
-        sql_policy.policy(false),
+        sql_policy.api_policy(),
         SqlPolicy {
             allow_session_views: true,
             allow_session_statements: false,
@@ -327,8 +327,8 @@ fn test_config_sql_policy_partial_override_keeps_scope_defaults() {
 
     let defaults = CLIConfig::default();
     let sql_policy = &defaults.engine.datafusion_embedded.sql_policy;
-    pretty_assertions::assert_eq!(sql_policy.policy(true), SqlPolicy::LOCAL_INTERACTIVE);
-    pretty_assertions::assert_eq!(sql_policy.policy(false), SqlPolicy::READ_ONLY);
+    pretty_assertions::assert_eq!(sql_policy.local_policy(), SqlPolicy::LOCAL_INTERACTIVE);
+    pretty_assertions::assert_eq!(sql_policy.api_policy(), SqlPolicy::READ_ONLY);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

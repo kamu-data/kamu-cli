@@ -11,7 +11,7 @@ use std::sync::Arc;
 
 use database_common_macros::transactional_method4;
 use internal_error::InternalError;
-use kamu_auth_rebac::RebacService;
+use kamu_auth_rebac::{DefaultDatasetProperties, RebacService};
 use kamu_datasets::{DatasetEntryService, DatasetRegistry, dataset_search_schema};
 use kamu_search::*;
 
@@ -23,6 +23,7 @@ use crate::search::dataset_search_indexer::*;
 #[dill::interface(dyn kamu_search::SearchEntitySchemaProvider)]
 pub struct DatasetSearchSchemaProvider {
     catalog: dill::Catalog,
+    default_dataset_properties: Arc<DefaultDatasetProperties>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -59,6 +60,16 @@ impl kamu_search::SearchEntitySchemaProvider for DatasetSearchSchemaProvider {
 
     fn provide_schemas(&self) -> &[kamu_search::SearchEntitySchema] {
         &[dataset_search_schema::SCHEMA]
+    }
+
+    // A dataset that does not set anonymous read takes the default, which
+    // decides whether its document is visible to anonymous callers
+    fn indexed_settings(&self, schema: &SearchEntitySchema) -> Option<String> {
+        assert_eq!(schema.schema_name, dataset_search_schema::SCHEMA_NAME);
+        Some(format!(
+            "allows_anonymous_read={}",
+            self.default_dataset_properties.allows_anonymous_read
+        ))
     }
 
     async fn run_schema_initial_indexing(

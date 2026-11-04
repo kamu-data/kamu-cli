@@ -294,6 +294,7 @@ impl SearchRepository for ElasticsearchRepository {
     async fn ensure_entity_index(
         &self,
         schema: &SearchEntitySchema,
+        indexed_settings: Option<&str>,
     ) -> Result<(), SearchEnsureEntityIndexError> {
         {
             // Check if schema is already registered
@@ -320,12 +321,15 @@ impl SearchRepository for ElasticsearchRepository {
             self.repo_config.embedding_dimensions,
         );
 
-        let outcome = index.ensure_version_existence(mappings, schema).await?;
+        let outcome = index
+            .ensure_version_existence(mappings, schema, indexed_settings)
+            .await?;
 
         use es_helpers::EntityIndexEnsureOutcome;
         match outcome {
             EntityIndexEnsureOutcome::UpToDate { .. }
             | EntityIndexEnsureOutcome::CreatedNew { .. }
+            | EntityIndexEnsureOutcome::RecreatedForSettings { .. }
             | EntityIndexEnsureOutcome::UpgradePerformed { .. } => {}
             EntityIndexEnsureOutcome::DriftDetected {
                 alias,

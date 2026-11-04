@@ -21,6 +21,13 @@ pub trait SearchEntitySchemaProvider: Send + Sync {
 
     fn provide_schemas(&self) -> &[SearchEntitySchema];
 
+    /// Settings outside the schema that the schema's documents are computed
+    /// from, such as a configured default. An index built with other settings
+    /// is recreated empty and indexed again
+    fn indexed_settings(&self, _schema: &SearchEntitySchema) -> Option<String> {
+        None
+    }
+
     async fn run_schema_initial_indexing(
         &self,
         search_repo: Arc<dyn SearchRepository>,

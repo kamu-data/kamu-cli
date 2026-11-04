@@ -823,12 +823,12 @@ pub fn register_config_in_catalog(
             risingwave_image: images_config.risingwave,
         });
 
-        catalog_builder.add_value(
-            engine_config
-                .datafusion_embedded
-                .sql_policy
-                .policy(is_local_sql_session),
-        );
+        let sql_policy = &engine_config.datafusion_embedded.sql_policy;
+        catalog_builder.add_value(if is_local_sql_session {
+            sql_policy.local_policy()
+        } else {
+            sql_policy.api_policy()
+        });
 
         let (ingest_config, batch_query_config, compaction_config) =
             engine_config.datafusion_embedded.into_system()?;
@@ -970,6 +970,10 @@ pub fn register_config_in_catalog(
 
     // Authentication configuration
     catalog_builder.add_value(config.auth.clone());
+    //
+
+    // Access of datasets whose owner has not set it
+    catalog_builder.add_value(config.dataset_defaults.dataset_properties());
     //
 
     // Background agents configuration

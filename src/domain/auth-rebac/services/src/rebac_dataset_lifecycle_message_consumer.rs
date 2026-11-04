@@ -31,6 +31,8 @@ use messaging_outbox::{
     MessageConsumptionMode,
 };
 
+use crate::DefaultDatasetProperties;
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[component(pub)]
@@ -47,6 +49,7 @@ use messaging_outbox::{
 pub struct RebacDatasetLifecycleMessageConsumer {
     set_dataset_properties_uc: Arc<dyn SetDatasetRebacPropertiesUseCase>,
     delete_dataset_properties_uc: Arc<dyn DeleteDatasetRebacPropertiesUseCase>,
+    default_dataset_properties: Arc<DefaultDatasetProperties>,
 }
 
 impl RebacDatasetLifecycleMessageConsumer {
@@ -54,11 +57,9 @@ impl RebacDatasetLifecycleMessageConsumer {
         &self,
         message: &DatasetLifecycleMessageCreated,
     ) -> Result<(), InternalError> {
-        // A public dataset is open to anonymous readers until its owner narrows it
-        let is_public = message.dataset_visibility.is_public();
         let dataset_properties = DatasetProperties {
-            allows_public_read: is_public,
-            allows_anonymous_read: is_public,
+            allows_public_read: message.dataset_visibility.is_public(),
+            allows_anonymous_read: self.default_dataset_properties.allows_anonymous_read,
         };
 
         self.set_dataset_properties_uc

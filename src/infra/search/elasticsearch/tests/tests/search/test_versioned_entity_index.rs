@@ -93,6 +93,7 @@ async fn test_ensure_version_existence_create_and_up_to_date(ctx: Arc<Elasticsea
                 mappings_hash: mappings.mappings_hash.clone(),
             },
             &schema,
+            None,
         )
         .await
         .unwrap();
@@ -124,7 +125,7 @@ async fn test_ensure_version_existence_create_and_up_to_date(ctx: Arc<Elasticsea
     assert_eq!(parsed_meta.mapping_hash, mappings.mappings_hash);
 
     let up_to_date_outcome = index
-        .ensure_version_existence(mappings, &schema)
+        .ensure_version_existence(mappings, &schema, None)
         .await
         .unwrap();
     assert!(matches!(
@@ -148,7 +149,7 @@ async fn test_ensure_version_existence_detects_drift_for_same_version(
     let index_v1 = harness.index(schema_v1.version);
 
     index_v1
-        .ensure_version_existence(mappings_v1, &schema_v1)
+        .ensure_version_existence(mappings_v1, &schema_v1, None)
         .await
         .unwrap();
 
@@ -160,7 +161,7 @@ async fn test_ensure_version_existence_detects_drift_for_same_version(
     let drift_mappings = harness.mappings(&drift_schema);
 
     let drift_outcome = index_v1
-        .ensure_version_existence(drift_mappings, &drift_schema)
+        .ensure_version_existence(drift_mappings, &drift_schema, None)
         .await
         .unwrap();
 
@@ -188,7 +189,7 @@ async fn test_ensure_version_existence_upgrade_reindex_moves_data(
     let index_v1 = harness.index(schema_v1.version);
 
     index_v1
-        .ensure_version_existence(mappings_v1, &schema_v1)
+        .ensure_version_existence(mappings_v1, &schema_v1, None)
         .await
         .unwrap();
 
@@ -215,7 +216,7 @@ async fn test_ensure_version_existence_upgrade_reindex_moves_data(
     let index_v2 = harness.index(schema_v2.version);
 
     let upgrade_outcome = index_v2
-        .ensure_version_existence(mappings_v2, &schema_v2)
+        .ensure_version_existence(mappings_v2, &schema_v2, None)
         .await
         .unwrap();
 
@@ -281,7 +282,7 @@ async fn test_ensure_version_existence_upgrade_breaking_recreate_keeps_new_index
     let index_v1 = harness.index(schema_v1.version);
 
     index_v1
-        .ensure_version_existence(mappings_v1, &schema_v1)
+        .ensure_version_existence(mappings_v1, &schema_v1, None)
         .await
         .unwrap();
 
@@ -311,7 +312,7 @@ async fn test_ensure_version_existence_upgrade_breaking_recreate_keeps_new_index
     let index_v2 = harness.index(schema_v2.version);
 
     let upgrade_outcome = index_v2
-        .ensure_version_existence(mappings_v2, &schema_v2)
+        .ensure_version_existence(mappings_v2, &schema_v2, None)
         .await
         .unwrap();
 
@@ -368,7 +369,7 @@ async fn test_ensure_version_existence_detects_downgrade_attempt(
     let index_v2 = harness.index(schema_v2.version);
 
     index_v2
-        .ensure_version_existence(mappings_v2, &schema_v2)
+        .ensure_version_existence(mappings_v2, &schema_v2, None)
         .await
         .unwrap();
 
@@ -378,7 +379,7 @@ async fn test_ensure_version_existence_detects_downgrade_attempt(
     let index_v1 = harness.index(schema_v1.version);
 
     let outcome = index_v1
-        .ensure_version_existence(mappings_v1, &schema_v1)
+        .ensure_version_existence(mappings_v1, &schema_v1, None)
         .await
         .unwrap();
 
@@ -407,7 +408,7 @@ async fn test_find_document_by_id_returns_none_for_missing_document_with_url_uns
     let index = harness.index(schema.version);
 
     index
-        .ensure_version_existence(mappings, &schema)
+        .ensure_version_existence(mappings, &schema, None)
         .await
         .unwrap();
 
@@ -422,6 +423,81 @@ async fn test_find_document_by_id_returns_none_for_missing_document_with_url_uns
             .await,
         Ok(None)
     );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_group::group(elasticsearch)]
+#[test_log::test(kamu_search_elasticsearch::test)]
+async fn test_ensure_version_existence_recreates_index_when_settings_change(
+    ctx: Arc<ElasticsearchTestContext>,
+) {
+    let harness = VersionedEntityIndexHarness::new(ctx);
+
+    let schema =
+        VersionedEntityIndexHarness::schema(1, SearchEntitySchemaUpgradeMode::Reindex, V1_FIELDS);
+    let index = harness.index(schema.version);
+
+    assert_matches!(
+        harness.ensure(&index, &schema, Some("default=a")).await,
+        EntityIndexEnsureOutcome::CreatedNew { .. }
+    );
+    harness.index_document(&index.index_name(), "doc-1").await;
+
+    // Same settings: the index and its documents stay
+    assert_matches!(
+        harness.ensure(&index, &schema, Some("default=a")).await,
+        EntityIndexEnsureOutcome::UpToDate { .. }
+    );
+    pretty_assertions::assert_eq!(harness.documents_in(&index.index_name()).await, 1);
+
+    // Other settings: the documents are stale, so the index starts empty
+    assert_matches!(
+        harness.ensure(&index, &schema, Some("default=b")).await,
+        EntityIndexEnsureOutcome::RecreatedForSettings { .. }
+    );
+    pretty_assertions::assert_eq!(harness.documents_in(&index.index_name()).await, 0);
+    pretty_assertions::assert_eq!(
+        harness.alias_indices(&index.alias_name()).await,
+        vec![index.index_name()]
+    );
+
+    assert_matches!(
+        harness.ensure(&index, &schema, Some("default=b")).await,
+        EntityIndexEnsureOutcome::UpToDate { .. }
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_group::group(elasticsearch)]
+#[test_log::test(kamu_search_elasticsearch::test)]
+async fn test_ensure_version_existence_upgrade_with_changed_settings_skips_reindex(
+    ctx: Arc<ElasticsearchTestContext>,
+) {
+    let harness = VersionedEntityIndexHarness::new(ctx);
+
+    let schema_v1 =
+        VersionedEntityIndexHarness::schema(1, SearchEntitySchemaUpgradeMode::Reindex, V1_FIELDS);
+    let index_v1 = harness.index(schema_v1.version);
+    harness
+        .ensure(&index_v1, &schema_v1, Some("default=a"))
+        .await;
+    harness
+        .index_document(&index_v1.index_name(), "doc-1")
+        .await;
+
+    let schema_v2 =
+        VersionedEntityIndexHarness::schema(2, SearchEntitySchemaUpgradeMode::Reindex, V2_FIELDS);
+    let index_v2 = harness.index(schema_v2.version);
+
+    assert_matches!(
+        harness
+            .ensure(&index_v2, &schema_v2, Some("default=b"))
+            .await,
+        EntityIndexEnsureOutcome::UpgradePerformed { .. }
+    );
+    pretty_assertions::assert_eq!(harness.documents_in(&index_v2.index_name()).await, 0);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -475,6 +551,53 @@ impl VersionedEntityIndexHarness {
             schema,
             self.repo_config.embedding_dimensions,
         )
+    }
+
+    async fn ensure(
+        &self,
+        index: &ElasticsearchVersionedEntityIndex<'_>,
+        schema: &SearchEntitySchema,
+        indexed_settings: Option<&str>,
+    ) -> EntityIndexEnsureOutcome {
+        index
+            .ensure_version_existence(self.mappings(schema), schema, indexed_settings)
+            .await
+            .unwrap()
+    }
+
+    async fn index_document(&self, index_name: &str, id: &str) {
+        self.es_ctx()
+            .client()
+            .bulk_update(
+                index_name,
+                vec![SearchIndexUpdateOperation::Index {
+                    id: id.to_string(),
+                    doc: serde_json::json!({
+                        "name": id,
+                        "kind": "source"
+                    }),
+                }],
+            )
+            .await
+            .unwrap();
+        self.es_ctx().refresh_indices().await;
+    }
+
+    async fn documents_in(&self, index_name: &str) -> u64 {
+        self.es_ctx().refresh_indices().await;
+        self.es_ctx()
+            .client()
+            .documents_in_index(index_name)
+            .await
+            .unwrap()
+    }
+
+    async fn alias_indices(&self, alias_name: &str) -> Vec<String> {
+        self.es_ctx()
+            .client()
+            .resolve_alias_indices(alias_name)
+            .await
+            .unwrap()
     }
 
     fn index(&self, version: u32) -> ElasticsearchVersionedEntityIndex<'_> {

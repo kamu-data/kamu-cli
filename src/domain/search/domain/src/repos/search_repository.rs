@@ -17,9 +17,12 @@ use crate::*;
 pub trait SearchRepository: Send + Sync {
     async fn health(&self) -> Result<serde_json::Value, InternalError>;
 
+    /// Creates or upgrades the schema's index. An existing index built with
+    /// other `indexed_settings` is recreated empty
     async fn ensure_entity_index(
         &self,
         schema: &SearchEntitySchema,
+        indexed_settings: Option<&str>,
     ) -> Result<(), SearchEnsureEntityIndexError>;
 
     async fn total_documents(&self) -> Result<u64, InternalError>;

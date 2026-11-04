@@ -20,13 +20,15 @@ Recommendation: for ease of reading, use the following format:
 - Config: `engine.datafusionEmbedded.sqlPolicy` sets which statements SQL sessions accept besides
   queries, separately for `kamu sql` (`local`: views and `SET` allowed) and for API callers (`api`:
   queries only). Statements that write data, such as `COPY ... TO`, stay off in both by default
+- Config: `datasetDefaults.allowsAnonymousRead` (default `true`) sets whether anonymous callers can
+  read a public dataset whose owner has not chosen otherwise
 ### Changed
 - SQL over the API (breaking): HTTP `/query`, GraphQL `data.query` and `FlightSQL` accept only
   queries. `SET`, DDL such as `CREATE VIEW` or `CREATE EXTERNAL TABLE`, `COPY ... TO` and `INSERT`
   fail with a "not supported" error. Transformation queries and Ethereum log filters must be queries too
 ### Fixed
 - Anonymous callers can no longer read public datasets that their owner closed to anonymous readers.
-  Public datasets created before this release stay open to anonymous readers
+  Other public datasets, including existing ones, follow `datasetDefaults.allowsAnonymousRead`
 - `kamu sql`: `COPY ... TO` in the SQL shell is reported as not supported instead of crashing the shell
 - `/ingest`: an invalid preprocess query in a dataset's push source is a bad request instead of an
   internal error
