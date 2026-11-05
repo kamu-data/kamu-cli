@@ -10,11 +10,16 @@
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use datafusion::arrow::array::RecordBatch;
+use datafusion::arrow::array::{RecordBatch, StringArray, UInt64Array};
+use datafusion::arrow::datatypes::{DataType, Field, Schema};
+use datafusion::arrow::util::pretty::pretty_format_batches;
 use datafusion::prelude::SessionContext;
+use file_utils::OwnedFile;
+use indoc::indoc;
 use kamu::domain::*;
+use kamu::testing::ParquetWriterHelper;
 use kamu::*;
-use kamu_datasets::MockDatasetActionAuthorizer;
+use kamu_datasets::{MockDatasetActionAuthorizer, ResolvedDataset};
 use tempfile::TempDir;
 
 use crate::tests::queries::helpers;
@@ -279,12 +284,167 @@ async fn test_session_with_writes_creates_tables() {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_group::group(engine, datafusion)]
+#[test_log::test(tokio::test)]
+async fn test_local_session_view_keeps_definition_of_views_it_reads() {
+    let harness = SqlPolicyHarness::new(Some(SqlPolicy::LOCAL_INTERACTIVE)).await;
+    let session = harness.session().await;
+
+    harness
+        .run(&session, "CREATE VIEW base AS SELECT offset, blah FROM foo")
+        .await
+        .unwrap();
+    harness
+        .run(
+            &session,
+            "CREATE VIEW dep AS SELECT blah FROM base WHERE offset < 2",
+        )
+        .await
+        .unwrap();
+
+    // A view stores the plan of its query, so it does not follow later changes
+    // to the views it reads
+    harness.run(&session, "DROP VIEW base").await.unwrap();
+    pretty_assertions::assert_eq!(harness.run(&session, "SELECT * FROM dep").await, Ok(2));
+
+    harness
+        .run(
+            &session,
+            "CREATE VIEW base AS SELECT 99 AS offset, 'z' AS blah",
+        )
+        .await
+        .unwrap();
+    pretty_assertions::assert_eq!(harness.run(&session, "SELECT * FROM dep").await, Ok(2));
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_group::group(engine, datafusion)]
+#[test_log::test(tokio::test)]
+async fn test_local_session_views_live_in_default_schema() {
+    let harness = SqlPolicyHarness::new(Some(SqlPolicy::LOCAL_INTERACTIVE)).await;
+    let session = harness.session().await;
+
+    for sql in [
+        "CREATE VIEW kamu.a AS SELECT 1",
+        "CREATE VIEW kamu.kamu.b AS SELECT 1",
+    ] {
+        harness.run(&session, sql).await.unwrap();
+    }
+
+    for (sql, error) in [
+        (
+            "CREATE VIEW other.c AS SELECT 1",
+            "failed to resolve schema: other",
+        ),
+        (
+            "CREATE VIEW information_schema.d AS SELECT 1",
+            "schema provider does not support registering tables",
+        ),
+    ] {
+        let result = harness.run(&session, sql).await;
+        assert!(
+            result.as_ref().is_err_and(|e| e.contains(error)),
+            "{sql}: {result:?}"
+        );
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_group::group(engine, datafusion)]
+#[test_log::test(tokio::test)]
+async fn test_local_session_views_are_listed() {
+    let harness = SqlPolicyHarness::new(Some(SqlPolicy::LOCAL_INTERACTIVE)).await;
+    let session = harness.session().await;
+
+    harness
+        .run(&session, "CREATE VIEW v AS SELECT blah FROM foo")
+        .await
+        .unwrap();
+
+    pretty_assertions::assert_eq!(
+        harness
+            .table(
+                &session,
+                "SELECT table_name, table_type FROM information_schema.tables WHERE table_schema \
+                 = 'kamu' ORDER BY table_name"
+            )
+            .await,
+        indoc!(
+            "
+            +------------+------------+
+            | table_name | table_type |
+            +------------+------------+
+            | foo        | BASE TABLE |
+            | v          | VIEW       |
+            +------------+------------+"
+        )
+    );
+    pretty_assertions::assert_eq!(
+        harness
+            .table(
+                &session,
+                "SELECT definition FROM information_schema.views WHERE table_name = 'v'"
+            )
+            .await,
+        indoc!(
+            "
+            +---------------------------------------+
+            | definition                            |
+            +---------------------------------------+
+            | CREATE VIEW v AS SELECT blah FROM foo |
+            +---------------------------------------+"
+        )
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_group::group(engine, datafusion)]
+#[test_log::test(tokio::test)]
+async fn test_session_reads_datasets_as_of_first_scan() {
+    let harness = SqlPolicyHarness::new(Some(SqlPolicy::LOCAL_INTERACTIVE)).await;
+
+    // Data committed before the first scan is read, including by views
+    // created earlier
+    let session = harness.session().await;
+    harness
+        .run(&session, "CREATE VIEW v AS SELECT * FROM foo")
+        .await
+        .unwrap();
+    harness.append_to_foo(&[4, 5]).await;
+    pretty_assertions::assert_eq!(harness.run(&session, "SELECT * FROM v").await, Ok(6));
+
+    // Data committed after it is not, for the rest of the session
+    harness.append_to_foo(&[6, 7]).await;
+    pretty_assertions::assert_eq!(harness.run(&session, "SELECT * FROM v").await, Ok(6));
+    pretty_assertions::assert_eq!(harness.run(&session, "SELECT * FROM foo").await, Ok(6));
+
+    // Datasets created after the session started are not visible in it
+    harness.create_dataset("bar").await;
+    let result = harness.run(&session, "SELECT * FROM bar").await;
+    assert!(
+        result
+            .as_ref()
+            .is_err_and(|e| e.contains("table 'kamu.kamu.bar' not found")),
+        "{result:?}"
+    );
+
+    let new_session = harness.session().await;
+    pretty_assertions::assert_eq!(harness.run(&new_session, "SELECT * FROM foo").await, Ok(8));
+    pretty_assertions::assert_eq!(harness.run(&new_session, "SELECT * FROM bar").await, Ok(4));
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Harness
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 struct SqlPolicyHarness {
     tempdir: TempDir,
     catalog: dill::Catalog,
+    foo: ResolvedDataset,
 }
 
 impl SqlPolicyHarness {
@@ -305,9 +465,57 @@ impl SqlPolicyHarness {
         }
         let catalog = b.build();
 
-        helpers::create_test_dataset(&catalog, tempdir.path(), "foo").await;
+        let foo = helpers::create_test_dataset(&catalog, tempdir.path(), "foo").await;
 
-        Self { tempdir, catalog }
+        Self {
+            tempdir,
+            catalog,
+            foo,
+        }
+    }
+
+    /// Creates a dataset of 4 records, like `foo`
+    async fn create_dataset(&self, name: &str) {
+        helpers::create_test_dataset(&self.catalog, self.tempdir.path(), name).await;
+    }
+
+    /// Commits records with the given offsets to `foo`; they must continue
+    /// its last offset
+    async fn append_to_foo(&self, offsets: &[u64]) {
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("offset", DataType::UInt64, false),
+            Field::new("blah", DataType::Utf8, false),
+        ]));
+        let blah: Vec<String> = offsets.iter().map(|offset| format!("x{offset}")).collect();
+        let batch = RecordBatch::try_new(
+            schema,
+            vec![
+                Arc::new(UInt64Array::from(offsets.to_vec())),
+                Arc::new(StringArray::from(blah)),
+            ],
+        )
+        .unwrap();
+        let data_path = self.path("append.parquet");
+        ParquetWriterHelper::from_record_batch(&data_path, &batch).unwrap();
+
+        let start = offsets[0];
+        let end = *offsets.last().unwrap();
+        self.foo
+            .commit_add_data(
+                odf::dataset::AddDataParams {
+                    prev_checkpoint: None,
+                    prev_offset: Some(start - 1),
+                    new_offset_interval: Some(odf::metadata::OffsetInterval { start, end }),
+                    new_linked_objects: None,
+                    new_watermark: None,
+                    new_source_state: None,
+                },
+                Some(OwnedFile::new(data_path)),
+                None,
+                odf::dataset::CommitOpts::default(),
+            )
+            .await
+            .unwrap();
     }
 
     fn path(&self, name: &str) -> PathBuf {
@@ -349,6 +557,17 @@ impl SqlPolicyHarness {
             .map_err(|e| e.to_string())?;
         let batches = df.collect().await.map_err(|e| e.to_string())?;
         Ok(batches.iter().map(RecordBatch::num_rows).sum())
+    }
+
+    /// Runs a statement in a session and returns its result as a text table
+    async fn table(&self, session: &SessionContext, sql: &str) -> String {
+        let batches = SqlPolicy::sql(session, sql)
+            .await
+            .unwrap()
+            .collect()
+            .await
+            .unwrap();
+        pretty_format_batches(&batches).unwrap().to_string()
     }
 
     /// Runs a statement without checking it against the session's policy

@@ -164,6 +164,7 @@ change invalidates what it says.
 | How background agents wake up, Postgres `LISTEN`/`NOTIFY`, SQLite polling, deadline-driven waits | [`docs/internal/wakeup-listeners.md`](docs/internal/wakeup-listeners.md) |
 | Exported Prometheus metrics, recommended alerts, adding metrics | [`docs/internal/metrics.md`](docs/internal/metrics.md) |
 | Task scheduling and execution, the task agent, planners and runners, new task types | [`docs/internal/task-system.md`](docs/internal/task-system.md) |
+| SQL session views, `SqlPolicy` per entry point, what views can do in the shell, HTTP, GraphQL and FlightSQL | [`docs/internal/sql-session-views.md`](docs/internal/sql-session-views.md) |
 | Flows, triggers, configurations, scheduling, sensors, flow process state, new flow types | [`docs/internal/flow-system.md`](docs/internal/flow-system.md) |
 | Root dataset ingest: polling and push sources, fetch steps, savepoints, the DataFusion data writer, merge strategies | [`docs/internal/root-dataset-ingest.md`](docs/internal/root-dataset-ingest.md) |
 | Dataset pull: `kamu pull` flags, pull planning and depth ordering, iteration execution, authorization, how the update task reuses the planner | [`docs/internal/dataset-pull.md`](docs/internal/dataset-pull.md) |
