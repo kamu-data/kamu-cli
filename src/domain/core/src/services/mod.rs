@@ -23,6 +23,7 @@ pub use transform::*;
 pub use watermark::*;
 
 mod did_generator;
+pub mod download_service;
 pub mod engine_provisioner;
 pub mod export_service;
 pub mod metadata_query_service;
@@ -44,6 +45,7 @@ pub mod upload_service;
 pub mod verification_service;
 
 pub use did_generator::*;
+pub use download_service::*;
 pub use engine_provisioner::*;
 pub use export_service::*;
 pub use metadata_query_service::*;

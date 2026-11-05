@@ -26,7 +26,7 @@ use internal_error::ResultIntoInternal;
 use kamu::domain::{FileUploadLimitConfig, TenancyConfig};
 use kamu_accounts::{AuthConfig, PredefinedAccountsConfig};
 use kamu_accounts_services::PasswordPolicyConfig;
-use kamu_datasets::SecretsEncryptionConfig;
+use kamu_datasets::{SecretsEncryptionConfig, VersionedFilesConfig};
 use kamu_webhooks::WebhooksConfig;
 
 use super::{CLIError, Command};
@@ -40,6 +40,7 @@ pub struct UICommand {
     tenancy_config: TenancyConfig,
     predefined_accounts_config: Arc<PredefinedAccountsConfig>,
     file_upload_limit_config: Arc<FileUploadLimitConfig>,
+    versioned_files_config: Arc<VersionedFilesConfig>,
     secrets_encryption_config: Arc<SecretsEncryptionConfig>,
     auth_config: Arc<AuthConfig>,
     output_config: Arc<OutputConfig>,
@@ -73,6 +74,7 @@ impl Command for UICommand {
             self.current_account_name.clone(),
             self.predefined_accounts_config.as_ref(),
             self.file_upload_limit_config.as_ref(),
+            self.versioned_files_config.as_ref(),
             self.secrets_encryption_config.is_enabled(),
             self.auth_config.allow_anonymous,
             self.address,

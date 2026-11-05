@@ -1351,6 +1351,50 @@
         ]
       }
     },
+    "/platform/file/download/{download_token}": {
+      "get": {
+        "operationId": "file_download_get_handler",
+        "parameters": [
+          {
+            "description": "Signed token from a file's content URL",
+            "in": "path",
+            "name": "download_token",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "default": null
+                }
+              }
+            },
+            "description": "file content"
+          },
+          "401": {
+            "description": "token has expired"
+          },
+          "403": {
+            "description": "token is invalid"
+          },
+          "404": {
+            "description": "dataset or file not found"
+          }
+        },
+        "security": [
+          {}
+        ],
+        "summary": "Download a dataset file by a signed token",
+        "tags": [
+          "kamu"
+        ]
+      }
+    },
     "/platform/file/upload/prepare": {
       "post": {
         "operationId": "file_upload_prepare_post_handler",

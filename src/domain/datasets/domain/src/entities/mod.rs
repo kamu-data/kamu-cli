@@ -22,6 +22,7 @@ mod extra_data_fields;
 mod resolved_dataset;
 mod resolved_datasets_map;
 mod versioned_file_entry;
+mod versioned_files_config;
 
 pub use block_hash_prefix::*;
 pub use collection_entry::*;
@@ -38,3 +39,4 @@ pub use extra_data_fields::*;
 pub use resolved_dataset::*;
 pub use resolved_datasets_map::*;
 pub use versioned_file_entry::*;
+pub use versioned_files_config::*;
