@@ -18,12 +18,9 @@
 //! Execution functions
 
 use std::collections::HashMap;
-use std::fs::File;
-use std::io::BufReader;
-use std::io::prelude::*;
 
 use datafusion::common::instant::Instant;
-use datafusion::common::{plan_datafusion_err, plan_err};
+use datafusion::common::{exec_datafusion_err, plan_datafusion_err, plan_err};
 use datafusion::config::{ConfigFileType, Dialect};
 use datafusion::datasource::listing::ListingTableUrl;
 use datafusion::error::{DataFusionError, Result};
@@ -35,6 +32,7 @@ use datafusion::physical_plan::{ExecutionPlanProperties, execute_stream};
 use datafusion::sql::parser::{DFParser, Statement};
 use datafusion::sql::sqlparser;
 use datafusion::sql::sqlparser::dialect::dialect_from_str;
+use datafusion::sql::sqlparser::tokenizer::{Location, Token, Tokenizer};
 use futures::StreamExt;
 use log::warn;
 use object_store::Error::Generic;
@@ -64,49 +62,83 @@ pub async fn exec_from_commands(
     Ok(())
 }
 
-/// run and execute SQL statements and commands from a file, against a context
-/// with the given print options
-pub async fn exec_from_lines(
+/// run and execute the SQL statements of a script, against a context with the
+/// given print options, stopping at the first statement that fails. Each
+/// statement is parsed with the dialect the session has when it is reached. A
+/// leading `#!` line is skipped
+pub async fn exec_from_script(
     ctx: &dyn CliSessionContext,
-    reader: &mut BufReader<File>,
+    script: &str,
     print_options: &PrintOptions,
 ) -> Result<()> {
-    let mut query = "".to_owned();
+    let mut rest = match script.strip_prefix("#!") {
+        Some(rest) => rest.split_once('\n').map_or("", |(_, rest)| rest),
+        None => script,
+    };
 
-    for line in reader.lines() {
-        match line {
-            Ok(line) if line.starts_with("#!") => {
-                continue;
-            }
-            Ok(line) if line.starts_with("--") => {
-                continue;
-            }
-            Ok(line) => {
-                let line = line.trim_end();
-                query.push_str(line);
-                if line.ends_with(';') {
-                    match exec_and_print(ctx, print_options, query).await {
-                        Ok(_) => {}
-                        Err(err) => eprintln!("{err}"),
-                    }
-                    query = "".to_string();
-                } else {
-                    query.push('\n');
-                }
-            }
-            _ => {
+    loop {
+        let dialect_name = ctx
+            .task_ctx()
+            .session_config()
+            .options()
+            .sql_parser
+            .dialect
+            .to_string();
+        // On an error, `tokens` keeps what came before it. The error may come from
+        // text that a statement before it changes the dialect of, so it counts only
+        // once those statements have run
+        let mut tokens = Vec::new();
+        let tokenized = Tokenizer::new(session_dialect(ctx)?.as_ref(), rest)
+            .tokenize_with_location_into_buf(&mut tokens);
+
+        let mut statement_start = 0;
+        let mut dialect_changed = false;
+        for token in tokens.iter().filter(|t| t.token == Token::SemiColon) {
+            let statement_end = byte_offset(rest, token.span.start);
+            exec_and_print(
+                ctx,
+                print_options,
+                rest[statement_start..statement_end].to_string(),
+            )
+            .await?;
+            statement_start = statement_end + 1;
+
+            dialect_changed = ctx
+                .task_ctx()
+                .session_config()
+                .options()
+                .sql_parser
+                .dialect
+                .to_string()
+                != dialect_name;
+            if dialect_changed {
                 break;
             }
         }
-    }
+        rest = &rest[statement_start..];
 
-    // run the left over query if the last statement doesn't contain ‘;’
-    // ignore if it only consists of '\n'
-    if query.contains(|c| c != '\n') {
-        exec_and_print(ctx, print_options, query).await?;
-    }
+        // The rest of the script is split by the dialect the statement set
+        if dialect_changed {
+            continue;
+        }
 
-    Ok(())
+        tokenized.map_err(|e| plan_datafusion_err!("{e}"))?;
+        return exec_and_print(ctx, print_options, rest.to_string()).await;
+    }
+}
+
+/// Byte offset of a tokenizer location, whose line and column count characters
+/// from 1
+fn byte_offset(text: &str, location: Location) -> usize {
+    let line_start: usize = text
+        .split_inclusive('\n')
+        .take(usize::try_from(location.line.saturating_sub(1)).unwrap())
+        .map(str::len)
+        .sum();
+    text[line_start..]
+        .char_indices()
+        .nth(usize::try_from(location.column.saturating_sub(1)).unwrap())
+        .map_or(text.len(), |(i, _)| line_start + i)
 }
 
 pub async fn exec_from_files(
@@ -114,14 +146,10 @@ pub async fn exec_from_files(
     files: Vec<String>,
     print_options: &PrintOptions,
 ) -> Result<()> {
-    let files = files
-        .into_iter()
-        .map(|file_path| File::open(file_path).unwrap())
-        .collect::<Vec<_>>();
-
-    for file in files {
-        let mut reader = BufReader::new(file);
-        exec_from_lines(ctx, &mut reader, print_options).await?;
+    for file_path in files {
+        let script = std::fs::read_to_string(&file_path)
+            .map_err(|e| exec_datafusion_err!("Error reading {file_path:?} {e}"))?;
+        exec_from_script(ctx, &script, print_options).await?;
     }
 
     Ok(())
@@ -163,6 +191,7 @@ pub async fn exec_from_repl(
                                 }
                             } else {
                                 println!("Output format is {:?}.", print_options.format);
+                                println!("{}", print_options.maxrows_status());
                             }
                         }
                         _ => {
@@ -222,17 +251,7 @@ pub(super) async fn exec_and_print(
     print_options: &PrintOptions,
     sql: String,
 ) -> Result<()> {
-    let task_ctx = ctx.task_ctx();
-    let options = task_ctx.session_config().options();
-    let dialect = &options.sql_parser.dialect;
-    let dialect = dialect_from_str(dialect).ok_or_else(|| {
-        plan_datafusion_err!(
-            "Unsupported SQL dialect: {dialect}. Available dialects: {}.",
-            Dialect::available()
-        )
-    })?;
-
-    let statements = DFParser::parse_sql_with_dialect(&sql, dialect.as_ref())?;
+    let statements = DFParser::parse_sql_with_dialect(&sql, session_dialect(ctx)?.as_ref())?;
     for statement in statements {
         StatementExecutor::new(statement)
             .execute(ctx, print_options)
@@ -240,6 +259,17 @@ pub(super) async fn exec_and_print(
     }
 
     Ok(())
+}
+
+fn session_dialect(ctx: &dyn CliSessionContext) -> Result<Box<dyn sqlparser::dialect::Dialect>> {
+    let task_ctx = ctx.task_ctx();
+    let dialect = &task_ctx.session_config().options().sql_parser.dialect;
+    dialect_from_str(dialect).ok_or_else(|| {
+        plan_datafusion_err!(
+            "Unsupported SQL dialect: {dialect}. Available dialects: {}.",
+            Dialect::available()
+        )
+    })
 }
 
 /// Executor for SQL statements, including special handling for S3 region
@@ -269,6 +299,7 @@ impl StatementExecutor {
         let (df, adjusted) = self
             .create_and_execute_logical_plan(ctx, print_options)
             .await?;
+        let adjusted = adjusted.into_inner();
         let physical_plan = df.create_physical_plan().await?;
         let task_ctx = ctx.task_ctx();
         let options = task_ctx.session_config().options();
@@ -290,14 +321,23 @@ impl StatementExecutor {
                 .print_stream(stream, now, &options.format)
                 .await?;
         } else {
-            // Bounded stream; collected results size is limited by the maxrows option
+            // Bounded stream; only the table format limits the rows it shows, so other
+            // formats collect the whole result
             let schema = physical_plan.schema();
             let mut stream = execute_stream(physical_plan, task_ctx.clone())?;
             let mut results = vec![];
             let mut row_count = 0_usize;
-            let max_rows = match print_options.maxrows {
-                MaxRows::Unlimited => usize::MAX,
-                MaxRows::Limited(n) => n,
+            let max_rows = match (adjusted.format, adjusted.maxrows) {
+                (PrintFormat::Table, MaxRows::Limited(n)) => n,
+                (
+                    PrintFormat::Table
+                    | PrintFormat::Csv
+                    | PrintFormat::Tsv
+                    | PrintFormat::Json
+                    | PrintFormat::NdJson
+                    | PrintFormat::Automatic,
+                    MaxRows::Unlimited | MaxRows::Limited(_),
+                ) => usize::MAX,
             };
             while let Some(batch) = stream.next().await {
                 let batch = batch?;
@@ -311,13 +351,7 @@ impl StatementExecutor {
                 }
                 row_count += curr_num_rows;
             }
-            adjusted.into_inner().print_batches(
-                schema,
-                &results,
-                now,
-                row_count,
-                &options.format,
-            )?;
+            adjusted.print_batches(schema, &results, now, row_count, &options.format)?;
             reservation.free();
         }
 

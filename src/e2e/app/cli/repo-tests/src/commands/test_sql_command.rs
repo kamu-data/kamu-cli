@@ -287,3 +287,156 @@ pub async fn test_sql_command_export_errors(kamu: KamuCliPuppet) {
     )
     .await;
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_datafusion_cli_max_rows(kamu: KamuCliPuppet) {
+    let query = "SELECT * FROM unnest(range(50));";
+
+    // Output that is not a terminal shows all rows by default
+    let assert = kamu.execute_with_input(["sql"], query).await.success();
+    let stdout = std::str::from_utf8(&assert.get_output().stdout).unwrap();
+    assert!(
+        stdout.contains("50 row(s) fetched.") && !stdout.contains("displayed"),
+        "Unexpected output:\n{stdout}",
+    );
+
+    let assert = kamu
+        .execute_with_input(["sql", "--max-rows", "2"], query)
+        .await
+        .success();
+    let stdout = std::str::from_utf8(&assert.get_output().stdout).unwrap();
+    assert!(
+        stdout.contains(
+            "50 row(s) fetched. (First 2 displayed. Use \\pset maxrows or --max-rows to adjust)"
+        ),
+        "Unexpected output:\n{stdout}",
+    );
+
+    let assert = kamu
+        .execute_with_input(
+            ["sql", "--max-rows", "2"],
+            format!("\\pset maxrows 1\n{query}\n\\pset maxrows none\n{query}\n"),
+        )
+        .await
+        .success();
+    let stdout = std::str::from_utf8(&assert.get_output().stdout).unwrap();
+    let (limited, unlimited) = stdout.split_once("Max rows is none.").unwrap();
+    assert!(
+        limited.contains("Max rows is 1.")
+            && limited.contains("50 row(s) fetched. (First 1 displayed.")
+            && unlimited.contains("50 row(s) fetched.")
+            && !unlimited.contains("displayed"),
+        "Unexpected output:\n{stdout}",
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_sql_script(kamu: KamuCliPuppet) {
+    let script = kamu.workspace_path().join("query.sql");
+
+    std::fs::write(
+        &script,
+        "-- Two results\nSELECT 1 AS a;\nSELECT 2\n  AS b;\n",
+    )
+    .unwrap();
+    kamu.assert_success_command_execution(
+        ["sql", "--script", script.to_str().unwrap(), "-o", "csv"],
+        Some("a\n1\nb\n2\n"),
+        None::<Vec<&str>>,
+    )
+    .await;
+
+    std::fs::write(
+        &script,
+        "SELECT * FROM unnest(range(5));\nSELECT * FROM missing;\nSELECT 3 AS c;\n",
+    )
+    .unwrap();
+    let assert = kamu
+        .execute([
+            "sql",
+            "--script",
+            script.to_str().unwrap(),
+            "--max-rows",
+            "2",
+            "-o",
+            "table",
+        ])
+        .await
+        .failure();
+    let stdout = std::str::from_utf8(&assert.get_output().stdout).unwrap();
+    let stderr = std::str::from_utf8(&assert.get_output().stderr).unwrap();
+    pretty_assertions::assert_eq!(
+        indoc::indoc!(
+            r#"
+            +-------------------------+
+            | UNNEST(range(Int64(5))) |
+            +-------------------------+
+            | 0                       |
+            | 1                       |
+            | .                       |
+            | .                       |
+            | .                       |
+            +-------------------------+
+            "#
+        ),
+        stdout
+    );
+    assert!(stderr.contains("missing"), "Unexpected error:\n{stderr}");
+
+    // Statement boundaries and comments follow SQL quoting
+    std::fs::write(
+        &script,
+        "#!/usr/bin/env -S kamu sql --script\nSELECT 'first;\nsecond' AS v; -- comment;\nSELECT \
+         'first\n--second\nthird' AS v\n",
+    )
+    .unwrap();
+    kamu.assert_success_command_execution(
+        ["sql", "--script", script.to_str().unwrap(), "-o", "ndjson"],
+        Some("{\"v\":\"first;\\nsecond\"}\n{\"v\":\"first\\n--second\\nthird\"}\n"),
+        None::<Vec<&str>>,
+    )
+    .await;
+
+    // Statements after a dialect change are parsed in the new dialect
+    std::fs::write(
+        &script,
+        "SET datafusion.sql_parser.dialect = 'MySQL';\nSELECT \"foo\" AS v;\nSELECT 'it\\'s' AS \
+         v;\n",
+    )
+    .unwrap();
+    kamu.assert_success_command_execution(
+        ["sql", "--script", script.to_str().unwrap(), "-o", "ndjson"],
+        Some("{\"v\":\"foo\"}\n{\"v\":\"it's\"}\n"),
+        None::<Vec<&str>>,
+    )
+    .await;
+
+    // A script that cannot be read runs nothing
+    std::fs::write(&script, b"SELECT 1 AS a;\n\xff\nSELECT 2 AS b;\n").unwrap();
+    let workspace_dir = kamu.workspace_path().to_str().unwrap().to_string();
+    for path in [script.to_str().unwrap(), &workspace_dir] {
+        kamu.assert_failure_command_execution(
+            ["sql", "--script", path, "-o", "csv"],
+            Some(""),
+            Some(["Cannot read script"]),
+        )
+        .await;
+    }
+
+    kamu.assert_failure_command_execution(
+        [
+            "sql",
+            "--script",
+            script.to_str().unwrap(),
+            "-c",
+            "SELECT 1",
+        ],
+        None,
+        Some(["cannot be used with"]),
+    )
+    .await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

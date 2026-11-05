@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::{Arc, LazyLock};
 use std::time::Duration;
 
@@ -18,6 +18,7 @@ use itertools::Itertools;
 use kamu::domain::{ExportFormat, ExportService, QueryOptions, QueryService};
 use kamu::*;
 use kamu_datafusion_cli::exec;
+use kamu_datafusion_cli::object_storage::instrumented::InstrumentedObjectStoreRegistry;
 use kamu_datafusion_cli::print_format::PrintFormat;
 use kamu_datafusion_cli::print_options::{MaxRows, PrintOptions};
 
@@ -71,6 +72,12 @@ pub struct SqlShellCommand {
 
     #[dill::component(explicit)]
     records_per_file: Option<usize>,
+
+    #[dill::component(explicit)]
+    script: Option<PathBuf>,
+
+    #[dill::component(explicit)]
+    max_rows: Option<MaxRows>,
 }
 
 impl SqlShellCommand {
@@ -149,15 +156,9 @@ impl SqlShellCommand {
     }
 
     async fn run_datafusion_cli_command(&self) -> Result<(), CLIError> {
-        let mut print_options = PrintOptions {
-            format: PrintFormat::Table,
-            quiet: false,
-            color: true,
-            maxrows: MaxRows::Limited(DEFAULT_MAX_ROWS_FOR_OUTPUT),
-            instrumented_registry: Arc::new(kamu_datafusion_cli::object_storage::instrumented::InstrumentedObjectStoreRegistry::new()),
-        };
+        let mut print_options = self.print_options(PrintFormat::Table, self.output_config.quiet);
 
-        let ctx = self.query_svc.create_session().await.unwrap();
+        let ctx = self.query_svc.create_session().await.int_err()?;
 
         eprintln!(
             "{}",
@@ -169,6 +170,55 @@ impl SqlShellCommand {
             .map_err(CLIError::failure)?;
 
         Ok(())
+    }
+
+    async fn run_datafusion_script_command(&self, script: &Path) -> Result<(), CLIError> {
+        let format = self
+            .script_print_format()
+            .expect("Rejected by validate_args");
+        // Row counts and timings would mix with the results in a redirected output
+        let print_options = self.print_options(
+            format,
+            self.output_config.quiet || !self.output_config.is_tty,
+        );
+
+        let script = std::fs::read_to_string(script).map_err(|e| {
+            CLIError::usage_error(format!("Cannot read script {}: {e}", script.display()))
+        })?;
+
+        let ctx = self.query_svc.create_session().await.int_err()?;
+
+        exec::exec_from_script(&ctx, &script, &print_options)
+            .await
+            .map_err(CLIError::failure)?;
+
+        Ok(())
+    }
+
+    fn script_print_format(&self) -> Option<PrintFormat> {
+        match self.output_config.format {
+            OutputFormat::Table => Some(PrintFormat::Table),
+            OutputFormat::Csv => Some(PrintFormat::Csv),
+            OutputFormat::Json => Some(PrintFormat::Json),
+            OutputFormat::NdJson => Some(PrintFormat::NdJson),
+            OutputFormat::JsonSoA | OutputFormat::JsonAoA | OutputFormat::Parquet => None,
+        }
+    }
+
+    fn print_options(&self, format: PrintFormat, quiet: bool) -> PrintOptions {
+        let maxrows = self.max_rows.unwrap_or(if self.output_config.is_tty {
+            MaxRows::Limited(DEFAULT_MAX_ROWS_FOR_OUTPUT)
+        } else {
+            MaxRows::Unlimited
+        });
+
+        PrintOptions {
+            format,
+            quiet,
+            color: true,
+            maxrows,
+            instrumented_registry: Arc::new(InstrumentedObjectStoreRegistry::new()),
+        }
     }
 
     async fn run_datafusion_export_command(&self) -> Result<(), CLIError> {
@@ -213,6 +263,25 @@ impl SqlShellCommand {
 #[async_trait::async_trait(?Send)]
 impl Command for SqlShellCommand {
     async fn validate_args(&self) -> Result<(), CLIError> {
+        match self.engine.unwrap_or(SqlShellEngine::Datafusion) {
+            SqlShellEngine::Datafusion => {
+                if self.script.is_some() && self.script_print_format().is_none() {
+                    return Err(CLIError::usage_error(format!(
+                        "Output format '{}' is not supported for scripts",
+                        self.output_config.format
+                    )));
+                }
+            }
+            SqlShellEngine::Spark => {
+                if self.script.is_some() || self.max_rows.is_some() {
+                    return Err(CLIError::usage_error(
+                        "Scripts and row limits are available with DataFusion (default) engine \
+                         only",
+                    ));
+                }
+            }
+        }
+
         // Bulk export related checks
         if self.output_path.is_some() {
             match self.engine {
@@ -245,6 +314,10 @@ impl Command for SqlShellCommand {
 
     async fn run(&self) -> Result<(), CLIError> {
         let engine = self.engine.unwrap_or(SqlShellEngine::Datafusion);
+
+        if let (SqlShellEngine::Datafusion, Some(script)) = (engine, &self.script) {
+            return self.run_datafusion_script_command(script).await;
+        }
 
         match (engine, &self.command, &self.url, &self.output_path) {
             (SqlShellEngine::Datafusion, None, None, None) => {
