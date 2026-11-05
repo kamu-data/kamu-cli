@@ -266,15 +266,7 @@ impl<'a> DatasetMetadata<'a> {
     async fn current_transform(&self, ctx: &Context<'_>) -> Result<Option<SetTransform>> {
         let source_maybe = self.get_current_transform(ctx).await?;
 
-        if let Some((_hash, block)) = source_maybe {
-            Ok(Some(
-                SetTransform::with_extended_aliases(ctx, block.event)
-                    .await?
-                    .into(),
-            ))
-        } else {
-            Ok(None)
-        }
+        Ok(source_maybe.map(|(_hash, block)| block.event.into()))
     }
 
     /// Current descriptive information about the dataset
@@ -454,14 +446,11 @@ impl<'a> DatasetMetadata<'a> {
                 .map(|(h, b)| Some((h, b.into()))),
         );
 
-        let futures_iter = maybe_hashed_blocks
+        let result = maybe_hashed_blocks
             .into_iter()
             .flatten() // Skip nones
-            .map(|(hash, block)| async {
-                MetadataBlockExtended::new(ctx, hash, block, account.clone()).await
-            });
-
-        let result = futures::future::try_join_all(futures_iter).await?;
+            .map(|(hash, block)| MetadataBlockExtended::new(hash, block, account.clone()))
+            .collect();
 
         Ok(result)
     }

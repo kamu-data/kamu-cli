@@ -370,7 +370,12 @@ async fn test_current_set_transform() {
                         "currentTransform": {
                             "inputs": [{
                                 "datasetRef": create_root_result.dataset_handle.id.to_string(),
-                                "alias": create_root_result.dataset_handle.alias.to_string(),
+                                "alias": "foo_input",
+                                "inputDataset": {
+                                    "dataset": {
+                                        "alias": create_root_result.dataset_handle.alias.to_string(),
+                                    }
+                                },
                             }],
                         }
                     }
@@ -409,7 +414,7 @@ async fn test_current_set_transform_block() {
                                 "__typename": "SetTransform",
                                 "inputs": [{
                                     "datasetRef": create_root_result.dataset_handle.id.to_string(),
-                                    "alias": create_root_result.dataset_handle.alias.to_string(),
+                                    "alias": "foo_input",
                                 }],
                             }
                         }]
@@ -873,9 +878,12 @@ impl DatasetMetadataHarness {
                     .kind(odf::DatasetKind::Derivative)
                     .push_event(
                         MetadataFactory::set_transform()
-                            .inputs_from_refs([odf::DatasetAlias::new(
-                                Some(DEFAULT_ACCOUNT_NAME.clone()),
-                                odf::DatasetName::new_unchecked("foo"),
+                            .inputs_from_refs_and_aliases([(
+                                odf::DatasetAlias::new(
+                                    Some(DEFAULT_ACCOUNT_NAME.clone()),
+                                    odf::DatasetName::new_unchecked("foo"),
+                                ),
+                                "foo_input",
                             )])
                             .build(),
                     )
@@ -1005,6 +1013,13 @@ impl DatasetMetadataHarness {
                                         inputs {
                                             datasetRef
                                             alias
+                                            inputDataset {
+                                                ... on TransformInputDatasetAccessible {
+                                                    dataset {
+                                                        alias
+                                                    }
+                                                }
+                                            }
                                         }
                                     }
                                 }
