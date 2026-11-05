@@ -21,7 +21,6 @@ pub fn register_dependencies(b: &mut CatalogBuilder, needs_indexing: bool) {
     b.add::<RebacServiceImpl>();
     b.add::<RebacDatasetRegistryFacadeImpl>();
     b.add_value(DefaultAccountProperties::default());
-    b.add_value(DefaultDatasetProperties::default());
 
     b.add::<ApplyAccountDatasetRelationsUseCaseImpl>();
     b.add::<DeleteDatasetRebacPropertiesUseCaseImpl>();

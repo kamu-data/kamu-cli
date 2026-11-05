@@ -212,6 +212,13 @@ impl DatasetProperties {
         }
     }
 
+    /// Anonymous read is a kind of public read, so a private dataset does not
+    /// allow it, whatever its stored or default value
+    pub fn into_effective(mut self) -> Self {
+        self.allows_anonymous_read &= self.allows_public_read;
+        self
+    }
+
     pub fn as_property_value<'a>(&self, name: DatasetPropertyName) -> PropertyValue<'a> {
         let value = match name {
             DatasetPropertyName::AllowsAnonymousRead => self.allows_anonymous_read,

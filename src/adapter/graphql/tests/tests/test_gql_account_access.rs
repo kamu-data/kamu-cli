@@ -31,9 +31,12 @@ use odf::metadata::testing::MetadataFactory;
 use pretty_assertions::assert_eq;
 
 use crate::utils::{
+    Access,
+    AccessMatrix,
     BaseGQLDatasetHarness,
     BaseGQLFlowHarness,
     BaseGQLFlowRunsHarness,
+    Caller,
     FlowRunsHarnessOverrides,
 };
 
@@ -326,76 +329,6 @@ async fn test_quotas_mut() {
 // Harness
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone, Copy)]
-enum Caller {
-    Anonymous,
-    Owner,
-    OtherAccount,
-    Admin,
-}
-
-#[derive(Debug, PartialEq, Eq)]
-enum Access {
-    Allowed,
-    Denied(String),
-}
-
-impl Access {
-    fn denied(message: &str) -> Self {
-        Self::Denied(message.to_string())
-    }
-
-    fn from_response(response: async_graphql::Response) -> Self {
-        if response.errors.is_empty() {
-            Self::Allowed
-        } else {
-            let messages = response
-                .errors
-                .into_iter()
-                .map(|e| e.message)
-                .collect::<Vec<_>>();
-            Self::Denied(messages.join("; "))
-        }
-    }
-}
-
-#[derive(Debug, PartialEq, Eq)]
-struct AccessMatrix {
-    anonymous: Access,
-    owner: Access,
-    other_account: Access,
-    admin: Access,
-}
-
-impl AccessMatrix {
-    fn everyone() -> Self {
-        Self {
-            anonymous: Access::Allowed,
-            owner: Access::Allowed,
-            other_account: Access::Allowed,
-            admin: Access::Allowed,
-        }
-    }
-
-    fn owner_only(error: &str) -> Self {
-        Self {
-            anonymous: Access::denied(error),
-            owner: Access::Allowed,
-            other_account: Access::denied(error),
-            admin: Access::denied(error),
-        }
-    }
-
-    fn owner_and_admin(error: &str) -> Self {
-        Self {
-            anonymous: Access::denied(error),
-            owner: Access::Allowed,
-            other_account: Access::denied(error),
-            admin: Access::Allowed,
-        }
-    }
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[oop::extend(BaseGQLFlowRunsHarness, base_gql_flow_runs_harness)]
@@ -602,12 +535,7 @@ impl AccountAccessHarness {
     }
 
     async fn access_matrix(request_code: &str) -> AccessMatrix {
-        AccessMatrix {
-            anonymous: Self::access_as(Caller::Anonymous, request_code).await,
-            owner: Self::access_as(Caller::Owner, request_code).await,
-            other_account: Self::access_as(Caller::OtherAccount, request_code).await,
-            admin: Self::access_as(Caller::Admin, request_code).await,
-        }
+        AccessMatrix::collect(async |caller| Self::access_as(caller, request_code).await).await
     }
 
     async fn account_data(caller: Caller, selection: &str) -> serde_json::Value {

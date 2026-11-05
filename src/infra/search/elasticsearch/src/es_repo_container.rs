@@ -118,8 +118,12 @@ impl SearchRepository for ElasticsearchContainerRepository {
     async fn ensure_entity_index(
         &self,
         schema: &SearchEntitySchema,
+        indexed_settings: Option<&str>,
     ) -> Result<(), SearchEnsureEntityIndexError> {
-        self.inner().await?.ensure_entity_index(schema).await
+        self.inner()
+            .await?
+            .ensure_entity_index(schema, indexed_settings)
+            .await
     }
 
     async fn total_documents(&self) -> Result<u64, InternalError> {

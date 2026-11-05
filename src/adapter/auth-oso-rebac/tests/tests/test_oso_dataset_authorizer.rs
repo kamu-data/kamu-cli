@@ -28,6 +28,7 @@ use kamu_accounts_services::{
     PredefinedAccountsRegistrator,
     UpdateAccountUseCaseImpl,
 };
+use kamu_auth_rebac::DatasetDefaultsConfig;
 use kamu_auth_rebac_inmem::InMemoryRebacRepository;
 use kamu_auth_rebac_services::{
     DeleteDatasetRebacPropertiesUseCaseImpl,
@@ -715,7 +716,7 @@ impl DatasetAuthorizerHarness {
                 .add::<PredefinedAccountsRegistrator>()
                 .add::<kamu_auth_rebac_services::RebacServiceImpl>()
                 .add_value(kamu_auth_rebac_services::DefaultAccountProperties::default())
-                .add_value(kamu_auth_rebac_services::DefaultDatasetProperties::default())
+                .add_value(DatasetDefaultsConfig::default().dataset_properties())
                 .add::<kamu_auth_rebac_services::RebacDatasetLifecycleMessageConsumer>()
                 .add::<SetDatasetRebacPropertiesUseCaseImpl>()
                 .add::<DeleteDatasetRebacPropertiesUseCaseImpl>()

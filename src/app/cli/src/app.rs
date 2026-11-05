@@ -194,6 +194,7 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
                 workspace_status,
                 args.password_hashing_mode,
                 is_e2e_testing,
+                cli_commands::command_runs_local_sql_session(&args),
             )?;
 
             let base_catalog = base_catalog_builder.build();
@@ -792,6 +793,7 @@ pub fn register_config_in_catalog(
     workspace_status: WorkspaceStatus,
     password_hashing_mode: Option<cli::PasswordHashingMode>,
     is_e2e_testing: bool,
+    is_local_sql_session: bool,
 ) -> Result<(), CLIError> {
     // Extra
     catalog_builder.add_value(config.extra.graphql.clone());
@@ -819,6 +821,13 @@ pub fn register_config_in_catalog(
             flink_image: images_config.flink,
             datafusion_image: images_config.datafusion,
             risingwave_image: images_config.risingwave,
+        });
+
+        let sql_policy = &engine_config.datafusion_embedded.sql_policy;
+        catalog_builder.add_value(if is_local_sql_session {
+            sql_policy.local_policy()
+        } else {
+            sql_policy.api_policy()
         });
 
         let (ingest_config, batch_query_config, compaction_config) =
@@ -961,6 +970,10 @@ pub fn register_config_in_catalog(
 
     // Authentication configuration
     catalog_builder.add_value(config.auth.clone());
+    //
+
+    // Access of datasets whose owner has not set it
+    catalog_builder.add_value(config.dataset_defaults.dataset_properties());
     //
 
     // Background agents configuration

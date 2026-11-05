@@ -16,6 +16,7 @@ pub use kamu_cli_e2e_common_macros::{
 
 pub use crate::e2e_harness::{
     KAMU_CONFIG_WITH_FAST_FLOW_SYSTEM,
+    KAMU_CONFIG_WITH_LOCAL_SQL_WRITES,
     KamuCliApiServerHarness,
     KamuCliApiServerHarnessOptions as Options,
     MULTITENANT_KAMU_CONFIG_WITH_DEFAULT_USER,

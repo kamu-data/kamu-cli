@@ -186,6 +186,7 @@ impl SearchRepository for TestSearchRepository {
     async fn ensure_entity_index(
         &self,
         schema: &SearchEntitySchema,
+        _indexed_settings: Option<&str>,
     ) -> Result<(), SearchEnsureEntityIndexError> {
         self.events
             .lock()

@@ -11,8 +11,9 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
 use datafusion::catalog::SchemaProvider;
+use datafusion::common::{exec_err, plan_err};
 use datafusion::config::TableOptions;
-use datafusion::datasource::TableProvider;
+use datafusion::datasource::{TableProvider, ViewTable};
 use datafusion::error::DataFusionError;
 use datafusion::prelude::{SessionConfig, SessionContext};
 use internal_error::InternalError;
@@ -33,6 +34,9 @@ pub(crate) struct KamuSchema {
     dataset_registry: Arc<dyn DatasetRegistry>,
     options: QueryOptions,
     tables: Mutex<HashMap<String, Arc<KamuTable>>>,
+    /// Views and tables created in this session, as its [`SqlPolicy`] allows.
+    /// They never share a name with a dataset
+    session_tables: Mutex<HashMap<String, Arc<dyn TableProvider>>>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -49,6 +53,7 @@ impl KamuSchema {
             dataset_registry,
             options,
             tables: Mutex::new(HashMap::new()),
+            session_tables: Mutex::new(HashMap::new()),
         };
 
         schema.init_schema_cache().await?;
@@ -108,13 +113,50 @@ impl KamuSchema {
 #[async_trait::async_trait]
 impl SchemaProvider for KamuSchema {
     fn table_names(&self) -> Vec<String> {
-        let guard = self.tables.lock().unwrap();
-        guard.keys().cloned().collect()
+        let mut names: Vec<String> = self.tables.lock().unwrap().keys().cloned().collect();
+        names.extend(self.session_tables.lock().unwrap().keys().cloned());
+        names
     }
 
     fn table_exist(&self, name: &str) -> bool {
-        let guard = self.tables.lock().unwrap();
-        guard.contains_key(name)
+        self.tables.lock().unwrap().contains_key(name)
+            || self.session_tables.lock().unwrap().contains_key(name)
+    }
+
+    fn register_table(
+        &self,
+        name: String,
+        table: Arc<dyn TableProvider>,
+    ) -> Result<Option<Arc<dyn TableProvider>>, DataFusionError> {
+        let policy = SqlPolicy::of(&self.session_config);
+        if table.is::<ViewTable>() {
+            if !policy.allow_session_views {
+                return plan_err!("Views are not allowed in this session");
+            }
+        } else if !policy.allow_writes {
+            return plan_err!("Tables cannot be created in this session");
+        }
+
+        if self.tables.lock().unwrap().contains_key(&name) {
+            return exec_err!("Table '{name}' already exists");
+        }
+
+        let mut session_tables = self.session_tables.lock().unwrap();
+        if session_tables.contains_key(&name) {
+            return exec_err!("Table '{name}' already exists");
+        }
+        session_tables.insert(name, table);
+        Ok(None)
+    }
+
+    fn deregister_table(
+        &self,
+        name: &str,
+    ) -> Result<Option<Arc<dyn TableProvider>>, DataFusionError> {
+        if self.tables.lock().unwrap().contains_key(name) {
+            return plan_err!("Dataset '{name}' cannot be replaced or dropped");
+        }
+        Ok(self.session_tables.lock().unwrap().remove(name))
     }
 
     async fn table(&self, name: &str) -> Result<Option<Arc<dyn TableProvider>>, DataFusionError> {
@@ -133,7 +175,7 @@ impl SchemaProvider for KamuSchema {
 
             Ok(Some(table))
         } else {
-            Ok(None)
+            Ok(self.session_tables.lock().unwrap().get(name).cloned())
         }
     }
 }

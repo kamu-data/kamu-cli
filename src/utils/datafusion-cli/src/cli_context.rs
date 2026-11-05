@@ -49,6 +49,12 @@ pub trait CliSessionContext {
 
     /// Execute a logical plan and return a DataFrame.
     async fn execute_logical_plan(&self, plan: LogicalPlan) -> Result<DataFrame, DataFusionError>;
+
+    /// Checks a planned statement before the shell acts on it in any way,
+    /// such as registering object stores for the locations it names
+    fn check_plan(&self, plan: LogicalPlan) -> Result<LogicalPlan, DataFusionError> {
+        Ok(plan)
+    }
 }
 
 #[async_trait::async_trait]

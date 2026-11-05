@@ -18,7 +18,7 @@ use tokio::sync::RwLock;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub type DefaultAccountProperties = AccountProperties;
-pub type DefaultDatasetProperties = DatasetProperties;
+pub use kamu_auth_rebac::DefaultDatasetProperties;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -401,7 +401,7 @@ impl RebacService for RebacServiceImpl {
                 acc
             });
 
-        Ok(dataset_properties)
+        Ok(dataset_properties.into_effective())
     }
 
     async fn get_dataset_properties_by_ids(
@@ -445,7 +445,10 @@ impl RebacService for RebacServiceImpl {
             dataset_properties.apply(name, &value);
         }
 
-        Ok(dataset_properties_map)
+        Ok(dataset_properties_map
+            .into_iter()
+            .map(|(dataset_id, properties)| (dataset_id, properties.into_effective()))
+            .collect())
     }
 
     async fn set_account_dataset_relation(

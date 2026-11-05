@@ -48,6 +48,9 @@ pub struct QueryServiceImpl {
     session_context_builder: Arc<SessionContextBuilder>,
     dataset_registry: Arc<dyn DatasetRegistry>,
     dataset_action_authorizer: Arc<dyn DatasetActionAuthorizer>,
+    /// Policy of the sessions this service creates. Without one they are
+    /// read-only
+    sql_policy: Option<SqlPolicy>,
 }
 
 impl CheapClone for QueryServiceImpl {}
@@ -159,7 +162,7 @@ impl QueryServiceImpl {
             // See: https://github.com/apache/datafusion/blob/main/datafusion-examples/examples/remote_catalog.rs#L78
             let statements = datafusion::sql::parser::DFParser::parse_sql(sql)?;
 
-            // TODO: SEC: Restrict the subset of supported statements
+            // Non-query statements are checked later against the session's `SqlPolicy`
             for stmt in statements {
                 if let DfStatement::Statement(stmt) = stmt
                     && let SqlStatement::Query(query) = stmt.as_ref()
@@ -335,21 +338,24 @@ impl QueryServiceImpl {
 
         let ctx = self
             .session_context_builder
-            .session_context(QueryOptions {
-                input_datasets: Some(BTreeMap::from([(
-                    resolved_dataset.get_id().clone(),
-                    QueryOptionsDataset {
-                        alias: resolved_dataset.get_alias().to_string(),
-                        block_hash: Some(head.clone()),
-                        hints: DatasetQueryHints {
-                            handle: Some(resolved_dataset.get_handle().clone()),
-                            source_dataset: Some(resolved_dataset.clone()),
-                            last_records_to_consider,
-                            does_not_need_schema: false,
+            .session_context(
+                QueryOptions {
+                    input_datasets: Some(BTreeMap::from([(
+                        resolved_dataset.get_id().clone(),
+                        QueryOptionsDataset {
+                            alias: resolved_dataset.get_alias().to_string(),
+                            block_hash: Some(head.clone()),
+                            hints: DatasetQueryHints {
+                                handle: Some(resolved_dataset.get_handle().clone()),
+                                source_dataset: Some(resolved_dataset.clone()),
+                                last_records_to_consider,
+                                does_not_need_schema: false,
+                            },
                         },
-                    },
-                )])),
-            })
+                    )])),
+                },
+                SqlPolicy::READ_ONLY,
+            )
             .await?;
 
         let df = ctx
@@ -373,7 +379,7 @@ impl QueryServiceImpl {
 
         let ctx = self
             .session_context_builder
-            .session_context(options)
+            .session_context(options, self.sql_policy.unwrap_or(SqlPolicy::READ_ONLY))
             .await?;
 
         let self_clone = (*self).cheap_clone();
@@ -669,7 +675,7 @@ impl QueryService for QueryServiceImpl {
         tracing::info!(?state, ?new_options, "Resolved SQL query state");
 
         let ctx = self.session_context(new_options).await?;
-        let df = ctx.sql(statement).await?;
+        let df = SqlPolicy::sql(&ctx, statement).await?;
 
         Ok(QueryResponse {
             df: df.into(),

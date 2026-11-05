@@ -92,6 +92,7 @@ fn test_di_cli_graph_validates(
         WorkspaceStatus::Created(tenancy_config),
         None,
         false,
+        false,
     )
     .unwrap();
     base_catalog_builder.add_value(Interact::new(false, false));
@@ -137,6 +138,7 @@ fn test_di_server_graph_validates(
         &mut base_catalog_builder,
         WorkspaceStatus::Created(tenancy_config),
         None,
+        false,
         false,
     )
     .unwrap();
@@ -199,6 +201,7 @@ async fn update_di_graph() {
         &mut base_catalog_builder,
         WorkspaceStatus::Created(tenancy_config),
         None,
+        false,
         false,
     )
     .unwrap();

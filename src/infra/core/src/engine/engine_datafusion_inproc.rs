@@ -11,6 +11,7 @@ use std::sync::Arc;
 
 use datafusion::prelude::*;
 use internal_error::*;
+use kamu_core::SqlPolicy;
 use kamu_core::engine::*;
 use kamu_datasets::ResolvedDatasetsMap;
 
@@ -43,7 +44,12 @@ impl EngineDatafusionInproc {
             "Creating view for a query",
         );
 
-        let logical_plan = match ctx.state().create_logical_plan(query).await {
+        let logical_plan = match ctx
+            .state()
+            .create_logical_plan(query)
+            .await
+            .and_then(|plan| SqlPolicy::READ_ONLY.check_plan(plan))
+        {
             Ok(plan) => plan,
             Err(error) => {
                 tracing::error!(

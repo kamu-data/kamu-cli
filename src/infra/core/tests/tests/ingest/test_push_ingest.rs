@@ -14,6 +14,7 @@ use chrono::{TimeZone, Utc};
 use datafusion::prelude::*;
 use file_utils::MediaType;
 use indoc::indoc;
+use kamu::domain::engine::EngineError;
 use kamu::domain::*;
 use kamu::testing::*;
 use kamu::*;
@@ -945,6 +946,64 @@ async fn test_ingest_sql_case_sensitivity() {
             ),
         )
         .await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_group::group(engine, ingest, datafusion)]
+#[test_log::test(tokio::test)]
+async fn test_ingest_preprocess_rejects_copy_to_file() {
+    let harness = IngestTestHarness::new();
+
+    let target_path = harness.temp_dir.path().join("pwn.csv");
+
+    let dataset_snapshot = MetadataFactory::dataset_snapshot()
+        .name("foo.bar")
+        .kind(odf::DatasetKind::Root)
+        .push_event(
+            MetadataFactory::add_push_source()
+                .read(odf::metadata::ReadStepNdJson::default())
+                .merge(odf::metadata::MergeStrategyAppend {})
+                .preprocess(odf::metadata::TransformSql {
+                    engine: "datafusion".into(),
+                    version: None,
+                    query: Some(format!(
+                        "COPY (SELECT * FROM input) TO '{}' STORED AS CSV",
+                        target_path.display()
+                    )),
+                    queries: None,
+                    temporal_tables: None,
+                })
+                .build(),
+        )
+        .build();
+
+    let dataset_alias = dataset_snapshot.name.clone();
+    let stored = harness.create_dataset(dataset_snapshot).await;
+    let target = ResolvedDataset::from_stored(&stored, &dataset_alias);
+
+    let src_path = harness.temp_dir.path().join("data.ndjson");
+    std::fs::write(&src_path, r#"{"a": "x"}"#).unwrap();
+
+    let res = harness
+        .ingest_from(
+            target,
+            None,
+            DataSource::Url(url::Url::from_file_path(&src_path).unwrap()),
+            PushIngestOpts::default(),
+        )
+        .await;
+
+    assert!(
+        !target_path.exists(),
+        "COPY wrote {}",
+        target_path.display()
+    );
+    assert_matches!(
+        res,
+        Err(PushIngestError::EngineError(EngineError::InvalidQuery(e)))
+            if e.message.contains("DML not supported: COPY")
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -21,6 +21,23 @@ kamu_cli_execute_command_e2e_test!(
 
 kamu_cli_execute_command_e2e_test!(
     storage = sqlite,
+    fixture = kamu_cli_e2e_repo_tests::commands::test_datafusion_cli_session_views,
+    extra_test_groups = "engine, datafusion"
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+kamu_cli_execute_command_e2e_test!(
+    storage = sqlite,
+    fixture = kamu_cli_e2e_repo_tests::commands::test_datafusion_cli_with_writes,
+    options = Options::default().with_kamu_config(KAMU_CONFIG_WITH_LOCAL_SQL_WRITES),
+    extra_test_groups = "engine, datafusion"
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+kamu_cli_execute_command_e2e_test!(
+    storage = sqlite,
     fixture = kamu_cli_e2e_repo_tests::commands::test_datafusion_cli_not_launched_in_root_ws,
     options = Options::default().with_no_workspace(),
     extra_test_groups = "engine, datafusion"

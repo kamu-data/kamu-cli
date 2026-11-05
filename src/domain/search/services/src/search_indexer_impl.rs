@@ -109,7 +109,12 @@ impl SearchIndexerImpl {
     ) -> Result<(), InternalError> {
         for target in targets {
             let schema = target.schema;
-            match self.search_repo.ensure_entity_index(schema).await {
+            let indexed_settings = target.provider.indexed_settings(schema);
+            match self
+                .search_repo
+                .ensure_entity_index(schema, indexed_settings.as_deref())
+                .await
+            {
                 Ok(outcome) => {
                     tracing::info!(
                         entity_kind = %schema.schema_name,
@@ -224,8 +229,9 @@ impl SearchIndexer for SearchIndexerImpl {
             self.search_repo
                 .drop_schema(target.schema.schema_name)
                 .await?;
+            let indexed_settings = target.provider.indexed_settings(target.schema);
             self.search_repo
-                .ensure_entity_index(target.schema)
+                .ensure_entity_index(target.schema, indexed_settings.as_deref())
                 .await
                 .map_err(ErrorIntoInternal::int_err)?;
 

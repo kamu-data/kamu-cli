@@ -354,6 +354,18 @@
       ],
       "type": "object"
     },
+    "DatasetDefaultsConfig": {
+      "additionalProperties": false,
+      "description": "Access properties of every dataset whose owner has not set them.\n\nOnly properties that differ from these are stored, so changing a default\napplies to all datasets that do not override it, existing ones included.",
+      "properties": {
+        "allowsAnonymousRead": {
+          "default": true,
+          "description": "Whether anonymous callers can read a public dataset",
+          "type": "boolean"
+        }
+      },
+      "type": "object"
+    },
     "DidSecretEncryptionConfig": {
       "additionalProperties": false,
       "properties": {
@@ -473,6 +485,10 @@
             "ingest": {
               "datafusion.execution.target_partitions": "1"
             },
+            "sqlPolicy": {
+              "api": {},
+              "local": {}
+            },
             "useLegacyArrowBufferEncoding": false
           },
           "description": "Embedded Datafusion engine configuration"
@@ -566,6 +582,14 @@
           },
           "description": "Ingest-specific overrides to the base config",
           "type": "object"
+        },
+        "sqlPolicy": {
+          "$ref": "#/$defs/SqlPolicyConfig",
+          "default": {
+            "api": {},
+            "local": {}
+          },
+          "description": "Statements that SQL sessions accept besides queries"
         },
         "useLegacyArrowBufferEncoding": {
           "default": false,
@@ -1144,6 +1168,51 @@
       },
       "type": "object"
     },
+    "SqlPolicyConfig": {
+      "additionalProperties": false,
+      "description": "Statements that SQL sessions accept besides queries, per kind of caller",
+      "properties": {
+        "api": {
+          "$ref": "#/$defs/SqlPolicyRulesConfig",
+          "default": {},
+          "description": "Sessions of API callers: HTTP, GraphQL and `FlightSQL`. Unset rules\ndeny everything but queries"
+        },
+        "local": {
+          "$ref": "#/$defs/SqlPolicyRulesConfig",
+          "default": {},
+          "description": "Sessions of the local user's `kamu sql` shell, including `--command`\nand exports. Unset rules allow session views and session statements,\nand deny writes"
+        }
+      },
+      "type": "object"
+    },
+    "SqlPolicyRulesConfig": {
+      "additionalProperties": false,
+      "description": "Rules default per scope, so a config can set only some of them",
+      "properties": {
+        "allowSessionStatements": {
+          "description": "Allows session statements such as `SET`, `PREPARE` and transactions",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "allowSessionViews": {
+          "description": "Allows `CREATE [TEMP] VIEW` and `DROP VIEW`. Views live only as long\nas the session and cannot replace a dataset",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "allowWrites": {
+          "description": "Allows statements that write or register data sources, such as\n`COPY ... TO`, `INSERT` and `CREATE EXTERNAL TABLE`",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        }
+      },
+      "type": "object"
+    },
     "UploadsConfig": {
       "additionalProperties": false,
       "properties": {
@@ -1226,6 +1295,13 @@
       ],
       "description": "Database connection configuration"
     },
+    "datasetDefaults": {
+      "$ref": "#/$defs/DatasetDefaultsConfig",
+      "default": {
+        "allowsAnonymousRead": true
+      },
+      "description": "Access of datasets whose owner has not set it"
+    },
     "didEncryption": {
       "$ref": "#/$defs/DidSecretEncryptionConfig",
       "default": {
@@ -1249,6 +1325,10 @@
           },
           "ingest": {
             "datafusion.execution.target_partitions": "1"
+          },
+          "sqlPolicy": {
+            "api": {},
+            "local": {}
           },
           "useLegacyArrowBufferEncoding": false
         },

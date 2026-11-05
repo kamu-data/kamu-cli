@@ -265,3 +265,35 @@ async fn test_statement_bearer() {
     )
     .await;
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_statement_writes_rejected() {
+    let server = run_server().await;
+
+    let mut client = get_client(&server.addr).await;
+    client.handshake("anonymous", "").await.unwrap();
+
+    for (sql, error) in [
+        (
+            "copy (select 1) to '/tmp/x.csv' stored as csv",
+            "DML not supported: COPY",
+        ),
+        ("create view v as select 1", "DDL not supported: CreateView"),
+        (
+            "set datafusion.execution.batch_size = 100",
+            "Statement not supported: SetVariable",
+        ),
+    ] {
+        let result = client.execute(sql.to_string(), None).await;
+        assert!(
+            result
+                .as_ref()
+                .is_err_and(|e| e.to_string().contains(error)),
+            "{sql}: {result:?}"
+        );
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

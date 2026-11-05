@@ -14,16 +14,17 @@ actor UserActor {
 }
 
 resource DatasetResource {
-    # ┌────────────────────┬───────────────────────────────────────────────┐
-    # │       Field        │                     Type                      │
-    # ├────────────────────┼───────────────────────────────────────────────┤
-    # │ owner_account_id   │ String                                        │
-    # │ allows_public_read │ bool                                          │
-    # │ authorized_users   │ Dictionary<                                   │
-    # │                    │   authorized_account_id: String,              │
-    # │                    │   role: ["Reader", "Editor", "Maintainer"]    │
-    # │                    │ >                                             │
-    # └────────────────────┴───────────────────────────────────────────────┘
+    # ┌───────────────────────┬───────────────────────────────────────────────┐
+    # │         Field         │                      Type                     │
+    # ├───────────────────────┼───────────────────────────────────────────────┤
+    # │ owner_account_id      │ String                                        │
+    # │ allows_public_read    │ bool                                          │
+    # │ allows_anonymous_read │ bool                                          │
+    # │ authorized_users      │ Dictionary<                                   │
+    # │                       │   authorized_account_id: String,              │
+    # │                       │   role: ["Reader", "Editor", "Maintainer"]    │
+    # │                       │ >                                             │
+    # └───────────────────────┴───────────────────────────────────────────────┘
 
     permissions = ["read", "write", "maintain", "own"];
 }
@@ -38,7 +39,7 @@ allow(user: UserActor, action: String, dataset: DatasetResource) if
 ########################################################################################################################
 
 has_permission(user: UserActor, "read", dataset: DatasetResource) if
-    dataset.allows_public_read or
+    dataset_readable_by_public(user, dataset) or
     user.is_admin or
     user_owns_dataset(user, dataset) or
     user_authorized_for_dataset(user, dataset, ["Reader", "Editor", "Maintainer"]);
@@ -60,6 +61,10 @@ has_permission(user: UserActor, "own", dataset: DatasetResource) if
 ########################################################################################################################
 # Helpers
 ########################################################################################################################
+
+dataset_readable_by_public(user: UserActor, dataset: DatasetResource) if
+    dataset.allows_public_read and
+    (not user.anonymous or dataset.allows_anonymous_read);
 
 user_owns_dataset(user: UserActor, dataset: DatasetResource) if
     dataset.owner_account_id == user.account_id;

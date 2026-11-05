@@ -22,7 +22,7 @@ use kamu_accounts::{
 use kamu_auth_rebac::{DatasetProperties, RebacService, SetDatasetRebacPropertiesUseCase};
 use kamu_datasets::{DatasetEntryService, JOB_KAMU_DATASETS_DATASET_ENTRY_INDEXER};
 
-use crate::JOB_KAMU_REBAC_INDEXER;
+use crate::{DefaultDatasetProperties, JOB_KAMU_REBAC_INDEXER};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -46,6 +46,7 @@ pub struct RebacIndexer {
     dataset_entry_service: Arc<dyn DatasetEntryService>,
     expensive_account_repo: Arc<dyn ExpensiveAccountRepository>,
     predefined_accounts_config: Arc<PredefinedAccountsConfig>,
+    default_dataset_properties: Arc<DefaultDatasetProperties>,
 }
 
 impl RebacIndexer {
@@ -81,7 +82,7 @@ impl RebacIndexer {
 
             let dataset_properties = DatasetProperties {
                 allows_public_read: is_public_dataset,
-                allows_anonymous_read: is_public_dataset,
+                allows_anonymous_read: self.default_dataset_properties.allows_anonymous_read,
             };
 
             self.set_dataset_properties_uc

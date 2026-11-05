@@ -35,6 +35,21 @@ pub const MULTITENANT_KAMU_CONFIG_WITH_DEFAULT_USER: &str = indoc::indoc!(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+pub const KAMU_CONFIG_WITH_LOCAL_SQL_WRITES: &str = indoc::indoc!(
+    r#"
+    kind: CLIConfig
+    version: 1
+    content:
+      engine:
+        datafusionEmbedded:
+          sqlPolicy:
+            local:
+              allowWrites: true
+    "#
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 pub const MULTITENANT_KAMU_CONFIG_WITH_RESTRICTED_ANONYMOUS: &str = indoc::indoc!(
     r#"
     kind: CLIConfig

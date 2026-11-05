@@ -51,6 +51,7 @@ impl<'a> ElasticsearchVersionedEntityIndex<'a> {
         &self,
         mappings: ElasticsearchIndexMappings,
         schema: &SearchEntitySchema,
+        indexed_settings: Option<&str>,
     ) -> Result<EntityIndexEnsureOutcome, InternalError> {
         let alias_name = self.alias_name();
         let index_name = self.index_name();
@@ -58,6 +59,7 @@ impl<'a> ElasticsearchVersionedEntityIndex<'a> {
         let version_metadata = IndexVersionMetadata {
             schema_version: self.version,
             mapping_hash: Cow::Borrowed(&mappings.mappings_hash),
+            indexed_settings: indexed_settings.map(Cow::Borrowed),
         };
 
         // Try to resolve existing index by alias
@@ -95,9 +97,43 @@ impl<'a> ElasticsearchVersionedEntityIndex<'a> {
                             alias_name,
                             "Existing index mapping hash matches expected hash"
                         );
-                        Ok(EntityIndexEnsureOutcome::UpToDate {
+
+                        if existing_version_metadata.indexed_settings
+                            == version_metadata.indexed_settings
+                        {
+                            return Ok(EntityIndexEnsureOutcome::UpToDate {
+                                alias: alias_name,
+                                index: existing_index_name,
+                            });
+                        }
+
+                        // The documents were computed under other settings, so
+                        // they are dropped, to be indexed again from source
+                        tracing::warn!(
+                            index_name = existing_index_name,
+                            alias_name,
+                            existing_settings = ?existing_version_metadata.indexed_settings,
+                            new_settings = ?version_metadata.indexed_settings,
+                            "Recreating index: indexed settings changed",
+                        );
+                        self.client
+                            .delete_indices_bulk(&[existing_index_name.as_str()])
+                            .await
+                            .int_err()?;
+                        self.create_new_index(&index_name, &mappings, version_metadata)
+                            .await?;
+                        self.client
+                            .assign_alias(
+                                &alias_name,
+                                &index_name,
+                                self.build_alias_filter_json(schema),
+                            )
+                            .await
+                            .int_err()?;
+
+                        Ok(EntityIndexEnsureOutcome::RecreatedForSettings {
                             alias: alias_name,
-                            index: existing_index_name,
+                            index: index_name,
                         })
                     } else {
                         tracing::error!(
@@ -147,11 +183,16 @@ impl<'a> ElasticsearchVersionedEntityIndex<'a> {
                         "Upgrading index to new version",
                     );
 
+                    // Documents computed under other settings are not carried over
+                    let settings_changed = existing_version_metadata.indexed_settings
+                        != version_metadata.indexed_settings;
+
                     // Create new index version
                     self.create_new_index(&index_name, &mappings, version_metadata)
                         .await?;
 
                     match schema.upgrade_mode {
+                        SearchEntitySchemaUpgradeMode::Reindex if settings_changed => {}
                         SearchEntitySchemaUpgradeMode::Reindex => {
                             // Try reindexing data from old index to new index
                             // Keep old data for retention, new index will have updated schema and
@@ -328,6 +369,9 @@ impl<'a> ElasticsearchVersionedEntityIndex<'a> {
 pub struct IndexVersionMetadata<'a> {
     pub schema_version: u32,
     pub mapping_hash: Cow<'a, str>,
+    /// See [`kamu_search::SearchEntitySchemaProvider::indexed_settings`]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub indexed_settings: Option<Cow<'a, str>>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -343,6 +387,10 @@ pub enum EntityIndexEnsureOutcome {
         index: String,
     },
     UpToDate {
+        alias: String,
+        index: String,
+    },
+    RecreatedForSettings {
         alias: String,
         index: String,
     },
@@ -467,6 +515,7 @@ mod tests {
         let metadata = IndexVersionMetadata {
             schema_version: 5,
             mapping_hash: Cow::Borrowed("sha256:abc"),
+            indexed_settings: Some(Cow::Borrowed("allows_anonymous_read=true")),
         };
         let json = serde_json::to_value(&metadata).expect("serialize");
         let decoded =
@@ -474,6 +523,22 @@ mod tests {
 
         assert_eq!(decoded.schema_version, 5);
         assert_eq!(decoded.mapping_hash, "sha256:abc");
+        assert_eq!(
+            decoded.indexed_settings.as_deref(),
+            Some("allows_anonymous_read=true")
+        );
+    }
+
+    #[test]
+    fn test_index_version_metadata_without_settings() {
+        // Indexes created before indexed settings existed have no such key
+        let decoded = serde_json::from_value::<IndexVersionMetadata<'static>>(serde_json::json!({
+            "schema_version": 5,
+            "mapping_hash": "sha256:abc",
+        }))
+        .expect("deserialize");
+
+        assert_eq!(decoded.indexed_settings, None);
     }
 }
 

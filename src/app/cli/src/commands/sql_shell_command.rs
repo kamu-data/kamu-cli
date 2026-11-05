@@ -24,7 +24,7 @@ use kamu_datafusion_cli::print_options::{MaxRows, PrintOptions};
 use super::common::PullImageProgress;
 use super::{CLIError, Command};
 use crate::WorkspaceLayout;
-use crate::explore::SqlShellImpl;
+use crate::explore::{SqlShellImpl, SqlShellSessionContext};
 use crate::output::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -157,7 +157,7 @@ impl SqlShellCommand {
             instrumented_registry: Arc::new(kamu_datafusion_cli::object_storage::instrumented::InstrumentedObjectStoreRegistry::new()),
         };
 
-        let ctx = self.query_svc.create_session().await.unwrap();
+        let ctx = SqlShellSessionContext::new(self.query_svc.create_session().await.unwrap());
 
         eprintln!(
             "{}",

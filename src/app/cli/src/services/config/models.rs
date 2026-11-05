@@ -83,6 +83,10 @@ pub struct CLIConfig {
     #[config(default)]
     pub quota_defaults: QuotaDefaults,
 
+    /// Access of datasets whose owner has not set it
+    #[config(default)]
+    pub dataset_defaults: kamu_auth_rebac::DatasetDefaultsConfig,
+
     /// Experimental and temporary configuration options
     #[config(default)]
     pub extra: ExtraConfig,
@@ -193,6 +197,10 @@ pub struct EngineConfigDatafusion {
     /// See: [kamu-node#277](https://github.com/kamu-data/kamu-node/issues/277)
     #[config(default = false)]
     pub use_legacy_arrow_buffer_encoding: bool,
+
+    /// Statements that SQL sessions accept besides queries
+    #[config(default)]
+    pub sql_policy: kamu::domain::SqlPolicyConfig,
 }
 
 fn to_map(v: &[(&str, &str)]) -> BTreeMap<String, String> {

@@ -15,6 +15,7 @@ mod test_error_handling;
 mod test_gql_account_access;
 mod test_gql_account_quotas;
 mod test_gql_data;
+mod test_gql_data_access;
 mod test_gql_dataset_adapter_collection;
 mod test_gql_dataset_adapter_versioned_file;
 mod test_gql_dataset_env_vars;

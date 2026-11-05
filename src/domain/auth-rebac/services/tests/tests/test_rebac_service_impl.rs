@@ -18,6 +18,7 @@ use kamu_auth_rebac::{
     AccountToDatasetRelation,
     AuthorizedAccount,
     AuthorizedDataset,
+    DatasetDefaultsConfig,
     DatasetProperties,
     DatasetPropertyName,
     EntityWithRelation,
@@ -291,6 +292,46 @@ async fn test_properties_queries_and_count() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
+async fn test_dataset_properties_follow_configured_defaults() {
+    for allows_anonymous_read in [true, false] {
+        let harness = Harness::with_dataset_defaults(&DatasetDefaultsConfig {
+            allows_anonymous_read,
+        });
+        let public_dataset_id = odf::DatasetID::new_generated_ed25519().1;
+        let private_dataset_id = odf::DatasetID::new_generated_ed25519().1;
+        harness.make_public(&public_dataset_id).await;
+
+        // A private dataset never allows anonymous read, whatever the default
+        let expected = HashMap::from([
+            (
+                public_dataset_id.clone(),
+                DatasetProperties {
+                    allows_public_read: true,
+                    allows_anonymous_read,
+                },
+            ),
+            (
+                private_dataset_id.clone(),
+                DatasetProperties {
+                    allows_public_read: false,
+                    allows_anonymous_read: false,
+                },
+            ),
+        ]);
+
+        assert_eq!(
+            harness
+                .dataset_properties(&[public_dataset_id, private_dataset_id])
+                .await,
+            expected,
+            "allows_anonymous_read default: {allows_anonymous_read}"
+        );
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
 async fn test_relation_mutations_changed_vs_unchanged() {
     let harness = Harness::new();
     let account_id_1 = odf::AccountID::new_generated_ed25519().1;
@@ -539,12 +580,22 @@ struct RebacServiceImplHarness {
 
 impl RebacServiceImplHarness {
     fn new() -> Self {
+        Self::with_default_dataset_properties(DefaultDatasetProperties::default())
+    }
+
+    fn with_dataset_defaults(dataset_defaults: &DatasetDefaultsConfig) -> Self {
+        Self::with_default_dataset_properties(dataset_defaults.dataset_properties())
+    }
+
+    fn with_default_dataset_properties(
+        default_dataset_properties: DefaultDatasetProperties,
+    ) -> Self {
         let catalog = {
             let mut b = CatalogBuilder::new();
 
             b.add::<RebacServiceImpl>();
             b.add_value(DefaultAccountProperties::default());
-            b.add_value(DefaultDatasetProperties::default());
+            b.add_value(default_dataset_properties);
             b.add::<InMemoryRebacRepository>();
 
             b.build()
@@ -553,6 +604,42 @@ impl RebacServiceImplHarness {
         Self {
             rebac_service: catalog.get_one().unwrap(),
         }
+    }
+
+    async fn make_public(&self, dataset_id: &odf::DatasetID) {
+        self.rebac_service
+            .set_dataset_property(
+                dataset_id,
+                DatasetPropertyName::AllowsPublicRead,
+                &boolean_property_value(true),
+            )
+            .await
+            .unwrap();
+    }
+
+    /// Properties of each dataset, read one by one and in a batch, which must
+    /// agree
+    async fn dataset_properties(
+        &self,
+        dataset_ids: &[odf::DatasetID],
+    ) -> HashMap<odf::DatasetID, DatasetProperties> {
+        let batch = self
+            .rebac_service
+            .get_dataset_properties_by_ids(dataset_ids)
+            .await
+            .unwrap();
+
+        for dataset_id in dataset_ids {
+            assert_eq!(
+                self.rebac_service
+                    .get_dataset_properties(dataset_id)
+                    .await
+                    .unwrap(),
+                batch[dataset_id],
+            );
+        }
+
+        batch
     }
 
     fn sort_authorized_datasets_map(

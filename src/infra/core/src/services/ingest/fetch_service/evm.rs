@@ -155,7 +155,8 @@ impl FetchService {
         };
 
         // Extract the filter out of the plan
-        let df = ctx.sql(&sql).await.int_err()?;
+        // The session carries no policy, so the filter is checked as read-only
+        let df = SqlPolicy::sql(&ctx, &sql).await.int_err()?;
         let plan = df.create_physical_plan().await.int_err()?;
 
         let plan_str = datafusion::physical_plan::get_plan_string(&plan).join("\n");

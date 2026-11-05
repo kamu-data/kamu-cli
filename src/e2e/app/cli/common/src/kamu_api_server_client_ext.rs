@@ -872,11 +872,16 @@ impl DatasetApi<'_> {
     pub async fn set_visibility(
         &self,
         dataset_id: &odf::DatasetID,
-        dataset_visibility: odf::DatasetVisibility,
+        dataset_visibility: DatasetVisibilityInput,
     ) -> Result<(), SetDatasetVisibilityError> {
         let visibility = match dataset_visibility {
-            odf::DatasetVisibility::Private => "private: {}",
-            odf::DatasetVisibility::Public => "public: { anonymousAvailable: false }",
+            DatasetVisibilityInput::Private => "private: {}",
+            DatasetVisibilityInput::Public {
+                anonymous_available: true,
+            } => "public: { anonymousAvailable: true }",
+            DatasetVisibilityInput::Public {
+                anonymous_available: false,
+            } => "public: { anonymousAvailable: false }",
         };
         let response = self
             .client
@@ -1533,6 +1538,13 @@ impl PartialEq for GetDatasetVisibilityError {
 }
 
 impl Eq for GetDatasetVisibilityError {}
+
+/// Mirrors the GraphQL `DatasetVisibilityInput`
+#[derive(Debug, Clone, Copy)]
+pub enum DatasetVisibilityInput {
+    Private,
+    Public { anonymous_available: bool },
+}
 
 #[derive(Error, Debug)]
 pub enum SetDatasetVisibilityError {

@@ -414,7 +414,7 @@ async fn create_plan(
     statement: Statement,
     resolve_region: bool,
 ) -> Result<LogicalPlan, DataFusionError> {
-    let mut plan = ctx.session_state().statement_to_plan(statement).await?;
+    let mut plan = ctx.check_plan(ctx.session_state().statement_to_plan(statement).await?)?;
 
     // Note that cmd is a mutable reference so that create_external_table function
     // can remove all datafusion-cli specific options before passing through to

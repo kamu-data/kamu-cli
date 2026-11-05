@@ -16,9 +16,10 @@ use datafusion::arrow::datatypes::{DataType, Field};
 use datafusion::common::DFSchema;
 use datafusion::error::DataFusionError;
 use datafusion::prelude::SessionContext;
-use datafusion::sql::sqlparser::ast::ArrayElemTypeDef;
+use datafusion::sql::sqlparser::ast::{ArrayElemTypeDef, ColumnDef};
 use datafusion::sql::sqlparser::dialect::GenericDialect;
 use datafusion::sql::sqlparser::parser::{Parser, ParserError};
+use datafusion::sql::sqlparser::tokenizer::Token;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -36,22 +37,15 @@ use datafusion::sql::sqlparser::parser::{Parser, ParserError};
 pub fn parse_ddl_to_odf_schema(
     ddl: &str,
 ) -> Result<odf_metadata::schema::DataSchema, odf_metadata::data::UnsupportedSchema> {
-    use datafusion::sql::sqlparser::ast::{ColumnOption, ColumnOptionDef, Statement};
+    use datafusion::sql::sqlparser::ast::{ColumnOption, ColumnOptionDef};
     use odf_metadata::schema::*;
 
-    let sql = format!("create table x ({ddl})");
-    let Statement::CreateTable(create_table) = Parser::parse_sql(&GenericDialect {}, &sql)
-        .unwrap()
-        .into_iter()
-        .next()
-        .unwrap()
-    else {
-        unreachable!();
-    };
+    let columns = parse_column_defs(ddl)
+        .map_err(|e| UnsupportedSchema::new(format!("Invalid DDL schema: {e}")))?;
 
     let mut fields = Vec::new();
 
-    for col in create_table.columns {
+    for col in columns {
         let mut data_type = convert_sql_to_odf_data_type(&col.data_type)?;
 
         for opt in col.options {
@@ -73,6 +67,20 @@ pub fn parse_ddl_to_odf_schema(
 
     Ok(DataSchema::new(fields))
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Parses `ddl` as a comma-separated list of column definitions and nothing
+/// else, so it is safe to embed into `CREATE TABLE x (...)`
+fn parse_column_defs(ddl: &str) -> Result<Vec<ColumnDef>, ParserError> {
+    let dialect = GenericDialect {};
+    let mut parser = Parser::new(&dialect).try_with_sql(ddl)?;
+    let columns = parser.parse_comma_separated(Parser::parse_column_def)?;
+    parser.expect_token(&Token::EOF)?;
+    Ok(columns)
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 fn convert_sql_to_odf_data_type(
     data_type: &datafusion::sql::sqlparser::ast::DataType,
@@ -243,7 +251,6 @@ pub async fn parse_ddl_to_datafusion_schema(
     ddl: &str,
     force_utc_time: bool,
 ) -> Result<DFSchema, DataFusionError> {
-    // TODO: SEC: should we worry about SQL injections?
     let sql = format!("create table x ({ddl})");
 
     if let Err(ParserError::ParserError(err)) = Parser::parse_sql(&GenericDialect {}, &sql)
@@ -257,6 +264,8 @@ pub async fn parse_ddl_to_datafusion_schema(
             None,
         ));
     }
+
+    parse_column_defs(ddl).map_err(|e| DataFusionError::SQL(Box::new(e), None))?;
 
     let plan = ctx.state().create_logical_plan(&sql).await?;
 

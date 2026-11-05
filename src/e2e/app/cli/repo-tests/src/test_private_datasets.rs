@@ -15,12 +15,14 @@ use kamu_cli_e2e_common::{
     DatasetCollaborationAccountRolesError,
     DatasetDependencies,
     DatasetDependency,
+    DatasetVisibilityInput,
     FoundDatasetItem,
     GetDatasetVisibilityError,
     KamuApiServerClient,
     KamuApiServerClientExt,
     QueryError,
     QueryExecutionError,
+    RequestBody,
     ResolvedDatasetDependency,
     SetDatasetVisibilityError,
     UnresolvedDatasetDependency,
@@ -28,6 +30,8 @@ use kamu_cli_e2e_common::{
 use kamu_cli_puppet::KamuCliPuppet;
 use kamu_cli_puppet::extensions::{AddDatasetOptions, KamuCliPuppetExt};
 use odf::metadata::testing::MetadataFactory;
+use reqwest::{Method, StatusCode};
+use serde_json::json;
 
 use crate::utils::{generate_password, make_logged_clients};
 
@@ -81,6 +85,8 @@ pub const PRIVATE_DATESET_WITH_ALLOWED_ANONYMOUS_WORKSPACE_KAMU_CONFIG: &str = i
     kind: CLIConfig
     version: 1
     content:
+      identity:
+        privateKey: f0000000000000000000000000000000000000000000000000000000000000000
       auth:
         allowAnonymous: true
         users:
@@ -273,7 +279,7 @@ pub async fn test_minimum_dataset_maintainer_can_change_dataset_visibility(
                 Err(expected_error),
                 client
                     .dataset()
-                    .set_visibility(&dataset_id, odf::DatasetVisibility::Private)
+                    .set_visibility(&dataset_id, DatasetVisibilityInput::Private)
                     .await,
                 "Tag: {}",
                 tag,
@@ -297,7 +303,7 @@ pub async fn test_minimum_dataset_maintainer_can_change_dataset_visibility(
                 Ok(()),
                 set_client
                     .dataset()
-                    .set_visibility(&dataset_id, odf::DatasetVisibility::Private)
+                    .set_visibility(&dataset_id, DatasetVisibilityInput::Private)
                     .await,
                 "Tag: {}",
                 set_tag,
@@ -343,7 +349,7 @@ pub async fn test_minimum_dataset_maintainer_can_change_dataset_visibility(
                     Err(expected_error),
                     client
                         .dataset()
-                        .set_visibility(&dataset_id, odf::DatasetVisibility::Private)
+                        .set_visibility(&dataset_id, DatasetVisibilityInput::Private)
                         .await,
                     "Tag: {}",
                     tag,
@@ -357,7 +363,12 @@ pub async fn test_minimum_dataset_maintainer_can_change_dataset_visibility(
                 Ok(()),
                 set_client
                     .dataset()
-                    .set_visibility(&dataset_id, odf::DatasetVisibility::Public)
+                    .set_visibility(
+                        &dataset_id,
+                        DatasetVisibilityInput::Public {
+                            anonymous_available: true,
+                        },
+                    )
                     .await,
                 "Tag: {}",
                 set_tag,
@@ -1812,6 +1823,52 @@ pub async fn test_dataset_role_is_correctly_displayed_for_the_current_user(
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_a_public_dataset_closed_to_anonymous_is_hidden_from_anonymous_rest_calls(
+    anonymous: KamuApiServerClient,
+) {
+    let [not_owner, owner] = make_logged_clients(&anonymous, ["not-owner", "owner"]).await;
+
+    let CreateDatasetResponse {
+        dataset_id,
+        dataset_alias,
+    } = owner
+        .dataset()
+        .create_player_scores_dataset_with_data()
+        .await;
+
+    let all_ok = RestReadPath::expected_statuses(StatusCode::OK, StatusCode::OK);
+    let all_hidden =
+        RestReadPath::expected_statuses(StatusCode::NOT_FOUND, StatusCode::BAD_REQUEST);
+
+    for (anonymous_available, anonymous_expected) in [(true, &all_ok), (false, &all_hidden)] {
+        owner
+            .dataset()
+            .set_visibility(
+                &dataset_id,
+                DatasetVisibilityInput::Public {
+                    anonymous_available,
+                },
+            )
+            .await
+            .unwrap();
+
+        for (tag, client, expected) in [
+            ("anonymous", &anonymous, anonymous_expected),
+            ("not_owner", &not_owner, &all_ok),
+        ] {
+            pretty_assertions::assert_eq!(
+                *expected,
+                RestReadPath::actual_statuses(client, &dataset_id, &dataset_alias).await,
+                "Tag: {}; anonymous_available: {}",
+                tag,
+                anonymous_available,
+            );
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Helpers
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -1845,6 +1902,92 @@ async fn authorize_users_by_roles(
                 tag,
                 dataset_id.as_did_str().to_stack_string()
             );
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// REST paths that read a dataset's data or metadata
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum RestReadPath {
+    Tail,
+    Metadata,
+    Refs,
+    DatasetInfo,
+    OData,
+    Query,
+}
+
+impl RestReadPath {
+    const ALL: [Self; 6] = [
+        Self::Tail,
+        Self::Metadata,
+        Self::Refs,
+        Self::DatasetInfo,
+        Self::OData,
+        Self::Query,
+    ];
+
+    /// Expected status of every path: `Query` reports a hidden dataset as an
+    /// unknown table, the other paths as not found
+    fn expected_statuses(status: StatusCode, query_status: StatusCode) -> Vec<(Self, StatusCode)> {
+        Self::ALL
+            .into_iter()
+            .map(|path| match path {
+                Self::Query => (path, query_status),
+                Self::Tail | Self::Metadata | Self::Refs | Self::DatasetInfo | Self::OData => {
+                    (path, status)
+                }
+            })
+            .collect()
+    }
+
+    /// Calls every path for the dataset and collects the response statuses
+    async fn actual_statuses(
+        client: &KamuApiServerClient,
+        dataset_id: &odf::DatasetID,
+        dataset_alias: &odf::DatasetAlias,
+    ) -> Vec<(Self, StatusCode)> {
+        let mut statuses = Vec::with_capacity(Self::ALL.len());
+        for path in Self::ALL {
+            let (method, endpoint, body) = path.request(dataset_id, dataset_alias);
+            let response = client.rest_api_call(method, &endpoint, body).await;
+            statuses.push((path, response.status()));
+        }
+        statuses
+    }
+
+    fn request(
+        self,
+        dataset_id: &odf::DatasetID,
+        dataset_alias: &odf::DatasetAlias,
+    ) -> (Method, String, Option<RequestBody>) {
+        match self {
+            Self::Tail => (Method::GET, format!("{dataset_alias}/tail"), None),
+            Self::Metadata => (Method::GET, format!("{dataset_alias}/metadata"), None),
+            Self::Refs => (Method::GET, format!("{dataset_alias}/refs/head"), None),
+            Self::DatasetInfo => (
+                Method::GET,
+                format!("datasets/{}", dataset_id.as_did_str()),
+                None,
+            ),
+            Self::OData => (
+                Method::GET,
+                format!(
+                    "odata/{}/{}",
+                    dataset_alias.account_name.as_ref().unwrap(),
+                    dataset_alias.dataset_name
+                ),
+                None,
+            ),
+            Self::Query => (
+                Method::POST,
+                "query".to_string(),
+                Some(RequestBody::Json(json!({
+                    "query": format!(r#"select * from "{dataset_alias}""#),
+                }))),
+            ),
         }
     }
 }

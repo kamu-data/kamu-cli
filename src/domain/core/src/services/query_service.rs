@@ -99,6 +99,8 @@ pub struct GetDataOptions {
     pub block_hash: Option<odf::Multihash>,
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[derive(Debug, Clone, Default)]
 pub struct QueryOptions {
     /// Options for datasets used as query inputs. If not `None` - the name

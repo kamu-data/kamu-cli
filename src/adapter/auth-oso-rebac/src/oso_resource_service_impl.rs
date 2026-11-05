@@ -73,10 +73,8 @@ impl OsoResourceServiceImpl {
             .await
             .int_err()?;
 
-        let mut dataset_resource = DatasetResource::new(
-            &dataset_entry.owner_id,
-            dataset_properties.allows_public_read,
-        );
+        let mut dataset_resource =
+            DatasetResource::new(&dataset_entry.owner_id, &dataset_properties);
         for AuthorizedAccount { account_id, role } in authorized_accounts {
             dataset_resource.authorize_account(&account_id, role);
         }
@@ -142,7 +140,7 @@ impl OsoResourceServiceImpl {
                                 })?;
 
                         let mut dataset_resource =
-                            DatasetResource::new(owner_id, dataset_properties.allows_public_read);
+                            DatasetResource::new(owner_id, &dataset_properties);
 
                         if let Some(authorized_accounts) =
                             dataset_accounts_relation_map.remove(&dataset_id)
