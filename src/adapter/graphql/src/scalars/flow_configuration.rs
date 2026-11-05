@@ -71,7 +71,8 @@ impl From<fs::FlowConfigurationRule> for FlowConfigRule {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// Settings of an ingest flow
-#[derive(SimpleObject, PartialEq, Eq)]
+#[derive(SimpleObject, InputObject, Debug, Copy, Clone, PartialEq, Eq)]
+#[graphql(input_name = "FlowConfigIngestInput")]
 pub struct FlowConfigRuleIngest {
     /// Whether to ignore the cache for API calls during ingest
     pub fetch_uncacheable: bool,
@@ -92,7 +93,8 @@ impl From<afs::FlowConfigRuleIngest> for FlowConfigRuleIngest {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// Settings of a compaction flow
-#[derive(SimpleObject, Eq, PartialEq)]
+#[derive(SimpleObject, InputObject, Debug, Copy, Clone, PartialEq, Eq)]
+#[graphql(input_name = "FlowConfigCompactionInput")]
 pub struct FlowConfigRuleCompaction {
     /// Maximum size of a compacted data slice, in bytes
     pub max_slice_size: u64,
@@ -129,16 +131,19 @@ pub enum FlowConfigResetPropagationMode {
 }
 
 /// Reset the dataset head to a given block
-#[derive(SimpleObject, PartialEq, Eq)]
+#[derive(SimpleObject, InputObject, Debug, PartialEq, Eq)]
+#[graphql(input_name = "FlowConfigInputResetPropagationModeCustom")]
 pub struct FlowConfigResetPropagationModeCustom {
     /// Hash of the block that becomes the new head
     pub new_head_hash: Multihash<'static>,
 }
 
 /// Reset the dataset head to its seed block
-#[derive(SimpleObject, PartialEq, Eq, Default)]
+#[derive(SimpleObject, InputObject, Debug, PartialEq, Eq, Default)]
+#[graphql(input_name = "FlowConfigInputResetPropagationModeToSeed")]
 pub struct FlowConfigResetPropagationModeToSeed {
-    /// Placeholder without meaning, always null
+    /// Placeholder without meaning: always null in responses, ignored in
+    /// requests
     _dummy: Option<String>,
 }
 
@@ -174,23 +179,9 @@ pub struct FlowConfigResetInput {
 #[derive(OneofObject)]
 pub enum FlowConfigInputResetPropagationMode {
     /// Reset to a given block
-    Custom(FlowConfigInputResetPropagationModeCustom),
+    Custom(FlowConfigResetPropagationModeCustom),
     /// Reset to the seed block
-    ToSeed(FlowConfigInputResetPropagationModeToSeed),
-}
-
-/// Reset the dataset head to a given block
-#[derive(InputObject)]
-pub struct FlowConfigInputResetPropagationModeCustom {
-    /// Hash of the block that becomes the new head
-    pub new_head_hash: Multihash<'static>,
-}
-
-/// Reset the dataset head to its seed block
-#[derive(InputObject)]
-pub struct FlowConfigInputResetPropagationModeToSeed {
-    /// Placeholder without meaning, the value is ignored
-    _dummy: Option<String>,
+    ToSeed(FlowConfigResetPropagationModeToSeed),
 }
 
 impl FlowConfigResetInput {
@@ -206,19 +197,10 @@ impl FlowConfigResetInput {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Settings of a compaction flow
-#[derive(InputObject, Copy, Clone)]
-pub struct FlowConfigCompactionInput {
-    /// Maximum size of a compacted data slice, in bytes
-    pub max_slice_size: u64,
-    /// Maximum number of records in a compacted data slice
-    pub max_slice_records: u64,
-}
-
-impl TryFrom<FlowConfigCompactionInput> for afs::FlowConfigRuleCompact {
+impl TryFrom<FlowConfigRuleCompaction> for afs::FlowConfigRuleCompact {
     type Error = String;
 
-    fn try_from(value: FlowConfigCompactionInput) -> Result<Self, Self::Error> {
+    fn try_from(value: FlowConfigRuleCompaction) -> Result<Self, Self::Error> {
         afs::FlowConfigRuleCompact::try_new(value.max_slice_size, value.max_slice_records)
             .map_err(|err| err.to_string())
     }
@@ -226,18 +208,8 @@ impl TryFrom<FlowConfigCompactionInput> for afs::FlowConfigRuleCompact {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Settings of an ingest flow
-#[derive(InputObject, Copy, Clone)]
-pub struct FlowConfigIngestInput {
-    /// Flag indicates to ignore cache during ingest step for API calls
-    pub fetch_uncacheable: bool,
-    /// Flag indicates to trigger next flow iteration right if `has_more` is
-    /// true
-    pub fetch_next_iteration: bool,
-}
-
-impl From<FlowConfigIngestInput> for afs::FlowConfigRuleIngest {
-    fn from(value: FlowConfigIngestInput) -> Self {
+impl From<FlowConfigRuleIngest> for afs::FlowConfigRuleIngest {
+    fn from(value: FlowConfigRuleIngest) -> Self {
         Self {
             fetch_uncacheable: value.fetch_uncacheable,
             fetch_next_iteration: value.fetch_next_iteration,
