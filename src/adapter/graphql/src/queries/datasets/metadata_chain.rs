@@ -79,11 +79,7 @@ impl<'a> MetadataChain<'a> {
         let account = Account::from_dataset_alias(ctx, self.dataset_request_state.dataset_alias())
             .await?
             .expect("Account must exist");
-        Ok(if let Some(block) = block_maybe {
-            Some(MetadataBlockExtended::new(ctx, hash, block, account).await?)
-        } else {
-            None
-        })
+        Ok(block_maybe.map(|block| MetadataBlockExtended::new(hash, block, account)))
     }
 
     /// Returns a metadata block corresponding to the specified hash and encoded
@@ -106,9 +102,8 @@ impl<'a> MetadataChain<'a> {
             None => Ok(None),
             Some(block) => match format {
                 MetadataManifestFormat::Yaml => {
-                    let block_content = MetadataBlock::with_extended_aliases(ctx, block).await?;
                     let ser = odf::metadata::serde::yaml::YamlMetadataBlockSerializer;
-                    let buffer = ser.write_manifest(&block_content).int_err()?;
+                    let buffer = ser.write_manifest(&block).int_err()?;
                     let content = std::str::from_utf8(&buffer).int_err()?;
                     Ok(Some(content.to_string()))
                 }
@@ -157,7 +152,7 @@ impl<'a> MetadataChain<'a> {
 
         // Special case: head block request
         if page == 0 && per_page == 1 {
-            let block = MetadataBlockExtended::new(ctx, head, head_block, account).await?;
+            let block = MetadataBlockExtended::new(head, head_block, account);
             Ok(MetadataBlockConnection::new(
                 vec![block],
                 page,
@@ -173,7 +168,7 @@ impl<'a> MetadataChain<'a> {
 
             let mut nodes = Vec::new();
             while let Some((hash, block)) = block_stream.try_next().await.int_err()? {
-                let block = MetadataBlockExtended::new(ctx, hash, block, account.clone()).await?;
+                let block = MetadataBlockExtended::new(hash, block, account.clone());
                 nodes.push(block);
             }
 
@@ -211,7 +206,7 @@ impl<'a> MetadataChain<'a> {
 
         let mut nodes = Vec::with_capacity(listing.blocks.len());
         for (hash, block) in listing.blocks {
-            nodes.push(MetadataBlockExtended::new(ctx, hash, block, account.clone()).await?);
+            nodes.push(MetadataBlockExtended::new(hash, block, account.clone()));
         }
 
         Ok(MetadataBlockConnection::new(

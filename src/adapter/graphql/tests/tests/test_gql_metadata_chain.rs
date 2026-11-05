@@ -825,6 +825,13 @@ async fn test_metadata_chain_set_transform_event() {
                                             inputs {
                                                 datasetRef
                                                 alias
+                                                inputDataset {
+                                                    ... on TransformInputDatasetAccessible {
+                                                        dataset {
+                                                            alias
+                                                        }
+                                                    }
+                                                }
                                             }
                                         }
                                     }
@@ -856,7 +863,12 @@ async fn test_metadata_chain_set_transform_event() {
                                         "__typename": "SetTransform",
                                         "inputs": [{
                                             "datasetRef": root_id.to_string(),
-                                            "alias": "kamu/foo",
+                                            "alias": "foo_input",
+                                            "inputDataset": {
+                                                "dataset": {
+                                                    "alias": "kamu/foo",
+                                                }
+                                            },
                                         }]
                                     }
                                 }, {
@@ -872,6 +884,27 @@ async fn test_metadata_chain_set_transform_event() {
         })
     );
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_metadata_chain_set_transform_encoded_as_stored() {
+    let harness = GraphQLMetadataChainHarness::new(TenancyConfig::MultiTenant).await;
+
+    harness
+        .create_root_dataset(Some(DEFAULT_ACCOUNT_NAME.clone()))
+        .await;
+    let derived_id = harness
+        .create_derived_dataset(Some(DEFAULT_ACCOUNT_NAME.clone()))
+        .await
+        .dataset_handle
+        .id;
+
+    let content = harness.query_head_block_yaml(&derived_id).await;
+    assert!(content.contains("alias: foo_input"), "{content}");
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
 async fn test_metadata_chain_blocks_filtered_by_event_types() {
@@ -1154,9 +1187,12 @@ impl GraphQLMetadataChainHarness {
                     .kind(odf::DatasetKind::Derivative)
                     .push_event(
                         MetadataFactory::set_transform()
-                            .inputs_from_refs([odf::DatasetAlias::new(
-                                Some(DEFAULT_ACCOUNT_NAME.clone()),
-                                odf::DatasetName::new_unchecked("foo"),
+                            .inputs_from_refs_and_aliases([(
+                                odf::DatasetAlias::new(
+                                    Some(DEFAULT_ACCOUNT_NAME.clone()),
+                                    odf::DatasetName::new_unchecked("foo"),
+                                ),
+                                "foo_input",
                             )])
                             .build(),
                     )
@@ -1296,6 +1332,43 @@ impl GraphQLMetadataChainHarness {
 
         let mut data = res.data.into_json().unwrap();
         data["datasets"]["byId"]["metadata"]["chain"]["blocks"].take()
+    }
+
+    /// YAML encoding of the head block, as returned by `encoded`
+    async fn query_head_block_yaml(&self, dataset_id: &odf::DatasetID) -> String {
+        let request_code = indoc!(
+            r#"
+            {
+                datasets {
+                    byId (datasetId: "<id>") {
+                        metadata {
+                            chain {
+                                blocks (page: 0, perPage: 1) {
+                                    nodes {
+                                        encoded(encoding: YAML) {
+                                            content
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            "#
+        )
+        .replace("<id>", &dataset_id.to_string());
+
+        let res = self
+            .execute_authorized_query(async_graphql::Request::new(request_code))
+            .await;
+        assert!(res.is_ok(), "{res:?}");
+
+        let data = res.data.into_json().unwrap();
+        data["datasets"]["byId"]["metadata"]["chain"]["blocks"]["nodes"][0]["encoded"]["content"]
+            .as_str()
+            .unwrap()
+            .to_string()
     }
 
     pub async fn get_dataset(&self, hdl: &odf::DatasetHandle) -> ResolvedDataset {

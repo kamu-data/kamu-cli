@@ -7,10 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::borrow::Cow;
-
 use chrono::{DateTime, Utc};
-use kamu_datasets::{BlockHashPrefix, DatasetBlocksFilter, DatasetRegistry};
+use kamu_datasets::{BlockHashPrefix, DatasetBlocksFilter};
 
 use crate::prelude::*;
 use crate::queries::Account;
@@ -42,25 +40,22 @@ pub struct MetadataBlockExtended {
 #[ComplexObject]
 impl MetadataBlockExtended {
     #[graphql(skip)]
-    pub async fn new(
-        ctx: &Context<'_>,
+    pub fn new(
         block_hash: impl Into<Multihash<'static>>,
         block: odf::metadata::MetadataBlock,
         author: Account,
-    ) -> Result<Self, InternalError> {
-        let odf_block = MetadataBlock::with_extended_aliases(ctx, block).await?;
-        let original_block = odf_block.clone();
-        let block: MetadataBlock = odf_block.into();
+    ) -> Self {
+        let gql_block: MetadataBlock = block.clone().into();
 
-        Ok(Self {
+        Self {
             block_hash: block_hash.into(),
-            prev_block_hash: block.prev_block_hash,
-            system_time: block.system_time,
+            prev_block_hash: gql_block.prev_block_hash,
+            system_time: gql_block.system_time,
             author,
-            event: block.event,
-            sequence_number: block.sequence_number.into(),
-            block: original_block,
-        })
+            event: gql_block.event,
+            sequence_number: gql_block.sequence_number.into(),
+            block,
+        }
     }
 
     /// Block serialized in the requested format
@@ -180,88 +175,6 @@ impl From<odf::metadata::serde::UnsupportedVersionError> for MetadataManifestUns
             supported_version_from: e.supported_version_range.0 as i32,
             supported_version_to: e.supported_version_range.1 as i32,
         }
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-impl SetTransform {
-    pub async fn with_extended_aliases(
-        ctx: &Context<'_>,
-        v: odf::metadata::SetTransform,
-    ) -> Result<odf::metadata::SetTransform, InternalError> {
-        let input_ids = v
-            .inputs
-            .iter()
-            .map(|input| Cow::Borrowed(input.dataset_ref.id().unwrap()))
-            .collect::<Vec<_>>();
-        let dataset_registry = from_catalog_n!(ctx, dyn DatasetRegistry);
-        let dataset_infos = dataset_registry
-            .resolve_multiple_dataset_handles_by_ids(&input_ids)
-            .await
-            .int_err()?;
-
-        let mut accessible_inputs: Vec<_> = dataset_infos
-            .resolved_handles
-            .iter()
-            .map(|dataset_handle| odf::metadata::TransformInput {
-                dataset_ref: dataset_handle.id.as_local_ref(),
-                alias: Some(dataset_handle.alias.clone().to_string()),
-            })
-            .collect();
-
-        accessible_inputs.extend(dataset_infos.unresolved_datasets.into_iter().map(
-            |(dataset_id, _)| {
-                let original_input_info = v
-                    .inputs
-                    .iter()
-                    .find(|input| {
-                        input.dataset_ref.id().unwrap().as_local_ref() == dataset_id.as_local_ref()
-                    })
-                    .unwrap();
-                odf::metadata::TransformInput {
-                    dataset_ref: original_input_info.dataset_ref.clone(),
-                    alias: original_input_info.alias.clone(),
-                }
-            },
-        ));
-        Ok(odf::metadata::SetTransform {
-            inputs: accessible_inputs,
-            transform: v.transform,
-        })
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-impl MetadataBlock {
-    pub async fn with_extended_aliases(
-        ctx: &Context<'_>,
-        v: odf::metadata::MetadataBlock,
-    ) -> Result<odf::metadata::MetadataBlock, InternalError> {
-        Ok(odf::metadata::MetadataBlock {
-            system_time: v.system_time,
-            prev_block_hash: v.prev_block_hash,
-            sequence_number: v.sequence_number,
-            event: MetadataEvent::with_extended_aliases(ctx, v.event).await?,
-        })
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-impl MetadataEvent {
-    async fn with_extended_aliases(
-        ctx: &Context<'_>,
-        event: odf::metadata::MetadataEvent,
-    ) -> Result<odf::metadata::MetadataEvent, InternalError> {
-        Ok(
-            if let odf::metadata::MetadataEvent::SetTransform(v) = event {
-                SetTransform::with_extended_aliases(ctx, v).await?.into()
-            } else {
-                event
-            },
-        )
     }
 }
 
