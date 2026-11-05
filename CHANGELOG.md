@@ -13,7 +13,7 @@ Recommendation: for ease of reading, use the following format:
 ### Fixed
 -->
 
-## [Unreleased]
+## [0.272.1] - 2026-11-05
 ### Added
 - Versioned files can be viewed and downloaded on nodes with local storage, including every
   kamu-cli workspace: `VersionedFileEntry.contentUrl` returns a short-lived URL served by the node
@@ -22,14 +22,12 @@ Recommendation: for ease of reading, use the following format:
   returned in-band by `VersionedFileEntry.content`. `/ui-config` returns it as
   `versionedFiles.maxInBandContentSizeInBytes`
 ### Changed
-- `VersionedFileEntry.content` fails with a GraphQL error coded `CONTENT_TOO_LARGE` for files over
-  the in-band limit. Use `contentUrl` for those
+- GraphQL (breaking): `VersionedFileEntry.content` fails with an error coded `CONTENT_TOO_LARGE` for
+  files over the in-band limit. Use `contentUrl` for those
 ### Fixed
 - `/query` (breaking): commitment hashes and signatures are computed over RFC 8785 (JCS) canonical
   JSON, as the ODF spec requires, so standard JCS clients can reproduce them. Commitments signed by
   earlier versions fail `/verify`
-- `POST /query` no longer fails with "Response signing is not enabled" on nodes without a signing key.
-  Only queries that request a `Proof` need the key
 - GraphQL: `TransformInput.alias` returns the query alias the input has in `SetTransform`, not the
   input dataset's alias, and inputs keep their order. Read the dataset alias from
   `TransformInput.inputDataset`. Encoded metadata blocks (`encoded`, `blockByHashEncoded`) now match
