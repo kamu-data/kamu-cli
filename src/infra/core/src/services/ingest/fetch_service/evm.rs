@@ -9,6 +9,7 @@
 
 use std::collections::HashMap;
 use std::path::Path;
+use std::pin::pin;
 use std::sync::Arc;
 
 use futures::TryStreamExt;
@@ -197,7 +198,7 @@ impl FetchService {
             stream_options,
             resume_from_state.clone(),
         );
-        futures::pin_mut!(stream);
+        let mut stream = pin!(stream);
 
         while let Some(batch) = stream.try_next().await.int_err()? {
             let blocks_processed = batch.state.last_seen_block + 1 - block_range_unprocessed.0;
