@@ -190,8 +190,7 @@ pub async fn test_gql_dataset_adapter_versioned_file_direct_upload_download_mt(
         }),
     );
 
-    // Read back the content
-    // TODO: Figure out how to test direct download
+    // Read back the content in-band
     let res = kamu_api_server_client
         .graphql_api_call(
             indoc::indoc!(
@@ -234,6 +233,55 @@ pub async fn test_gql_dataset_adapter_versioned_file_direct_upload_download_mt(
           }
         }),
     );
+
+    // Download the content through the URL the node serves itself
+    let res = kamu_api_server_client
+        .graphql_api_call(
+            indoc::indoc!(
+                r#"
+                query directDownloadUrl($datasetId: DatasetID!) {
+                  datasets {
+                    byId(datasetId: $datasetId) {
+                      asVersionedFile {
+                        latest {
+                          contentUrl {
+                            url
+                            headers {
+                              key
+                              value
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+                "#
+            ),
+            Some(json!({
+              "datasetId": did,
+            })),
+        )
+        .await
+        .unwrap();
+
+    let content_url = &res["datasets"]["byId"]["asVersionedFile"]["latest"]["contentUrl"];
+    pretty_assertions::assert_eq!(content_url["headers"], json!([]));
+
+    // A plain request without credentials, as a browser would make it
+    let response = reqwest::get(content_url["url"].as_str().unwrap())
+        .await
+        .unwrap();
+
+    pretty_assertions::assert_eq!(reqwest::StatusCode::OK, response.status());
+    pretty_assertions::assert_eq!(
+        Some("text/plain"),
+        response
+            .headers()
+            .get(reqwest::header::CONTENT_TYPE)
+            .map(|v| v.to_str().unwrap()),
+    );
+    pretty_assertions::assert_eq!(DUMMY_FILE_CONTENT, response.text().await.unwrap());
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

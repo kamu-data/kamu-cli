@@ -9447,12 +9447,14 @@ type VersionedFileEntry {
 	"""
 	extraData: ExtraData!
 	"""
-	Returns encoded content in-band. Should be used for small files only and
-	will return an error if called on large data.
+	Returns encoded content in-band. Should be used for small files only:
+	files over the node's in-band size limit fail with an error whose
+	`extensions.code` is `CONTENT_TOO_LARGE`
 	"""
 	content: Base64Usnp!
 	"""
-	Returns a direct download URL
+	Returns a direct download URL. When the storage cannot issue one, the
+	URL points to the node itself and needs no extra headers
 	"""
 	contentUrl: VersionedFileContentDownload!
 }

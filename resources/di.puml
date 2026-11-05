@@ -499,6 +499,7 @@ class "VariableSetResourcePresentationDispatcher"
 class "VariableSetTypedResourceQueryServiceImpl"
 class "VerificationServiceImpl"
 class "VerifyDatasetUseCaseImpl"
+class "VersionedFilesConfig" <<singleton>>
 class "ViewCollectionEntriesUseCaseImpl"
 class "ViewVersionedFileHistoryUseCaseImpl"
 class "WakeupListenerConfig" <<singleton>>

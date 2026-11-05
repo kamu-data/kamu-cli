@@ -21,7 +21,7 @@ use kamu::domain::*;
 use kamu::*;
 use kamu_accounts::*;
 use kamu_accounts_services::PasswordPolicyConfig;
-use kamu_adapter_http::platform::UploadServiceLocal;
+use kamu_adapter_http::platform::{FileDownloadServiceJwt, UploadServiceLocal};
 use kamu_adapter_oauth::GithubAuthenticationConfig;
 use kamu_datasets_services::QuotaDefaultsConfig;
 use kamu_flow_system::{
@@ -712,6 +712,7 @@ pub fn configure_server_catalog(
     }
 
     b.add::<UploadServiceLocal>();
+    b.add::<FileDownloadServiceJwt>();
 
     b.add_value(kamu_adapter_graphql::GqlFeatureFlags::new());
 
@@ -906,6 +907,10 @@ pub fn register_config_in_catalog(
     catalog_builder.add_value(FileUploadLimitConfig::new_in_mb(
         config.uploads.max_file_size_in_mb,
     ));
+    //
+
+    // Versioned files configuration
+    catalog_builder.add_value(config.versioned_files.clone());
     //
 
     // Secrets encryption configuration

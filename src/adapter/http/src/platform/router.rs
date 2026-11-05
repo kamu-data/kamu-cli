@@ -29,6 +29,7 @@ pub fn root_router(allow_anonymous: bool) -> OpenApiRouter {
     }
 
     router = router
+        .routes(routes!(handlers::file_download_get_handler))
         .routes(routes!(handlers::login_handler))
         .routes(routes!(handlers::token_validate_handler))
         .routes(routes!(handlers::token_device_authorization_handler))

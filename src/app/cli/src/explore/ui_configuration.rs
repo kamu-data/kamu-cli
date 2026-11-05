@@ -18,6 +18,7 @@ pub(crate) struct UIConfiguration {
     pub(crate) min_new_password_length: usize,
     pub(crate) feature_flags: UIFeatureFlags,
     pub(crate) webhooks: UIWebhooksConfiguration,
+    pub(crate) versioned_files: UIVersionedFilesConfiguration,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -38,6 +39,16 @@ pub(crate) struct UIFeatureFlags {
 #[serde(rename_all = "camelCase")]
 pub(crate) struct UIWebhooksConfiguration {
     pub(crate) loopback_targets_only: bool,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct UIVersionedFilesConfiguration {
+    /// Files up to this size can be read in-band through
+    /// `VersionedFileEntry.content`, larger ones through `contentUrl`
+    pub(crate) max_in_band_content_size_in_bytes: usize,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

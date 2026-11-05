@@ -7955,6 +7955,7 @@ dependencies = [
  "indoc 2.0.8",
  "init-on-startup",
  "internal-error",
+ "jsonwebtoken",
  "kamu",
  "kamu-accounts",
  "kamu-accounts-inmem",
