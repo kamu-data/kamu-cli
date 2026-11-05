@@ -139,4 +139,8 @@ ignore = [
     # Pulled via alloy -> k256 0.13 / elliptic-curve 0.13; no alloy release uses 0.14 yet
     # https://rustsec.org/advisories/RUSTSEC-2026-0387
     "RUSTSEC-2026-0387",
+    # Unmaintained: pin-utils
+    # Pulled via alloy-provider -> wasmtimer 0.4.3 (latest), no release drops it yet
+    # https://rustsec.org/advisories/RUSTSEC-2026-0441
+    "RUSTSEC-2026-0441",
 ]
