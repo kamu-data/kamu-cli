@@ -73,15 +73,18 @@ pub enum FlowTriggerBatchingRule {
 }
 
 /// Run the flow as soon as new input data appears
-#[derive(SimpleObject, PartialEq, Eq)]
+#[derive(SimpleObject, InputObject, Debug, PartialEq, Eq)]
+#[graphql(input_name = "FlowTriggerBatchingRuleImmediateInput")]
 pub struct FlowTriggerBatchingRuleImmediate {
-    /// Placeholder without meaning, always true
+    /// Placeholder without meaning: always true in responses, ignored in
+    /// requests
     pub dummy: bool,
 }
 
 /// Accumulate new input data until enough records arrive or the interval
 /// passes
-#[derive(SimpleObject, PartialEq, Eq)]
+#[derive(SimpleObject, InputObject, Debug, PartialEq, Eq)]
+#[graphql(input_name = "FlowTriggerBatchingRuleBufferingInput")]
 pub struct FlowTriggerBatchingRuleBuffering {
     /// Number of new input records that runs the flow
     pub min_records_to_await: u64,
@@ -114,16 +117,19 @@ pub enum FlowTriggerStopPolicy {
 }
 
 /// Trigger never stops because of failures
-#[derive(SimpleObject, PartialEq, Eq)]
+#[derive(SimpleObject, InputObject, Debug, PartialEq, Eq)]
+#[graphql(input_name = "FlowTriggerStopPolicyNeverInput")]
 pub struct FlowTriggerStopPolicyNever {
-    /// Placeholder without meaning, always true
+    /// Placeholder without meaning: always true in responses, ignored in
+    /// requests
     pub dummy: bool,
 }
 
 /// Trigger stops after a number of failed runs in a row
-#[derive(SimpleObject, PartialEq, Eq)]
+#[derive(SimpleObject, InputObject, Debug, PartialEq, Eq)]
+#[graphql(input_name = "FlowTriggerStopPolicyAfterConsecutiveFailuresInput")]
 pub struct FlowTriggerStopPolicyAfterConsecutiveFailures {
-    /// Number of failed runs in a row that stops the trigger
+    /// Number of failed runs in a row that stops the trigger, from 1 to 10
     pub max_failures: u32,
 }
 
@@ -167,32 +173,18 @@ impl From<kamu_flow_system::FlowTriggerState> for FlowTrigger {
 #[derive(OneofObject, Debug)]
 pub enum FlowTriggerStopPolicyInput {
     /// Never stop the trigger because of failures
-    Never(FlowTriggerStopPolicyNeverInput),
+    Never(FlowTriggerStopPolicyNever),
     /// Stop the trigger after a number of failed runs in a row
-    AfterConsecutiveFailures(FlowTriggerStopPolicyAfterConsecutiveFailuresInput),
+    AfterConsecutiveFailures(FlowTriggerStopPolicyAfterConsecutiveFailures),
 }
 
 // For tests only!
 impl Default for FlowTriggerStopPolicyInput {
     fn default() -> Self {
-        Self::AfterConsecutiveFailures(FlowTriggerStopPolicyAfterConsecutiveFailuresInput {
+        Self::AfterConsecutiveFailures(FlowTriggerStopPolicyAfterConsecutiveFailures {
             max_failures: 1,
         })
     }
-}
-
-/// Trigger never stops because of failures
-#[derive(InputObject, Debug)]
-pub struct FlowTriggerStopPolicyNeverInput {
-    /// Placeholder without meaning, the value is ignored
-    pub dummy: bool,
-}
-
-/// Trigger stops after a number of failed runs in a row
-#[derive(InputObject, Debug)]
-pub struct FlowTriggerStopPolicyAfterConsecutiveFailuresInput {
-    /// Number of failed runs in a row that stops the trigger, from 1 to 10
-    pub max_failures: u32,
 }
 
 impl TryFrom<FlowTriggerStopPolicyInput> for fs::FlowTriggerStopPolicy {
@@ -230,7 +222,7 @@ pub enum FlowTriggerRuleInput {
 #[derive(OneofObject, Debug)]
 pub enum FlowTriggerRuleScheduleInput {
     /// Run at a fixed interval
-    TimeDelta(TimeDeltaInput),
+    TimeDelta(TimeDelta),
     /// Supported CRON syntax: min hour dayOfMonth month dayOfWeek
     Cron5ComponentExpression(String),
 }
@@ -248,59 +240,9 @@ pub struct FlowTriggerRuleReactiveInput {
 #[derive(OneofObject, Debug)]
 pub enum FlowTriggerBatchingRuleInput {
     /// Run as soon as new input data appears
-    Immediate(FlowTriggerBatchingRuleImmediateInput),
+    Immediate(FlowTriggerBatchingRuleImmediate),
     /// Accumulate new input data first
-    Buffering(FlowTriggerBatchingRuleBufferingInput),
-}
-
-/// Run the flow as soon as new input data appears
-#[derive(InputObject, Debug)]
-pub struct FlowTriggerBatchingRuleImmediateInput {
-    /// Placeholder without meaning, the value is ignored
-    pub dummy: bool,
-}
-
-/// Accumulate new input data until enough records arrive or the interval
-/// passes
-#[derive(InputObject, Debug)]
-pub struct FlowTriggerBatchingRuleBufferingInput {
-    /// Number of new input records that runs the flow
-    pub min_records_to_await: u64,
-    /// Longest wait after the first new data before the flow runs anyway
-    pub max_batching_interval: TimeDeltaInput,
-}
-
-/// Time interval expressed as a number of units
-#[derive(InputObject, Debug)]
-pub struct TimeDeltaInput {
-    /// Number of units in the interval
-    pub every: u32,
-    /// Unit of the interval
-    pub unit: TimeUnit,
-}
-
-impl From<TimeDeltaInput> for chrono::Duration {
-    fn from(value: TimeDeltaInput) -> Self {
-        let every = i64::from(value.every);
-        match value.unit {
-            TimeUnit::Weeks => chrono::Duration::try_weeks(every).unwrap(),
-            TimeUnit::Days => chrono::Duration::try_days(every).unwrap(),
-            TimeUnit::Hours => chrono::Duration::try_hours(every).unwrap(),
-            TimeUnit::Minutes => chrono::Duration::try_minutes(every).unwrap(),
-        }
-    }
-}
-
-impl From<&TimeDeltaInput> for chrono::Duration {
-    fn from(value: &TimeDeltaInput) -> Self {
-        let every = i64::from(value.every);
-        match value.unit {
-            TimeUnit::Weeks => chrono::Duration::try_weeks(every).unwrap(),
-            TimeUnit::Days => chrono::Duration::try_days(every).unwrap(),
-            TimeUnit::Hours => chrono::Duration::try_hours(every).unwrap(),
-            TimeUnit::Minutes => chrono::Duration::try_minutes(every).unwrap(),
-        }
-    }
+    Buffering(FlowTriggerBatchingRuleBuffering),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

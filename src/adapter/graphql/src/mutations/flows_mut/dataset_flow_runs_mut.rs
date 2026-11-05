@@ -46,7 +46,7 @@ impl<'a> DatasetFlowRunsMut<'a> {
     pub async fn trigger_ingest_flow(
         &self,
         ctx: &Context<'_>,
-        ingest_config_input: Option<FlowConfigIngestInput>,
+        ingest_config_input: Option<FlowConfigRuleIngest>,
     ) -> Result<TriggerFlowResult> {
         let resolved_dataset = self.dataset_request_state.resolved_dataset(ctx).await?;
         if let Err(e) =
@@ -151,7 +151,7 @@ impl<'a> DatasetFlowRunsMut<'a> {
     pub async fn trigger_compaction_flow(
         &self,
         ctx: &Context<'_>,
-        compaction_config_input: Option<FlowConfigCompactionInput>,
+        compaction_config_input: Option<FlowConfigRuleCompaction>,
     ) -> Result<TriggerFlowResult> {
         let resolved_dataset = self.dataset_request_state.resolved_dataset(ctx).await?;
         if let Err(e) =

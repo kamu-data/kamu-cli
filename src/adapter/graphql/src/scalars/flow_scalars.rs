@@ -133,10 +133,11 @@ pub(crate) fn decode_dataset_flow_type(flow_type: &str) -> DatasetFlowType {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// Time interval expressed as a number of units
-#[derive(SimpleObject, PartialEq, Eq)]
+#[derive(SimpleObject, InputObject, Debug, PartialEq, Eq)]
+#[graphql(input_name = "TimeDeltaInput")]
 pub struct TimeDelta {
     /// Number of units in the interval
-    pub every: i64,
+    pub every: u32,
     /// Unit of the interval
     pub unit: TimeUnit,
 }
@@ -171,7 +172,7 @@ impl From<chrono::Duration> for TimeDelta {
         let num_weeks = value.num_weeks();
         if (value - chrono::Duration::try_weeks(num_weeks).unwrap()).is_zero() {
             return Self {
-                every: num_weeks,
+                every: u32::try_from(num_weeks).unwrap(),
                 unit: TimeUnit::Weeks,
             };
         }
@@ -179,7 +180,7 @@ impl From<chrono::Duration> for TimeDelta {
         let num_days = value.num_days();
         if (value - chrono::Duration::try_days(num_days).unwrap()).is_zero() {
             return Self {
-                every: num_days,
+                every: u32::try_from(num_days).unwrap(),
                 unit: TimeUnit::Days,
             };
         }
@@ -187,7 +188,7 @@ impl From<chrono::Duration> for TimeDelta {
         let num_hours = value.num_hours();
         if (value - chrono::Duration::try_hours(num_hours).unwrap()).is_zero() {
             return Self {
-                every: num_hours,
+                every: u32::try_from(num_hours).unwrap(),
                 unit: TimeUnit::Hours,
             };
         }
@@ -195,12 +196,36 @@ impl From<chrono::Duration> for TimeDelta {
         let num_minutes = value.num_minutes();
         if (value - chrono::Duration::try_minutes(num_minutes).unwrap()).is_zero() {
             return Self {
-                every: num_minutes,
+                every: u32::try_from(num_minutes).unwrap(),
                 unit: TimeUnit::Minutes,
             };
         }
 
         panic!("Expecting intervals that are clearly dividable by unit, but received [{value}]");
+    }
+}
+
+impl From<TimeDelta> for chrono::Duration {
+    fn from(value: TimeDelta) -> Self {
+        let every = i64::from(value.every);
+        match value.unit {
+            TimeUnit::Weeks => chrono::Duration::try_weeks(every).unwrap(),
+            TimeUnit::Days => chrono::Duration::try_days(every).unwrap(),
+            TimeUnit::Hours => chrono::Duration::try_hours(every).unwrap(),
+            TimeUnit::Minutes => chrono::Duration::try_minutes(every).unwrap(),
+        }
+    }
+}
+
+impl From<&TimeDelta> for chrono::Duration {
+    fn from(value: &TimeDelta) -> Self {
+        let every = i64::from(value.every);
+        match value.unit {
+            TimeUnit::Weeks => chrono::Duration::try_weeks(every).unwrap(),
+            TimeUnit::Days => chrono::Duration::try_days(every).unwrap(),
+            TimeUnit::Hours => chrono::Duration::try_hours(every).unwrap(),
+            TimeUnit::Minutes => chrono::Duration::try_minutes(every).unwrap(),
+        }
     }
 }
 
