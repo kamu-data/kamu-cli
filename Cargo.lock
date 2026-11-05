@@ -9259,6 +9259,7 @@ dependencies = [
  "nonempty",
  "nutype",
  "opendatafabric",
+ "pretty_assertions",
  "regex",
  "serde",
  "serde_json",
@@ -9266,6 +9267,7 @@ dependencies = [
  "strum 0.28.0",
  "thiserror 2.0.21",
  "tokio",
+ "tracing",
  "uuid",
 ]
 

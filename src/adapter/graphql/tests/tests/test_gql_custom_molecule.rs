@@ -4704,7 +4704,11 @@ async fn test_molecule_data_room_as_of_block_hash(
                       asVersionedFile {
                         asOf(version: $version) {
                           version
+                          contentType
+                          accessLevel
+                          changeBy
                           description
+                          categories
                           tags
                         }
                       }
@@ -4740,7 +4744,11 @@ async fn test_molecule_data_room_as_of_block_hash(
                                     "asVersionedFile": {
                                         "asOf": {
                                             "version": 1,
+                                            "contentType": "text/plain",
+                                            "accessLevel": "public",
+                                            "changeBy": USER_1,
                                             "description": "Plain text file",
+                                            "categories": ["test-category-1"],
                                             "tags": ["tag-old"],
                                         }
                                     }

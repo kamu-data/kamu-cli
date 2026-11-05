@@ -12,6 +12,7 @@ use std::borrow::Cow;
 use chrono::{DateTime, Utc};
 use file_utils::MediaType;
 use kamu_datasets::FileVersion;
+use serde_with::DefaultOnNull;
 
 use crate::{MoleculeDenormalizeFileToDataRoom, MoleculeEncryptionMetadataRecord};
 
@@ -45,7 +46,16 @@ pub struct MoleculeVersionedFileEntry {
 
 impl MoleculeVersionedFileEntry {
     pub fn from_raw_versioned_file_entry(raw: kamu_datasets::VersionedFileEntry) -> Self {
-        let extra_data = MoleculeVersionedFileEntryExtraData::from_fields(raw.extra_data);
+        let extra_data = MoleculeVersionedFileEntryExtraData::try_from_fields(raw.extra_data)
+            .unwrap_or_else(|e| {
+                tracing::error!(
+                    version = raw.version,
+                    content_hash = %raw.content_hash,
+                    error = ?e,
+                    "Failed to decode versioned file entry extra data, using defaults",
+                );
+                MoleculeVersionedFileEntryExtraData::default()
+            });
 
         MoleculeVersionedFileEntry {
             system_time: raw.system_time,
@@ -89,14 +99,23 @@ impl MoleculeVersionedFileEntry {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Default, Clone, Debug, serde::Serialize, serde::Deserialize)]
+/// All columns are nullable in the dataset schema: a `null` or missing value
+/// reads as empty
+#[serde_with::serde_as]
+#[derive(Default, Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct MoleculeVersionedFileEntryBasicInfo {
-    #[serde(rename = "molecule_access_level")]
+    #[serde(rename = "molecule_access_level", default)]
+    #[serde_as(as = "DefaultOnNull")]
     pub access_level: String,
-    #[serde(rename = "molecule_change_by")]
+    #[serde(rename = "molecule_change_by", default)]
+    #[serde_as(as = "DefaultOnNull")]
     pub change_by: String,
     pub description: Option<String>,
+    #[serde(default)]
+    #[serde_as(as = "DefaultOnNull")]
     pub categories: Vec<String>,
+    #[serde(default)]
+    #[serde_as(as = "DefaultOnNull")]
     pub tags: Vec<String>,
 }
 
@@ -129,9 +148,10 @@ impl Default for MoleculeVersionedFileEntryExtraData<'_> {
 }
 
 impl MoleculeVersionedFileEntryExtraData<'static> {
-    pub fn from_fields(extra_data: kamu_datasets::ExtraDataFields) -> Self {
+    pub fn try_from_fields(
+        extra_data: kamu_datasets::ExtraDataFields,
+    ) -> Result<Self, serde_json::Error> {
         serde_json::from_value(serde_json::Value::Object(extra_data.into_inner()))
-            .unwrap_or_default()
     }
 }
 
