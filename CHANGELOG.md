@@ -20,6 +20,10 @@ Recommendation: for ease of reading, use the following format:
   earlier versions fail `/verify`
 - `POST /query` no longer fails with "Response signing is not enabled" on nodes without a signing key.
   Only queries that request a `Proof` need the key
+- GraphQL: `TransformInput.alias` returns the query alias the input has in `SetTransform`, not the
+  input dataset's alias, and inputs keep their order. Read the dataset alias from
+  `TransformInput.inputDataset`. Encoded metadata blocks (`encoded`, `blockByHashEncoded`) now match
+  the stored block
 
 ## [0.272.0] - 2026-11-02
 ### Added
