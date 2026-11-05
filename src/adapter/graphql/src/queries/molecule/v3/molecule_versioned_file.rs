@@ -143,19 +143,21 @@ impl MoleculeVersionedFile<'_> {
         MoleculeVersionedFileEntry::new_matching_data_room_entry(self.data_room_entry.as_ref())
     }
 
-    /// Returns particular versioned file entry, regardless of data room version
+    /// Returns the specified entry by block or version number, regardless of
+    /// data room version
     pub async fn as_of(
         &self,
         ctx: &Context<'_>,
-        block_hash: Multihash<'static>,
+        version: Option<FileVersion>,
+        block_hash: Option<Multihash<'static>>,
     ) -> Result<Option<MoleculeVersionedFileEntry<'_>>> {
-        let block_hash: odf::Multihash = block_hash.into();
+        let block_hash: Option<odf::Multihash> = block_hash.map(Into::into);
 
         let maybe_versioned_file_entry = try_read_versioned_file_entry(
             ctx,
             &self.data_room_entry.reference,
-            None,
-            Some(block_hash.clone()),
+            version,
+            block_hash.clone(),
         )
         .await?;
 
@@ -167,8 +169,9 @@ impl MoleculeVersionedFile<'_> {
         } else {
             tracing::warn!(
                 versioned_file_dataset_id = %self.data_room_entry.reference,
-                block_hash = %block_hash,
-                "No matching versioned file entry found for block hash",
+                ?version,
+                ?block_hash,
+                "No matching versioned file entry found",
             );
             Ok(None)
         }

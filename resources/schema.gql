@@ -6532,9 +6532,10 @@ type MoleculeVersionedFile {
 	"""
 	matching: MoleculeVersionedFileEntry!
 	"""
-	Returns particular versioned file entry, regardless of data room version
+	Returns the specified entry by block or version number, regardless of
+	data room version
 	"""
-	asOf(blockHash: Multihash!): MoleculeVersionedFileEntry
+	asOf(version: Int, blockHash: Multihash): MoleculeVersionedFileEntry
 }
 
 type MoleculeVersionedFileEntry {

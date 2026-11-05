@@ -4691,6 +4691,98 @@ async fn test_molecule_data_room_as_of_block_hash(
             }
         })
     );
+
+    const AS_OF_VERSION_QUERY: &str = indoc!(
+        r#"
+        query ($oclId: String!, $version: Int!) {
+          molecule {
+            v3 {
+              project(oclId: $oclId) {
+                dataRoom {
+                  latest {
+                    entry(path: "/foo.txt") {
+                      asVersionedFile {
+                        asOf(version: $version) {
+                          version
+                          description
+                          tags
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+        "#
+    );
+
+    // As of version: an older one, from the latest data room
+    pretty_assertions::assert_eq!(
+        GraphQLQueryRequest::new(
+            AS_OF_VERSION_QUERY,
+            async_graphql::Variables::from_json(json!({
+                "oclId": OCL_ID,
+                "version": 1,
+            })),
+        )
+        .execute(&harness.schema, &harness.catalog_authorized)
+        .await
+        .data,
+        value!({
+            "molecule": {
+                "v3": {
+                    "project": {
+                        "dataRoom": {
+                            "latest": {
+                                "entry": {
+                                    "asVersionedFile": {
+                                        "asOf": {
+                                            "version": 1,
+                                            "description": "Plain text file",
+                                            "tags": ["tag-old"],
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        })
+    );
+
+    // As of version: one that does not exist
+    pretty_assertions::assert_eq!(
+        GraphQLQueryRequest::new(
+            AS_OF_VERSION_QUERY,
+            async_graphql::Variables::from_json(json!({
+                "oclId": OCL_ID,
+                "version": 3,
+            })),
+        )
+        .execute(&harness.schema, &harness.catalog_authorized)
+        .await
+        .data,
+        value!({
+            "molecule": {
+                "v3": {
+                    "project": {
+                        "dataRoom": {
+                            "latest": {
+                                "entry": {
+                                    "asVersionedFile": {
+                                        "asOf": null,
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        })
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
