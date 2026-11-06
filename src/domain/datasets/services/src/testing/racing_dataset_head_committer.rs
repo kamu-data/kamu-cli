@@ -37,6 +37,12 @@ impl RacingDatasetHeadCommitter {
             Some(ConcurrentHeadMove::new(catalog, concurrent_head));
     }
 
+    /// Arms the next `commit_head` to remove `HEAD` first, in a transaction of
+    /// its own made from `catalog`
+    pub fn remove_head_before_next_commit(&self, catalog: &dill::Catalog) {
+        *self.concurrent_head_move.lock().unwrap() = Some(ConcurrentHeadMove::removing(catalog));
+    }
+
     /// Arms the next `commit_head` to fail as not allowed, moving nothing
     pub fn deny_next_commit(&self) {
         *self.deny_next_commit.lock().unwrap() = true;

@@ -58,9 +58,7 @@ async fn test_http_methods(
         } else {
             CurrentAccountSubject::Anonymous(AnonymousAccountReason::NoAuthenticationProvided)
         },
-        ServerHarness::mock_dataset_permission_checker(
-            granted_permissions.iter().copied().collect(),
-        ),
+        granted_permissions.iter().copied().collect(),
     )
     .await;
 
@@ -323,7 +321,7 @@ async fn test_dataset_access_safe_method_but_potential_write_logged_authorized_f
 async fn test_dataset_access_invalid_token_returns_unauthorized() {
     let server_harness = ServerHarness::new(
         CurrentAccountSubject::Anonymous(AnonymousAccountReason::AuthenticationInvalid),
-        ServerHarness::mock_dataset_permission_checker(HashSet::new()),
+        HashSet::new(),
     )
     .await;
 
@@ -364,10 +362,16 @@ struct ServerHarness {
 }
 
 impl ServerHarness {
+    /// The permission checker grants `granted_permissions` only when asked
+    /// for the principal of `current_account_subject`
     pub async fn new(
         current_account_subject: CurrentAccountSubject,
-        dataset_permission_checker: MockDatasetPermissionChecker,
+        granted_permissions: HashSet<DatasetPermission>,
     ) -> Self {
+        let dataset_permission_checker = Self::mock_dataset_permission_checker(
+            Principal::from(&current_account_subject),
+            granted_permissions,
+        );
         let temp_dir = tempfile::TempDir::new().unwrap();
         let datasets_dir = temp_dir.path().join("datasets");
         std::fs::create_dir(&datasets_dir).unwrap();
@@ -483,16 +487,17 @@ impl ServerHarness {
         }
     }
 
-    pub fn mock_dataset_permission_checker(
+    fn mock_dataset_permission_checker(
+        expected_principal: Principal,
         granted_permissions: HashSet<DatasetPermission>,
     ) -> MockDatasetPermissionChecker {
-        use mockall::predicate::{always, function};
+        use mockall::predicate::{eq, function};
 
         let mut mock_dataset_permission_checker = MockDatasetPermissionChecker::new();
         mock_dataset_permission_checker
             .expect_get_granted_permissions()
             .with(
-                always(),
+                eq(expected_principal),
                 function(|dataset_id: &odf::DatasetID| *dataset_id == Self::dataset_id()),
             )
             .returning(move |_, _| Ok(granted_permissions.clone()));

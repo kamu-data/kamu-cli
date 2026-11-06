@@ -154,3 +154,52 @@ kamu_cli_execute_command_e2e_test!(
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+kamu_cli_execute_command_e2e_test!(
+    storage = postgres,
+    fixture = kamu_cli_e2e_repo_tests::commands::test_pull_uncacheable_source,
+    options = Options::default().with_frozen_system_time(),
+    extra_test_groups = "engine, ingest, datafusion"
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+kamu_cli_execute_command_e2e_test!(
+    storage = postgres,
+    fixture = kamu_cli_e2e_repo_tests::commands::test_pull_derivative_with_engine_name_in_any_case,
+    extra_test_groups = "containerized, engine, transform, datafusion"
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+kamu_cli_execute_command_e2e_test!(
+    storage = postgres,
+    fixture = kamu_cli_e2e_repo_tests::commands::test_pull_derivative_with_unknown_engine_fails,
+    extra_test_groups = "engine, transform"
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+kamu_cli_execute_command_e2e_test!(
+    storage = postgres,
+    fixture =
+        kamu_cli_e2e_repo_tests::commands::test_pull_derivative_without_transform_with_other_datasets_fails
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+kamu_cli_execute_command_e2e_test!(
+    storage = postgres,
+    fixture = kamu_cli_e2e_repo_tests::commands::test_pull_derivative_after_inputs_changed_fails,
+    extra_test_groups = "containerized, engine, transform, datafusion"
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+kamu_cli_execute_command_e2e_test!(
+    storage = postgres,
+    fixture = kamu_cli_e2e_repo_tests::commands::test_pull_reset_derivative_without_new_input_data,
+    extra_test_groups = "containerized, engine, transform, datafusion"
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

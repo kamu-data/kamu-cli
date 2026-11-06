@@ -19,6 +19,7 @@ use kamu_accounts::{
     CurrentAccountSubjectCatalogExt as _,
     DidSecretEncryptionConfig,
     PredefinedAccountsConfig,
+    Principal,
 };
 use kamu_accounts_inmem::{
     InMemoryAccountQuotaEventStore,
@@ -81,6 +82,49 @@ async fn test_service_handler() {
             res.headers()["content-type"],
             "application/xml;charset=utf-8"
         );
+
+        let body = res.text().await.unwrap();
+        pretty_assertions::assert_eq!(
+            body,
+            indoc!(
+                r#"
+                <?xml version="1.0" encoding="utf-8"?>
+                <service xml:base="http://example.com/odata"
+                 xmlns="http://www.w3.org/2007/app"
+                 xmlns:atom="http://www.w3.org/2005/Atom">
+                <workspace>
+                <atom:title>default</atom:title>
+                <collection href="foo.bar">
+                <atom:title>foo.bar</atom:title>
+                </collection>
+                </workspace>
+                </service>
+                "#
+            )
+            .replace('\n', "")
+        );
+    };
+
+    await_client_server_flow!(harness.api_server.run(), client);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_group::group(engine, datafusion)]
+#[test_log::test(tokio::test)]
+async fn test_service_handler_hides_unreadable_datasets() {
+    let harness =
+        TestHarness::new_with_permission_checker(TestHarness::reading_only("foo.bar")).await;
+
+    harness.create_simple_dataset().await;
+    harness.create_empty_dataset("foo.hidden").await;
+
+    let service_url = format!("http://{}/odata", harness.api_server.local_addr());
+
+    let client = async move {
+        let cl = reqwest::Client::new();
+        let res = cl.get(&service_url).send().await.unwrap();
+        assert_eq!(res.status(), http::StatusCode::OK);
 
         let body = res.text().await.unwrap();
         pretty_assertions::assert_eq!(
@@ -477,6 +521,40 @@ impl TestHarness {
             catalog,
             api_server,
         }
+    }
+
+    /// Grants `Read` to the test account on the named dataset only
+    fn reading_only(readable_dataset_name: &'static str) -> MockDatasetPermissionChecker {
+        let expected_principal = Principal::from(&CurrentAccountSubject::new_test());
+        let mut checker = MockDatasetPermissionChecker::new();
+        checker
+            .expect_filter_datasets_allowing()
+            .withf(move |principal, _, permission| {
+                *principal == expected_principal && *permission == DatasetPermission::Read
+            })
+            .returning(move |_, handles, _| {
+                Ok(handles
+                    .into_iter()
+                    .filter(|hdl| hdl.alias.dataset_name.as_str() == readable_dataset_name)
+                    .collect())
+            });
+        checker
+    }
+
+    /// A root dataset with no data
+    async fn create_empty_dataset(&self, name: &str) -> CreateDatasetResult {
+        self.catalog
+            .get_one::<dyn CreateDatasetFromSnapshotUseCase>()
+            .unwrap()
+            .execute(
+                MetadataFactory::dataset_snapshot()
+                    .name(name)
+                    .kind(odf::DatasetKind::Root)
+                    .build(),
+                Default::default(),
+            )
+            .await
+            .unwrap()
     }
 
     async fn create_simple_dataset(&self) -> CreateDatasetResult {

@@ -10,8 +10,8 @@
 use std::any::TypeId;
 use std::sync::Arc;
 
-use kamu::DatasetUpdateStepsImpl;
-use kamu::testing::{BaseUseCaseHarness, BaseUseCaseHarnessOptions};
+use internal_error::ErrorIntoInternal;
+use kamu::testing::{BaseUseCaseHarness, BaseUseCaseHarnessOptions, RacingDatasetUpdateSteps};
 use kamu_adapter_task_dataset::{
     CompactionDatasetTaskRunner,
     DatasetHeadMovedError,
@@ -25,7 +25,7 @@ use kamu_core::testing::ReportedHeads;
 use kamu_core::*;
 use kamu_datasets::{CreateDatasetResult, ResolvedDataset};
 use kamu_datasets_services::DatasetHeadCommitterImpl;
-use kamu_task_system::{TaskDefinition, TaskOutcome, TaskRunner, TaskRunnerMeta};
+use kamu_task_system::{TaskDefinition, TaskError, TaskOutcome, TaskRunner, TaskRunnerMeta};
 use pretty_assertions::assert_eq;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -178,6 +178,72 @@ async fn test_reset_to_metadata_head_moved_concurrently_fails_recoverably() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[tokio::test]
+async fn test_hard_compact_of_dataset_deleted_before_commit_fails_unrecoverably() {
+    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let reported_heads = ReportedHeads::default();
+
+    let harness = CompactionTaskRunnersHarness::new(
+        MockCompactionExecutor::new()
+            .make_expect_compaction_success(alias_foo.clone(), reported_heads.clone()),
+    );
+    let foo = harness.create_root_dataset(&alias_foo).await;
+    let compacted_head = harness.append_unreferenced_block(&foo, "compacted").await;
+    reported_heads.set(&foo.head, &compacted_head);
+    harness.delete_dataset_before_next_commit();
+
+    let outcome = harness.run_hard_compact(&foo).await;
+
+    assert_eq!(
+        TaskOutcome::Failed(TaskError::empty_unrecoverable()),
+        outcome
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[tokio::test]
+async fn test_hard_compact_execution_failure_fails_recoverably() {
+    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+
+    let harness = CompactionTaskRunnersHarness::new(
+        CompactionTaskRunnersHarness::failing_executor(&alias_foo),
+    );
+    let foo = harness.create_root_dataset(&alias_foo).await;
+
+    let outcome = harness.run_hard_compact(&foo).await;
+
+    assert_eq!(TaskOutcome::Failed(TaskError::empty_recoverable()), outcome);
+    assert_eq!(harness.get_head(&foo).await, foo.head);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[tokio::test]
+async fn test_hard_compact_with_nothing_to_do_succeeds_without_moving_head() {
+    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+
+    let harness = CompactionTaskRunnersHarness::new(
+        MockCompactionExecutor::new().make_expect_compaction_nothing_to_do(alias_foo.clone()),
+    );
+    let foo = harness.create_root_dataset(&alias_foo).await;
+
+    let outcome = harness.run_hard_compact(&foo).await;
+
+    assert_eq!(
+        TaskOutcome::Success(
+            TaskResultDatasetHardCompact {
+                compaction_result: CompactionResult::NothingToDo,
+            }
+            .into_task_result()
+        ),
+        outcome,
+    );
+    assert_eq!(harness.get_head(&foo).await, foo.head);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[oop::extend(BaseUseCaseHarness, base_use_case_harness)]
 struct CompactionTaskRunnersHarness {
     base_use_case_harness: BaseUseCaseHarness,
@@ -189,8 +255,8 @@ impl CompactionTaskRunnersHarness {
         let base_use_case_harness = BaseUseCaseHarness::new(BaseUseCaseHarnessOptions::new());
 
         let mut b = dill::CatalogBuilder::new_chained(base_use_case_harness.catalog());
+        RacingDatasetUpdateSteps::register(&mut b);
         b.add::<CompactionDatasetTaskRunner>()
-            .add::<DatasetUpdateStepsImpl>()
             .add::<DatasetHeadCommitterImpl>()
             .add_value(mock_compaction_executor)
             .bind::<dyn CompactionExecutor, MockCompactionExecutor>();
@@ -201,6 +267,25 @@ impl CompactionTaskRunnersHarness {
             base_use_case_harness,
             catalog: b.build(),
         }
+    }
+
+    /// Expects one compaction of `alias` that fails
+    fn failing_executor(alias: &odf::DatasetAlias) -> MockCompactionExecutor {
+        let alias = alias.clone();
+        let mut mock_compaction_executor = MockCompactionExecutor::new();
+        mock_compaction_executor
+            .expect_execute()
+            .withf(move |target, _, _| target.get_alias() == &alias)
+            .times(1)
+            .returning(|_, _, _| Err("Cannot write the compacted slice".int_err().into()));
+        mock_compaction_executor
+    }
+
+    fn delete_dataset_before_next_commit(&self) {
+        self.catalog
+            .get_one::<RacingDatasetUpdateSteps>()
+            .unwrap()
+            .delete_dataset_before_next_commit();
     }
 
     /// Implementations registered for the task type, looked up the way the

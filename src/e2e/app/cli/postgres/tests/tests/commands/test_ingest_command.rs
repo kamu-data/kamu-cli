@@ -67,3 +67,30 @@ kamu_cli_execute_command_e2e_test!(
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+kamu_cli_execute_command_e2e_test!(
+    storage = postgres,
+    fixture = kamu_cli_e2e_repo_tests::commands::test_ingest_into_derivative_fails,
+    options = Options::default().with_frozen_system_time(),
+    extra_test_groups = "engine, ingest, datafusion"
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+kamu_cli_execute_command_e2e_test!(
+    storage = postgres,
+    fixture = kamu_cli_e2e_repo_tests::commands::test_ingest_with_unknown_source_name_fails,
+    options = Options::default().with_frozen_system_time(),
+    extra_test_groups = "engine, ingest, datafusion"
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+kamu_cli_execute_command_e2e_test!(
+    storage = postgres,
+    fixture = kamu_cli_e2e_repo_tests::commands::test_ingest_of_unparsable_value_fails,
+    options = Options::default().with_frozen_system_time(),
+    extra_test_groups = "engine, ingest, datafusion"
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

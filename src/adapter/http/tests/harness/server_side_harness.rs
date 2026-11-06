@@ -128,6 +128,9 @@ pub(crate) trait ServerSideHarness {
 pub(crate) struct ServerSideHarnessOptions {
     pub tenancy_config: TenancyConfig,
     pub authorized_writes: bool,
+    /// Builds the permission checker of web requests in place of the one
+    /// `authorized_writes` selects
+    pub web_permission_checker: Option<fn() -> MockDatasetPermissionChecker>,
     pub base_catalog: Option<dill::Catalog>,
     pub smart_transfer_protocol_config: SmartTransferProtocolServerConfig,
 }
@@ -137,6 +140,7 @@ impl Default for ServerSideHarnessOptions {
         Self {
             tenancy_config: TenancyConfig::SingleTenant,
             authorized_writes: false,
+            web_permission_checker: None,
             base_catalog: None,
             smart_transfer_protocol_config: SmartTransferProtocolServerConfig {
                 upload_progress_interval: DEFAULT_UPLOAD_PROGRESS_INTERVAL,
@@ -193,7 +197,11 @@ pub(crate) fn create_web_user_catalog(
     options: &ServerSideHarnessOptions,
 ) -> dill::Catalog {
     let mut web_catalog_builder = dill::CatalogBuilder::new_chained(base_catalog);
-    if options.authorized_writes {
+    if let Some(make_checker) = options.web_permission_checker {
+        web_catalog_builder
+            .add_value(make_checker())
+            .bind::<dyn DatasetPermissionChecker, MockDatasetPermissionChecker>();
+    } else if options.authorized_writes {
         web_catalog_builder.add::<AlwaysHappyDatasetPermissionChecker>();
     } else {
         let mut mock_dataset_permission_checker = MockDatasetPermissionChecker::new();

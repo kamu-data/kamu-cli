@@ -17,9 +17,11 @@ use futures::TryStreamExt;
 use indoc::indoc;
 use kamu_accounts::{
     Account,
+    AccountHandle,
     AuthenticationService,
     GetAccountInfoError,
     MockAuthenticationService,
+    Principal,
 };
 use kamu_adapter_flight_sql::*;
 use kamu_core::{MockQueryService, QueryService};
@@ -40,7 +42,8 @@ impl Drop for FlightServer {
     }
 }
 
-async fn run_server() -> FlightServer {
+/// Serves a session created only for `session_principal`
+async fn run_server(session_principal: Principal) -> FlightServer {
     let ctx = SessionContext::new_with_config(
         SessionConfig::new()
             .with_information_schema(true)
@@ -73,6 +76,7 @@ async fn run_server() -> FlightServer {
     let mut query_svc: kamu_core::MockQueryService = kamu_core::MockQueryService::new();
     query_svc
         .expect_create_session()
+        .withf(move |principal| *principal == session_principal)
         .return_once(move |_| Ok(ctx));
 
     let mut b = dill::Catalog::builder();
@@ -132,7 +136,7 @@ async fn get_client(addr: &SocketAddr) -> FlightSqlServiceClient<Channel> {
 
 #[test_log::test(tokio::test)]
 async fn test_basic_auth_disabled() {
-    let server = run_server().await;
+    let server = run_server(Principal::Anonymous).await;
     let mut client = get_client(&server.addr).await;
 
     assert_matches!(client.handshake("admin", "zzz").await, Err(_));
@@ -142,7 +146,7 @@ async fn test_basic_auth_disabled() {
 
 #[test_log::test(tokio::test)]
 async fn test_invalid_bearer_token() {
-    let server = run_server().await;
+    let server = run_server(Principal::Anonymous).await;
     let mut client = get_client(&server.addr).await;
     client.set_token("invalid-token".to_string());
 
@@ -156,7 +160,7 @@ async fn test_invalid_bearer_token() {
 
 #[test_log::test(tokio::test)]
 async fn test_statement_anonymous() {
-    let server = run_server().await;
+    let server = run_server(Principal::Anonymous).await;
 
     let mut client = get_client(&server.addr).await;
     client.handshake("anonymous", "").await.unwrap();
@@ -213,7 +217,7 @@ async fn test_statement_anonymous() {
 
 #[test_log::test(tokio::test)]
 async fn test_statement_bearer() {
-    let server = run_server().await;
+    let server = run_server(Principal::User(AccountHandle::from(&Account::dummy()))).await;
 
     let mut client = get_client(&server.addr).await;
     client.set_token("valid-token".to_string());

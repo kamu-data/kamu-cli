@@ -18,6 +18,7 @@ use kamu_cli_e2e_common::{
 };
 use kamu_cli_puppet::KamuCliPuppet;
 use kamu_cli_puppet::extensions::KamuCliPuppetExt;
+use url::Url;
 
 use crate::utils::{commit_event, dataset_id, set_private};
 
@@ -208,6 +209,71 @@ pub async fn test_verify_replay_denied_when_input_became_unreadable(mut kamu: Ka
         ["verify", DATASET_DERIVATIVE_LEADERBOARD_NAME.as_str()],
         None,
         Some([r#"User has no 'read' permission in dataset 'bob/player-scores'"#]),
+    )
+    .await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_verify_pulled_derivative_without_its_input(kamu: KamuCliPuppet) {
+    let source = KamuCliPuppet::new_workspace_tmp_single_tenant().await;
+    source
+        .execute_with_input(["add", "--stdin"], DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR)
+        .await
+        .success();
+    source
+        .execute_with_input(
+            ["add", "--stdin"],
+            DATASET_DERIVATIVE_LEADERBOARD_SNAPSHOT_STR,
+        )
+        .await
+        .success();
+    source
+        .ingest_data(
+            &DATASET_ROOT_PLAYER_NAME,
+            DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_1,
+        )
+        .await;
+    source
+        .execute(["pull", DATASET_DERIVATIVE_LEADERBOARD_NAME.as_str()])
+        .await
+        .success();
+
+    let dataset_url = Url::from_directory_path(kamu.workspace_path().join("repo"))
+        .unwrap()
+        .join(DATASET_DERIVATIVE_LEADERBOARD_NAME.as_str())
+        .unwrap();
+    source
+        .execute([
+            "push",
+            DATASET_DERIVATIVE_LEADERBOARD_NAME.as_str(),
+            "--to",
+            dataset_url.as_str(),
+        ])
+        .await
+        .success();
+
+    kamu.execute(["pull", dataset_url.as_str()]).await.success();
+
+    // Replaying the transformation needs the input, which was never pulled
+    kamu.assert_success_command_execution(
+        ["verify", DATASET_DERIVATIVE_LEADERBOARD_NAME.as_str()],
+        None,
+        Some([
+            r#"Unable verify derivative transformation for some dataset\(s\)"#,
+            "or add --integrity flag and try again",
+        ]),
+    )
+    .await;
+
+    kamu.assert_success_command_execution(
+        [
+            "verify",
+            DATASET_DERIVATIVE_LEADERBOARD_NAME.as_str(),
+            "--integrity",
+        ],
+        None,
+        Some([r#"1 dataset\(s\) are valid"#]),
     )
     .await;
 }

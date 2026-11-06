@@ -76,7 +76,8 @@ fn create_random_parquet_file(path: PathBuf, offset_interval: &OffsetInterval) -
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// Appends a `SetInfo` block after the current `HEAD` without moving any
-/// reference
+/// reference. The block takes the `HEAD` block's system time, which keeps the
+/// chain monotonic whatever time the server's clock is set to.
 pub(crate) async fn append_unreferenced_block(
     dataset_registry: &dyn DatasetRegistry,
     dataset_handle: &odf::DatasetHandle,
@@ -93,6 +94,7 @@ pub(crate) async fn append_unreferenced_block(
             .build(),
     )
     .prev(&head, head_block.sequence_number)
+    .system_time(head_block.system_time)
     .build();
 
     chain

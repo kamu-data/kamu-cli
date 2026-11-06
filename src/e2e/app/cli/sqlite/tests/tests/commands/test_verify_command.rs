@@ -38,8 +38,7 @@ kamu_cli_execute_command_e2e_test!(
 kamu_cli_execute_command_e2e_test!(
     storage = sqlite,
     fixture = kamu_cli_e2e_repo_tests::commands::test_verify_derivative_after_query_change,
-    extra_test_groups = "containerized, engine, transform, datafusion",
-    sqlite_only = "checks engine and workspace behaviour; the repository type cannot change it"
+    extra_test_groups = "containerized, engine, transform, datafusion"
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -51,6 +50,14 @@ kamu_cli_execute_command_e2e_test!(
     options = Options::default()
         .with_multi_tenant()
         .with_kamu_config(MULTITENANT_KAMU_CONFIG_WITH_DEFAULT_USER),
+    extra_test_groups = "containerized, engine, transform, datafusion"
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+kamu_cli_execute_command_e2e_test!(
+    storage = sqlite,
+    fixture = kamu_cli_e2e_repo_tests::commands::test_verify_pulled_derivative_without_its_input,
     extra_test_groups = "containerized, engine, transform, datafusion"
 );
 

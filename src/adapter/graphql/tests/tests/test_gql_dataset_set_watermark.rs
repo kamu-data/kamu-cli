@@ -96,6 +96,36 @@ async fn test_set_watermark_head_moved_concurrently() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[test_log::test(tokio::test)]
+async fn test_set_watermark_head_removed_concurrently() {
+    let harness = SetWatermarkHarness::new().await;
+    let foo = harness.create_root_dataset().await;
+    let planned_head = harness.stored_head(&foo).await;
+
+    harness.remove_head_before_next_commit();
+
+    let res = harness.set_watermark(&foo).await;
+
+    assert!(res.is_ok(), "{res:?}");
+    assert_eq!(
+        async_graphql::value!({
+            "datasets": {
+                "byId": {
+                    "setWatermark": {
+                        "__typename": "SetWatermarkCasFailed",
+                        "message": "Expected head didn't match, dataset was likely updated concurrently",
+                        "expectedHead": planned_head.to_string(),
+                        "actualHead": null,
+                    }
+                }
+            }
+        }),
+        res.data,
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 struct SetWatermarkHarness {
     base_gql_harness: BaseGQLDatasetHarness,
     catalog_authorized: dill::Catalog,
@@ -187,6 +217,11 @@ impl SetWatermarkHarness {
     fn move_head_before_next_commit(&self, concurrent_head: odf::Multihash) {
         self.racing_committer
             .move_head_before_next_commit(&self.catalog_authorized, concurrent_head);
+    }
+
+    fn remove_head_before_next_commit(&self) {
+        self.racing_committer
+            .remove_head_before_next_commit(&self.catalog_authorized);
     }
 
     async fn stored_head(&self, created: &CreateDatasetResult) -> odf::Multihash {

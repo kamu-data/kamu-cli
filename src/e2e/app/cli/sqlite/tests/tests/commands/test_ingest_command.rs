@@ -61,8 +61,7 @@ kamu_cli_execute_command_e2e_test!(
     storage = sqlite,
     fixture = kamu_cli_e2e_repo_tests::commands::test_ingest_into_derivative_fails,
     options = Options::default().with_frozen_system_time(),
-    extra_test_groups = "engine, ingest, datafusion",
-    sqlite_only = "checks a CLI error message; the repository type cannot change it"
+    extra_test_groups = "engine, ingest, datafusion"
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -92,8 +91,7 @@ kamu_cli_execute_command_e2e_test!(
     storage = sqlite,
     fixture = kamu_cli_e2e_repo_tests::commands::test_ingest_with_unknown_source_name_fails,
     options = Options::default().with_frozen_system_time(),
-    extra_test_groups = "engine, ingest, datafusion",
-    sqlite_only = "checks a CLI error message; the repository type cannot change it"
+    extra_test_groups = "engine, ingest, datafusion"
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -102,8 +100,17 @@ kamu_cli_execute_command_e2e_test!(
     storage = sqlite,
     fixture = kamu_cli_e2e_repo_tests::commands::test_ingest_of_unparsable_value_fails,
     options = Options::default().with_frozen_system_time(),
+    extra_test_groups = "engine, ingest, datafusion"
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+kamu_cli_execute_command_e2e_test!(
+    storage = sqlite,
+    fixture = kamu_cli_e2e_repo_tests::commands::test_ingest_into_dataset_with_pull_alias_fails,
+    options = Options::default().with_frozen_system_time(),
     extra_test_groups = "engine, ingest, datafusion",
-    sqlite_only = "checks a CLI error message; the repository type cannot change it"
+    sqlite_only = "pull aliases are workspace files; the repository type cannot change them"
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -551,3 +551,33 @@ pub async fn test_ingest_of_unparsable_value_fails(kamu: KamuCliPuppet) {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_ingest_into_dataset_with_pull_alias_fails(kamu: KamuCliPuppet) {
+    kamu.execute_with_input(["add", "--stdin"], DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR)
+        .await
+        .success();
+    kamu.execute([
+        "repo",
+        "alias",
+        "add",
+        "player-scores",
+        "odf+http://example.com/x",
+        "--pull",
+    ])
+    .await
+    .success();
+
+    kamu.assert_failure_command_execution_with_input(
+        ["ingest", "player-scores", "--stdin"],
+        DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_1,
+        None,
+        Some([
+            "Ingesting data into a dataset that is pulled from a remote will cause histories to \
+             diverge",
+            "kamu repo alias list",
+        ]),
+    )
+    .await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

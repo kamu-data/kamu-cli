@@ -22,7 +22,7 @@ use pretty_assertions::assert_eq;
 use crate::utils::{
     BaseGQLDatasetHarness,
     PredefinedAccountOpts,
-    authentication_catalogs,
+    authentication_catalogs_ext,
     expect_anonymous_access_error,
 };
 
@@ -348,6 +348,59 @@ async fn test_dataset_by_account_id() {
             }
         }),
         res.data,
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_private_dataset_listings_check_request_principal() {
+    let harness = GraphQLDatasetsHarness::builder()
+        .tenancy_config(TenancyConfig::SingleTenant)
+        .build()
+        .await;
+
+    let foo = harness
+        .create_root_dataset(
+            None,
+            odf::DatasetName::new_unchecked("foo"),
+            odf::DatasetVisibility::Private,
+        )
+        .await;
+    let foo_id = &foo.dataset_handle.id;
+    let none = Vec::<String>::new();
+
+    for caller in [Caller::Anonymous, Caller::Stranger] {
+        assert_eq!(
+            harness.datasets_by_account_id(caller).await,
+            none,
+            "{caller:?}"
+        );
+        assert_eq!(
+            harness.account_owned_datasets(caller).await,
+            none,
+            "{caller:?}"
+        );
+        assert_eq!(
+            harness.datasets_by_ids(caller, foo_id).await,
+            none,
+            "{caller:?}"
+        );
+    }
+    assert_eq!(
+        harness.datasets_mut_by_ids(Caller::Stranger, foo_id).await,
+        none
+    );
+
+    assert_eq!(harness.datasets_by_account_id(Caller::Owner).await, ["foo"]);
+    assert_eq!(harness.account_owned_datasets(Caller::Owner).await, ["foo"]);
+    assert_eq!(
+        harness.datasets_by_ids(Caller::Owner, foo_id).await,
+        ["foo"]
+    );
+    assert_eq!(
+        harness.datasets_mut_by_ids(Caller::Owner, foo_id).await,
+        ["foo"]
     );
 }
 
@@ -1057,6 +1110,7 @@ async fn test_dataset_view_permissions(
 #[oop::extend(BaseGQLDatasetHarness, base_gql_harness)]
 struct GraphQLDatasetsHarness {
     base_gql_harness: BaseGQLDatasetHarness,
+    catalog_no_subject: dill::Catalog,
     catalog_anonymous: dill::Catalog,
     catalog_authorized: dill::Catalog,
 }
@@ -1085,13 +1139,15 @@ impl GraphQLDatasetsHarness {
             b.build()
         };
 
-        let (catalog_anonymous, catalog_authorized) =
-            authentication_catalogs(&base_catalog, PredefinedAccountOpts::default()).await;
+        let auth_catalogs =
+            authentication_catalogs_ext(&base_catalog, None, PredefinedAccountOpts::default())
+                .await;
 
         Self {
             base_gql_harness,
-            catalog_anonymous,
-            catalog_authorized,
+            catalog_no_subject: auth_catalogs.catalog_no_subject,
+            catalog_anonymous: auth_catalogs.catalog_anonymous,
+            catalog_authorized: auth_catalogs.catalog_authorized,
         }
     }
 
@@ -1162,6 +1218,91 @@ impl GraphQLDatasetsHarness {
     ) -> async_graphql::Response {
         self.execute_query(query, &self.catalog_anonymous).await
     }
+
+    fn catalog_of(&self, caller: Caller) -> dill::Catalog {
+        match caller {
+            Caller::Anonymous => self.catalog_anonymous.clone(),
+            Caller::Owner => self.catalog_authorized.clone(),
+            Caller::Stranger => dill::CatalogBuilder::new_chained(&self.catalog_no_subject)
+                .add_current_account_subject(CurrentAccountSubject::new_test_with(&"stranger"))
+                .build(),
+        }
+    }
+
+    pub async fn datasets_by_account_id(&self, caller: Caller) -> Vec<String> {
+        let query = r#"{ datasets { byAccountId(accountId: "<id>") { nodes { name } } } }"#
+            .replace("<id>", &TEST_ACCOUNT_ID.to_string());
+        self.dataset_names(caller, query, &["datasets", "byAccountId", "nodes"])
+            .await
+    }
+
+    pub async fn account_owned_datasets(&self, caller: Caller) -> Vec<String> {
+        let query =
+            r#"{ accounts { byName(name: "<name>") { ownedDatasets { nodes { name } } } } }"#
+                .replace("<name>", DEFAULT_ACCOUNT_NAME_STR);
+        self.dataset_names(
+            caller,
+            query,
+            &["accounts", "byName", "ownedDatasets", "nodes"],
+        )
+        .await
+    }
+
+    pub async fn datasets_by_ids(&self, caller: Caller, id: &odf::DatasetID) -> Vec<String> {
+        let query = r#"{ datasets { byIds(datasetIds: ["<id>"], skipMissing: true) { name } } }"#
+            .replace("<id>", &id.to_string());
+        self.dataset_names(caller, query, &["datasets", "byIds"])
+            .await
+    }
+
+    pub async fn datasets_mut_by_ids(&self, caller: Caller, id: &odf::DatasetID) -> Vec<String> {
+        let query = indoc!(
+            r#"
+            mutation {
+                datasets { byIds(datasetIds: ["<id>"], skipMissing: true) { dataset { name } } }
+            }
+            "#
+        )
+        .replace("<id>", &id.to_string());
+        let datasets_mut = self.query_json(caller, query, &["datasets", "byIds"]).await;
+
+        datasets_mut
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|dataset_mut| dataset_mut["dataset"]["name"].as_str().unwrap().to_string())
+            .collect()
+    }
+
+    /// Names of the datasets listed at `path` in the query's response
+    async fn dataset_names(&self, caller: Caller, query: String, path: &[&str]) -> Vec<String> {
+        self.query_json(caller, query, path)
+            .await
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|dataset| dataset["name"].as_str().unwrap().to_string())
+            .collect()
+    }
+
+    async fn query_json(&self, caller: Caller, query: String, path: &[&str]) -> serde_json::Value {
+        let response = self.execute_query(query, &self.catalog_of(caller)).await;
+        assert!(response.is_ok(), "{response:?}");
+
+        let json = response.data.into_json().unwrap();
+        path.iter().fold(&json, |value, key| &value[key]).clone()
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Clone, Copy)]
+enum Caller {
+    Anonymous,
+    /// The account that owns the datasets the harness creates
+    Owner,
+    /// A logged account without relations to any dataset
+    Stranger,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

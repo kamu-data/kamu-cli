@@ -8,24 +8,25 @@
 // by the Apache License, Version 2.0.
 
 use std::assert_matches;
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use chrono::{DateTime, TimeZone, Utc};
 use container_runtime::{ContainerRuntime, ContainerRuntimeConfig};
 use datafusion::arrow::datatypes::Schema;
-use internal_error::ErrorIntoInternal;
+use internal_error::{ErrorIntoInternal, InternalError};
 use kamu::testing::{
     BaseUseCaseHarness,
     BaseUseCaseHarnessOptions,
     DatasetTestHelper,
     DummySmartTransferProtocolClient,
+    RacingDatasetUpdateSteps,
 };
 use kamu::utils::ipfs_wrapper::IpfsClient;
 use kamu::utils::simple_transfer_protocol::SimpleTransferProtocol;
 use kamu::{
     DataFormatRegistryImpl,
-    DatasetUpdateStepsImpl,
     EngineConfigDatafusionEmbeddedIngest,
     EngineProvisionerNull,
     FetchService,
@@ -57,7 +58,15 @@ use kamu_adapter_task_dataset::{
 use kamu_core::engine::TransformResponseExt;
 use kamu_core::testing::{MockIngestIteration, ReportedHeads};
 use kamu_core::*;
-use kamu_datasets::{CreateDatasetResult, DatasetHeadCommitter};
+use kamu_datasets::{
+    CreateDatasetResult,
+    DatasetEnvVar,
+    DatasetEnvVarResolver,
+    DatasetEnvVarValue,
+    DatasetHeadCommitter,
+    GetDatasetEnvVarError,
+    SecretsEncryptionConfig,
+};
 use kamu_datasets_services::DatasetKeyValueServiceSysEnv;
 use kamu_datasets_services::testing::RacingDatasetHeadCommitter;
 use kamu_task_system::{TaskDefinition, TaskError, TaskOutcome, TaskRunner};
@@ -889,12 +898,98 @@ async fn test_sync_into_deleted_dataset_fails_unrecoverably() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[tokio::test]
+async fn test_ingest_passes_resolved_env_vars_to_the_ingest() {
+    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+
+    let harness = UpdateDatasetTaskRunnerHarness::new_ingesting_expecting_env_var(
+        &alias_foo,
+        ConstDatasetEnvVarResolver::KEY,
+    );
+    let foo = harness.create_root_dataset(&alias_foo).await;
+
+    let outcome = harness.run_ingest_update(&foo).await;
+
+    assert_matches!(outcome, TaskOutcome::Success(_));
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[tokio::test]
+async fn test_ingest_planning_failure_fails_recoverably() {
+    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+
+    let harness = UpdateDatasetTaskRunnerHarness::new(UpdateDatasetTaskRunnerMocks {
+        env_var_resolution: Some(EnvVarResolution::Failing),
+        ..UpdateDatasetTaskRunnerMocks::default()
+    });
+    let foo = harness.create_root_dataset(&alias_foo).await;
+
+    let outcome = harness.run_ingest_update(&foo).await;
+
+    assert_eq!(TaskOutcome::Failed(TaskError::empty_recoverable()), outcome);
+    assert_eq!(harness.get_head(&foo).await, foo.head);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[tokio::test]
+async fn test_ingest_of_dataset_deleted_before_commit_fails_unrecoverably() {
+    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let reported_heads = ReportedHeads::default();
+
+    let harness = UpdateDatasetTaskRunnerHarness::new(UpdateDatasetTaskRunnerMocks {
+        mock_polling_ingest_service: MockPollingIngestService::new()
+            .make_expect_ingest_updated(alias_foo.clone(), reported_heads.clone()),
+        ..UpdateDatasetTaskRunnerMocks::default()
+    });
+    let foo = harness.create_root_dataset(&alias_foo).await;
+    let ingested_head = harness.append_unreferenced_block(&foo, "ingested").await;
+    reported_heads.set(&foo.head, &ingested_head);
+    harness.delete_dataset_before_next_commit();
+
+    let outcome = harness.run_ingest_update(&foo).await;
+
+    assert_eq!(
+        TaskOutcome::Failed(TaskError::empty_unrecoverable()),
+        outcome
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[tokio::test]
+async fn test_transform_of_dataset_deleted_before_commit_fails_unrecoverably() {
+    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let alias_bar = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("bar"));
+    let reported_heads = ReportedHeads::default();
+
+    let harness = UpdateDatasetTaskRunnerHarness::new_transforming(&alias_bar, &reported_heads);
+    let foo = harness.create_root_dataset(&alias_foo).await;
+    let bar = harness
+        .create_derived_dataset(&alias_bar, vec![foo.dataset_handle.as_local_ref()])
+        .await;
+    let transformed_head = harness.append_unreferenced_block(&bar, "transformed").await;
+    reported_heads.set(&bar.head, &transformed_head);
+    harness.delete_dataset_before_next_commit();
+
+    let outcome = harness.run_transform_update(&bar).await;
+
+    assert_eq!(
+        TaskOutcome::Failed(TaskError::empty_unrecoverable()),
+        outcome
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[oop::extend(BaseUseCaseHarness, base_use_case_harness)]
 struct UpdateDatasetTaskRunnerHarness {
     base_use_case_harness: BaseUseCaseHarness,
     catalog: dill::Catalog,
     runner: Arc<dyn TaskRunner>,
     racing_committer: Arc<RacingDatasetHeadCommitter>,
+    racing_update_steps: Arc<RacingDatasetUpdateSteps>,
 }
 
 impl UpdateDatasetTaskRunnerHarness {
@@ -908,6 +1003,41 @@ impl UpdateDatasetTaskRunnerHarness {
                 .bind::<dyn TransformPlanner, MockTransformPlanner>()
                 .add_value(mocks.mock_transform_executor)
                 .bind::<dyn TransformExecutor, MockTransformExecutor>();
+
+            match mocks.env_var_resolution {
+                None => {}
+                Some(EnvVarResolution::Const) => {
+                    b.add_value(SecretsEncryptionConfig::sample())
+                        .add::<ConstDatasetEnvVarResolver>();
+                }
+                Some(EnvVarResolution::Failing) => {
+                    b.add_value(SecretsEncryptionConfig::sample())
+                        .add::<FailingDatasetEnvVarResolver>();
+                }
+            }
+        })
+    }
+
+    /// Expects one up-to-date ingest of `alias` that receives `env_var_key`,
+    /// resolved by [`ConstDatasetEnvVarResolver`]
+    fn new_ingesting_expecting_env_var(
+        alias: &odf::DatasetAlias,
+        env_var_key: &'static str,
+    ) -> Self {
+        let mut mock_polling_ingest_service = MockPollingIngestService::new();
+        let alias = alias.clone();
+        mock_polling_ingest_service
+            .expect_ingest()
+            .withf(move |target, _, _, env_vars, _, _| {
+                target.get_alias() == &alias && env_vars.as_map().contains_key(env_var_key)
+            })
+            .times(1)
+            .returning(|_, _, _, _, _, _| Ok(PollingIngestResult::UpToDate { uncacheable: false }));
+
+        Self::new(UpdateDatasetTaskRunnerMocks {
+            mock_polling_ingest_service,
+            env_var_resolution: Some(EnvVarResolution::Const),
+            ..UpdateDatasetTaskRunnerMocks::default()
         })
     }
 
@@ -997,8 +1127,8 @@ impl UpdateDatasetTaskRunnerHarness {
         let base_use_case_harness = BaseUseCaseHarness::new(BaseUseCaseHarnessOptions::new());
 
         let mut b = dill::CatalogBuilder::new_chained(base_use_case_harness.catalog());
+        RacingDatasetUpdateSteps::register(&mut b);
         b.add::<UpdateDatasetTaskRunner>()
-            .add::<DatasetUpdateStepsImpl>()
             .add::<PollingIngestPlannerImpl>()
             .add_value(RacingDatasetHeadCommitter::default())
             .bind::<dyn DatasetHeadCommitter, RacingDatasetHeadCommitter>()
@@ -1013,6 +1143,7 @@ impl UpdateDatasetTaskRunnerHarness {
             base_use_case_harness,
             runner: catalog.get_one::<UpdateDatasetTaskRunner>().unwrap(),
             racing_committer: catalog.get_one().unwrap(),
+            racing_update_steps: catalog.get_one().unwrap(),
             catalog,
         }
     }
@@ -1177,6 +1308,10 @@ impl UpdateDatasetTaskRunnerHarness {
         self.racing_committer.deny_next_commit();
     }
 
+    fn delete_dataset_before_next_commit(&self) {
+        self.racing_update_steps.delete_dataset_before_next_commit();
+    }
+
     /// Writes the file a polling source reads, in the harness's directory
     fn write_source_file(&self, contents: &str) -> PathBuf {
         let path = self.temp_dir_path().join("data.csv");
@@ -1277,6 +1412,81 @@ struct UpdateDatasetTaskRunnerMocks {
     mock_polling_ingest_service: MockPollingIngestService,
     mock_transform_planner: MockTransformPlanner,
     mock_transform_executor: MockTransformExecutor,
+    env_var_resolution: Option<EnvVarResolution>,
+}
+
+/// The dataset env-var resolver registered with secrets enabled, if any
+enum EnvVarResolution {
+    Const,
+    Failing,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Resolves one plain variable for every dataset
+#[dill::component]
+#[dill::interface(dyn DatasetEnvVarResolver)]
+struct ConstDatasetEnvVarResolver {}
+
+impl ConstDatasetEnvVarResolver {
+    const KEY: &'static str = "API_KEY";
+
+    fn env_var(dataset_id: &odf::DatasetID) -> DatasetEnvVar {
+        DatasetEnvVar::new(
+            Self::KEY,
+            Utc::now(),
+            &DatasetEnvVarValue::Regular("value".to_string()),
+            dataset_id,
+            "",
+        )
+        .unwrap()
+    }
+}
+
+#[async_trait::async_trait]
+impl DatasetEnvVarResolver for ConstDatasetEnvVarResolver {
+    async fn resolve_effective_env_vars(
+        &self,
+        dataset_id: &odf::DatasetID,
+    ) -> Result<HashMap<String, DatasetEnvVar>, InternalError> {
+        Ok(HashMap::from([(
+            Self::KEY.to_string(),
+            Self::env_var(dataset_id),
+        )]))
+    }
+
+    async fn get_env_var_by_entry_key(
+        &self,
+        dataset_id: &odf::DatasetID,
+        _entry_key: &str,
+    ) -> Result<DatasetEnvVar, GetDatasetEnvVarError> {
+        Ok(Self::env_var(dataset_id))
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Fails to resolve, as when the dataset's secrets cannot be decrypted
+#[dill::component]
+#[dill::interface(dyn DatasetEnvVarResolver)]
+struct FailingDatasetEnvVarResolver {}
+
+#[async_trait::async_trait]
+impl DatasetEnvVarResolver for FailingDatasetEnvVarResolver {
+    async fn resolve_effective_env_vars(
+        &self,
+        _dataset_id: &odf::DatasetID,
+    ) -> Result<HashMap<String, DatasetEnvVar>, InternalError> {
+        Err("Cannot decrypt the dataset's secrets".int_err())
+    }
+
+    async fn get_env_var_by_entry_key(
+        &self,
+        _dataset_id: &odf::DatasetID,
+        _entry_key: &str,
+    ) -> Result<DatasetEnvVar, GetDatasetEnvVarError> {
+        Err("Cannot decrypt the dataset's secrets".int_err().into())
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

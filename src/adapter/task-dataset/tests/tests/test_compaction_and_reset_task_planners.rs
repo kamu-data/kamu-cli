@@ -17,8 +17,10 @@ use kamu_adapter_task_dataset::{
     LogicalPlanDatasetResetToMetadata,
     ResetDatasetTaskPlanner,
     TaskDefinitionDatasetHardCompact,
+    TaskDefinitionDatasetResetToMetadata,
     TaskErrorDatasetReset,
 };
+use kamu_core::CompactionDataSliceBatch;
 use kamu_datasets::CreateDatasetResult;
 use kamu_task_system::{
     LogicalPlan,
@@ -28,6 +30,7 @@ use kamu_task_system::{
     TaskError,
     TaskID,
 };
+use odf::metadata::testing::MetadataFactory;
 use pretty_assertions::assert_eq;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -133,6 +136,74 @@ async fn test_reset_to_metadata_of_deleted_dataset_fails_unrecoverably() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[tokio::test]
+async fn test_hard_compaction_merges_slices_up_to_max_slice_records() {
+    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let harness = CompactionAndResetTaskPlannersHarness::new();
+    let foo = harness
+        .create_root_dataset_with_two_slices(&alias_foo)
+        .await;
+
+    let unlimited = harness
+        .plan_hard_compaction_merged_batches(&foo, None, None)
+        .await;
+    let limited = harness
+        .plan_hard_compaction_merged_batches(
+            &foo,
+            None,
+            Some(CompactionAndResetTaskPlannersHarness::SLICE_RECORDS),
+        )
+        .await;
+
+    assert_eq!((1, 0), (unlimited, limited));
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[tokio::test]
+async fn test_hard_compaction_merges_slices_up_to_max_slice_size() {
+    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let harness = CompactionAndResetTaskPlannersHarness::new();
+    let foo = harness
+        .create_root_dataset_with_two_slices(&alias_foo)
+        .await;
+
+    let unlimited = harness
+        .plan_hard_compaction_merged_batches(&foo, None, None)
+        .await;
+    let limited = harness
+        .plan_hard_compaction_merged_batches(
+            &foo,
+            Some(CompactionAndResetTaskPlannersHarness::SLICE_SIZE),
+            None,
+        )
+        .await;
+
+    assert_eq!((1, 0), (unlimited, limited));
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[tokio::test]
+async fn test_reset_to_metadata_of_derived_dataset_plans_for_the_dataset() {
+    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let alias_bar = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("bar"));
+    let harness = CompactionAndResetTaskPlannersHarness::new();
+    let foo = harness.create_root_dataset(&alias_foo).await;
+    let bar = harness
+        .create_derived_dataset(&alias_bar, vec![foo.dataset_handle.as_local_ref()])
+        .await;
+
+    let task_definition = harness.plan_reset_to_metadata(&bar).await.unwrap();
+
+    let task_reset = task_definition
+        .downcast::<TaskDefinitionDatasetResetToMetadata>()
+        .unwrap();
+    assert_eq!(bar.dataset_handle, *task_reset.target.get_handle());
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[oop::extend(BaseUseCaseHarness, base_use_case_harness)]
 struct CompactionAndResetTaskPlannersHarness {
     base_use_case_harness: BaseUseCaseHarness,
@@ -157,18 +228,95 @@ impl CompactionAndResetTaskPlannersHarness {
         }
     }
 
+    /// Records in each slice of [`Self::create_root_dataset_with_two_slices`]
+    const SLICE_RECORDS: u64 = 10;
+    /// Bytes in each slice of [`Self::create_root_dataset_with_two_slices`]
+    const SLICE_SIZE: u64 = 100;
+
     async fn plan_hard_compaction(
         &self,
         created: &CreateDatasetResult,
     ) -> Result<TaskDefinition, TaskError> {
+        self.plan_hard_compaction_with(created, None, None).await
+    }
+
+    async fn plan_hard_compaction_with(
+        &self,
+        created: &CreateDatasetResult,
+        max_slice_size: Option<u64>,
+        max_slice_records: Option<u64>,
+    ) -> Result<TaskDefinition, TaskError> {
         let logical_plan = LogicalPlanDatasetHardCompact {
             dataset_id: created.dataset_handle.id.clone(),
-            max_slice_size: None,
-            max_slice_records: None,
+            max_slice_size,
+            max_slice_records,
         }
         .into_logical_plan();
         self.prepare::<CompactionDatasetTaskPlanner>(&logical_plan)
             .await
+    }
+
+    /// How many batches of several slices the planned hard compaction merges
+    async fn plan_hard_compaction_merged_batches(
+        &self,
+        created: &CreateDatasetResult,
+        max_slice_size: Option<u64>,
+        max_slice_records: Option<u64>,
+    ) -> usize {
+        let task_compact = self
+            .plan_hard_compaction_with(created, max_slice_size, max_slice_records)
+            .await
+            .unwrap()
+            .downcast::<TaskDefinitionDatasetHardCompact>()
+            .unwrap();
+
+        task_compact
+            .compaction_plan
+            .data_slice_batches
+            .iter()
+            .filter(|batch| match batch {
+                CompactionDataSliceBatch::CompactedBatch(_) => true,
+                CompactionDataSliceBatch::SingleBlock(_) => false,
+            })
+            .count()
+    }
+
+    /// A root dataset with two data slices of [`Self::SLICE_RECORDS`] records
+    /// and [`Self::SLICE_SIZE`] bytes each, which a hard compaction without
+    /// limits merges into one
+    async fn create_root_dataset_with_two_slices(
+        &self,
+        alias: &odf::DatasetAlias,
+    ) -> CreateDatasetResult {
+        let created = self
+            .create_root_dataset_with_events(
+                alias,
+                vec![MetadataFactory::set_data_schema().build().into()],
+            )
+            .await;
+
+        let chain = created.dataset.as_metadata_chain();
+        for start in [0, Self::SLICE_RECORDS] {
+            let head = self.get_head(&created).await;
+            let head_block = chain.get_block(&head).await.unwrap();
+            chain
+                .append(
+                    MetadataFactory::metadata_block(
+                        MetadataFactory::add_data()
+                            .new_offset_interval(start, start + Self::SLICE_RECORDS - 1)
+                            .new_data_size(Self::SLICE_SIZE)
+                            .build(),
+                    )
+                    .prev(&head, head_block.sequence_number)
+                    .system_time(self.system_time_source().now())
+                    .build(),
+                    odf::dataset::AppendOpts::default(),
+                )
+                .await
+                .unwrap();
+        }
+
+        created
     }
 
     /// Plans a reset of `created` to its `Seed`, expecting `HEAD` at

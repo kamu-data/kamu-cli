@@ -15,6 +15,7 @@ mod dummy_smart_transfer_protocol_client;
 mod local_sync_helper;
 mod parquet_reader_helper;
 mod parquet_writer_helper;
+mod racing_dataset_update_steps;
 
 pub use base_repo_harness::*;
 pub use base_use_case_harness::*;
@@ -24,3 +25,4 @@ pub use dummy_smart_transfer_protocol_client::*;
 pub use local_sync_helper::*;
 pub use parquet_reader_helper::*;
 pub use parquet_writer_helper::*;
+pub use racing_dataset_update_steps::*;

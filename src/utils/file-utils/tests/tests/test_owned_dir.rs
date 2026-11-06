@@ -50,6 +50,22 @@ fn test_owned_dir_already_gone() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[cfg(unix)]
+#[test]
+fn test_owned_dir_removal_failure_does_not_panic() {
+    let harness = OwnedDirHarness::new();
+    let Some(path) = harness.make_undeletable_dir("run") else {
+        // Permissions do not bind this user, e.g. root
+        return;
+    };
+
+    drop(OwnedDir::new(&path, "test directory"));
+
+    assert!(path.exists());
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 struct OwnedDirHarness {
     temp_dir: tempfile::TempDir,
 }
@@ -71,6 +87,47 @@ impl OwnedDirHarness {
 
     fn missing_path(&self, name: &str) -> PathBuf {
         self.temp_dir.path().join(name)
+    }
+
+    /// A directory inside a read-only parent, so removing it fails with a
+    /// permission error. `None` when the read-only parent still accepts
+    /// writes, as it does for root.
+    #[cfg(unix)]
+    fn make_undeletable_dir(&self, name: &str) -> Option<PathBuf> {
+        use std::os::unix::fs::PermissionsExt;
+
+        let parent = self.locked_parent_path();
+        std::fs::create_dir(&parent).unwrap();
+        let path = parent.join(name);
+        std::fs::create_dir(&path).unwrap();
+        std::fs::set_permissions(&parent, std::fs::Permissions::from_mode(0o555)).unwrap();
+
+        let probe = parent.join("probe");
+        if std::fs::write(&probe, b"").is_ok() {
+            std::fs::remove_file(probe).unwrap();
+            return None;
+        }
+        Some(path)
+    }
+
+    fn locked_parent_path(&self) -> PathBuf {
+        self.temp_dir.path().join("locked")
+    }
+}
+
+impl Drop for OwnedDirHarness {
+    /// Unlocks the read-only parent, so the temporary directory can be
+    /// removed
+    fn drop(&mut self) {
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+
+            let parent = self.locked_parent_path();
+            if parent.exists() {
+                std::fs::set_permissions(&parent, std::fs::Permissions::from_mode(0o755)).unwrap();
+            }
+        }
     }
 }
 

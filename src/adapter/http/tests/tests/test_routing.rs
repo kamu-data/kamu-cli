@@ -9,10 +9,12 @@
 
 use std::future::IntoFuture;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
+use std::time::Duration;
 
 use ::serde::Deserialize;
 use axum::extract::{FromRequestParts, Path};
 use database_common::{DatabaseTransactionRunner, NoOpDatabasePlugin};
+use headers::Header as _;
 use kamu::domain::*;
 use kamu_accounts::{
     CurrentAccountSubject,
@@ -28,7 +30,9 @@ use kamu_accounts_services::{
     PredefinedAccountsRegistrator,
     UpdateAccountUseCaseImpl,
 };
-use kamu_adapter_http::DatasetAuthorizationLayer;
+use kamu_adapter_http::smart_protocol::SmartTransferProtocolServerConfig;
+use kamu_adapter_http::smart_protocol::messages::SMART_TRANSFER_PROTOCOL_VERSION;
+use kamu_adapter_http::{DatasetAuthorizationLayer, OdfSmtpVersion};
 use kamu_auth_rebac_inmem::InMemoryRebacRepository;
 use kamu_auth_rebac_services::{
     DefaultAccountProperties,
@@ -42,6 +46,8 @@ use messaging_outbox::{Outbox, OutboxImmediateImpl, register_message_dispatcher}
 use odf::dataset::{DatasetFactoryImpl, IpfsGateway};
 use odf::metadata::testing::MetadataFactory;
 use time_source::SystemTimeSourceDefault;
+use tokio_tungstenite::connect_async;
+use tokio_tungstenite::tungstenite::client::IntoClientRequest;
 use utoipa_axum::router::OpenApiRouter;
 
 use crate::harness::await_client_server_flow;
@@ -95,7 +101,11 @@ async fn setup_repo() -> RepoFixture {
         .add_value(DefaultAccountProperties::default())
         .add_value(DefaultDatasetProperties::default())
         .add_value(PredefinedAccountsConfig::test_single_tenant_with_id())
-        .add::<LoginPasswordAuthProvider>();
+        .add::<LoginPasswordAuthProvider>()
+        .add_value(ServerUrlConfig::new_test(None))
+        .add_value(SmartTransferProtocolServerConfig {
+            upload_progress_interval: Duration::from_secs(10),
+        });
 
     NoOpDatabasePlugin::init_database_components(&mut b);
 
@@ -136,6 +146,40 @@ async fn setup_repo() -> RepoFixture {
     }
 }
 
+impl RepoFixture {
+    async fn is_dataset_stored(&self, dataset_ref: &odf::DatasetRef) -> bool {
+        match self
+            .catalog
+            .get_one::<dyn DatasetRegistry>()
+            .unwrap()
+            .resolve_dataset_handle_by_ref(dataset_ref)
+            .await
+        {
+            Ok(_) => true,
+            Err(odf::DatasetRefUnresolvedError::NotFound(_)) => false,
+            Err(e @ odf::DatasetRefUnresolvedError::Internal(_)) => panic!("{e}"),
+        }
+    }
+
+    /// Status of a push websocket upgrade request for the dataset at
+    /// `dataset_url`
+    async fn push_upgrade_status(dataset_url: &str) -> http::StatusCode {
+        let mut request = format!("ws://{dataset_url}/push")
+            .into_client_request()
+            .unwrap();
+        request.headers_mut().append(
+            OdfSmtpVersion::name(),
+            http::HeaderValue::from(SMART_TRANSFER_PROTOCOL_VERSION),
+        );
+
+        match connect_async(request).await {
+            Ok((_, response)) => response.status(),
+            Err(tokio_tungstenite::tungstenite::Error::Http(response)) => response.status(),
+            Err(e) => panic!("{e}"),
+        }
+    }
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 async fn setup_server<IdExt, Extractor>(
@@ -156,7 +200,7 @@ where
                 .layer(DatasetAuthorizationLayer::default())
                 .layer(kamu_adapter_http::DatasetResolverLayer::new(
                     identity_extractor,
-                    |_| false, /* does not matter for routing tests */
+                    |request| request.uri().path() == "/push",
                 ))
                 .layer(axum::extract::Extension(catalog)),
         )
@@ -385,6 +429,60 @@ async fn test_routing_err_invalid_identity_format() {
     let client = async move {
         let res = reqwest::get(dataset_url).await.unwrap();
         assert_eq!(res.status(), http::StatusCode::BAD_REQUEST);
+    };
+
+    await_client_server_flow!(server, client);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_routing_push_to_missing_dataset_id_is_not_found() {
+    let repo = setup_repo().await;
+    let missing_id = odf::DatasetID::new_seeded_ed25519(b"missing");
+
+    let (server, local_addr) = setup_server(
+        repo.catalog.clone(),
+        "/{dataset_id}",
+        |Path(p): Path<DatasetByID>| p.dataset_id.as_local_ref(),
+    )
+    .await;
+
+    let dataset_url = format!("{local_addr}/{}", missing_id.as_did_str());
+
+    let client = async {
+        assert_eq!(
+            http::StatusCode::NOT_FOUND,
+            RepoFixture::push_upgrade_status(&dataset_url).await
+        );
+        assert!(!repo.is_dataset_stored(&missing_id.as_local_ref()).await);
+    };
+
+    await_client_server_flow!(server, client);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_routing_push_to_missing_dataset_alias_upgrades() {
+    let repo = setup_repo().await;
+
+    let (server, local_addr) = setup_server(
+        repo.catalog.clone(),
+        "/{dataset_name}",
+        |Path(p): Path<DatasetByName>| {
+            odf::DatasetAlias::new(None, p.dataset_name).into_local_ref()
+        },
+    )
+    .await;
+
+    let dataset_url = format!("{local_addr}/new.dataset");
+
+    let client = async {
+        assert_eq!(
+            http::StatusCode::SWITCHING_PROTOCOLS,
+            RepoFixture::push_upgrade_status(&dataset_url).await
+        );
     };
 
     await_client_server_flow!(server, client);

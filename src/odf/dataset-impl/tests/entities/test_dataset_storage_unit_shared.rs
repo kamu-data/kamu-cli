@@ -78,6 +78,44 @@ pub async fn test_store_dataset<
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+pub async fn test_store_dataset_takes_over_headless<
+    TDatasetStorageUnit: odf::DatasetStorageUnit + odf::DatasetStorageUnitWriter,
+>(
+    storage_unit: &TDatasetStorageUnit,
+) {
+    let seed_block = MetadataFactory::metadata_block(
+        MetadataFactory::seed(odf::DatasetKind::Root)
+            .id_random()
+            .build(),
+    )
+    .build_typed();
+
+    let first = storage_unit
+        .store_dataset(seed_block.clone(), StoreDatasetOpts::default())
+        .await
+        .unwrap();
+
+    // Without `HEAD` the stored dataset counts as a leftover of an
+    // interrupted creation, so the same seed is stored again
+    let second = storage_unit
+        .store_dataset(seed_block.clone(), StoreDatasetOpts::default())
+        .await
+        .unwrap();
+
+    assert_eq!(second.dataset_id, seed_block.event.dataset_id);
+    assert_eq!(second.seed, first.seed);
+    assert_matches!(
+        second
+            .dataset
+            .as_metadata_chain()
+            .resolve_ref(&odf::BlockRef::Head)
+            .await,
+        Err(odf::storage::GetRefError::NotFound(_))
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 pub async fn test_delete_dataset<
     TDatasetStorageUnit: odf::DatasetStorageUnit + odf::DatasetStorageUnitWriter + 'static,
 >(

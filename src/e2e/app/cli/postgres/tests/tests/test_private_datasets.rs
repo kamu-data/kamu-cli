@@ -212,3 +212,32 @@ kamu_cli_run_api_server_e2e_test!(
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+kamu_cli_run_api_server_e2e_test!(
+    storage = postgres,
+    fixture = kamu_cli_e2e_repo_tests::private_datasets::test_only_owner_and_editor_can_ingest_into_a_private_dataset,
+    // We need synthetic time for the tests, but the third-party JWT code
+    // uses the current time. Assuming that the token lifetime is 24 hours, we will
+    // use the projected date (the current day) as a workaround.
+    options = Options::default()
+        .with_multi_tenant()
+        .with_today_as_frozen_system_time()
+        .with_kamu_config(PRIVATE_DATESET_WITH_ALLOWED_ANONYMOUS_WORKSPACE_KAMU_CONFIG),
+    extra_test_groups = "ingest, datafusion"
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+kamu_cli_run_api_server_e2e_test!(
+    storage = postgres,
+    fixture = kamu_cli_e2e_repo_tests::private_datasets::test_a_private_dataset_info_by_id_is_available_only_to_authorized_users,
+    // We need synthetic time for the tests, but the third-party JWT code
+    // uses the current time. Assuming that the token lifetime is 24 hours, we will
+    // use the projected date (the current day) as a workaround.
+    options = Options::default()
+        .with_multi_tenant()
+        .with_today_as_frozen_system_time()
+        .with_kamu_config(PRIVATE_DATESET_WITH_ALLOWED_ANONYMOUS_WORKSPACE_KAMU_CONFIG),
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

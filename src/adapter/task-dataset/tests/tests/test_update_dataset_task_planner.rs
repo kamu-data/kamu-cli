@@ -131,6 +131,26 @@ async fn test_dataset_with_several_pull_aliases_fails_unrecoverably() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[tokio::test]
+async fn test_fetch_uncacheable_is_planned_into_the_ingest_options() {
+    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let harness = UpdateDatasetTaskPlannerHarness::new();
+    let foo = harness.create_root_dataset(&alias_foo).await;
+
+    let not_fetching = harness.plan_update_definition(&foo, false).await.unwrap();
+    let fetching = harness.plan_update_definition(&foo, true).await.unwrap();
+
+    assert_eq!(
+        (false, true),
+        (
+            not_fetching.ingest_options.fetch_uncacheable,
+            fetching.ingest_options.fetch_uncacheable
+        )
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[oop::extend(BaseUseCaseHarness, base_use_case_harness)]
 struct UpdateDatasetTaskPlannerHarness {
     base_use_case_harness: BaseUseCaseHarness,
@@ -177,9 +197,21 @@ impl UpdateDatasetTaskPlannerHarness {
         &self,
         created: &CreateDatasetResult,
     ) -> Result<DatasetUpdateJob, TaskError> {
+        self.plan_update_definition(created, false)
+            .await
+            .map(|definition| definition.job)
+    }
+
+    /// Plans an update of `created`, returning the task definition or the error
+    /// the task fails with
+    async fn plan_update_definition(
+        &self,
+        created: &CreateDatasetResult,
+        fetch_uncacheable: bool,
+    ) -> Result<TaskDefinitionDatasetUpdate, TaskError> {
         let logical_plan = LogicalPlanDatasetUpdate {
             dataset_id: created.dataset_handle.id.clone(),
-            fetch_uncacheable: false,
+            fetch_uncacheable,
         }
         .into_logical_plan();
 
@@ -188,10 +220,9 @@ impl UpdateDatasetTaskPlannerHarness {
             .prepare_task_definition(TaskID::new(1), &logical_plan)
             .await
         {
-            Ok(task_definition) => Ok(task_definition
+            Ok(task_definition) => Ok(*task_definition
                 .downcast::<TaskDefinitionDatasetUpdate>()
-                .unwrap()
-                .job),
+                .unwrap()),
             Err(PrepareTaskDefinitionError::Failed(task_error)) => Err(task_error),
             Err(PrepareTaskDefinitionError::Internal(e)) => {
                 panic!("Unexpected internal error: {e}")

@@ -15,8 +15,9 @@ use kamu::domain::*;
 use kamu::testing::DatasetDataHelper;
 use kamu::*;
 use kamu_adapter_http::platform::UploadServiceLocal;
-use kamu_datasets::CreateDatasetResult;
+use kamu_datasets::{CreateDatasetResult, DatasetPermission, MockDatasetPermissionChecker};
 use kamu_datasets_services::DatasetOperationGuardImpl;
+use odf::metadata::testing::MetadataFactory;
 use serde_json::json;
 use url::Url;
 use uuid::Uuid;
@@ -696,6 +697,121 @@ async fn test_data_push_ingest_content_type_not_text_is_bad_request() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[test_group::group(engine, ingest, datafusion)]
+#[test_log::test(tokio::test)]
+async fn test_data_push_ingest_without_access_is_not_found() {
+    let harness = DataIngestHarness::without_web_access().await;
+    let create_result = harness.create_population_dataset(true).await;
+    let dataset_id = create_result.dataset_handle.id.clone();
+    let ingest_url = harness.ingest_url(&create_result.dataset_handle.alias);
+    let stored_heads = harness.server_harness.stored_heads();
+    let head_before = stored_heads.get(&dataset_id).await;
+
+    let client = async move {
+        let res = DataIngestHarness::push_population_record(&ingest_url).await;
+
+        pretty_assertions::assert_eq!(http::StatusCode::NOT_FOUND, res.status());
+        pretty_assertions::assert_eq!(head_before, stored_heads.get(&dataset_id).await);
+    };
+
+    await_client_server_flow!(harness.server_harness.api_server_run(), client);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_group::group(engine, ingest, datafusion)]
+#[test_log::test(tokio::test)]
+async fn test_data_push_ingest_by_reader_is_forbidden() {
+    let harness = DataIngestHarness::with_web_reader().await;
+    let create_result = harness.create_population_dataset(true).await;
+    let dataset_id = create_result.dataset_handle.id.clone();
+    let ingest_url = harness.ingest_url(&create_result.dataset_handle.alias);
+    let stored_heads = harness.server_harness.stored_heads();
+    let head_before = stored_heads.get(&dataset_id).await;
+
+    let client = async move {
+        let res = DataIngestHarness::push_population_record(&ingest_url).await;
+
+        pretty_assertions::assert_eq!(http::StatusCode::FORBIDDEN, res.status());
+        pretty_assertions::assert_eq!(head_before, stored_heads.get(&dataset_id).await);
+    };
+
+    await_client_server_flow!(harness.server_harness.api_server_run(), client);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_group::group(engine, ingest, datafusion)]
+#[test_log::test(tokio::test)]
+async fn test_data_push_ingest_denied_by_use_case_is_not_found() {
+    let harness = DataIngestHarness::with_write_denied_past_layer().await;
+    let create_result = harness.create_population_dataset(true).await;
+    let dataset_id = create_result.dataset_handle.id.clone();
+    let ingest_url = harness.ingest_url(&create_result.dataset_handle.alias);
+    let stored_heads = harness.server_harness.stored_heads();
+    let head_before = stored_heads.get(&dataset_id).await;
+
+    let client = async move {
+        let res = DataIngestHarness::push_population_record(&ingest_url).await;
+
+        pretty_assertions::assert_eq!(http::StatusCode::NOT_FOUND, res.status());
+        pretty_assertions::assert_eq!(head_before, stored_heads.get(&dataset_id).await);
+    };
+
+    await_client_server_flow!(harness.server_harness.api_server_run(), client);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_group::group(engine, ingest, datafusion)]
+#[test_log::test(tokio::test)]
+async fn test_data_push_ingest_into_derivative_is_bad_request() {
+    let harness = DataIngestHarness::new().await;
+    let root = harness.create_population_dataset(true).await;
+    let derivative = harness
+        .create_derivative_dataset(&root.dataset_handle.alias)
+        .await;
+    let ingest_url = harness.ingest_url(&derivative.dataset_handle.alias);
+
+    let client = async move {
+        let res = DataIngestHarness::push_population_record(&ingest_url).await;
+
+        pretty_assertions::assert_eq!(http::StatusCode::BAD_REQUEST, res.status());
+    };
+
+    await_client_server_flow!(harness.server_harness.api_server_run(), client);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_group::group(engine, ingest, datafusion)]
+#[test_log::test(tokio::test)]
+async fn test_data_push_ingest_head_moved_concurrently_is_conflict() {
+    let harness = DataIngestHarness::new().await;
+    let create_result = harness.create_population_dataset(true).await;
+    let dataset_id = create_result.dataset_handle.id.clone();
+    let ingest_url = harness.ingest_url(&create_result.dataset_handle.alias);
+    let concurrent_head = harness
+        .server_harness
+        .append_unreferenced_block(&create_result.dataset_handle)
+        .await;
+    harness
+        .server_harness
+        .move_head_before_next_commit(concurrent_head.clone());
+    let stored_heads = harness.server_harness.stored_heads();
+
+    let client = async move {
+        let res = DataIngestHarness::push_population_record(&ingest_url).await;
+
+        pretty_assertions::assert_eq!(http::StatusCode::CONFLICT, res.status());
+        pretty_assertions::assert_eq!(concurrent_head, stored_heads.get(&dataset_id).await);
+    };
+
+    await_client_server_flow!(harness.server_harness.api_server_run(), client);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 struct DataIngestHarness {
     pub server_harness: ServerSideLocalFsHarness,
     pub system_time: DateTime<Utc>,
@@ -703,6 +819,45 @@ struct DataIngestHarness {
 
 impl DataIngestHarness {
     async fn new() -> Self {
+        Self::with_web_access(true, None).await
+    }
+
+    /// Web callers hold no permission on server datasets
+    async fn without_web_access() -> Self {
+        Self::with_web_access(false, None).await
+    }
+
+    /// Web callers may only read server datasets
+    async fn with_web_reader() -> Self {
+        Self::with_web_access(
+            false,
+            Some(|| {
+                MockDatasetPermissionChecker::new()
+                    .make_expect_get_granted_permissions(&[DatasetPermission::Read], 1)
+            }),
+        )
+        .await
+    }
+
+    /// The authorization layer sees a writer, while the use case's own check
+    /// denies the write, as when the permission is revoked between the two
+    async fn with_write_denied_past_layer() -> Self {
+        Self::with_web_access(
+            false,
+            Some(|| {
+                MockDatasetPermissionChecker::denying().make_expect_get_granted_permissions(
+                    &[DatasetPermission::Read, DatasetPermission::Write],
+                    1,
+                )
+            }),
+        )
+        .await
+    }
+
+    async fn with_web_access(
+        authorized_writes: bool,
+        web_permission_checker: Option<fn() -> MockDatasetPermissionChecker>,
+    ) -> Self {
         let catalog = dill::CatalogBuilder::new()
             .add::<DataFormatRegistryImpl>()
             .add_value(EngineConfigDatafusionEmbeddedIngest::default())
@@ -717,7 +872,8 @@ impl DataIngestHarness {
 
         let server_harness = ServerSideLocalFsHarness::new(ServerSideHarnessOptions {
             tenancy_config: TenancyConfig::MultiTenant,
-            authorized_writes: true,
+            authorized_writes,
+            web_permission_checker,
             base_catalog: Some(catalog),
             ..ServerSideHarnessOptions::default()
         })
@@ -781,6 +937,28 @@ impl DataIngestHarness {
             .unwrap()
     }
 
+    async fn create_derivative_dataset(&self, input: &odf::DatasetAlias) -> CreateDatasetResult {
+        self.server_harness
+            .cli_create_dataset_from_snapshot_use_case()
+            .execute(
+                MetadataFactory::dataset_snapshot()
+                    .name(odf::DatasetAlias::new(
+                        self.server_harness.operating_account_name(),
+                        odf::DatasetName::new_unchecked("population-derived"),
+                    ))
+                    .kind(odf::DatasetKind::Derivative)
+                    .push_event(
+                        MetadataFactory::set_transform()
+                            .inputs_from_refs_and_aliases([(input.clone(), "population")])
+                            .build(),
+                    )
+                    .build(),
+                Default::default(),
+            )
+            .await
+            .unwrap()
+    }
+
     fn dataset_http_url(&self, alias: &odf::DatasetAlias) -> Url {
         self.server_harness.dataset_url_with_scheme(alias, "http")
     }
@@ -795,6 +973,16 @@ impl DataIngestHarness {
             ingest_url,
             http::HeaderValue::from_str(content_type).unwrap(),
             body,
+        )
+        .await
+    }
+
+    /// Pushes one record matching the population schema
+    async fn push_population_record(ingest_url: &str) -> reqwest::Response {
+        Self::push(
+            ingest_url,
+            "application/x-ndjson",
+            r#"{"event_time": "2020-01-01T00:00:00", "city": "A", "population": 100}"#,
         )
         .await
     }

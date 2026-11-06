@@ -7,11 +7,9 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::sync::Arc;
-
 use database_common::{DatabaseTransactionManager, DatabaseTransactionRunner};
 use internal_error::{InternalError, ResultIntoInternal};
-use kamu_datasets::DatasetRegistry;
+use kamu_datasets::{DatasetReferenceRepository, DatasetRegistry};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -19,7 +17,8 @@ use kamu_datasets::DatasetRegistry;
 /// its own, committed before the writer it races with commits
 pub(crate) struct ConcurrentHeadMove {
     catalog: dill::Catalog,
-    concurrent_head: odf::Multihash,
+    /// `None` removes `HEAD` instead of moving it
+    concurrent_head: Option<odf::Multihash>,
 }
 
 impl ConcurrentHeadMove {
@@ -27,7 +26,16 @@ impl ConcurrentHeadMove {
     pub fn new(catalog: &dill::Catalog, concurrent_head: odf::Multihash) -> Self {
         Self {
             catalog: catalog.clone(),
-            concurrent_head,
+            concurrent_head: Some(concurrent_head),
+        }
+    }
+
+    /// Removes `HEAD`; `catalog` resolves `DatasetReferenceRepository` once a
+    /// transaction is added to it
+    pub fn removing(catalog: &dill::Catalog) -> Self {
+        Self {
+            catalog: catalog.clone(),
+            concurrent_head: None,
         }
     }
 
@@ -38,8 +46,7 @@ impl ConcurrentHeadMove {
             .get_one::<dyn DatabaseTransactionManager>()
             .is_err()
         {
-            let dataset_registry = self.catalog.get_one::<dyn DatasetRegistry>().unwrap();
-            Self::set_head(dataset_registry, dataset_handle, &self.concurrent_head)
+            Self::move_head(&self.catalog, dataset_handle, self.concurrent_head.as_ref())
                 .await
                 .unwrap();
             return;
@@ -47,19 +54,35 @@ impl ConcurrentHeadMove {
 
         let concurrent_head = self.concurrent_head;
         DatabaseTransactionRunner::new(self.catalog)
-            .transactional_with(|dataset_registry: Arc<dyn DatasetRegistry>| async move {
-                Self::set_head(dataset_registry, dataset_handle, &concurrent_head).await
+            .transactional(|transaction_catalog| async move {
+                Self::move_head(
+                    &transaction_catalog,
+                    dataset_handle,
+                    concurrent_head.as_ref(),
+                )
+                .await
             })
             .await
             .unwrap();
     }
 
-    async fn set_head(
-        dataset_registry: Arc<dyn DatasetRegistry>,
+    async fn move_head(
+        catalog: &dill::Catalog,
         dataset_handle: &odf::DatasetHandle,
-        concurrent_head: &odf::Multihash,
+        concurrent_head: Option<&odf::Multihash>,
     ) -> Result<(), InternalError> {
-        dataset_registry
+        let Some(concurrent_head) = concurrent_head else {
+            return catalog
+                .get_one::<dyn DatasetReferenceRepository>()
+                .int_err()?
+                .remove_dataset_reference(&dataset_handle.id, &odf::BlockRef::Head)
+                .await
+                .int_err();
+        };
+
+        catalog
+            .get_one::<dyn DatasetRegistry>()
+            .int_err()?
             .get_dataset_by_handle(dataset_handle)
             .await
             .as_metadata_chain()

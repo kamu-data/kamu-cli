@@ -51,6 +51,24 @@ pub struct FlowRunsHarnessOverrides {
     pub dataset_changes_mock: Option<MockDatasetIncrementQueryService>,
 }
 
+/// Block a triggered reset flow moves the dataset head to
+#[derive(Clone, Copy)]
+pub enum ResetFlowMode<'a> {
+    Custom { new_head_hash: &'a odf::Multihash },
+    ToSeed,
+}
+
+impl ResetFlowMode<'_> {
+    fn to_input_value(self) -> async_graphql::Value {
+        match self {
+            Self::Custom { new_head_hash } => value!({
+                "custom": { "newHeadHash": new_head_hash.to_string() }
+            }),
+            Self::ToSeed => value!({ "toSeed": {} }),
+        }
+    }
+}
+
 impl BaseGQLFlowRunsHarness {
     pub async fn new(base_gql_harness: BaseGQLDatasetHarness, runs_catalog: dill::Catalog) -> Self {
         let base_gql_flow_harness = BaseGQLFlowHarness::new(base_gql_harness, runs_catalog).await;
@@ -275,23 +293,19 @@ impl BaseGQLFlowRunsHarness {
     pub fn trigger_reset_flow_mutation(
         &self,
         id: &odf::DatasetID,
-        new_head_hash: &odf::Multihash,
+        mode: ResetFlowMode<'_>,
         old_head_hash: &odf::Multihash,
     ) -> GraphQLQueryRequest {
         let mutation_code = indoc!(
             r#"
-            mutation($datasetId: DatasetID!, $newHeadHash: String!, $oldHeadHash: String!) {
+            mutation($datasetId: DatasetID!, $mode: FlowConfigInputResetPropagationMode!, $oldHeadHash: String!) {
                 datasets {
                     byId (datasetId: $datasetId) {
                         flows {
                             runs {
                                 triggerResetFlow (
                                     resetConfigInput: {
-                                        mode: {
-                                            custom: {
-                                                newHeadHash: $newHeadHash
-                                            }
-                                        },
+                                        mode: $mode,
                                         oldHeadHash: $oldHeadHash,
                                     }
                                 ) {
@@ -339,7 +353,7 @@ impl BaseGQLFlowRunsHarness {
             mutation_code,
             async_graphql::Variables::from_value(value!({
                 "datasetId": id.to_string(),
-                "newHeadHash": new_head_hash.to_string(),
+                "mode": mode.to_input_value(),
                 "oldHeadHash": old_head_hash.to_string()
             })),
         )
