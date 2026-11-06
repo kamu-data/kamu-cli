@@ -52,7 +52,7 @@ impl MockTransformPlanner {
                         schema: None,
                         prev_offset: None,
                         vocab: odf::metadata::DatasetVocabulary::default(),
-                        inputs: inputs.iter().map(unchanged_input).collect(),
+                        inputs: inputs.iter().map(Self::unchanged_input).collect(),
                         prev_checkpoint: None,
                     },
                     datasets_map: ResolvedDatasetsMap::default(),
@@ -99,22 +99,20 @@ impl MockTransformPlanner {
             .returning(move |_| Err(make_error()));
         self
     }
-}
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-fn unchanged_input(handle: &odf::DatasetHandle) -> TransformRequestInputExt {
-    TransformRequestInputExt {
-        dataset_handle: handle.clone(),
-        alias: handle.alias.dataset_name.to_string(),
-        vocab: odf::metadata::DatasetVocabulary::default(),
-        prev_block_hash: None,
-        new_block_hash: None,
-        prev_offset: None,
-        new_offset: None,
-        schema: Arc::new(Schema::empty()),
-        data_slices: Vec::new(),
-        explicit_watermarks: Vec::new(),
+    fn unchanged_input(handle: &odf::DatasetHandle) -> TransformRequestInputExt {
+        TransformRequestInputExt {
+            dataset_handle: handle.clone(),
+            alias: handle.alias.dataset_name.to_string(),
+            vocab: odf::metadata::DatasetVocabulary::default(),
+            prev_block_hash: None,
+            new_block_hash: None,
+            prev_offset: None,
+            new_offset: None,
+            schema: Arc::new(Schema::empty()),
+            data_slices: Vec::new(),
+            explicit_watermarks: Vec::new(),
+        }
     }
 }
 

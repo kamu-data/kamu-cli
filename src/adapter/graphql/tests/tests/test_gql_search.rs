@@ -30,6 +30,7 @@ use kamu_search::{
 };
 use odf::metadata::testing::MetadataFactory;
 use pretty_assertions::{assert_eq, assert_matches};
+use strum::{EnumIter, IntoEnumIterator};
 
 use crate::utils::{BaseGQLDatasetHarness, PredefinedAccountOpts, authentication_catalogs};
 
@@ -525,7 +526,7 @@ async fn test_search_security_context_of_user() {
     let harness = SearchSecurityHarness::new(PredefinedAccountOpts::default()).await;
     let account_id = harness.logged_account_id();
 
-    for search in SearchKind::ALL {
+    for search in SearchKind::iter() {
         assert_matches!(
             harness.security_of_authorized_search(search).await,
             SearchSecurityContext::Restricted { current_principal_ids }
@@ -545,7 +546,7 @@ async fn test_search_security_context_of_admin() {
     })
     .await;
 
-    for search in SearchKind::ALL {
+    for search in SearchKind::iter() {
         assert_matches!(
             harness.security_of_authorized_search(search).await,
             SearchSecurityContext::Unrestricted,
@@ -796,7 +797,7 @@ impl SearchSecurityHarness {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, EnumIter)]
 enum SearchKind {
     FullText,
     FullTextListing,
@@ -805,13 +806,6 @@ enum SearchKind {
 }
 
 impl SearchKind {
-    const ALL: [Self; 4] = [
-        Self::FullText,
-        Self::FullTextListing,
-        Self::NaturalLanguage,
-        Self::Hybrid,
-    ];
-
     fn request_code(self) -> &'static str {
         match self {
             Self::FullText => r#"{ search { queryFullText(prompt: "foo") { totalHits } } }"#,

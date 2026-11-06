@@ -36,13 +36,6 @@ pub struct InMemoryTransactionManager {
     open_transactions: Mutex<Vec<OpenTransaction>>,
 }
 
-/// A transaction that has not ended yet, with a handle telling whether any
-/// reference to it is still alive
-struct OpenTransaction {
-    id: TransactionId,
-    liveness: Weak<dyn Any + Send + Sync>,
-}
-
 #[dill::component(pub)]
 #[dill::interface(dyn DatabaseTransactionManager)]
 #[dill::scope(dill::Singleton)]
@@ -142,6 +135,13 @@ impl DatabaseTransactionManager for InMemoryTransactionManager {
         self.rollback_in_participants(transaction_id);
         Ok(())
     }
+}
+
+/// A transaction that has not ended yet, with a handle telling whether any
+/// reference to it is still alive
+struct OpenTransaction {
+    id: TransactionId,
+    liveness: Weak<dyn Any + Send + Sync>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

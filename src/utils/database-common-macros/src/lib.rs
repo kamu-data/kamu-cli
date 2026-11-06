@@ -749,15 +749,7 @@ pub fn transactional_static_method4(attr: TokenStream, item: TokenStream) -> Tok
 
 #[proc_macro]
 pub fn database_transactional_test(input: TokenStream) -> TokenStream {
-    // Preliminary actions to clean up tables as migrations add rows.
-    let tables_for_cleanup = parse_str::<ExprArray>(
-        r#"
-        [
-            "outbox_message_consumptions",
-        ]
-        "#,
-    )
-    .unwrap();
+    let tables_for_cleanup = tables_for_cleanup();
 
     let DatabaseTransactionalTestInputArgs {
         storage,
@@ -881,6 +873,8 @@ pub fn database_transactional_test(input: TokenStream) -> TokenStream {
 /// SQLite serialises writers and a race there reduces to a sequential test.
 #[proc_macro]
 pub fn database_concurrent_transactions_test(input: TokenStream) -> TokenStream {
+    let tables_for_cleanup = tables_for_cleanup();
+
     let DatabaseTransactionalTestInputArgs {
         storage,
         fixture,
@@ -910,6 +904,13 @@ pub fn database_concurrent_transactions_test(input: TokenStream) -> TokenStream 
             #[test_group::group(database, postgres, #extra_test_groups)]
             #[test_log::test(sqlx::test(migrations = "../../../../migrations/postgres"))]
             async fn #test_function_name (pg_pool: sqlx::PgPool) {
+                for table in #tables_for_cleanup {
+                    sqlx::query(sqlx::AssertSqlSafe(format!("DELETE FROM {table}")))
+                    .execute(&pg_pool)
+                    .await
+                    .unwrap();
+                }
+
                 let harness = #harness ::new(pg_pool);
 
                 #fixture (&harness.catalog).await;
@@ -924,6 +925,20 @@ pub fn database_concurrent_transactions_test(input: TokenStream) -> TokenStream 
     };
 
     output.into()
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Tables to clean up before a database test, as migrations add rows to them
+fn tables_for_cleanup() -> ExprArray {
+    parse_str::<ExprArray>(
+        r#"
+        [
+            "outbox_message_consumptions",
+        ]
+        "#,
+    )
+    .unwrap()
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

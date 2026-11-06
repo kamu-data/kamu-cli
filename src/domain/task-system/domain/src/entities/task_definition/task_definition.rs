@@ -61,3 +61,55 @@ pub trait TaskDefinitionInner: Send + Sync + std::fmt::Debug {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::task_definition_struct;
+
+    task_definition_struct! {
+        struct TaskDefinitionFoo {
+            value: u32,
+        }
+        => "test.foo"
+    }
+
+    task_definition_struct! {
+        struct TaskDefinitionBar {
+            name: String,
+        }
+        => "test.bar"
+    }
+
+    #[test]
+    fn test_downcast_to_own_type() {
+        let foo = TaskDefinition::new(TaskDefinitionFoo { value: 42 })
+            .downcast::<TaskDefinitionFoo>()
+            .unwrap();
+
+        assert_eq!(foo.value, 42);
+
+        let bar = TaskDefinition::new(TaskDefinitionBar {
+            name: String::from("bar"),
+        })
+        .downcast::<TaskDefinitionBar>()
+        .unwrap();
+
+        assert_eq!(bar.name, "bar");
+    }
+
+    #[test]
+    fn test_downcast_to_other_type_returns_definition_unchanged() {
+        let definition = TaskDefinition::new(TaskDefinitionFoo { value: 42 })
+            .downcast::<TaskDefinitionBar>()
+            .unwrap_err();
+
+        assert_eq!(definition.task_type(), TaskDefinitionFoo::TASK_TYPE);
+        assert_eq!(
+            definition.downcast::<TaskDefinitionFoo>().unwrap().value,
+            42
+        );
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

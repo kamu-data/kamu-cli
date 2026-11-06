@@ -26,14 +26,13 @@ use test_utils::LocalS3Server;
 use time_source::SystemTimeSource;
 use url::Url;
 
-use crate::utils::SyncWorkspaceCatalog;
+use crate::utils::{LocalSyncHelper, SyncWorkspaceCatalog};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
 async fn test_first_pull_creates_dataset_at_transferred_head_local_fs() {
-    let tmp_repo_dir = tempfile::tempdir().unwrap();
-    LocalPullHarness::new(Url::from_directory_path(tmp_repo_dir.path()).unwrap())
+    LocalPullHarness::local_fs()
         .assert_first_pull_creates_dataset_at_transferred_head()
         .await;
 }
@@ -55,8 +54,7 @@ async fn test_first_pull_creates_dataset_at_transferred_head_s3() {
 
 #[test_log::test(tokio::test)]
 async fn test_transfer_into_existing_dataset_moves_no_head() {
-    let tmp_repo_dir = tempfile::tempdir().unwrap();
-    let harness = LocalPullHarness::new(Url::from_directory_path(tmp_repo_dir.path()).unwrap());
+    let harness = LocalPullHarness::local_fs();
 
     harness.create_source_dataset().await;
     harness.push_source().await;
@@ -89,8 +87,7 @@ async fn test_transfer_into_existing_dataset_moves_no_head() {
 
 #[test_log::test(tokio::test)]
 async fn test_first_pull_continues_after_uncommitted_transfer_local_fs() {
-    let tmp_repo_dir = tempfile::tempdir().unwrap();
-    LocalPullHarness::new(Url::from_directory_path(tmp_repo_dir.path()).unwrap())
+    LocalPullHarness::local_fs()
         .assert_first_pull_continues_after_uncommitted_transfer()
         .await;
 }
@@ -112,9 +109,8 @@ async fn test_first_pull_continues_after_uncommitted_transfer_s3() {
 
 #[test_log::test(tokio::test)]
 async fn test_pull_retry_reuses_objects_of_an_uncommitted_transfer() {
-    let tmp_repo_dir = tempfile::tempdir().unwrap();
-    LocalPullHarness::new(Url::from_directory_path(tmp_repo_dir.path()).unwrap())
-        .assert_retry_reuses_objects_of_uncommitted_transfer(tmp_repo_dir.path())
+    LocalPullHarness::local_fs()
+        .assert_retry_reuses_objects_of_uncommitted_transfer()
         .await;
 }
 
@@ -123,11 +119,7 @@ async fn test_pull_retry_reuses_objects_of_an_uncommitted_transfer() {
 /// Zero lifts the limit on parallel transfers
 #[test_log::test(tokio::test)]
 async fn test_pull_with_zero_max_parallel_transfers() {
-    let tmp_repo_dir = tempfile::tempdir().unwrap();
-    let harness = LocalPullHarness::with_max_parallel_transfers(
-        Url::from_directory_path(tmp_repo_dir.path()).unwrap(),
-        0,
-    );
+    let harness = LocalPullHarness::with_max_parallel_transfers(0);
 
     harness.create_source_dataset().await;
     let source_head = harness.append_source_data().await;
@@ -144,11 +136,7 @@ async fn test_pull_with_zero_max_parallel_transfers() {
 /// An update without data or checkpoint files leaves nothing to copy
 #[test_log::test(tokio::test)]
 async fn test_metadata_only_pull_with_zero_max_parallel_transfers() {
-    let tmp_repo_dir = tempfile::tempdir().unwrap();
-    let harness = LocalPullHarness::with_max_parallel_transfers(
-        Url::from_directory_path(tmp_repo_dir.path()).unwrap(),
-        0,
-    );
+    let harness = LocalPullHarness::with_max_parallel_transfers(0);
 
     harness.create_source_dataset().await;
     harness.push_source().await;
@@ -166,8 +154,7 @@ async fn test_metadata_only_pull_with_zero_max_parallel_transfers() {
 
 #[test_log::test(tokio::test)]
 async fn test_pull_validates_remote_blocks_by_default() {
-    let tmp_repo_dir = tempfile::tempdir().unwrap();
-    let harness = LocalPullHarness::new(Url::from_directory_path(tmp_repo_dir.path()).unwrap());
+    let harness = LocalPullHarness::local_fs();
 
     harness.create_source_dataset().await;
     harness.push_source().await;
@@ -189,8 +176,7 @@ async fn test_pull_validates_remote_blocks_by_default() {
 
 #[test_log::test(tokio::test)]
 async fn test_first_pull_of_tampered_seed_creates_no_dataset() {
-    let tmp_repo_dir = tempfile::tempdir().unwrap();
-    let harness = LocalPullHarness::new(Url::from_directory_path(tmp_repo_dir.path()).unwrap());
+    let harness = LocalPullHarness::local_fs();
 
     harness.create_source_seed_only().await;
     harness.push_source().await;
@@ -208,8 +194,7 @@ async fn test_first_pull_of_tampered_seed_creates_no_dataset() {
 
 #[test_log::test(tokio::test)]
 async fn test_pull_rejects_tampered_data_file() {
-    let tmp_repo_dir = tempfile::tempdir().unwrap();
-    LocalPullHarness::new(Url::from_directory_path(tmp_repo_dir.path()).unwrap())
+    LocalPullHarness::local_fs()
         .assert_pull_rejects_tampered_object(RepositoryObjects::Data)
         .await;
 }
@@ -218,8 +203,7 @@ async fn test_pull_rejects_tampered_data_file() {
 
 #[test_log::test(tokio::test)]
 async fn test_pull_rejects_tampered_checkpoint_file() {
-    let tmp_repo_dir = tempfile::tempdir().unwrap();
-    LocalPullHarness::new(Url::from_directory_path(tmp_repo_dir.path()).unwrap())
+    LocalPullHarness::local_fs()
         .assert_pull_rejects_tampered_object(RepositoryObjects::Checkpoints)
         .await;
 }
@@ -228,8 +212,7 @@ async fn test_pull_rejects_tampered_checkpoint_file() {
 
 #[test_log::test(tokio::test)]
 async fn test_first_pull_creates_dataset_with_requested_visibility() {
-    let tmp_repo_dir = tempfile::tempdir().unwrap();
-    let harness = LocalPullHarness::new(Url::from_directory_path(tmp_repo_dir.path()).unwrap());
+    let harness = LocalPullHarness::local_fs();
 
     harness.create_source_dataset().await;
     harness.push_source().await;
@@ -252,8 +235,7 @@ async fn test_first_pull_creates_dataset_with_requested_visibility() {
 
 #[test_log::test(tokio::test)]
 async fn test_commit_into_dataset_deleted_during_transfer_fails() {
-    let tmp_repo_dir = tempfile::tempdir().unwrap();
-    let harness = LocalPullHarness::new(Url::from_directory_path(tmp_repo_dir.path()).unwrap());
+    let harness = LocalPullHarness::local_fs();
 
     harness.create_source_dataset().await;
     harness.push_source().await;
@@ -274,8 +256,7 @@ async fn test_commit_into_dataset_deleted_during_transfer_fails() {
 
 #[test_log::test(tokio::test)]
 async fn test_forced_pull_replaces_diverged_history() {
-    let tmp_repo_dir = tempfile::tempdir().unwrap();
-    let harness = LocalPullHarness::new(Url::from_directory_path(tmp_repo_dir.path()).unwrap());
+    let harness = LocalPullHarness::local_fs();
 
     harness.create_source_dataset().await;
     harness.push_source().await;
@@ -308,8 +289,7 @@ async fn test_forced_pull_replaces_diverged_history() {
 
 #[test_log::test(tokio::test(flavor = "multi_thread"))]
 async fn test_pull_with_head_moved_during_transfer_local_fs() {
-    let tmp_repo_dir = tempfile::tempdir().unwrap();
-    LocalPullHarness::new(Url::from_directory_path(tmp_repo_dir.path()).unwrap())
+    LocalPullHarness::local_fs()
         .assert_pull_keeps_head_moved_during_transfer(true)
         .await;
 }
@@ -318,8 +298,7 @@ async fn test_pull_with_head_moved_during_transfer_local_fs() {
 
 #[test_log::test(tokio::test(flavor = "multi_thread"))]
 async fn test_unforced_pull_with_head_moved_during_transfer_local_fs() {
-    let tmp_repo_dir = tempfile::tempdir().unwrap();
-    LocalPullHarness::new(Url::from_directory_path(tmp_repo_dir.path()).unwrap())
+    LocalPullHarness::local_fs()
         .assert_pull_keeps_head_moved_during_transfer(false)
         .await;
 }
@@ -353,8 +332,7 @@ async fn test_pull_from_unreachable_repository_fails_recoverably() {
 
 #[test_log::test(tokio::test)]
 async fn test_pull_from_unknown_repository_fails_in_transfer_unrecoverably() {
-    let tmp_repo_dir = tempfile::tempdir().unwrap();
-    let harness = LocalPullHarness::new(Url::from_directory_path(tmp_repo_dir.path()).unwrap());
+    let harness = LocalPullHarness::local_fs();
 
     let result = harness.pull_from("missing/foo".parse().unwrap()).await;
 
@@ -365,8 +343,7 @@ async fn test_pull_from_unknown_repository_fails_in_transfer_unrecoverably() {
 
 #[test_log::test(tokio::test)]
 async fn test_pull_of_remote_by_id_fails_unrecoverably() {
-    let tmp_repo_dir = tempfile::tempdir().unwrap();
-    let harness = LocalPullHarness::new(Url::from_directory_path(tmp_repo_dir.path()).unwrap());
+    let harness = LocalPullHarness::local_fs();
 
     let result = harness
         .pull_from(odf::DatasetRefRemote::ID(
@@ -382,10 +359,7 @@ async fn test_pull_of_remote_by_id_fails_unrecoverably() {
 
 #[test_log::test(tokio::test)]
 async fn test_first_pull_into_alias_taken_before_commit_fails_unrecoverably() {
-    let tmp_repo_dir = tempfile::tempdir().unwrap();
-    let harness = LocalPullHarness::with_destination_alias_taken(
-        Url::from_directory_path(tmp_repo_dir.path()).unwrap(),
-    );
+    let harness = LocalPullHarness::with_destination_alias_taken();
 
     harness.create_source_dataset().await;
     harness.push_source().await;
@@ -403,8 +377,7 @@ async fn test_first_pull_into_alias_taken_before_commit_fails_unrecoverably() {
 
 #[test_log::test(tokio::test)]
 async fn test_concurrent_first_pulls_create_dataset_once() {
-    let tmp_repo_dir = tempfile::tempdir().unwrap();
-    let harness = LocalPullHarness::new(Url::from_directory_path(tmp_repo_dir.path()).unwrap());
+    let harness = LocalPullHarness::local_fs();
 
     harness.create_source_dataset().await;
     let source_head = harness.append_source_data().await;
@@ -426,8 +399,7 @@ async fn test_concurrent_first_pulls_create_dataset_once() {
 
 #[test_log::test(tokio::test)]
 async fn test_pull_into_headless_dataset_of_another_id_fails_unrecoverably() {
-    let tmp_repo_dir = tempfile::tempdir().unwrap();
-    let harness = LocalPullHarness::new(Url::from_directory_path(tmp_repo_dir.path()).unwrap());
+    let harness = LocalPullHarness::local_fs();
 
     harness.create_source_dataset().await;
     harness.append_source_data().await;
@@ -457,19 +429,25 @@ struct LocalPullHarness {
 
 impl LocalPullHarness {
     fn new(repo_url: Url) -> Self {
-        Self::build(repo_url, false, None)
+        Self::build(Some(repo_url), false, None)
+    }
+
+    /// The repository is a local directory the harness owns
+    fn local_fs() -> Self {
+        Self::build(None, false, None)
     }
 
     /// Another dataset takes the destination's name when a first pull creates
-    /// it
-    fn with_destination_alias_taken(repo_url: Url) -> Self {
-        Self::build(repo_url, true, None)
+    /// it; the repository is a local directory
+    fn with_destination_alias_taken() -> Self {
+        Self::build(None, true, None)
     }
 
-    /// The destination copies at most `limit` files at a time
-    fn with_max_parallel_transfers(repo_url: Url, limit: usize) -> Self {
+    /// The destination copies at most `limit` files at a time; the repository
+    /// is a local directory
+    fn with_max_parallel_transfers(limit: usize) -> Self {
         Self::build(
-            repo_url,
+            None,
             false,
             Some(SimpleTransferProtocolConfig {
                 max_parallel_transfers: limit,
@@ -477,12 +455,19 @@ impl LocalPullHarness {
         )
     }
 
+    /// Without `maybe_repo_url` the repository is a directory in the
+    /// harness's temporary directory
     fn build(
-        repo_url: Url,
+        maybe_repo_url: Option<Url>,
         destination_alias_taken: bool,
         maybe_destination_transfer_config: Option<SimpleTransferProtocolConfig>,
     ) -> Self {
         let tmp_dir = tempfile::tempdir().unwrap();
+        let repo_url = maybe_repo_url.unwrap_or_else(|| {
+            let repo_dir = tmp_dir.path().join("repo");
+            std::fs::create_dir(&repo_dir).unwrap();
+            Url::from_directory_path(repo_dir).unwrap()
+        });
 
         Self {
             source_catalog: Self::build_workspace_catalog(
@@ -570,13 +555,13 @@ impl LocalPullHarness {
     /// A retry after an uncommitted transfer takes the data and checkpoint
     /// files the destination already has instead of downloading them: with
     /// the repository's copies removed, a download would fail
-    async fn assert_retry_reuses_objects_of_uncommitted_transfer(&self, repo_dir: &Path) {
+    async fn assert_retry_reuses_objects_of_uncommitted_transfer(&self) {
         self.create_source_dataset().await;
         let source_head = self.append_source_data().await;
         self.push_source().await;
 
         let _abandoned = self.transfer().await;
-        self.remove_repository_objects(repo_dir);
+        self.remove_repository_objects();
 
         let listener = Arc::new(StatsRecordingListener::default());
         let transferred = self.transfer_with_listener(Some(listener.clone())).await;
@@ -607,10 +592,10 @@ impl LocalPullHarness {
 
     /// Deletes the data and checkpoint files of the dataset in a local
     /// repository, keeping its metadata
-    fn remove_repository_objects(&self, repo_dir: &Path) {
-        let dataset_dir = repo_dir.join(self.dataset_alias.dataset_name.as_str());
-        for objects_dir in ["data", "checkpoints"] {
-            let objects_dir = dataset_dir.join(objects_dir);
+    fn remove_repository_objects(&self) {
+        let dataset_dir = self.repository_dataset_dir();
+        for objects in [RepositoryObjects::Data, RepositoryObjects::Checkpoints] {
+            let objects_dir = dataset_dir.join(objects.dir_name());
             assert!(objects_dir.exists(), "{} is missing", objects_dir.display());
             std::fs::remove_dir_all(&objects_dir).unwrap();
             std::fs::create_dir(&objects_dir).unwrap();
@@ -1021,7 +1006,8 @@ impl LocalPullHarness {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// The files a block references, in a repository directory of their own
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, strum::IntoStaticStr)]
+#[strum(serialize_all = "snake_case")]
 enum RepositoryObjects {
     Data,
     Checkpoints,
@@ -1029,10 +1015,7 @@ enum RepositoryObjects {
 
 impl RepositoryObjects {
     fn dir_name(self) -> &'static str {
-        match self {
-            Self::Data => "data",
-            Self::Checkpoints => "checkpoints",
-        }
+        self.into()
     }
 }
 
@@ -1045,6 +1028,24 @@ struct DestinationHeadMovingListener {
     dataset_alias: odf::DatasetAlias,
     concurrent_head: Mutex<Option<odf::Multihash>>,
 }
+
+impl SyncListener for DestinationHeadMovingListener {
+    fn on_status(&self, stage: SyncStage, _stats: &SyncStats) {
+        if stage != SyncStage::TransferData || self.concurrent_head.lock().unwrap().is_some() {
+            return;
+        }
+
+        let concurrent_head = tokio::task::block_in_place(|| {
+            tokio::runtime::Handle::current().block_on(LocalPullHarness::append_random_data(
+                &self.catalog,
+                &self.dataset_alias,
+            ))
+        });
+        *self.concurrent_head.lock().unwrap() = Some(concurrent_head);
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// Keeps the last stats a sync reported
 #[derive(Default)]
@@ -1061,24 +1062,6 @@ impl StatsRecordingListener {
 impl SyncListener for StatsRecordingListener {
     fn on_status(&self, _stage: SyncStage, stats: &SyncStats) {
         *self.last_stats.lock().unwrap() = Some(stats.clone());
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-impl SyncListener for DestinationHeadMovingListener {
-    fn on_status(&self, stage: SyncStage, _stats: &SyncStats) {
-        if stage != SyncStage::TransferData || self.concurrent_head.lock().unwrap().is_some() {
-            return;
-        }
-
-        let concurrent_head = tokio::task::block_in_place(|| {
-            tokio::runtime::Handle::current().block_on(LocalPullHarness::append_random_data(
-                &self.catalog,
-                &self.dataset_alias,
-            ))
-        });
-        *self.concurrent_head.lock().unwrap() = Some(concurrent_head);
     }
 }
 

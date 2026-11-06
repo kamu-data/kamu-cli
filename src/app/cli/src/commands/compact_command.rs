@@ -19,6 +19,7 @@ use kamu::domain::{
     VerificationRequest,
     VerifyDatasetUseCase,
 };
+use kamu::utils::datasets_filtering::filter_datasets_by_local_pattern;
 use kamu_datasets::DatasetRegistry;
 
 use crate::{
@@ -61,7 +62,7 @@ pub struct CompactCommand {
 impl CompactCommand {
     #[transactional_method1(dataset_registry: Arc<dyn DatasetRegistry>)]
     async fn get_dataset_handles(&self) -> Result<Vec<odf::DatasetHandle>, CLIError> {
-        let dataset_handles = kamu::utils::datasets_filtering::filter_datasets_by_local_pattern(
+        let dataset_handles = filter_datasets_by_local_pattern(
             dataset_registry.as_ref(),
             self.dataset_ref_patterns.clone(),
         )

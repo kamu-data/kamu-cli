@@ -38,7 +38,7 @@ impl ErrorReplyClose {
     /// The internal error any phase may end with, shaped as the `Err` of that
     /// phase's response; a failed completion closes with
     /// [`PUSH_NOT_COMPLETED_CLOSE_CODE`]
-    pub fn internal(phase: TransferPhase) -> Result<Self, WriteMessageError> {
+    pub(crate) fn internal(phase: TransferPhase) -> Result<Self, WriteMessageError> {
         let error = TransferInternalError {
             phase,
             error_message: "Internal error".to_string(),
@@ -62,7 +62,7 @@ impl ErrorReplyClose {
     }
 
     /// Any other error reply of a phase
-    pub fn reply<TPayload: Serialize>(payload: TPayload) -> Result<Self, WriteMessageError> {
+    pub(crate) fn reply<TPayload: Serialize>(payload: TPayload) -> Result<Self, WriteMessageError> {
         Self::new(ERROR_REPLY_CLOSE_CODE, payload)
     }
 
@@ -76,7 +76,7 @@ impl ErrorReplyClose {
     /// Reads the reply a client expects from a close frame. Other close codes
     /// are a disconnect; an unexpected reason is read as the phase's internal
     /// error, or kept raw when it is not one
-    pub fn read<TPayload: DeserializeOwned>(
+    pub(crate) fn read<TPayload: DeserializeOwned>(
         code: u16,
         reason: &str,
     ) -> Result<TPayload, ReadMessageError> {

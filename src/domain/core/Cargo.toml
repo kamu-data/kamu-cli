@@ -84,4 +84,8 @@ utoipa = { optional = true, version = "6", default-features = false }
 
 
 [dev-dependencies]
+odf = { workspace = true, features = [
+    "testing",
+] }
+
 mockall = { version = "0.15", default-features = false }

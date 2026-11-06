@@ -24,7 +24,7 @@ use test_utils::{HttpFileServer, LocalS3Server};
 use time_source::SystemTimeSource;
 use url::Url;
 
-use crate::utils::{IpfsDaemon, SyncWorkspaceCatalog};
+use crate::utils::{IpfsDaemon, LocalSyncHelper, SyncWorkspaceCatalog};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

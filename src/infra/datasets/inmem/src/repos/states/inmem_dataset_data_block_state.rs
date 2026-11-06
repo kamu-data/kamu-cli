@@ -7,11 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use database_common::{
-    InMemoryTransactionParticipant,
-    InMemoryTransactionalMap,
-    in_memory_transaction_participant,
-};
+use database_common::{InMemoryTransactionParticipant, in_memory_transaction_participant};
 use dill::*;
 
 use super::DatasetBlocksMap;
@@ -29,7 +25,7 @@ pub struct InMemoryDatasetDataBlockState {
 impl InMemoryDatasetDataBlockState {
     pub fn new() -> Self {
         Self {
-            data_blocks: InMemoryTransactionalMap::new(),
+            data_blocks: DatasetBlocksMap::new(),
         }
     }
 }

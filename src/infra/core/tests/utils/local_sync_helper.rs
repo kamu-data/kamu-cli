@@ -10,10 +10,9 @@
 use std::sync::Arc;
 
 use database_common::DatabaseTransactionRunner;
+use kamu::DatasetUpdateStepsImpl;
 use kamu_core::*;
 use kamu_datasets::{DatasetRegistry, DatasetRegistryExt};
-
-use crate::DatasetUpdateStepsImpl;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

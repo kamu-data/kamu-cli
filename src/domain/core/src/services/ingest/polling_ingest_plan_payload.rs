@@ -79,13 +79,12 @@ impl TryFrom<&odf::metadata::SourceState> for PollingIngestPlanSourceState {
     type Error = InternalError;
 
     fn try_from(state: &odf::metadata::SourceState) -> Result<Self, Self::Error> {
-        let kind = if state.kind == odf::metadata::SourceState::KIND_ETAG {
-            PollingIngestPlanSourceStateKind::ETag
-        } else if state.kind == odf::metadata::SourceState::KIND_LAST_MODIFIED {
-            PollingIngestPlanSourceStateKind::LastModified
-        } else {
-            return Err(format!("Unsupported polling source state kind {}", state.kind).int_err());
-        };
+        let kind = state
+            .kind
+            .parse::<PollingIngestPlanSourceStateKind>()
+            .map_err(|_| {
+                format!("Unsupported polling source state kind {}", state.kind).int_err()
+            })?;
 
         Ok(Self {
             kind,
@@ -96,10 +95,133 @@ impl TryFrom<&odf::metadata::SourceState> for PollingIngestPlanSourceState {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+/// Kinds of `odf::metadata::SourceState` a polling ingest plan can carry.
+/// Their strings are the `odf::metadata::SourceState::KIND_*` constants.
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Serialize,
+    Deserialize,
+    strum::EnumString,
+    strum::IntoStaticStr,
+    strum::EnumIter,
+)]
 pub enum PollingIngestPlanSourceStateKind {
+    #[strum(serialize = "odf/etag")]
     ETag,
+    #[strum(serialize = "odf/last-modified")]
     LastModified,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[cfg(test)]
+mod tests {
+    use chrono::TimeZone;
+    use serde_json::json;
+    use strum::IntoEnumIterator;
+
+    use super::*;
+
+    #[test]
+    fn test_source_state_kind_strings_are_odf_constants() {
+        let kinds = [
+            (
+                PollingIngestPlanSourceStateKind::ETag,
+                odf::metadata::SourceState::KIND_ETAG,
+            ),
+            (
+                PollingIngestPlanSourceStateKind::LastModified,
+                odf::metadata::SourceState::KIND_LAST_MODIFIED,
+            ),
+        ];
+
+        assert_eq!(
+            kinds.len(),
+            PollingIngestPlanSourceStateKind::iter().count()
+        );
+        for (kind, odf_kind) in kinds {
+            assert_eq!(<&'static str>::from(kind), odf_kind);
+            assert_eq!(
+                odf_kind.parse::<PollingIngestPlanSourceStateKind>(),
+                Ok(kind)
+            );
+        }
+    }
+
+    #[test]
+    fn test_plan_payload_json() {
+        let dataset_id = odf::DatasetID::new_seeded_ed25519(b"foo");
+        let head = odf::Multihash::from_digest_sha3_256(b"head");
+        let source_block = odf::Multihash::from_digest_sha3_256(b"source");
+        let payload = PollingIngestPlanPayload {
+            dataset_id: dataset_id.clone(),
+            expected_head: head.clone(),
+            source_block: source_block.clone(),
+            previous_source_state: Some(PollingIngestPlanSourceState {
+                kind: PollingIngestPlanSourceStateKind::ETag,
+                value: "abc".to_string(),
+            }),
+            prev_offset: Some(9),
+            prev_watermark: Some(Utc.with_ymd_and_hms(2050, 1, 1, 0, 0, 0).unwrap()),
+            fetch_uncacheable: true,
+        };
+
+        let value = serde_json::to_value(&payload).unwrap();
+
+        assert_eq!(
+            value,
+            json!({
+                "kind": "PollingIngestPlan",
+                "datasetId": dataset_id.to_string(),
+                "expectedHead": head.to_string(),
+                "sourceBlock": source_block.to_string(),
+                "previousSourceState": { "kind": "ETag", "value": "abc" },
+                "prevOffset": 9,
+                "prevWatermark": "2050-01-01T00:00:00Z",
+                "fetchUncacheable": true,
+            })
+        );
+        assert_eq!(
+            serde_json::from_value::<PollingIngestPlanPayload>(value).unwrap(),
+            payload
+        );
+    }
+
+    #[test]
+    fn test_plan_payload_json_omits_absent_fields() {
+        let dataset_id = odf::DatasetID::new_seeded_ed25519(b"foo");
+        let head = odf::Multihash::from_digest_sha3_256(b"head");
+        let payload = PollingIngestPlanPayload {
+            dataset_id: dataset_id.clone(),
+            expected_head: head.clone(),
+            source_block: head.clone(),
+            previous_source_state: None,
+            prev_offset: None,
+            prev_watermark: None,
+            fetch_uncacheable: false,
+        };
+
+        let value = serde_json::to_value(&payload).unwrap();
+
+        assert_eq!(
+            value,
+            json!({
+                "kind": "PollingIngestPlan",
+                "datasetId": dataset_id.to_string(),
+                "expectedHead": head.to_string(),
+                "sourceBlock": head.to_string(),
+                "fetchUncacheable": false,
+            })
+        );
+        assert_eq!(
+            serde_json::from_value::<PollingIngestPlanPayload>(value).unwrap(),
+            payload
+        );
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

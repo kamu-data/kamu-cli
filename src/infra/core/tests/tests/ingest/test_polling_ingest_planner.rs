@@ -27,7 +27,6 @@ use kamu_datasets::{
     SecretsEncryptionConfig,
 };
 use pretty_assertions::assert_eq;
-use serde_json::json;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -165,81 +164,6 @@ async fn test_rebuild_ingest_without_polling_source() {
     let res = harness.rebuild(&bar, &stored).await;
 
     assert_matches!(res, Err(PollingIngestRebuildError::Mismatch(_)));
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[test]
-fn test_plan_payload_json() {
-    let dataset_id = odf::DatasetID::new_seeded_ed25519(b"foo");
-    let head = odf::Multihash::from_digest_sha3_256(b"head");
-    let source_block = odf::Multihash::from_digest_sha3_256(b"source");
-    let payload = PollingIngestPlanPayload {
-        dataset_id: dataset_id.clone(),
-        expected_head: head.clone(),
-        source_block: source_block.clone(),
-        previous_source_state: Some(PollingIngestPlanSourceState {
-            kind: PollingIngestPlanSourceStateKind::ETag,
-            value: "abc".to_string(),
-        }),
-        prev_offset: Some(9),
-        prev_watermark: Some(Utc.with_ymd_and_hms(2050, 1, 1, 0, 0, 0).unwrap()),
-        fetch_uncacheable: true,
-    };
-
-    let value = serde_json::to_value(&payload).unwrap();
-
-    assert_eq!(
-        value,
-        json!({
-            "kind": "PollingIngestPlan",
-            "datasetId": dataset_id.to_string(),
-            "expectedHead": head.to_string(),
-            "sourceBlock": source_block.to_string(),
-            "previousSourceState": { "kind": "ETag", "value": "abc" },
-            "prevOffset": 9,
-            "prevWatermark": "2050-01-01T00:00:00Z",
-            "fetchUncacheable": true,
-        })
-    );
-    assert_eq!(
-        serde_json::from_value::<PollingIngestPlanPayload>(value).unwrap(),
-        payload
-    );
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[test]
-fn test_plan_payload_json_omits_absent_fields() {
-    let dataset_id = odf::DatasetID::new_seeded_ed25519(b"foo");
-    let head = odf::Multihash::from_digest_sha3_256(b"head");
-    let payload = PollingIngestPlanPayload {
-        dataset_id: dataset_id.clone(),
-        expected_head: head.clone(),
-        source_block: head.clone(),
-        previous_source_state: None,
-        prev_offset: None,
-        prev_watermark: None,
-        fetch_uncacheable: false,
-    };
-
-    let value = serde_json::to_value(&payload).unwrap();
-
-    assert_eq!(
-        value,
-        json!({
-            "kind": "PollingIngestPlan",
-            "datasetId": dataset_id.to_string(),
-            "expectedHead": head.to_string(),
-            "sourceBlock": head.to_string(),
-            "fetchUncacheable": false,
-        })
-    );
-    assert_eq!(
-        serde_json::from_value::<PollingIngestPlanPayload>(value).unwrap(),
-        payload
-    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

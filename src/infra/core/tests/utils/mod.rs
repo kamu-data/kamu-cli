@@ -21,9 +21,11 @@ pub use ipfs_daemon::*;
 #[cfg(feature = "ingest-mqtt")]
 pub use mqtt_broker::*;
 
+mod local_sync_helper;
 mod recording_listener;
 mod sync_workspace_catalog;
 mod transform_test_helper;
+pub use local_sync_helper::*;
 pub use recording_listener::*;
 pub use sync_workspace_catalog::*;
 pub use transform_test_helper::*;

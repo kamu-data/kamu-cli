@@ -12,17 +12,56 @@ use kamu_task_system::TaskOutcome;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Records how a task ended as the `outcome` field of the current span. Why a
-/// task failed is in the spans and events inside it.
-pub(crate) fn record_task_outcome(outcome: &Result<TaskOutcome, InternalError>) {
-    tracing::Span::current().record(
-        "outcome",
+/// How a task ended, recorded as the `outcome` field of its span. Why a task
+/// failed is in the spans and events inside it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, strum::IntoStaticStr, strum::EnumIter)]
+#[strum(serialize_all = "snake_case")]
+pub(crate) enum TaskSpanOutcome {
+    Succeeded,
+    Failed,
+    Cancelled,
+}
+
+impl TaskSpanOutcome {
+    /// Records how a task ended on the current span, which must declare the
+    /// field
+    pub(crate) fn record(outcome: &Result<TaskOutcome, InternalError>) {
+        let outcome: &'static str = Self::from(outcome).into();
+        tracing::Span::current().record("outcome", outcome);
+    }
+}
+
+impl From<&Result<TaskOutcome, InternalError>> for TaskSpanOutcome {
+    fn from(outcome: &Result<TaskOutcome, InternalError>) -> Self {
         match outcome {
-            Ok(TaskOutcome::Success(_)) => "succeeded",
-            Ok(TaskOutcome::Failed(_)) | Err(_) => "failed",
-            Ok(TaskOutcome::Cancelled) => "cancelled",
-        },
-    );
+            Ok(TaskOutcome::Success(_)) => Self::Succeeded,
+            Ok(TaskOutcome::Failed(_)) | Err(_) => Self::Failed,
+            Ok(TaskOutcome::Cancelled) => Self::Cancelled,
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[cfg(test)]
+mod tests {
+    use strum::IntoEnumIterator;
+
+    use super::*;
+
+    #[test]
+    fn test_outcome_names_are_stable() {
+        let names = [
+            (TaskSpanOutcome::Succeeded, "succeeded"),
+            (TaskSpanOutcome::Failed, "failed"),
+            (TaskSpanOutcome::Cancelled, "cancelled"),
+        ];
+
+        assert_eq!(names.len(), TaskSpanOutcome::iter().count());
+        for (outcome, name) in names {
+            assert_eq!(<&'static str>::from(outcome), name);
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

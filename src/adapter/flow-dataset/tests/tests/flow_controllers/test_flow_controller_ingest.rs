@@ -169,40 +169,7 @@ async fn test_ingest_propagate_success_updated_notifies_dispatcher() {
 async fn test_ingest_propagate_success_with_more_data_runs_next_iteration() {
     let foo_dataset_id = odf::DatasetID::new_seeded_ed25519(b"foo");
 
-    let mut mock_flow_sensor_dispatcher = MockFlowSensorDispatcher::new();
-    mock_flow_sensor_dispatcher
-        .expect_dispatch_input_flow_success()
-        .times(1)
-        .returning(|_, _, _| Ok(()));
-
-    let mut mock_flow_run_service = MockFlowRunService::new();
-    mock_flow_run_service
-        .expect_run_flow_automatically()
-        .withf(|_, flow_binding, activation_causes, _, maybe_config| {
-            flow_binding.flow_type == FLOW_TYPE_DATASET_INGEST
-                && matches!(
-                    activation_causes.as_slice(),
-                    [FlowActivationCause::IterationFinished(_)]
-                )
-                && maybe_config.is_some()
-        })
-        .times(1)
-        .returning(
-            |activation_time, flow_binding, activation_causes, _, maybe_config| {
-                Ok(Flow::new(
-                    activation_time,
-                    FlowID::new(2),
-                    flow_binding.clone(),
-                    activation_causes[0].clone(),
-                    maybe_config,
-                    None,
-                )
-                .into())
-            },
-        );
-
-    let harness =
-        FlowControllerIngestHarness::with_mocks(mock_flow_sensor_dispatcher, mock_flow_run_service);
+    let harness = FlowControllerIngestHarness::expecting_next_iteration(FlowID::new(2));
 
     let ingest_flow = harness
         .make_ingest_flow(
@@ -249,6 +216,44 @@ impl FlowControllerIngestHarness {
 
     fn with_overrides(mock_flow_sensor_dispatcher: MockFlowSensorDispatcher) -> Self {
         Self::with_mocks(mock_flow_sensor_dispatcher, MockFlowRunService::new())
+    }
+
+    /// Expects one dispatch of the flow's success and one automatic run of
+    /// the next ingest iteration as `next_flow_id`
+    fn expecting_next_iteration(next_flow_id: FlowID) -> Self {
+        let mut mock_flow_sensor_dispatcher = MockFlowSensorDispatcher::new();
+        mock_flow_sensor_dispatcher
+            .expect_dispatch_input_flow_success()
+            .times(1)
+            .returning(|_, _, _| Ok(()));
+
+        let mut mock_flow_run_service = MockFlowRunService::new();
+        mock_flow_run_service
+            .expect_run_flow_automatically()
+            .withf(|_, flow_binding, activation_causes, _, maybe_config| {
+                flow_binding.flow_type == FLOW_TYPE_DATASET_INGEST
+                    && matches!(
+                        activation_causes.as_slice(),
+                        [FlowActivationCause::IterationFinished(_)]
+                    )
+                    && maybe_config.is_some()
+            })
+            .times(1)
+            .returning(
+                move |activation_time, flow_binding, activation_causes, _, maybe_config| {
+                    Ok(Flow::new(
+                        activation_time,
+                        next_flow_id,
+                        flow_binding.clone(),
+                        activation_causes[0].clone(),
+                        maybe_config,
+                        None,
+                    )
+                    .into())
+                },
+            );
+
+        Self::with_mocks(mock_flow_sensor_dispatcher, mock_flow_run_service)
     }
 
     fn with_mocks(

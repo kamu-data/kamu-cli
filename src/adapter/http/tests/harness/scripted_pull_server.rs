@@ -28,42 +28,6 @@ pub(crate) struct ScriptedPullServer {
     session: ScriptedPullSession,
 }
 
-/// Where the server breaks the transfer
-#[derive(Clone, Copy)]
-enum PullScript {
-    /// Sends the whole chain, then answers the request for objects wrongly
-    Objects(ObjectsScript),
-
-    /// Sends a metadata batch the client cannot use, so the client asks for
-    /// no objects
-    Metadata(MetadataScript),
-}
-
-/// How the server answers the request for objects
-#[derive(Clone, Copy)]
-enum ObjectsScript {
-    /// Offers none of them
-    Omit,
-
-    /// Offers each of them as the other object type, with a download URL
-    /// the client must never reach
-    Mislabel,
-
-    /// Offers each of them as it is, with a download URL that serves bytes
-    /// of another content
-    Corrupt,
-}
-
-/// Which metadata batch the server sends in place of the planned one
-#[derive(Clone, Copy)]
-enum MetadataScript {
-    /// A payload that is not an archive
-    Undecodable,
-
-    /// An archive without blocks
-    NoBlocks,
-}
-
 impl ScriptedPullServer {
     pub async fn omitting_objects(
         dataset_registry: &dyn DatasetRegistry,
@@ -212,6 +176,42 @@ impl ScriptedPullServer {
             .await
             .unwrap()
     }
+}
+
+/// Where the server breaks the transfer
+#[derive(Clone, Copy)]
+enum PullScript {
+    /// Sends the whole chain, then answers the request for objects wrongly
+    Objects(ObjectsScript),
+
+    /// Sends a metadata batch the client cannot use, so the client asks for
+    /// no objects
+    Metadata(MetadataScript),
+}
+
+/// How the server answers the request for objects
+#[derive(Clone, Copy)]
+enum ObjectsScript {
+    /// Offers none of them
+    Omit,
+
+    /// Offers each of them as the other object type, with a download URL
+    /// the client must never reach
+    Mislabel,
+
+    /// Offers each of them as it is, with a download URL that serves bytes
+    /// of another content
+    Corrupt,
+}
+
+/// Which metadata batch the server sends in place of the planned one
+#[derive(Clone, Copy)]
+enum MetadataScript {
+    /// A payload that is not an archive
+    Undecodable,
+
+    /// An archive without blocks
+    NoBlocks,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

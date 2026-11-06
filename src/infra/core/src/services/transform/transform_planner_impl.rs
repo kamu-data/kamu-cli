@@ -37,12 +37,6 @@ pub struct TransformPlannerImpl {
     time_source: Arc<dyn SystemTimeSource>,
 }
 
-/// Fixes what elaboration would otherwise read at call time
-struct ElaborationPins {
-    system_time: DateTime<Utc>,
-    input_heads: HashMap<odf::DatasetID, odf::Multihash>,
-}
-
 #[component(pub)]
 #[interface(dyn TransformPlanner)]
 impl TransformPlannerImpl {
@@ -530,6 +524,14 @@ impl TransformPlanner for TransformPlannerImpl {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Fixes what elaboration would otherwise read at call time
+struct ElaborationPins {
+    system_time: DateTime<Utc>,
+    input_heads: HashMap<odf::DatasetID, odf::Multihash>,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 /// The `ExecuteTransform` blocks of a verified range, and every block that
 /// sets metadata a transform depends on, all newest first
 #[derive(Default)]
@@ -584,13 +586,13 @@ impl VerificationHistory {
         head: &odf::Multihash,
         tail_sequence_number: Option<u64>,
     ) -> Result<Self, InternalError> {
-        use odf::dataset::*;
+        use odf::dataset::MetadataChainExt as _;
         type Flag = odf::metadata::MetadataEventTypeFlags;
-        type Decision = MetadataVisitorDecision;
+        type Decision = odf::dataset::MetadataVisitorDecision;
 
         let metadata_flags = Flag::SET_TRANSFORM | Flag::SET_DATA_SCHEMA | Flag::SET_VOCAB;
 
-        let mut visitor = GenericCallbackVisitor::new(
+        let mut visitor = odf::dataset::GenericCallbackVisitor::new(
             Self {
                 tail_sequence_number,
                 ..Self::default()

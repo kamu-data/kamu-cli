@@ -217,24 +217,6 @@ async fn test_dataset_of_another_account_is_not_found_by_its_pull_alias() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[test]
-fn test_pull_source_endpoint_carries_the_url_without_credentials() {
-    let source = DatasetPullSource {
-        remote_ref: BaseRepoHarness::remote_ref("repo/bar"),
-        url: Url::parse("odf+https://example.com/bar/").unwrap(),
-    };
-
-    assert_eq!(
-        source.to_sync_endpoint(),
-        odf::metadata::tasks::SyncEndpoint {
-            url: "odf+https://example.com/bar/".to_owned(),
-            auth: None,
-        }
-    );
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 #[oop::extend(BaseRepoHarness, base_repo_harness)]
 struct PullSourceHarness {
     base_repo_harness: BaseRepoHarness,

@@ -23,7 +23,7 @@ use kamu_datasets::{
 };
 use random_strings::get_random_name;
 
-use crate::utils::span_outcome::record_pull_outcome;
+use crate::utils::span_outcome::SpanOutcome;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -64,7 +64,7 @@ impl PullTransformJob {
         maybe_listener: Option<Arc<dyn TransformListener>>,
     ) -> Result<PullResponse, InternalError> {
         let response = self.run_job(pti, transform_options, maybe_listener).await;
-        record_pull_outcome(&response);
+        SpanOutcome::of_pull_response(&response).record();
         response
     }
 

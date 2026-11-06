@@ -36,7 +36,7 @@ pub struct SimpleTransferProtocolConfig {
 impl SimpleTransferProtocolConfig {
     /// Reads [`ENV_VAR_SIMPLE_PROTOCOL_MAX_PARALLEL_TRANSFERS`], falling back to
     /// the default when it is unset or not a number
-    pub fn from_env() -> Self {
+    pub(crate) fn from_env() -> Self {
         Self::from_env_value(
             std::env::var(ENV_VAR_SIMPLE_PROTOCOL_MAX_PARALLEL_TRANSFERS)
                 .ok()
@@ -57,7 +57,7 @@ impl SimpleTransferProtocolConfig {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Eq, PartialEq)]
-pub struct SimpleProtocolTransferOptions {
+pub(crate) struct SimpleProtocolTransferOptions {
     pub max_parallel_transfers: usize,
     pub visibility_for_created_dataset: odf::DatasetVisibility,
 }
@@ -75,7 +75,7 @@ pub struct SimpleTransferProtocol {
 impl SimpleTransferProtocol {
     /// Pushes into a remote dataset, moving its `HEAD` by the storage's own
     /// compare-and-swap from the head read at the start
-    pub async fn push(
+    pub(crate) async fn push(
         &self,
         src_ref: &odf::DatasetRefAny,
         src: Arc<dyn odf::Dataset>,
@@ -149,7 +149,7 @@ impl SimpleTransferProtocol {
     /// Writes the blocks and objects a local dataset lacks without moving its
     /// `HEAD`. A new dataset is stored from the source's `Seed`, without an
     /// entry or `HEAD`, for the commit to create
-    pub async fn transfer_into_local(
+    pub(crate) async fn transfer_into_local(
         &self,
         src_ref: &odf::DatasetRefAny,
         src: Arc<dyn odf::Dataset>,
@@ -195,7 +195,7 @@ impl SimpleTransferProtocol {
         let TransferTarget {
             storage: dst_dataset,
             target,
-        } = prepare_transfer_target(
+        } = TransferTarget::prepare(
             &self.catalog,
             dst,
             transfer_options.visibility_for_created_dataset,

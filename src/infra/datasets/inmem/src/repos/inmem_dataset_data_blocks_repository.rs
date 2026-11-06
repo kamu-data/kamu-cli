@@ -14,12 +14,7 @@ use dill::*;
 use internal_error::InternalError;
 use kamu_datasets::*;
 
-use super::{
-    DatasetBlocksMapExt,
-    DatasetBlocksView,
-    DatasetBlocksViewExt,
-    InMemoryDatasetDataBlockState,
-};
+use super::InMemoryDatasetDataBlockState;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -51,20 +46,11 @@ impl InMemoryDatasetDataBlockRepository {
         self.state
             .data_blocks
             .read(self.transaction_id, |data_blocks| {
-                Self::dataset_blocks(data_blocks, dataset_id)
+                data_blocks
+                    .dataset_blocks(dataset_id)
                     .find(|block| &block.block_hash == block_hash)
                     .map(map)
             })
-    }
-
-    fn dataset_blocks<'a>(
-        data_blocks: &DatasetBlocksView<'a>,
-        dataset_id: &'a odf::DatasetID,
-    ) -> impl Iterator<Item = &'a DatasetBlock> {
-        data_blocks
-            .iter()
-            .filter(move |((id, _, _), _)| id == dataset_id)
-            .map(|(_, block)| block)
     }
 }
 

@@ -10,7 +10,7 @@
 use internal_error::InternalError;
 use thiserror::Error;
 
-use crate::{GetRepoError, RepositoryNotFoundError, SyncError};
+use crate::{GetRepoError, RepositoryNotFoundError};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -134,16 +134,6 @@ impl From<GetRepoError> for ResolveRemoteSourceError {
     }
 }
 
-impl From<ResolveRemoteSourceError> for SyncError {
-    fn from(value: ResolveRemoteSourceError) -> Self {
-        match value {
-            ResolveRemoteSourceError::ByIdUnsupported(e) => Self::RemoteByIdUnsupported(e),
-            ResolveRemoteSourceError::RepositoryNotFound(e) => Self::RepositoryNotFound(e),
-            ResolveRemoteSourceError::Internal(e) => Self::Internal(e),
-        }
-    }
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Error)]
@@ -185,6 +175,31 @@ impl From<ResolveRemoteSourceError> for ResolvePullSourceError {
             ResolveRemoteSourceError::RepositoryNotFound(e) => Self::RepositoryNotFound(e),
             ResolveRemoteSourceError::Internal(e) => Self::Internal(e),
         }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[cfg(test)]
+mod tests {
+    use url::Url;
+
+    use super::*;
+
+    #[test]
+    fn test_pull_source_endpoint_carries_the_url_without_credentials() {
+        let source = DatasetPullSource {
+            remote_ref: odf::DatasetRefRemote::try_from("repo/bar").unwrap(),
+            url: Url::parse("odf+https://example.com/bar/").unwrap(),
+        };
+
+        assert_eq!(
+            source.to_sync_endpoint(),
+            odf::metadata::tasks::SyncEndpoint {
+                url: "odf+https://example.com/bar/".to_owned(),
+                auth: None,
+            }
+        );
     }
 }
 

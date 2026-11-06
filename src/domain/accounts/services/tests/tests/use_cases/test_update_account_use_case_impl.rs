@@ -134,15 +134,9 @@ async fn test_rename_own_account() {
     UpdateAccountUseCaseImplHarness::expect_outbox_account_created(&mut outbox, 2);
     UpdateAccountUseCaseImplHarness::expect_outbox_account_renamed(&mut outbox);
 
-    let predefined_account_config = {
-        let mut p = PredefinedAccountsConfig::new();
-        p.predefined = vec![
-            AccountConfig::test_config_from_name(odf::AccountName::new_unchecked(ADMIN))
-                .set_properties(vec![AccountPropertyName::IsAdmin]),
-            AccountConfig::test_config_from_name(odf::AccountName::new_unchecked(REGULAR_USER)),
-        ];
-        p
-    };
+    let predefined_account_config = UpdateAccountUseCaseImplHarness::admin_and_regular_user(
+        AccountConfig::test_config_from_name,
+    );
 
     let harness = UpdateAccountUseCaseImplHarness::builder()
         .account_authorization_helper_provider(Default::default())
@@ -176,15 +170,9 @@ async fn test_duplicate_name() {
     let mut outbox = MockOutbox::new();
     UpdateAccountUseCaseImplHarness::expect_outbox_account_created(&mut outbox, 2);
 
-    let predefined_account_config = {
-        let mut p = PredefinedAccountsConfig::new();
-        p.predefined = vec![
-            AccountConfig::test_config_from_name(odf::AccountName::new_unchecked(ADMIN))
-                .set_properties(vec![AccountPropertyName::IsAdmin]),
-            AccountConfig::test_config_from_name(odf::AccountName::new_unchecked(REGULAR_USER)),
-        ];
-        p
-    };
+    let predefined_account_config = UpdateAccountUseCaseImplHarness::admin_and_regular_user(
+        AccountConfig::test_config_from_name,
+    );
 
     let harness = UpdateAccountUseCaseImplHarness::builder()
         .account_authorization_helper_provider(Default::default())
@@ -221,17 +209,9 @@ async fn test_admin_renames_other_account() {
     UpdateAccountUseCaseImplHarness::expect_outbox_account_created(&mut outbox, 2);
     UpdateAccountUseCaseImplHarness::expect_outbox_account_renamed(&mut outbox);
 
-    let predefined_account_config = {
-        let mut p = PredefinedAccountsConfig::new();
-        p.predefined = vec![
-            AccountConfig::test_config_from_name_with_id(odf::AccountName::new_unchecked(ADMIN))
-                .set_properties(vec![AccountPropertyName::IsAdmin]),
-            AccountConfig::test_config_from_name_with_id(odf::AccountName::new_unchecked(
-                REGULAR_USER,
-            )),
-        ];
-        p
-    };
+    let predefined_account_config = UpdateAccountUseCaseImplHarness::admin_and_regular_user(
+        AccountConfig::test_config_from_name_with_id,
+    );
 
     let harness = UpdateAccountUseCaseImplHarness::builder()
         .account_authorization_helper_provider(Default::default())
@@ -266,17 +246,9 @@ async fn test_node_renames_other_account() {
     UpdateAccountUseCaseImplHarness::expect_outbox_account_created(&mut outbox, 2);
     UpdateAccountUseCaseImplHarness::expect_outbox_account_renamed(&mut outbox);
 
-    let predefined_account_config = {
-        let mut p = PredefinedAccountsConfig::new();
-        p.predefined = vec![
-            AccountConfig::test_config_from_name_with_id(odf::AccountName::new_unchecked(ADMIN))
-                .set_properties(vec![AccountPropertyName::IsAdmin]),
-            AccountConfig::test_config_from_name_with_id(odf::AccountName::new_unchecked(
-                REGULAR_USER,
-            )),
-        ];
-        p
-    };
+    let predefined_account_config = UpdateAccountUseCaseImplHarness::admin_and_regular_user(
+        AccountConfig::test_config_from_name_with_id,
+    );
 
     let harness = UpdateAccountUseCaseImplHarness::builder()
         .account_authorization_helper_provider(Default::default())
@@ -312,15 +284,9 @@ async fn test_anonymous_try_to_rename_account() {
     let mut outbox = MockOutbox::new();
     UpdateAccountUseCaseImplHarness::expect_outbox_account_created(&mut outbox, 2);
 
-    let predefined_account_config = {
-        let mut p = PredefinedAccountsConfig::new();
-        p.predefined = vec![
-            AccountConfig::test_config_from_name(odf::AccountName::new_unchecked(ADMIN))
-                .set_properties(vec![AccountPropertyName::IsAdmin]),
-            AccountConfig::test_config_from_name(odf::AccountName::new_unchecked(REGULAR_USER)),
-        ];
-        p
-    };
+    let predefined_account_config = UpdateAccountUseCaseImplHarness::admin_and_regular_user(
+        AccountConfig::test_config_from_name,
+    );
 
     let harness = UpdateAccountUseCaseImplHarness::builder()
         .account_authorization_helper_provider(Default::default())
@@ -348,15 +314,9 @@ async fn test_non_admin_try_to_rename_other_account() {
     let mut outbox = MockOutbox::new();
     UpdateAccountUseCaseImplHarness::expect_outbox_account_created(&mut outbox, 2);
 
-    let predefined_account_config = {
-        let mut p = PredefinedAccountsConfig::new();
-        p.predefined = vec![
-            AccountConfig::test_config_from_name(odf::AccountName::new_unchecked(ADMIN))
-                .set_properties(vec![AccountPropertyName::IsAdmin]),
-            AccountConfig::test_config_from_name(odf::AccountName::new_unchecked(REGULAR_USER)),
-        ];
-        p
-    };
+    let predefined_account_config = UpdateAccountUseCaseImplHarness::admin_and_regular_user(
+        AccountConfig::test_config_from_name,
+    );
 
     let harness = UpdateAccountUseCaseImplHarness::builder()
         .account_authorization_helper_provider(Default::default())
@@ -444,6 +404,19 @@ impl UpdateAccountUseCaseImplHarness {
             )
             .times(expected_count)
             .returning(|_, _, _| Ok(()));
+    }
+
+    /// The admin and the regular user, each configured by `account_config`
+    fn admin_and_regular_user(
+        account_config: fn(odf::AccountName) -> AccountConfig,
+    ) -> PredefinedAccountsConfig {
+        let mut p = PredefinedAccountsConfig::new();
+        p.predefined = vec![
+            account_config(odf::AccountName::new_unchecked(ADMIN))
+                .set_properties(vec![AccountPropertyName::IsAdmin]),
+            account_config(odf::AccountName::new_unchecked(REGULAR_USER)),
+        ];
+        p
     }
 
     fn expect_outbox_account_email_changed(mock_outbox: &mut MockOutbox) {

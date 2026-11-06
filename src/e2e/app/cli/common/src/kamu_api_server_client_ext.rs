@@ -304,6 +304,8 @@ pub trait KamuApiServerClientExt {
 
     fn swagger(&self) -> SwaggerApi<'_>;
 
+    fn system(&self) -> SystemApi<'_>;
+
     fn upload(&self) -> UploadApi<'_>;
 
     fn webhook(&self) -> WebhookApi<'_>;
@@ -347,6 +349,10 @@ impl KamuApiServerClientExt for KamuApiServerClient {
 
     fn swagger(&self) -> SwaggerApi<'_> {
         SwaggerApi { client: self }
+    }
+
+    fn system(&self) -> SystemApi<'_> {
+        SystemApi { client: self }
     }
 
     fn upload(&self) -> UploadApi<'_> {
@@ -1128,6 +1134,11 @@ impl DatasetApi<'_> {
             .unwrap()
     }
 
+    /// Hashes of the dataset's blocks, in the order of [`Self::blocks`]
+    pub async fn block_hashes(&self, dataset_id: &odf::DatasetID) -> Vec<odf::Multihash> {
+        self.blocks(dataset_id).await.block_hashes()
+    }
+
     pub async fn blocks(&self, dataset_id: &odf::DatasetID) -> DatasetBlocksResponse {
         let response = self
             .client
@@ -1867,6 +1878,19 @@ impl FlowApi<'_> {
         self.trigger_flow(dataset_id, "triggerTransformFlow").await
     }
 
+    /// Triggers a transform flow and waits for it to finish
+    pub async fn run_transform(&self, dataset_id: &odf::DatasetID) -> FlowSummary {
+        let FlowTriggerResponse::Success(flow_id) = self.trigger_transform(dataset_id).await else {
+            panic!("Transform flow was not triggered");
+        };
+        let flow_id = flow_id.to_string();
+
+        self.wait_for_flow(dataset_id, |flow| {
+            flow.flow_id == flow_id && flow.status == "FINISHED"
+        })
+        .await
+    }
+
     pub async fn trigger_compaction(&self, dataset_id: &odf::DatasetID) -> FlowTriggerResponse {
         self.trigger_flow(dataset_id, "triggerCompactionFlow").await
     }
@@ -2057,6 +2081,36 @@ impl FlowApi<'_> {
             flow.status == "WAITING" && condition(flow)
         })
         .await
+    }
+
+    /// Waits for `expected_count` finished flows, advancing the frozen system
+    /// time an hour per attempt so that each follow-up flow passes its
+    /// throttling period
+    pub async fn wait_finished_advancing_time(
+        &self,
+        dataset_id: &odf::DatasetID,
+        expected_count: usize,
+    ) -> Vec<FlowSummary> {
+        let retry_strategy = FixedInterval::from_millis(1_000).take(59); // 1m
+
+        let mut hours = 0;
+        Retry::start(retry_strategy, || {
+            hours += 1;
+            let hours_after_start = hours;
+            async move {
+                let flows = self.list_flows(dataset_id).await;
+                if flows.len() >= expected_count && flows.iter().all(|f| f.status == "FINISHED") {
+                    return Ok(flows);
+                }
+                self.client
+                    .e2e()
+                    .advance_frozen_system_time(hours_after_start)
+                    .await;
+                Err(())
+            }
+        })
+        .await
+        .unwrap_or_else(|()| panic!("Expected {expected_count} finished flows"))
     }
 
     // Method to wait for a flow to finish
@@ -2380,6 +2434,12 @@ pub struct OdfQuery<'a> {
 }
 
 impl OdfQuery<'_> {
+    /// The CSV rows of a successful query, without the header
+    pub async fn query_rows(&self, query: &str) -> Vec<String> {
+        let result = self.query(query).await.unwrap();
+        result.lines().skip(1).map(ToOwned::to_owned).collect()
+    }
+
     pub async fn query(&self, query: &str) -> Result<String, QueryError> {
         let response = self
             .client
@@ -2685,6 +2745,47 @@ impl SwaggerApi<'_> {
         pretty_assertions::assert_eq!(StatusCode::OK, response.status());
 
         response.json().await.unwrap()
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// API: System
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub struct SystemApi<'a> {
+    client: &'a KamuApiServerClient,
+}
+
+impl SystemApi<'_> {
+    pub async fn metrics(&self) -> String {
+        let response = self
+            .client
+            .rest_api_call(Method::GET, "system/metrics", None)
+            .await;
+
+        pretty_assertions::assert_eq!(StatusCode::OK, response.status());
+
+        response.text().await.unwrap()
+    }
+
+    /// Waits until the metrics contain `expected`: background work may record
+    /// its metrics after the server becomes ready
+    pub async fn wait_for_metrics_containing(&self, expected: &str) {
+        let retry_strategy = FixedInterval::from_millis(200).take(49); // 10s
+
+        let result = Retry::start(retry_strategy, || async {
+            let metrics = self.metrics().await;
+            if metrics.contains(expected) {
+                Ok(())
+            } else {
+                Err(metrics)
+            }
+        })
+        .await;
+
+        if let Err(metrics) = result {
+            panic!("No '{expected}' in metrics:\n{metrics}");
+        }
     }
 }
 

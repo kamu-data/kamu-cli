@@ -125,7 +125,7 @@ impl DatasetOperationGuardImpl {
                     denied_handles.insert(handle.id.clone(), handle.clone());
                     Verdict::Denied
                 }
-                e @ E::Internal(_) => return Err(e.int_err()),
+                E::Internal(e) => return Err(e),
             };
             verdicts.insert((permission, handle.id), verdict);
         }

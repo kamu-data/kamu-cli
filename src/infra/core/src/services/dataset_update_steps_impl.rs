@@ -15,14 +15,7 @@ use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_core::*;
 use kamu_datasets::{DatasetHeadCommitter, DatasetRegistry, DatasetRegistryExt};
 
-use crate::utils::span_outcome::{
-    DATASET_DELETED,
-    FAILED,
-    UP_TO_DATE,
-    UPDATED,
-    record_outcome,
-    sync_error_outcome,
-};
+use crate::utils::span_outcome::SpanOutcome;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -86,7 +79,24 @@ impl DatasetUpdateStepsImpl {
             Ok(sync_result) => Ok(Some(sync_result)),
             // The committer reopens an existing target by its ID, so a deleted one is not found
             Err(SyncError::DatasetNotFound(_)) => Ok(None),
-            Err(e) => Err(e),
+            Err(
+                e @ (SyncError::RefCollision(_)
+                | SyncError::NameCollision(_)
+                | SyncError::CreateDatasetFailed(_)
+                | SyncError::UnsupportedProtocol(_)
+                | SyncError::UnsupportedIpfsStorageType(_)
+                | SyncError::RemoteByIdUnsupported(_)
+                | SyncError::InvalidDestination(_)
+                | SyncError::RepositoryNotFound(_)
+                | SyncError::DatasetsDiverged(_)
+                | SyncError::DatasetIdMismatch(_)
+                | SyncError::DestinationAhead(_)
+                | SyncError::OverwriteSeedBlock(_)
+                | SyncError::Corrupted(_)
+                | SyncError::HeadMoved(_)
+                | SyncError::Access(_)
+                | SyncError::Internal(_)),
+            ) => Err(e),
         }
     }
 
@@ -197,11 +207,12 @@ impl DatasetUpdateSteps for DatasetUpdateStepsImpl {
         target: &odf::DatasetHandle,
     ) -> Result<Option<PlannedIngest>, PollingIngestPlanError> {
         let result = self.plan_ingest_transactionally(target).await;
-        record_outcome(match &result {
-            Ok(Some(_)) => "planned",
-            Ok(None) => DATASET_DELETED,
-            Err(_) => FAILED,
-        });
+        match &result {
+            Ok(Some(_)) => SpanOutcome::Planned,
+            Ok(None) => SpanOutcome::DatasetDeleted,
+            Err(_) => SpanOutcome::Failed,
+        }
+        .record();
         result
     }
 
@@ -211,18 +222,19 @@ impl DatasetUpdateSteps for DatasetUpdateStepsImpl {
         target: &odf::DatasetHandle,
     ) -> Result<Option<ElaboratedTransform>, TransformElaborateError> {
         let result = self.elaborate_transform_transactionally(target).await;
-        record_outcome(match &result {
+        match &result {
             Ok(Some(ElaboratedTransform {
                 elaboration: TransformElaboration::Elaborated(_),
                 ..
-            })) => "elaborated",
+            })) => SpanOutcome::Elaborated,
             Ok(Some(ElaboratedTransform {
                 elaboration: TransformElaboration::UpToDate,
                 ..
-            })) => UP_TO_DATE,
-            Ok(None) => DATASET_DELETED,
-            Err(_) => FAILED,
-        });
+            })) => SpanOutcome::UpToDate,
+            Ok(None) => SpanOutcome::DatasetDeleted,
+            Err(_) => SpanOutcome::Failed,
+        }
+        .record();
         result
     }
 
@@ -232,12 +244,13 @@ impl DatasetUpdateSteps for DatasetUpdateStepsImpl {
         target: &PullLocalTarget,
     ) -> Result<Option<LocalSyncTarget>, SyncError> {
         let result = self.resolve_sync_target_transactionally(target).await;
-        record_outcome(match &result {
-            Ok(Some(LocalSyncTarget::Existing { .. })) => "existing",
-            Ok(Some(LocalSyncTarget::New(_))) => "new",
-            Ok(None) => DATASET_DELETED,
-            Err(e) => sync_error_outcome(e),
-        });
+        match &result {
+            Ok(Some(LocalSyncTarget::Existing { .. })) => SpanOutcome::Existing,
+            Ok(Some(LocalSyncTarget::New(_))) => SpanOutcome::New,
+            Ok(None) => SpanOutcome::DatasetDeleted,
+            Err(e) => SpanOutcome::from(e),
+        }
+        .record();
         result
     }
 
@@ -251,10 +264,11 @@ impl DatasetUpdateSteps for DatasetUpdateStepsImpl {
         let result = self
             .commit_head_transactionally(target, old_head, new_head)
             .await;
-        record_outcome(match &result {
-            Ok(head_commit) => head_commit.into(),
-            Err(_) => FAILED,
-        });
+        match &result {
+            Ok(head_commit) => SpanOutcome::from(head_commit),
+            Err(_) => SpanOutcome::Failed,
+        }
+        .record();
         result
     }
 
@@ -277,12 +291,13 @@ impl DatasetUpdateSteps for DatasetUpdateStepsImpl {
             }
             Err(e) => Err(e),
         };
-        record_outcome(match &result {
-            Ok(Some(SyncResult::Updated { .. })) => UPDATED,
-            Ok(Some(SyncResult::UpToDate)) => UP_TO_DATE,
-            Ok(None) => DATASET_DELETED,
-            Err(e) => sync_error_outcome(e),
-        });
+        match &result {
+            Ok(Some(SyncResult::Updated { .. })) => SpanOutcome::Updated,
+            Ok(Some(SyncResult::UpToDate)) => SpanOutcome::UpToDate,
+            Ok(None) => SpanOutcome::DatasetDeleted,
+            Err(e) => SpanOutcome::from(e),
+        }
+        .record();
         result
     }
 }

@@ -11,11 +11,7 @@ use std::collections::HashSet;
 
 use futures::stream::{StreamExt, TryStreamExt};
 use internal_error::{ErrorIntoInternal, ResultIntoInternal};
-use kamu::utils::local_sync_writes::{
-    TransferTarget,
-    append_transferred_blocks,
-    prepare_transfer_target,
-};
+use kamu::utils::local_sync_writes::{TransferTarget, append_transferred_blocks};
 use kamu::utils::smart_transfer_protocol::TransferOptions;
 use kamu::utils::sync_increment::sync_increment;
 use kamu_core::*;
@@ -425,7 +421,7 @@ impl WsSmartTransferProtocolClient {
                 let TransferTarget {
                     storage: dst_storage,
                     target,
-                } = prepare_transfer_target(
+                } = TransferTarget::prepare(
                     self.catalog(),
                     dst,
                     transfer_options.visibility_for_created_dataset,

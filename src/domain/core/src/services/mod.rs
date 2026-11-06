@@ -39,7 +39,7 @@ pub mod push_request_planner;
 pub mod query_service;
 pub mod remote_aliases;
 pub mod remote_aliases_registry;
-pub mod remote_dataset_url_resolver;
+mod remote_dataset_url_resolver;
 pub mod remote_repository_registry;
 pub mod remote_status_service;
 pub mod resource_loader;

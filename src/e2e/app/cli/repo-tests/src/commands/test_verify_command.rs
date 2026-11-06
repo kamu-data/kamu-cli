@@ -14,19 +14,11 @@ use kamu_cli_e2e_common::{
     DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_1,
     DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_2,
     DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR,
+    KamuCliPuppetFixturesExt,
     leaderboard_set_transform_event,
 };
 use kamu_cli_puppet::KamuCliPuppet;
 use kamu_cli_puppet::extensions::KamuCliPuppetExt;
-use url::Url;
-
-use crate::utils::{
-    add_player_scores_with_derivative,
-    commit_event,
-    create_alice_and_bob,
-    dataset_id,
-    set_private,
-};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -56,7 +48,7 @@ pub async fn test_verify_regular_dataset(kamu: KamuCliPuppet) {
 pub async fn test_verify_recursive(kamu: KamuCliPuppet) {
     let dataset_derivative_name = DATASET_DERIVATIVE_LEADERBOARD_NAME.clone();
 
-    add_player_scores_with_derivative(&kamu).await;
+    kamu.add_player_scores_with_derivative().await;
 
     kamu.execute(["pull", dataset_derivative_name.as_str()])
         .await
@@ -105,16 +97,15 @@ pub async fn test_verify_integrity(kamu: KamuCliPuppet) {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_verify_derivative_after_query_change(kamu: KamuCliPuppet) {
-    add_player_scores_with_derivative(&kamu).await;
+    kamu.add_player_scores_with_derivative().await;
     kamu.execute(["pull", DATASET_DERIVATIVE_LEADERBOARD_NAME.as_str()])
         .await
         .success();
 
-    commit_event(
-        &kamu,
+    kamu.commit_event(
         &DATASET_DERIVATIVE_LEADERBOARD_NAME,
         &leaderboard_set_transform_event(
-            &dataset_id(&kamu, &DATASET_ROOT_PLAYER_NAME).await,
+            &kamu.get_dataset_id(&DATASET_ROOT_PLAYER_NAME).await,
             "SELECT ROW_NUMBER() OVER (PARTITION BY 1 ORDER BY score ASC) AS place, match_time, \
              match_id, player_id, score FROM player_scores",
         ),
@@ -141,7 +132,7 @@ pub async fn test_verify_derivative_after_query_change(kamu: KamuCliPuppet) {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_verify_replay_denied_when_input_became_unreadable(mut kamu: KamuCliPuppet) {
-    let (alice, bob) = create_alice_and_bob(&kamu).await;
+    let [alice, bob] = kamu.create_accounts(["alice", "bob"]).await;
 
     kamu.set_account(Some(bob.clone()));
     kamu.execute_with_input(
@@ -175,7 +166,7 @@ pub async fn test_verify_replay_denied_when_input_became_unreadable(mut kamu: Ka
     .await;
 
     kamu.set_account(Some(bob));
-    set_private(&kamu, &DATASET_ROOT_PLAYER_NAME).await;
+    kamu.set_dataset_private(&DATASET_ROOT_PLAYER_NAME).await;
 
     kamu.set_account(Some(alice));
     kamu.assert_failure_command_execution(
@@ -190,16 +181,14 @@ pub async fn test_verify_replay_denied_when_input_became_unreadable(mut kamu: Ka
 
 pub async fn test_verify_pulled_derivative_without_its_input(kamu: KamuCliPuppet) {
     let source = KamuCliPuppet::new_workspace_tmp_single_tenant().await;
-    add_player_scores_with_derivative(&source).await;
+    source.add_player_scores_with_derivative().await;
     source
         .execute(["pull", DATASET_DERIVATIVE_LEADERBOARD_NAME.as_str()])
         .await
         .success();
 
-    let dataset_url = Url::from_directory_path(kamu.workspace_path().join("repo"))
-        .unwrap()
-        .join(DATASET_DERIVATIVE_LEADERBOARD_NAME.as_str())
-        .unwrap();
+    let dataset_url =
+        kamu.workspace_dataset_url("repo", DATASET_DERIVATIVE_LEADERBOARD_NAME.as_str());
     source
         .execute([
             "push",

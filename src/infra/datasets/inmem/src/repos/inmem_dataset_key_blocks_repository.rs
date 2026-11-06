@@ -14,7 +14,7 @@ use dill::*;
 use internal_error::InternalError;
 use kamu_datasets::*;
 
-use super::{DatasetBlocksMapExt, DatasetBlocksViewExt, InMemoryDatasetKeyBlockState};
+use super::InMemoryDatasetKeyBlockState;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

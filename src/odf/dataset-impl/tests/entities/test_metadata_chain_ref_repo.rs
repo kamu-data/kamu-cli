@@ -8,7 +8,6 @@
 // by the Apache License, Version 2.0.
 
 use std::assert_matches;
-use std::path::Path;
 
 use odf::dataset::*;
 use odf::metadata::*;
@@ -19,8 +18,7 @@ use odf::storage::*;
 
 #[tokio::test]
 async fn test_set_ref_cas_reports_the_actual_head() {
-    let tmp_dir = tempfile::tempdir().unwrap();
-    let harness = RefRepoHarness::new(tmp_dir.path());
+    let harness = RefRepoHarness::new();
 
     harness.set_head(None, &harness.hash_a).await.unwrap();
 
@@ -49,8 +47,7 @@ async fn test_set_ref_cas_reports_the_actual_head() {
 
 #[tokio::test]
 async fn test_set_ref_without_conditional_writes_checks_before_writing() {
-    let tmp_dir = tempfile::tempdir().unwrap();
-    let harness = RefRepoHarness::without_conditional_writes(tmp_dir.path());
+    let harness = RefRepoHarness::without_conditional_writes();
 
     harness.set_head(None, &harness.hash_a).await.unwrap();
 
@@ -72,8 +69,7 @@ async fn test_set_ref_without_conditional_writes_checks_before_writing() {
 
 #[tokio::test]
 async fn test_set_ref_without_check_overwrites() {
-    let tmp_dir = tempfile::tempdir().unwrap();
-    let harness = RefRepoHarness::new(tmp_dir.path());
+    let harness = RefRepoHarness::new();
 
     harness.set_head(None, &harness.hash_a).await.unwrap();
     harness
@@ -94,29 +90,38 @@ struct RefRepoHarness {
     hash_a: Multihash,
     hash_b: Multihash,
     hash_c: Multihash,
+    _tmp_dir: tempfile::TempDir,
 }
 
 impl RefRepoHarness {
-    fn new(root: &Path) -> Self {
-        Self::with_ref_repo(Box::new(MetadataChainReferenceRepositoryImpl::new(
-            ReferenceRepositoryImpl::new(NamedObjectRepositoryLocalFS::new(root)),
-        )))
+    fn new() -> Self {
+        let tmp_dir = tempfile::tempdir().unwrap();
+        let ref_repo = Box::new(MetadataChainReferenceRepositoryImpl::new(
+            ReferenceRepositoryImpl::new(NamedObjectRepositoryLocalFS::new(tmp_dir.path())),
+        ));
+        Self::with_ref_repo(ref_repo, tmp_dir)
     }
 
-    fn without_conditional_writes(root: &Path) -> Self {
-        Self::with_ref_repo(Box::new(MetadataChainReferenceRepositoryImpl::new(
+    fn without_conditional_writes() -> Self {
+        let tmp_dir = tempfile::tempdir().unwrap();
+        let ref_repo = Box::new(MetadataChainReferenceRepositoryImpl::new(
             ReferenceRepositoryImpl::new(NamedObjectRepositoryWithoutConditionalWrites(
-                NamedObjectRepositoryLocalFS::new(root),
+                NamedObjectRepositoryLocalFS::new(tmp_dir.path()),
             )),
-        )))
+        ));
+        Self::with_ref_repo(ref_repo, tmp_dir)
     }
 
-    fn with_ref_repo(ref_repo: Box<dyn MetadataChainReferenceRepository>) -> Self {
+    fn with_ref_repo(
+        ref_repo: Box<dyn MetadataChainReferenceRepository>,
+        tmp_dir: tempfile::TempDir,
+    ) -> Self {
         Self {
             ref_repo,
             hash_a: Multihash::from_digest_sha3_256(b"a"),
             hash_b: Multihash::from_digest_sha3_256(b"b"),
             hash_c: Multihash::from_digest_sha3_256(b"c"),
+            _tmp_dir: tmp_dir,
         }
     }
 

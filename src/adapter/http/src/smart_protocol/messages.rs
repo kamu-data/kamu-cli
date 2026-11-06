@@ -473,3 +473,164 @@ pub enum TransferInternalErrorKind {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[cfg(test)]
+mod tests {
+    use std::assert_matches;
+
+    use pretty_assertions::assert_eq;
+
+    use super::*;
+
+    // Push replies cross versions in both directions, so these tests pin
+    // their JSON form
+
+    #[test]
+    fn test_confirmation_is_read_by_clients_that_predate_the_typed_reply() {
+        let json = serde_json::to_string(&DatasetPushCompleteResponse::Ok(
+            DatasetPushCompleteConfirmed {},
+        ))
+        .unwrap();
+
+        assert_eq!(json, r#"{"Ok":{}}"#);
+        assert_matches!(
+            serde_json::from_str::<DatasetPushCompleteConfirmed>(&json),
+            Ok(DatasetPushCompleteConfirmed {})
+        );
+    }
+
+    #[test]
+    fn test_bare_confirmation_of_servers_that_predate_the_typed_reply_is_accepted() {
+        assert_matches!(
+            serde_json::from_str::<DatasetPushCompleteReply>("{}"),
+            Ok(DatasetPushCompleteReply::Legacy(_))
+        );
+    }
+
+    #[test]
+    fn test_internal_error_of_servers_that_predate_the_typed_reply_is_read_as_internal() {
+        // What such a server sends on any failure of the complete request
+        let json = r#"{"Err":{"Internal":{"phase":{"Push":"CompleteRequest"},"error_message":"Internal error"}}}"#;
+
+        assert_matches!(
+            serde_json::from_str::<DatasetPushCompleteReply>(json),
+            Ok(DatasetPushCompleteReply::Response(Err(DatasetPushCompleteError::Internal(e))))
+                if e.error_message == "Internal error"
+        );
+    }
+
+    #[test]
+    fn test_updated_concurrently_fits_a_close_frame() {
+        let json = serde_json::to_string(&DatasetPushCompleteResponse::Err(
+            DatasetPushCompleteError::UpdatedConcurrently(DatasetPushUpdatedConcurrentlyError {}),
+        ))
+        .unwrap();
+
+        assert_eq!(json, r#"{"Err":{"UpdatedConcurrently":{}}}"#);
+        assert_matches!(
+            serde_json::from_str::<DatasetPushCompleteReply>(&json),
+            Ok(DatasetPushCompleteReply::Response(Err(
+                DatasetPushCompleteError::UpdatedConcurrently(_)
+            )))
+        );
+    }
+
+    #[test]
+    fn test_unknown_error_is_not_taken_for_a_confirmation() {
+        assert_matches!(
+            serde_json::from_str::<DatasetPushCompleteReply>(r#"{"Err":{"FutureError":{}}}"#),
+            Err(_)
+        );
+    }
+
+    #[test]
+    fn test_progress_request_read_with_the_complete_reply_is_not_a_confirmation() {
+        let json = serde_json::to_string(&DatasetPushObjectsUploadProgressRequest {
+            progress_requested: true,
+        })
+        .unwrap();
+
+        assert_eq!(json, r#"{"progress_requested":true}"#);
+        assert_matches!(
+            serde_json::from_str::<DatasetPushCompleteReply>(&json),
+            Ok(DatasetPushCompleteReply::StaleProgressRequest(_))
+        );
+    }
+
+    #[test]
+    fn test_progress_request_is_read_by_clients_that_predate_its_field() {
+        #[derive(serde::Deserialize, Debug)]
+        struct ProgressRequestBeforeTheField {}
+
+        assert_matches!(
+            serde_json::from_str::<ProgressRequestBeforeTheField>(r#"{"progress_requested":true}"#),
+            Ok(ProgressRequestBeforeTheField {})
+        );
+        // And the progress request of an older server is read by this one
+        assert_eq!(
+            serde_json::from_str::<DatasetPushObjectsUploadProgressRequest>("{}").unwrap(),
+            DatasetPushObjectsUploadProgressRequest {
+                progress_requested: false
+            }
+        );
+    }
+
+    #[test]
+    fn test_name_collision_reply_for_a_long_alias_is_read_back() {
+        let dataset_alias = odf::DatasetAlias::new(
+            Some(odf::AccountName::new_unchecked(
+                "an-account-with-a-rather-long-name",
+            )),
+            odf::DatasetName::new_unchecked(
+                "a-dataset-whose-name-alone-is-longer-than-a-close-frame-allows",
+            ),
+        );
+
+        let json = serde_json::to_string(&DatasetPushObjectsTransferResponse::Err(
+            DatasetPushObjectsTransferError::NameCollision(
+                DatasetPushObjectsTransferNameCollisionError {
+                    dataset_alias: dataset_alias.clone(),
+                },
+            ),
+        ))
+        .unwrap();
+
+        // Too long for a close frame reason, so the server sends it as a message
+        assert!(json.len() > 123, "{json}");
+        assert_matches!(
+            serde_json::from_str::<DatasetPushObjectsTransferResponse>(&json),
+            Ok(Err(DatasetPushObjectsTransferError::NameCollision(e)))
+                if e.dataset_alias == dataset_alias
+        );
+    }
+
+    #[test]
+    fn test_invalid_head_reply_keeps_expected_and_actual_heads() {
+        let cas_error = odf::dataset::RefCASError {
+            reference: odf::BlockRef::Head,
+            expected: Some(odf::Multihash::from_digest_sha3_256(b"planned")),
+            actual: Some(odf::Multihash::from_digest_sha3_256(b"concurrent")),
+        };
+
+        let json = serde_json::to_string(&DatasetPushResponse::Err(
+            DatasetPushRequestError::InvalidHead((&cas_error).into()),
+        ))
+        .unwrap();
+        let DatasetPushResponse::Err(DatasetPushRequestError::InvalidHead(reply)) =
+            serde_json::from_str::<DatasetPushResponse>(&json).unwrap()
+        else {
+            panic!("Unexpected reply: {json}");
+        };
+
+        assert_eq!(
+            reply,
+            DatasetPushInvalidHeadError {
+                actual_head: cas_error.actual.clone(),
+                expected_head: cas_error.expected.clone(),
+            }
+        );
+        assert_eq!(odf::dataset::RefCASError::from(reply), cas_error);
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

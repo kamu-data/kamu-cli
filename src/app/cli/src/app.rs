@@ -426,6 +426,8 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
     command_result
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 /// The result of a command once the Outbox was processed after it: the
 /// command's own error wins, and an Outbox failure fails a command that
 /// succeeded

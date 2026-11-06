@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use kamu_accounts::Principal;
 use kamu_adapter_flow_dataset as afs;
 use kamu_auth_rebac::RebacDatasetRegistryFacade;
 use kamu_datasets::{DatasetPermission, ResolvedDataset};
@@ -150,7 +151,7 @@ pub(crate) async fn ensure_flow_preconditions(
                 ctx,
                 dyn kamu_core::MetadataQueryService,
                 dyn RebacDatasetRegistryFacade,
-                kamu_accounts::Principal
+                Principal
             );
             let source_res = metadata_query_service
                 .get_active_transform(resolved_dataset)

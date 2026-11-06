@@ -1915,14 +1915,13 @@ pub async fn test_a_private_dataset_is_found_by_id_and_ingested_into_only_by_aut
                 Some(RequestBody::NdJson(data.into())),
             )
             .await;
-        pretty_assertions::assert_eq!(expected_status, response.status(), "Tag: {}", tag);
+        pretty_assertions::assert_eq!(expected_status, response.status(), "Tag: {tag}");
 
         let head = owner_head(&owner, &dataset_alias).await;
         pretty_assertions::assert_eq!(
             expected_status == StatusCode::OK,
             head != last_head,
-            "Tag: {}",
-            tag,
+            "Tag: {tag}",
         );
         last_head = head;
     }

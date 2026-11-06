@@ -38,7 +38,7 @@ use kamu_datasets_services::utils::CreateDatasetUseCaseHelper;
 use reqwest::Url;
 use time_source::SystemTimeSourceStub;
 
-use super::{ServerSideDatasetFixture, commit_set_info, create_headless_dataset, find_stored_head};
+use super::{DatasetCommits, HeadlessDatasets, ServerSideDatasetFixture, StoredHeads};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -81,29 +81,25 @@ pub(crate) trait ServerSideHarness {
 
     /// A dataset of the operating account with its own `Seed` but no `HEAD`
     async fn create_headless_dataset(&self, dataset_name: &str) -> odf::DatasetHandle {
-        create_headless_dataset(
-            self.cli_create_dataset_use_case_helper().as_ref(),
-            &self.server_account_id(),
-            &odf::DatasetAlias::new(
-                self.operating_account_name(),
-                odf::DatasetName::new_unchecked(dataset_name),
-            ),
-        )
-        .await
+        HeadlessDatasets::new(self.cli_create_dataset_use_case_helper())
+            .create(
+                &self.server_account_id(),
+                &odf::DatasetAlias::new(
+                    self.operating_account_name(),
+                    odf::DatasetName::new_unchecked(dataset_name),
+                ),
+            )
+            .await
     }
 
     /// Taken before `api_server_run`, which consumes the harness
     fn stored_heads(&self) -> StoredHeads {
-        StoredHeads {
-            dataset_reference_service: self.cli_dataset_reference_service(),
-        }
+        StoredHeads::new(self.cli_dataset_reference_service())
     }
 
     /// Taken before `api_server_run`, which consumes the harness
-    fn server_commits(&self) -> ServerCommits {
-        ServerCommits {
-            commit_dataset_event: self.cli_commit_dataset_event_use_case(),
-        }
+    fn server_commits(&self) -> DatasetCommits {
+        DatasetCommits::new(self.cli_commit_dataset_event_use_case())
     }
 
     fn dataset_url_with_scheme(&self, dataset_alias: &odf::DatasetAlias, scheme: &str) -> Url;
@@ -214,41 +210,6 @@ pub(crate) fn create_web_user_catalog(
     }
 
     web_catalog_builder.build()
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-/// Reads the `HEAD` stored on the server
-pub(crate) struct StoredHeads {
-    dataset_reference_service: Arc<dyn DatasetReferenceService>,
-}
-
-impl StoredHeads {
-    pub async fn get(&self, dataset_id: &odf::DatasetID) -> odf::Multihash {
-        self.dataset_reference_service
-            .get_reference(dataset_id, &odf::BlockRef::Head)
-            .await
-            .unwrap()
-    }
-
-    /// `None` while the dataset has no `HEAD`
-    pub async fn find(&self, dataset_id: &odf::DatasetID) -> Option<odf::Multihash> {
-        find_stored_head(self.dataset_reference_service.as_ref(), dataset_id).await
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-/// Commits to server datasets while the server runs, moving `HEAD` as any
-/// writer would
-pub(crate) struct ServerCommits {
-    commit_dataset_event: Arc<dyn CommitDatasetEventUseCase>,
-}
-
-impl ServerCommits {
-    pub async fn commit_set_info(&self, dataset_handle: &odf::DatasetHandle) -> odf::Multihash {
-        commit_set_info(self.commit_dataset_event.as_ref(), dataset_handle).await
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

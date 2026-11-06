@@ -61,7 +61,7 @@ use super::{
     ServerSideHarness,
     ServerSideHarnessOptions,
     TestAPIServer,
-    append_unreferenced_block,
+    UnreferencedBlocks,
     create_cli_user_catalog,
     create_web_user_catalog,
     make_server_account,
@@ -125,7 +125,9 @@ impl ServerSideLocalFsHarness {
         &self,
         dataset_handle: &odf::DatasetHandle,
     ) -> odf::Multihash {
-        append_unreferenced_block(self.cli_dataset_registry().as_ref(), dataset_handle).await
+        UnreferencedBlocks::new(self.cli_dataset_registry())
+            .append(dataset_handle)
+            .await
     }
     pub async fn new(options: ServerSideHarnessOptions) -> Self {
         let tempdir = tempfile::tempdir().unwrap();

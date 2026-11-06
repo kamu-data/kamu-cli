@@ -101,7 +101,7 @@ the repository model and both protocols. This page does not restate them; read t
 | Smart protocol client trait | `kamu` — [`smart_transfer_protocol.rs`](../../src/infra/core/src/utils/smart_transfer_protocol.rs) | `SmartTransferProtocolClient`, `TransferOptions` |
 | Smart protocol client and server | `kamu-adapter-http` — [`src/adapter/http/src/smart_protocol/`](../../src/adapter/http/src/smart_protocol) | `WsSmartTransferProtocolClient`, `AxumServerPullProtocolInstance`, `AxumServerPushProtocolInstance`, messages, `protocol_dataset_helper` |
 | Server HTTP endpoints | `kamu-adapter-http` — [`simple_protocol/handlers.rs`](../../src/adapter/http/src/simple_protocol/handlers.rs), [`http_server_dataset_router.rs`](../../src/adapter/http/src/http_server_dataset_router.rs) | `refs`, `blocks`, `data`, `checkpoints` (GET and PUT), `pull` and `push` WebSocket upgrades |
-| Committing a pull | `kamu-core` — [`local_sync_committer.rs`](../../src/domain/core/src/services/local_sync_committer.rs); `kamu` — [`local_sync_committer_impl.rs`](../../src/infra/core/src/services/sync/local_sync_committer_impl.rs), [`local_sync_writes.rs`](../../src/infra/core/src/utils/local_sync_writes.rs) | `LocalSyncCommitter`: `HEAD` CAS through `DatasetHeadCommitter`, or creation through `CreateDatasetUseCase`; the `Seed` store and block append both protocols share |
+| Committing a pull | `kamu-core` — [`local_sync_committer.rs`](../../src/domain/core/src/services/local_sync_committer.rs); `kamu` — [`local_sync_committer_impl.rs`](../../src/infra/core/src/services/sync/local_sync_committer_impl.rs), [`local_sync_writes/`](../../src/infra/core/src/utils/local_sync_writes/) | `LocalSyncCommitter`: `HEAD` CAS through `DatasetHeadCommitter`, or creation through `CreateDatasetUseCase`; the `Seed` store and block append both protocols share |
 | Appending incoming blocks | `kamu-datasets-services` — `AppendDatasetMetadataBatchUseCaseImpl`; `odf` — `MetadataChainExt::append_batch` | block validation, `HEAD` update on the smart push server |
 | Push | `kamu` — [`push_dataset_use_case_impl.rs`](../../src/infra/core/src/use_cases/push_dataset_use_case_impl.rs), [`push_request_planner_impl.rs`](../../src/infra/core/src/services/push_request_planner_impl.rs); CLI [`push_command.rs`](../../src/app/cli/src/commands/push_command.rs) | `kamu push` |
 | Remotes | `kamu` — [`src/infra/core/src/services/remote/`](../../src/infra/core/src/services/remote) | `RemoteRepositoryRegistryImpl`, `RemoteAliasesRegistryImpl`, `RemoteDatasetUrlResolverImpl`, `RemoteAliasResolverImpl`, `DatasetPullSourceResolverImpl` |
@@ -127,8 +127,8 @@ the reference carries an alias.
 
 - `PullLocalTarget::resolve_sync_target` reads the destination of a planned pull; it is `None` for
   an existing dataset deleted since planning.
-- `LocalSyncHelper::build_request` (`kamu::testing`) does the same from a local reference, for
-  tests; it never opens the source.
+- `LocalSyncHelper::build_request` (`src/infra/core/tests/utils/`) does the same from a local
+  reference, for tests; it never opens the source.
 - `SyncRequestBuilder::build_sync_request(src, dst, create_dst_if_not_exists)` builds a push to a
   `DatasetRefRemote`, which `RemoteDatasetUrlResolver` resolves to a URL
   ([§9](#9-remote-repositories-and-aliases)). The source must have a `HEAD`.
@@ -542,8 +542,8 @@ into the recoverability of the failed task.
 
 - Sync service tests: `src/infra/core/tests/tests/test_sync_service_impl.rs`; the transfer and
   commit split, first pull, forced pull and a `HEAD` moved during the transfer, on local FS and
-  S3: `test_sync_service_local_commit.rs`. `kamu::testing::LocalSyncHelper` pulls the way the use
-  case does.
+  S3: `test_sync_service_local_commit.rs`. `LocalSyncHelper` in `src/infra/core/tests/utils/`
+  pulls the way the use case does.
 - Smart protocol tests, client against an in-process server, single- and multi-tenant, local and
   S3 storage: `src/adapter/http/tests/tests/test_protocol_dataset_helpers.rs` and the
   `tests_pull` / `tests_push` scenario directories under `src/adapter/http/tests/tests/`. The
@@ -572,7 +572,7 @@ into the recoverability of the failed task.
 | --- | --- |
 | Sync types and errors | [`sync_service.rs`](../../src/domain/core/src/services/sync_service.rs) |
 | Committing a pull into a local dataset | [`local_sync_committer.rs`](../../src/domain/core/src/services/local_sync_committer.rs), [`local_sync_committer_impl.rs`](../../src/infra/core/src/services/sync/local_sync_committer_impl.rs) |
-| `Seed` store and block append shared by both protocols | [`local_sync_writes.rs`](../../src/infra/core/src/utils/local_sync_writes.rs) |
+| `Seed` store and block append shared by both protocols | [`local_sync_writes/`](../../src/infra/core/src/utils/local_sync_writes/) |
 | Protocol dispatch, push to IPNS, URL helpers | [`sync_service_impl.rs`](../../src/infra/core/src/services/sync/sync_service_impl.rs) |
 | Local IPFS node | [`ipfs_service.rs`](../../src/domain/core/src/services/ipfs_service.rs), [`ipfs_service_impl.rs`](../../src/infra/core/src/services/ipfs_service_impl.rs) |
 | Sync ref resolution | [`sync_request_builder.rs`](../../src/infra/core/src/services/sync/sync_request_builder.rs) |

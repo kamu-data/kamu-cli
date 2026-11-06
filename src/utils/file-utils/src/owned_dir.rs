@@ -50,8 +50,8 @@ impl Drop for OwnedDir {
             tracing::warn!(
                 error = %err,
                 path = %path.display(),
-                "Failed to remove the {}",
-                self.description
+                description = self.description,
+                "Failed to remove the directory"
             );
         }
     }

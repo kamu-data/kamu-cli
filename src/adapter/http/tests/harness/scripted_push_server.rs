@@ -26,26 +26,6 @@ pub(crate) struct ScriptedPushServer {
     state: Arc<ScriptState>,
 }
 
-/// What the server does once the client asked to transfer objects
-#[derive(Clone, Copy)]
-enum PushScript {
-    /// Skips every upload, sends one more progress request after the client
-    /// reports completion (as a real server's timer can), then fails the
-    /// completion with `UpdatedConcurrently`
-    StaleProgressRequest,
-
-    /// Takes every object by HTTP upload, but holds each upload until the
-    /// client answered one progress request, then confirms the completion.
-    /// A push with no objects to hold fails, as the server closes the socket
-    ProgressDuringUpload,
-}
-
-#[derive(Default)]
-struct ScriptState {
-    progress_reports: Mutex<Vec<ObjectsUploadProgressDetails>>,
-    uploads_released: tokio::sync::watch::Sender<bool>,
-}
-
 impl ScriptedPushServer {
     pub async fn stale_progress_request() -> Self {
         Self::new(PushScript::StaleProgressRequest).await
@@ -104,6 +84,26 @@ impl ScriptedPushServer {
             );
         self.listener.serve(router).await
     }
+}
+
+/// What the server does once the client asked to transfer objects
+#[derive(Clone, Copy)]
+enum PushScript {
+    /// Skips every upload, sends one more progress request after the client
+    /// reports completion (as a real server's timer can), then fails the
+    /// completion with `UpdatedConcurrently`
+    StaleProgressRequest,
+
+    /// Takes every object by HTTP upload, but holds each upload until the
+    /// client answered one progress request, then confirms the completion.
+    /// A push with no objects to hold fails, as the server closes the socket
+    ProgressDuringUpload,
+}
+
+#[derive(Default)]
+struct ScriptState {
+    progress_reports: Mutex<Vec<ObjectsUploadProgressDetails>>,
+    uploads_released: tokio::sync::watch::Sender<bool>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

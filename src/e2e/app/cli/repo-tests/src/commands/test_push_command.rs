@@ -9,7 +9,6 @@
 
 use kamu_cli_puppet::KamuCliPuppet;
 use kamu_cli_puppet::extensions::KamuCliPuppetExt;
-use url::Url;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -17,10 +16,7 @@ pub async fn test_push_unknown_dataset_id_fails(kamu: KamuCliPuppet) {
     let dataset_id = odf::DatasetID::new_seeded_ed25519(b"unknown")
         .as_did_str()
         .to_string();
-    let repo_url = Url::from_directory_path(kamu.workspace_path().join("repo"))
-        .unwrap()
-        .join("dataset")
-        .unwrap();
+    let repo_url = kamu.workspace_dataset_url("repo", "dataset");
 
     kamu.assert_failure_command_execution(
         ["push", &dataset_id, "--to", repo_url.as_str()],

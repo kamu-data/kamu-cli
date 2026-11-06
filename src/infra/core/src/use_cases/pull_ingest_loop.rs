@@ -13,7 +13,7 @@ use internal_error::{InternalError, ResultIntoInternal};
 use kamu_core::*;
 use random_strings::get_random_name;
 
-use crate::utils::span_outcome::record_pull_outcome;
+use crate::utils::span_outcome::SpanOutcome;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -45,7 +45,7 @@ impl PullIngestLoop {
         maybe_listener: Option<Arc<dyn PollingIngestListener>>,
     ) -> Result<PullResponse, InternalError> {
         let response = self.run_job(pii, options, maybe_listener).await;
-        record_pull_outcome(&response);
+        SpanOutcome::of_pull_response(&response).record();
         response
     }
 

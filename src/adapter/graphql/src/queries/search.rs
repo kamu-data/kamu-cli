@@ -9,9 +9,9 @@
 
 use database_common::PaginationOpts;
 use kamu::utils::datasets_filtering::filter_dataset_handle_stream;
-use kamu_accounts::{AccountService, SearchAccountsByNamePatternFilters};
+use kamu_accounts::{AccountService, Principal, SearchAccountsByNamePatternFilters};
 use kamu_auth_rebac::RebacServiceExt;
-use kamu_datasets::{DatasetPermission, DatasetPermissionCheckerExt};
+use kamu_datasets::{DatasetPermission, DatasetPermissionChecker, DatasetPermissionCheckerExt};
 
 use crate::prelude::*;
 use crate::queries::{Account, Dataset};
@@ -45,8 +45,8 @@ impl Search {
         let (dataset_registry, dataset_permission_checker, principal) = from_catalog_n!(
             ctx,
             dyn kamu_datasets::DatasetRegistry,
-            dyn kamu_datasets::DatasetPermissionChecker,
-            kamu_accounts::Principal
+            dyn DatasetPermissionChecker,
+            Principal
         );
 
         let page = page.unwrap_or(0);
@@ -391,7 +391,6 @@ impl Search {
         &self,
         ctx: &Context<'a>,
     ) -> Result<kamu_search::SearchContext<'a>> {
-        use kamu_accounts::Principal;
         let (principal, rebac_service) =
             from_catalog_n!(ctx, Principal, dyn kamu_auth_rebac::RebacService);
 

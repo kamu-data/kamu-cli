@@ -49,6 +49,7 @@ impl MockPollingIngestService {
             });
         self
     }
+
     /// Expects one ingest asked to `fetch_uncacheable` or not, and reports it
     /// up to date with `uncacheable`
     pub fn make_expect_ingest_up_to_date(

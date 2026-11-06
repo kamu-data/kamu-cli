@@ -13,6 +13,8 @@ use std::sync::Arc;
 use chrono::{DateTime, TimeZone, Utc};
 use container_runtime::*;
 use datafusion::prelude::*;
+use flate2::Compression;
+use flate2::write::GzEncoder;
 use indoc::indoc;
 use internal_error::ResultIntoInternal;
 use kamu::domain::*;
@@ -27,6 +29,7 @@ use odf::metadata::testing::MetadataFactory;
 use tempfile::TempDir;
 use test_utils::HttpFileServer;
 use time_source::{SystemTimeSource, SystemTimeSourceStub};
+use url::Url;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -43,10 +46,7 @@ async fn test_ingest_polling_snapshot() {
         .push_event(
             MetadataFactory::set_polling_source()
                 .fetch(odf::metadata::FetchStep::Url(odf::metadata::FetchStepUrl {
-                    url: url::Url::from_file_path(&src_path)
-                        .unwrap()
-                        .as_str()
-                        .to_owned(),
+                    url: Url::from_file_path(&src_path).unwrap().as_str().to_owned(),
                     event_time: Some(odf::metadata::EventTimeSourceFromSystemTime {}.into()),
                     cache: None,
                     headers: None,
@@ -249,10 +249,7 @@ async fn test_ingest_polling_ledger() {
         .push_event(
             MetadataFactory::set_polling_source()
                 .fetch(odf::metadata::FetchStep::Url(odf::metadata::FetchStepUrl {
-                    url: url::Url::from_file_path(&src_path)
-                        .unwrap()
-                        .as_str()
-                        .to_owned(),
+                    url: Url::from_file_path(&src_path).unwrap().as_str().to_owned(),
                     event_time: Some(odf::metadata::EventTimeSourceFromSystemTime {}.into()),
                     cache: None,
                     headers: None,
@@ -467,10 +464,7 @@ async fn test_ingest_polling_empty_data() {
         .push_event(
             MetadataFactory::set_polling_source()
                 .fetch(odf::metadata::FetchStep::Url(odf::metadata::FetchStepUrl {
-                    url: url::Url::from_file_path(&src_path)
-                        .unwrap()
-                        .as_str()
-                        .to_owned(),
+                    url: Url::from_file_path(&src_path).unwrap().as_str().to_owned(),
                     event_time: Some(odf::metadata::EventTimeSourceFromSystemTime {}.into()),
                     cache: None,
                     headers: None,
@@ -532,10 +526,7 @@ async fn test_ingest_polling_event_time_as_date() {
         .push_event(
             MetadataFactory::set_polling_source()
                 .fetch(odf::metadata::FetchStep::Url(odf::metadata::FetchStepUrl {
-                    url: url::Url::from_file_path(&src_path)
-                        .unwrap()
-                        .as_str()
-                        .to_owned(),
+                    url: Url::from_file_path(&src_path).unwrap().as_str().to_owned(),
                     event_time: Some(odf::metadata::EventTimeSourceFromSystemTime {}.into()),
                     cache: None,
                     headers: None,
@@ -635,10 +626,7 @@ async fn test_ingest_polling_event_time_of_invalid_type() {
         .push_event(
             MetadataFactory::set_polling_source()
                 .fetch(odf::metadata::FetchStep::Url(odf::metadata::FetchStepUrl {
-                    url: url::Url::from_file_path(&src_path)
-                        .unwrap()
-                        .as_str()
-                        .to_owned(),
+                    url: Url::from_file_path(&src_path).unwrap().as_str().to_owned(),
                     event_time: Some(odf::metadata::EventTimeSourceFromSystemTime {}.into()),
                     cache: None,
                     headers: None,
@@ -696,10 +684,7 @@ async fn test_ingest_polling_bad_column_names_preserve() {
         .push_event(
             MetadataFactory::set_polling_source()
                 .fetch(odf::metadata::FetchStep::Url(odf::metadata::FetchStepUrl {
-                    url: url::Url::from_file_path(&src_path)
-                        .unwrap()
-                        .as_str()
-                        .to_owned(),
+                    url: Url::from_file_path(&src_path).unwrap().as_str().to_owned(),
                     event_time: Some(odf::metadata::EventTimeSourceFromSystemTime {}.into()),
                     cache: None,
                     headers: None,
@@ -782,10 +767,7 @@ async fn test_ingest_polling_bad_column_names_rename() {
         .push_event(
             MetadataFactory::set_polling_source()
                 .fetch(odf::metadata::FetchStep::Url(odf::metadata::FetchStepUrl {
-                    url: url::Url::from_file_path(&src_path)
-                        .unwrap()
-                        .as_str()
-                        .to_owned(),
+                    url: Url::from_file_path(&src_path).unwrap().as_str().to_owned(),
                     event_time: Some(odf::metadata::EventTimeSourceFromSystemTime {}.into()),
                     cache: None,
                     headers: None,
@@ -879,10 +861,7 @@ async fn test_ingest_polling_schema_case_sensitivity() {
         .push_event(
             MetadataFactory::set_polling_source()
                 .fetch(odf::metadata::FetchStep::Url(odf::metadata::FetchStepUrl {
-                    url: url::Url::from_file_path(&src_path)
-                        .unwrap()
-                        .as_str()
-                        .to_owned(),
+                    url: Url::from_file_path(&src_path).unwrap().as_str().to_owned(),
                     event_time: None,
                     cache: None,
                     headers: None,
@@ -1243,10 +1222,7 @@ async fn test_ingest_polling_deprecated_ddl_schema() {
         .push_event(
             MetadataFactory::set_polling_source()
                 .fetch(odf::metadata::FetchStep::Url(odf::metadata::FetchStepUrl {
-                    url: url::Url::from_file_path(&src_path)
-                        .unwrap()
-                        .as_str()
-                        .to_owned(),
+                    url: Url::from_file_path(&src_path).unwrap().as_str().to_owned(),
                     event_time: Some(odf::metadata::EventTimeSourceFromSystemTime {}.into()),
                     cache: None,
                     headers: None,
@@ -1560,7 +1536,7 @@ async fn test_ingest_polling_preprocess_with_unsupported_engine_fails_unrecovera
     std::fs::write(&src_path, "city,population\nA,1000\n").unwrap();
     let target = harness
         .create_csv_url_polling_dataset(
-            url::Url::from_file_path(&src_path).unwrap(),
+            Url::from_file_path(&src_path).unwrap(),
             Some(odf::metadata::TransformSql {
                 engine: "no-such-engine".to_string(),
                 version: None,
@@ -1701,7 +1677,7 @@ impl IngestTestHarness {
 
     /// A root dataset polling a CSV file with `city` and `population`
     async fn create_csv_polling_dataset(&self, src_path: &std::path::Path) -> ResolvedDataset {
-        self.create_csv_url_polling_dataset(url::Url::from_file_path(src_path).unwrap(), None)
+        self.create_csv_url_polling_dataset(Url::from_file_path(src_path).unwrap(), None)
             .await
     }
 
@@ -1709,7 +1685,7 @@ impl IngestTestHarness {
     /// `url`, with an optional preprocess step
     async fn create_csv_url_polling_dataset(
         &self,
-        url: url::Url,
+        url: Url,
         preprocess: Option<odf::metadata::TransformSql>,
     ) -> ResolvedDataset {
         self.create_csv_dataset_fetching(
@@ -1765,13 +1741,13 @@ impl IngestTestHarness {
     }
 
     /// Serves `name` with `contents` over HTTP and returns its URL
-    async fn serve_file(&self, name: &str, contents: impl AsRef<[u8]>) -> url::Url {
+    async fn serve_file(&self, name: &str, contents: impl AsRef<[u8]>) -> Url {
         let server_dir = self.temp_dir.path().join("srv");
         std::fs::create_dir_all(&server_dir).unwrap();
         self.write_served_file(name, contents);
 
         let server = HttpFileServer::new(&server_dir).await;
-        let url = url::Url::parse(&format!("http://{}/{name}", server.local_addr())).unwrap();
+        let url = Url::parse(&format!("http://{}/{name}", server.local_addr())).unwrap();
         tokio::spawn(server.run());
         url
     }
@@ -1781,17 +1757,17 @@ impl IngestTestHarness {
     }
 
     /// Serves `contents` gzipped as `name` over HTTP and returns its URL
-    async fn serve_gzipped_file(&self, name: &str, contents: &str) -> url::Url {
+    async fn serve_gzipped_file(&self, name: &str, contents: &str) -> Url {
         use std::io::Write;
 
-        let mut gzip = flate2::write::GzEncoder::new(Vec::new(), flate2::Compression::fast());
+        let mut gzip = GzEncoder::new(Vec::new(), Compression::fast());
         gzip.write_all(contents.as_bytes()).unwrap();
         self.serve_file(name, gzip.finish().unwrap()).await
     }
 
     /// A root dataset polling a gzipped CSV file with `city` and `population`
     /// from `url`
-    async fn create_gzipped_csv_url_polling_dataset(&self, url: url::Url) -> ResolvedDataset {
+    async fn create_gzipped_csv_url_polling_dataset(&self, url: Url) -> ResolvedDataset {
         let mut source = MetadataFactory::set_polling_source()
             .fetch(odf::metadata::FetchStep::Url(odf::metadata::FetchStepUrl {
                 url: url.to_string(),

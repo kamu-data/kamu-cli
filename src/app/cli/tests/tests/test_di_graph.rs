@@ -109,9 +109,7 @@ fn test_di_background_catalog_acts_as_node(
 
     let mut background_catalog_builder =
         kamu_cli::configure_background_catalog(&base_catalog, subject.clone(), tenancy_config);
-    background_catalog_builder.add_value(JwtAuthenticationConfig::default());
-    background_catalog_builder.add_value(GithubAuthenticationConfig::default());
-    background_catalog_builder.add_value(kamu_adapter_flight_sql::SessionId(String::new()));
+    add_test_command_values(&mut background_catalog_builder);
     let validate_result = background_catalog_builder.validate();
     assert!(validate_result.is_ok(), "{}", validate_result.unwrap_err());
 
@@ -176,6 +174,8 @@ fn build_test_base_catalog(
     base_catalog_builder.build()
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 /// The server catalog `system api-server run` chains its catalogs from
 fn build_test_server_catalog(
     workspace_path: &Path,
@@ -226,6 +226,8 @@ fn build_test_server_catalog(
     server_catalog_builder.build()
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 fn configure_test_cli_catalog(
     base_catalog: &dill::Catalog,
     tenancy_config: TenancyConfig,
@@ -233,11 +235,17 @@ fn configure_test_cli_catalog(
     let mut cli_catalog_builder = kamu_cli::configure_cli_catalog(base_catalog, tenancy_config);
 
     cli_catalog_builder.add_current_account_subject(CurrentAccountSubject::new_test());
-    cli_catalog_builder.add_value(JwtAuthenticationConfig::default());
-    cli_catalog_builder.add_value(GithubAuthenticationConfig::default());
-    cli_catalog_builder.add_value(kamu_adapter_flight_sql::SessionId(String::new()));
+    add_test_command_values(&mut cli_catalog_builder);
 
     cli_catalog_builder
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+fn add_test_command_values(catalog_builder: &mut CatalogBuilder) {
+    catalog_builder.add_value(JwtAuthenticationConfig::default());
+    catalog_builder.add_value(GithubAuthenticationConfig::default());
+    catalog_builder.add_value(kamu_adapter_flight_sql::SessionId(String::new()));
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

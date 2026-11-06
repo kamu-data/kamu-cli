@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 pub mod commands;
+mod mock_csv_source;
 pub mod resources;
 pub mod rest_api;
 pub mod scenarios;

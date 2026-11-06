@@ -10,7 +10,7 @@
 use internal_error::InternalError;
 use thiserror::Error;
 
-use crate::{AmbiguousPullSourceError, FindPullAliasError, PullError};
+use crate::{AmbiguousPullSourceError, FindPullAliasError};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -37,6 +37,8 @@ pub enum DatasetUpdateKind {
     SyncFrom { remote_ref: odf::DatasetRefRemote },
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[derive(Debug, Error)]
 pub enum ResolveDatasetUpdateKindError {
     #[error(transparent)]
@@ -55,15 +57,6 @@ impl From<FindPullAliasError> for ResolveDatasetUpdateKindError {
         match value {
             FindPullAliasError::AmbiguousSource(e) => Self::AmbiguousSource(e),
             FindPullAliasError::Internal(e) => Self::Internal(e),
-        }
-    }
-}
-
-impl From<ResolveDatasetUpdateKindError> for PullError {
-    fn from(value: ResolveDatasetUpdateKindError) -> Self {
-        match value {
-            ResolveDatasetUpdateKindError::AmbiguousSource(e) => Self::AmbiguousSource(e),
-            ResolveDatasetUpdateKindError::Internal(e) => Self::Internal(e),
         }
     }
 }

@@ -11,8 +11,15 @@ use std::collections::HashSet;
 use std::ops::Deref;
 
 use fallible_map::FallibleMapExt as _;
+use kamu_accounts::Principal;
 use kamu_auth_rebac::AuthorizedAccount;
-use kamu_datasets::{DatasetPermission, DatasetRegistry, ResolvedDataset};
+use kamu_datasets::{
+    DatasetPermission,
+    DatasetPermissionChecker,
+    DatasetPermissionCheckerExt,
+    DatasetRegistry,
+    ResolvedDataset,
+};
 use odf::dataset::MetadataChainExt as _;
 use tokio::sync::OnceCell;
 
@@ -127,13 +134,8 @@ impl DatasetRequestState {
     ) -> Result<&HashSet<DatasetPermission>> {
         self.granted_dataset_permissions
             .get_or_try_init(|| async {
-                use kamu_datasets::DatasetPermissionCheckerExt;
-
-                let (dataset_permission_checker, principal) = from_catalog_n!(
-                    ctx,
-                    dyn kamu_datasets::DatasetPermissionChecker,
-                    kamu_accounts::Principal
-                );
+                let (dataset_permission_checker, principal) =
+                    from_catalog_n!(ctx, dyn DatasetPermissionChecker, Principal);
 
                 let allowed_actions = dataset_permission_checker
                     .get_granted_permissions_for_existing_dataset(

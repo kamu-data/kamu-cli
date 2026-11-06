@@ -40,6 +40,8 @@ use messaging_outbox::{ConsumerFilter, Outbox, OutboxImmediateImpl, register_mes
 use odf::dataset::testing::create_test_dataset_from_snapshot;
 use odf::metadata::testing::MetadataFactory;
 
+use crate::utils::LocalSyncHelper;
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 macro_rules! n {

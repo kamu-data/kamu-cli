@@ -61,14 +61,14 @@ use tokio_tungstenite::tungstenite::client::IntoClientRequest;
 use url::Url;
 
 use super::{
+    DatasetCommits,
+    HeadlessDatasets,
     RawProtocolSocket,
     RawPullSession,
     RawPushSession,
-    append_unreferenced_block,
+    StoredHeads,
+    UnreferencedBlocks,
     commit_add_data_event,
-    commit_set_info,
-    create_headless_dataset,
-    find_stored_head,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -337,35 +337,35 @@ impl ClientSideHarness {
         &self,
         dataset_handle: &odf::DatasetHandle,
     ) -> odf::Multihash {
-        append_unreferenced_block(self.dataset_registry().as_ref(), dataset_handle).await
+        UnreferencedBlocks::new(self.dataset_registry())
+            .append(dataset_handle)
+            .await
     }
 
     pub async fn stored_head(&self, dataset_id: &odf::DatasetID) -> odf::Multihash {
-        self.dataset_reference_service()
-            .get_reference(dataset_id, &odf::BlockRef::Head)
+        StoredHeads::new(self.dataset_reference_service())
+            .get(dataset_id)
             .await
-            .unwrap()
     }
 
     /// `None` while the dataset has no `HEAD`
     pub async fn find_stored_head(&self, dataset_id: &odf::DatasetID) -> Option<odf::Multihash> {
-        find_stored_head(self.dataset_reference_service().as_ref(), dataset_id).await
+        StoredHeads::new(self.dataset_reference_service())
+            .find(dataset_id)
+            .await
     }
 
     /// A dataset of the operating account with its own `Seed` but no `HEAD`
     pub async fn create_headless_dataset(&self, dataset_name: &str) -> odf::DatasetHandle {
-        create_headless_dataset(
-            self.catalog
-                .get_one::<CreateDatasetUseCaseHelper>()
-                .unwrap()
-                .as_ref(),
-            &self.client_account_id(),
-            &odf::DatasetAlias::new(
-                self.operating_account_name(),
-                odf::DatasetName::new_unchecked(dataset_name),
-            ),
-        )
-        .await
+        HeadlessDatasets::new(self.catalog.get_one().unwrap())
+            .create(
+                &self.client_account_id(),
+                &odf::DatasetAlias::new(
+                    self.operating_account_name(),
+                    odf::DatasetName::new_unchecked(dataset_name),
+                ),
+            )
+            .await
     }
 
     // TODO: accept alias or handle
@@ -546,7 +546,9 @@ impl ClientSideHarness {
 
     /// Commits a metadata-only block, which references no objects
     pub async fn commit_set_info(&self, dataset_handle: &odf::DatasetHandle) -> odf::Multihash {
-        commit_set_info(self.commit_dataset_event().as_ref(), dataset_handle).await
+        DatasetCommits::new(self.commit_dataset_event())
+            .commit_set_info(dataset_handle)
+            .await
     }
 
     /// The push request and metadata for the blocks after `base_head`, as the

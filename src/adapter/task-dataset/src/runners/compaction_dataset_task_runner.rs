@@ -15,7 +15,7 @@ use kamu_datasets::ResolvedDataset;
 use kamu_task_system::*;
 
 use super::task_head_commit::HeadCommitTaskOutcome as _;
-use super::task_span_outcome::record_task_outcome;
+use super::task_span_outcome::TaskSpanOutcome;
 use crate::{
     TaskDefinitionDatasetHardCompact,
     TaskDefinitionDatasetResetToMetadata,
@@ -52,7 +52,7 @@ impl CompactionDatasetTaskRunner {
         let outcome = self
             .run_compaction_job(target, plan, into_task_result)
             .await;
-        record_task_outcome(&outcome);
+        TaskSpanOutcome::record(&outcome);
         outcome
     }
 

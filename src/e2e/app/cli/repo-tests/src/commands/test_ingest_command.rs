@@ -20,8 +20,6 @@ use kamu_cli_e2e_common::{
 use kamu_cli_puppet::KamuCliPuppet;
 use kamu_cli_puppet::extensions::{AddDatasetOptions, KamuCliPuppetExt};
 
-use crate::utils::{assert_case_fails, create_alice_and_bob};
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_push_ingest_from_file_ledger(kamu: KamuCliPuppet) {
@@ -445,7 +443,7 @@ async fn assert_ingest_data_to_player_scores_from_stdio<I, S, T>(
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_ingest_into_other_accounts_dataset_fails(mut kamu: KamuCliPuppet) {
-    let (alice, bob) = create_alice_and_bob(&kamu).await;
+    let [alice, bob] = kamu.create_accounts(["alice", "bob"]).await;
 
     kamu.set_account(Some(bob));
     for (name, visibility) in [("bob-root", "private"), ("bob-public", "public")] {
@@ -550,7 +548,10 @@ pub async fn test_ingest_of_invalid_request_fails(kamu: KamuCliPuppet) {
             ],
         ),
     ] {
-        let stderr = assert_case_fails(&kamu, case, cmd, stdin, expected_stderr).await;
+        let stderr = kamu
+            .assert_failure_stderr_in_order(case, cmd, stdin, expected_stderr)
+            .await
+            .stderr;
 
         // The request is at fault, so it is not reported as an internal error
         assert!(

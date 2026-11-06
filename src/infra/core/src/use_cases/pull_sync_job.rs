@@ -12,7 +12,7 @@ use std::sync::Arc;
 use internal_error::InternalError;
 use kamu_core::*;
 
-use crate::utils::span_outcome::record_pull_outcome;
+use crate::utils::span_outcome::SpanOutcome;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -35,7 +35,7 @@ impl PullSyncJob {
         listener: Option<Arc<dyn SyncListener>>,
     ) -> Result<PullResponse, InternalError> {
         let response = self.run_job(psi, options, listener).await;
-        record_pull_outcome(&response);
+        SpanOutcome::of_pull_response(&response).record();
         response
     }
 

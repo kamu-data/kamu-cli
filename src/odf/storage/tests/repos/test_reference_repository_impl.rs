@@ -53,8 +53,8 @@ async fn test_basics() {
 
 #[tokio::test]
 async fn test_compare_and_set() {
-    let tmp_repo_dir = tempfile::tempdir().unwrap();
-    let repo = ReferenceRepositoryImpl::new(NamedObjectRepositoryLocalFS::new(tmp_repo_dir.path()));
+    let harness = RefRepoHarness::new();
+    let repo = &harness.repo;
 
     let foo = Multihash::from_digest_sha3_256(b"foo");
     let bar = Multihash::from_digest_sha3_256(b"bar");
@@ -96,29 +96,27 @@ async fn test_compare_and_set() {
 
 #[tokio::test]
 async fn test_compare_and_set_accepts_another_encoding_of_the_expected_hash() {
-    let tmp_repo_dir = tempfile::tempdir().unwrap();
-    let named_repo = NamedObjectRepositoryLocalFS::new(tmp_repo_dir.path());
+    let harness = RefRepoHarness::new();
 
     let foo = Multihash::from_digest_sha3_256(b"foo");
     let bar = Multihash::from_digest_sha3_256(b"bar");
 
     // Written by another writer in a non-default encoding
-    named_repo
-        .set(
-            TEST_REF,
+    harness
+        .store_raw(
             foo.as_multibase()
                 .encoding(Multibase::Base58Btc)
                 .to_stack_string()
                 .as_bytes(),
         )
-        .await
-        .unwrap();
+        .await;
 
-    let repo = ReferenceRepositoryImpl::new(named_repo);
-    repo.compare_and_set(TEST_REF, Some(&foo), &bar)
+    harness
+        .repo
+        .compare_and_set(TEST_REF, Some(&foo), &bar)
         .await
         .unwrap();
-    assert_eq!(repo.get(TEST_REF).await.unwrap(), bar);
+    assert_eq!(harness.repo.get(TEST_REF).await.unwrap(), bar);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

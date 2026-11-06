@@ -236,6 +236,8 @@ pub fn secret_set_manifest_yaml(name: &str, token: &str, password: &str) -> Stri
     )
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 /// Plaintext that [`PRE_ENCRYPTED_API_TOKEN_JWE`] decrypts back to.
 pub const PRE_ENCRYPTED_API_TOKEN_PLAINTEXT: &str = "super-secret-token";
 

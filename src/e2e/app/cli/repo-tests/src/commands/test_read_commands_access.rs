@@ -14,12 +14,10 @@ use kamu_cli_e2e_common::{
 use kamu_cli_puppet::KamuCliPuppet;
 use kamu_cli_puppet::extensions::KamuCliPuppetExt;
 
-use crate::utils::create_alice_and_bob;
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_read_commands_deny_other_accounts_private_dataset(mut kamu: KamuCliPuppet) {
-    let (alice, bob) = create_alice_and_bob(&kamu).await;
+    let [alice, bob] = kamu.create_accounts(["alice", "bob"]).await;
 
     kamu.set_account(Some(bob));
     for (dataset_name, visibility) in [("bob-private", "private"), ("bob-public", "public")] {

@@ -16,7 +16,7 @@ use kamu_datasets::{DatasetRegistry, DatasetRegistryExt};
 use kamu_task_system::*;
 
 use super::task_head_commit::{dataset_deleted_outcome, head_moved_outcome};
-use super::task_span_outcome::record_task_outcome;
+use super::task_span_outcome::TaskSpanOutcome;
 use crate::{TaskDefinitionDatasetReset, TaskErrorDatasetReset, TaskResultDatasetReset};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -39,7 +39,7 @@ impl ResetDatasetTaskRunner {
         task_reset: TaskDefinitionDatasetReset,
     ) -> Result<TaskOutcome, InternalError> {
         let outcome = self.run_reset_job(task_reset).await;
-        record_task_outcome(&outcome);
+        TaskSpanOutcome::record(&outcome);
         outcome
     }
 

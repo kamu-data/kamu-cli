@@ -109,3 +109,51 @@ pub struct TransformPlanOffsetInterval {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[cfg(test)]
+mod tests {
+    use chrono::TimeZone;
+
+    use super::*;
+
+    #[test]
+    fn test_transform_plan_payload_json_shape() {
+        let payload = TransformPlanPayload {
+            dataset_id: odf::DatasetID::new_seeded_ed25519(b"bar"),
+            system_time: Utc.with_ymd_and_hms(2050, 1, 1, 12, 0, 0).unwrap(),
+            expected_head: odf::Multihash::from_digest_sha3_256(b"head"),
+            transform_block: odf::Multihash::from_digest_sha3_256(b"transform"),
+            query_inputs: vec![TransformPlanPayloadInput {
+                dataset_id: odf::DatasetID::new_seeded_ed25519(b"foo"),
+                planned_head: odf::Multihash::from_digest_sha3_256(b"foo-head"),
+                offset_interval: Some(TransformPlanOffsetInterval { start: 10, end: 19 }),
+                watermark: Some(Utc.with_ymd_and_hms(2020, 1, 1, 0, 0, 0).unwrap()),
+            }],
+        };
+
+        let json = serde_json::to_value(&payload).unwrap();
+
+        assert_eq!(
+            json,
+            serde_json::json!({
+                "kind": "TransformPlan",
+                "datasetId": payload.dataset_id.to_string(),
+                "systemTime": "2050-01-01T12:00:00Z",
+                "expectedHead": payload.expected_head.to_string(),
+                "transformBlock": payload.transform_block.to_string(),
+                "queryInputs": [{
+                    "datasetId": payload.query_inputs[0].dataset_id.to_string(),
+                    "plannedHead": payload.query_inputs[0].planned_head.to_string(),
+                    "offsetInterval": { "start": 10, "end": 19 },
+                    "watermark": "2020-01-01T00:00:00Z",
+                }],
+            })
+        );
+        assert_eq!(
+            serde_json::from_value::<TransformPlanPayload>(json).unwrap(),
+            payload
+        );
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

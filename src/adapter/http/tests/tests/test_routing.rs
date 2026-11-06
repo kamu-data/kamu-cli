@@ -47,6 +47,7 @@ use odf::dataset::{DatasetFactoryImpl, IpfsGateway};
 use odf::metadata::testing::MetadataFactory;
 use time_source::SystemTimeSourceDefault;
 use tokio_tungstenite::connect_async;
+use tokio_tungstenite::tungstenite::Error;
 use tokio_tungstenite::tungstenite::client::IntoClientRequest;
 use utoipa_axum::router::OpenApiRouter;
 
@@ -60,93 +61,93 @@ struct RepoFixture {
     created_dataset: CreateDatasetResult,
 }
 
-async fn setup_repo() -> RepoFixture {
-    let tmp_dir = tempfile::tempdir().unwrap();
-    let datasets_dir = tmp_dir.path().join("datasets");
-    std::fs::create_dir(&datasets_dir).unwrap();
-
-    let mut b = dill::CatalogBuilder::new();
-    kamu_datasets_inmem::register_dependencies(&mut b);
-    b.add::<SystemTimeSourceDefault>()
-        .add::<DidGeneratorDefault>()
-        .add_builder(messaging_outbox::OutboxImmediateImpl::builder(
-            messaging_outbox::ConsumerFilter::AllConsumers,
-        ))
-        .bind::<dyn Outbox, OutboxImmediateImpl>()
-        .add::<DatabaseTransactionRunner>()
-        .add::<DependencyGraphServiceImpl>()
-        .add_value(TenancyConfig::SingleTenant)
-        .add_builder(odf::dataset::DatasetStorageUnitLocalFs::builder(
-            datasets_dir,
-        ))
-        .add::<DatasetLfsBuilderDatabaseBackedImpl>()
-        .add_value(MetadataChainDbBackedConfig::default())
-        .add_current_account_subject(CurrentAccountSubject::new_test())
-        .add::<AlwaysHappyDatasetPermissionChecker>()
-        .add::<CreateDatasetFromSnapshotUseCaseImpl>()
-        .add::<CreateDatasetUseCaseImpl>()
-        .add::<CreateDatasetUseCaseHelper>()
-        .add::<DatasetHeadCommitterImpl>()
-        .add::<DatasetReferenceServiceImpl>()
-        .add::<DatasetEntryServiceImpl>()
-        .add::<AccountServiceImpl>()
-        .add::<UpdateAccountUseCaseImpl>()
-        .add::<CreateAccountUseCaseImpl>()
-        .add::<InMemoryAccountRepository>()
-        .add::<PredefinedAccountsRegistrator>()
-        .add::<RebacServiceImpl>()
-        .add::<InMemoryRebacRepository>()
-        .add::<InMemoryDidSecretKeyRepository>()
-        .add_value(DidSecretEncryptionConfig::sample())
-        .add_value(DefaultAccountProperties::default())
-        .add_value(DefaultDatasetProperties::default())
-        .add_value(PredefinedAccountsConfig::test_single_tenant_with_id())
-        .add::<LoginPasswordAuthProvider>()
-        .add_value(ServerUrlConfig::new_test(None))
-        .add_value(SmartTransferProtocolServerConfig {
-            upload_progress_interval: Duration::from_secs(10),
-        });
-
-    NoOpDatabasePlugin::init_database_components(&mut b);
-
-    register_message_dispatcher::<DatasetLifecycleMessage>(
-        &mut b,
-        MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
-    );
-
-    register_message_dispatcher::<DatasetReferenceMessage>(
-        &mut b,
-        MESSAGE_PRODUCER_KAMU_DATASET_REFERENCE_SERVICE,
-    );
-
-    let catalog = b.build();
-
-    init_on_startup::run_startup_jobs(&catalog).await.unwrap();
-
-    let create_dataset_from_snapshot = catalog
-        .get_one::<dyn CreateDatasetFromSnapshotUseCase>()
-        .unwrap();
-
-    let created_dataset = create_dataset_from_snapshot
-        .execute(
-            MetadataFactory::dataset_snapshot()
-                .name("foo")
-                .kind(odf::DatasetKind::Root)
-                .push_event(MetadataFactory::set_polling_source().build())
-                .build(),
-            Default::default(),
-        )
-        .await
-        .unwrap();
-
-    RepoFixture {
-        _tmp_dir: tmp_dir,
-        catalog,
-        created_dataset,
-    }
-}
-
 impl RepoFixture {
+    async fn new() -> Self {
+        let tmp_dir = tempfile::tempdir().unwrap();
+        let datasets_dir = tmp_dir.path().join("datasets");
+        std::fs::create_dir(&datasets_dir).unwrap();
+
+        let mut b = dill::CatalogBuilder::new();
+        kamu_datasets_inmem::register_dependencies(&mut b);
+        b.add::<SystemTimeSourceDefault>()
+            .add::<DidGeneratorDefault>()
+            .add_builder(messaging_outbox::OutboxImmediateImpl::builder(
+                messaging_outbox::ConsumerFilter::AllConsumers,
+            ))
+            .bind::<dyn Outbox, OutboxImmediateImpl>()
+            .add::<DatabaseTransactionRunner>()
+            .add::<DependencyGraphServiceImpl>()
+            .add_value(TenancyConfig::SingleTenant)
+            .add_builder(odf::dataset::DatasetStorageUnitLocalFs::builder(
+                datasets_dir,
+            ))
+            .add::<DatasetLfsBuilderDatabaseBackedImpl>()
+            .add_value(MetadataChainDbBackedConfig::default())
+            .add_current_account_subject(CurrentAccountSubject::new_test())
+            .add::<AlwaysHappyDatasetPermissionChecker>()
+            .add::<CreateDatasetFromSnapshotUseCaseImpl>()
+            .add::<CreateDatasetUseCaseImpl>()
+            .add::<CreateDatasetUseCaseHelper>()
+            .add::<DatasetHeadCommitterImpl>()
+            .add::<DatasetReferenceServiceImpl>()
+            .add::<DatasetEntryServiceImpl>()
+            .add::<AccountServiceImpl>()
+            .add::<UpdateAccountUseCaseImpl>()
+            .add::<CreateAccountUseCaseImpl>()
+            .add::<InMemoryAccountRepository>()
+            .add::<PredefinedAccountsRegistrator>()
+            .add::<RebacServiceImpl>()
+            .add::<InMemoryRebacRepository>()
+            .add::<InMemoryDidSecretKeyRepository>()
+            .add_value(DidSecretEncryptionConfig::sample())
+            .add_value(DefaultAccountProperties::default())
+            .add_value(DefaultDatasetProperties::default())
+            .add_value(PredefinedAccountsConfig::test_single_tenant_with_id())
+            .add::<LoginPasswordAuthProvider>()
+            .add_value(ServerUrlConfig::new_test(None))
+            .add_value(SmartTransferProtocolServerConfig {
+                upload_progress_interval: Duration::from_secs(10),
+            });
+
+        NoOpDatabasePlugin::init_database_components(&mut b);
+
+        register_message_dispatcher::<DatasetLifecycleMessage>(
+            &mut b,
+            MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
+        );
+
+        register_message_dispatcher::<DatasetReferenceMessage>(
+            &mut b,
+            MESSAGE_PRODUCER_KAMU_DATASET_REFERENCE_SERVICE,
+        );
+
+        let catalog = b.build();
+
+        init_on_startup::run_startup_jobs(&catalog).await.unwrap();
+
+        let create_dataset_from_snapshot = catalog
+            .get_one::<dyn CreateDatasetFromSnapshotUseCase>()
+            .unwrap();
+
+        let created_dataset = create_dataset_from_snapshot
+            .execute(
+                MetadataFactory::dataset_snapshot()
+                    .name("foo")
+                    .kind(odf::DatasetKind::Root)
+                    .push_event(MetadataFactory::set_polling_source().build())
+                    .build(),
+                Default::default(),
+            )
+            .await
+            .unwrap();
+
+        Self {
+            _tmp_dir: tmp_dir,
+            catalog,
+            created_dataset,
+        }
+    }
+
     async fn is_dataset_stored(&self, dataset_ref: &odf::DatasetRef) -> bool {
         match self
             .catalog
@@ -174,7 +175,7 @@ impl RepoFixture {
 
         match connect_async(request).await {
             Ok((_, response)) => response.status(),
-            Err(tokio_tungstenite::tungstenite::Error::Http(response)) => response.status(),
+            Err(Error::Http(response)) => response.status(),
             Err(e) => panic!("{e}"),
         }
     }
@@ -247,7 +248,7 @@ async fn setup_client(dataset_url: url::Url, head_expected: odf::Multihash) {
 
 #[test_log::test(tokio::test)]
 async fn test_routing_root() {
-    let repo = setup_repo().await;
+    let repo = RepoFixture::new().await;
 
     let dataset_ref = repo.created_dataset.dataset_handle.as_local_ref();
 
@@ -294,7 +295,7 @@ struct DatasetByID {
 
 #[test_log::test(tokio::test)]
 async fn test_routing_dataset_id() {
-    let repo = setup_repo().await;
+    let repo = RepoFixture::new().await;
 
     let (server, local_addr) = setup_server(
         repo.catalog,
@@ -324,7 +325,7 @@ struct DatasetByName {
 
 #[test_log::test(tokio::test)]
 async fn test_routing_dataset_name() {
-    let repo = setup_repo().await;
+    let repo = RepoFixture::new().await;
 
     let (server, local_addr) = setup_server(
         repo.catalog,
@@ -350,7 +351,7 @@ async fn test_routing_dataset_name() {
 
 #[test_log::test(tokio::test)]
 async fn test_routing_dataset_name_case_insensetive() {
-    let repo = setup_repo().await;
+    let repo = RepoFixture::new().await;
 
     let (server, local_addr) = setup_server(
         repo.catalog,
@@ -389,7 +390,7 @@ struct DatasetByAccountAndName {
 
 #[test_log::test(tokio::test)]
 async fn test_routing_dataset_account_and_name() {
-    let repo = setup_repo().await;
+    let repo = RepoFixture::new().await;
 
     let (server, local_addr) = setup_server(
         repo.catalog,
@@ -415,7 +416,7 @@ async fn test_routing_dataset_account_and_name() {
 
 #[test_log::test(tokio::test)]
 async fn test_routing_err_invalid_identity_format() {
-    let repo = setup_repo().await;
+    let repo = RepoFixture::new().await;
 
     let (server, local_addr) = setup_server(
         repo.catalog,
@@ -438,7 +439,7 @@ async fn test_routing_err_invalid_identity_format() {
 
 #[test_log::test(tokio::test)]
 async fn test_routing_push_to_missing_dataset_id_is_not_found() {
-    let repo = setup_repo().await;
+    let repo = RepoFixture::new().await;
     let missing_id = odf::DatasetID::new_seeded_ed25519(b"missing");
 
     let (server, local_addr) = setup_server(
@@ -465,7 +466,7 @@ async fn test_routing_push_to_missing_dataset_id_is_not_found() {
 
 #[test_log::test(tokio::test)]
 async fn test_routing_push_to_missing_dataset_alias_upgrades() {
-    let repo = setup_repo().await;
+    let repo = RepoFixture::new().await;
 
     let (server, local_addr) = setup_server(
         repo.catalog.clone(),
@@ -492,7 +493,7 @@ async fn test_routing_push_to_missing_dataset_alias_upgrades() {
 
 #[test_log::test(tokio::test)]
 async fn test_routing_err_dataset_not_found() {
-    let repo = setup_repo().await;
+    let repo = RepoFixture::new().await;
 
     let (server, local_addr) = setup_server(
         repo.catalog,

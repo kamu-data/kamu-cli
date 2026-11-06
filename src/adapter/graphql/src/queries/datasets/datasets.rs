@@ -7,7 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_datasets::{DatasetPermission, DatasetPermissionCheckerExt};
+use kamu_accounts::{CurrentAccountSubject, Principal};
+use kamu_datasets::{DatasetPermission, DatasetPermissionChecker, DatasetPermissionCheckerExt};
 
 use crate::prelude::*;
 use crate::queries::*;
@@ -59,8 +60,8 @@ impl Datasets {
             ctx,
             dyn kamu_auth_rebac::RebacDatasetRegistryFacade,
             dyn kamu_accounts::AccountService,
-            kamu_accounts::CurrentAccountSubject,
-            kamu_accounts::Principal
+            CurrentAccountSubject,
+            Principal
         );
 
         let dataset_refs_refs = dataset_refs.iter().collect::<Vec<_>>();
@@ -225,8 +226,8 @@ impl Datasets {
         let (dataset_registry, dataset_permission_checker, principal) = from_catalog_n!(
             ctx,
             dyn kamu_datasets::DatasetRegistry,
-            dyn kamu_datasets::DatasetPermissionChecker,
-            kamu_accounts::Principal
+            dyn DatasetPermissionChecker,
+            Principal
         );
 
         let page = page.unwrap_or(0);

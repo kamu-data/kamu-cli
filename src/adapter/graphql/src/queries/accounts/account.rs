@@ -7,7 +7,12 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_accounts::{AccountNotFoundByIdError, CurrentAccountSubject, DEFAULT_ACCOUNT_NAME};
+use kamu_accounts::{
+    AccountNotFoundByIdError,
+    CurrentAccountSubject,
+    DEFAULT_ACCOUNT_NAME,
+    Principal,
+};
 use kamu_auth_rebac::{RebacService, RebacServiceExt};
 use kamu_datasets::{DatasetPermission, DatasetPermissionChecker, DatasetPermissionCheckerExt};
 use tokio::sync::OnceCell;
@@ -291,7 +296,7 @@ impl Account {
             ctx,
             dyn kamu_datasets::DatasetRegistry,
             dyn DatasetPermissionChecker,
-            kamu_accounts::Principal
+            Principal
         );
 
         let page = page.unwrap_or(0);

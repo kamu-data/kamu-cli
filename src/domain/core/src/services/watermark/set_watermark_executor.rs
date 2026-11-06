@@ -64,8 +64,8 @@ impl From<odf::dataset::SetChainRefError> for SetWatermarkExecutionError {
         match v {
             odf::dataset::SetChainRefError::CASFailed(e) => Self::RefCASFailed(e),
             e @ (odf::dataset::SetChainRefError::BlockNotFound(_)
-            | odf::dataset::SetChainRefError::Access(_)
-            | odf::dataset::SetChainRefError::Internal(_)) => Self::Internal(e.int_err()),
+            | odf::dataset::SetChainRefError::Access(_)) => Self::Internal(e.int_err()),
+            odf::dataset::SetChainRefError::Internal(e) => Self::Internal(e),
         }
     }
 }

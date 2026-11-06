@@ -19,7 +19,7 @@ use super::task_head_commit::{
     dataset_deleted_outcome,
     head_moved_outcome,
 };
-use super::task_span_outcome::record_task_outcome;
+use super::task_span_outcome::TaskSpanOutcome;
 use crate::{
     DatasetUpdateJob,
     InputDatasetCompactedError,
@@ -49,7 +49,7 @@ impl UpdateDatasetTaskRunner {
         task_update: TaskDefinitionDatasetUpdate,
     ) -> Result<TaskOutcome, InternalError> {
         let outcome = self.run_update_job(task_update).await;
-        record_task_outcome(&outcome);
+        TaskSpanOutcome::record(&outcome);
         outcome
     }
 
@@ -128,7 +128,24 @@ impl UpdateDatasetTaskRunner {
             Err(SyncError::HeadMoved(SyncHeadMovedError { heads })) => {
                 Ok(head_moved_outcome(target_handle.id.clone(), heads))
             }
-            Err(e) => {
+            Err(
+                e @ (SyncError::DatasetNotFound(_)
+                | SyncError::RefCollision(_)
+                | SyncError::NameCollision(_)
+                | SyncError::CreateDatasetFailed(_)
+                | SyncError::UnsupportedProtocol(_)
+                | SyncError::UnsupportedIpfsStorageType(_)
+                | SyncError::RemoteByIdUnsupported(_)
+                | SyncError::InvalidDestination(_)
+                | SyncError::RepositoryNotFound(_)
+                | SyncError::DatasetsDiverged(_)
+                | SyncError::DatasetIdMismatch(_)
+                | SyncError::DestinationAhead(_)
+                | SyncError::OverwriteSeedBlock(_)
+                | SyncError::Corrupted(_)
+                | SyncError::Access(_)
+                | SyncError::Internal(_)),
+            ) => {
                 tracing::error!(error = ?e, error_msg = %e, "Sync failed");
                 Ok(Self::failed(e.is_recoverable()))
             }

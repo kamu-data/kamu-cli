@@ -193,30 +193,9 @@ async fn test_verify_checkpoint_of_block_without_data() {
     let foo_alias = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
     let foo = harness.create_root_dataset(&foo_alias).await;
 
-    let checkpoint_path = harness.temp_dir_path().join("checkpoint");
-    std::fs::write(&checkpoint_path, b"checkpoint").unwrap();
-    let checkpoint_hash = odf::utils::data::hash::get_file_physical_hash(&checkpoint_path).unwrap();
-
-    let head = foo
-        .dataset
-        .commit_add_data(
-            odf::dataset::AddDataParams {
-                prev_checkpoint: None,
-                prev_offset: None,
-                new_offset_interval: None,
-                new_linked_objects: None,
-                new_watermark: None,
-                new_source_state: None,
-            },
-            None,
-            Some(odf::dataset::CheckpointRef::New(OwnedFile::new(
-                checkpoint_path,
-            ))),
-            odf::dataset::CommitOpts::default(),
-        )
-        .await
-        .unwrap()
-        .new_head;
+    let (head, checkpoint_hash) = harness
+        .commit_checkpoint_without_data(&foo, b"checkpoint")
+        .await;
 
     assert_matches!(
         harness
@@ -288,6 +267,42 @@ impl VerifyHarness {
                 None,
             )
             .await
+    }
+
+    /// Commits an `AddData` block that carries only a checkpoint with
+    /// `contents`; returns the new head and the checkpoint's physical hash
+    async fn commit_checkpoint_without_data(
+        &self,
+        created: &CreateDatasetResult,
+        contents: &[u8],
+    ) -> (odf::Multihash, odf::Multihash) {
+        let checkpoint_path = self.temp_dir_path().join("checkpoint");
+        std::fs::write(&checkpoint_path, contents).unwrap();
+        let checkpoint_hash =
+            odf::utils::data::hash::get_file_physical_hash(&checkpoint_path).unwrap();
+
+        let head = created
+            .dataset
+            .commit_add_data(
+                odf::dataset::AddDataParams {
+                    prev_checkpoint: None,
+                    prev_offset: None,
+                    new_offset_interval: None,
+                    new_linked_objects: None,
+                    new_watermark: None,
+                    new_source_state: None,
+                },
+                None,
+                Some(odf::dataset::CheckpointRef::New(OwnedFile::new(
+                    checkpoint_path,
+                ))),
+                odf::dataset::CommitOpts::default(),
+            )
+            .await
+            .unwrap()
+            .new_head;
+
+        (head, checkpoint_hash)
     }
 
     async fn overwrite_checkpoint(

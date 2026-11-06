@@ -1162,19 +1162,21 @@ pub async fn test_rename_to_same_name_in_concurrent_transactions(catalog: &dill:
         RacingTransactionOutcome::FailedAtWrite(UpdateDatasetEntryNameError::NameCollision(_))
             | RacingTransactionOutcome::FailedAtCommit(_)
     );
-    let (baz_id, bar_name) = in_committed_transaction(catalog, |catalog| async move {
-        let entry_repo = catalog.get_one::<dyn DatasetEntryRepository>().unwrap();
-        let baz_id = entry_repo
+    let baz_id = in_committed_transaction(catalog, |catalog| async move {
+        catalog
+            .get_one::<dyn DatasetEntryRepository>()
+            .unwrap()
             .get_dataset_entry_by_owner_and_name(&owner.id, &odf::DatasetName::new_unchecked("baz"))
             .await
             .unwrap()
-            .id;
-        let bar_name = entry_repo.get_dataset_entry(&bar_id).await.unwrap().name;
-        (baz_id, bar_name)
+            .id
     })
     .await;
     assert_eq!(baz_id, entries[0].id);
-    assert_eq!(bar_name, odf::DatasetName::new_unchecked("bar"));
+    assert_eq!(
+        get_committed_entry(catalog, &bar_id).await.name,
+        odf::DatasetName::new_unchecked("bar")
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1211,21 +1213,15 @@ pub async fn test_rename_in_concurrent_transactions(catalog: &dill::Catalog) {
     .await;
 
     assert_matches!(outcome, RacingTransactionOutcome::Committed);
+    assert_eq!(
+        get_committed_entry(catalog, &entries[0].id).await.name,
+        odf::DatasetName::new_unchecked("baz")
+    );
     let other_entry = new_dataset_entry_with(&owner, "bar", odf::DatasetKind::Root);
-    let (committed_name, other_entry_saved) =
-        in_committed_transaction(catalog, |catalog| async move {
-            let committed_name = catalog
-                .get_one::<dyn DatasetEntryRepository>()
-                .unwrap()
-                .get_dataset_entry(&entries[0].id)
-                .await
-                .unwrap()
-                .name;
-            let other_entry_saved = save_entry(&catalog, &other_entry).await;
-            (committed_name, other_entry_saved)
-        })
-        .await;
-    assert_eq!(committed_name, odf::DatasetName::new_unchecked("baz"));
+    let other_entry_saved = in_committed_transaction(catalog, |catalog| async move {
+        save_entry(&catalog, &other_entry).await
+    })
+    .await;
     assert_matches!(other_entry_saved, Ok(()));
 }
 
@@ -1274,6 +1270,8 @@ async fn rename_owner(
         )
         .await
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 async fn get_committed_entry(catalog: &dill::Catalog, dataset_id: &odf::DatasetID) -> DatasetEntry {
     in_committed_transaction(catalog, |catalog| async move {

@@ -85,8 +85,7 @@ pub struct ElaboratedTransform {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// How moving `HEAD` ended
-#[derive(Debug, strum::IntoStaticStr)]
-#[strum(serialize_all = "snake_case")]
+#[derive(Debug)]
 pub enum HeadCommit {
     Committed,
     /// Another writer moved `HEAD` first
