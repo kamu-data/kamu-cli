@@ -337,6 +337,39 @@ async fn test_planning_failure_finishes_task_with_its_error() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[test_log::test(tokio::test)]
+async fn test_recoverable_planning_failure_finishes_task_with_its_error() {
+    let mut mock_outbox = MockOutbox::new();
+    TaskAgentHarness::add_outbox_task_expectations(&mut mock_outbox, TaskID::new(0));
+
+    let harness = TaskAgentHarness::new(
+        mock_outbox,
+        MockTaskDefinitionPlanner::new(),
+        MockTaskRunner::new(),
+    );
+    // Unlike the empty recoverable error that other failure paths produce
+    let planning_error = TaskError {
+        error_type: "ProbePlanningFailed".to_owned(),
+        payload: serde_json::json!({ "reason": "probe" }),
+        recoverable: true,
+    };
+    let task_id = harness
+        .schedule_probe_task(LogicalPlanProbe {
+            fail_planning_with: Some(planning_error.clone()),
+            ..LogicalPlanProbe::default()
+        })
+        .await;
+
+    harness.task_agent.run_single_task().await.unwrap();
+
+    let task = harness.get_task(task_id).await;
+    assert_eq!(task.status(), TaskStatus::Finished);
+    assert_eq!(task.outcome(), Some(&TaskOutcome::Failed(planning_error)));
+    assert_eq!(harness.finished_tasks("failed"), 1);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 const LISTENING_TIMEOUT: Duration = Duration::from_mins(1);
 
 struct TaskAgentHarness {

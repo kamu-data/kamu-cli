@@ -674,6 +674,106 @@ async fn test_smart_push_without_uploading_referenced_objects_is_not_committed()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
+async fn test_smart_push_batch_of_other_than_planned_size_is_rejected() {
+    let scenario = SmartPushExistingUpToDateDatasetScenario::prepare(
+        ClientSideHarness::new(ClientSideHarnessOptions {
+            tenancy_config: TenancyConfig::SingleTenant,
+            authenticated_remotely: true,
+        })
+        .await,
+        ServerSideLocalFsHarness::new(ServerSideHarnessOptions {
+            tenancy_config: TenancyConfig::MultiTenant,
+            authorized_writes: true,
+            ..ServerSideHarnessOptions::default()
+        })
+        .await,
+    )
+    .await;
+
+    let dataset_handle = &scenario.client_dataset_handle;
+    let server_head = scenario
+        .client_harness
+        .stored_head(&dataset_handle.id)
+        .await;
+    scenario
+        .client_harness
+        .commit_set_info(dataset_handle)
+        .await;
+    let (mut push_request, metadata_request) = scenario
+        .client_harness
+        .raw_push_requests(dataset_handle, &server_head)
+        .await;
+    push_request.transfer_plan.num_blocks += 1;
+    let stored_heads = scenario.server_harness.stored_heads();
+
+    let api_server_handle = scenario.server_harness.api_server_run();
+
+    let client_handle = async {
+        let mut session = scenario
+            .client_harness
+            .open_raw_push_session(scenario.server_dataset_ref.url().unwrap())
+            .await;
+        session.send_metadata(push_request, metadata_request).await;
+
+        pretty_assertions::assert_eq!(
+            session.internal_error_phase().await,
+            "Push Phase: Metadata Request"
+        );
+        pretty_assertions::assert_eq!(stored_heads.get(&dataset_handle.id).await, server_head);
+    };
+
+    await_client_server_flow!(api_server_handle, client_handle);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_smart_push_new_dataset_without_seed_is_rejected() {
+    let scenario = SmartPushNewDatasetScenario::prepare(
+        ClientSideHarness::new(ClientSideHarnessOptions {
+            tenancy_config: TenancyConfig::MultiTenant,
+            authenticated_remotely: true,
+        })
+        .await,
+        ServerSideLocalFsHarness::new(ServerSideHarnessOptions {
+            tenancy_config: TenancyConfig::MultiTenant,
+            authorized_writes: true,
+            ..ServerSideHarnessOptions::default()
+        })
+        .await,
+    )
+    .await;
+
+    let dataset_handle = &scenario.client_dataset_handle;
+    let (push_request, metadata_request) = scenario
+        .client_harness
+        .raw_new_dataset_push_requests_without_seed(dataset_handle)
+        .await;
+    let stored_heads = scenario.server_harness.stored_heads();
+
+    let api_server_handle = scenario.server_harness.api_server_run();
+
+    let client_handle = async {
+        let mut session = scenario
+            .client_harness
+            .open_raw_push_session(scenario.server_dataset_ref.url().unwrap())
+            .await;
+        session.send_metadata(push_request, metadata_request).await;
+        session.assert_metadata_accepted().await;
+
+        pretty_assertions::assert_eq!(
+            session.internal_error_phase().await,
+            "Push Phase: Ensuring Target Dataset Exists"
+        );
+        pretty_assertions::assert_eq!(stored_heads.find(&dataset_handle.id).await, None);
+    };
+
+    await_client_server_flow!(api_server_handle, client_handle);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
 async fn test_smart_push_server_asks_for_upload_progress_at_its_interval() {
     let scenario = SmartPushExistingUpToDateDatasetScenario::prepare(
         ClientSideHarness::new(ClientSideHarnessOptions {

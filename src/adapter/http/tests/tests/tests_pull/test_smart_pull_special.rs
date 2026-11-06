@@ -184,6 +184,33 @@ async fn test_smart_pull_with_mislabeled_objects_is_not_committed() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
+async fn test_smart_pull_with_corrupted_objects_is_not_committed() {
+    CorruptedSourceCase::CorruptingObjects
+        .assert_pull_fails("file hash didn't match the computed")
+        .await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_smart_pull_with_undecodable_metadata_is_not_committed() {
+    CorruptedSourceCase::SendingUndecodableMetadata
+        .assert_pull_fails("Server sent a metadata batch that cannot be read")
+        .await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_smart_pull_without_planned_blocks_is_not_committed() {
+    CorruptedSourceCase::SendingNoBlocks
+        .assert_pull_fails("Server sent no blocks for a non-empty transfer plan")
+        .await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
 async fn test_smart_pull_into_existing_reports_increment() {
     let scenario = SmartPullExistingEvolvedDatasetScenario::prepare(
         ClientSideHarness::new(ClientSideHarnessOptions {
@@ -488,6 +515,79 @@ impl MissingObjectsCase {
                 &pull_responses[0].result,
                 Err(PullError::SyncError(SyncError::Corrupted(CorruptedSourceError { message, .. })))
                     if message.starts_with("Server did not send 2 file(s)")
+            );
+            pretty_assertions::assert_eq!(
+                scenario
+                    .client_harness
+                    .find_stored_head(&scenario.server_dataset_handle.id)
+                    .await,
+                None
+            );
+        };
+
+        await_client_server_flow!(server_handle, client_handle);
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// A server whose transfer of a new dataset breaks the same way on every
+/// retry
+enum CorruptedSourceCase {
+    CorruptingObjects,
+    SendingUndecodableMetadata,
+    SendingNoBlocks,
+}
+
+impl CorruptedSourceCase {
+    async fn assert_pull_fails(self, expected_message: &str) {
+        let scenario = SmartPullNewDatasetScenario::prepare(
+            ClientSideHarness::new(ClientSideHarnessOptions {
+                tenancy_config: TenancyConfig::SingleTenant,
+                authenticated_remotely: false,
+            })
+            .await,
+            ServerSideLocalFsHarness::new(ServerSideHarnessOptions {
+                tenancy_config: TenancyConfig::SingleTenant,
+                authorized_writes: true,
+                ..ServerSideHarnessOptions::default()
+            })
+            .await,
+        )
+        .await;
+        let dataset_registry = scenario.server_harness.cli_dataset_registry();
+        let dataset_handle = &scenario.server_dataset_handle;
+        let server = match self {
+            Self::CorruptingObjects => {
+                ScriptedPullServer::corrupting_objects(dataset_registry.as_ref(), dataset_handle)
+                    .await
+            }
+            Self::SendingUndecodableMetadata => {
+                ScriptedPullServer::sending_undecodable_metadata(
+                    dataset_registry.as_ref(),
+                    dataset_handle,
+                )
+                .await
+            }
+            Self::SendingNoBlocks => {
+                ScriptedPullServer::sending_no_blocks(dataset_registry.as_ref(), dataset_handle)
+                    .await
+            }
+        };
+        let server_dataset_url = server.dataset_url("foo");
+
+        let server_handle = server.run();
+
+        let client_handle = async {
+            let pull_responses = scenario
+                .client_harness
+                .pull_datasets(odf::DatasetRefAny::from(server_dataset_url), false)
+                .await;
+
+            assert_matches!(
+                &pull_responses[0].result,
+                Err(PullError::SyncError(e @ SyncError::Corrupted(CorruptedSourceError { message, .. })))
+                    if message.contains(expected_message) && !e.is_recoverable()
             );
             pretty_assertions::assert_eq!(
                 scenario

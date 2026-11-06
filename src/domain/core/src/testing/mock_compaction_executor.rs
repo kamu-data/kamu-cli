@@ -35,6 +35,15 @@ impl MockCompactionExecutor {
             });
         self
     }
+
+    /// Expects one compaction that finds nothing to compact
+    pub fn make_expect_compaction_nothing_to_do(mut self, target_alias: odf::DatasetAlias) -> Self {
+        self.expect_execute()
+            .withf(move |target, _, _| target.get_alias() == &target_alias)
+            .times(1)
+            .returning(|_, _, _| Ok(CompactionResult::NothingToDo));
+        self
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

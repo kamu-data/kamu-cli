@@ -624,6 +624,90 @@ async fn test_dataset_compaction_removes_its_run_directory() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[test_group::group(ingest, datafusion, compact)]
+#[tokio::test]
+async fn test_dataset_compaction_failed_merge_removes_its_run_directory() {
+    let harness = CompactTestHarness::new();
+    let target = harness.create_test_root_dataset().await;
+
+    harness
+        .ingest_data(CITIES_1_TO_3.to_string(), target.clone())
+        .await;
+    harness
+        .ingest_data(CITIES_4_TO_6.to_string(), target.clone())
+        .await;
+    harness.corrupt_data_file_at(&target, 0).await;
+
+    assert_matches!(
+        harness
+            .compact_dataset(target, CompactionOptions::default())
+            .await,
+        Err(CompactionError::Execution(_))
+    );
+    pretty_assertions::assert_eq!(harness.run_dir_entries(), Vec::<std::path::PathBuf>::new());
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_group::group(ingest, datafusion, compact)]
+#[tokio::test]
+async fn test_dataset_compaction_is_undone_by_reset_to_old_head() {
+    let harness = CompactTestHarness::new();
+    let target = harness.create_test_root_dataset().await;
+    let dataset_ref = target.get_handle().as_local_ref();
+
+    harness
+        .ingest_data(CITIES_1_TO_3.to_string(), target.clone())
+        .await;
+    harness
+        .ingest_data(CITIES_4_TO_6.to_string(), target.clone())
+        .await;
+    let old_head = harness.get_dataset_head(&dataset_ref).await;
+    assert_matches!(
+        harness
+            .compact_dataset(target.clone(), CompactionOptions::default())
+            .await,
+        Ok(CompactionResult::Success { .. })
+    );
+
+    // The old head is not in the history of the compacted one
+    assert_matches!(harness.reset_dataset(target, &old_head).await, Ok(_));
+    assert_eq!(harness.get_dataset_head(&dataset_ref).await, old_head);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_group::group(ingest, datafusion, compact)]
+#[tokio::test]
+async fn test_dataset_compaction_sums_linked_objects_of_merged_blocks() {
+    let harness = CompactTestHarness::new();
+    let target = harness.create_root_dataset_with_object_links().await;
+    let dataset_ref = target.get_handle().as_local_ref();
+
+    harness
+        .ingest_records_with_linked_objects(&target, &["a", "b"])
+        .await;
+    harness
+        .ingest_records_with_linked_objects(&target, &["c"])
+        .await;
+
+    assert_matches!(
+        harness
+            .compact_dataset(target, CompactionOptions::default())
+            .await,
+        Ok(CompactionResult::Success { .. })
+    );
+    assert_eq!(
+        harness.linked_objects_at(&dataset_ref, 0).await,
+        Some(odf::schema::ext::LinkedObjectsSummary {
+            num_objects_naive: 3,
+            size_naive: 24,
+        })
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 const CITIES_1_TO_3: &str =
     "date,city,population\n2020-01-01,A,1000\n2020-01-02,B,2000\n2020-01-03,C,3000\n";
 const CITIES_4_TO_6: &str =
@@ -1751,6 +1835,8 @@ struct CompactTestHarness {
     dataset_storage_unit_writer: Arc<dyn odf::DatasetStorageUnitWriter>,
     compaction_planner: Arc<dyn CompactionPlanner>,
     compaction_executor: Arc<dyn CompactionExecutor>,
+    reset_planner: Arc<dyn ResetPlanner>,
+    reset_executor: Arc<dyn ResetExecutor>,
     ingest_data_use_case: Arc<dyn PushIngestDataUseCase>,
     query_svc: Arc<dyn QueryService>,
     transform_helper: TransformTestHelper,
@@ -1793,6 +1879,8 @@ impl CompactTestHarness {
             .add_value(EngineConfigDatafusionEmbeddedCompaction::default())
             .add::<CompactionPlannerImpl>()
             .add::<CompactionExecutorImpl>()
+            .add::<ResetPlannerImpl>()
+            .add::<ResetExecutorImpl>()
             .add::<QueryServiceImpl>()
             .add::<SessionContextBuilder>()
             .add_value(EngineConfigDatafusionEmbeddedBatchQuery::default())
@@ -1830,6 +1918,8 @@ impl CompactTestHarness {
             dataset_storage_unit_writer: catalog.get_one().unwrap(),
             compaction_planner: catalog.get_one().unwrap(),
             compaction_executor: catalog.get_one().unwrap(),
+            reset_planner: catalog.get_one().unwrap(),
+            reset_executor: catalog.get_one().unwrap(),
             ingest_data_use_case: catalog.get_one().unwrap(),
             query_svc: catalog.get_one().unwrap(),
             verification_svc: catalog.get_one().unwrap(),
@@ -1890,6 +1980,8 @@ impl CompactTestHarness {
             .add_value(EngineConfigDatafusionEmbeddedCompaction::default())
             .add::<CompactionPlannerImpl>()
             .add::<CompactionExecutorImpl>()
+            .add::<ResetPlannerImpl>()
+            .add::<ResetExecutorImpl>()
             .add::<QueryServiceImpl>()
             .add::<SessionContextBuilder>()
             .add_value(EngineConfigDatafusionEmbeddedBatchQuery::default())
@@ -1905,6 +1997,8 @@ impl CompactTestHarness {
             dataset_storage_unit_writer: catalog.get_one().unwrap(),
             compaction_planner: catalog.get_one().unwrap(),
             compaction_executor: catalog.get_one().unwrap(),
+            reset_planner: catalog.get_one().unwrap(),
+            reset_executor: catalog.get_one().unwrap(),
             ingest_data_use_case: catalog.get_one().unwrap(),
             query_svc: catalog.get_one().unwrap(),
             transform_helper,
@@ -2213,6 +2307,121 @@ impl CompactTestHarness {
             .unwrap()
             .map(|entry| entry.unwrap().path())
             .collect()
+    }
+
+    async fn reset_dataset(
+        &self,
+        target: ResolvedDataset,
+        new_head: &odf::Multihash,
+    ) -> Result<ResetResult, ResetError> {
+        let plan = self
+            .reset_planner
+            .plan_reset(target.clone(), Some(new_head), None)
+            .await?;
+        Ok(self.reset_executor.execute(target, plan).await?)
+    }
+
+    /// Overwrites the data file of the block `index` blocks below `HEAD` with
+    /// bytes that are not Parquet
+    async fn corrupt_data_file_at(&self, target: &ResolvedDataset, index: usize) {
+        let data_slice = self
+            .add_data_at(&target.get_handle().as_local_ref(), index)
+            .await
+            .new_data
+            .unwrap();
+        let path = odf::utils::data::local_url::into_local_path(
+            target
+                .as_data_repo()
+                .get_internal_url(&data_slice.physical_hash)
+                .await,
+        )
+        .unwrap();
+        std::fs::write(path, b"not a parquet file").unwrap();
+    }
+
+    /// A root dataset whose `census_hash` column links objects in its data
+    /// repository
+    async fn create_root_dataset_with_object_links(&self) -> ResolvedDataset {
+        let dataset_alias = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+        let census_hash = || {
+            odf::schema::DataField::string("census_hash").type_ext(
+                odf::schema::ext::DataTypeExt::object_link(
+                    odf::schema::ext::DataTypeExt::multihash(),
+                ),
+            )
+        };
+
+        let store_result = self
+            .store_dataset(
+                MetadataFactory::dataset_snapshot()
+                    .name("foo")
+                    .kind(odf::DatasetKind::Root)
+                    .push_event(
+                        MetadataFactory::add_push_source()
+                            .read(odf::metadata::ReadStepCsv {
+                                header: Some(true),
+                                schema: Some(odf::schema::DataSchema::new(vec![
+                                    odf::schema::DataField::timestamp_millis_utc("date"),
+                                    odf::schema::DataField::string("city"),
+                                    odf::schema::DataField::i64("population"),
+                                    odf::schema::DataField::string("census_hash"),
+                                ])),
+                                ..odf::metadata::ReadStepCsv::default()
+                            })
+                            .merge(odf::metadata::MergeStrategyAppend {})
+                            .build(),
+                    )
+                    .push_event(odf::metadata::SetVocab {
+                        event_time_column: Some("date".to_string()),
+                        ..Default::default()
+                    })
+                    .push_event(odf::metadata::SetDataSchema::new(
+                        odf::schema::DataSchema::new(vec![
+                            odf::schema::DataField::i64("offset"),
+                            odf::schema::DataField::i32("op"),
+                            odf::schema::DataField::timestamp_millis_utc("system_time"),
+                            odf::schema::DataField::timestamp_millis_utc("date"),
+                            odf::schema::DataField::string("city"),
+                            odf::schema::DataField::i64("population"),
+                            census_hash(),
+                        ]),
+                    ))
+                    .build(),
+            )
+            .await;
+
+        ResolvedDataset::from_stored(&store_result, &dataset_alias)
+    }
+
+    /// Ingests one record per city, each linking a new object of 8 bytes
+    async fn ingest_records_with_linked_objects(&self, target: &ResolvedDataset, cities: &[&str]) {
+        use std::fmt::Write;
+
+        let mut data = String::from("date,city,population,census_hash\n");
+        for city in cities {
+            let census = format!("census_{city}");
+            let hash = target
+                .as_data_repo()
+                .insert_bytes(census.as_bytes(), Default::default())
+                .await
+                .unwrap()
+                .hash;
+            writeln!(data, "2020-01-01,{city},1000,{hash}").unwrap();
+        }
+        self.ingest_data(data, target.clone()).await;
+    }
+
+    /// Linked objects the block `index` blocks below `HEAD` declares
+    async fn linked_objects_at(
+        &self,
+        dataset_ref: &odf::DatasetRef,
+        index: usize,
+    ) -> Option<odf::schema::ext::LinkedObjectsSummary> {
+        self.add_data_at(dataset_ref, index)
+            .await
+            .extra
+            .and_then(|extra| extra.get::<odf::schema::ext::AttrLinkedObjects>().unwrap())
+            .map(|attr| attr.linked_objects)
     }
 
     fn etag(value: &str) -> odf::metadata::SourceState {

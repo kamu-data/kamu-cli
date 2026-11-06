@@ -969,6 +969,26 @@ impl DatasetApi<'_> {
             .await;
     }
 
+    /// Ingests the file of an upload and returns the response status
+    pub async fn ingest_upload(
+        &self,
+        dataset_alias: &odf::DatasetAlias,
+        upload_context: &UploadContext,
+    ) -> StatusCode {
+        let query_params =
+            serde_urlencoded::to_string([("uploadToken", upload_context.upload_token.to_string())])
+                .unwrap();
+
+        self.client
+            .rest_api_call(
+                Method::POST,
+                &format!("{dataset_alias}/ingest?{query_params}"),
+                None,
+            )
+            .await
+            .status()
+    }
+
     /// Advances the watermark without data; the new block records no source
     /// state
     pub async fn set_watermark(&self, dataset_id: &odf::DatasetID, watermark: DateTime<Utc>) {
@@ -2643,6 +2663,22 @@ pub struct UploadApi<'a> {
 }
 
 impl UploadApi<'_> {
+    /// Prepares an upload of `file_data` and uploads it
+    pub async fn prepare_and_upload(&self, file_name: &str, file_data: &str) -> UploadContext {
+        let upload_context = self
+            .prepare(PlatformFileUploadQuery {
+                file_name: file_name.into(),
+                content_length: file_data.len(),
+                content_type: None,
+            })
+            .await
+            .unwrap();
+        self.upload_file(&upload_context, file_name, file_data)
+            .await
+            .unwrap();
+        upload_context
+    }
+
     pub async fn prepare(
         &self,
         options: PlatformFileUploadQuery,

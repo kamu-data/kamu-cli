@@ -37,13 +37,17 @@ impl SimpleTransferProtocolConfig {
     /// Reads [`ENV_VAR_SIMPLE_PROTOCOL_MAX_PARALLEL_TRANSFERS`], falling back to
     /// the default when it is unset or not a number
     pub fn from_env() -> Self {
-        let max_parallel_transfers =
-            match std::env::var(ENV_VAR_SIMPLE_PROTOCOL_MAX_PARALLEL_TRANSFERS) {
-                Ok(string_value) => string_value
-                    .parse::<usize>()
-                    .unwrap_or(DEFAULT_SIMPLE_PROTOCOL_MAX_PARALLEL_TRANSFERS),
-                Err(_) => DEFAULT_SIMPLE_PROTOCOL_MAX_PARALLEL_TRANSFERS,
-            };
+        Self::from_env_value(
+            std::env::var(ENV_VAR_SIMPLE_PROTOCOL_MAX_PARALLEL_TRANSFERS)
+                .ok()
+                .as_deref(),
+        )
+    }
+
+    fn from_env_value(maybe_value: Option<&str>) -> Self {
+        let max_parallel_transfers = maybe_value
+            .and_then(|value| value.parse::<usize>().ok())
+            .unwrap_or(DEFAULT_SIMPLE_PROTOCOL_MAX_PARALLEL_TRANSFERS);
         Self {
             max_parallel_transfers,
         }
@@ -258,6 +262,32 @@ impl SimpleTransferProtocol {
             })?;
 
         Ok(())
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_from_env_value_reads_a_number() {
+        assert_eq!(
+            SimpleTransferProtocolConfig::from_env_value(Some("3")).max_parallel_transfers,
+            3
+        );
+    }
+
+    #[test]
+    fn test_from_env_value_falls_back_to_the_default() {
+        for maybe_value in [None, Some("many"), Some("-1")] {
+            assert_eq!(
+                SimpleTransferProtocolConfig::from_env_value(maybe_value).max_parallel_transfers,
+                DEFAULT_SIMPLE_PROTOCOL_MAX_PARALLEL_TRANSFERS,
+                "{maybe_value:?}"
+            );
+        }
     }
 }
 

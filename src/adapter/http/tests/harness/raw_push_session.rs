@@ -33,17 +33,8 @@ impl RawPushSession {
         request: DatasetPushRequest,
         metadata: DatasetPushMetadataRequest,
     ) {
-        self.socket.send(&request).await;
-        assert_matches!(
-            self.socket.receive::<DatasetPushResponse>().await,
-            Ok(DatasetPushRequestAccepted {})
-        );
-
-        self.socket.send(&metadata).await;
-        assert_matches!(
-            self.socket.receive::<DatasetPushMetadataResponse>().await,
-            Ok(DatasetPushMetadataAccepted {})
-        );
+        self.send_metadata(request, metadata).await;
+        self.assert_metadata_accepted().await;
 
         self.socket
             .send(&DatasetPushObjectsTransferRequest {
@@ -57,6 +48,38 @@ impl RawPushSession {
                 object_transfer_strategies
             }) if object_transfer_strategies.is_empty()
         );
+    }
+
+    /// Sends the push request, checks the server accepts it, then sends the
+    /// metadata
+    pub async fn send_metadata(
+        &mut self,
+        request: DatasetPushRequest,
+        metadata: DatasetPushMetadataRequest,
+    ) {
+        self.socket.send(&request).await;
+        assert_matches!(
+            self.socket.receive::<DatasetPushResponse>().await,
+            Ok(DatasetPushRequestAccepted {})
+        );
+
+        self.socket.send(&metadata).await;
+    }
+
+    pub async fn assert_metadata_accepted(&mut self) {
+        assert_matches!(
+            self.socket.receive::<DatasetPushMetadataResponse>().await,
+            Ok(DatasetPushMetadataAccepted {})
+        );
+    }
+
+    /// The phase of the internal error the server ends the session with
+    pub async fn internal_error_phase(&mut self) -> String {
+        match self.socket.receive::<TransferInternalErrorReply>().await {
+            TransferInternalErrorReply::Err(TransferInternalErrorKind::Internal(error)) => {
+                error.phase.to_string()
+            }
+        }
     }
 
     pub async fn next_progress_request(&mut self) -> DatasetPushObjectsUploadProgressRequest {

@@ -14,6 +14,7 @@ use bytes::Bytes;
 use file_utils::MediaType;
 use kamu::testing::{BaseUseCaseHarness, BaseUseCaseHarnessOptions};
 use kamu::*;
+use kamu_accounts::{Account, AccountRepository, QuotaError};
 use kamu_accounts_inmem::{InMemoryAccountQuotaEventStore, InMemoryAccountRepository};
 use kamu_accounts_services::{AccountQuotaServiceImpl, AccountServiceImpl};
 use kamu_auth_rebac_inmem::InMemoryRebacRepository;
@@ -668,24 +669,87 @@ async fn test_push_ingest_data_head_moved_before_commit_reports_error_not_succes
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[tokio::test]
+#[test_group::group(engine, ingest, datafusion)]
+async fn test_push_ingest_data_execute_multi_counts_staged_slices_towards_quota() {
+    let harness = PushIngestDataUseCaseHarness::with_room_for_one_slice().await;
+    let target = harness.create_quota_owner_dataset("foo").await;
+    let initial_head = harness.head(&target).await;
+
+    assert_matches!(
+        harness.ingest_slices(&target, &["foo", "bar"]).await,
+        Err(PushIngestDataError::Execution(
+            PushIngestError::QuotaExceeded(QuotaError::Exceeded(_))
+        ))
+    );
+    assert_eq!(harness.head(&target).await, initial_head);
+
+    // Each slice fits on its own
+    assert_matches!(
+        harness.ingest_slices(&target, &["bar"]).await,
+        Ok(PushIngestResult::Updated { .. })
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[oop::extend(BaseUseCaseHarness, base_use_case_harness)]
 struct PushIngestDataUseCaseHarness {
     base_use_case_harness: BaseUseCaseHarness,
     use_case: Arc<dyn PushIngestDataUseCase>,
     racing_committer: Arc<RacingDatasetHeadCommitter>,
+    account_repo: Arc<dyn AccountRepository>,
 }
 
 impl PushIngestDataUseCaseHarness {
+    const QUOTA_OWNER: &'static str = "alice";
+
     fn new(
         mock_dataset_permission_checker: MockDatasetPermissionChecker,
         mock_did_generator: MockDidGenerator,
     ) -> Self {
-        let base_use_case_harness = BaseUseCaseHarness::new(
+        Self::new_with(
             BaseUseCaseHarnessOptions::new()
                 .with_maybe_permission_checker(Some(mock_dataset_permission_checker))
-                .with_maybe_mock_did_generator(Some(mock_did_generator))
-                .without_outbox(),
+                .with_maybe_mock_did_generator(Some(mock_did_generator)),
+            QuotaDefaultsConfig::default(),
+        )
+    }
+
+    /// Multi-tenant, where [`Self::QUOTA_OWNER`] has room for one slice of
+    /// [`Self::slice_source`] but not for two
+    async fn with_room_for_one_slice() -> Self {
+        let probe = Self::new_for_quota_owner(QuotaDefaultsConfig::default()).await;
+        let slice_size = probe.ingested_slice_size().await;
+
+        Self::new_for_quota_owner(QuotaDefaultsConfig {
+            storage: slice_size * 3 / 2,
+        })
+        .await
+    }
+
+    async fn new_for_quota_owner(quota_defaults: QuotaDefaultsConfig) -> Self {
+        let harness = Self::new_with(
+            BaseUseCaseHarnessOptions::new()
+                .with_tenancy_config(TenancyConfig::MultiTenant)
+                .with_maybe_permission_checker(Some(MockDatasetPermissionChecker::allowing())),
+            quota_defaults,
         );
+
+        harness
+            .account_repo
+            .save_account(&Account::test(
+                odf::AccountID::new_seeded_ed25519(Self::QUOTA_OWNER.as_bytes()),
+                Self::QUOTA_OWNER,
+            ))
+            .await
+            .unwrap();
+
+        harness
+    }
+
+    fn new_with(options: BaseUseCaseHarnessOptions, quota_defaults: QuotaDefaultsConfig) -> Self {
+        let base_use_case_harness = BaseUseCaseHarness::new(options.without_outbox());
 
         let mut b = dill::CatalogBuilder::new_chained(base_use_case_harness.catalog());
 
@@ -703,7 +767,7 @@ impl PushIngestDataUseCaseHarness {
             .add::<InMemoryAccountQuotaEventStore>()
             .add::<AccountQuotaServiceImpl>()
             .add::<DatasetStatisticsServiceImpl>()
-            .add_value(QuotaDefaultsConfig::default())
+            .add_value(quota_defaults)
             .add::<AccountQuotaCheckerStorageImpl>()
             .add::<RebacServiceImpl>()
             .add::<InMemoryRebacRepository>()
@@ -724,6 +788,7 @@ impl PushIngestDataUseCaseHarness {
             base_use_case_harness,
             use_case: catalog.get_one().unwrap(),
             racing_committer: catalog.get_one().unwrap(),
+            account_repo: catalog.get_one().unwrap(),
         }
     }
 
@@ -866,6 +931,61 @@ impl PushIngestDataUseCaseHarness {
         self.use_case
             .execute_multi(target, data_sources, options, None)
             .await
+    }
+
+    async fn create_quota_owner_dataset(&self, name: &str) -> ResolvedDataset {
+        let alias = odf::DatasetAlias::new(
+            Some(odf::AccountName::new_unchecked(Self::QUOTA_OWNER)),
+            odf::DatasetName::new_unchecked(name),
+        );
+        ResolvedDataset::from_created(&self.create_root_dataset_with_push_source(&alias).await)
+    }
+
+    /// One record, so that every slice of it has about the same size
+    fn slice_source(city: &'static str) -> DataSource {
+        DataSource::Buffer(Bytes::from(format!(
+            r#"{{"city":"{city}","population":100}}"#
+        )))
+    }
+
+    async fn ingest_slices(
+        &self,
+        target: &ResolvedDataset,
+        cities: &[&'static str],
+    ) -> Result<PushIngestResult, PushIngestDataError> {
+        self.ingest_multi_data(
+            target.clone(),
+            cities.iter().copied().map(Self::slice_source).collect(),
+            PushIngestDataUseCaseOptions {
+                media_type: None,
+                ..Self::ndjson_options(None, false)
+            },
+        )
+        .await
+    }
+
+    /// Size of the data file one slice of [`Self::slice_source`] adds
+    async fn ingested_slice_size(&self) -> u64 {
+        let target = self.create_quota_owner_dataset("probe").await;
+        self.ingest_slices(&target, &["foo"]).await.unwrap();
+
+        let block = target
+            .as_metadata_chain()
+            .get_block(&self.head(&target).await)
+            .await
+            .unwrap();
+        let odf::MetadataEvent::AddData(add_data) = block.event else {
+            panic!("Expected AddData, got: {block:?}");
+        };
+        add_data.new_data.unwrap().size
+    }
+
+    async fn head(&self, target: &ResolvedDataset) -> odf::Multihash {
+        target
+            .as_metadata_chain()
+            .resolve_ref(&odf::BlockRef::Head)
+            .await
+            .unwrap()
     }
 }
 

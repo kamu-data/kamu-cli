@@ -995,6 +995,53 @@ async fn test_sync_from_remote_id_without_local_alias_fails_planning() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[tokio::test]
+async fn test_sync_from_url_without_path_is_named_after_its_domain() {
+    let harness = PullTestHarness::new(TenancyConfig::SingleTenant, MockDatasetEntryWriter::new());
+
+    let res = harness
+        .pull_with_requests(
+            vec![PullRequest::Remote(PullRequestRemote {
+                maybe_local_alias: None,
+                remote_ref: rr!("http://example.com/"),
+            })],
+            PullOptions::default(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(
+        res,
+        vec![vec![PullJob::Sync((
+            rr!("http://example.com/").into(),
+            n!("example.com").into()
+        ))]]
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[tokio::test]
+async fn test_sync_from_url_with_ip_host_and_no_path_fails_planning() {
+    let harness = PullTestHarness::new(TenancyConfig::SingleTenant, MockDatasetEntryWriter::new());
+
+    let responses = harness
+        .pull_with_requests(
+            vec![PullRequest::Remote(PullRequestRemote {
+                maybe_local_alias: None,
+                remote_ref: rr!("http://127.0.0.1/"),
+            })],
+            PullOptions::default(),
+        )
+        .await
+        .unwrap_err();
+
+    assert_eq!(1, responses.len());
+    assert_matches!(responses[0].result, Err(PullError::CannotInferLocalName(_)));
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[tokio::test]
 async fn test_sync_into_missing_dataset_without_auto_create_fails_before_naming_it() {
     let harness = PullTestHarness::new(TenancyConfig::SingleTenant, MockDatasetEntryWriter::new());
 

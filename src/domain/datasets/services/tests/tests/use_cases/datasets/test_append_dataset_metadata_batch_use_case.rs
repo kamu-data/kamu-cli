@@ -332,6 +332,32 @@ async fn test_append_dataset_metadata_batch_with_new_dependencies() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[tokio::test]
+async fn test_append_dataset_metadata_batch_empty_is_noop() {
+    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let predefined_foo_id = odf::DatasetID::new_seeded_ed25519(b"foo");
+
+    let harness = AppendDatasetMetadataBatchUseCaseHarness::new(
+        MockDidGenerator::predefined_dataset_ids(vec![predefined_foo_id]),
+    )
+    .await;
+    let foo = harness
+        .create_root_dataset(&harness.catalog, &alias_foo)
+        .await;
+    harness.reset_collected_outbox_messages();
+
+    assert_matches!(
+        harness
+            .append_batch(&foo, VecDeque::new(), SetRefCheckRefMode::default())
+            .await,
+        Ok(None)
+    );
+    assert_eq!(harness.get_head(&foo).await, foo.head);
+    assert_eq!("", harness.collected_outbox_messages());
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[tokio::test]
 async fn test_append_dataset_metadata_batch_head_moved_concurrently() {
     let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
     let predefined_foo_id = odf::DatasetID::new_seeded_ed25519(b"foo");
@@ -350,6 +376,7 @@ async fn test_append_dataset_metadata_batch_head_moved_concurrently() {
         .append_batch(&foo, concurrent_batch, SetRefCheckRefMode::default())
         .await
         .unwrap();
+    harness.reset_collected_outbox_messages();
 
     assert_matches!(
         harness
@@ -365,6 +392,7 @@ async fn test_append_dataset_metadata_batch_head_moved_concurrently() {
     );
     assert_ne!(batch_head, concurrent_head);
     assert_eq!(harness.get_head(&foo).await, concurrent_head);
+    assert_eq!("", harness.collected_outbox_messages());
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -27,8 +27,8 @@ use url::Url;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// Answers one smart pull of a dataset by script: it serves the dataset's
-/// `HEAD` and blocks and sends its whole chain, but no usable transfer
-/// strategy for the objects the client asks for
+/// `HEAD` and blocks and plans its whole chain, then breaks the transfer in
+/// the way the script says
 pub(crate) struct ScriptedPullServer {
     listener: tokio::net::TcpListener,
     local_addr: SocketAddr,
@@ -36,15 +36,40 @@ pub(crate) struct ScriptedPullServer {
     session: ScriptedPullSession,
 }
 
-/// How the server answers the request for objects
+/// Where the server breaks the transfer
 #[derive(Clone, Copy)]
 enum PullScript {
+    /// Sends the whole chain, then answers the request for objects wrongly
+    Objects(ObjectsScript),
+
+    /// Sends a metadata batch the client cannot use, so the client asks for
+    /// no objects
+    Metadata(MetadataScript),
+}
+
+/// How the server answers the request for objects
+#[derive(Clone, Copy)]
+enum ObjectsScript {
     /// Offers none of them
-    OmitObjects,
+    Omit,
 
     /// Offers each of them as the other object type, with a download URL
     /// the client must never reach
-    MislabelObjects,
+    Mislabel,
+
+    /// Offers each of them as it is, with a download URL that serves bytes
+    /// of another content
+    Corrupt,
+}
+
+/// Which metadata batch the server sends in place of the planned one
+#[derive(Clone, Copy)]
+enum MetadataScript {
+    /// A payload that is not an archive
+    Undecodable,
+
+    /// An archive without blocks
+    NoBlocks,
 }
 
 impl ScriptedPullServer {
@@ -52,7 +77,12 @@ impl ScriptedPullServer {
         dataset_registry: &dyn DatasetRegistry,
         dataset_handle: &odf::DatasetHandle,
     ) -> Self {
-        Self::new(dataset_registry, dataset_handle, PullScript::OmitObjects).await
+        Self::new(
+            dataset_registry,
+            dataset_handle,
+            PullScript::Objects(ObjectsScript::Omit),
+        )
+        .await
     }
 
     pub async fn mislabeling_objects(
@@ -62,7 +92,43 @@ impl ScriptedPullServer {
         Self::new(
             dataset_registry,
             dataset_handle,
-            PullScript::MislabelObjects,
+            PullScript::Objects(ObjectsScript::Mislabel),
+        )
+        .await
+    }
+
+    pub async fn corrupting_objects(
+        dataset_registry: &dyn DatasetRegistry,
+        dataset_handle: &odf::DatasetHandle,
+    ) -> Self {
+        Self::new(
+            dataset_registry,
+            dataset_handle,
+            PullScript::Objects(ObjectsScript::Corrupt),
+        )
+        .await
+    }
+
+    pub async fn sending_undecodable_metadata(
+        dataset_registry: &dyn DatasetRegistry,
+        dataset_handle: &odf::DatasetHandle,
+    ) -> Self {
+        Self::new(
+            dataset_registry,
+            dataset_handle,
+            PullScript::Metadata(MetadataScript::Undecodable),
+        )
+        .await
+    }
+
+    pub async fn sending_no_blocks(
+        dataset_registry: &dyn DatasetRegistry,
+        dataset_handle: &odf::DatasetHandle,
+    ) -> Self {
+        Self::new(
+            dataset_registry,
+            dataset_handle,
+            PullScript::Metadata(MetadataScript::NoBlocks),
         )
         .await
     }
@@ -78,6 +144,22 @@ impl ScriptedPullServer {
             prepare_dataset_metadata_batch(dataset.as_metadata_chain(), &head, None, false)
                 .await
                 .unwrap();
+        let planned_num_blocks = blocks.num_blocks;
+        let sent_blocks = match script {
+            PullScript::Objects(_) => blocks,
+            PullScript::Metadata(MetadataScript::Undecodable) => MetadataBlocksBatch {
+                payload: b"not an archive".to_vec(),
+                ..blocks
+            },
+            PullScript::Metadata(MetadataScript::NoBlocks) => prepare_dataset_metadata_batch(
+                dataset.as_metadata_chain(),
+                &head,
+                Some(&head),
+                false,
+            )
+            .await
+            .unwrap(),
+        };
 
         let listener = tokio::net::TcpListener::bind(SocketAddr::from(([127, 0, 0, 1], 0)))
             .await
@@ -89,8 +171,10 @@ impl ScriptedPullServer {
             dataset,
             session: ScriptedPullSession {
                 script,
-                blocks,
+                planned_num_blocks,
+                sent_blocks,
                 unreachable_url: Url::parse(&format!("http://{local_addr}/unreachable")).unwrap(),
+                corrupted_url: Url::parse(&format!("http://{local_addr}/corrupted")).unwrap(),
             },
         }
     }
@@ -104,6 +188,7 @@ impl ScriptedPullServer {
         let dataset = self.dataset;
         let blocks_dataset = dataset.clone();
         let router = axum::Router::new()
+            .route("/corrupted", get(|| async { b"not the object".to_vec() }))
             .route(
                 "/{dataset_name}/pull",
                 get(move |ws: WebSocketUpgrade| {
@@ -147,8 +232,10 @@ impl ScriptedPullServer {
 #[derive(Clone)]
 struct ScriptedPullSession {
     script: PullScript,
-    blocks: MetadataBlocksBatch,
+    planned_num_blocks: u32,
+    sent_blocks: MetadataBlocksBatch,
     unreachable_url: Url,
+    corrupted_url: Url,
 }
 
 impl ScriptedPullSession {
@@ -158,7 +245,7 @@ impl ScriptedPullSession {
             &mut socket,
             Ok(DatasetPullSuccessResponse {
                 transfer_plan: TransferPlan {
-                    num_blocks: self.blocks.num_blocks,
+                    num_blocks: self.planned_num_blocks,
                     num_objects: 0,
                     num_records: 0,
                     bytes_in_raw_blocks: 0,
@@ -172,18 +259,28 @@ impl ScriptedPullSession {
         Self::send(
             &mut socket,
             DatasetMetadataPullResponse {
-                blocks: self.blocks.clone(),
+                blocks: self.sent_blocks.clone(),
             },
         )
         .await;
 
+        let objects_script = match self.script {
+            PullScript::Objects(objects_script) => objects_script,
+            PullScript::Metadata(_) => return,
+        };
+
         let objects_request = Self::receive::<DatasetPullObjectsTransferRequest>(&mut socket).await;
-        let object_transfer_strategies = match self.script {
-            PullScript::OmitObjects => Vec::new(),
-            PullScript::MislabelObjects => objects_request
+        let object_transfer_strategies = match objects_script {
+            ObjectsScript::Omit => Vec::new(),
+            ObjectsScript::Mislabel => objects_request
                 .object_files
                 .into_iter()
                 .map(|object_file| self.mislabeled_strategy(object_file))
+                .collect(),
+            ObjectsScript::Corrupt => objects_request
+                .object_files
+                .into_iter()
+                .map(|object_file| self.corrupted_strategy(object_file))
                 .collect(),
         };
         Self::send(
@@ -208,6 +305,18 @@ impl ScriptedPullSession {
             pull_strategy: ObjectPullStrategy::HttpDownload,
             download_from: TransferUrl {
                 url: self.unreachable_url.clone(),
+                headers: Vec::new(),
+                expires_at: None,
+            },
+        }
+    }
+
+    fn corrupted_strategy(&self, object_file: ObjectFileReference) -> PullObjectTransferStrategy {
+        PullObjectTransferStrategy {
+            object_file,
+            pull_strategy: ObjectPullStrategy::HttpDownload,
+            download_from: TransferUrl {
+                url: self.corrupted_url.clone(),
                 headers: Vec::new(),
                 expires_at: None,
             },

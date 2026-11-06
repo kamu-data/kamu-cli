@@ -305,6 +305,75 @@ async fn test_commit_event_with_new_dependencies() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[tokio::test]
+async fn test_commit_event_with_inaccessible_input_is_rejected() {
+    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let alias_bar = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("bar"));
+    let alias_baz = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("baz"));
+    let (_, dataset_id_foo) = odf::DatasetID::new_generated_ed25519();
+    let (_, dataset_id_bar) = odf::DatasetID::new_generated_ed25519();
+    let (_, dataset_id_baz) = odf::DatasetID::new_generated_ed25519();
+
+    let mock_permission_checker = MockDatasetPermissionChecker::new()
+        .expect_check_write_dataset(&dataset_id_baz, 1, true)
+        .make_expect_classify_datasets_by_allowance(
+            DatasetPermission::Read,
+            1,
+            HashSet::from([alias_foo.clone()]),
+        );
+
+    let harness = CommitDatasetEventUseCaseHarness::new(
+        mock_permission_checker,
+        MockDidGenerator::predefined_dataset_ids(vec![
+            dataset_id_foo,
+            dataset_id_bar,
+            dataset_id_baz,
+        ]),
+    )
+    .await;
+
+    let foo = harness
+        .create_root_dataset(&harness.catalog, &alias_foo)
+        .await;
+    let bar = harness
+        .create_root_dataset(&harness.catalog, &alias_bar)
+        .await;
+    let baz = harness
+        .create_derived_dataset(
+            &harness.catalog,
+            &alias_baz,
+            vec![foo.dataset_handle.as_local_ref()],
+        )
+        .await;
+    harness.reset_collected_outbox_messages();
+
+    assert_matches!(
+        harness
+            .use_case
+            .execute(
+                &baz.dataset_handle,
+                odf::MetadataEvent::SetTransform(
+                    MetadataFactory::set_transform()
+                        .inputs_from_refs_and_aliases(vec![
+                            (foo.dataset_handle.id, alias_foo.to_string()),
+                            (bar.dataset_handle.id, alias_bar.to_string()),
+                        ])
+                        .build(),
+                ),
+            )
+            .await,
+        Err(odf::dataset::CommitError::MetadataAppendError(
+            odf::dataset::AppendError::InvalidBlock(
+                odf::dataset::AppendValidationError::InvalidEvent(e)
+            )
+        )) if e.to_string().contains("Some input dataset(s) are inaccessible: 'bar'")
+    );
+    assert_eq!(harness.stored_head(&baz).await, baz.head);
+    assert_eq!("", harness.collected_outbox_messages());
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[tokio::test]
 async fn test_commit_dataset_event_head_moved_concurrently() {
     let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
     let (_, dataset_id_foo) = odf::DatasetID::new_generated_ed25519();
@@ -314,7 +383,7 @@ async fn test_commit_dataset_event_head_moved_concurrently() {
 
     let harness = CommitDatasetEventUseCaseHarness::new(
         mock_permission_checker,
-        MockDidGenerator::predefined_dataset_ids(vec![dataset_id_foo]),
+        MockDidGenerator::predefined_dataset_ids(vec![dataset_id_foo.clone()]),
     )
     .await;
     let foo = harness
@@ -325,6 +394,7 @@ async fn test_commit_dataset_event_head_moved_concurrently() {
         .append_unreferenced_block(&foo, &foo.head, "concurrent")
         .await;
     harness.move_head_before_next_commit(concurrent_head.clone());
+    harness.reset_collected_outbox_messages();
 
     assert_matches!(
         harness
@@ -345,6 +415,31 @@ async fn test_commit_dataset_event_head_moved_concurrently() {
         )) if expected == Some(foo.head.clone()) && actual == Some(concurrent_head.clone())
     );
     assert_eq!(harness.stored_head(&foo).await, concurrent_head);
+    // Only the concurrent move is announced
+    assert_eq!(
+        indoc::indoc!(
+            r#"
+            Dataset Reference Messages: 1
+              Ref Updated {
+                Dataset ID: <foo_id>
+                Ref: head
+                Prev Head: Some(Multihash<Sha3_256>(<old_head>))
+                New Head: Multihash<Sha3_256>(<concurrent_head>)
+              }
+            Dataset Key Block Messages: 1
+              Key Blocks Appended {
+                Dataset ID: <foo_id>
+                Ref: head
+                Key Block Tail: <concurrent_head>
+                Key Block Head: <concurrent_head>
+              }
+            "#
+        )
+        .replace("<foo_id>", dataset_id_foo.to_string().as_str())
+        .replace("<old_head>", foo.head.to_string().as_str())
+        .replace("<concurrent_head>", concurrent_head.to_string().as_str()),
+        harness.collected_outbox_messages(),
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

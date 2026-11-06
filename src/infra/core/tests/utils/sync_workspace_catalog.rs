@@ -15,6 +15,15 @@ use kamu::utils::ipfs_wrapper::IpfsClient;
 use kamu::utils::simple_transfer_protocol::{SimpleTransferProtocol, SimpleTransferProtocolConfig};
 use kamu::*;
 use kamu_accounts::{CurrentAccountSubject, CurrentAccountSubjectCatalogExt as _};
+use kamu_auth_rebac_inmem::InMemoryRebacRepository;
+use kamu_auth_rebac_services::{
+    DefaultAccountProperties,
+    DefaultDatasetProperties,
+    DeleteDatasetRebacPropertiesUseCaseImpl,
+    RebacDatasetLifecycleMessageConsumer,
+    RebacServiceImpl,
+    SetDatasetRebacPropertiesUseCaseImpl,
+};
 use kamu_datasets::*;
 use kamu_datasets_services::utils::CreateDatasetUseCaseHelper;
 use kamu_datasets_services::*;
@@ -24,7 +33,8 @@ use time_source::SystemTimeSourceDefault;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// The catalog of a single-tenant workspace that syncs datasets with
-/// local-file and simple-protocol remotes. Smart transfers are not wired
+/// local-file and simple-protocol remotes. Smart transfers are not wired.
+/// Access properties of created datasets are recorded in memory
 pub struct SyncWorkspaceCatalog {
     workspace_dir: PathBuf,
     ipfs_gateway: odf::dataset::IpfsGateway,
@@ -104,7 +114,14 @@ impl SyncWorkspaceCatalog {
             .add_value(self.dataset_entry_writer)
             .bind::<dyn DatasetEntryWriter, MockDatasetEntryWriter>()
             .add::<DatasetReferenceServiceImpl>()
-            .add::<DatasetHeadCommitterImpl>();
+            .add::<DatasetHeadCommitterImpl>()
+            .add::<RebacDatasetLifecycleMessageConsumer>()
+            .add::<SetDatasetRebacPropertiesUseCaseImpl>()
+            .add::<DeleteDatasetRebacPropertiesUseCaseImpl>()
+            .add::<RebacServiceImpl>()
+            .add::<InMemoryRebacRepository>()
+            .add_value(DefaultAccountProperties::default())
+            .add_value(DefaultDatasetProperties::default());
 
         if let Some(config) = self.maybe_simple_transfer_config {
             b.add_value(config);

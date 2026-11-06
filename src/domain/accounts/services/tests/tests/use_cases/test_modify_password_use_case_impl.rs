@@ -259,6 +259,45 @@ async fn test_modify_account_password_with_confirmation_incorrect_not_enough_per
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[test_log::test(tokio::test)]
+async fn test_node_modifies_other_account_password() {
+    let mut outbox = MockOutbox::new();
+    ModifyAccountPasswordUseCaseImplHarness::expect_outbox_account_messages(&mut outbox);
+
+    let harness = ModifyAccountPasswordUseCaseImplHarness::with_principal(Principal::Node, outbox);
+
+    let initial_password = TEST_PASSWORD.clone();
+    let account = harness
+        .create_account_with_password(initial_password.clone())
+        .await;
+    let new_password = Password::try_new("new_password").unwrap();
+
+    assert_matches!(
+        harness
+            .modify_account_password_use_case
+            .execute(&account, new_password.clone())
+            .await,
+        Ok(_),
+    );
+
+    assert_matches!(
+        harness
+            .account_service()
+            .verify_account_password_by_name(&account.account_name, &initial_password)
+            .await,
+        Err(VerifyPasswordError::IncorrectPassword(_)),
+    );
+    assert_matches!(
+        harness
+            .account_service()
+            .verify_account_password_by_name(&account.account_name, &new_password)
+            .await,
+        Ok(_),
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[oop::extend(AccountBaseUseCaseHarness, account_base_harness)]
 struct ModifyAccountPasswordUseCaseImplHarness {
     account_base_harness: AccountBaseUseCaseHarness,
@@ -271,17 +310,36 @@ impl ModifyAccountPasswordUseCaseImplHarness {
         mock_account_authorization_helper: MockAccountAuthorizationHelper,
         mock_outbox: MockOutbox,
     ) -> Self {
+        // The mocked authorization helper decides, whoever the principal is
+        Self::build(
+            AccountAuthorizationHelperTestProvider::Mock(mock_account_authorization_helper),
+            Principal::new_test(),
+            mock_outbox,
+        )
+    }
+
+    /// The real authorization helper decides for the given principal
+    fn with_principal(principal: Principal, mock_outbox: MockOutbox) -> Self {
+        Self::build(
+            AccountAuthorizationHelperTestProvider::Default,
+            principal,
+            mock_outbox,
+        )
+    }
+
+    fn build(
+        account_authorization_helper_provider: AccountAuthorizationHelperTestProvider,
+        principal: Principal,
+        mock_outbox: MockOutbox,
+    ) -> Self {
         let account_base_harness = AccountBaseUseCaseHarness::new(AccountBaseUseCaseHarnessOpts {
-            account_authorization_helper_provider: AccountAuthorizationHelperTestProvider::Mock(
-                mock_account_authorization_helper,
-            ),
+            account_authorization_helper_provider,
             ..Default::default()
         });
 
         let mut b = dill::CatalogBuilder::new_chained(account_base_harness.intermediate_catalog());
         b.add_value(mock_outbox).bind::<dyn Outbox, MockOutbox>();
-        // The mocked authorization helper decides, whoever the principal is
-        b.add_value(Principal::new_test());
+        b.add_value(principal);
         b.add::<ModifyAccountPasswordUseCaseImpl>();
 
         let catalog = b.build();

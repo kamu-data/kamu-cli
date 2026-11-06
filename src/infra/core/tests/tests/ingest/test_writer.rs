@@ -2338,6 +2338,39 @@ async fn test_data_writer_schema_evolution_add_optional_field_merge_snapshot() {
     .await;
 }
 
+#[test_group::group(engine, ingest, datafusion)]
+#[test_log::test(tokio::test)]
+async fn test_data_writer_reports_json_decode_failure_as_execution_error() {
+    let harness = Harness::new(vec![]).await;
+
+    let res = harness
+        .write_ndjson(
+            r#"{"city": "A", "population": "not-a-number"}"#,
+            "city STRING, population BIGINT",
+        )
+        .await;
+
+    assert_matches!(res, Err(WriteDataError::ExecutionError(_)));
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_group::group(engine, ingest, datafusion)]
+#[test_log::test(tokio::test)]
+async fn test_data_writer_reports_cast_failure_as_execution_error() {
+    let harness = Harness::new(vec![]).await;
+
+    let res = harness
+        .write_csv_casting_to_bigint(
+            "city,population\nA,not-a-number\n",
+            "city STRING, population STRING",
+            "population",
+        )
+        .await;
+
+    assert_matches!(res, Err(WriteDataError::ExecutionError(_)));
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // ObjectLink
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -2969,6 +3002,63 @@ impl Harness {
                 .collect(),
         )
         .unwrap()
+    }
+
+    /// Writes NDJSON `data` read with the DDL `schema`
+    async fn write_ndjson(
+        &self,
+        data: &str,
+        schema: &str,
+    ) -> Result<WriteDataResult, WriteDataError> {
+        let data_path = self.temp_dir.path().join("data.ndjson");
+        std::fs::write(&data_path, data).unwrap();
+
+        let df = ReaderNdJson::new(
+            self.ctx.clone(),
+            odf::metadata::ReadStepNdJson {
+                schema: Some(odf::utils::schema::parse::parse_ddl_to_odf_schema(schema).unwrap()),
+                ..Default::default()
+            },
+            &odf::schema::ToArrowSettings::default(),
+        )
+        .unwrap()
+        .read(&data_path)
+        .await
+        .unwrap();
+
+        self.write_df_with_ctx(self.ctx.clone(), df).await
+    }
+
+    /// Writes CSV `data` read with the DDL `schema`, casting `column` to
+    /// `BIGINT` as a preprocess query would
+    async fn write_csv_casting_to_bigint(
+        &self,
+        data: &str,
+        schema: &str,
+        column: &str,
+    ) -> Result<WriteDataResult, WriteDataError> {
+        use ::datafusion::arrow::datatypes::DataType;
+
+        let data_path = self.temp_dir.path().join("data.csv");
+        std::fs::write(&data_path, data).unwrap();
+
+        let df = ReaderCsv::new(
+            self.ctx.clone(),
+            odf::metadata::ReadStepCsv {
+                header: Some(true),
+                schema: Some(odf::utils::schema::parse::parse_ddl_to_odf_schema(schema).unwrap()),
+                ..Default::default()
+            },
+            &odf::schema::ToArrowSettings::default(),
+        )
+        .unwrap()
+        .read(&data_path)
+        .await
+        .unwrap()
+        .with_column(column, cast(col(column), DataType::Int64))
+        .unwrap();
+
+        self.write_df_with_ctx(self.ctx.clone(), df).await
     }
 
     /// Writes data with a dedicated writer that uses the specified session context

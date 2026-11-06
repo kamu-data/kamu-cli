@@ -321,6 +321,14 @@ impl TestHarness {
         }
     }
 
+    /// Directory of the transform run with `operation_id`
+    fn transform_run_dir(&self, operation_id: &str) -> PathBuf {
+        self.tempdir
+            .path()
+            .join("run")
+            .join(format!("transform-{operation_id}"))
+    }
+
     async fn elaborated_plan(&self, target: ResolvedDataset) -> TransformExecutionPlan {
         match self
             .transform_helper
@@ -794,6 +802,33 @@ async fn test_transform_attempts_use_own_locations() {
         .await;
     assert_matches!(res, TransformResult::Updated { .. });
     assert!(!run_dir.join("transform-attempt-b").exists());
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_group::group(containerized, engine, transform, datafusion)]
+#[test_log::test(tokio::test)]
+async fn test_transform_failed_engine_run_drops_inputs_and_keeps_logs() {
+    let harness = TestHarness::new();
+    let (_, _, deriv_target) = harness
+        .new_root_ingested_and_deriv(
+            MetadataFactory::transform()
+                .engine("datafusion")
+                .query("SELECT no_such_column FROM root")
+                .build(),
+        )
+        .await;
+
+    let plan = harness.elaborated_plan(deriv_target.clone()).await;
+    let res = harness
+        .transform_helper
+        .try_execute_transform(deriv_target, plan, "failed")
+        .await;
+
+    assert_matches!(res, Err(TransformExecuteError::EngineError(_)));
+    let run_dir = harness.transform_run_dir("failed");
+    assert!(!run_dir.join("in").exists());
+    assert!(run_dir.join("logs").exists());
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

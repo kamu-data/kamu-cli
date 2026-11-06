@@ -124,6 +124,41 @@ async fn test_rebuild_ingest_that_differs_from_stored_plan() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[tokio::test]
+async fn test_rebuild_ingest_of_plan_for_another_dataset() {
+    let harness = PollingIngestPlannerHarness::new();
+    let foo = harness.create_root_dataset(&alias("foo")).await;
+    let bar = harness.create_root_dataset(&alias("bar")).await;
+    let stored = harness.payload(&foo).await;
+
+    let res = harness.rebuild(&bar, &stored).await;
+
+    assert_matches!(res, Err(PollingIngestRebuildError::Mismatch(_)));
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[tokio::test]
+async fn test_rebuild_ingest_without_polling_source() {
+    let harness = PollingIngestPlannerHarness::new();
+    let foo = harness.create_root_dataset(&alias("foo")).await;
+    let bar = harness
+        .create_root_dataset_without_source(&alias("bar"))
+        .await;
+    // A plan pinned to a head that has no polling source
+    let stored = PollingIngestPlanPayload {
+        dataset_id: bar.dataset_handle.id.clone(),
+        expected_head: bar.head.clone(),
+        ..harness.payload(&foo).await
+    };
+
+    let res = harness.rebuild(&bar, &stored).await;
+
+    assert_matches!(res, Err(PollingIngestRebuildError::Mismatch(_)));
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[test]
 fn test_plan_payload_json() {
     let dataset_id = odf::DatasetID::new_seeded_ed25519(b"foo");

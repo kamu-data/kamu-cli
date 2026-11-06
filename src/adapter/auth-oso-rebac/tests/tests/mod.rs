@@ -10,3 +10,4 @@
 mod test_dataset_operation_guard;
 mod test_oso;
 mod test_oso_dataset_permission_checker;
+mod test_rebac_dataset_registry_facade;

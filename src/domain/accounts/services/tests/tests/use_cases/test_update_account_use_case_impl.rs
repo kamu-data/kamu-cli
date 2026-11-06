@@ -261,6 +261,53 @@ async fn test_admin_renames_other_account() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
+async fn test_node_renames_other_account() {
+    let mut outbox = MockOutbox::new();
+    UpdateAccountUseCaseImplHarness::expect_outbox_account_created(&mut outbox, 2);
+    UpdateAccountUseCaseImplHarness::expect_outbox_account_renamed(&mut outbox);
+
+    let predefined_account_config = {
+        let mut p = PredefinedAccountsConfig::new();
+        p.predefined = vec![
+            AccountConfig::test_config_from_name_with_id(odf::AccountName::new_unchecked(ADMIN))
+                .set_properties(vec![AccountPropertyName::IsAdmin]),
+            AccountConfig::test_config_from_name_with_id(odf::AccountName::new_unchecked(
+                REGULAR_USER,
+            )),
+        ];
+        p
+    };
+
+    let harness = UpdateAccountUseCaseImplHarness::builder()
+        .account_authorization_helper_provider(Default::default())
+        .maybe_predefined_accounts_config(predefined_account_config)
+        .current_account_subject(CurrentAccountSubject::anonymous(
+            AnonymousAccountReason::NoAuthenticationProvided,
+        ))
+        .principal(Principal::Node)
+        .mock_outbox(outbox)
+        .build()
+        .await;
+
+    let mut account_to_update = harness.find_account_by_name(&REGULAR_USER).await.unwrap();
+    account_to_update.account_name = odf::AccountName::new_unchecked(NEW_REGULAR_USER_NAME);
+
+    assert_matches!(
+        harness.update_use_case.execute(&account_to_update).await,
+        Ok(())
+    );
+
+    assert_matches!(
+        harness.find_account_by_name(&NEW_REGULAR_USER_NAME).await,
+        Some(account)
+            if account.account_name == odf::AccountName::new_unchecked(NEW_REGULAR_USER_NAME)
+    );
+    assert_matches!(harness.find_account_by_name(&REGULAR_USER).await, None);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
 async fn test_anonymous_try_to_rename_account() {
     let mut outbox = MockOutbox::new();
     UpdateAccountUseCaseImplHarness::expect_outbox_account_created(&mut outbox, 2);
@@ -344,6 +391,7 @@ impl UpdateAccountUseCaseImplHarness {
         account_authorization_helper_provider: AccountAuthorizationHelperTestProvider,
         mock_outbox: MockOutbox,
         current_account_subject: Option<CurrentAccountSubject>,
+        principal: Option<Principal>,
         maybe_predefined_accounts_config: Option<PredefinedAccountsConfig>,
     ) -> Self {
         let account_base_harness = AccountBaseUseCaseHarness::new(AccountBaseUseCaseHarnessOpts {
@@ -355,7 +403,12 @@ impl UpdateAccountUseCaseImplHarness {
         let mut b = dill::CatalogBuilder::new_chained(account_base_harness.intermediate_catalog());
         b.add_value(mock_outbox).bind::<dyn Outbox, MockOutbox>();
 
-        if let Some(current_account_subject) = current_account_subject {
+        if let Some(principal) = principal {
+            b.add_value(principal);
+            if let Some(current_account_subject) = current_account_subject {
+                b.add_value(current_account_subject);
+            }
+        } else if let Some(current_account_subject) = current_account_subject {
             b.add_current_account_subject(current_account_subject);
         } else {
             // The mocked authorization helper decides, whoever the principal is

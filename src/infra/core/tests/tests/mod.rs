@@ -16,6 +16,7 @@ mod test_dataset_update_kind_resolver_impl;
 mod test_datasets_filtering;
 mod test_metadata_chain_comparator;
 mod test_object_store_s3;
+mod test_provenance_service_impl;
 mod test_pull_request_planner_impl;
 mod test_push_request_planner_impl;
 mod test_remote_aliases_registry_impl;

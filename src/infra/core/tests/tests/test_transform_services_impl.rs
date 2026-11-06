@@ -8,10 +8,11 @@
 // by the Apache License, Version 2.0.
 
 use std::assert_matches;
+use std::path::PathBuf;
 use std::sync::Arc;
 
 use chrono::{DateTime, TimeZone, Utc};
-use datafusion::arrow::datatypes::{DataType, Field, Schema};
+use datafusion::arrow::datatypes::{DataType, Field, Schema, SchemaRef};
 use futures::TryStreamExt;
 use indoc::indoc;
 use kamu::domain::engine::*;
@@ -49,7 +50,7 @@ use time_source::{SystemTimeSource, SystemTimeSourceStub};
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 struct TransformTestHarness {
-    _tempdir: TempDir,
+    tempdir: TempDir,
     system_time_source: Arc<dyn SystemTimeSource>,
     system_time_stub: Arc<SystemTimeSourceStub>,
     did_generator: Arc<dyn DidGenerator>,
@@ -66,7 +67,35 @@ impl TransformTestHarness {
     pub fn new_custom<TEngineProvisioner: EngineProvisioner + 'static>(
         engine_provisioner: TEngineProvisioner,
     ) -> Self {
+        Self::new_custom_in(tempfile::tempdir().unwrap(), engine_provisioner)
+    }
+
+    /// The engine reports [`Self::engine_run_dir`] as its run directory and
+    /// advances the watermark, claiming `output_schema`
+    fn new_with_engine_run_dir(output_schema: Option<SchemaRef>) -> Self {
         let tempdir = tempfile::tempdir().unwrap();
+        let engine_run_dir = Self::engine_run_dir_in(&tempdir);
+        std::fs::create_dir(&engine_run_dir).unwrap();
+
+        let engine_provisioner =
+            MockEngineProvisioner::new().always_provision_engine_responding(move || {
+                TransformResponseExt {
+                    new_offset_interval: None,
+                    new_watermark: Some(Utc.with_ymd_and_hms(2020, 1, 1, 0, 0, 0).unwrap()),
+                    output_schema: output_schema.clone(),
+                    new_checkpoint: None,
+                    new_data: None,
+                    run_dir: Some(engine_run_dir.clone()),
+                }
+            });
+
+        Self::new_custom_in(tempdir, engine_provisioner)
+    }
+
+    fn new_custom_in<TEngineProvisioner: EngineProvisioner + 'static>(
+        tempdir: TempDir,
+        engine_provisioner: TEngineProvisioner,
+    ) -> Self {
         let datasets_dir = tempdir.path().join("datasets");
         let run_info_dir = tempdir.path().join("run");
         std::fs::create_dir(&datasets_dir).unwrap();
@@ -118,7 +147,7 @@ impl TransformTestHarness {
             .build();
 
         Self {
-            _tempdir: tempdir,
+            tempdir,
             system_time_source: catalog.get_one().unwrap(),
             system_time_stub: catalog.get_one().unwrap(),
             did_generator: catalog.get_one().unwrap(),
@@ -134,6 +163,14 @@ impl TransformTestHarness {
 
     pub fn new() -> Self {
         Self::new_custom(EngineProvisionerNull)
+    }
+
+    fn engine_run_dir(&self) -> PathBuf {
+        Self::engine_run_dir_in(&self.tempdir)
+    }
+
+    fn engine_run_dir_in(tempdir: &TempDir) -> PathBuf {
+        tempdir.path().join("engine-run")
     }
 
     pub async fn new_root(&self, name: &str, system_time: DateTime<Utc>) -> ResolvedDataset {
@@ -1737,6 +1774,97 @@ async fn test_transform_incompatible_output_schema() {
             TransformExecuteError::IncompatibleSchema(_)
         ))
     );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_transform_failed_commit_keeps_engine_run_dir() {
+    let harness = TransformTestHarness::new_with_engine_run_dir(Some(Arc::new(Schema::new(vec![
+        Field::new("unexpected", DataType::Utf8, false),
+    ]))));
+    let foo_target = harness
+        .new_root("foo", harness.system_time_source.now())
+        .await;
+    let (bar_target, _) = harness
+        .new_deriv(
+            "bar",
+            &[foo_target.get_alias().clone()],
+            harness.system_time_source.now(),
+        )
+        .await;
+    harness.append_data_block(foo_target, 3).await;
+
+    assert_matches!(
+        harness.transform(bar_target).await,
+        Err(TransformError::Execute(
+            TransformExecuteError::IncompatibleSchema(_)
+        ))
+    );
+    assert!(harness.engine_run_dir().exists());
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_transform_successful_commit_removes_engine_run_dir() {
+    let harness = TransformTestHarness::new_with_engine_run_dir(None);
+    let foo_target = harness
+        .new_root("foo", harness.system_time_source.now())
+        .await;
+    let (bar_target, _) = harness
+        .new_deriv(
+            "bar",
+            &[foo_target.get_alias().clone()],
+            harness.system_time_source.now(),
+        )
+        .await;
+    harness.append_data_block(foo_target, 3).await;
+
+    assert_matches!(
+        harness.transform(bar_target).await,
+        Ok(TransformResult::Updated { .. })
+    );
+    assert!(!harness.engine_run_dir().exists());
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_transform_rebuild_ignores_input_vocab_added_later() {
+    let harness = TransformTestHarness::new();
+    let foo_alias = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let foo_target = harness.new_root_with_push_source(&foo_alias).await;
+    harness
+        .ingest_rows(foo_target.clone(), "2020-01-01,A,1000")
+        .await;
+    let (bar_target, _) = harness
+        .new_deriv(
+            "bar",
+            std::slice::from_ref(&foo_alias),
+            harness.system_time_source.now(),
+        )
+        .await;
+    let request = harness.elaborated_request(bar_target.clone()).await;
+    let stored = TransformPlanPayload::from_request(&request);
+
+    harness
+        .append_event(
+            foo_target,
+            odf::metadata::SetVocab {
+                event_time_column: Some("date".to_string()),
+                operation_type_column: Some("operation".to_string()),
+                ..Default::default()
+            },
+        )
+        .await;
+
+    let rebuilt = harness
+        .rebuild_transform(bar_target, &stored)
+        .await
+        .unwrap();
+
+    assert_eq!(rebuilt, request);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

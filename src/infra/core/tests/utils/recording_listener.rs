@@ -14,8 +14,7 @@ use kamu::domain::*;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// Records listener calls in order: `begin`, `success`, `error` and
-/// `no_polling_source`. As a pull listener it records ingest and transform
-/// calls, not sync ones
+/// `no_polling_source`
 #[derive(Default)]
 pub struct RecordingListener {
     events: Mutex<Vec<&'static str>>,
@@ -85,7 +84,7 @@ impl PullListener for RecordingListener {
     }
 
     fn get_sync_listener(self: Arc<Self>) -> Option<Arc<dyn SyncListener>> {
-        None
+        Some(self)
     }
 }
 

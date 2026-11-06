@@ -1526,6 +1526,26 @@ async fn test_ingest_polling_unreadable_savepoint_downloads_again() {
 
 #[test_group::group(engine, ingest, datafusion)]
 #[test_log::test(tokio::test)]
+async fn test_ingest_polling_failed_staging_removes_prepared_data() {
+    let harness = IngestTestHarness::new();
+    let url = harness
+        .serve_gzipped_file("data.csv.gz", "city,population\nA,not-a-number\n")
+        .await;
+    let target = harness.create_gzipped_csv_url_polling_dataset(url).await;
+
+    assert_matches!(
+        harness.ingest(target).await,
+        Err(PollingIngestError::ExecutionError(_))
+    );
+    assert_eq!(harness.prepared_files(), Vec::<String>::new());
+    assert_eq!(harness.downloaded_files().len(), 1);
+    assert_eq!(harness.savepoints_left(), 1);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_group::group(engine, ingest, datafusion)]
+#[test_log::test(tokio::test)]
 async fn test_ingest_polling_failed_download_leaves_no_files() {
     let harness = IngestTestHarness::new();
     let url = harness
@@ -1756,7 +1776,7 @@ impl IngestTestHarness {
     }
 
     /// Serves `name` with `contents` over HTTP and returns its URL
-    async fn serve_file(&self, name: &str, contents: &str) -> url::Url {
+    async fn serve_file(&self, name: &str, contents: impl AsRef<[u8]>) -> url::Url {
         let server_dir = self.temp_dir.path().join("srv");
         std::fs::create_dir_all(&server_dir).unwrap();
         self.write_served_file(name, contents);
@@ -1767,8 +1787,63 @@ impl IngestTestHarness {
         url
     }
 
-    fn write_served_file(&self, name: &str, contents: &str) {
+    fn write_served_file(&self, name: &str, contents: impl AsRef<[u8]>) {
         std::fs::write(self.temp_dir.path().join("srv").join(name), contents).unwrap();
+    }
+
+    /// Serves `contents` gzipped as `name` over HTTP and returns its URL
+    async fn serve_gzipped_file(&self, name: &str, contents: &str) -> url::Url {
+        use std::io::Write;
+
+        let mut gzip = flate2::write::GzEncoder::new(Vec::new(), flate2::Compression::fast());
+        gzip.write_all(contents.as_bytes()).unwrap();
+        self.serve_file(name, gzip.finish().unwrap()).await
+    }
+
+    /// A root dataset polling a gzipped CSV file with `city` and `population`
+    /// from `url`
+    async fn create_gzipped_csv_url_polling_dataset(&self, url: url::Url) -> ResolvedDataset {
+        let mut source = MetadataFactory::set_polling_source()
+            .fetch(odf::metadata::FetchStep::Url(odf::metadata::FetchStepUrl {
+                url: url.to_string(),
+                event_time: Some(odf::metadata::EventTimeSourceFromSystemTime {}.into()),
+                cache: None,
+                headers: None,
+            }))
+            .read(odf::metadata::ReadStep::Csv(odf::metadata::ReadStepCsv {
+                header: Some(true),
+                schema: Some(odf::schema::DataSchema::new(vec![
+                    odf::schema::DataField::string("city"),
+                    odf::schema::DataField::i64("population"),
+                ])),
+                ..odf::metadata::ReadStepCsv::default()
+            }))
+            .build();
+        source.prepare = Some(vec![odf::metadata::PrepStep::Decompress(
+            odf::metadata::PrepStepDecompress {
+                format: odf::metadata::CompressionFormat::Gzip,
+                sub_path: None,
+            },
+        )]);
+
+        let dataset_snapshot = MetadataFactory::dataset_snapshot()
+            .name("foo")
+            .kind(odf::DatasetKind::Root)
+            .push_event(source)
+            .build();
+
+        let dataset_alias = dataset_snapshot.name.clone();
+        let stored = self.create_dataset(dataset_snapshot).await;
+        ResolvedDataset::from_stored(&stored, &dataset_alias)
+    }
+
+    /// Data the prepare steps wrote into the cache
+    fn prepared_files(&self) -> Vec<String> {
+        self.cache_entries()
+            .iter()
+            .map(|path| path.file_name().unwrap().to_string_lossy().into_owned())
+            .filter(|name| name.starts_with("prepare-"))
+            .collect()
     }
 
     fn remove_served_file(&self, name: &str) {

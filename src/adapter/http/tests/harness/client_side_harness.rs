@@ -13,6 +13,7 @@ use std::sync::Arc;
 
 use container_runtime::ContainerRuntime;
 use database_common::NoOpDatabasePlugin;
+use futures::TryStreamExt;
 use headers::Header;
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu::domain::*;
@@ -49,7 +50,7 @@ use kamu_datasets_services::testing::RacingDatasetHeadCommitter;
 use kamu_datasets_services::utils::CreateDatasetUseCaseHelper;
 use kamu_datasets_services::*;
 use messaging_outbox::{Outbox, OutboxImmediateImpl, register_message_dispatcher};
-use odf::dataset::{DatasetFactoryImpl, DatasetLayout, IpfsGateway};
+use odf::dataset::{DatasetFactoryImpl, DatasetLayout, IpfsGateway, MetadataChainExt};
 use odf::metadata::testing::MetadataFactory;
 use tempfile::TempDir;
 use time_source::SystemTimeSourceDefault;
@@ -577,6 +578,31 @@ impl ClientSideHarness {
             },
             DatasetPushMetadataRequest { new_blocks },
         )
+    }
+
+    /// The requests that push the dataset's chain without its `Seed` to a
+    /// server that has no dataset under its alias
+    pub async fn raw_new_dataset_push_requests_without_seed(
+        &self,
+        dataset_handle: &odf::DatasetHandle,
+    ) -> (DatasetPushRequest, DatasetPushMetadataRequest) {
+        let resolved_dataset = self
+            .dataset_registry()
+            .get_dataset_by_handle(dataset_handle)
+            .await;
+        let (seed_hash, _) = resolved_dataset
+            .as_metadata_chain()
+            .iter_blocks()
+            .try_collect::<Vec<_>>()
+            .await
+            .unwrap()
+            .pop()
+            .unwrap();
+
+        let (mut push_request, metadata_request) =
+            self.raw_push_requests(dataset_handle, &seed_hash).await;
+        push_request.current_head = None;
+        (push_request, metadata_request)
     }
 
     pub async fn open_raw_push_session(&self, url: &Url) -> RawPushSession {
