@@ -75,8 +75,8 @@ impl PullIngestLoop {
 
     /// Ingests until the source reports no more data, or once when
     /// `exhaust_sources` is off. An iteration that fails after others
-    /// committed is [`PullError::IngestStopped`]. The listener learns of each
-    /// committed iteration, and of the failure that ends the ingest
+    /// committed is [`PullError::IngestStopped`]. The listener learns the
+    /// result of each iteration, and the failure that ends the ingest
     async fn ingest(
         &self,
         target_handle: &odf::DatasetHandle,

@@ -373,7 +373,7 @@ impl TransformPlanner for TransformPlannerImpl {
             return Ok(TransformStatus::InputBreakingChange { breaking_inputs });
         }
 
-        // Only inputs that elaboration would consume from can have advanced
+        // Advancements are read from the elaborated request, so only inputs it consumes count
         let output_has_schema = plan.preliminary_request.schema.is_some();
         let request = match self.elaborate_preliminary(plan, None).await {
             Ok(TransformElaboration::Elaborated(plan)) => plan.request,

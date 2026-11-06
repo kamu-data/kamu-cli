@@ -1447,8 +1447,8 @@ async fn query_cities(kamu_api_server_client: &KamuApiServerClient) -> Vec<Strin
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Flows resolve variables from reconciled sets, and reconciliation follows
-/// `apply` asynchronously
+/// Waits until the variable set is `Ready`: flows resolve variables from
+/// reconciled sets only, and reconciliation follows `apply` asynchronously
 async fn wait_until_ready(ctx: &ResourceCtx, variable_set_name: &str) {
     for _ in 0..60 {
         if ctx.get_one(["get", "vs", variable_set_name]).await.phase() == "Ready" {

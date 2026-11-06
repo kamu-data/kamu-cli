@@ -192,9 +192,9 @@ Why the split:
   long ago still means the same thing; JSON as `{ "<plan_type>": payload }`.
   `LogicalPlan::dataset_id()` reads a `dataset_id` field from any payload for the store's
   per-dataset index.
-- **The definition is computed at run time.** It holds live objects — `ResolvedDataset`, a
-  `DatasetUpdateJob`, a `CompactionPlan` — reflecting the dataset as it is when the task runs,
-  not when it was queued. It is never serialized.
+- **The definition is computed at run time.** It holds what the planner computed when the task runs
+  — a `ResolvedDataset`, a `DatasetUpdateJob`, a `CompactionPlan` — not what was known when it
+  was queued. It is never serialized.
 - **The outcome is typed but opaque to the task system.** `TaskResult::empty()` and
   `TaskError::empty_recoverable()` / `empty_unrecoverable()` exist for outcomes with nothing to
   report; the flow controllers downcast results and errors with `from_task_result` /

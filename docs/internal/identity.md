@@ -19,11 +19,12 @@ caller of the process but runs as `Principal::Node`.
 
 | Variant | Meaning | Permissions |
 |---|---|---|
-| `User(AccountHandle)` | An authenticated account of a person | Decided by Oso and ReBAC as before |
+| `User(AccountHandle)` | An authenticated account of a person | Decided by Oso and ReBAC |
 | `Node` | The local node, acting in system work | Passes every check, without asking Oso; counts as admin |
 | `Anonymous` | An unauthenticated request | Public datasets only |
 
-`Principal::handle()` gives the ODF `odf::metadata::auth::PrincipalHandle`. `Node` uses the
+`Principal::handle()` gives the ODF `odf::metadata::auth::PrincipalHandle`, or `None` for
+`Anonymous`. `Node` uses the
 reserved name `node`, a resource ID seeded from it and no DID, until the node becomes an account
 resource of its own.
 
@@ -72,9 +73,8 @@ built in `app.rs`:
 
 - It is a *sibling* of the CLI catalog: the same CLI components on the same parent, with the process
   caller and `Principal::Node` instead of the caller's principal.
-- It cannot be chained from the CLI catalog. A dill catalog resolves a type across its whole chain,
-  so a second `Principal` in a child makes every resolution of it ambiguous instead of overriding
-  the parent's.
+- It cannot be chained from the CLI catalog: a child catalog cannot override its parent's
+  `Principal` ([`kamu-dill-di`](../../.claude/skills/kamu-dill-di/SKILL.md#chaining-catalogs)).
 - System singletons are resolved from it first: metrics registration, then the startup jobs, then
   the agents collected by `APIServer::new`. A singleton keeps a `CatalogWeakRef` to the catalog
   that first created it and resolves its per-call dependencies there, so its later work runs as

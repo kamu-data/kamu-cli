@@ -24,7 +24,7 @@ use odf::metadata::AsTypedBlock;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// A dataset a pull created in storage only: its `Seed` is written, it has
-/// no `HEAD` and no entry until the transfer is committed
+/// no `HEAD` and no dataset entry until the transfer is committed
 struct StoredSeed {
     dataset: Arc<dyn odf::Dataset>,
     seed_block: odf::MetadataBlockTyped<odf::metadata::Seed>,

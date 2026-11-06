@@ -291,7 +291,7 @@ async fn test_push_ingest_data_upload_adds_push_source() {
         Ok(PushIngestResult::Updated { old_head, num_blocks: 2, .. }) if old_head == seed_head
     );
 
-    // The first ingest committed the source, so one not allowed to create it still finds it
+    // The first ingest committed the source, so an ingest that may not create one finds it
     assert_matches!(
         harness.ingest_ndjson(&foo, None, false).await,
         Ok(PushIngestResult::Updated { .. })

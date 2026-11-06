@@ -295,7 +295,7 @@ impl Engine for ODFEngine {
         let target = datasets_map.get_by_handle(&request.dataset_handle);
         let io_strategy = self.get_io_strategy(target.as_ref());
 
-        // Copies of the inputs are not needed once the engine stopped, so a run that failed at
+        // Copies of the inputs are not needed once the engine has stopped, so a run that failed at
         // any step keeps only its logs and output. Declared before the container, so on every
         // exit the container stops first
         let _input_dir = OwnedDir::new(operation_dir.join("in"), "engine input directory");

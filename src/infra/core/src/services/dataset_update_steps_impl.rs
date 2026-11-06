@@ -84,7 +84,7 @@ impl DatasetUpdateStepsImpl {
         };
         match result {
             Ok(sync_result) => Ok(Some(sync_result)),
-            // The committer opens an existing target again by its ID
+            // The committer reopens an existing target by its ID, so a deleted one is not found
             Err(SyncError::DatasetNotFound(_)) => Ok(None),
             Err(e) => Err(e),
         }

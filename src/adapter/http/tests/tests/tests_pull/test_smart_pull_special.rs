@@ -430,8 +430,8 @@ impl HeadMovedConcurrentlyCase {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// A server that sends the blocks of a new data block, but none of the files
-/// they reference as the type the client asked for
+/// A server that sends the blocks of a new dataset, but none of the files
+/// they reference under the type the client asked for
 struct MissingObjectsCase {
     mislabeled: bool,
 }

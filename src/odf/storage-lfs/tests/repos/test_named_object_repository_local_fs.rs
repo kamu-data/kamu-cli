@@ -33,7 +33,7 @@ async fn test_compare_and_set_local_fs() {
     test_named_object_repository_shared::test_named_repository_compare_and_set(&repo).await;
     test_named_object_repository_shared::test_named_repository_compare_and_set_race(&repo).await;
 
-    // The lock file goes with the write or the mismatch
+    // Every write and every mismatch removes its lock file
     let entries: Vec<_> = std::fs::read_dir(tmp_dir.path())
         .unwrap()
         .map(|entry| entry.unwrap().file_name().into_string().unwrap())

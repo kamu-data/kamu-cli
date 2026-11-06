@@ -179,7 +179,8 @@ impl EngineProvisionerLocal {
         }
     }
 
-    /// One engine per CPU core when no limit is configured
+    /// Engines per private network namespace when no limit is configured: one
+    /// per CPU core
     fn default_max_concurrency() -> u32 {
         std::thread::available_parallelism()
             .map_or(1, |n| u32::try_from(n.get()).unwrap_or(u32::MAX))

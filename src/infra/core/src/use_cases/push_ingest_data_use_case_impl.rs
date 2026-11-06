@@ -142,8 +142,8 @@ impl PushIngestDataUseCaseImpl {
         })
     }
 
-    /// Commits the push source block on top of `expected_head`, or of `HEAD`
-    /// as it is now, without moving `HEAD`
+    /// Appends the push source block after `expected_head`, or after the
+    /// current `HEAD`, without moving `HEAD`
     async fn add_push_source(
         &self,
         target: &ResolvedDataset,
@@ -387,8 +387,6 @@ impl PushIngestDataUseCase for PushIngestDataUseCaseImpl {
         result
     }
 }
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

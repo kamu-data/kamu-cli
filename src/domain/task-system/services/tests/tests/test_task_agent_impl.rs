@@ -347,7 +347,7 @@ async fn test_recoverable_planning_failure_finishes_task_with_its_error() {
         MockTaskDefinitionPlanner::new(),
         MockTaskRunner::new(),
     );
-    // Unlike the empty recoverable error that other failure paths produce
+    // Distinct from the empty recoverable error other failure paths produce
     let planning_error = TaskError {
         error_type: "ProbePlanningFailed".to_owned(),
         payload: serde_json::json!({ "reason": "probe" }),

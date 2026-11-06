@@ -528,8 +528,8 @@ impl ClientSideHarness {
         alias.as_local_ref()
     }
 
-    /// Commits a data block on top of the data block `prev_data_block_hash`,
-    /// with its data and checkpoint files
+    /// Commits a data block with its data and checkpoint files, continuing the
+    /// offsets and checkpoint of the data block `prev_data_block_hash`
     pub async fn commit_add_data(
         &self,
         dataset_handle: &odf::DatasetHandle,

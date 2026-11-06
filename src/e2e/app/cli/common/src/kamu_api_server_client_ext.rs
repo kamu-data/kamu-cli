@@ -1017,8 +1017,8 @@ impl DatasetApi<'_> {
             .status()
     }
 
-    /// Advances the watermark without data; the new block records no source
-    /// state
+    /// Advances the watermark without data; the new block carries the source
+    /// state over
     pub async fn set_watermark(&self, dataset_id: &odf::DatasetID, watermark: DateTime<Utc>) {
         let response = self
             .client

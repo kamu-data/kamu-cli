@@ -2361,7 +2361,8 @@ impl CompactTestHarness {
         ResolvedDataset::from_stored(&store_result, &dataset_alias)
     }
 
-    /// Ingests one record per city, each linking a new object of 8 bytes
+    /// Ingests one record per city, each linking a new object that holds
+    /// `census_<city>`
     async fn ingest_records_with_linked_objects(&self, target: &ResolvedDataset, cities: &[&str]) {
         use std::fmt::Write;
 

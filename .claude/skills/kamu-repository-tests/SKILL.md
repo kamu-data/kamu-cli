@@ -66,10 +66,10 @@ which the repo-tests crate gets through `database-common`'s `testing` feature. S
 wiring: it serialises writers, so a race there only repeats the fixture's sequential twin.
 
 A race fixture belongs in the shared suite where every storage gives the second writer the same
-outcome. `InMemoryTransactionalMap::put` and `delete` fail the second commit on the same key; where
+outcome. `InMemoryMapWrite::put` and `delete` fail the second commit on the same key; where
 a database lets the second writer apply its change after the first instead, the in-memory
 repository writes with `overwrite` (an upsert) or `update` (an `UPDATE` of an existing row), and the
-fixture asserts that the second transaction commits. A repository that still writes such a change
+fixture asserts that the second transaction commits. A repository that writes such a change
 with `put` fails that fixture.
 
 Example:

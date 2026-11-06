@@ -67,10 +67,10 @@ Recommendation: for ease of reading, use the following format:
   no longer written to the debug log
 - `kamu pull --reset-derivatives-on-diverged-input` reports a reset derivative as updated, even when
   the transform that follows the reset has no new data to process
-- `kamu pull` of several datasets no longer pulls none of them when the remote of one is unknown
-  or cannot be reached; that dataset fails on its own
-- `kamu pull` of several datasets, some of which the account may not update, still pulls the
-  others and reports every dataset, instead of reporting only the denied ones and skipping the rest
+- `kamu pull` of several datasets still pulls the others when the remote of one is unknown or
+  cannot be reached, or when the account may not update some of them, and reports every dataset.
+  Before, an unreachable remote pulled none of them, and a denied dataset was reported alone while
+  the rest were skipped
 - `kamu pull` without `--recursive` no longer fails a requested derivative because one of its
   inputs, which it does not pull, has an ambiguous or missing source
 - A slow or unreachable remote repository no longer delays other writers to the node's database
@@ -106,8 +106,9 @@ Recommendation: for ease of reading, use the following format:
   with `FlowPreconditionsNotMet`, and a reset task that fails because its old head no longer
   matches says so instead of a generic failure
 - `kamu push` and `kamu pull` over the smart protocol report a destination that is ahead of the
-  source as ahead, and diverged histories with the number of blocks on each side, as the other
-  protocols do, instead of reporting any mismatch as diverged
+  source as ahead, and diverged histories as diverged with the number of blocks on each side, as
+  the other protocols do, instead of reporting any mismatch as diverged or, for a push, as an
+  invalid interval
 - `kamu pull` of a dataset whose pull alias names an unknown repository fails with "Repository …
   does not exist", and one whose pull alias names a remote dataset by ID fails with "Syncing remote
   dataset by ID is not yet supported: …", instead of an internal error
@@ -117,8 +118,6 @@ Recommendation: for ease of reading, use the following format:
   follows fails, the error now says that the dataset was reset to its metadata
 - A first `kamu pull` from a remote that fails, including when saving the pull alias fails, no
   longer leaves a dataset behind: the dataset appears only once the pull succeeds
-- `kamu push` over the smart protocol onto a remote with a diverged history reports the histories as
-  diverged, as the other protocols do, instead of an invalid interval
 - Update tasks that pull over the smart protocol retry a failed object download, such as an expired
   download link, instead of failing as a corrupted source
 - A malformed reply during a smart protocol transfer fails the transfer instead of crashing the
@@ -190,8 +189,8 @@ Recommendation: for ease of reading, use the following format:
   source's progress: the next poll no longer skips the source as uncacheable, or ingests again the
   files a `FilesGlob` source had already read
 - Pushing data over HTTP (`POST /ingest`) returns 400 for a derived dataset, for data that does not
-  match the dataset's schema or does not parse, and for a `Content-Type` that is not plain text, and
-  409 when the dataset's head moved concurrently, instead of a server error or a crash
+  match the dataset's schema or does not parse, and for a `Content-Type` header that is not valid
+  text, and 409 when the dataset's head moved concurrently, instead of a server error or a crash
 - The first upload into a dataset without a source no longer fails when its `odf-event-time` is
   earlier than the dataset's last change
 

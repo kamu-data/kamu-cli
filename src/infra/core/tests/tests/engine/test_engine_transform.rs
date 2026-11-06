@@ -961,7 +961,7 @@ async fn test_transform_empty_inputs() {
     // DatasetDataHelper::new(dataset);
 
     ///////////////////////////////////////////////////////////////////////////
-    // 1: Input doesn't have schema yet - elaboration reports the input
+    // 1: Input doesn't have schema yet - elaboration reports it as not pulled
     ///////////////////////////////////////////////////////////////////////////
 
     let res = harness

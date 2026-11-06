@@ -991,8 +991,8 @@ impl UpdateDatasetTaskRunnerHarness {
         })
     }
 
-    /// `register_operations` registers the ingest and transform services; it
-    /// gets the harness's temporary directory
+    /// `register_operations` registers the sync, ingest and transform
+    /// services; it gets the harness's temporary directory
     fn build(register_operations: impl FnOnce(&mut dill::CatalogBuilder, &Path)) -> Self {
         let base_use_case_harness = BaseUseCaseHarness::new(BaseUseCaseHarnessOptions::new());
 

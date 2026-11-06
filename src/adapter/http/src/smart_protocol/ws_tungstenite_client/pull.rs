@@ -257,9 +257,9 @@ impl WsSmartTransferProtocolClient {
         Ok(())
     }
 
-    /// Fails unless the server offered every requested object with its type,
-    /// which picks the repository it is stored in; one it offered but could
-    /// not deliver fails its download
+    /// Fails unless the server offered every requested object under its type,
+    /// which picks the repository it is stored in. An offered object that
+    /// cannot be delivered fails its download instead
     fn ensure_all_objects_offered(
         requested_objects: Vec<ObjectFileReference>,
         strategies: &[PullObjectTransferStrategy],

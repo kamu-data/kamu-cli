@@ -344,7 +344,7 @@ compared across the rewrite, so the derivative cannot continue.
 
 | Path | Detection | What happens |
 | --- | --- | --- |
-| `kamu pull` | elaboration fails with `InvalidInputIntervalError` | error, unless `--reset-derivatives-on-diverged-input`: then `PullDatasetUseCaseImpl` resets the derivative to metadata ([dataset-reset.md](dataset-reset.md#6-reset-to-metadata)), moves `HEAD` to the reset head through `DatasetHeadCommitter` (CAS), re-plans and elaborates once more. The pull reports one update from the head before the reset to the final head |
+| `kamu pull` | elaboration fails with `InvalidInputIntervalError` | error, unless `--reset-derivatives-on-diverged-input`: then `PullTransformJob` resets the derivative to metadata ([dataset-reset.md](dataset-reset.md#6-reset-to-metadata)), moves `HEAD` to the reset head through `DatasetHeadCommitter` (CAS), re-plans and elaborates once more. The pull reports one update from the head before the reset to the final head |
 | Transform task | elaboration fails with `InvalidInputIntervalError` | task fails with `InputDatasetCompacted`, which is unrecoverable |
 | Flow sensor | `evaluate_transform_status` returns `InputBreakingChange` (checked before new data); or an upstream flow reports a `Breaking` change | with the `Recover` rule, a reset-to-metadata flow; with `NoAction`, a warning ([flow-system.md](flow-system.md#8-sensors-and-propagation)) |
 

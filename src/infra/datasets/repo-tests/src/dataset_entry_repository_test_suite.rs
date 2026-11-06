@@ -809,7 +809,7 @@ pub async fn test_update_dataset_entry_name(catalog: &dill::Catalog) {
         assert_matches!(count_res, Ok(1));
     }
     {
-        // A second rename wins, and the name it leaves is free again
+        // Renaming again frees the name the entry leaves
         let newer_name = odf::DatasetName::new_unchecked("newer-name");
         dataset_entry_repo
             .update_dataset_entry_name(&dataset_entry.id, &newer_name)

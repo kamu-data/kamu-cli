@@ -157,7 +157,9 @@ pool arg; SQLite creates its own DB).
 > `sqlite_only = "<reason>"` (`postgres_only` for the opposite case). A fixture
 > wired to both stays in lockstep: the two wiring files list it with the same
 > options and test groups. The `e2e_storage_wiring` lint in `kamu-repo-tools`
-> (`make lint-repo`) checks all three rules.
+> (`make lint-repo`) refuses a fixture wired for one database without a marker, a
+> marker on a fixture wired for both, and mirrored wirings whose options or test
+> groups differ.
 >
 > ```rust
 > kamu_cli_execute_command_e2e_test!(

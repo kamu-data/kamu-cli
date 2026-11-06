@@ -225,7 +225,8 @@ impl ServerHarness {
         Url::from_str(format!("http://{}{}", self.local_addr, TEST_ENDPOINT).as_str()).unwrap()
     }
 
-    /// Answers with the `Debug` form of the request's [`Principal`]
+    /// An endpoint that answers with the `Debug` form of the request's
+    /// [`Principal`]
     pub fn principal_url(&self) -> Url {
         Url::from_str(format!("http://{}{}", self.local_addr, PRINCIPAL_ENDPOINT).as_str()).unwrap()
     }

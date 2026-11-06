@@ -29,7 +29,8 @@ static NODE_PRINCIPAL_RESOURCE_ID: LazyLock<odf::ResourceID> =
 pub enum Principal {
     /// An authenticated account of a person
     User(AccountHandle),
-    /// The local node, acting in system work; passes every permission check
+    /// The local node, acting in system work; passes every dataset and account
+    /// permission check, but holds no account's signing key
     Node,
     /// An unauthenticated request
     Anonymous,

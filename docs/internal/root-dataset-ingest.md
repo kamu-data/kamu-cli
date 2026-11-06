@@ -478,7 +478,7 @@ reuses the fetch savepoint only if the winning commit left the source state unch
 uncacheable and the retry is skipped as up to date unless `fetch_uncacheable` is set.
 
 The HTTP handler maps push errors to status codes: `SourceNotFound`, `InvalidDatasetKind`, a
-`Content-Type` that is not text, and the input errors (`ReadError`, `BadInputSchema`,
+`Content-Type` header that is not visible ASCII, and the input errors (`ReadError`, `BadInputSchema`,
 `IncompatibleSchema`, `ExecutionError`, `DataValidation`) → 400, unsupported media type → 415, an
 exceeded quota → 403, `NotFound` and `Access` → 404 (a dataset the caller may not write looks
 missing), a `HEAD` CAS conflict → 409, the rest → 500.

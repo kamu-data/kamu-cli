@@ -76,7 +76,6 @@ impl<'a> PullGraphDepthFirstTraversal<'a> {
         let target = self.target_resolver.resolve(request).await?;
         let local_alias = target.local_alias().clone();
 
-        // Already visited?
         if let Some(pi) = self.visited.get_mut(&local_alias) {
             tracing::debug!("Already visited - continuing");
             if referenced_explicitly {

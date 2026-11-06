@@ -71,8 +71,8 @@ impl DatasetOperationRequest {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// An operation on a target dataset. Only the operations that read other
-/// datasets carry them.
+/// An operation on a target dataset. An operation that also reads other
+/// datasets carries their handles.
 #[derive(Debug, Clone)]
 pub enum DatasetOperation {
     Transform {

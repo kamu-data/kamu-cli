@@ -408,12 +408,9 @@ impl PollingIngestServiceImpl {
         }
     }
 
-    /// Savepoint is considered valid only when it corresponds to the same
-    /// dataset, the identical fetch step and the source state of the previous
-    /// commit - this way savepoint is always based on next state increment
-    /// after the previous run. We ensure validity by naming the savepoint
-    /// based on a hash of the dataset ID, the fetch step and the source state
-    /// in flatbuffers representation.
+    /// Names the savepoint by a hash of the dataset ID, the fetch step and the
+    /// source state of the previous commit, so a run only resumes a savepoint
+    /// of the same increment
     fn get_savepoint_path(
         &self,
         dataset_id: &odf::DatasetID,

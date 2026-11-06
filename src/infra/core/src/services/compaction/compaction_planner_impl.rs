@@ -61,7 +61,7 @@ impl CompactionPlannerImpl {
             while let Some((block_hash, block)) = block_stream.try_next().await? {
                 old_num_blocks += 1;
                 match block.event {
-                    // Reset to metadata drops all data
+                    // Compacting to metadata only drops every data block
                     odf::MetadataEvent::AddData(_) | odf::MetadataEvent::ExecuteTransform(_)
                         if keep_metadata_only => {}
                     odf::MetadataEvent::AddData(add_data_event) => {
@@ -167,7 +167,7 @@ impl CompactionPlanner for CompactionPlannerImpl {
 #[derive(Default)]
 struct BatchBuilder {
     info: CompactionDataSliceBatchInfo,
-    /// Every block of the batch, data or not, newest first
+    /// Every block of the batch, with or without a data slice, newest first
     block_hashes: Vec<odf::Multihash>,
     size: u64,
     records: u64,

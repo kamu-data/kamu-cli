@@ -126,7 +126,7 @@ fn test_di_background_catalog_acts_as_node(
         *background_catalog.get_one::<Principal>().unwrap(),
         Principal::Node
     );
-    // Name scope still reads the caller
+    // Name scope reads the caller's subject, not the node
     assert_eq!(
         background_catalog
             .get_one::<CurrentAccountSubject>()

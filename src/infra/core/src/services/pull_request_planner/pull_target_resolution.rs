@@ -119,7 +119,7 @@ impl<'a> PullTargetResolver<'a> {
             return Ok(None);
         };
 
-        // Ensure new alias is identical to the old one
+        // A dataset already pulled from this remote cannot be stored under another alias
         if let Some(local_alias) = &remote.maybe_local_alias
             && handle.alias != *local_alias
         {

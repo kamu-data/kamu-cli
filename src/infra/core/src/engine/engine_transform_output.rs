@@ -43,7 +43,6 @@ impl EngineTransformOutput {
                 ));
             }
 
-            // Read output schema
             let data_metadata = ArrowReaderMetadata::load(
                 &std::fs::File::open(&data_path).int_err()?,
                 Default::default(),

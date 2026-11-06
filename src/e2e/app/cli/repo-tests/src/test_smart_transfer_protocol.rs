@@ -285,7 +285,7 @@ async fn test_smart_push_smart_pull_sequence(
             )
             .await;
 
-        // Should fail once the remote is ahead
+        // A push fails once the local head is reset behind the server's
         let local_blocks = kamu_in_push_workspace
             .list_blocks(&dataset_alias.dataset_name)
             .await;

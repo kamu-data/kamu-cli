@@ -17,8 +17,8 @@ pub trait InMemoryTransactionParticipant: Send + Sync {
     /// Starts collecting the changes of `transaction_id`
     fn begin(&self, transaction_id: TransactionId);
 
-    /// Locks the state and checks that no other transaction committed a change
-    /// the working set of `transaction_id` was based on. The state stays
+    /// Locks the state and fails if another transaction committed a change the
+    /// working set of `transaction_id` cannot be applied over. The state stays
     /// locked until the returned commit is applied or dropped, so nothing can
     /// change in between
     fn prepare_commit(

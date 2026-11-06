@@ -275,7 +275,7 @@ pub enum ObjectPushStrategy {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Push phase3: object upload progress request, sent by the server
+/// Push phase 3: object upload progress request, sent by the server
 /// periodically while the client uploads objects
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
 pub struct DatasetPushObjectsUploadProgressRequest {
@@ -288,7 +288,7 @@ pub struct DatasetPushObjectsUploadProgressRequest {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Push phase3: object upload progress response
+/// Push phase 3: object upload progress response
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
 pub struct DatasetPushObjectsUploadProgressResponse {
     pub details: ObjectsUploadProgressDetails,
@@ -311,19 +311,19 @@ pub struct ObjectsUploadProgressDetailsRunning {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Push phase4: complete handshake indication
+/// Push phase 4: complete handshake indication
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
 pub struct DatasetPushComplete {}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Push phase4: complete handshake acknowledge
+/// Push phase 4: complete handshake acknowledge
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
 pub struct DatasetPushCompleteConfirmed {}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Push phase4: response to the complete request.
+/// Push phase 4: response to the complete request.
 ///
 /// A client that predates this type reads `{"Ok": {}}` as a bare
 /// `DatasetPushCompleteConfirmed`, ignoring the unknown key.
@@ -332,7 +332,7 @@ pub type DatasetPushCompleteResponse =
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Push phase4: the pushed blocks could not be committed
+/// Push phase 4: the pushed blocks could not be committed
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
 pub enum DatasetPushCompleteError {
     Internal(TransferInternalError),
@@ -364,7 +364,7 @@ pub struct DatasetPushObjectsNotUploadedError {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Push phase4: the complete response as a client reads it, accepting the
+/// Push phase 4: the complete response as a client reads it, accepting the
 /// bare confirmation sent by a server that predates
 /// `DatasetPushCompleteResponse`, and skipping an upload progress request
 /// the server sent before it read that the upload had finished

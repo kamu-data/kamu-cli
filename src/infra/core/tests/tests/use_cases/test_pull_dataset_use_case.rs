@@ -2284,7 +2284,8 @@ impl PullUseCaseHarnessMocks {
         }
     }
 
-    /// Expects one ingest of `foo` that reports `reported_heads`.
+    /// Expects authorized ingest iterations of `foo` that report `iterations`
+    /// in order
     fn for_ingest_iterations(
         alias_foo: &odf::DatasetAlias,
         iterations: Vec<MockIngestIteration>,
@@ -2303,6 +2304,7 @@ impl PullUseCaseHarnessMocks {
             )
     }
 
+    /// Expects one authorized ingest of `foo` that reports `reported_heads`
     fn for_ingest_updated(alias_foo: &odf::DatasetAlias, reported_heads: &ReportedHeads) -> Self {
         Self::default()
             .with_permission_checker_mock(

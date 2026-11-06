@@ -55,7 +55,7 @@ impl InMemoryDatasetEntryRepository {
         entries
     }
 
-    /// Dataset names compare case-insensitively
+    /// The owner's entry named `name`, compared case-insensitively
     fn entry_by_owner_and_name<'a>(
         rows: &Rows<'a>,
         owner_id: &odf::AccountID,

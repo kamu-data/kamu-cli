@@ -264,7 +264,7 @@ impl PushDatasetUseCase for PushDatasetUseCaseImpl {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// The push itself succeeded
+/// A push that succeeded but whose push alias could not be saved
 #[derive(thiserror::Error, Debug)]
 #[error("Dataset was pushed, but its push alias was not saved")]
 struct PushAliasNotSavedError(#[source] InternalError);
