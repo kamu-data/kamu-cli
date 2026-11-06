@@ -88,12 +88,9 @@ async fn test_set_watermark_unauthorized() {
     let (_, dataset_id_foo) = odf::DatasetID::new_generated_ed25519();
 
     let harness = SetWatermarkUseCaseHarness::new(
-        MockDatasetPermissionChecker::new().expect_authorize_for(
-            DatasetPermission::Write,
-            &dataset_id_foo,
-            1,
-            false,
-        ),
+        MockDatasetPermissionChecker::new()
+            .expect_authorize_for(DatasetPermission::Write, &dataset_id_foo, 1, false)
+            .expect_readable(&dataset_id_foo, 1),
         MockDidGenerator::predefined_dataset_ids(vec![dataset_id_foo]),
     );
 

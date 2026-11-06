@@ -316,17 +316,22 @@ pub async fn test_pull_multiple_datasets_with_mixed_outcomes(mut kamu: KamuCliPu
         "${{ env.data_dir || env.workspace_dir }}",
         &kamu.workspace_path().display().to_string(),
     );
+    let add_dataset_with_visibility =
+        async |kamu: &KamuCliPuppet, name: &str, snapshot: &str, visibility: &str| {
+            kamu.execute_with_input(
+                ["add", "--stdin", "--name", name, "--visibility", visibility],
+                snapshot,
+            )
+            .await
+            .success();
+        };
     let add_dataset = async |kamu: &KamuCliPuppet, name: &str, snapshot: &str| {
-        kamu.execute_with_input(
-            ["add", "--stdin", "--name", name, "--visibility", "public"],
-            snapshot,
-        )
-        .await
-        .success();
+        add_dataset_with_visibility(kamu, name, snapshot, "public").await;
     };
 
     kamu.set_account(Some(bob));
     add_dataset(&kamu, "b", &file_source_snapshot).await;
+    add_dataset_with_visibility(&kamu, "p", &file_source_snapshot, "private").await;
 
     kamu.set_account(Some(alice));
     add_dataset(&kamu, "a", &file_source_snapshot).await;
@@ -346,15 +351,17 @@ pub async fn test_pull_multiple_datasets_with_mixed_outcomes(mut kamu: KamuCliPu
     .await
     .success();
 
-    // A dataset the account may not update is reported as not found
+    // A dataset the account can read but not update keeps the permission error,
+    // one it cannot read is reported as not found
     let gone_url_str = gone_url.as_str();
     kamu.assert_failure_command_execution(
-        ["pull", "alice/a", "bob/b", "alice/c"],
+        ["pull", "alice/a", "bob/b", "bob/p", "alice/c"],
         None,
         Some([
             r#"1 dataset\(s\) updated"#,
-            r#"Failed to update 2 dataset\(s\)"#,
-            regex::escape("Failed to pull bob/b: Dataset not found: bob/b").as_str(),
+            r#"Failed to update 3 dataset\(s\)"#,
+            regex::escape("User has no 'write' permission in dataset 'bob/b'").as_str(),
+            regex::escape("Failed to pull bob/p: Dataset not found: bob/p").as_str(),
             regex::escape(&format!(
                 "Failed to sync alice/c from {gone_url_str}: Dataset {gone_url_str}/ not found"
             ))
@@ -455,6 +462,89 @@ pub async fn test_pull_set_watermark_keeps_source_state(kamu: KamuCliPuppet) {
         None::<Vec<&str>>,
     )
     .await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// test_pull_datasets_sharing_a_fetch_step_keep_own_source_state
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_pull_datasets_sharing_a_fetch_step_keep_own_source_state(kamu: KamuCliPuppet) {
+    for dataset_name in ["test.first", "test.second"] {
+        let snapshot = indoc::formatdoc!(
+            r#"
+            kind: DatasetSnapshot
+            version: 1
+            content:
+              name: {dataset_name}
+              kind: Root
+              metadata:
+                - kind: SetPollingSource
+                  fetch:
+                    kind: FilesGlob
+                    path: {workspace_path}/data-*.csv
+                  read:
+                    kind: Csv
+                    header: true
+                    schema:
+                      fields:
+                        - name: city
+                          type: String
+                        - name: population
+                          type: Int64
+                  merge:
+                    kind: append
+            "#,
+            workspace_path = kamu.workspace_path().display(),
+        );
+        kamu.execute_with_input(["add", "--stdin"], snapshot)
+            .await
+            .success();
+    }
+    let write_file = |name: &str, city: &str| {
+        std::fs::write(
+            kamu.workspace_path().join(name),
+            format!("city,population\n{city},1000\n"),
+        )
+        .unwrap();
+    };
+
+    write_file("data-1.csv", "A");
+    kamu.assert_success_command_execution(
+        ["pull", "test.first"],
+        None,
+        Some([r#"1 dataset\(s\) updated"#]),
+    )
+    .await;
+
+    // The first dataset reads only the new file, the second one reads both
+    write_file("data-2.csv", "B");
+    kamu.assert_success_command_execution(
+        ["pull", "test.first", "test.second"],
+        None,
+        Some([r#"2 dataset\(s\) updated"#]),
+    )
+    .await;
+    kamu.assert_success_command_execution(
+        ["pull", "test.first", "test.second", "--fetch-uncacheable"],
+        None,
+        Some([r#"2 dataset\(s\) up-to-date"#]),
+    )
+    .await;
+
+    for dataset_name in ["test.first", "test.second"] {
+        kamu.assert_success_command_execution(
+            [
+                "sql",
+                "--output-format",
+                "csv",
+                "-c",
+                &format!(r#"SELECT city FROM "{dataset_name}" ORDER BY city"#),
+            ],
+            Some("city\nA\nB"),
+            None::<Vec<&str>>,
+        )
+        .await;
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

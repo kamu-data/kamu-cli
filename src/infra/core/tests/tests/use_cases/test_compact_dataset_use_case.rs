@@ -129,12 +129,9 @@ async fn test_compact_dataset_unauthorized() {
     let (_, dataset_id_foo) = odf::DatasetID::new_generated_ed25519();
 
     let harness = CompactUseCaseHarness::new(
-        MockDatasetPermissionChecker::new().expect_authorize_for(
-            DatasetPermission::Maintain,
-            &dataset_id_foo,
-            1,
-            false,
-        ),
+        MockDatasetPermissionChecker::new()
+            .expect_authorize_for(DatasetPermission::Maintain, &dataset_id_foo, 1, false)
+            .expect_readable(&dataset_id_foo, 1),
         MockDidGenerator::predefined_dataset_ids(vec![dataset_id_foo]),
     );
 
@@ -156,12 +153,9 @@ async fn test_reset_dataset_to_metadata_requires_maintain() {
     let (_, dataset_id_foo) = odf::DatasetID::new_generated_ed25519();
 
     let harness = CompactUseCaseHarness::new(
-        MockDatasetPermissionChecker::new().expect_authorize_for(
-            DatasetPermission::Maintain,
-            &dataset_id_foo,
-            1,
-            false,
-        ),
+        MockDatasetPermissionChecker::new()
+            .expect_authorize_for(DatasetPermission::Maintain, &dataset_id_foo, 1, false)
+            .expect_readable(&dataset_id_foo, 1),
         MockDidGenerator::predefined_dataset_ids(vec![dataset_id_foo]),
     );
 
@@ -187,6 +181,7 @@ async fn test_compact_dataset_mixed_authorization_outcome() {
     let harness = CompactUseCaseHarness::new(
         MockDatasetPermissionChecker::new()
             .expect_authorize_for(DatasetPermission::Maintain, &dataset_id_foo, 1, false)
+            .expect_readable(&dataset_id_foo, 1)
             .expect_authorize_for(DatasetPermission::Maintain, &dataset_id_bar, 1, true),
         MockDidGenerator::predefined_dataset_ids(vec![dataset_id_foo, dataset_id_bar]),
     );
@@ -223,7 +218,7 @@ async fn test_compact_dataset_mixed_authorization_outcome() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[tokio::test]
-async fn test_compact_dataset_commits_head_and_reports_breaking() {
+async fn test_compact_dataset_commits_head() {
     let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
     let (_, dataset_id_foo) = odf::DatasetID::new_generated_ed25519();
     let reported_heads = ReportedHeads::default();

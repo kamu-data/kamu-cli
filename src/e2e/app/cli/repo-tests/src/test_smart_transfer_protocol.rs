@@ -167,6 +167,84 @@ pub async fn test_smart_push_several_datasets_pushes_the_ones_it_can_mt(
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_smart_push_several_datasets_reports_unreachable_and_unreadable_ones(
+    mut kamu_api_server_client: KamuApiServerClient,
+) {
+    let alice = odf::AccountName::new_unchecked("alice");
+    let bob = odf::AccountName::new_unchecked("bob");
+    let unreachable_url = "ftp://example.com/c";
+
+    let token = kamu_api_server_client.auth().login_as_e2e_user().await;
+
+    let mut kamu_in_push_workspace = KamuCliPuppet::new_workspace_tmp(true).await;
+    kamu_in_push_workspace.create_account(&alice).await;
+    kamu_in_push_workspace.create_account(&bob).await;
+
+    kamu_in_push_workspace.set_account(Some(bob));
+    kamu_in_push_workspace
+        .execute_with_input(
+            ["add", "--stdin", "--name", "d", "--visibility", "private"],
+            DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR,
+        )
+        .await
+        .success();
+
+    kamu_in_push_workspace.set_account(Some(alice));
+    for dataset_name in ["a", "c"] {
+        kamu_in_push_workspace
+            .execute_with_input(
+                ["add", "--stdin", "--name", dataset_name],
+                DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR,
+            )
+            .await
+            .success();
+    }
+    kamu_in_push_workspace
+        .execute(["repo", "alias", "add", "--push", "alice/c", unreachable_url])
+        .await
+        .success();
+    kamu_in_push_workspace
+        .execute([
+            "login",
+            kamu_api_server_client.get_base_url().as_str(),
+            "--access-token",
+            token.as_str(),
+        ])
+        .await
+        .success();
+
+    // `c` has a target no sync can reach, `bob/d` is not readable for alice
+    let unreachable_failure = regex::escape(&format!(
+        "Failed to push alice/c: Unsupported protocol ftp when accessing dataset at \
+         {unreachable_url}/"
+    ));
+    kamu_in_push_workspace
+        .assert_failure_command_execution(
+            ["push", "alice/a", "alice/c", "bob/d"],
+            None,
+            Some([
+                r#"1 dataset\(s\) pushed"#,
+                r#"Failed to push 2 dataset\(s\)"#,
+                regex::escape("Failed to push bob/d: Dataset bob/d not found").as_str(),
+                unreachable_failure.as_str(),
+            ]),
+        )
+        .await;
+
+    // Only the pushed dataset gains a push alias to the server
+    pretty_assertions::assert_eq!(
+        vec!["Push".to_string()],
+        kamu_in_push_workspace
+            .get_list_of_repo_aliases(&odf::DatasetRef::from_str("alice/a").unwrap())
+            .await
+            .into_iter()
+            .map(|repo_alias| repo_alias.kind)
+            .collect::<Vec<_>>()
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Implementations
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -505,7 +583,10 @@ async fn test_smart_push_force_smart_pull_force(
                     kamu_api_server_dataset_endpoint.as_str(),
                 ],
                 None,
-                Some([r#"Failed to push 1 dataset\(s\)"#]),
+                Some([
+                    r#"Failed to push 1 dataset\(s\)"#,
+                    r#"Source and destination datasets have diverged"#,
+                ]),
             )
             .await;
 
@@ -523,6 +604,27 @@ async fn test_smart_push_force_smart_pull_force(
                 Some([r#"1 dataset\(s\) pushed"#]),
             )
             .await;
+
+        // The server now holds exactly the compacted chain
+        let compacted = local_dataset(
+            &kamu_in_push_workspace,
+            is_push_workspace_multi_tenant,
+            &dataset_alias.dataset_name,
+        )
+        .await;
+        pretty_assertions::assert_eq!(
+            kamu_in_push_workspace
+                .list_blocks(&dataset_alias.dataset_name)
+                .await
+                .into_iter()
+                .map(|b| b.block_hash)
+                .collect::<Vec<_>>(),
+            kamu_api_server_client
+                .dataset()
+                .blocks(&compacted.id)
+                .await
+                .block_hashes()
+        );
     }
 
     // 3. Pulling the dataset from the API server
@@ -543,8 +645,14 @@ async fn test_smart_push_force_smart_pull_force(
             )
             .await;
 
-        // Ingest data in pulled dataset
+        let pulled = local_dataset(
+            &kamu_in_pull_workspace,
+            is_pull_workspace_multi_tenant,
+            &dataset_alias.dataset_name,
+        )
+        .await;
 
+        // Ingest data in pulled dataset
         kamu_in_pull_workspace
             .ingest_data(
                 &dataset_alias.dataset_name,
@@ -552,12 +660,27 @@ async fn test_smart_push_force_smart_pull_force(
             )
             .await;
 
+        let ingested = local_dataset(
+            &kamu_in_pull_workspace,
+            is_pull_workspace_multi_tenant,
+            &dataset_alias.dataset_name,
+        )
+        .await;
+
         // Should fail without force flag
         kamu_in_pull_workspace
             .assert_failure_command_execution(
                 ["pull", kamu_api_server_dataset_endpoint.as_str()],
                 None,
-                Some([r#"Failed to update 1 dataset\(s\)"#]),
+                Some([
+                    r#"Failed to update 1 dataset\(s\)"#,
+                    regex::escape(&format!(
+                        "Failed to sync {} from {kamu_api_server_dataset_endpoint}: Destination \
+                         head {} is ahead of source head {} by 1 blocks",
+                        ingested.alias, ingested.head, pulled.head,
+                    ))
+                    .as_str(),
+                ]),
             )
             .await;
 
@@ -569,6 +692,21 @@ async fn test_smart_push_force_smart_pull_force(
                 Some([r#"1 dataset\(s\) updated"#]),
             )
             .await;
+
+        // The local chain is the server's again, without the local block
+        pretty_assertions::assert_eq!(
+            kamu_api_server_client
+                .dataset()
+                .blocks(&pulled.id)
+                .await
+                .block_hashes(),
+            kamu_in_pull_workspace
+                .list_blocks(&dataset_alias.dataset_name)
+                .await
+                .into_iter()
+                .map(|b| b.block_hash)
+                .collect::<Vec<_>>()
+        );
 
         if is_pull_workspace_multi_tenant {
             pretty_assertions::assert_eq!(

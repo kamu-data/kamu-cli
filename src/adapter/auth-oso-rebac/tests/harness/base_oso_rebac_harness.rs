@@ -149,6 +149,17 @@ impl BaseOsoRebacHarness {
         handle
     }
 
+    pub(crate) async fn create_public_dataset(
+        &self,
+        owner: &str,
+        name: &str,
+    ) -> odf::DatasetHandle {
+        let handle = odf::metadata::testing::handle(&owner, &name, odf::DatasetKind::Root);
+        self.create_dataset(&handle, odf::DatasetVisibility::Public)
+            .await;
+        handle
+    }
+
     /// Creates a root dataset owned by the account its alias names
     pub(crate) async fn create_dataset(
         &self,

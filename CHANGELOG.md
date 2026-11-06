@@ -50,9 +50,13 @@ Recommendation: for ease of reading, use the following format:
 
   Network and other transient failures are still retried
 - `kamu verify` with transform replay requires read permission on every input it replays; an
-  unreadable input fails with an access error before anything is replayed
+  unreadable input fails as not found before anything is replayed
 - `kamu ingest` in a multi-tenant workspace requires write permission on the dataset, as ingesting
   through the API does
+- Pulls, pushes, ingests, verification, compaction, reset and setting a watermark report a dataset
+  the account may not read as not found, so a denial does not reveal that a private dataset
+  exists. A dataset the account can read but may not change fails with the missing permission;
+  `kamu pull` used to report it as not found
 - `kamu pull` of a derivative fails with "Input dataset … has no data yet, pull it first" when an
   input has never received data, instead of reporting the derivative as up to date
 - `kamu pull --reset-derivatives-on-diverged-input` resets a derivative only for an account that

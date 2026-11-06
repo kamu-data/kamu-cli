@@ -472,21 +472,32 @@ pub async fn test_ingest_into_other_accounts_dataset_fails(mut kamu: KamuCliPupp
     kamu.create_account(&bob).await;
 
     kamu.set_account(Some(bob));
-    kamu.execute_with_input(
-        ["add", "--stdin", "--name", "bob-root"],
-        DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR,
-    )
-    .await
-    .success();
+    for (name, visibility) in [("bob-root", "private"), ("bob-public", "public")] {
+        kamu.execute_with_input(
+            ["add", "--stdin", "--name", name, "--visibility", visibility],
+            DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR,
+        )
+        .await
+        .success();
+    }
 
+    // A dataset alice cannot read is not found for her, a readable one is denied
     kamu.set_account(Some(alice));
-    kamu.assert_failure_command_execution_with_input(
-        ["ingest", "bob/bob-root", "--stdin"],
-        DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_1,
-        None,
-        Some([r#"User has no 'write' permission in dataset 'bob/bob-root'"#]),
-    )
-    .await;
+    for (name, expected_error) in [
+        ("bob/bob-root", "Dataset not found: bob/bob-root"),
+        (
+            "bob/bob-public",
+            "User has no 'write' permission in dataset 'bob/bob-public'",
+        ),
+    ] {
+        kamu.assert_failure_command_execution_with_input(
+            ["ingest", name, "--stdin"],
+            DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_1,
+            None,
+            Some([expected_error]),
+        )
+        .await;
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

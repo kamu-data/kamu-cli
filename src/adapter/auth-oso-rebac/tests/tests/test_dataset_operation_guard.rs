@@ -83,7 +83,7 @@ async fn test_target_permission_of_each_operation_by_role() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_unreadable_input_is_denied_naming_the_input() {
+async fn test_unreadable_input_is_not_found_naming_the_input() {
     let harness =
         OperationGuardHarness::new(CurrentAccountSubjectTestHelper::logged("owner")).await;
     let target = harness.create_private_dataset("owner", "target").await;
@@ -100,11 +100,39 @@ async fn test_unreadable_input_is_denied_naming_the_input() {
             replayed_inputs: vec![readable.clone(), unreadable.clone()],
         },
     ] {
-        let result = harness.authorize("owner", &target, operation).await;
+        assert_matches!(
+            harness.authorize("owner", &target, operation).await,
+            Err(DatasetPermissionError::NotFound(e))
+                if e.dataset_ref == unreadable.as_local_ref()
+        );
+    }
+}
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_denied_target_is_not_found_unless_readable() {
+    let harness =
+        OperationGuardHarness::new(CurrentAccountSubjectTestHelper::logged("owner")).await;
+    let public = harness.create_public_dataset("stranger", "public").await;
+    let private = harness.create_private_dataset("stranger", "private").await;
+
+    for operation in [
+        DatasetOperation::PollingIngest,
+        DatasetOperation::Compaction,
+    ] {
         assert_eq!(
-            Some(unreadable.as_local_ref()),
-            OperationGuardHarness::denied_dataset(&result)
+            Some(public.as_local_ref()),
+            OperationGuardHarness::denied_dataset(
+                &harness.authorize("owner", &public, operation.clone()).await
+            ),
+            "{operation:?} of a public dataset"
+        );
+        assert_matches!(
+            harness.authorize("owner", &private, operation.clone()).await,
+            Err(DatasetPermissionError::NotFound(e))
+                if e.dataset_ref == private.as_local_ref(),
+            "{operation:?} of a private dataset"
         );
     }
 }
@@ -166,7 +194,7 @@ async fn test_principal_is_the_given_one_not_the_current_account() {
         owner_harness
             .authorize("stranger", &owned, DatasetOperation::Compaction)
             .await,
-        Err(DatasetPermissionError::Access(_))
+        Err(DatasetPermissionError::NotFound(_))
     );
 
     let anonymous_harness =
@@ -267,7 +295,7 @@ async fn test_batch_keeps_request_order() {
     assert_matches!(
         results.as_slice(),
         [
-            Err(DatasetPermissionError::Access(_)),
+            Err(DatasetPermissionError::NotFound(_)),
             Ok(()),
             Err(DatasetPermissionError::NotFound(_)),
             Ok(()),

@@ -168,7 +168,8 @@ async fn test_pull_transform_rechecks_inputs_changed_after_planning() {
     );
 
     // The pull authorizes `foo`, but elaboration finds a transform reading `baz`.
-    // The recheck authorizes the transform again, its target included.
+    // The recheck authorizes the transform again, its target included, and
+    // reports the unreadable `baz` as not found.
     let mocks = PullUseCaseHarnessMocks::default()
         .with_permission_checker_mock(
             MockDatasetPermissionChecker::new()
@@ -184,8 +185,10 @@ async fn test_pull_transform_rechecks_inputs_changed_after_planning() {
                 ),
         )
         .with_transform_elaboration_mock(
-            MockTransformPlanner::new()
-                .make_expect_elaborate_transform_reading(alias_bar.clone(), vec![baz_handle]),
+            MockTransformPlanner::new().make_expect_elaborate_transform_reading(
+                alias_bar.clone(),
+                vec![baz_handle.clone()],
+            ),
         );
 
     let harness = PullUseCaseHarness::new(mocks);
@@ -201,9 +204,10 @@ async fn test_pull_transform_rechecks_inputs_changed_after_planning() {
         pull_response,
         PullResponse {
             maybe_local_ref: Some(a_local_ref),
-            result: Err(PullError::Access(_)),
+            result: Err(PullError::NotFound(e)),
             ..
         } if a_local_ref == bar.dataset_handle.as_local_ref()
+            && e.dataset_ref == baz_handle.as_local_ref()
     );
     assert_eq!(events, vec!["error"]);
 }
@@ -1485,11 +1489,17 @@ async fn test_pull_authorization_denial_still_pulls_allowed_datasets() {
 
     let mocks = PullUseCaseHarnessMocks::default()
         .with_permission_checker_mock(
-            MockDatasetPermissionChecker::new().make_expect_classify_datasets_by_allowance(
-                DatasetPermission::Write,
-                1,
-                HashSet::from_iter([alias_foo.clone(), alias_baz.clone()]),
-            ),
+            MockDatasetPermissionChecker::new()
+                .make_expect_classify_datasets_by_allowance(
+                    DatasetPermission::Write,
+                    1,
+                    HashSet::from_iter([alias_foo.clone(), alias_baz.clone()]),
+                )
+                .make_expect_classify_datasets_by_allowance(
+                    DatasetPermission::Read,
+                    1,
+                    HashSet::from_iter([alias_bar.clone()]),
+                ),
         )
         .with_polling_ingest_mock(
             MockPollingIngestService::new()
@@ -1581,11 +1591,17 @@ async fn test_pull_recursive_stops_after_depth_with_denied_job() {
     // Neither an ingest of `foo` nor a transform of `bar` is expected
     let harness = PullUseCaseHarness::new(
         PullUseCaseHarnessMocks::default().with_permission_checker_mock(
-            MockDatasetPermissionChecker::new().make_expect_classify_datasets_by_allowance(
-                DatasetPermission::Write,
-                1,
-                HashSet::new(),
-            ),
+            MockDatasetPermissionChecker::new()
+                .make_expect_classify_datasets_by_allowance(
+                    DatasetPermission::Write,
+                    1,
+                    HashSet::new(),
+                )
+                .make_expect_classify_datasets_by_allowance(
+                    DatasetPermission::Read,
+                    1,
+                    HashSet::from_iter([alias_foo.clone(), alias_bar.clone()]),
+                ),
         ),
     );
     let foo = harness.create_root_dataset(&alias_foo).await;
@@ -2501,6 +2517,8 @@ impl PullUseCaseHarnessMocks {
         } else {
             HashSet::new()
         };
+        // A denied Maintain makes the guard check that `bar` is readable
+        let read_checks_of_bar = usize::from(!maintain_granted);
         Self::default().with_permission_checker_mock(
             MockDatasetPermissionChecker::new()
                 .make_expect_classify_datasets_by_allowance(
@@ -2517,6 +2535,11 @@ impl PullUseCaseHarnessMocks {
                     DatasetPermission::Maintain,
                     1,
                     maintainable,
+                )
+                .make_expect_classify_datasets_by_allowance(
+                    DatasetPermission::Read,
+                    read_checks_of_bar,
+                    HashSet::from_iter([alias_bar.clone()]),
                 ),
         )
     }

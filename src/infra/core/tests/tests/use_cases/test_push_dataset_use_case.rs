@@ -162,7 +162,7 @@ async fn test_push_success_without_saving_alias() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[tokio::test]
-async fn test_push_unauthorized() {
+async fn test_push_unreadable_is_not_found() {
     let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
 
     let mock_permission_checker = MockDatasetPermissionChecker::new()
@@ -194,7 +194,7 @@ async fn test_push_unauthorized() {
          PushResponse {
             local_handle: Some(local_handle),
             target: Some(odf::DatasetPushTarget::Repository(repo_name)),
-            result: Err(PushError::SyncError(SyncError::Access(_))),
+            result: Err(PushError::SyncError(SyncError::DatasetNotFound(_))),
         } if local_handle == foo.dataset_handle &&
             repo_name == harness.remote_repo_name
     );
@@ -281,7 +281,7 @@ async fn test_push_multiple_success() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[tokio::test]
-async fn test_push_multiple_mixed_authorization_pushes_allowed_datasets() {
+async fn test_push_multiple_mixed_authorization_pushes_readable_datasets() {
     let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
     let alias_bar = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("bar"));
     let alias_baz = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("baz"));
@@ -334,7 +334,7 @@ async fn test_push_multiple_mixed_authorization_pushes_allowed_datasets() {
          PushResponse {
             local_handle: Some(local_handle),
             target: Some(odf::DatasetPushTarget::Repository(repo_name)),
-            result: Err(PushError::SyncError(SyncError::Access(_))),
+            result: Err(PushError::SyncError(SyncError::DatasetNotFound(_))),
         } if local_handle == baz.dataset_handle &&
             repo_name == harness.remote_repo_name
     );
@@ -343,12 +343,12 @@ async fn test_push_multiple_mixed_authorization_pushes_allowed_datasets() {
          PushResponse {
             local_handle: Some(local_handle),
             target: Some(odf::DatasetPushTarget::Repository(repo_name)),
-            result: Err(PushError::SyncError(SyncError::Access(_))),
+            result: Err(PushError::SyncError(SyncError::DatasetNotFound(_))),
         } if local_handle == foo.dataset_handle &&
             repo_name == harness.remote_repo_name
     );
 
-    // The pushed dataset gets its alias, the denied ones do not
+    // The pushed dataset gets its alias, the unreadable ones do not
     let bar_aliases = harness.get_remote_aliases(&bar).await;
     assert!(!bar_aliases.is_empty(RemoteAliasKind::Push));
     let foo_aliases = harness.get_remote_aliases(&foo).await;

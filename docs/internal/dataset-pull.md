@@ -125,9 +125,9 @@ repositories need an explicit URL form.
 
 On a TTY at default verbosity, `PrettyPullProgress` shows per-dataset progress bars. Afterwards
 the command prints how many datasets were updated and up to date, and returns a `BatchError`
-listing each failure. A not-enough-permissions failure is shown as "not found"
-(`sanitize_pull_error`), so the CLI does not reveal that a dataset exists; other access errors are
-shown as they are.
+listing each failure. A missing Read permission is shown as "not found" (`sanitize_pull_error`),
+so the CLI does not reveal that a dataset exists; other access errors, such as a missing Write on a
+dataset the account can read, are shown as they are.
 
 ---
 
@@ -268,7 +268,7 @@ The sync listener takes `SyncError` because pull and push share it.
 operation on its target (`PullPlanIterationJob::as_operation_request`), and one
 [`DatasetOperationGuard`](../../src/domain/datasets/domain/src/services/dataset_operation_guard.rs)
 call checks them all for the current account. That guard owns which permissions each operation
-needs:
+needs, and reports a dataset the account cannot read as not found:
 
 | Job | Operation | Checks |
 | --- | --- | --- |

@@ -17,7 +17,7 @@ use futures::TryStreamExt;
 use kamu::domain::*;
 use kamu::utils::datasets_filtering::filter_datasets_by_any_pattern;
 use kamu_accounts::CurrentAccountSubject;
-use kamu_datasets::{DatasetPermissionMissingError, DatasetRegistry};
+use kamu_datasets::{DatasetPermission, DatasetPermissionMissingError, DatasetRegistry};
 use odf::{DatasetRefAny, DatasetRefUnresolvedError};
 
 use super::{BatchError, CLIError, Command};
@@ -971,17 +971,23 @@ impl SyncListener for PrettySyncProgress {
 // Helpers
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Reports a dataset the account may not read as not found, so its existence
+/// stays hidden. A dataset it can read but not update keeps the permission
+/// error
 fn sanitize_pull_error(original_pull_error: PullError) -> PullError {
-    // Tricky way...
     if let PullError::Access(odf::AccessError::Unauthorized(forbidden_error)) = &original_pull_error
         && let Some(permissions_error) =
             forbidden_error.downcast_ref::<DatasetPermissionMissingError>()
     {
-        let dataset_ref = permissions_error.dataset_ref.clone();
-        return PullError::NotFound(odf::DatasetNotFoundError { dataset_ref });
+        match permissions_error.permission {
+            DatasetPermission::Read => {
+                let dataset_ref = permissions_error.dataset_ref.clone();
+                return PullError::NotFound(odf::DatasetNotFoundError { dataset_ref });
+            }
+            DatasetPermission::Write | DatasetPermission::Maintain | DatasetPermission::Own => {}
+        }
     }
 
-    // No miracle happened, giving away the error that was
     original_pull_error
 }
 

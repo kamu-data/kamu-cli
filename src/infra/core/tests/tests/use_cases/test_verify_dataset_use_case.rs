@@ -99,7 +99,7 @@ async fn test_verify_multiple_success() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[tokio::test]
-async fn test_verify_replay_denied_on_input_replays_nothing() {
+async fn test_verify_replay_with_unreadable_input_replays_nothing() {
     let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
     let alias_bar = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("bar"));
     let (_, dataset_id_foo) = odf::DatasetID::new_generated_ed25519();
@@ -124,16 +124,16 @@ async fn test_verify_replay_denied_on_input_replays_nothing() {
             .await,
         VerificationResult {
             dataset_handle: Some(dataset_handle),
-            outcome: Err(VerificationError::Access(odf::AccessError::Unauthorized(e))),
+            outcome: Err(VerificationError::DatasetNotFound(e)),
         } if dataset_handle == bar.dataset_handle
-            && e.to_string().contains(&foo.dataset_handle.alias.to_string())
+            && e.dataset_ref == foo.dataset_handle.as_local_ref()
     );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[tokio::test]
-async fn test_verify_unauthorized() {
+async fn test_verify_unreadable_is_not_found() {
     let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
     let (_, dataset_id_foo) = odf::DatasetID::new_generated_ed25519();
 
@@ -152,7 +152,7 @@ async fn test_verify_unauthorized() {
         harness.verify_dataset(ResolvedDataset::from_created(&foo)).await,
         VerificationResult {
             dataset_handle: Some(dataset_handle),
-            outcome: Err(VerificationError::Access(_)),
+            outcome: Err(VerificationError::DatasetNotFound(_)),
         } if dataset_handle == foo.dataset_handle
     );
 }
@@ -209,7 +209,7 @@ async fn test_verify_mixed_authorization_outcome() {
         response_bar,
         VerificationResult {
             dataset_handle,
-            outcome: Err(VerificationError::Access(_)),
+            outcome: Err(VerificationError::DatasetNotFound(_)),
         }
         if dataset_handle == Some(bar.dataset_handle)
     );

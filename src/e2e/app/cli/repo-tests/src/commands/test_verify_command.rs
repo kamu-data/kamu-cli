@@ -208,7 +208,7 @@ pub async fn test_verify_replay_denied_when_input_became_unreadable(mut kamu: Ka
     kamu.assert_failure_command_execution(
         ["verify", DATASET_DERIVATIVE_LEADERBOARD_NAME.as_str()],
         None,
-        Some([r#"User has no 'read' permission in dataset 'bob/player-scores'"#]),
+        Some([r#"Dataset not found: bob/player-scores"#]),
     )
     .await;
 }

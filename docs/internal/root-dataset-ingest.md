@@ -339,7 +339,8 @@ A source that yields data in batches (glob, container, EVM) reports `has_more`. 
 `PushIngestDataUseCaseImpl::execute(target, data_source, options, listener)` first authorizes
 `PushIngest` (Write) on the target for the current account through
 [`DatasetOperationGuard`](../../src/domain/datasets/domain/src/services/dataset_operation_guard.rs),
-before anything is read; a denial is `PushIngestDataError::Access`, a missing dataset `NotFound`.
+before anything is read; a denial on a readable dataset is `PushIngestDataError::Access`, a missing
+or unreadable dataset `NotFound`.
 Then:
 
 1. **Add a push source** (uploads through the HTTP endpoint only) —

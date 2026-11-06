@@ -35,7 +35,9 @@ use crate::{DatasetPermission, DatasetPermissionError};
 /// no more than `Read`.
 ///
 /// For each request, the target's error comes first, then the first failing
-/// input in input order. Errors name the dataset that failed.
+/// input in input order. Errors name the dataset that failed. A dataset the
+/// principal may not read fails as not found, so a denial does not reveal that
+/// it exists; a readable one fails with the missing permission.
 #[cfg_attr(feature = "testing", mockall::automock)]
 #[async_trait::async_trait]
 pub trait DatasetOperationGuard: Send + Sync {

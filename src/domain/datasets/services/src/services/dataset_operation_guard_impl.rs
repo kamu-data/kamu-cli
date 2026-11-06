@@ -40,7 +40,8 @@ impl DatasetOperationGuardImpl {
     }
 
     /// Classifies every distinct (permission, dataset) pair of the requests, one
-    /// call per permission
+    /// call per permission, then `Read` of every denied dataset not classified
+    /// for it yet, so a denial can tell an unreadable dataset apart
     async fn classify(
         &self,
         principal: &Principal,
@@ -68,31 +69,68 @@ impl DatasetOperationGuardImpl {
         }
 
         let mut verdicts = HashMap::new();
+        let mut denied_handles = HashMap::new();
         for (permission, handles) in handles_by_permission {
-            let response = self
-                .dataset_permission_checker
-                .classify_dataset_handles_by_allowance(
-                    principal,
-                    handles.into_values().collect(),
-                    permission,
-                )
-                .await?;
+            self.classify_permission(
+                principal,
+                permission,
+                handles.into_values().collect(),
+                &mut verdicts,
+                &mut denied_handles,
+            )
+            .await?;
+        }
 
-            for handle in response.authorized_handles {
-                verdicts.insert((permission, handle.id), Verdict::Allowed);
-            }
-            for (handle, error) in response.unauthorized_handles_with_errors {
-                use ClassifyByAllowanceDatasetPermissionError as E;
-                let verdict = match error {
-                    E::NotFound(_) => Verdict::NotFound,
-                    E::Access(_) => Verdict::Denied,
-                    e @ E::Internal(_) => return Err(e.int_err()),
-                };
-                verdicts.insert((permission, handle.id), verdict);
-            }
+        let unclassified_for_read = denied_handles
+            .into_values()
+            .filter(|handle: &odf::DatasetHandle| {
+                !verdicts.contains_key(&(DatasetPermission::Read, handle.id.clone()))
+            })
+            .collect::<Vec<_>>();
+        if !unclassified_for_read.is_empty() {
+            self.classify_permission(
+                principal,
+                DatasetPermission::Read,
+                unclassified_for_read,
+                &mut verdicts,
+                &mut HashMap::new(),
+            )
+            .await?;
         }
 
         Ok(verdicts)
+    }
+
+    async fn classify_permission(
+        &self,
+        principal: &Principal,
+        permission: DatasetPermission,
+        handles: Vec<odf::DatasetHandle>,
+        verdicts: &mut HashMap<(DatasetPermission, odf::DatasetID), Verdict>,
+        denied_handles: &mut HashMap<odf::DatasetID, odf::DatasetHandle>,
+    ) -> Result<(), InternalError> {
+        let response = self
+            .dataset_permission_checker
+            .classify_dataset_handles_by_allowance(principal, handles, permission)
+            .await?;
+
+        for handle in response.authorized_handles {
+            verdicts.insert((permission, handle.id), Verdict::Allowed);
+        }
+        for (handle, error) in response.unauthorized_handles_with_errors {
+            use ClassifyByAllowanceDatasetPermissionError as E;
+            let verdict = match error {
+                E::NotFound(_) => Verdict::NotFound,
+                E::Access(_) => {
+                    denied_handles.insert(handle.id.clone(), handle.clone());
+                    Verdict::Denied
+                }
+                e @ E::Internal(_) => return Err(e.int_err()),
+            };
+            verdicts.insert((permission, handle.id), verdict);
+        }
+
+        Ok(())
     }
 
     fn check_request(
@@ -115,22 +153,36 @@ impl DatasetOperationGuardImpl {
         permission: DatasetPermission,
         handle: &odf::DatasetHandle,
     ) -> Result<(), DatasetPermissionError> {
-        match verdicts.get(&(permission, handle.id.clone())) {
-            Some(Verdict::Allowed) => Ok(()),
-            Some(Verdict::NotFound) => {
-                Err(odf::DatasetNotFoundError::new(handle.as_local_ref()).into())
-            }
-            Some(Verdict::Denied) => Err(DatasetPermissionError::not_enough_permissions(
-                handle.as_local_ref(),
-                permission,
-            )),
-            None => Err(format!(
-                "Dataset '{}' was not classified for '{permission}'",
-                handle.alias
-            )
-            .int_err()
-            .into()),
+        match Self::verdict(verdicts, permission, handle)? {
+            Verdict::Allowed => Ok(()),
+            Verdict::NotFound => Err(odf::DatasetNotFoundError::new(handle.as_local_ref()).into()),
+            // A dataset the principal may not read is not found for it
+            Verdict::Denied => match Self::verdict(verdicts, DatasetPermission::Read, handle)? {
+                Verdict::Allowed => Err(DatasetPermissionError::not_enough_permissions(
+                    handle.as_local_ref(),
+                    permission,
+                )),
+                Verdict::NotFound | Verdict::Denied => {
+                    Err(odf::DatasetNotFoundError::new(handle.as_local_ref()).into())
+                }
+            },
         }
+    }
+
+    fn verdict<'a>(
+        verdicts: &'a HashMap<(DatasetPermission, odf::DatasetID), Verdict>,
+        permission: DatasetPermission,
+        handle: &odf::DatasetHandle,
+    ) -> Result<&'a Verdict, InternalError> {
+        verdicts
+            .get(&(permission, handle.id.clone()))
+            .ok_or_else(|| {
+                format!(
+                    "Dataset '{}' was not classified for '{permission}'",
+                    handle.alias
+                )
+                .int_err()
+            })
     }
 }
 
@@ -160,8 +212,8 @@ impl DatasetOperationGuard for DatasetOperationGuardImpl {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Outcome of one (permission, dataset) check. A denial always means a missing
-/// permission, so no error is stored; `check` rebuilds it per request.
+/// Outcome of one (permission, dataset) check. No error is stored; `check`
+/// rebuilds it per request.
 enum Verdict {
     Allowed,
     NotFound,
