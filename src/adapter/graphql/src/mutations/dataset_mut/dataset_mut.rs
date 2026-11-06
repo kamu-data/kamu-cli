@@ -201,13 +201,16 @@ impl DatasetMut {
             })),
             Err(domain::SetWatermarkError::Execution(
                 domain::SetWatermarkExecutionError::RefCASFailed(e),
-            )) => Ok(SetWatermarkResult::CasFailed(SetWatermarkCasFailed {
-                expected_head: e
-                    .expected
-                    .expect("Watermark is always committed on top of an existing head")
-                    .into(),
-                actual_head: e.actual.map(Into::into),
-            })),
+            )) => {
+                // A watermark is always committed on top of an existing head
+                let Some(expected_head) = e.expected.clone() else {
+                    return Err(e.int_err().into());
+                };
+                Ok(SetWatermarkResult::CasFailed(SetWatermarkCasFailed {
+                    expected_head: expected_head.into(),
+                    actual_head: e.actual.map(Into::into),
+                }))
+            }
             Err(
                 e @ (domain::SetWatermarkError::NotFound(_)
                 | domain::SetWatermarkError::Planning(

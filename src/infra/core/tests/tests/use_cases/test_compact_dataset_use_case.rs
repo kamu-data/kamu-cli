@@ -251,7 +251,6 @@ async fn test_compact_dataset_commits_head_and_reports_breaking() {
         Ok(CompactionResult::Success {
             old_head,
             new_head,
-            breaking: true,
             ..
         }) if old_head == foo.head && new_head == compacted_head
     );
@@ -288,7 +287,6 @@ async fn test_reset_dataset_to_metadata_commits_head() {
             .await,
         Ok(CompactionResult::Success {
             new_head,
-            breaking: true,
             ..
         }) if new_head == reset_head
     );

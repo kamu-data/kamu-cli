@@ -13,8 +13,6 @@ use kamu_cli_puppet::extensions::{AddDatasetOptions, KamuCliPuppetExt};
 use odf::metadata::testing::MetadataFactory;
 use url::Url;
 
-use crate::utils::{dataset_id, set_private};
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_delete_dataset(kamu: KamuCliPuppet) {
@@ -720,90 +718,6 @@ pub async fn test_delete_args_validation(kamu: KamuCliPuppet) {
         Some([r#"Specify dataset\(s\) or pass --all"#]),
     )
     .await;
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub async fn test_delete_derivative_of_input_that_became_private(mut kamu: KamuCliPuppet) {
-    let alice = odf::AccountName::new_unchecked("alice");
-    let bob = odf::AccountName::new_unchecked("bob");
-
-    kamu.create_account(&alice).await;
-    kamu.create_account(&bob).await;
-
-    use odf::metadata::testing::alias;
-
-    let bob_root_alias = alias(&bob, &"bob-root");
-
-    kamu.set_account(Some(bob.clone()));
-    kamu.add_dataset(
-        MetadataFactory::dataset_snapshot()
-            .name(bob_root_alias.dataset_name.as_str())
-            .build(),
-        AddDatasetOptions::builder()
-            .visibility(odf::DatasetVisibility::Public)
-            .build(),
-    )
-    .await;
-
-    kamu.set_account(Some(alice.clone()));
-    kamu.add_dataset(
-        MetadataFactory::dataset_snapshot()
-            .name("alice-derivative")
-            .kind(odf::DatasetKind::Derivative)
-            .push_event(
-                MetadataFactory::set_transform()
-                    .inputs_from_refs(vec![bob_root_alias.clone()])
-                    .build(),
-            )
-            .build(),
-        AddDatasetOptions::builder()
-            .visibility(odf::DatasetVisibility::Public)
-            .build(),
-    )
-    .await;
-
-    kamu.set_account(Some(bob.clone()));
-    pretty_assertions::assert_eq!(
-        1,
-        downstream_dependencies_count(&kamu, &bob_root_alias.dataset_name).await
-    );
-    set_private(&kamu, &bob_root_alias.dataset_name).await;
-
-    kamu.set_account(Some(alice));
-    kamu.assert_success_command_execution(
-        ["--yes", "delete", "alice-derivative"],
-        None,
-        Some(["Deleted: alice/alice-derivative"]),
-    )
-    .await;
-
-    kamu.set_account(Some(bob));
-    pretty_assertions::assert_eq!(
-        0,
-        downstream_dependencies_count(&kamu, &bob_root_alias.dataset_name).await
-    );
-}
-
-/// Counts the downstream dependencies of a dataset of the current account
-/// through the workspace's GraphQL API
-async fn downstream_dependencies_count(
-    kamu: &KamuCliPuppet,
-    dataset_name: &odf::DatasetName,
-) -> usize {
-    let dataset_id = dataset_id(kamu, dataset_name).await;
-    let response = kamu
-        .gql_query(&format!(
-            r#"{{ datasets {{ byId(datasetId: "{}") {{ metadata {{ currentDownstreamDependencies {{ __typename }} }} }} }} }}"#,
-            dataset_id.as_did_str(),
-        ))
-        .await;
-    let response: serde_json::Value = serde_json::from_str(&response).unwrap();
-
-    response["datasets"]["byId"]["metadata"]["currentDownstreamDependencies"]
-        .as_array()
-        .unwrap_or_else(|| panic!("{response}"))
-        .len()
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

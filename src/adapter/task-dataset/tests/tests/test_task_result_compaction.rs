@@ -60,7 +60,6 @@ fn test_compaction_result_json_is_stable() {
                 "new_head": Fixture::new_head().to_string(),
                 "old_num_blocks": 5,
                 "new_num_blocks": 2,
-                "breaking": true,
             }
         }),
         serde_json::to_value(Fixture::expected_success()).unwrap(),
@@ -95,7 +94,6 @@ impl Fixture {
             new_head: Self::new_head(),
             old_num_blocks: 5,
             new_num_blocks: 2,
-            breaking: true,
         }
     }
 

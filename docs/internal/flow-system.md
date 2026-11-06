@@ -494,9 +494,9 @@ source is `UpstreamFlow` and dispatch it with their own binding as input:
 | --- | --- |
 | Ingest | `Updated` → `NewData` from the result's `increment`. First, if `has_more` and the configuration sets `fetch_next_iteration`, runs the same binding again with `IterationFinished`. `UpToDate` → nothing |
 | Transform | `Updated` → `NewData` from the result's `increment`. `UpToDate` → nothing |
-| Compact | `Success` with `breaking` → `Breaking`; `NothingToDo`, or a `Success` that is not breaking → nothing |
+| Compact | `Success` → `Breaking`; `NothingToDo` → nothing |
 | Reset | head changed → `Breaking` |
-| Reset to metadata | `Success` with `breaking` → `Breaking`, then re-activates the dataset's own sensor, so a derivative with a reactive trigger schedules its rebuild from its inputs immediately, under that trigger's batching rule, instead of waiting for the next input change |
+| Reset to metadata | `Success` → `Breaking`, then re-activates the dataset's own sensor, so a derivative with a reactive trigger schedules its rebuild from its inputs immediately, under that trigger's batching rule, instead of waiting for the next input change |
 
 The task computes the `increment` itself, and every `Updated` result carries one.
 

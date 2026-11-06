@@ -119,7 +119,6 @@ impl CompactionListener for CompactionProgress {
                 new_head: _,
                 old_num_blocks,
                 new_num_blocks,
-                breaking: _,
             } => {
                 self.curr_progress.finish_with_message(
                     self.spinner_message(

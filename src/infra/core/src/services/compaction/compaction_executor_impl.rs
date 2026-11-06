@@ -238,7 +238,6 @@ impl CompactionExecutor for CompactionExecutorImpl {
             new_head,
             old_num_blocks: plan.old_num_blocks,
             new_num_blocks,
-            breaking: true,
         })
     }
 }

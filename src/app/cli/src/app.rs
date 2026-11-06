@@ -366,16 +366,10 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
             }
             .await;
 
-            match (&command_run_result, outbox_result) {
-                (_, Ok(())) => {}
-                (Ok(()), Err(e)) => return Err(e.into()),
-                (Err(_), Err(e)) => {
-                    tracing::error!(error = ?e, error_msg = %e, "Outbox processing failed after a failed command");
-                }
-            }
+            command_with_outbox_result(command_run_result, outbox_result)?;
+        } else {
+            command_run_result?;
         }
-
-        command_run_result?;
 
         let post_command_actions = cli_catalog.get_one::<PostCommandActions>().int_err()?;
         for action in post_command_actions.take() {
@@ -430,6 +424,23 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
     }
 
     command_result
+}
+
+/// The result of a command once the Outbox was processed after it: the
+/// command's own error wins, and an Outbox failure fails a command that
+/// succeeded
+fn command_with_outbox_result(
+    command_result: Result<(), CLIError>,
+    outbox_result: Result<(), InternalError>,
+) -> Result<(), CLIError> {
+    match (command_result, outbox_result) {
+        (command_result, Ok(())) => command_result,
+        (Ok(()), Err(e)) => Err(e.into()),
+        (Err(command_error), Err(e)) => {
+            tracing::error!(error = ?e, error_msg = %e, "Outbox processing failed after a failed command");
+            Err(command_error)
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1348,6 +1359,47 @@ fn configure_output_format(args: &cli::Cli, workspace_svc: &WorkspaceService) ->
 struct Guards {
     _appender: Option<tracing_appender::non_blocking::WorkerGuard>,
     _perfetto: Option<tracing_perfetto::FlushGuard>,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[cfg(test)]
+mod tests {
+    use std::assert_matches;
+
+    use internal_error::InternalError;
+
+    use super::command_with_outbox_result;
+    use crate::CLIError;
+
+    #[test]
+    fn test_outbox_failure_fails_a_successful_command() {
+        let result = command_with_outbox_result(Ok(()), Err(InternalError::new("outbox")));
+
+        assert_matches!(
+            result,
+            Err(CLIError::CriticalFailure { source, .. }) if format!("{source:?}").contains("outbox")
+        );
+    }
+
+    #[test]
+    fn test_command_error_wins_over_outbox_failure() {
+        let result = command_with_outbox_result(
+            Err(CLIError::usage_error("command")),
+            Err(InternalError::new("outbox")),
+        );
+
+        assert_matches!(result, Err(CLIError::UsageError(_)));
+    }
+
+    #[test]
+    fn test_outbox_success_keeps_the_command_result() {
+        assert_matches!(command_with_outbox_result(Ok(()), Ok(())), Ok(()));
+        assert_matches!(
+            command_with_outbox_result(Err(CLIError::usage_error("command")), Ok(())),
+            Err(CLIError::UsageError(_))
+        );
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

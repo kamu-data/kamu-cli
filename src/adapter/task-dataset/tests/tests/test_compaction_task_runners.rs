@@ -351,7 +351,6 @@ impl CompactionTaskRunnersHarness {
             new_head: new_head.clone(),
             old_num_blocks: 2,
             new_num_blocks: 1,
-            breaking: true,
         }
     }
 }

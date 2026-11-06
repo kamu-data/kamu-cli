@@ -184,7 +184,7 @@ count.
    by its existing hash, and the merged file, whose hashes and size are computed on commit. Every
    block gets a new `system_time` and `prev_block_hash`, so every hash after the `Seed` changes.
    Blocks are written with `update_block_ref: false`.
-3. **Report.** `Success { old_head, new_head, old_num_blocks, new_num_blocks, breaking }`. The
+3. **Report.** `Success { old_head, new_head, old_num_blocks, new_num_blocks }`. The
    executor never moves `HEAD`. The run directory is removed when `execute` returns, with whatever
    a failed run left in it.
 
