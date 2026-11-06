@@ -158,11 +158,11 @@ stage(df?, opts)                                   commit(staged)
  └─ compute_offset_and_watermark, linked objects
 ```
 
-`write` is `stage` followed by `commit`; `write_watermark` commits an `AddData` that carries no data,
-only a watermark and optionally a source state (used by `SetWatermarkExecutorImpl` on behalf of
-`SetWatermarkUseCase`, not by ingest, which passes the previous source state on so the polling
-source resumes where it was). The executor moves `HEAD` through `DatasetHeadCommitter`; if
-`HEAD` moved after planning it fails with `SetWatermarkExecutionError::RefCASFailed`.
+`write` is `stage` followed by `commit`. `write_watermark` commits an `AddData` that carries no data,
+only a watermark and optionally a source state. Ingest does not use it; `SetWatermarkExecutorImpl`
+(behind `SetWatermarkUseCase`) does, passing the previous source state on so the polling source
+resumes where it was. That executor moves `HEAD` through `DatasetHeadCommitter` and fails with
+`SetWatermarkExecutionError::RefCASFailed` if `HEAD` moved after planning.
 
 ### 4.3 What `stage` decides
 
@@ -236,14 +236,15 @@ A polling ingest has three steps, the same for every caller:
 
 Planning fails with `SourceNotDefined` when the dataset has no `SetPollingSource`.
 `PollingIngestPlanPayload` is the plan's stored form, for a caller that stores a plan before
-running it (only tests do): the dataset, the expected head, the
-`SetPollingSource` block and the source state, offset and watermark it found.
-`rebuild_ingest` turns it back into a plan, failing with `HeadMoved` when the head is no longer the
-expected one and with `Mismatch` when the facts differ, which only a defect can cause.
+running it (only tests do). It records the expected head and what planning found there, never the
+writer state itself. `rebuild_ingest` turns it back into a plan, failing with `HeadMoved` when the
+head is no longer the expected one and with `Mismatch` when what it finds differs, which only a
+defect can cause.
 
 Environment variable values are never part of a plan or a task definition. `resolve_env_vars` is
 their only path: it returns an empty map unless secrets encryption is configured and enabled
-(`SecretsEncryptionConfig::is_enabled`), and `IngestEnvVars` prints keys only.
+(`SecretsEncryptionConfig::is_enabled`) and a `DatasetEnvVarResolver` is registered, and
+`IngestEnvVars` prints keys only.
 
 `PollingIngestServiceImpl::ingest` runs one **iteration**:
 
@@ -261,9 +262,8 @@ their only path: it returns an empty map unless secrets encryption is configured
    coerces an integer or string `event_time` to a timestamp, but only when the read step has no
    explicit schema.
 6. **Stage and commit** through the writer with the fetch's new source state and event time.
-7. Return `Updated { old_head, new_head, has_more, uncacheable, increment, new_source_state,
-   metadata_state }`, where `metadata_state` is the advanced writer state. `increment` counts the
-   blocks, records and watermark between the two heads.
+7. Return `Updated` with both heads, `has_more`, the `increment` between the heads (blocks,
+   records, watermark) and the advanced writer state, so a caller that loops need not plan again.
 
 The working directory `RunInfoDir/ingest-<operation_id>/` is removed after a successful iteration
 and kept after a failed one, whose errors may point at logs in it. The service never moves
@@ -278,7 +278,7 @@ cannot be decrypted, fails the fetch. A substituted value is inserted as it is: 
 it is not expanded. With secrets encryption enabled (`DatasetKeyValueServiceImpl`), names resolve
 from the dataset's env vars only; without it (`DatasetKeyValueServiceSysEnv`), any supplied dataset
 env vars are checked first and the process environment is the fallback, which in practice means the
-process environment, since no dataset env var service is wired in that mode.
+process environment, since `resolve_env_vars` supplies none in that mode.
 
 | Fetch step | Source state written | `has_more` | Notes |
 | --- | --- | --- | --- |
@@ -293,7 +293,7 @@ process environment, since no dataset env var service is wired in that mode.
 `PollingSourceState` understands only the `odf/etag` and `odf/last-modified` kinds; any other kind
 is ignored by the fetch step, which then fetches as if there were no previous state. The source
 state is read from the latest `AddData` only, so any `AddData` written without one (for example by
-`set-watermark`) makes the source look stateless as well. The `cache` (`SourceCaching`) field of
+a push ingest into the same dataset) makes the source look stateless as well. The `cache` (`SourceCaching`) field of
 `Url` and `FilesGlob` fetch steps is not consulted.
 
 ### 5.3 Savepoints
@@ -337,7 +337,7 @@ A source that yields data in batches (glob, container, EVM) reports `has_more`. 
 ### 6.1 Call sequence
 
 `PushIngestDataUseCaseImpl::execute(target, data_source, options, listener)` first authorizes
-`PushIngest` (Write) on the target for the current account through
+`PushIngest` (Write) on the target for the current `Principal` through
 [`DatasetOperationGuard`](../../src/domain/datasets/domain/src/services/dataset_operation_guard.rs),
 before anything is read; a denial on a readable dataset is `PushIngestDataError::Access`, a missing
 or unreadable dataset `NotFound`.
@@ -366,9 +366,9 @@ Then:
 4. **Finalize** — move `HEAD` from `old_head` to `new_head` through `DatasetHeadCommitter` and post
    `DatasetExternallyChangedMessage::ingest_http`.
 
-A lost CAS in step 4 is
-`PushIngestError::CommitError(CommitError::MetadataAppendError(AppendError::RefCASFailed))` with
-the expected and actual heads; nothing is committed.
+A lost CAS in step 4 is `PushIngestDataError::Execution` wrapping
+`CommitError::MetadataAppendError(AppendError::RefCASFailed)` with the expected and actual heads;
+`HEAD` stays where the winner put it and the appended blocks stay unreferenced.
 
 The executor reports `begin` and progress to the listener; the use case reports `success` or `error`
 once, after step 4 or the failure ([dataset-pull.md](dataset-pull.md#63-listeners)).
@@ -401,8 +401,8 @@ schema.
 
 | Entry point | Path | Authorization | Transaction scope | Moves `HEAD` | Messages |
 | --- | --- | --- | --- | --- | --- |
-| `kamu pull <root>` | `PullCommand` → `PullDatasetUseCaseImpl` → `PullIngestLoop` → `PollingIngestService` | write check per plan iteration | short transactions: pull planning; ingest planning with env-var lookup; each ref update | after each iteration | `DatasetReferenceMessage` from the ref update |
-| Ingest flow | `FlowControllerIngest` → `LogicalPlanDatasetUpdate` → `UpdateDatasetTaskPlanner` → `UpdateDatasetTaskRunner` → `PollingIngestService` (one iteration) | system | ingest planning with env-var lookup in one transaction, when the task runs; fetch and write outside; ref update in its own | once | `DatasetReferenceMessage`; task and flow progress messages |
+| `kamu pull <root>` | `PullCommand` → `PullDatasetUseCaseImpl` → `PullIngestLoop` → `PollingIngestService` | Write, per pull iteration ([dataset-pull.md](dataset-pull.md#7-authorization)) | pull planning in its own; then [§5.1](#51-call-sequence) per ingest iteration | after each iteration | `DatasetReferenceMessage` from the ref update |
+| Ingest flow | `FlowControllerIngest` → `LogicalPlanDatasetUpdate` → `UpdateDatasetTaskPlanner` → `UpdateDatasetTaskRunner` → `PollingIngestService` (one iteration) | none; the task runs as `Principal::Node` | [§5.1](#51-call-sequence), when the task runs | once | `DatasetReferenceMessage`; task and flow progress messages |
 | `kamu ingest <root>` | `IngestCommand` → `PushIngestDataUseCase::execute` per file | Write, in the use case; the command rejects derivative datasets and datasets with a pull alias | the command's | once per file | `DatasetReferenceMessage`, `DatasetExternallyChangedMessage` |
 | `POST /{dataset}/ingest` | `dataset_ingest_handler` → `PushIngestDataUseCase::execute` | Write, in the use case; upload token must belong to the caller | the whole request (`#[transactional_handler]`) | once | as above |
 | Collections, versioned files | `UpdateCollectionEntriesUseCaseImpl`, `UpdateVersionedFileUseCaseImpl` → `PushIngestDataUseCase` | the calling use case, then Write again in the push ingest use case | the caller's | once | as above |
@@ -421,8 +421,9 @@ Ingest separates **appending blocks** from **publishing them**:
    `update_block_ref: false`. Data files and blocks land in storage; `HEAD` does not move, so no
    reader sees them yet.
 2. The caller moves `HEAD` from `old_head` through `DatasetHeadCommitter`, a CAS in the caller's
-   transaction. This goes through `DatasetReferenceServiceImpl::set_reference`, which writes the
-   reference row and posts `DatasetReferenceMessage::Updated` in the same transaction; consumers
+   transaction. The chain's database-backed reference repository calls
+   `DatasetReferenceServiceImpl::set_reference`, which writes the reference row and posts
+   `DatasetReferenceMessage::Updated` in the same transaction; consumers
    write the storage-level reference, index the new blocks (which feeds the dependency graph), and
    update statistics and search ([outbox.md](outbox.md)).
 
@@ -448,40 +449,33 @@ Consequences:
 ## 9. Errors
 
 `PollingIngestError` and `PushIngestError` share the input errors (`ReadError`,
-`BadInputSchema`, `IncompatibleSchema`, `MergeError`, `ExecutionError`, `DataValidation`),
-`EngineError`, `CommitError` and `Internal`. Only polling has fetch errors (`NotFound`,
-`Unreachable`, `ProcessError`, `ImagePull`, `PipeError`), `EngineProvisioningError`, and template
-and parameter errors. Only push has `UnsupportedMediaType`, `QuotaExceeded` and `Access`. Push
-planning fails separately with `PushIngestPlanningError` (`SourceNotFound`, `HeadNotFound`,
-`InvalidDatasetKind`, `UnsupportedMediaType`, `Internal`).
+`BadInputSchema`, `IncompatibleSchema`, `MergeError`, `ExecutionError`, `DataValidation`) and the
+engine and commit errors. Only
+polling has fetch, provisioning, template and parameter errors; only push has the media type,
+quota and access errors. Push planning fails separately with `PushIngestPlanningError`.
 
 Each error type says whether a retry could succeed: `PollingIngestError::is_recoverable` and
 `PollingIngestPlanError::is_recoverable`, built on the same methods of `EngineError` and
 `EngineProvisioningError`. Errors caused by the source definition or by the fetched data are not
-recoverable: a retry resumes from the same savepoint and fails the same way. That covers template
-and parameter errors, an invalid fetch step (a templated URL that does not parse, a URL scheme or
-fetch kind this build does not support, an invalid header or MQTT port, a files glob ordered other
-than by name or matching a file name that is not UTF-8, an Ethereum source with neither a node URL
-nor a chain ID, an event time that cannot be taken from the source), read, schema, merge,
-execution and validation errors, an invalid preprocess query, an unsupported engine, and a
-dataset without a polling source. Fetch, process, image, commit and internal errors are
-recoverable. The update task maps the flag to its
-outcome ([task-system.md](task-system.md#71-update-dataset)).
+recoverable, because a retry resumes from the same savepoint and fails the same way: template and
+parameter errors, an invalid fetch step (`InvalidFetchStep`), read, schema, merge, execution and
+validation errors, an invalid preprocess query, an unsupported engine, and a dataset without a
+polling source. Fetch, process, image, commit and internal errors are recoverable. The update task
+maps the flag, and the failures to move `HEAD`, to its outcome
+([task-system.md](task-system.md#71-update-dataset)).
 
 The writer reports a value that does not parse or cast to its column's type as `ExecutionError`,
-including CSV and JSON values the readers decode only when the data is written. A CAS conflict when
-moving `HEAD` after a successful ingest becomes the recoverable task error `DatasetCommitError` →
-`HeadMoved`; any other failure to move `HEAD` is returned from the runner as an internal error,
-which the task agent also records as a recoverable failure. The retry plans from the new head. It
-reuses the fetch savepoint only if the winning commit left the source state unchanged, as
-`set-watermark` does; if the winner was a push, which writes no source state, the source now looks
-uncacheable and the retry is skipped as up to date unless `fetch_uncacheable` is set.
+including CSV and JSON values the readers decode only when the data is written.
+
+A retry after another writer moved `HEAD` plans from the new head. It reuses the fetch savepoint
+only if the winning commit left the source state unchanged, as `set-watermark` does; if the winner
+was a push, which writes no source state, the source now looks uncacheable and the retry is
+skipped as up to date unless `fetch_uncacheable` is set.
 
 The HTTP handler maps push errors to status codes: `SourceNotFound`, `InvalidDatasetKind`, a
-`Content-Type` header that is not visible ASCII, and the input errors (`ReadError`, `BadInputSchema`,
-`IncompatibleSchema`, `ExecutionError`, `DataValidation`) → 400, unsupported media type → 415, an
-exceeded quota → 403, `NotFound` and `Access` → 404 (a dataset the caller may not write looks
-missing), a `HEAD` CAS conflict → 409, the rest → 500.
+`Content-Type` header that is not visible ASCII, and the input errors other than `MergeError` →
+400, unsupported media type → 415, an exceeded quota → 403, `NotFound` and `Access` → 404 (a
+dataset the caller may not write looks missing), a `HEAD` CAS conflict → 409, the rest → 500.
 
 ---
 
@@ -503,8 +497,9 @@ hours. A long-running server does not evict while it runs.
 
 ### Testing
 
-- Writer and merge strategy tests live in `src/infra/ingest-datafusion/tests/`; polling planner,
-  polling and push service tests in `src/infra/core/tests/tests/ingest/`; CLI scenarios in
+- Merge strategy and reader tests live in `src/infra/ingest-datafusion/tests/`; writer, fetch,
+  prepare, polling planner, polling and push service tests in `src/infra/core/tests/tests/ingest/`;
+  CLI scenarios in
   `src/e2e/app/cli/repo-tests/src/commands/` (`test_ingest_command.rs`, `test_pull_command.rs`),
   wired for SQLite only when they check only CLI output.
 - Server-side ingest flows run end to end in `src/e2e/app/cli/repo-tests/src/test_flow.rs` on SQLite

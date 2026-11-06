@@ -288,10 +288,12 @@ run_while_has_tasks(): loop { held = has_held_back_messages(); drain; if !held b
 ```
 
 Waking is described in [wakeup-listeners.md](wakeup-listeners.md) (channel `outbox_messages_ready`).
-The same drain is callable as `run_while_has_tasks()`. The CLI calls it after commands that need it,
-including failed ones, since they may have committed work in transactions of their own. The HTTP E2E
-middleware calls it after every successful mutating request, so E2E tests observe consumers' effects
-synchronously. A `run_lock` keeps these entrances from overlapping with the main loop.
+The same drain is callable as `run_while_has_tasks()`. With a database configured, the CLI calls it
+after every command that `command_needs_outbox_processing` selects, whether the command succeeded or
+failed: a failed command may still have committed work in transactions of its own. The HTTP E2E
+middleware calls it after every successful mutating request (a REST `POST` or a GraphQL
+`mutation`), so E2E tests observe
+consumers' effects synchronously. A `run_lock` keeps these entrances from overlapping with the main loop.
 
 `run_while_has_tasks()` does not stop at the first empty iteration. Committed messages can be held
 back while an older transaction runs ([§6](#reading-below-the-oldest-running-transaction)), anywhere

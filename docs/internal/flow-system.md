@@ -498,8 +498,6 @@ source is `UpstreamFlow` and dispatch it with their own binding as input:
 | Reset | head changed → `Breaking` |
 | Reset to metadata | `Success` → `Breaking`, then re-activates the dataset's own sensor, so a derivative with a reactive trigger schedules its rebuild from its inputs immediately, under that trigger's batching rule, instead of waiting for the next input change |
 
-The task computes the `increment` itself, and every `Updated` result carries one.
-
 Breaking changes therefore cascade: with `Recover`, each downstream dataset resets to metadata in
 turn, which dispatches `Breaking` again. With `NoAction`, the downstream transform will next fail
 with the task error `InputDatasetCompacted`, which is unrecoverable
@@ -778,7 +776,7 @@ Dataset mutations live under `mutations/flows_mut/`. Each leaf requires a logged
 | `runs.triggerIngestFlow(ingestConfigInput?)` | `FlowRunService::run_flow_manually` | root dataset with a polling source |
 | `runs.triggerTransformFlow` | same | derivative with a transform, every input readable by the caller |
 | `runs.triggerCompactionFlow(compactionConfigInput?)` | same | root; config validated |
-| `runs.triggerResetFlow(resetConfigInput?)` | same | with a reset config: the dataset has a head, a custom new head must be a stored block and differ from the current head, and an expected old head must be the current head; the old head defaults to the current one |
+| `runs.triggerResetFlow(resetConfigInput?)` | same | only with a reset config: the dataset has a head; a custom new head is a stored block other than the current head; an expected old head is the current head. Without an expected old head, the current head is passed |
 | `runs.triggerResetToMetadataFlow` | same | — |
 | `runs.cancelFlowRun(flowId)` | `FlowRunService::cancel_flow_run` | the flow belongs to this dataset |
 | `triggers.setTrigger(datasetFlowType, triggerRuleInput, triggerStopPolicyInput)` | `FlowTriggerService::set_trigger` | schedules only for ingest and hard compaction, reactive rules only for transform; dataset kind; valid cron or batching; valid stop policy; flow preconditions |

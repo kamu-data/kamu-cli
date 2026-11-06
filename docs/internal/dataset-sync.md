@@ -126,7 +126,8 @@ lag behind the database. A dataset entry left without `HEAD` by an interrupted c
 the reference carries an alias.
 
 - `PullLocalTarget::resolve_sync_target` reads the destination of a planned pull; it is `None` for
-  an existing dataset deleted since planning.
+  an existing dataset deleted since planning, and `Existing` for a dataset to create that appeared
+  since planning.
 - `LocalSyncHelper::build_request` (`src/infra/core/tests/utils/`) does the same from a local
   reference, for tests; it never opens the source.
 - `SyncRequestBuilder::build_sync_request(src, dst, create_dst_if_not_exists)` builds a push to a
@@ -155,7 +156,7 @@ earlier failed pull, so the next pull continues into it.
 
 | Option | Effect |
 | --- | --- |
-| `trust_source` | skip block validation and hash recomputation; defaults to `true` for a push, whose source is local, and `false` for a pull |
+| `trust_source` | Simple protocol only: skip block validation and hash recomputation; defaults to `true` for a push, whose source is local, and `false` for a pull. The Smart protocol ignores it: the receiving side always validates |
 | `create_if_not_exists` | allow creating the destination (default on) |
 | `force` | accept a destination that is ahead or has diverged, and replace its history; never disables the CAS on `HEAD` |
 | `dataset_visibility` | visibility of a dataset created by the sync (default private) |
@@ -382,7 +383,8 @@ Server-side details:
   (`SetRefCheckRefMode::Explicit`). Either way a head moved after initiation fails the push with
   `UpdatedConcurrently`. A server without this check compares against `HEAD` at commit time under
   `force`. A batch starting with a `Seed` into an existing dataset, with `force` or without a
-  `HEAD`, is refused with `SeedBlockOverwriteRestricted` when that `Seed` is of another dataset.
+  `HEAD`, is refused with `SeedBlockOverwriteRestricted` when that `Seed` has another dataset ID
+  or kind (`SeedConflict`, shared with the pull client).
 - While objects upload, the server asks for progress every
   `protocol.smartTransferProtocol.uploadProgressInterval` of the node configuration
   ([config reference](../../resources/config-reference.md#smarttransferprotocolconfig)).
@@ -408,7 +410,7 @@ hash as it inserts it. On push the server's `PUT` endpoint verifies the hash; a 
 upload is not re-hashed by the server.
 
 Before the blocks are committed, the side that receives them checks that every object they
-reference is present: the pull client fails with `CorruptedSource` when the server did not offer
+reference is present: the pull client fails with `Corrupted` when the server did not offer
 one, and the push server, before its commit transaction, fails the push with `ObjectsNotUploaded`
 when the client did not upload one, so `HEAD` never points at a block whose objects are missing.
 
@@ -455,7 +457,7 @@ calls it with no transaction held:
 | Pull URL of `repo/name` or `repo/account/name` | `odf+` repository: the repository's `odf+http(s)` URL plus the account (asked from the server's `info` and `accounts/me` when the reference has none and the server is multi-tenant) and the name; other repositories: the repository URL joined with the alias |
 | Pull URL of a URL | the URL itself, with a trailing `/` |
 | Pull URL of an ID | not supported |
-| Push target | `--to` URL as given; otherwise the dataset's single push alias, if it is a URL alias (a `repo/name` push alias is skipped; several aliases are `AmbiguousAlias`); otherwise the only configured repository (none is `EmptyRepositoryList`, several are `AmbiguousRepository`). For a repository, the account comes from the server as above, and the remote dataset name from a lookup of the dataset ID on the server, falling back to the local name |
+| Push target | a `--to` URL as given; a `--to` alias or repository names the repository. Without `--to`: the dataset's single push alias, if it is a URL alias (a `repo/name` push alias is skipped; several aliases are `AmbiguousAlias`); otherwise the only configured repository (none is `EmptyRepositoryList`, several are `AmbiguousRepository`). For a repository, the account and dataset name are those of the `--to` alias when it gives them; otherwise the account comes from the server as above, and the name from a lookup of the dataset ID on the server, falling back to the local name |
 
 `DatasetPullSourceResolverImpl` owns what a pull alias means:
 
@@ -463,13 +465,8 @@ calls it with no transaction held:
 | --- | --- |
 | `has_pull_source` | whether the dataset has any pull alias, several included; reads the alias registry only. `kamu ingest` and setting a watermark refuse such a dataset, since its history comes from the remote; `kamu verify` replays its transforms only when all its inputs exist locally |
 | `find_pull_alias` | the dataset's single pull alias, `None` without one, `AmbiguousPullSourceError` with several; reads the alias registry only |
-| `resolve_remote_source` | a `DatasetPullSource { remote_ref, url }`, the URL from `RemoteDatasetUrlResolver::resolve_dataset_url`; an unknown repository is `RepositoryNotFound`, a remote named only by ID is `ByIdUnsupported` |
-| `resolve_pull_source` | both of the above for one dataset |
+| `resolve_remote_source`, `resolve_pull_source` | a `DatasetPullSource { remote_ref, url }`, the URL from `RemoteDatasetUrlResolver::resolve_dataset_url`. A pull does not use them: its transfer resolves the source URL itself ([§4](#4-sync-requests)) |
 | `find_dataset_by_pull_alias` | the current account's dataset whose pull aliases contain a remote ref: the dataset named as the remote one first, then a scan of the account's datasets |
-
-`DatasetPullSource::to_sync_endpoint` gives the `SyncEndpoint` a sync task reads, without
-credentials. A pull resolves its source URL with `RemoteDatasetUrlResolver` during the transfer
-([§4](#4-sync-requests)).
 
 How `kamu pull` uses pull aliases to decide that a dataset is synced belongs to
 [dataset-pull.md](dataset-pull.md#51-resolving-each-request).
@@ -495,17 +492,18 @@ nothing themselves; callers own authorization.
 
 | Writer | Validation of incoming blocks | `HEAD` update |
 | --- | --- | --- |
-| Simple protocol, local source (push) | none (trusted), hashes not recomputed | CAS on the remote head read at the start |
+| Simple protocol, local source (push) | none, hashes not recomputed, unless `trust_source` is off | CAS on the remote head read at the start |
 | Simple protocol, remote source (pull) | full, hashes recomputed | CAS on `expected_head`, read just before the transfer |
 | Smart pull client | full | CAS on `expected_head`, read just before the transfer, with or without `force` |
 | Smart push server | full | CAS on the first new block's `prevBlockHash`; with `force`, on the request's `current_head` (the `Seed` for a dataset the push created) |
 
-Every block except the `Seed` of a newly created dataset is appended by
-`MetadataChainExt::append_batch` (IPFS publishing aside), which moves no reference; `HEAD` is set
-once at the end, so readers see either the old or the new head. For a local destination
-`LocalSyncCommitter` moves it through `DatasetHeadCommitter`, or creates the dataset at it; the
-smart push server uses `AppendDatasetMetadataBatchUseCase`, which does both. Setting `HEAD` posts
-`DatasetReferenceMessage`; the smart push server also posts `DatasetExternallyChangedMessage`.
+Blocks are appended without moving `HEAD`, which is set once after the last one, so readers see
+either the old or the new head. A local destination's `HEAD` is set by `LocalSyncCommitter`
+([§4](#4-sync-requests)), a remote Simple destination's by `append_batch_and_set_head`
+([§6.1](#61-client-simpletransferprotocol)), and the smart push server's by
+`AppendDatasetMetadataBatchUseCase`; IPFS publishing has no `HEAD` to set. Moving the `HEAD` of a
+dataset of this node posts `DatasetReferenceMessage`; the smart push server also posts
+`DatasetExternallyChangedMessage`.
 
 The variants are in `SyncError` (`sync_service.rs`). A lost `HEAD` CAS is `HeadMoved` on every
 destination, with a `SyncHeadMovedError` that carries the expected and actual heads when they are
@@ -542,8 +540,9 @@ into the recoverability of the failed task.
 
 - Sync service tests: `src/infra/core/tests/tests/test_sync_service_impl.rs`; the transfer and
   commit split, first pull, forced pull and a `HEAD` moved during the transfer, on local FS and
-  S3: `test_sync_service_local_commit.rs`. `LocalSyncHelper` in `src/infra/core/tests/utils/`
-  pulls the way the use case does.
+  S3: `test_sync_service_local_commit.rs`; a remote head moved during a push:
+  `test_sync_service_remote_head_moved.rs`; IPNS: `test_sync_service_ipns_push.rs`.
+  `LocalSyncHelper` in `src/infra/core/tests/utils/` pulls the way the use case does.
 - Smart protocol tests, client against an in-process server, single- and multi-tenant, local and
   S3 storage: `src/adapter/http/tests/tests/test_protocol_dataset_helpers.rs` and the
   `tests_pull` / `tests_push` scenario directories under `src/adapter/http/tests/tests/`. The
@@ -573,7 +572,8 @@ into the recoverability of the failed task.
 | Sync types and errors | [`sync_service.rs`](../../src/domain/core/src/services/sync_service.rs) |
 | Committing a pull into a local dataset | [`local_sync_committer.rs`](../../src/domain/core/src/services/local_sync_committer.rs), [`local_sync_committer_impl.rs`](../../src/infra/core/src/services/sync/local_sync_committer_impl.rs) |
 | `Seed` store and block append shared by both protocols | [`local_sync_writes/`](../../src/infra/core/src/utils/local_sync_writes/) |
-| Protocol dispatch, push to IPNS, URL helpers | [`sync_service_impl.rs`](../../src/infra/core/src/services/sync/sync_service_impl.rs) |
+| Protocol dispatch, push to IPNS | [`sync_service_impl.rs`](../../src/infra/core/src/services/sync/sync_service_impl.rs) |
+| `odf+` URL helpers | [`url_ext.rs`](../../src/infra/core/src/utils/url_ext.rs) |
 | Local IPFS node | [`ipfs_service.rs`](../../src/domain/core/src/services/ipfs_service.rs), [`ipfs_service_impl.rs`](../../src/infra/core/src/services/ipfs_service_impl.rs) |
 | Sync ref resolution | [`sync_request_builder.rs`](../../src/infra/core/src/services/sync/sync_request_builder.rs) |
 | Chain comparison | [`metadata_chain_comparator.rs`](../../src/domain/core/src/utils/metadata_chain_comparator.rs) |

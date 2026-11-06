@@ -324,11 +324,11 @@ Since the progress messages are posted in the same transaction as the event that
 task is `Running` if and only if its `Running` message exists, and likewise for `Finished`
 ([outbox.md](outbox.md#1-purpose--scope) explains the guarantee).
 
-A dataset planner that keeps a `ResolvedDataset` in the definition calls
-`detach_from_transaction()` before returning, so the definition can outlive that transaction and
-be used by the runner; the update planner keeps only handles. A runner that needs the database
-again opens a new transaction and re-resolves what it needs (`DatasetUpdateSteps`,
-`LocalSyncCommitter`).
+The compaction planner keeps a `ResolvedDataset` in the definition, so it calls
+`detach_from_transaction()` before returning: the definition outlives the planner's transaction
+and is used by the runner. The update and reset planners keep only handles. A runner that needs the
+database again opens a new transaction and re-resolves the dataset there: the update and compaction
+runners through `DatasetUpdateSteps`, the reset runner in the transaction around its whole run.
 
 `TaskSchedulerImpl` itself opens no transactions: `create_task`, `cancel_task` and `try_take` run in
 the caller's, which is how the flow system creates a task atomically with the flow event that
@@ -355,21 +355,20 @@ before touching them.
 
 Ingest, transform and compaction share one shape: **the core service writes new blocks with
 `update_block_ref: false` outside any transaction, and the runner then moves `HEAD` in a short
-transaction with compare-and-swap** — the runner re-resolves the dataset through
-`DatasetRegistry` and moves `HEAD` from `old_head` to `new_head` through `DatasetHeadCommitter`
-(`DatasetUpdateSteps::commit_head`, the step `kamu pull` also uses). `task_head_commit.rs` turns
-a commit that did not happen into the task's outcome: `HeadCommitTaskOutcome` for the update and
-compaction runners, and its `head_moved_outcome` and `dataset_deleted_outcome` for a sync's commit
-and the reset runner too. Both log a warning; `head_moved_outcome` names the expected and actual
-heads. Blocks written by an attempt that never reaches that step stay unreferenced, so a re-run after
-a crash, or a concurrent writer that moved `HEAD` first, cannot corrupt the chain. Sync and reset
-differ:
+transaction with compare-and-swap** — `DatasetUpdateSteps::commit_head`, the step `kamu pull`
+also uses, re-resolves the dataset through `DatasetRegistry` and moves `HEAD` from `old_head` to
+`new_head` through `DatasetHeadCommitter`. `runners/task_head_commit.rs` turns a commit that did not
+happen into the task's outcome, for every dataset runner: a moved `HEAD` is the recoverable
+`TaskErrorDatasetCommit::HeadMoved`, a deleted dataset or a denied commit an unrecoverable empty
+error. Blocks written by an attempt that never reaches that step stay unreferenced, so a re-run
+after a crash, or a concurrent writer that moved `HEAD` first, cannot corrupt the chain. Sync and
+reset differ:
 
 | Task / job | Writes blocks | Moves `HEAD` | Transaction around the work |
 | --- | --- | --- | --- |
 | Update → ingest | `PollingIngestService` | runner, CAS on `old_head` | none; short one for `HEAD` |
 | Update → transform | `TransformExecutor` | runner, CAS on `old_head` | none; short one for `HEAD` |
-| Update → sync | `SyncService::transfer_into_local` | runner, `LocalSyncCommitter`: CAS on the head read before the transfer ([dataset-sync.md](dataset-sync.md#4-sync-requests)) | none; short one to read `HEAD`, short one for `HEAD` |
+| Update → sync | `SyncService::transfer_into_local` | runner, `DatasetUpdateSteps::transfer_and_commit_sync` through `LocalSyncCommitter`: CAS on the head read before the transfer ([dataset-sync.md](dataset-sync.md#4-sync-requests)) | none; short one to read `HEAD`, short one for `HEAD` |
 | Hard compact / reset to metadata | `CompactionExecutor` | runner, CAS on `old_head` | none; short one for `HEAD` |
 | Reset | — (existing block) | `ResetExecutor`, CAS on the planned `old_head` | one for the whole reset |
 
@@ -386,69 +385,60 @@ One logical plan serves both ingest and transform flows: `LogicalPlanDatasetUpda
 fetch_uncacheable }`. The dataset decides what "update" means.
 
 **Planning** (`UpdateDatasetTaskPlanner`, one transaction):
+`PullRequestPlanner::build_pull_plan(PullRequest::local(id), non-recursive)` yields one
+`PullPlanIterationJob` — `Ingest`, `Transform` or `Sync`, chosen as described in
+[dataset-pull.md](dataset-pull.md#53-turning-items-into-jobs) — stored in the definition as a
+`DatasetUpdateJob` with the ingest and sync options. The job keeps only the target's handle (and,
+for a sync, the remote ref): the runner plans the work itself when it runs, so the definition holds
+no writer state, no environment variable values and nothing read from a remote. A pull plan that
+syncs into a dataset that does not exist yet fails planning unrecoverably. Any other planning error
+fails the task with an empty error whose recoverability is `PullError::is_recoverable()`
+([dataset-pull.md](dataset-pull.md#9-results-and-errors)).
 
-1. `PullRequestPlanner::build_pull_plan(PullRequest::local(id), non-recursive)` builds a
-   single-node pull plan and yields one `PullPlanIterationJob`: `Ingest`, `Transform` or `Sync`,
-   chosen as described in [dataset-pull.md](dataset-pull.md#53-turning-items-into-jobs).
-2. The job is stored in `TaskDefinitionDatasetUpdate` as a `DatasetUpdateJob`, with the ingest
-   and sync options. Every job keeps only the target's handle, and a sync job also the remote ref:
-   the runner plans them itself, so the definition holds no writer state, no environment variable
-   values and nothing read from a remote. A planned sync into a dataset that does not exist is a
-   planning error.
+**Running** (`UpdateDatasetTaskRunner`), by job. Each short transaction below is opened by a
+`DatasetUpdateSteps` method, which re-resolves the dataset by its handle:
 
-A planning error is logged and classified by `PullError::is_recoverable()`
-([dataset-pull.md](dataset-pull.md#9-results-and-errors)), and the task fails with an empty error
-of that recoverability: a dataset deleted since the task was scheduled or one with several pull
-aliases fails unrecoverably, an infrastructure failure recoverably.
-
-**Running** (`UpdateDatasetTaskRunner`), by job:
-
-- **Ingest** — in one transaction `PollingIngestPlanner` plans the ingest from the target's
-  current `HEAD` and resolves the dataset's environment variables
+- **Ingest** — `plan_ingest` plans the ingest from the target's current `HEAD` and resolves its
+  environment variables in one transaction
   ([root-dataset-ingest.md](root-dataset-ingest.md#51-call-sequence)). Then
-  `PollingIngestService::ingest` runs one iteration: check cache, fetch (resuming from
-  a savepoint), prepare, read, preprocess, merge and commit `SetDataSchema` / `AddData` blocks.
-  Reading and merging run on embedded DataFusion in-process; a container is provisioned only for a
-  `container` fetch step or a `preprocess` step on a non-DataFusion engine. A dataset with no
-  `SetPollingSource` fails unrecoverably; an uncacheable source that already has data yields
-  `UpToDate { uncacheable }` unless `fetch_uncacheable` is set. `Updated { has_more }` means the
-  source has more to fetch: the task does not loop, and the ingest flow controller schedules the
-  next iteration if its config sets `fetch_next_iteration`.
-- **Transform** — in one transaction `TransformPlanner::elaborate_transform` plans the transform
-  from the target's current `HEAD` and computes each input's unprocessed slices and watermarks
-  ([derived-dataset-transform.md](derived-dataset-transform.md#44-transactions)). `UpToDate` ends
-  the task with an `UpToDate` result, as does an executor run that appends nothing. Otherwise
-  `TransformExecutor::execute_transform` provisions the engine named by the transform — always a
-  container engine, DataFusion included — runs the query and commits `ExecuteTransform`.
-  The runner never resets the derivative, so a diverged input is not repaired here:
-  `InvalidInputInterval` (the previously processed input block is no longer an ancestor, usually
-  because the input was compacted) becomes `TaskErrorDatasetUpdate::InputDatasetCompacted`, and
-  the transform flow controller decides what to do about it.
-- **Sync** — in one transaction re-resolves the destination and reads its `HEAD`; then
-  `SyncService::transfer_into_local` resolves and opens the remote, and copies blocks and objects
-  from it (smart transfer protocol for `odf+http(s)://`, simple protocol otherwise) without moving
-  `HEAD`; then `LocalSyncCommitter` moves `HEAD` in a transaction of its own.
+  `PollingIngestService::ingest` runs one iteration with no transaction open, and `commit_head`
+  moves `HEAD`. `Updated { has_more }` means the source has more to fetch: the task does not loop,
+  and the ingest flow controller schedules the next iteration if its config sets
+  `fetch_next_iteration`.
+- **Transform** — `elaborate_transform` runs `TransformPlanner::elaborate_transform` from the
+  target's current `HEAD` in one transaction
+  ([derived-dataset-transform.md](derived-dataset-transform.md#44-transactions)). An up-to-date
+  elaboration ends the task with an `UpToDate` result, as does an executor run that appends
+  nothing. Otherwise `TransformExecutor::execute_transform` runs with no transaction open, and
+  `commit_head` moves `HEAD`. The runner never resets the derivative, so a diverged input is not
+  repaired here: `InvalidInputInterval` (the previously processed input block is no longer an
+  ancestor, usually because the input was compacted) becomes the typed
+  `TaskErrorDatasetUpdate::InputDatasetCompacted`, and the transform flow controller decides what
+  to do about it.
+- **Sync** — `resolve_sync_target` reads the destination's `HEAD` in one transaction; then
+  `transfer_and_commit_sync` copies blocks and objects from the remote with
+  `SyncService::transfer_into_local`, without moving `HEAD` and with no transaction open, and
+  `LocalSyncCommitter` moves `HEAD` in a transaction of its own.
 
 On success the result is `TaskResultDatasetUpdate::Updated` with the old and new heads and the
-`increment`: block and record counts and the new watermark, which the flow controllers use to
-trigger downstream flows. Each operation's result carries it, so an update without one cannot be
-represented. When nothing changed the result is `UpToDate` with the operation's reason.
+`increment` (block and record counts and the new watermark), which the flow controllers use to
+trigger downstream flows. When nothing changed the result is `UpToDate` with the operation's
+reason.
 
-Planning and execution errors classify themselves with `is_recoverable()`, and the runner turns
-the flag into an empty recoverable or unrecoverable failure. The classification of each error is
-owned by its domain doc: ingest in
-[root-dataset-ingest.md](root-dataset-ingest.md#9-errors), transform in
-[derived-dataset-transform.md](derived-dataset-transform.md#9-errors), sync in
+Other planning and execution errors classify themselves with `is_recoverable()`, and the runner
+turns the flag into an empty recoverable or unrecoverable failure. The classification of each error
+is owned by its domain doc: ingest in [root-dataset-ingest.md](root-dataset-ingest.md#9-errors),
+transform in [derived-dataset-transform.md](derived-dataset-transform.md#9-errors), sync in
 [dataset-sync.md](dataset-sync.md#11-committing-validation-and-errors). Outcomes the runner decides
 itself:
 
 | Error | Outcome |
 | --- | --- |
-| Ingest, transform or sync: `HEAD` moved after planning (the CAS fails when moving it) | recoverable, typed `DatasetCommitError` → `HeadMoved` with the expected and actual heads |
-| Transform elaboration: `InvalidInputInterval` | unrecoverable, typed `InputDatasetCompacted` |
+| Ingest, transform or sync: `HEAD` moved after planning (the CAS fails when moving it) | recoverable, typed `TaskErrorDatasetCommit::HeadMoved` with the expected and actual heads |
+| Transform elaboration: `InvalidInputInterval` | unrecoverable, typed `TaskErrorDatasetUpdate::InputDatasetCompacted` |
 | Transform elaboration: `InputNotPulled` | not an error: the task ends with an `UpToDate` result |
-| The dataset was deleted after the task was scheduled | unrecoverable |
-| Moving `HEAD` is not allowed (`Access`) | unrecoverable, as for a sync that is denied access |
+| The dataset was deleted after the task was scheduled | unrecoverable, empty |
+| Moving `HEAD` is not allowed | unrecoverable, empty |
 
 ### 7.2 Hard compaction and reset to metadata
 
@@ -458,8 +448,7 @@ planner and executor do is owned by
 [dataset-hard-compaction.md](dataset-hard-compaction.md#5-planning); what reset to metadata keeps,
 by [dataset-reset.md](dataset-reset.md#6-reset-to-metadata).
 
-**Planning** (`CompactionDatasetTaskPlanner`, one
-transaction): resolves the dataset, calls `CompactionPlanner::plan_compaction` with the limits from
+**Planning** (`CompactionDatasetTaskPlanner`, one transaction): resolves the dataset, calls `CompactionPlanner::plan_compaction` with the limits from
 the logical plan (planner defaults when absent; reset to metadata passes none, and they do not
 matter when no data is kept), and stores the detached dataset and the `CompactionPlan` in the
 definition. A dataset deleted since the task was scheduled fails unrecoverably; a planning error
@@ -468,13 +457,10 @@ compacted) and `Access` unrecoverably, an internal error recoverably.
 
 **Running**: one runner, `CompactionDatasetTaskRunner`, is registered for both task types and
 picks the definition and the result type by `task_type`. `CompactionExecutor::execute` runs outside
-any transaction. On `Success` the runner moves `HEAD` by CAS and returns
-`TaskResultDatasetHardCompact` / `TaskResultDatasetResetToMetadata` carrying the `CompactionResult`
-(`Success { old_head, new_head, old_num_blocks, new_num_blocks, breaking }` or `NothingToDo`).
-The executor sets `breaking` in both modes, and a stored result without the field reads as
-breaking. Any executor error is a recoverable empty failure; a lost `HEAD` CAS is the
-recoverable typed `DatasetCommitError` → `HeadMoved`, as in [§7.1](#71-update-dataset). A commit
-that is not allowed, or into a dataset deleted since planning, fails unrecoverably.
+any transaction. On `Success` the runner moves `HEAD` by CAS (`DatasetUpdateSteps::commit_head`)
+and returns `TaskResultDatasetHardCompact` / `TaskResultDatasetResetToMetadata` carrying the
+`CompactionResult`. Any executor error is a recoverable empty failure; a failed commit becomes an
+outcome as in [Who moves `HEAD`](#who-moves-head).
 
 Compaction rewrites history, so derivative datasets that consumed the old blocks can no longer
 continue incrementally; that is what `InputDatasetCompacted` in [§7.1](#71-update-dataset)
@@ -484,12 +470,12 @@ reports.
 
 **Planning** (`ResetDatasetTaskPlanner`, one transaction): calls `ResetPlanner::plan_reset` with
 the new and old heads from the logical plan
-([dataset-reset.md](dataset-reset.md#5-reset-to-a-block)). The resulting
-`ResetPlan { old_head, new_head }` and the dataset handle form the definition. A dataset deleted
-since the task was scheduled fails unrecoverably. `OldHeadMismatch` fails it with the typed,
-unrecoverable `TaskErrorDatasetReset::OldHeadMismatch`, which carries the expected and actual heads:
-the expected old head is part of the request, so a retry fails the same way. An internal planning
-error fails recoverably.
+([dataset-reset.md](dataset-reset.md#5-reset-to-a-block)). The resulting `ResetPlan` and the
+dataset handle form the definition. A dataset deleted since the task was scheduled fails the task
+unrecoverably. `OldHeadMismatch` fails it with the typed, unrecoverable
+`TaskErrorDatasetReset::OldHeadMismatch`, which carries the expected and actual heads: the expected
+old head is part of the request, so a retry fails the same way. An internal planning error fails it
+recoverably.
 
 **Running** (`ResetDatasetTaskRunner`, one transaction around the whole run): re-resolves the
 dataset and calls `ResetExecutor::execute`, which moves `HEAD` by CAS on the planned `old_head`,
@@ -498,7 +484,8 @@ so a `HEAD` change between planning and running fails the task.
 | Error | Becomes |
 | --- | --- |
 | `SetReferenceFailed(BlockNotFound)` — the target block is not in the dataset's block store | typed `TaskErrorDatasetReset::ResetHeadNotFound`, unrecoverable |
-| `SetReferenceFailed(CASFailed)` — `HEAD` moved after planning | typed `DatasetCommitError` → `HeadMoved`, recoverable |
+| The dataset was deleted after planning | empty, unrecoverable |
+| `SetReferenceFailed(CASFailed)` — `HEAD` moved after planning | typed `TaskErrorDatasetCommit::HeadMoved`, recoverable |
 | `SetReferenceFailed(Access)` — moving `HEAD` is not allowed | empty, unrecoverable |
 | `SetReferenceFailed(Internal)`, `Internal` | empty, recoverable |
 
@@ -662,16 +649,13 @@ straight from `TaskEventStore` (`utils::get_task`), not through `TaskScheduler`.
 
 | `error_type` | GraphQL variant |
 | --- | --- |
-| `Empty` | `TaskFailureReasonGeneral { message: "FAILED", recoverable }` |
 | `UpdateDatasetError` → `InputDatasetCompacted` | `TaskFailureReasonInputDatasetCompacted { inputDataset: Dataset, message }` — resolves the input dataset and its owner |
-| `DatasetCommitError` → `HeadMoved` | `TaskFailureReasonGeneral { message: "Dataset head was moved by a concurrent update", recoverable }` |
-| `ResetDatasetError` → `ResetHeadNotFound` | `TaskFailureReasonGeneral { message: "New head hash to reset not found" }` |
-| `ResetDatasetError` → `OldHeadMismatch` | `TaskFailureReasonGeneral { message: "Dataset head is not the expected old head" }` |
 | `WebhookDeliveryError` | `TaskFailureReasonWebhookDeliveryProblem { targetUrl, message }` — timeout, connection failure, or the HTTP status and reason |
-| anything else | `TaskFailureReasonGeneral { message: "Unexpected task error type" }`, logged as an error |
+| `Empty`, `DatasetCommitError`, `ResetDatasetError` | `TaskFailureReasonGeneral { message, recoverable }`, with a fixed message per variant |
+| anything else | `TaskFailureReasonGeneral { message: "Unexpected task error type", recoverable }`, logged as an error |
 
 `TaskOutcomeSuccess` itself carries no result data. Typed results are decoded by the flow
-description, each into its own GraphQL union:
+description, each into its own GraphQL type:
 
 | Task result | GraphQL result | Used by flow descriptions |
 | --- | --- | --- |
@@ -747,8 +731,9 @@ changes and failure reasons in flow histories, with the harness in
   `process_task_outcome`.
 - **Cancelling a running task does not stop it.** It only guarantees the run is not retried after
   a restart.
-- **A planner failure loses its error.** It is logged and turned into an empty recoverable error,
-  so the flow retries even when the cause is permanent.
+- **An internal planner error loses its cause.** `PrepareTaskDefinitionError::Internal` is logged
+  and turned into an empty recoverable error, so the flow retries even when the cause is permanent.
+  A planner that knows the task cannot run returns `Failed` with the right recoverability instead.
 - **Changing a persisted type is a migration.** Logical plans, results and errors are replayed
   from `task_events` forever; add fields with `#[serde(default)]` and never rename type IDs.
 

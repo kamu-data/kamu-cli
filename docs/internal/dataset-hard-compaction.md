@@ -127,8 +127,8 @@ open during the merge:
 | Execute | none | `CompactionExecutor::execute`, which writes only blocks and files that no reference points to yet |
 | Commit | a new short one | on `Success`, re-resolves the dataset and moves `HEAD` from `old_head` through `DatasetHeadCommitter` |
 
-A `HEAD` moved by another writer during the merge fails the commit with `RefCASFailed`, and nothing
-is committed. `execute_multi` calls `execute` per dataset and returns one `CompactionResponse`
+A `HEAD` moved by another writer during the merge fails the commit ([§6](#6-execution)).
+`execute_multi` calls `execute` per dataset and returns one `CompactionResponse`
 each; one failure does not stop the others.
 
 **Flow.** The flow's preconditions, configuration and logical plan are owned by
@@ -157,10 +157,11 @@ with empty size and record counts. A closed batch becomes:
 - a **`CompactedBatch`** when it holds two or more slices: the slice URLs; a **lower bound** from
   the oldest block (`start_offset` from the oldest slice, `prev_offset`, `prev_checkpoint`); an
   **upper bound** with `end_offset` from the newest slice and the `new_checkpoint`,
-  `new_source_state` and `new_watermark` of the newest block, with or without data, even when
-  absent, since every `AddData` carries them forward; and the summed linked-object summaries;
-- a **`SingleBlock(hash)`** for each of its blocks otherwise: one slice, or none, together with the
-  blocks without data around it are carried over as they are.
+  `new_source_state` and `new_watermark` of the newest block, whether or not that block carries
+  data, and absent values included, since every `AddData` restates them; and the summed
+  linked-object summaries;
+- otherwise (one slice or none), a **`SingleBlock(hash)`** for each of its blocks, so the slice
+  and the blocks without data around it are carried over as they are.
 
 `CompactionPlan` holds the batches newest first, the `Seed` hash, the old head and block count, and
 the offset column name from the oldest `SetVocab` in the chain (the default vocabulary if there is

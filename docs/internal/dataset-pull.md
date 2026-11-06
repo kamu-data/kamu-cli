@@ -102,7 +102,7 @@ Out of scope, each with its own owner:
 `kamu pull` is dispatched in [`cli_commands.rs`](../../src/app/cli/src/cli_commands.rs): with
 `--set-watermark` it becomes `SetWatermarkCommand` and nothing below applies; otherwise it builds
 `PullCommand`. `PullCommand` runs without an outer transaction (the use case opens its own short
-ones), and the CLI processes outbox messages after it succeeds.
+ones), and the CLI processes outbox messages after it ([§9](#9-results-and-errors)).
 
 | Flag | Effect |
 | --- | --- |
@@ -157,8 +157,8 @@ request, or for a `Remote` one an existing dataset or the alias to create one un
 3. **Local alias.** The existing alias, the caller's alias, or one inferred from the remote ref:
    its dataset name, or for a URL the last path segment, then the host name. A ref none of these
    apply to, such as a remote ref by ID, fails with `CannotInferLocalName`.
-4. **Kind.** A `Remote` request, or a target still to be created, is a sync from the request's
-   ref. An existing dataset gets its kind from `DatasetUpdateKindResolver`: its pull alias
+4. **Kind.** A `Remote` request is a sync from its remote ref, whether its target exists or is
+   still to be created. The target of a `Local` request gets its kind from `DatasetUpdateKindResolver`: its pull alias
    (`DatasetPullSourceResolver::find_pull_alias`) makes it a sync, otherwise a root is ingested
    and a derivative transformed. Two or more pull aliases fail with `AmbiguousSource`.
 5. **Depth.** Syncs and ingests are depth 0. A transform is one more than its deepest upstream
@@ -224,7 +224,7 @@ runs outside them.
 | --- | --- | --- |
 | Ingest | `PullIngestLoop::run`: plans the ingest and resolves the dataset's env vars in one transaction (`DatasetUpdateSteps::plan_ingest`) ([root-dataset-ingest.md](root-dataset-ingest.md#51-call-sequence)); then calls `PollingIngestService::ingest` until `has_more` is false (with `exhaust_sources`), adding up the results so the response spans the first old head to the last new head. A dataset without a polling source is up to date. A failure after earlier iterations committed is `PullError::IngestStopped`, carrying the committed heads and increment and the iteration's error | after every ingest iteration that returns `Updated`, `DatasetUpdateSteps::commit_head` (CAS) |
 | Transform | `PullTransformJob::run`: plans and elaborates in one transaction (`DatasetUpdateSteps::elaborate_transform`) ([derived-dataset-transform.md](derived-dataset-transform.md#44-transactions)), so it sees what earlier depths committed; on a diverged input with `reset_derivatives_on_diverged_input`, resets the derivative to metadata and elaborates once more ([derived-dataset-transform.md](derived-dataset-transform.md#7-diverged-inputs)); then executes. A failure after the reset committed is `PullError::TransformStopped`, carrying the reset's heads and the error | after the reset and after the transform, `DatasetUpdateSteps::commit_head` (CAS) |
-| Sync | `PullSyncJob::run`: reads the target's `HEAD` in a transaction of its own (`DatasetUpdateSteps::resolve_sync_target`), then `SyncService::transfer_into_local` with no transaction open (`DatasetUpdateSteps::transfer_and_commit_sync`), which resolves and opens the source; when a dataset was created by the sync (`old_head: None`) and `add_aliases` is on, stores the pull alias in the commit's transaction, so the dataset never exists without it | after the transfer, in `transfer_and_commit_sync`: `LocalSyncCommitter` (CAS, or creation of a new dataset) |
+| Sync | `PullSyncJob::run`: reads the target's `HEAD` in a transaction of its own (`DatasetUpdateSteps::resolve_sync_target`), then `SyncService::transfer_into_local` with no transaction open (`DatasetUpdateSteps::transfer_and_commit_sync`), which resolves and opens the source. With `add_aliases` on, `transfer_and_commit_sync` stores the pull alias of a dataset the sync created (`old_head: None`) in the commit's transaction, so the dataset never exists without it | after the transfer, in `transfer_and_commit_sync`: `LocalSyncCommitter` (CAS, or creation of a new dataset) |
 
 `DatasetUpdateSteps::commit_head` moves `HEAD` through `DatasetHeadCommitter`, expecting the head
 the iteration started from, which posts `DatasetReferenceMessage`
@@ -234,8 +234,8 @@ makes any outcome but committed that dataset's error: `PullError::HeadMoved` wit
 actual heads, `NotFound` or `Access`. A sync job's lost race, `SyncError::HeadMoved` from
 `LocalSyncCommitter`, becomes the same `PullError::HeadMoved`, so a conflict has one shape for every
 job; a target deleted before the commit makes `transfer_and_commit_sync` return `None`, which
-becomes the same `NotFound`. After earlier commits of the same job it is the `source` of `IngestStopped` or
-`TransformStopped`.
+becomes the same `NotFound`. When the same job committed earlier (an ingest iteration, or a reset
+before a transform), that error becomes the `source` of `IngestStopped` or `TransformStopped`.
 
 ### 6.3 Listeners
 
@@ -267,7 +267,7 @@ The sync listener takes `SyncError` because pull and push share it.
 `PullAuthorization::authorize` runs per iteration, in one transaction: each job becomes an
 operation on its target (`PullPlanIterationJob::as_operation_request`), and one
 [`DatasetOperationGuard`](../../src/domain/datasets/domain/src/services/dataset_operation_guard.rs)
-call checks them all for the current account. That guard owns which permissions each operation
+call checks them all for the caller's `Principal`. That guard owns which permissions each operation
 needs, and reports a dataset the account cannot read as not found:
 
 | Job | Operation | Checks |
@@ -303,7 +303,6 @@ The server never calls `PullDatasetUseCase`: the update task builds a single-nod
 | Datasets per run | many, by depth | one |
 | Authorization | per iteration ([§7](#7-authorization)) | none at run time; access is checked when the flow is configured or triggered |
 | Polling loop | until `has_more` is false | one iteration; the flow decides whether to continue |
-| Env vars | resolved per dataset by the use case | resolved by the task planner |
 | Diverged-input reset | optional flag | never |
 | Planning to running | immediate | separated by the task queue; planning fixes the job kind and, for a sync, the remote ref. Ingest and transform are planned when the task runs, and a sync reads the destination's `HEAD` and resolves its source then |
 | Root dataset without a polling source | up to date | unrecoverable failure: a flow that keeps polling such a dataset is misconfigured |
@@ -316,16 +315,14 @@ The server never calls `PullDatasetUseCase`: the update task builds a single-nod
 Each dataset produces one `PullResponse`: the original request (empty for implicit upstreams),
 the local and remote refs if resolved, and `Result<PullResult, PullError>`.
 
-`PullResult` is `UpToDate(kind)` — polling ingest (with `uncacheable`), push ingest, transform or
-sync — or `Updated { old_head, new_head, has_more }`. `PullError` wraps the per-job errors
-(`PollingIngestError`, `IngestStopped`, `TransformError`, `TransformStopped`, `SyncError`), the
-lost commit race of any job (`HeadMoved`), plus
-planning errors (`NotFound`, `AmbiguousSource`, `SaveUnderDifferentAlias`, `AutoCreateDisabled`,
-`CannotInferLocalName`, `ScanMetadata`), `Access` and `Internal`.
+`PullResult` is `UpToDate(kind)` or `Updated { old_head, new_head, has_more }`. `PullError` holds
+the planning errors of [§5.1](#51-resolving-each-request), the errors of each job's own operation
+(`ScanMetadata` among them, from planning an ingest when the job runs), the lost commit race of
+any job (`HeadMoved`), `Access` and `Internal`.
 
-`PullError::is_recoverable()` tells whether pulling again could succeed. The per-job errors take
-the answer from their own operation; a lost commit race and `Internal` are recoverable; the
-planning errors and `Access` are not, apart from an internal failure inside `ScanMetadata`.
+`PullError::is_recoverable()` tells whether pulling again could succeed. The errors of a job's
+operation take the answer from that operation; a lost commit race and `Internal` are recoverable;
+the planning errors and `Access` are not.
 
 An `InternalError` returned by a job runner itself aborts the whole pull rather than becoming a
 per-dataset error; a failure to plan an ingest, resolve its env vars or move `HEAD` is a

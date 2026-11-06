@@ -130,27 +130,19 @@ that transaction ([§4.4](#44-transactions)):
 | `elaborate_transform(target)` | `Elaborated(TransformExecutionPlan)` (the request and the resolved inputs) or `UpToDate`, at the current heads and time | `kamu pull`, the update task |
 | `rebuild_transform(target, stored)` | the `TransformExecutionPlan` of a stored plan ([§4.5](#45-rebuilding-a-stored-plan)) | a caller that stores a plan before running it; only tests do |
 | `evaluate_transform_status(target)` | `TransformStatus` ([§6](#6-entry-points)) | the transform flow sensor |
-| `build_transform_verification_plan(target, range)` | one replay step per `ExecuteTransform` ([§6](#6-entry-points)) | `kamu verify` |
+| `build_transform_verification_plan(target, range)`, `get_verification_inputs(target, range)` | one replay step per `ExecuteTransform`; the inputs those steps read ([§6](#6-entry-points)) | `kamu verify` |
 
 ### 4.1 Plan
 
 `elaborate_transform`, `rebuild_transform` and `evaluate_transform_status` start from a
 preliminary request: `build_preliminary_request_ext` walks the derivative's chain once, from
-`HEAD` or from a given block when rebuilding, and collects the fields below. `describe_transform`
-reads only the `SetTransform` in effect; the verification plan reads its own history
-([§6](#6-entry-points)).
+`HEAD` or from a given block when rebuilding, and reads the latest `SetTransform`,
+`SetDataSchema`, `SetVocab` and `ExecuteTransform`. The commit is chained onto that starting block.
+Each `SetTransform` input is paired by dataset ID with its entry in the latest `ExecuteTransform`
+(none before the first run). `describe_transform` reads only the `SetTransform` in effect; the
+verification plan reads its own history ([§6](#6-entry-points)).
 
-| Field | From |
-| --- | --- |
-| `head` | the resolved `HEAD`; the commit is chained onto it |
-| `transform`, input declarations | latest `SetTransform` |
-| `transform_block` | hash of that `SetTransform` block |
-| `schema` | latest `SetDataSchema`, if any |
-| `vocab` | latest `SetVocab`, or the default vocabulary |
-| `input_states` | each `SetTransform` input paired by dataset ID with its entry in the latest `ExecuteTransform`, or `None` before the first run |
-| `prev_offset`, `prev_checkpoint` | latest `ExecuteTransform` |
-
-The planner also resolves every input by ID through `DatasetRegistry` into a `ResolvedDatasetsMap`
+The planner also resolves every input through `DatasetRegistry` into a `ResolvedDatasetsMap`
 that later phases use to read inputs. A non-derivative target, or one without `SetTransform`,
 fails with `TransformNotDefinedError`. When the inputs of the latest `SetTransform` differ from
 those the last `ExecuteTransform` consumed, planning fails with `TransformInputsChangedError`
@@ -164,9 +156,10 @@ blocks, moves no reference and reports to no listener.
 1. `get_transform_query_input` resolves the input's current `HEAD` and its last data offset. The
    consumed position is `prev_block_hash` / `prev_offset`; anything newer becomes
    `new_block_hash` / `new_offset`.
-2. It reads the input's schema and vocabulary as of the last block it consumes, not the input's
-   current `HEAD`. An input with no schema fails with `InputNotPulledError`, naming the input,
-   before any interval check.
+2. It reads the input's schema and vocabulary as of the newest input block the request consumes
+   (`new_block_hash`, else `prev_block_hash`), not as of the input's `HEAD` at a later rebuild. An
+   input with no schema there fails with `InputNotPulledError`, naming the input, before any
+   interval check.
 3. `collect_unprocessed_input_blocks` iterates the input chain from the new head back to (but
    excluding) the consumed block. If the consumed block is not an ancestor of the new head, it
    fails with `InvalidInputIntervalError`, naming the input ([§7](#7-diverged-inputs)).
@@ -176,8 +169,9 @@ blocks, moves no reference and reports to no listener.
 The result is `UpToDate` when every input has no new slices and no new watermarks **and** the
 derivative already has a schema. A derivative without a schema always runs, so that the engine can
 establish the output schema even from empty inputs. `InputNotPulledError` is returned to the
-caller: `kamu pull` reports it as the derivative's error, while the update task treats it as up to
-date ([§6](#6-entry-points)).
+caller: `kamu pull` reports it as the derivative's error, while the update task
+([task-system.md](task-system.md#71-update-dataset)) and the flow sensor ([§6](#6-entry-points))
+treat the derivative as up to date.
 
 Otherwise the request gets the current time as `system_time`, which becomes the new block's system
 time.
@@ -214,8 +208,9 @@ consumed, and a `SetDataSchema` before the first data.
 
 ### 4.4 Transactions
 
-Every caller follows one rule; `kamu pull` and the update task both go through
-`DatasetUpdateSteps::{elaborate_transform, commit_head}`:
+Both callers that commit a transform, `kamu pull` and the update task, follow one rule through
+`DatasetUpdateSteps::{elaborate_transform, commit_head}`, each of which re-resolves the target by
+ID in its own transaction:
 
 | Step | Transaction | Why |
 | --- | --- | --- |
@@ -229,10 +224,9 @@ planned ([§6](#6-entry-points)).
 ### 4.5 Rebuilding a stored plan
 
 A caller that stores a plan before running the engine must be able to rebuild the same request
-after a restart. `TransformPlanPayload::from_request` maps a request to that compact form,
-serialized with `kind: "TransformPlan"`: the dataset, `system_time`, the expected head,
-`transform_block`, and per input the head it was elaborated at, its offset interval and
-watermark. It names no data, checkpoint or staging paths, which are derived from the heads again.
+after a restart. `TransformPlanPayload::from_request` maps a request to that compact form: heads,
+system time, and per input its offset interval and watermark. It names no data, checkpoint or
+staging paths, which are derived from the heads again.
 
 `rebuild_transform(target, stored)` reads the target's current `HEAD` itself:
 
@@ -240,8 +234,8 @@ watermark. It names no data, checkpoint or staging paths, which are derived from
 | --- | --- | --- |
 | `TransformExecutionPlan` | `HEAD` is still the stored expected head; the request is elaborated at the stored input heads and system time | runs it |
 | `HeadMoved` | another writer moved `HEAD` since the plan was stored | discards the plan and elaborates again |
-| `Mismatch` | the rebuilt request differs from the stored one | discards the plan; this is a defect |
-| `Internal` | a read failed | retries |
+| `Mismatch` | the plan is for another dataset, or elaborating at the stored heads fails or yields a different request | discards the plan; this is a defect |
+| `Internal` | a read failed | may retry |
 
 Metadata at a fixed head is immutable, so the rebuilt request equals the original; the method
 checks this by mapping the result back and comparing it with the stored payload.
@@ -304,7 +298,7 @@ A successful run leaves nothing behind ([§10](#10-local-files)).
 | Entry point | Path | Authorization | Transaction scope | Moves `HEAD` |
 | --- | --- | --- | --- | --- |
 | `kamu pull <derivative>` | `PullCommand` → `PullDatasetUseCaseImpl` → planner, executor | per pull ([dataset-pull.md](dataset-pull.md#7-authorization)) | pull planning in one transaction per pull; per job, the rule of [§4.4](#44-transactions) ([dataset-pull.md](dataset-pull.md#62-per-job-runners)) | after each job |
-| Transform flow | `DerivedDatasetFlowSensor` → `FlowControllerTransform` → `LogicalPlanDatasetUpdate` → `UpdateDatasetTaskPlanner` → `UpdateDatasetTaskRunner::run_transform_update` | system; the GraphQL mutations that configure or trigger the flow check access ([flow-system.md](flow-system.md#12-graphql-api)) | the rule of [§4.4](#44-transactions), when the task runs | once |
+| Transform flow | `DerivedDatasetFlowSensor` → `FlowControllerTransform` → `LogicalPlanDatasetUpdate` → `UpdateDatasetTaskPlanner` → `UpdateDatasetTaskRunner::run_transform_update` | none; the task runs as `Principal::Node`, and the GraphQL mutations that configure or trigger the flow check access ([flow-system.md](flow-system.md#12-graphql-api)) | the rule of [§4.4](#44-transactions), when the task runs | once |
 | `kamu verify <derivative>` | `VerifyDatasetUseCaseImpl` → `VerificationServiceImpl` → `build_transform_verification_plan` → `execute_verify_transform` | Read on the target; with replay, also Read on every input the replay reads (`get_verification_inputs`), checked before replaying (`Verify` through [`DatasetOperationGuard`](../../src/domain/datasets/domain/src/services/dataset_operation_guard.rs)) | the command's | never |
 
 **`kamu pull`.** Planning, depth ordering, concurrency and authorization belong to pull
@@ -316,15 +310,16 @@ what depth 0 just committed, because elaboration re-reads input heads
 ([flow-system.md](flow-system.md#8-sensors-and-propagation)). Transform-specific pieces that
 live here:
 
-- `TransformFlowEvaluatorImpl` calls `TransformPlanner::evaluate_transform_status`, which
-  returns `InputBreakingChange` ([§7](#7-diverged-inputs)), checked first;
-  `NewInputDataAvailable` for the inputs elaboration would consume something from (new data or
-  a new watermark, or any new block while the derivative has no schema); or `UpToDate`, also when
-  an input was never pulled. The evaluator reports changed inputs as up to date with a warning.
-  The sensor uses it when it is activated.
-- For a transform the task keeps only the target's handle; the runner plans, elaborates, executes
-  and commits it ([task-system.md](task-system.md#71-update-dataset)). The runner never resets on
-  its own: a diverged input fails the task, and an input without data ends it as up to date.
+- When the sensor is activated, `TransformFlowEvaluatorImpl` calls
+  `TransformPlanner::evaluate_transform_status`. It returns `InputBreakingChange`
+  ([§7](#7-diverged-inputs)), checked first; `NewInputDataAvailable` for the inputs elaboration
+  would consume something from (new data or a new watermark, or any new block while the derivative
+  has no schema); or `UpToDate`, also when an input was never pulled. `evaluate_transform_status`
+  fails on a changed input list (`InputsChanged`); the evaluator turns that into `UpToDate` with a
+  warning, so the sensor waits instead of failing.
+- The update task runs the transform under the rule of [§4.4](#44-transactions) and never resets
+  the derivative; how it maps a diverged or never-pulled input to its outcome is owned by
+  [task-system.md](task-system.md#71-update-dataset).
 
 **Verify.** `build_transform_verification_plan` collects the `ExecuteTransform` blocks in the
 requested range and rebuilds a request for each from the block's own inputs, offsets, checkpoint
@@ -363,9 +358,9 @@ downstream sensors, the dependency graph and statistics react to.
 
 Consequences specific to transforms:
 
-- `old_head` is the head elaboration saw, when the job or task runs. Another writer that moves
+- `old_head` is the head elaboration saw ([§4.4](#44-transactions)). Another writer that moves
   the derivative's `HEAD` during execution (a manual `kamu pull`, a reset) makes the CAS fail, and
-  the committed blocks and data file stay unreferenced.
+  the appended blocks and data file stay unreferenced.
 - The CAS covers only the derivative. Inputs are read without locks: an input that moves after
   elaboration is picked up by the next run, and an input that is compacted between elaboration and
   execution fails inside the engine or at materialization.
@@ -376,23 +371,19 @@ Consequences specific to transforms:
 
 ## 9. Errors
 
-`TransformError` wraps `TransformPlanError` (`TransformNotDefined`), `TransformElaborateError`
-(`TransformNotDefined`, `InputsChanged`, `InputNotPulled`, `InvalidInputInterval`),
-`TransformExecuteError` (`EngineProvisioningError`, `EngineError`, `IncompatibleSchema`,
-`CommitError`) and `Internal`. `EngineProvisioningError` includes `UnsupportedEngine` and
-`ImagePull`. `EngineError` is `InvalidQuery` (the engine rejected the SQL), `ProcessError`,
-`ContractError` or `InternalError`, and carries engine log paths. `rebuild_transform` has its own
-`TransformRebuildError` ([§4.5](#45-rebuilding-a-stored-plan)), and `evaluate_transform_status`
-its own `TransformStatusError`.
+`TransformError` wraps the errors of the three phases (`TransformPlanError`,
+`TransformElaborateError`, `TransformExecuteError`); `rebuild_transform`, `evaluate_transform_status`
+and the verification plan have error types of their own. Engine errors raised while the container
+runs carry the paths of its logs ([§5.2](#52-one-transform-one-container)); the response contract
+checks carry none.
 
-`TransformElaborateError::is_recoverable` and `TransformExecuteError::is_recoverable` say whether
-a retry could succeed. A missing or changed transform, a diverged input (`InvalidInputInterval`),
-an incompatible schema, an invalid query and an unsupported engine are not recoverable: they need a
-change of metadata first. An input without data yet, commit, engine, provisioning and internal
-errors are recoverable. The engine part comes from `EngineError::is_recoverable` and
-`EngineProvisioningError::is_recoverable`, which ingest shares. The outcomes the update task
-decides itself, such as `InputDatasetCompacted`, are in
-[task-system.md](task-system.md#71-update-dataset).
+Each phase error's `is_recoverable` says whether a retry could succeed, and the engine part comes
+from `EngineError::is_recoverable` and `EngineProvisioningError::is_recoverable`, which ingest
+shares. An error that needs a change of metadata first is not recoverable: a missing transform, a
+changed input list, a diverged input (`InvalidInputInterval`), an incompatible output schema, a
+query the engine rejects (`InvalidQuery`) and an unknown engine. Everything else is recoverable,
+including an input that has no data yet. The outcomes the update task decides itself, such as
+`InputDatasetCompacted`, are in [task-system.md](task-system.md#71-update-dataset).
 
 ---
 
@@ -425,8 +416,8 @@ reuses an ID fails instead of mixing its output with an earlier one.
   `MockEngineProvisioner` (its engine stub can return a chosen response);
   `MockTransformFlowEvaluator` (flow-dataset `testing` feature) for sensor tests.
 - CLI scenarios: `src/e2e/app/cli/repo-tests/src/commands/test_pull_command.rs`,
-  `test_verify_command.rs`, on SQLite only. They change a transform by committing a `SetTransform`
-  through the workspace's GraphQL API.
+  `test_verify_command.rs`; those that check only CLI output are wired for SQLite only. They change
+  a transform by committing a `SetTransform` through the workspace's GraphQL API.
 - Server flow scenarios: `src/e2e/app/cli/repo-tests/src/test_flow.rs`, on SQLite and Postgres.
   A transform flow's failure message is generic, so they check its recoverability instead. System
   time is frozen, so a second transform flow needs the time advanced past its throttling period.
@@ -435,15 +426,14 @@ reuses an ID fails instead of mixing its output with an earlier one.
 
 ### Behaviour by design
 
-| Area | What happens |
-| --- | --- |
-| Engines | Every transform runs out of process in a pinned engine image; the in-process DataFusion engine is never used for transforms. Engine names ignore case |
-| Containers | One container per transform; nothing is reused between runs |
-| Schema-establishing runs | A derivative without a schema runs the engine even when no input has new data |
-| Inputs never ingested | `kamu pull` fails with `InputNotPulled`; the update task ends as up to date |
-| Diverged inputs | Never recovered automatically by the task; recovery is the CLI flag or the flow's `Recover` rule |
-| Query evolution | The query and engine of a `SetTransform` may change; its inputs may not. A changed input list fails planning with `InputsChanged`, because ODF validates `ExecuteTransform` inputs by position |
-| Verification | Replays every `ExecuteTransform` in the range with the `SetTransform` in effect at it, and compares the whole event except the data slice's physical hash and size and the checkpoint |
+| Area | What happens | Owner |
+| --- | --- | --- |
+| Engines | Every transform runs out of process in a pinned engine image, one new container per run | [§3](#3-layers-and-crates), [§5.2](#52-one-transform-one-container) |
+| Schema-establishing runs | A derivative without a schema runs the engine even when no input has new data | [§4.2](#42-elaborate) |
+| Inputs never ingested | `kamu pull` fails with `InputNotPulled`; the update task and the flow sensor treat the derivative as up to date | [§4.2](#42-elaborate) |
+| Diverged inputs | Never recovered by the task; recovery is the CLI flag or the flow's `Recover` rule | [§7](#7-diverged-inputs) |
+| Query evolution | The query and engine of a `SetTransform` may change; its inputs may not. A changed input list fails planning with `InputsChanged`, because ODF validates `ExecuteTransform` inputs by position | here |
+| Verification | Compares the replayed event with the recorded one except the data slice's physical hash and size and the checkpoint | [§6](#6-entry-points) |
 
 ---
 

@@ -1,8 +1,5 @@
 # Identity: Caller and Principal
 
-> **Status:** stable. Type names and paths below are drawn from source; when they drift, treat the
-> source as canonical and update this page.
-
 Two values describe who is behind a piece of work, and they are not the same thing:
 
 | Value | What it is | Read by |
@@ -20,13 +17,12 @@ caller of the process but runs as `Principal::Node`.
 | Variant | Meaning | Permissions |
 |---|---|---|
 | `User(AccountHandle)` | An authenticated account of a person | Decided by Oso and ReBAC |
-| `Node` | The local node, acting in system work | Passes every check, without asking Oso; counts as admin |
+| `Node` | The local node, acting in system work | Passes every dataset and account check without asking Oso and counts as admin; holds no account's signing key |
 | `Anonymous` | An unauthenticated request | Public datasets only |
 
 `Principal::handle()` gives the ODF `odf::metadata::auth::PrincipalHandle`, or `None` for
-`Anonymous`. `Node` uses the
-reserved name `node`, a resource ID seeded from it and no DID, until the node becomes an account
-resource of its own.
+`Anonymous`. The handle of `Node` has the reserved name `node`, a resource ID seeded from that
+name, and no DID.
 
 Match on `Principal` exhaustively, including in `==` and `matches!` tests: adding a variant must
 fail to compile at every site that decides permissions
@@ -35,7 +31,9 @@ fail to compile at every site that decides permissions
 ## Who registers it
 
 Every catalog that serves work registers exactly one `Principal`. A catalog without one fails to
-resolve the permission layer's callers; there is no fallback.
+resolve the permission layer's callers; there is no fallback. The one catalog that runs work without
+a principal is the base catalog, on which `app::run` runs the predefined-accounts registrator before
+the caller is known; that job must not reach the permission layer.
 
 | Boundary | Registers |
 |---|---|
@@ -51,7 +49,7 @@ with a bare `add_value(subject)`, so the two cannot disagree.
 
 | Layer | Takes the principal |
 |---|---|
-| Permission services listed above | **Explicitly**, as `&Principal` in every method |
+| Permission services listed above | **Explicitly**, as a `&Principal` argument of every method that decides access |
 | Use cases | Injected `Arc<Principal>`, passed down on each call |
 | Adapters (GraphQL resolvers, HTTP handlers and middleware, OData, Flight SQL session managers) | Read from the request catalog, passed down |
 | CLI commands | Injected `Arc<Principal>`, passed down |

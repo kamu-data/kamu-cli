@@ -105,11 +105,11 @@ latest block. The ideas reset relies on:
 | Entry point | Mechanism | Authorization | `HEAD` swap |
 | --- | --- | --- | --- |
 | `kamu reset <dataset> <hash>` | reset to a block, via `ResetDatasetUseCase` | Maintain (`Reset` through [`DatasetOperationGuard`](../../src/domain/datasets/domain/src/services/dataset_operation_guard.rs)), in the use case | CAS on the planned head, see [§5](#5-reset-to-a-block) |
-| GraphQL `runs.triggerResetFlow` | reset to a block (custom hash or `toSeed`), via the reset task | Maintain, checked by the mutation; the task runs as the system | CAS on the planned head |
+| GraphQL `runs.triggerResetFlow` | reset to a block (custom hash or `toSeed`), via the reset task | Maintain, checked by the mutation; the task runs as `Principal::Node` | CAS on the planned head |
 | `kamu system compact --hard --keep-metadata-only <pattern>…` | reset to metadata, via `CompactDatasetUseCase` | Maintain (`ResetToMetadata`), in the use case | CAS on the planned head |
 | GraphQL `runs.triggerResetToMetadataFlow` | reset to metadata, via the reset-to-metadata task | Maintain, checked by the mutation | CAS on the planned head |
 | `DerivedDatasetFlowSensor` with the `Recover` rule | reset to metadata of a derivative whose input broke | the downstream owner's opt-in; runs as the system | CAS on the planned head |
-| `kamu pull --reset-derivatives-on-diverged-input` | reset to metadata by the pull use case when elaboration finds a diverged input, before elaborating again | Write, as for any pull job | CAS on the planned head |
+| `kamu pull --reset-derivatives-on-diverged-input` | reset to metadata by the pull use case when elaboration finds a diverged input, before elaborating again | Maintain (`ResetToMetadata`), checked by the transform job before it resets ([dataset-pull.md](dataset-pull.md#7-authorization)) | CAS on the planned head |
 
 Reset flows run only when triggered, or (reset to metadata) when a sensor recovers from a breaking
 change. The GraphQL preconditions, configuration and trigger rules are owned by
@@ -208,7 +208,7 @@ consumers handle a rewrite as follows:
 | `ResetExecutionError::SetReferenceFailed(BlockNotFound)` | executor | the target block is not in the dataset's block store |
 | `ResetExecutionError::SetReferenceFailed(CASFailed)` | executor | `HEAD` moved after planning |
 | `ResetExecutionError::SetReferenceFailed(Access)` | executor | moving `HEAD` is not allowed |
-| `ResetExecutionError::SetReferenceFailed(Internal)`, `Internal` | executor | storage or database failure |
+| `ResetExecutionError::SetReferenceFailed(Internal)` | executor | storage or database failure |
 
 `ResetResult { old_head, new_head }` reports the head the planner read and the new head. The CLI
 prints errors as failures; task and GraphQL mappings are owned by
