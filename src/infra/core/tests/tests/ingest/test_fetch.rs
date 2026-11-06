@@ -1445,51 +1445,35 @@ async fn test_fetch_container_has_more_data_is_more_than_a_batch() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[tokio::test]
-async fn test_fetch_url_unsupported_scheme_is_invalid_fetch_step() {
+async fn test_fetch_misconfigured_steps_are_invalid_fetch_step() {
     let harness = FetchTestHarness::new();
-
-    let res = harness
-        .fetch_once(&odf::metadata::FetchStep::Url(
-            odf::metadata::FetchStepUrl {
-                url: "s3://bucket/data.csv".to_owned(),
-                event_time: None,
-                cache: None,
-                headers: None,
-            },
-        ))
-        .await;
-
-    assert_matches!(res, Err(PollingIngestError::InvalidFetchStep(_)));
-}
-
-#[tokio::test]
-async fn test_fetch_url_http_invalid_header_is_invalid_fetch_step() {
-    let harness = FetchTestHarness::new();
-
-    let res = harness
-        .fetch_once(&odf::metadata::FetchStep::Url(
-            odf::metadata::FetchStepUrl {
-                url: "http://localhost:123/data.csv".to_owned(),
-                event_time: None,
-                cache: None,
-                headers: Some(vec![odf::metadata::RequestHeader {
+    let url_step = |url: &str, headers| {
+        odf::metadata::FetchStep::Url(odf::metadata::FetchStepUrl {
+            url: url.to_owned(),
+            event_time: None,
+            cache: None,
+            headers,
+        })
+    };
+    let cases = [
+        ("unsupported scheme", url_step("s3://bucket/data.csv", None)),
+        (
+            "invalid HTTP header name",
+            url_step(
+                "http://localhost:123/data.csv",
+                Some(vec![odf::metadata::RequestHeader {
                     name: "not a header name".to_owned(),
                     value: "value".to_owned(),
                 }]),
-            },
-        ))
-        .await;
-
-    assert_matches!(res, Err(PollingIngestError::InvalidFetchStep(_)));
-}
-
-#[tokio::test]
-async fn test_fetch_files_glob_ordered_by_event_time_is_invalid_fetch_step() {
-    let harness = FetchTestHarness::new();
-
-    let res = harness
-        .fetch_once(&odf::metadata::FetchStep::FilesGlob(
-            odf::metadata::FetchStepFilesGlob {
+            ),
+        ),
+        (
+            "URL unparsable after templating",
+            url_step("${{ env.KAMU_TEST_UNSET || 'not a url' }}", None),
+        ),
+        (
+            "glob ordered by event time",
+            odf::metadata::FetchStep::FilesGlob(odf::metadata::FetchStepFilesGlob {
                 path: harness
                     .temp_dir
                     .path()
@@ -1500,11 +1484,15 @@ async fn test_fetch_files_glob_ordered_by_event_time_is_invalid_fetch_step() {
                 event_time: None,
                 cache: None,
                 order: Some(odf::metadata::SourceOrdering::ByEventTime),
-            },
-        ))
-        .await;
+            }),
+        ),
+    ];
 
-    assert_matches!(res, Err(PollingIngestError::InvalidFetchStep(_)));
+    for (case, fetch_step) in cases {
+        let res = harness.fetch_once(&fetch_step).await;
+
+        assert_matches!(res, Err(PollingIngestError::InvalidFetchStep(_)), "{case}");
+    }
 }
 
 #[cfg(feature = "ingest-mqtt")]
@@ -1572,65 +1560,27 @@ async fn test_fetch_url_http_invalid_header_value_is_reported_by_name_only() {
 }
 
 #[tokio::test]
-async fn test_fetch_url_unparsable_after_templating_is_invalid_fetch_step() {
-    let harness = FetchTestHarness::new();
+async fn test_fetch_files_glob_bad_event_time_from_path_is_invalid_fetch_step() {
+    let cases = [
+        ("bad regex", r"data-(\d+", None),
+        ("pattern not matching", r"other-(\d{4}-\d{2}-\d{2})", None),
+        ("pattern without group", r"data-\d{4}-\d{2}-\d{2}", None),
+        (
+            "bad timestamp format",
+            r"data-(\d{4}-\d{2}-\d{2})",
+            Some("%Y/%m/%d"),
+        ),
+    ];
 
-    let res = harness
-        .fetch_once(&odf::metadata::FetchStep::Url(
-            odf::metadata::FetchStepUrl {
-                url: "${{ env.KAMU_TEST_UNSET || 'not a url' }}".to_owned(),
-                event_time: None,
-                cache: None,
-                headers: None,
-            },
-        ))
-        .await;
+    for (case, pattern, timestamp_format) in cases {
+        let harness = FetchTestHarness::new();
 
-    assert_matches!(res, Err(PollingIngestError::InvalidFetchStep(_)));
-}
+        let res = harness
+            .fetch_glob_with_event_time_from_path(pattern, timestamp_format)
+            .await;
 
-#[tokio::test]
-async fn test_fetch_files_glob_event_time_bad_regex_is_invalid_fetch_step() {
-    let harness = FetchTestHarness::new();
-
-    let res = harness
-        .fetch_glob_with_event_time_from_path(r"data-(\d+", None)
-        .await;
-
-    assert_matches!(res, Err(PollingIngestError::InvalidFetchStep(_)));
-}
-
-#[tokio::test]
-async fn test_fetch_files_glob_event_time_pattern_not_matching_is_invalid_fetch_step() {
-    let harness = FetchTestHarness::new();
-
-    let res = harness
-        .fetch_glob_with_event_time_from_path(r"other-(\d{4}-\d{2}-\d{2})", None)
-        .await;
-
-    assert_matches!(res, Err(PollingIngestError::InvalidFetchStep(_)));
-}
-
-#[tokio::test]
-async fn test_fetch_files_glob_event_time_pattern_without_group_is_invalid_fetch_step() {
-    let harness = FetchTestHarness::new();
-
-    let res = harness
-        .fetch_glob_with_event_time_from_path(r"data-\d{4}-\d{2}-\d{2}", None)
-        .await;
-
-    assert_matches!(res, Err(PollingIngestError::InvalidFetchStep(_)));
-}
-
-#[tokio::test]
-async fn test_fetch_files_glob_event_time_bad_format_is_invalid_fetch_step() {
-    let harness = FetchTestHarness::new();
-
-    let res = harness
-        .fetch_glob_with_event_time_from_path(r"data-(\d{4}-\d{2}-\d{2})", Some("%Y/%m/%d"))
-        .await;
-
-    assert_matches!(res, Err(PollingIngestError::InvalidFetchStep(_)));
+        assert_matches!(res, Err(PollingIngestError::InvalidFetchStep(_)), "{case}");
+    }
 }
 
 #[tokio::test]

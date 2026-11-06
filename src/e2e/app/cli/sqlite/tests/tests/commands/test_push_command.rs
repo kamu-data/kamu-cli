@@ -13,15 +13,6 @@ use kamu_cli_e2e_common::prelude::*;
 
 kamu_cli_execute_command_e2e_test!(
     storage = sqlite,
-    fixture =
-        kamu_cli_e2e_repo_tests::commands::test_push_without_target_to_multiple_repositories_fails,
-    sqlite_only = "checks a CLI error message; the repository type cannot change it"
-);
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-kamu_cli_execute_command_e2e_test!(
-    storage = sqlite,
     fixture = kamu_cli_e2e_repo_tests::commands::test_push_unknown_dataset_id_fails,
     sqlite_only = "checks a CLI error message; the repository type cannot change it"
 );

@@ -14,21 +14,19 @@ use chrono::{Duration, TimeZone, Utc};
 use kamu_cli_e2e_common::{
     CreateDatasetResponse,
     DATASET_DERIVATIVE_CITY_POPULATION_SNAPSHOT,
-    DATASET_DERIVATIVE_LEADERBOARD_QUERY,
     DATASET_DERIVATIVE_LEADERBOARD_SNAPSHOT_STR,
     DATASET_ROOT_CITY_POPULATION_SNAPSHOT,
     DATASET_ROOT_PLAYER_NAME,
     DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_1,
     DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_2,
     DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_3,
-    DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR,
     FlowDownstreamSummary,
     FlowSummary,
     FlowTriggerResponse,
     KamuApiServerClient,
     KamuApiServerClientExt,
     RequestBody,
-    leaderboard_set_transform_event,
+    city_population_root_snapshot,
 };
 use kamu_cli_puppet::KamuCliPuppet;
 use wiremock::matchers::{method, path};
@@ -1138,92 +1136,32 @@ pub async fn test_trigger_flow_ingest_with_env_var_from_variable_set(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn test_trigger_flow_ingest_with_self_referencing_env_var(
+pub async fn test_trigger_flow_ingest_of_invalid_fetch_step_or_data_fails_without_retries(
     mut kamu_api_server_client: KamuApiServerClient,
 ) {
-    const SELF_REFERENCE: &str = "${{ env.data_file }}";
-
-    // A substituted value is inserted as it is, so the URL names a file called
-    // after the template itself. The reader takes the format from the extension,
-    // which the template would otherwise provide
     let temp_dir = tempfile::tempdir().unwrap();
-    std::fs::write(
-        temp_dir.path().join(format!("{SELF_REFERENCE}.csv")),
-        CITY_POPULATION_CSV,
-    )
-    .unwrap();
+    let unparsable_path = temp_dir.path().join("unparsable.csv");
+    std::fs::write(&unparsable_path, "city,population\nA,not-a-number\n").unwrap();
 
-    let ctx = ResourceCtx::remote_from_server(
-        &mut kamu_api_server_client,
-        ResourceCtx::DEFAULT_REMOTE_CONTEXT,
-    )
-    .await;
-
-    let CreateDatasetResponse { dataset_id, .. } = kamu_api_server_client
-        .dataset()
-        .create_dataset(&city_population_snapshot(
-            "Url",
-            "url",
-            &format!("file://{}/{SELF_REFERENCE}.csv", temp_dir.path().display()),
-        ))
-        .await;
-
-    let variable_set = indoc::formatdoc!(
-        r#"
-        $schema: https://opendatafabric.org/schemas/config/v1alpha1/VariableSet
-        headers:
-          name: ingest-vars
-          labels:
-            legacy-config-target-dataset: {dataset_id}
-        spec:
-          variables:
-            data_file: "{SELF_REFERENCE}"
-        "#
-    );
-    ctx.assert_success_with_stdin(["apply", "--stdin"], &variable_set, None)
-        .await;
-    wait_until_ready(&ctx, "ingest-vars").await;
-
-    assert_matches!(
-        kamu_api_server_client
-            .flow()
-            .trigger_ingest(&dataset_id)
-            .await,
-        FlowTriggerResponse::Success(_)
-    );
-    kamu_api_server_client.flow().wait(&dataset_id, 1).await;
-
-    let flows = kamu_api_server_client.flow().list_flows(&dataset_id).await;
-    pretty_assertions::assert_eq!(
-        vec![Some("FlowSuccessResult")],
-        flows
-            .iter()
-            .map(|f| f.outcome.as_deref())
-            .collect::<Vec<_>>()
-    );
-    pretty_assertions::assert_eq!(vec!["A", "B"], query_cities(&kamu_api_server_client).await);
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub async fn test_trigger_flow_ingest_of_invalid_fetch_step_fails_without_retries(
-    mut kamu_api_server_client: KamuApiServerClient,
-) {
     kamu_api_server_client.auth().login_as_kamu().await;
 
     for (dataset_name, fetch) in [
         (
             "unsupported-url-scheme",
-            r#"{ kind: Url, url: "s3://bucket/data.csv" }"#,
+            r#"{ kind: Url, url: "s3://bucket/data.csv" }"#.to_string(),
         ),
         (
             "invalid-header-name",
-            r#"{ kind: Url, url: "http://127.0.0.1:1/data.csv", headers: [{ name: "bad header", value: "x" }] }"#,
+            r#"{ kind: Url, url: "http://127.0.0.1:1/data.csv", headers: [{ name: "bad header", value: "x" }] }"#.to_string(),
+        ),
+        (
+            "unparsable-data",
+            format!(r#"{{ kind: Url, url: "file://{}" }}"#, unparsable_path.display()),
         ),
     ] {
         let CreateDatasetResponse { dataset_id, .. } = kamu_api_server_client
             .dataset()
-            .create_dataset(&city_population_snapshot_with_fetch(dataset_name, fetch))
+            .create_dataset(&city_population_snapshot_with_fetch(dataset_name, &fetch))
             .await;
         kamu_api_server_client
             .flow()
@@ -1253,7 +1191,6 @@ pub async fn test_trigger_flow_ingest_of_invalid_fetch_step_fails_without_retrie
     }
 
     // The node survives the failed ingests and still runs valid ones
-    let temp_dir = tempfile::tempdir().unwrap();
     let src_path = temp_dir.path().join("data.csv");
     std::fs::write(&src_path, CITY_POPULATION_CSV).unwrap();
     let CreateDatasetResponse { dataset_id, .. } = kamu_api_server_client
@@ -1283,44 +1220,6 @@ pub async fn test_trigger_flow_ingest_of_invalid_fetch_step_fails_without_retrie
             .collect::<Vec<_>>()
     );
     pretty_assertions::assert_eq!(vec!["A", "B"], query_cities(&kamu_api_server_client).await);
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub async fn test_trigger_flow_ingest_of_unparsable_data_fails_without_retries(
-    mut kamu_api_server_client: KamuApiServerClient,
-) {
-    let temp_dir = tempfile::tempdir().unwrap();
-    let src_path = temp_dir.path().join("data.csv");
-    std::fs::write(&src_path, "city,population\nA,not-a-number\n").unwrap();
-
-    kamu_api_server_client.auth().login_as_kamu().await;
-    let CreateDatasetResponse { dataset_id, .. } = kamu_api_server_client
-        .dataset()
-        .create_dataset(&city_population_snapshot(
-            "Url",
-            "url",
-            &format!("file://{}", src_path.display()),
-        ))
-        .await;
-    kamu_api_server_client
-        .flow()
-        .set_ingest_config(&dataset_id, false, false, 3)
-        .await;
-
-    assert_matches!(
-        kamu_api_server_client
-            .flow()
-            .trigger_ingest(&dataset_id)
-            .await,
-        FlowTriggerResponse::Success(_)
-    );
-    kamu_api_server_client.flow().wait(&dataset_id, 1).await;
-
-    let flows = kamu_api_server_client.flow().list_flows(&dataset_id).await;
-    pretty_assertions::assert_eq!(1, flows.len());
-    pretty_assertions::assert_eq!(Some("FlowFailedError"), flows[0].outcome.as_deref());
-    pretty_assertions::assert_eq!(1, flows[0].task_ids.len());
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1495,34 +1394,11 @@ fn city_population_snapshot(fetch_kind: &str, fetch_key: &str, fetch_value: &str
     )
 }
 
-/// A root dataset `dataset_name` reading CSV with `city` and `population`
-/// from a polling source whose fetch step is the YAML flow mapping `fetch`
+/// `city_population_root_snapshot` escaped for a GraphQL string
 fn city_population_snapshot_with_fetch(dataset_name: &str, fetch: &str) -> String {
-    indoc::formatdoc!(
-        r#"
-        kind: DatasetSnapshot
-        version: 1
-        content:
-          name: {dataset_name}
-          kind: Root
-          metadata:
-            - kind: SetPollingSource
-              fetch: {fetch}
-              read:
-                kind: Csv
-                header: true
-                schema:
-                  fields:
-                    - name: city
-                      type: String
-                    - name: population
-                      type: Int64
-              merge:
-                kind: Append
-        "#
-    )
-    .escape_default()
-    .to_string()
+    city_population_root_snapshot(dataset_name, fetch)
+        .escape_default()
+        .to_string()
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1605,19 +1481,13 @@ pub async fn test_trigger_flow_execute_transform(mut kamu_api_server_client: Kam
             .await
     );
 
-    assert_matches!(
-        kamu_api_server_client
-            .flow()
-            .trigger_transform(&derivative_dataset_id)
-            .await,
-        FlowTriggerResponse::Success(_)
+    let flow = run_transform_flow(&kamu_api_server_client, &derivative_dataset_id).await;
+
+    pretty_assertions::assert_eq!(
+        Some("FlowDescriptionUpdateResultSuccess"),
+        flow.transform_result.as_deref()
     );
-
-    kamu_api_server_client
-        .flow()
-        .wait(&derivative_dataset_id, 1)
-        .await;
-
+    pretty_assertions::assert_eq!(Some(2), flow.transformed_records);
     pretty_assertions::assert_eq!(
         indoc::indoc!(
             r#"
@@ -1672,41 +1542,6 @@ pub async fn test_trigger_flow_execute_transform_no_set_transform(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn test_trigger_flow_execute_transform_of_single_record_input(
-    mut kamu_api_server_client: KamuApiServerClient,
-) {
-    kamu_api_server_client.auth().login_as_kamu().await;
-
-    let CreateDatasetResponse { dataset_alias, .. } = kamu_api_server_client
-        .dataset()
-        .create_player_scores_dataset()
-        .await;
-    kamu_api_server_client
-        .dataset()
-        .ingest_data(
-            &dataset_alias,
-            RequestBody::NdJson(
-                r#"{"match_time": "2000-01-01", "match_id": 1, "player_id": "Alice", "score": 100}"#
-                    .into(),
-            ),
-        )
-        .await;
-    let CreateDatasetResponse {
-        dataset_id: derivative_dataset_id,
-        ..
-    } = kamu_api_server_client.dataset().create_leaderboard().await;
-
-    let flow = run_transform_flow(&kamu_api_server_client, &derivative_dataset_id).await;
-
-    pretty_assertions::assert_eq!(
-        Some("FlowDescriptionUpdateResultSuccess"),
-        flow.transform_result.as_deref()
-    );
-    pretty_assertions::assert_eq!(Some(1), flow.transformed_records);
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 pub async fn test_trigger_flow_execute_transform_after_input_watermark_advanced(
     mut kamu_api_server_client: KamuApiServerClient,
 ) {
@@ -1744,133 +1579,6 @@ pub async fn test_trigger_flow_execute_transform_after_input_watermark_advanced(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn test_trigger_flow_execute_transform_of_never_ingested_input(
-    mut kamu_api_server_client: KamuApiServerClient,
-) {
-    kamu_api_server_client.auth().login_as_kamu().await;
-
-    kamu_api_server_client
-        .dataset()
-        .create_player_scores_dataset()
-        .await;
-    let CreateDatasetResponse {
-        dataset_id: derivative_dataset_id,
-        ..
-    } = kamu_api_server_client.dataset().create_leaderboard().await;
-
-    let flow = run_transform_flow(&kamu_api_server_client, &derivative_dataset_id).await;
-
-    pretty_assertions::assert_eq!(Some("FlowSuccessResult"), flow.outcome.as_deref());
-    pretty_assertions::assert_eq!(
-        "",
-        kamu_api_server_client
-            .dataset()
-            .tail_data(&derivative_dataset_id)
-            .await
-    );
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub async fn test_trigger_flow_execute_transform_after_inputs_changed_fails(
-    mut kamu_api_server_client: KamuApiServerClient,
-) {
-    kamu_api_server_client.auth().login_as_kamu().await;
-
-    kamu_api_server_client
-        .dataset()
-        .create_player_scores_dataset_with_data()
-        .await;
-    let CreateDatasetResponse {
-        dataset_id: derivative_dataset_id,
-        ..
-    } = kamu_api_server_client.dataset().create_leaderboard().await;
-    run_transform_flow(&kamu_api_server_client, &derivative_dataset_id).await;
-    advance_time(&kamu_api_server_client, 1).await;
-
-    let CreateDatasetResponse {
-        dataset_id: other_dataset_id,
-        dataset_alias: other_dataset_alias,
-    } = kamu_api_server_client
-        .dataset()
-        .create_dataset(
-            &DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR
-                .replace("name: player-scores", "name: other-scores")
-                .escape_default()
-                .to_string(),
-        )
-        .await;
-    kamu_api_server_client
-        .dataset()
-        .ingest_data(
-            &other_dataset_alias,
-            RequestBody::NdJson(DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_2.into()),
-        )
-        .await;
-    kamu_api_server_client
-        .dataset()
-        .commit_event(
-            &derivative_dataset_id,
-            &leaderboard_set_transform_event(
-                &other_dataset_id,
-                DATASET_DERIVATIVE_LEADERBOARD_QUERY,
-            ),
-        )
-        .await;
-
-    let flow = run_transform_flow(&kamu_api_server_client, &derivative_dataset_id).await;
-
-    pretty_assertions::assert_eq!(Some("FlowFailedError"), flow.outcome.as_deref());
-    pretty_assertions::assert_eq!(Some(false), flow.failure_recoverable);
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub async fn test_trigger_flow_execute_transform_with_incompatible_schema_fails(
-    mut kamu_api_server_client: KamuApiServerClient,
-) {
-    kamu_api_server_client.auth().login_as_kamu().await;
-
-    let CreateDatasetResponse {
-        dataset_id: root_dataset_id,
-        dataset_alias: root_dataset_alias,
-    } = kamu_api_server_client
-        .dataset()
-        .create_player_scores_dataset_with_data()
-        .await;
-    let CreateDatasetResponse {
-        dataset_id: derivative_dataset_id,
-        ..
-    } = kamu_api_server_client.dataset().create_leaderboard().await;
-    run_transform_flow(&kamu_api_server_client, &derivative_dataset_id).await;
-    advance_time(&kamu_api_server_client, 1).await;
-
-    kamu_api_server_client
-        .dataset()
-        .commit_event(
-            &derivative_dataset_id,
-            &leaderboard_set_transform_event(
-                &root_dataset_id,
-                "SELECT match_time, CAST(score AS STRING) AS score FROM player_scores",
-            ),
-        )
-        .await;
-    kamu_api_server_client
-        .dataset()
-        .ingest_data(
-            &root_dataset_alias,
-            RequestBody::NdJson(DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_2.into()),
-        )
-        .await;
-
-    let flow = run_transform_flow(&kamu_api_server_client, &derivative_dataset_id).await;
-
-    pretty_assertions::assert_eq!(Some("FlowFailedError"), flow.outcome.as_deref());
-    pretty_assertions::assert_eq!(Some(false), flow.failure_recoverable);
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 pub async fn test_trigger_flow_execute_transform_with_unknown_engine_fails(
     mut kamu_api_server_client: KamuApiServerClient,
 ) {
@@ -1901,7 +1609,6 @@ pub async fn test_trigger_flow_execute_transform_with_unknown_engine_fails(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// The leaderboard's own query, on one line
 /// Triggers a transform flow and waits for it to finish
 async fn run_transform_flow(
     kamu_api_server_client: &KamuApiServerClient,

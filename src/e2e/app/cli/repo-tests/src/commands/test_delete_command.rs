@@ -13,6 +13,8 @@ use kamu_cli_puppet::extensions::{AddDatasetOptions, KamuCliPuppetExt};
 use odf::metadata::testing::MetadataFactory;
 use url::Url;
 
+use crate::utils::create_alice_and_bob;
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_delete_dataset(kamu: KamuCliPuppet) {
@@ -235,11 +237,7 @@ pub async fn test_delete_dataset_all(kamu: KamuCliPuppet) {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_delete_dataset_all_respects_current_account(mut kamu: KamuCliPuppet) {
-    let alice = odf::AccountName::new_unchecked("alice");
-    let bob = odf::AccountName::new_unchecked("bob");
-
-    kamu.create_account(&alice).await;
-    kamu.create_account(&bob).await;
+    let (alice, bob) = create_alice_and_bob(&kamu).await;
 
     kamu.set_account(Some(alice.clone()));
     kamu.execute_with_input(
@@ -288,11 +286,7 @@ pub async fn test_delete_dataset_all_respects_current_account(mut kamu: KamuCliP
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_delete_dataset_rejects_other_users_dataset(mut kamu: KamuCliPuppet) {
-    let alice = odf::AccountName::new_unchecked("alice");
-    let bob = odf::AccountName::new_unchecked("bob");
-
-    kamu.create_account(&alice).await;
-    kamu.create_account(&bob).await;
+    let (alice, bob) = create_alice_and_bob(&kamu).await;
 
     kamu.set_account(Some(bob.clone()));
     kamu.execute_with_input(
@@ -327,11 +321,7 @@ pub async fn test_delete_dataset_rejects_other_users_dataset(mut kamu: KamuCliPu
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_delete_dataset_recursive_rejects_foreign_downstream(mut kamu: KamuCliPuppet) {
-    let alice = odf::AccountName::new_unchecked("alice");
-    let bob = odf::AccountName::new_unchecked("bob");
-
-    kamu.create_account(&alice).await;
-    kamu.create_account(&bob).await;
+    let (alice, bob) = create_alice_and_bob(&kamu).await;
 
     use odf::metadata::testing::alias;
 
@@ -397,11 +387,7 @@ pub async fn test_delete_dataset_recursive_rejects_foreign_downstream(mut kamu: 
 pub async fn test_delete_dataset_recursive_force_orphans_foreign_downstream(
     mut kamu: KamuCliPuppet,
 ) {
-    let alice = odf::AccountName::new_unchecked("alice");
-    let bob = odf::AccountName::new_unchecked("bob");
-
-    kamu.create_account(&alice).await;
-    kamu.create_account(&bob).await;
+    let (alice, bob) = create_alice_and_bob(&kamu).await;
 
     use odf::metadata::testing::alias;
 
@@ -471,11 +457,7 @@ pub async fn test_delete_dataset_recursive_force_orphans_foreign_downstream(
 pub async fn test_delete_dataset_recursive_force_dry_run_previews_foreign_downstream_orphan(
     mut kamu: KamuCliPuppet,
 ) {
-    let alice = odf::AccountName::new_unchecked("alice");
-    let bob = odf::AccountName::new_unchecked("bob");
-
-    kamu.create_account(&alice).await;
-    kamu.create_account(&bob).await;
+    let (alice, bob) = create_alice_and_bob(&kamu).await;
 
     use odf::metadata::testing::alias;
 

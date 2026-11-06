@@ -27,6 +27,7 @@ use kamu_core::TenancyConfig;
 use crate::harness::{
     ClientSideHarness,
     ClientSideHarnessOptions,
+    LocalFsTransferOptions,
     ScriptedPushServer,
     ServerSideHarness,
     ServerSideHarnessOptions,
@@ -39,20 +40,15 @@ use crate::tests::tests_push::scenarios::*;
 
 #[test_log::test(tokio::test)]
 async fn test_smart_push_new_dataset_unauthenticated() {
-    let scenario = SmartPushNewDatasetScenario::prepare(
-        ClientSideHarness::new(ClientSideHarnessOptions {
-            tenancy_config: TenancyConfig::SingleTenant,
-            authenticated_remotely: false,
-        })
-        .await,
-        ServerSideLocalFsHarness::new(ServerSideHarnessOptions {
-            tenancy_config: TenancyConfig::MultiTenant,
-            authorized_writes: true,
-            ..ServerSideHarnessOptions::default()
-        })
-        .await,
-    )
+    let (client_harness, server_harness) = LocalFsTransferOptions {
+        client_tenancy: TenancyConfig::SingleTenant,
+        authenticated_remotely: false,
+        server_tenancy: TenancyConfig::MultiTenant,
+        authorized_writes: true,
+    }
+    .build()
     .await;
+    let scenario = SmartPushNewDatasetScenario::prepare(client_harness, server_harness).await;
 
     let api_server_handle = scenario.server_harness.api_server_run();
 
@@ -86,20 +82,15 @@ async fn test_smart_push_new_dataset_unauthenticated() {
 
 #[test_log::test(tokio::test)]
 async fn test_smart_push_new_dataset_wrong_user() {
-    let scenario = SmartPushNewDatasetScenario::prepare(
-        ClientSideHarness::new(ClientSideHarnessOptions {
-            tenancy_config: TenancyConfig::SingleTenant,
-            authenticated_remotely: true,
-        })
-        .await,
-        ServerSideLocalFsHarness::new(ServerSideHarnessOptions {
-            tenancy_config: TenancyConfig::MultiTenant,
-            authorized_writes: true,
-            ..ServerSideHarnessOptions::default()
-        })
-        .await,
-    )
+    let (client_harness, server_harness) = LocalFsTransferOptions {
+        client_tenancy: TenancyConfig::SingleTenant,
+        authenticated_remotely: true,
+        server_tenancy: TenancyConfig::MultiTenant,
+        authorized_writes: true,
+    }
+    .build()
     .await;
+    let scenario = SmartPushNewDatasetScenario::prepare(client_harness, server_harness).await;
 
     let wrong_server_alias = odf::DatasetAlias::new(
         Some(odf::AccountName::new_unchecked("bad-account")),
@@ -138,20 +129,16 @@ async fn test_smart_push_new_dataset_wrong_user() {
 
 #[test_log::test(tokio::test)]
 async fn test_smart_push_existing_dataset_unauthenticated() {
-    let scenario = SmartPushExistingEvolvedDatasetScenario::prepare(
-        ClientSideHarness::new(ClientSideHarnessOptions {
-            tenancy_config: TenancyConfig::SingleTenant,
-            authenticated_remotely: false,
-        })
-        .await,
-        ServerSideLocalFsHarness::new(ServerSideHarnessOptions {
-            tenancy_config: TenancyConfig::MultiTenant,
-            authorized_writes: false,
-            ..ServerSideHarnessOptions::default()
-        })
-        .await,
-    )
+    let (client_harness, server_harness) = LocalFsTransferOptions {
+        client_tenancy: TenancyConfig::SingleTenant,
+        authenticated_remotely: false,
+        server_tenancy: TenancyConfig::MultiTenant,
+        authorized_writes: false,
+    }
+    .build()
     .await;
+    let scenario =
+        SmartPushExistingEvolvedDatasetScenario::prepare(client_harness, server_harness).await;
 
     let api_server_handle = scenario.server_harness.api_server_run();
 
@@ -180,20 +167,16 @@ async fn test_smart_push_existing_dataset_unauthenticated() {
 
 #[test_log::test(tokio::test)]
 async fn test_smart_push_existing_dataset_unauthorized() {
-    let scenario = SmartPushExistingEvolvedDatasetScenario::prepare(
-        ClientSideHarness::new(ClientSideHarnessOptions {
-            tenancy_config: TenancyConfig::SingleTenant,
-            authenticated_remotely: true,
-        })
-        .await,
-        ServerSideLocalFsHarness::new(ServerSideHarnessOptions {
-            tenancy_config: TenancyConfig::MultiTenant,
-            authorized_writes: false,
-            ..ServerSideHarnessOptions::default()
-        })
-        .await,
-    )
+    let (client_harness, server_harness) = LocalFsTransferOptions {
+        client_tenancy: TenancyConfig::SingleTenant,
+        authenticated_remotely: true,
+        server_tenancy: TenancyConfig::MultiTenant,
+        authorized_writes: false,
+    }
+    .build()
     .await;
+    let scenario =
+        SmartPushExistingEvolvedDatasetScenario::prepare(client_harness, server_harness).await;
 
     let api_server_handle = scenario.server_harness.api_server_run();
 
@@ -222,20 +205,16 @@ async fn test_smart_push_existing_dataset_unauthorized() {
 
 #[test_log::test(tokio::test)]
 async fn test_smart_push_existing_ref_collision() {
-    let scenario = SmartPushExistingRefCollisionScenarion::prepare(
-        ClientSideHarness::new(ClientSideHarnessOptions {
-            tenancy_config: TenancyConfig::MultiTenant,
-            authenticated_remotely: true,
-        })
-        .await,
-        ServerSideLocalFsHarness::new(ServerSideHarnessOptions {
-            tenancy_config: TenancyConfig::MultiTenant,
-            authorized_writes: true,
-            ..ServerSideHarnessOptions::default()
-        })
-        .await,
-    )
+    let (client_harness, server_harness) = LocalFsTransferOptions {
+        client_tenancy: TenancyConfig::MultiTenant,
+        authenticated_remotely: true,
+        server_tenancy: TenancyConfig::MultiTenant,
+        authorized_writes: true,
+    }
+    .build()
     .await;
+    let scenario =
+        SmartPushExistingRefCollisionScenarion::prepare(client_harness, server_harness).await;
 
     let api_server_handle = scenario.server_harness.api_server_run();
 
@@ -266,20 +245,15 @@ async fn test_smart_push_existing_ref_collision() {
 /// `Seed` of another dataset must be refused, with or without `force`
 #[test_log::test(tokio::test)]
 async fn test_smart_push_into_headless_dataset_of_another_id_fails() {
-    let scenario = SmartPushNewDatasetScenario::prepare(
-        ClientSideHarness::new(ClientSideHarnessOptions {
-            tenancy_config: TenancyConfig::MultiTenant,
-            authenticated_remotely: true,
-        })
-        .await,
-        ServerSideLocalFsHarness::new(ServerSideHarnessOptions {
-            tenancy_config: TenancyConfig::MultiTenant,
-            authorized_writes: true,
-            ..ServerSideHarnessOptions::default()
-        })
-        .await,
-    )
+    let (client_harness, server_harness) = LocalFsTransferOptions {
+        client_tenancy: TenancyConfig::MultiTenant,
+        authenticated_remotely: true,
+        server_tenancy: TenancyConfig::MultiTenant,
+        authorized_writes: true,
+    }
+    .build()
     .await;
+    let scenario = SmartPushNewDatasetScenario::prepare(client_harness, server_harness).await;
     let headless_dataset_handle = scenario
         .server_harness
         .create_headless_dataset(scenario.dataset_name.as_str())
@@ -319,20 +293,16 @@ async fn test_smart_push_into_headless_dataset_of_another_id_fails() {
 
 #[test_log::test(tokio::test)]
 async fn test_smart_push_incompatible_version_err() {
-    let scenario = SmartPushExistingRefCollisionScenarion::prepare(
-        ClientSideHarness::new(ClientSideHarnessOptions {
-            tenancy_config: TenancyConfig::MultiTenant,
-            authenticated_remotely: true,
-        })
-        .await,
-        ServerSideLocalFsHarness::new(ServerSideHarnessOptions {
-            tenancy_config: TenancyConfig::MultiTenant,
-            authorized_writes: true,
-            ..ServerSideHarnessOptions::default()
-        })
-        .await,
-    )
+    let (client_harness, server_harness) = LocalFsTransferOptions {
+        client_tenancy: TenancyConfig::MultiTenant,
+        authenticated_remotely: true,
+        server_tenancy: TenancyConfig::MultiTenant,
+        authorized_writes: true,
+    }
+    .build()
     .await;
+    let scenario =
+        SmartPushExistingRefCollisionScenarion::prepare(client_harness, server_harness).await;
 
     let api_server_handle = scenario.server_harness.api_server_run();
 
@@ -356,20 +326,16 @@ async fn test_smart_push_incompatible_version_err() {
 
 #[test_log::test(tokio::test)]
 async fn test_smart_push_head_moved_concurrently() {
-    let scenario = SmartPushExistingEvolvedDatasetScenario::prepare(
-        ClientSideHarness::new(ClientSideHarnessOptions {
-            tenancy_config: TenancyConfig::SingleTenant,
-            authenticated_remotely: true,
-        })
-        .await,
-        ServerSideLocalFsHarness::new(ServerSideHarnessOptions {
-            tenancy_config: TenancyConfig::MultiTenant,
-            authorized_writes: true,
-            ..ServerSideHarnessOptions::default()
-        })
-        .await,
-    )
+    let (client_harness, server_harness) = LocalFsTransferOptions {
+        client_tenancy: TenancyConfig::SingleTenant,
+        authenticated_remotely: true,
+        server_tenancy: TenancyConfig::MultiTenant,
+        authorized_writes: true,
+    }
+    .build()
     .await;
+    let scenario =
+        SmartPushExistingEvolvedDatasetScenario::prepare(client_harness, server_harness).await;
 
     let server_dataset_handle = scenario
         .server_harness
@@ -419,20 +385,16 @@ async fn test_smart_push_head_moved_concurrently() {
 
 #[test_log::test(tokio::test)]
 async fn test_smart_push_rolled_back_when_change_message_fails() {
-    let scenario = SmartPushExistingEvolvedDatasetScenario::prepare(
-        ClientSideHarness::new(ClientSideHarnessOptions {
-            tenancy_config: TenancyConfig::SingleTenant,
-            authenticated_remotely: true,
-        })
-        .await,
-        ServerSideLocalFsHarness::new(ServerSideHarnessOptions {
-            tenancy_config: TenancyConfig::MultiTenant,
-            authorized_writes: true,
-            ..ServerSideHarnessOptions::default()
-        })
-        .await,
-    )
+    let (client_harness, server_harness) = LocalFsTransferOptions {
+        client_tenancy: TenancyConfig::SingleTenant,
+        authenticated_remotely: true,
+        server_tenancy: TenancyConfig::MultiTenant,
+        authorized_writes: true,
+    }
+    .build()
     .await;
+    let scenario =
+        SmartPushExistingEvolvedDatasetScenario::prepare(client_harness, server_harness).await;
 
     let dataset_id = scenario.client_create_result.dataset_handle.id.clone();
     let server_head = scenario.client_create_result.head.clone();
@@ -493,20 +455,16 @@ async fn test_smart_push_rolled_back_when_change_message_fails() {
 
 #[test_log::test(tokio::test)]
 async fn test_smart_push_from_stale_head_is_rejected_with_both_heads() {
-    let scenario = SmartPushExistingEvolvedDatasetScenario::prepare(
-        ClientSideHarness::new(ClientSideHarnessOptions {
-            tenancy_config: TenancyConfig::SingleTenant,
-            authenticated_remotely: true,
-        })
-        .await,
-        ServerSideLocalFsHarness::new(ServerSideHarnessOptions {
-            tenancy_config: TenancyConfig::MultiTenant,
-            authorized_writes: true,
-            ..ServerSideHarnessOptions::default()
-        })
-        .await,
-    )
+    let (client_harness, server_harness) = LocalFsTransferOptions {
+        client_tenancy: TenancyConfig::SingleTenant,
+        authenticated_remotely: true,
+        server_tenancy: TenancyConfig::MultiTenant,
+        authorized_writes: true,
+    }
+    .build()
     .await;
+    let scenario =
+        SmartPushExistingEvolvedDatasetScenario::prepare(client_harness, server_harness).await;
 
     // A pushed dataset keeps its ID on the server
     let dataset_id = &scenario.client_create_result.dataset_handle.id;
@@ -550,20 +508,16 @@ async fn test_smart_push_from_stale_head_is_rejected_with_both_heads() {
 
 #[test_log::test(tokio::test)]
 async fn test_smart_push_forced_head_moved_after_initiation() {
-    let scenario = SmartPushExistingDivergedDatasetScenario::prepare(
-        ClientSideHarness::new(ClientSideHarnessOptions {
-            tenancy_config: TenancyConfig::SingleTenant,
-            authenticated_remotely: true,
-        })
-        .await,
-        ServerSideLocalFsHarness::new(ServerSideHarnessOptions {
-            tenancy_config: TenancyConfig::MultiTenant,
-            authorized_writes: true,
-            ..ServerSideHarnessOptions::default()
-        })
-        .await,
-    )
+    let (client_harness, server_harness) = LocalFsTransferOptions {
+        client_tenancy: TenancyConfig::SingleTenant,
+        authenticated_remotely: true,
+        server_tenancy: TenancyConfig::MultiTenant,
+        authorized_writes: true,
+    }
+    .build()
     .await;
+    let scenario =
+        SmartPushExistingDivergedDatasetScenario::prepare(client_harness, server_harness).await;
 
     let server_dataset_handle = scenario
         .server_harness
@@ -613,20 +567,16 @@ async fn test_smart_push_forced_head_moved_after_initiation() {
 
 #[test_log::test(tokio::test)]
 async fn test_smart_push_without_uploading_referenced_objects_is_not_committed() {
-    let scenario = SmartPushExistingUpToDateDatasetScenario::prepare(
-        ClientSideHarness::new(ClientSideHarnessOptions {
-            tenancy_config: TenancyConfig::SingleTenant,
-            authenticated_remotely: true,
-        })
-        .await,
-        ServerSideLocalFsHarness::new(ServerSideHarnessOptions {
-            tenancy_config: TenancyConfig::MultiTenant,
-            authorized_writes: true,
-            ..ServerSideHarnessOptions::default()
-        })
-        .await,
-    )
+    let (client_harness, server_harness) = LocalFsTransferOptions {
+        client_tenancy: TenancyConfig::SingleTenant,
+        authenticated_remotely: true,
+        server_tenancy: TenancyConfig::MultiTenant,
+        authorized_writes: true,
+    }
+    .build()
     .await;
+    let scenario =
+        SmartPushExistingUpToDateDatasetScenario::prepare(client_harness, server_harness).await;
 
     let dataset_handle = &scenario.client_dataset_handle;
     let server_head = scenario
@@ -675,20 +625,16 @@ async fn test_smart_push_without_uploading_referenced_objects_is_not_committed()
 
 #[test_log::test(tokio::test)]
 async fn test_smart_push_batch_of_other_than_planned_size_is_rejected() {
-    let scenario = SmartPushExistingUpToDateDatasetScenario::prepare(
-        ClientSideHarness::new(ClientSideHarnessOptions {
-            tenancy_config: TenancyConfig::SingleTenant,
-            authenticated_remotely: true,
-        })
-        .await,
-        ServerSideLocalFsHarness::new(ServerSideHarnessOptions {
-            tenancy_config: TenancyConfig::MultiTenant,
-            authorized_writes: true,
-            ..ServerSideHarnessOptions::default()
-        })
-        .await,
-    )
+    let (client_harness, server_harness) = LocalFsTransferOptions {
+        client_tenancy: TenancyConfig::SingleTenant,
+        authenticated_remotely: true,
+        server_tenancy: TenancyConfig::MultiTenant,
+        authorized_writes: true,
+    }
+    .build()
     .await;
+    let scenario =
+        SmartPushExistingUpToDateDatasetScenario::prepare(client_harness, server_harness).await;
 
     let dataset_handle = &scenario.client_dataset_handle;
     let server_head = scenario
@@ -728,96 +674,10 @@ async fn test_smart_push_batch_of_other_than_planned_size_is_rejected() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_smart_push_new_dataset_without_seed_is_rejected() {
-    let scenario = SmartPushNewDatasetScenario::prepare(
-        ClientSideHarness::new(ClientSideHarnessOptions {
-            tenancy_config: TenancyConfig::MultiTenant,
-            authenticated_remotely: true,
-        })
-        .await,
-        ServerSideLocalFsHarness::new(ServerSideHarnessOptions {
-            tenancy_config: TenancyConfig::MultiTenant,
-            authorized_writes: true,
-            ..ServerSideHarnessOptions::default()
-        })
-        .await,
-    )
-    .await;
-
-    let dataset_handle = &scenario.client_dataset_handle;
-    let (push_request, metadata_request) = scenario
-        .client_harness
-        .raw_new_dataset_push_requests_without_seed(dataset_handle)
-        .await;
-    let stored_heads = scenario.server_harness.stored_heads();
-
-    let api_server_handle = scenario.server_harness.api_server_run();
-
-    let client_handle = async {
-        let mut session = scenario
-            .client_harness
-            .open_raw_push_session(scenario.server_dataset_ref.url().unwrap())
-            .await;
-        session.send_metadata(push_request, metadata_request).await;
-        session.assert_metadata_accepted().await;
-
-        pretty_assertions::assert_eq!(
-            session.internal_error_phase().await,
-            "Push Phase: Ensuring Target Dataset Exists"
-        );
-        pretty_assertions::assert_eq!(stored_heads.find(&dataset_handle.id).await, None);
-    };
-
-    await_client_server_flow!(api_server_handle, client_handle);
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[test_log::test(tokio::test)]
-async fn test_smart_push_new_dataset_with_wrong_seed_hash_creates_nothing() {
-    let scenario = SmartPushNewDatasetScenario::prepare(
-        ClientSideHarness::new(ClientSideHarnessOptions {
-            tenancy_config: TenancyConfig::MultiTenant,
-            authenticated_remotely: true,
-        })
-        .await,
-        ServerSideLocalFsHarness::new(ServerSideHarnessOptions {
-            tenancy_config: TenancyConfig::MultiTenant,
-            authorized_writes: true,
-            ..ServerSideHarnessOptions::default()
-        })
-        .await,
-    )
-    .await;
-
-    let dataset_handle = &scenario.client_dataset_handle;
-    let (push_request, metadata_request) = scenario
-        .client_harness
-        .raw_new_dataset_push_requests_with_seed_hash(
-            dataset_handle,
-            &odf::Multihash::from_digest_sha3_256(b"not-the-seed"),
-        )
-        .await;
-    let stored_heads = scenario.server_harness.stored_heads();
-
-    let api_server_handle = scenario.server_harness.api_server_run();
-
-    let client_handle = async {
-        let mut session = scenario
-            .client_harness
-            .open_raw_push_session(scenario.server_dataset_ref.url().unwrap())
-            .await;
-        session.send_metadata(push_request, metadata_request).await;
-        session.assert_metadata_accepted().await;
-
-        pretty_assertions::assert_eq!(
-            session.internal_error_phase().await,
-            "Push Phase: Ensuring Target Dataset Exists"
-        );
-        pretty_assertions::assert_eq!(stored_heads.find(&dataset_handle.id).await, None);
-    };
-
-    await_client_server_flow!(api_server_handle, client_handle);
+async fn test_smart_push_new_dataset_with_bad_seed_is_rejected_creating_nothing() {
+    for case in [BadSeedCase::Missing, BadSeedCase::WrongHash] {
+        case.assert_push_rejected_creating_nothing().await;
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -980,6 +840,76 @@ async fn test_smart_push_reads_the_completion_reply_after_a_stale_progress_reque
     };
 
     await_client_server_flow!(server_handle, client_handle);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// A push of a new dataset whose metadata does not start at the `Seed` the
+/// request declares
+#[derive(Debug, Clone, Copy)]
+enum BadSeedCase {
+    /// The metadata leaves the `Seed` out
+    Missing,
+    /// The request declares a hash that is not the `Seed`'s
+    WrongHash,
+}
+
+impl BadSeedCase {
+    async fn assert_push_rejected_creating_nothing(self) {
+        let (client_harness, server_harness) = LocalFsTransferOptions {
+            client_tenancy: TenancyConfig::MultiTenant,
+            authenticated_remotely: true,
+            server_tenancy: TenancyConfig::MultiTenant,
+            authorized_writes: true,
+        }
+        .build()
+        .await;
+        let scenario = SmartPushNewDatasetScenario::prepare(client_harness, server_harness).await;
+
+        let dataset_handle = &scenario.client_dataset_handle;
+        let (push_request, metadata_request) = match self {
+            Self::Missing => {
+                scenario
+                    .client_harness
+                    .raw_new_dataset_push_requests_without_seed(dataset_handle)
+                    .await
+            }
+            Self::WrongHash => {
+                scenario
+                    .client_harness
+                    .raw_new_dataset_push_requests_with_seed_hash(
+                        dataset_handle,
+                        &odf::Multihash::from_digest_sha3_256(b"not-the-seed"),
+                    )
+                    .await
+            }
+        };
+        let stored_heads = scenario.server_harness.stored_heads();
+
+        let api_server_handle = scenario.server_harness.api_server_run();
+
+        let client_handle = async {
+            let mut session = scenario
+                .client_harness
+                .open_raw_push_session(scenario.server_dataset_ref.url().unwrap())
+                .await;
+            session.send_metadata(push_request, metadata_request).await;
+            session.assert_metadata_accepted().await;
+
+            pretty_assertions::assert_eq!(
+                session.internal_error_phase().await,
+                "Push Phase: Ensuring Target Dataset Exists",
+                "{self:?}"
+            );
+            pretty_assertions::assert_eq!(
+                stored_heads.find(&dataset_handle.id).await,
+                None,
+                "{self:?}"
+            );
+        };
+
+        await_client_server_flow!(api_server_handle, client_handle);
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -276,7 +276,7 @@ async fn test_pull_ingest_commits_head() {
     let ingested_head = harness.append_unreferenced_block(&foo, "ingested").await;
     reported_heads.set(&foo.head, &ingested_head);
 
-    let pull_response = harness.pull_local(&alias_foo).await;
+    let (pull_response, events) = harness.pull_local_recording(&alias_foo).await;
 
     assert_matches!(
         pull_response.result,
@@ -284,6 +284,7 @@ async fn test_pull_ingest_commits_head() {
         if old_head == foo.head && new_head == ingested_head
     );
     assert_eq!(harness.get_head(&foo).await, ingested_head);
+    assert_eq!(events, vec!["success"]);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -299,11 +300,10 @@ async fn test_pull_ingest_head_moved_concurrently() {
     ));
     let foo = harness.create_root_dataset(&alias_foo).await;
     let ingested_head = harness.append_unreferenced_block(&foo, "ingested").await;
-    let concurrent_head = harness.append_unreferenced_block(&foo, "concurrent").await;
     reported_heads.set(&foo.head, &ingested_head);
-    harness.move_head(&foo, &foo.head, &concurrent_head).await;
+    let concurrent_head = harness.move_head_concurrently(&foo).await;
 
-    let pull_response = harness.pull_local(&alias_foo).await;
+    let (pull_response, events) = harness.pull_local_recording(&alias_foo).await;
 
     assert_matches!(
         pull_response.result,
@@ -311,49 +311,6 @@ async fn test_pull_ingest_head_moved_concurrently() {
         if e.expected == Some(foo.head.clone()) && e.actual == Some(concurrent_head.clone())
     );
     assert_eq!(harness.get_head(&foo).await, concurrent_head);
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[tokio::test]
-async fn test_pull_ingest_reports_success_after_commit() {
-    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
-    let reported_heads = ReportedHeads::default();
-
-    let harness = PullUseCaseHarness::new(PullUseCaseHarnessMocks::for_ingest_updated(
-        &alias_foo,
-        &reported_heads,
-    ));
-    let foo = harness.create_root_dataset(&alias_foo).await;
-    let ingested_head = harness.append_unreferenced_block(&foo, "ingested").await;
-    reported_heads.set(&foo.head, &ingested_head);
-
-    let (pull_response, events) = harness.pull_local_recording(&alias_foo).await;
-
-    assert_matches!(pull_response.result, Ok(PullResult::Updated { .. }));
-    assert_eq!(events, vec!["success"]);
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[tokio::test]
-async fn test_pull_ingest_head_moved_reports_error_not_success() {
-    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
-    let reported_heads = ReportedHeads::default();
-
-    let harness = PullUseCaseHarness::new(PullUseCaseHarnessMocks::for_ingest_updated(
-        &alias_foo,
-        &reported_heads,
-    ));
-    let foo = harness.create_root_dataset(&alias_foo).await;
-    let ingested_head = harness.append_unreferenced_block(&foo, "ingested").await;
-    let concurrent_head = harness.append_unreferenced_block(&foo, "concurrent").await;
-    reported_heads.set(&foo.head, &ingested_head);
-    harness.move_head(&foo, &foo.head, &concurrent_head).await;
-
-    let (pull_response, events) = harness.pull_local_recording(&alias_foo).await;
-
-    assert_matches!(pull_response.result, Err(PullError::HeadMoved(_)));
     assert_eq!(events, vec!["error"]);
 }
 
@@ -657,7 +614,7 @@ async fn test_pull_transform_commits_head() {
     let transformed_head = harness.append_unreferenced_block(&bar, "transformed").await;
     reported_heads.set(&bar.head, &transformed_head);
 
-    let pull_response = harness.pull_local(&alias_bar).await;
+    let (pull_response, events) = harness.pull_local_recording(&alias_bar).await;
 
     assert_matches!(
         pull_response.result,
@@ -665,6 +622,7 @@ async fn test_pull_transform_commits_head() {
         if old_head == bar.head && new_head == transformed_head
     );
     assert_eq!(harness.get_head(&bar).await, transformed_head);
+    assert_eq!(events, vec!["success"]);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -685,11 +643,10 @@ async fn test_pull_transform_head_moved_concurrently() {
         .create_derived_dataset(&alias_bar, vec![foo.dataset_handle.as_local_ref()])
         .await;
     let transformed_head = harness.append_unreferenced_block(&bar, "transformed").await;
-    let concurrent_head = harness.append_unreferenced_block(&bar, "concurrent").await;
     reported_heads.set(&bar.head, &transformed_head);
-    harness.move_head(&bar, &bar.head, &concurrent_head).await;
+    let concurrent_head = harness.move_head_concurrently(&bar).await;
 
-    let pull_response = harness.pull_local(&alias_bar).await;
+    let (pull_response, events) = harness.pull_local_recording(&alias_bar).await;
 
     assert_matches!(
         pull_response.result,
@@ -697,59 +654,6 @@ async fn test_pull_transform_head_moved_concurrently() {
         if e.expected == Some(bar.head.clone()) && e.actual == Some(concurrent_head.clone())
     );
     assert_eq!(harness.get_head(&bar).await, concurrent_head);
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[tokio::test]
-async fn test_pull_transform_reports_success_after_commit() {
-    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
-    let alias_bar = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("bar"));
-    let reported_heads = ReportedHeads::default();
-
-    let harness = PullUseCaseHarness::new(PullUseCaseHarnessMocks::for_transform_updated(
-        &alias_foo,
-        &alias_bar,
-        &reported_heads,
-    ));
-    let foo = harness.create_root_dataset(&alias_foo).await;
-    let bar = harness
-        .create_derived_dataset(&alias_bar, vec![foo.dataset_handle.as_local_ref()])
-        .await;
-    let transformed_head = harness.append_unreferenced_block(&bar, "transformed").await;
-    reported_heads.set(&bar.head, &transformed_head);
-
-    let (pull_response, events) = harness.pull_local_recording(&alias_bar).await;
-
-    assert_matches!(pull_response.result, Ok(PullResult::Updated { .. }));
-    assert_eq!(events, vec!["success"]);
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[tokio::test]
-async fn test_pull_transform_head_moved_reports_error_not_success() {
-    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
-    let alias_bar = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("bar"));
-    let reported_heads = ReportedHeads::default();
-
-    let harness = PullUseCaseHarness::new(PullUseCaseHarnessMocks::for_transform_updated(
-        &alias_foo,
-        &alias_bar,
-        &reported_heads,
-    ));
-    let foo = harness.create_root_dataset(&alias_foo).await;
-    let bar = harness
-        .create_derived_dataset(&alias_bar, vec![foo.dataset_handle.as_local_ref()])
-        .await;
-    let transformed_head = harness.append_unreferenced_block(&bar, "transformed").await;
-    let concurrent_head = harness.append_unreferenced_block(&bar, "concurrent").await;
-    reported_heads.set(&bar.head, &transformed_head);
-    harness.move_head(&bar, &bar.head, &concurrent_head).await;
-
-    let (pull_response, events) = harness.pull_local_recording(&alias_bar).await;
-
-    assert_matches!(pull_response.result, Err(PullError::HeadMoved(_)));
     assert_eq!(events, vec!["error"]);
 }
 
@@ -1008,9 +912,7 @@ async fn test_pull_sync_into_existing_commits_from_its_head_and_keeps_pull_alias
         maybe_local_alias: Some(alias_foo.clone()),
     });
 
-    let pull_response = harness
-        .pull(pull_request.clone(), PullOptions::default())
-        .await;
+    let (pull_response, events) = harness.pull_remote_recording(&alias_foo, &remote_ref).await;
 
     assert_matches!(
         pull_response,
@@ -1025,6 +927,7 @@ async fn test_pull_sync_into_existing_commits_from_its_head_and_keeps_pull_alias
         old_head == foo.head &&
         new_head == PullUseCaseHarnessMocks::synced_head(),
     );
+    assert_eq!(events, vec!["success"]);
 
     // Only a pull that creates its dataset stores the pull alias
     let aliases = harness.get_remote_aliases(&foo).await;
@@ -1094,15 +997,7 @@ async fn test_pull_sync_head_moved_without_heads_stays_a_sync_error() {
         .copy_dataset_to_remote_repo(&foo.dataset_handle.id, &alias_foo.dataset_name)
         .await;
 
-    let pull_response = harness
-        .pull(
-            PullRequest::Remote(PullRequestRemote {
-                remote_ref,
-                maybe_local_alias: Some(alias_foo),
-            }),
-            PullOptions::default(),
-        )
-        .await;
+    let (pull_response, events) = harness.pull_remote_recording(&alias_foo, &remote_ref).await;
 
     assert_matches!(
         pull_response.result,
@@ -1110,6 +1005,7 @@ async fn test_pull_sync_head_moved_without_heads_stays_a_sync_error() {
             SyncHeadMovedError { heads: None }
         )))
     );
+    assert_eq!(events, vec!["error"]);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1744,9 +1640,8 @@ async fn test_pull_transform_reset_head_moved_concurrently() {
         .create_derived_dataset(&alias_bar, vec![foo.dataset_handle.as_local_ref()])
         .await;
     let reset_head = harness.append_unreferenced_block(&bar, "reset").await;
-    let concurrent_head = harness.append_unreferenced_block(&bar, "concurrent").await;
     reset_heads.set(&bar.head, &reset_head);
-    harness.move_head(&bar, &bar.head, &concurrent_head).await;
+    let concurrent_head = harness.move_head_concurrently(&bar).await;
 
     let pull_response = harness
         .pull_local_resetting_on_diverged_input(&alias_bar)
@@ -1827,45 +1722,6 @@ async fn test_pull_sync_into_dataset_deleted_during_sync_is_not_found() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[tokio::test]
-async fn test_pull_sync_reports_success_after_commit() {
-    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
-    let remote_ref = PullUseCaseHarness::remote_ref_of(&alias_foo);
-
-    let harness = PullUseCaseHarness::new(
-        PullUseCaseHarnessMocks::default().for_sync_into_existing_updated(&alias_foo, &remote_ref),
-    );
-    harness.create_root_dataset(&alias_foo).await;
-
-    let (pull_response, events) = harness.pull_remote_recording(&alias_foo, &remote_ref).await;
-
-    assert_matches!(pull_response.result, Ok(PullResult::Updated { .. }));
-    assert_eq!(events, vec!["success"]);
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[tokio::test]
-async fn test_pull_sync_failed_commit_reports_error_not_success() {
-    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
-    let remote_ref = PullUseCaseHarness::remote_ref_of(&alias_foo);
-
-    let harness =
-        PullUseCaseHarness::new(PullUseCaseHarnessMocks::default().for_sync_into_existing(
-            &alias_foo,
-            &remote_ref,
-            Err(SyncError::HeadMoved(SyncHeadMovedError::unreported())),
-        ));
-    harness.create_root_dataset(&alias_foo).await;
-
-    let (pull_response, events) = harness.pull_remote_recording(&alias_foo, &remote_ref).await;
-
-    assert_matches!(pull_response.result, Err(PullError::SyncError(_)));
-    assert_eq!(events, vec!["error"]);
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[tokio::test]
 async fn test_pull_transform_with_allowed_input_added_after_planning_commits() {
     let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
     let alias_bar = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("bar"));
@@ -1930,7 +1786,6 @@ struct PullUseCaseHarness {
     base_use_case_harness: BaseUseCaseHarness,
     use_case: Arc<dyn PullDatasetUseCase>,
     dependency_graph_indexer: Arc<DependencyGraphIndexer>,
-    remote_aliases_registry: Arc<dyn RemoteAliasesRegistry>,
     remote_tmp_dir: TempDir,
 }
 
@@ -2056,7 +1911,6 @@ impl PullUseCaseHarness {
             base_use_case_harness,
             use_case: catalog.get_one().unwrap(),
             dependency_graph_indexer: catalog.get_one().unwrap(),
-            remote_aliases_registry: catalog.get_one().unwrap(),
             remote_tmp_dir,
         }
     }
@@ -2227,13 +2081,6 @@ impl PullUseCaseHarness {
         .unwrap();
 
         CreateDatasetResult::from_stored(store_result, alias.clone())
-    }
-
-    async fn get_remote_aliases(&self, created: &CreateDatasetResult) -> Box<dyn RemoteAliases> {
-        self.remote_aliases_registry
-            .get_remote_aliases(&created.dataset_handle)
-            .await
-            .unwrap()
     }
 
     async fn copy_dataset_to_remote_repo(

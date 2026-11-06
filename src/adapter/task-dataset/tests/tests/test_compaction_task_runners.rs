@@ -25,7 +25,14 @@ use kamu_core::testing::ReportedHeads;
 use kamu_core::*;
 use kamu_datasets::{CreateDatasetResult, ResolvedDataset};
 use kamu_datasets_services::DatasetHeadCommitterImpl;
-use kamu_task_system::{TaskDefinition, TaskError, TaskOutcome, TaskRunner, TaskRunnerMeta};
+use kamu_task_system::{
+    TaskDefinition,
+    TaskError,
+    TaskOutcome,
+    TaskResult,
+    TaskRunner,
+    TaskRunnerMeta,
+};
 use pretty_assertions::assert_eq;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -49,65 +56,34 @@ async fn test_one_runner_serves_both_compaction_task_types() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[tokio::test]
-async fn test_hard_compact_commits_head_and_reports_hard_compact_result() {
-    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
-    let reported_heads = ReportedHeads::default();
+async fn test_compaction_commits_head_and_reports_result_of_its_task_type() {
+    for task_type in [
+        TaskDefinitionDatasetHardCompact::TASK_TYPE,
+        TaskDefinitionDatasetResetToMetadata::TASK_TYPE,
+    ] {
+        let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+        let reported_heads = ReportedHeads::default();
 
-    let harness = CompactionTaskRunnersHarness::new(
-        MockCompactionExecutor::new()
-            .make_expect_compaction_success(alias_foo.clone(), reported_heads.clone()),
-    );
-    let foo = harness.create_root_dataset(&alias_foo).await;
-    let compacted_head = harness.append_unreferenced_block(&foo, "compacted").await;
-    reported_heads.set(&foo.head, &compacted_head);
+        let harness = CompactionTaskRunnersHarness::new(
+            MockCompactionExecutor::new()
+                .make_expect_compaction_success(alias_foo.clone(), reported_heads.clone()),
+        );
+        let foo = harness.create_root_dataset(&alias_foo).await;
+        let compacted_head = harness.append_unreferenced_block(&foo, "compacted").await;
+        reported_heads.set(&foo.head, &compacted_head);
 
-    let outcome = harness.run_hard_compact(&foo).await;
+        let outcome = harness.run(task_type, &foo).await;
 
-    assert_eq!(
-        TaskOutcome::Success(
-            TaskResultDatasetHardCompact {
-                compaction_result: CompactionTaskRunnersHarness::compaction_success(
-                    &foo.head,
-                    &compacted_head
-                ),
-            }
-            .into_task_result()
-        ),
-        outcome,
-    );
-    assert_eq!(harness.get_head(&foo).await, compacted_head);
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[tokio::test]
-async fn test_reset_to_metadata_commits_head_and_reports_reset_to_metadata_result() {
-    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
-    let reported_heads = ReportedHeads::default();
-
-    let harness = CompactionTaskRunnersHarness::new(
-        MockCompactionExecutor::new()
-            .make_expect_compaction_success(alias_foo.clone(), reported_heads.clone()),
-    );
-    let foo = harness.create_root_dataset(&alias_foo).await;
-    let compacted_head = harness.append_unreferenced_block(&foo, "compacted").await;
-    reported_heads.set(&foo.head, &compacted_head);
-
-    let outcome = harness.run_reset_to_metadata(&foo).await;
-
-    assert_eq!(
-        TaskOutcome::Success(
-            TaskResultDatasetResetToMetadata {
-                compaction_metadata_only_result: CompactionTaskRunnersHarness::compaction_success(
-                    &foo.head,
-                    &compacted_head
-                ),
-            }
-            .into_task_result()
-        ),
-        outcome,
-    );
-    assert_eq!(harness.get_head(&foo).await, compacted_head);
+        assert_eq!(
+            TaskOutcome::Success(CompactionTaskRunnersHarness::task_result(
+                task_type,
+                CompactionTaskRunnersHarness::compaction_success(&foo.head, &compacted_head),
+            )),
+            outcome,
+            "{task_type}",
+        );
+        assert_eq!(harness.get_head(&foo).await, compacted_head, "{task_type}");
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -128,39 +104,6 @@ async fn test_hard_compact_head_moved_concurrently_fails_recoverably() {
     harness.move_head(&foo, &foo.head, &concurrent_head).await;
 
     let outcome = harness.run_hard_compact(&foo).await;
-
-    assert_eq!(
-        TaskOutcome::Failed(
-            TaskErrorDatasetCommit::HeadMoved(DatasetHeadMovedError {
-                dataset_id: foo.dataset_handle.id.clone(),
-                expected_head: Some(foo.head.clone()),
-                actual_head: Some(concurrent_head.clone()),
-            })
-            .into_task_error()
-        ),
-        outcome,
-    );
-    assert_eq!(harness.get_head(&foo).await, concurrent_head);
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[tokio::test]
-async fn test_reset_to_metadata_head_moved_concurrently_fails_recoverably() {
-    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
-    let reported_heads = ReportedHeads::default();
-
-    let harness = CompactionTaskRunnersHarness::new(
-        MockCompactionExecutor::new()
-            .make_expect_compaction_success(alias_foo.clone(), reported_heads.clone()),
-    );
-    let foo = harness.create_root_dataset(&alias_foo).await;
-    let compacted_head = harness.append_unreferenced_block(&foo, "compacted").await;
-    let concurrent_head = harness.append_unreferenced_block(&foo, "concurrent").await;
-    reported_heads.set(&foo.head, &compacted_head);
-    harness.move_head(&foo, &foo.head, &concurrent_head).await;
-
-    let outcome = harness.run_reset_to_metadata(&foo).await;
 
     assert_eq!(
         TaskOutcome::Failed(
@@ -311,23 +254,47 @@ impl CompactionTaskRunnersHarness {
     }
 
     async fn run_hard_compact(&self, created: &CreateDatasetResult) -> TaskOutcome {
-        self.runner_for(TaskDefinitionDatasetHardCompact::TASK_TYPE)
-            .run_task(TaskDefinition::new(TaskDefinitionDatasetHardCompact {
-                target: ResolvedDataset::from_created(created),
-                compaction_plan: Self::compaction_plan(created),
-            }))
+        self.run(TaskDefinitionDatasetHardCompact::TASK_TYPE, created)
+            .await
+    }
+
+    /// Runs a compaction task of `task_type` over `created`
+    async fn run(&self, task_type: &str, created: &CreateDatasetResult) -> TaskOutcome {
+        let target = ResolvedDataset::from_created(created);
+        let task_definition = match task_type {
+            TaskDefinitionDatasetHardCompact::TASK_TYPE => {
+                TaskDefinition::new(TaskDefinitionDatasetHardCompact {
+                    target,
+                    compaction_plan: Self::compaction_plan(created),
+                })
+            }
+            TaskDefinitionDatasetResetToMetadata::TASK_TYPE => {
+                TaskDefinition::new(TaskDefinitionDatasetResetToMetadata {
+                    target,
+                    compaction_metadata_only_plan: Self::compaction_plan(created),
+                })
+            }
+            other => panic!("Not a compaction task type: {other}"),
+        };
+
+        self.runner_for(task_type)
+            .run_task(task_definition)
             .await
             .unwrap()
     }
 
-    async fn run_reset_to_metadata(&self, created: &CreateDatasetResult) -> TaskOutcome {
-        self.runner_for(TaskDefinitionDatasetResetToMetadata::TASK_TYPE)
-            .run_task(TaskDefinition::new(TaskDefinitionDatasetResetToMetadata {
-                target: ResolvedDataset::from_created(created),
-                compaction_metadata_only_plan: Self::compaction_plan(created),
-            }))
-            .await
-            .unwrap()
+    /// The result a compaction task of `task_type` reports
+    fn task_result(task_type: &str, compaction_result: CompactionResult) -> TaskResult {
+        match task_type {
+            TaskDefinitionDatasetHardCompact::TASK_TYPE => {
+                TaskResultDatasetHardCompact { compaction_result }.into_task_result()
+            }
+            TaskDefinitionDatasetResetToMetadata::TASK_TYPE => TaskResultDatasetResetToMetadata {
+                compaction_metadata_only_result: compaction_result,
+            }
+            .into_task_result(),
+            other => panic!("Not a compaction task type: {other}"),
+        }
     }
 
     /// The executor is mocked, so the plan only has to name the planned head

@@ -21,12 +21,9 @@ use kamu_adapter_http::smart_protocol::messages::DatasetPullRequest;
 use kamu_core::TenancyConfig;
 
 use crate::harness::{
-    ClientSideHarness,
-    ClientSideHarnessOptions,
+    LocalFsTransferOptions,
     ScriptedPullServer,
     ServerSideHarness,
-    ServerSideHarnessOptions,
-    ServerSideLocalFsHarness,
     await_client_server_flow,
 };
 use crate::tests::tests_pull::scenarios::*;
@@ -35,20 +32,15 @@ use crate::tests::tests_pull::scenarios::*;
 
 #[test_log::test(tokio::test)]
 async fn test_smart_pull_unauthenticated() {
-    let scenario = SmartPullNewDatasetScenario::prepare(
-        ClientSideHarness::new(ClientSideHarnessOptions {
-            tenancy_config: TenancyConfig::SingleTenant,
-            authenticated_remotely: false,
-        })
-        .await,
-        ServerSideLocalFsHarness::new(ServerSideHarnessOptions {
-            tenancy_config: TenancyConfig::SingleTenant,
-            authorized_writes: true,
-            ..ServerSideHarnessOptions::default()
-        })
-        .await,
-    )
+    let (client_harness, server_harness) = LocalFsTransferOptions {
+        client_tenancy: TenancyConfig::SingleTenant,
+        authenticated_remotely: false,
+        server_tenancy: TenancyConfig::SingleTenant,
+        authorized_writes: true,
+    }
+    .build()
     .await;
+    let scenario = SmartPullNewDatasetScenario::prepare(client_harness, server_harness).await;
     let dataset_fixture = scenario.server_harness.dataset_fixture();
 
     let api_server_handle = scenario.server_harness.api_server_run();
@@ -87,20 +79,15 @@ async fn test_smart_pull_unauthenticated() {
 
 #[test_log::test(tokio::test)]
 async fn test_smart_pull_incompatible_version_err() {
-    let scenario = SmartPullNewDatasetScenario::prepare(
-        ClientSideHarness::new(ClientSideHarnessOptions {
-            tenancy_config: TenancyConfig::MultiTenant,
-            authenticated_remotely: true,
-        })
-        .await,
-        ServerSideLocalFsHarness::new(ServerSideHarnessOptions {
-            tenancy_config: TenancyConfig::MultiTenant,
-            authorized_writes: true,
-            ..ServerSideHarnessOptions::default()
-        })
-        .await,
-    )
+    let (client_harness, server_harness) = LocalFsTransferOptions {
+        client_tenancy: TenancyConfig::MultiTenant,
+        authenticated_remotely: true,
+        server_tenancy: TenancyConfig::MultiTenant,
+        authorized_writes: true,
+    }
+    .build()
     .await;
+    let scenario = SmartPullNewDatasetScenario::prepare(client_harness, server_harness).await;
 
     let api_server_handle = scenario.server_harness.api_server_run();
 
@@ -124,20 +111,15 @@ async fn test_smart_pull_incompatible_version_err() {
 
 #[test_log::test(tokio::test)]
 async fn test_smart_pull_of_missing_dataset_fails() {
-    let scenario = SmartPullNewDatasetScenario::prepare(
-        ClientSideHarness::new(ClientSideHarnessOptions {
-            tenancy_config: TenancyConfig::MultiTenant,
-            authenticated_remotely: true,
-        })
-        .await,
-        ServerSideLocalFsHarness::new(ServerSideHarnessOptions {
-            tenancy_config: TenancyConfig::MultiTenant,
-            authorized_writes: true,
-            ..ServerSideHarnessOptions::default()
-        })
-        .await,
-    )
+    let (client_harness, server_harness) = LocalFsTransferOptions {
+        client_tenancy: TenancyConfig::MultiTenant,
+        authenticated_remotely: true,
+        server_tenancy: TenancyConfig::MultiTenant,
+        authorized_writes: true,
+    }
+    .build()
     .await;
+    let scenario = SmartPullNewDatasetScenario::prepare(client_harness, server_harness).await;
     let missing_dataset_url = scenario.server_harness.dataset_url(&odf::DatasetAlias::new(
         Some(scenario.server_harness.api_server_account().account_name),
         odf::DatasetName::new_unchecked("missing"),
@@ -212,20 +194,16 @@ async fn test_smart_pull_without_planned_blocks_is_not_committed() {
 
 #[test_log::test(tokio::test)]
 async fn test_smart_pull_into_existing_reports_increment() {
-    let scenario = SmartPullExistingEvolvedDatasetScenario::prepare(
-        ClientSideHarness::new(ClientSideHarnessOptions {
-            tenancy_config: TenancyConfig::SingleTenant,
-            authenticated_remotely: true,
-        })
-        .await,
-        ServerSideLocalFsHarness::new(ServerSideHarnessOptions {
-            tenancy_config: TenancyConfig::SingleTenant,
-            authorized_writes: true,
-            ..ServerSideHarnessOptions::default()
-        })
-        .await,
-    )
+    let (client_harness, server_harness) = LocalFsTransferOptions {
+        client_tenancy: TenancyConfig::SingleTenant,
+        authenticated_remotely: true,
+        server_tenancy: TenancyConfig::SingleTenant,
+        authorized_writes: true,
+    }
+    .build()
     .await;
+    let scenario =
+        SmartPullExistingEvolvedDatasetScenario::prepare(client_harness, server_harness).await;
     let dataset_handle = &scenario.server_create_result.dataset_handle;
 
     let api_server_handle = scenario.server_harness.api_server_run();
@@ -269,20 +247,15 @@ async fn test_smart_pull_into_existing_reports_increment() {
 /// comparison before the transfer refuses it first
 #[test_log::test(tokio::test)]
 async fn test_smart_pull_into_headless_dataset_of_another_id_fails() {
-    let scenario = SmartPullNewDatasetScenario::prepare(
-        ClientSideHarness::new(ClientSideHarnessOptions {
-            tenancy_config: TenancyConfig::SingleTenant,
-            authenticated_remotely: true,
-        })
-        .await,
-        ServerSideLocalFsHarness::new(ServerSideHarnessOptions {
-            tenancy_config: TenancyConfig::SingleTenant,
-            authorized_writes: true,
-            ..ServerSideHarnessOptions::default()
-        })
-        .await,
-    )
+    let (client_harness, server_harness) = LocalFsTransferOptions {
+        client_tenancy: TenancyConfig::SingleTenant,
+        authenticated_remotely: true,
+        server_tenancy: TenancyConfig::SingleTenant,
+        authorized_writes: true,
+    }
+    .build()
     .await;
+    let scenario = SmartPullNewDatasetScenario::prepare(client_harness, server_harness).await;
     let headless_dataset_handle = scenario
         .client_harness
         .create_headless_dataset(scenario.server_dataset_handle.alias.dataset_name.as_str())
@@ -329,20 +302,16 @@ async fn test_smart_pull_into_headless_dataset_of_another_id_fails() {
 /// session lets the server's `HEAD` move in between
 #[test_log::test(tokio::test)]
 async fn test_smart_pull_metadata_ends_at_planned_head() {
-    let scenario = SmartPullExistingEvolvedDatasetScenario::prepare(
-        ClientSideHarness::new(ClientSideHarnessOptions {
-            tenancy_config: TenancyConfig::SingleTenant,
-            authenticated_remotely: true,
-        })
-        .await,
-        ServerSideLocalFsHarness::new(ServerSideHarnessOptions {
-            tenancy_config: TenancyConfig::SingleTenant,
-            authorized_writes: true,
-            ..ServerSideHarnessOptions::default()
-        })
-        .await,
-    )
+    let (client_harness, server_harness) = LocalFsTransferOptions {
+        client_tenancy: TenancyConfig::SingleTenant,
+        authenticated_remotely: true,
+        server_tenancy: TenancyConfig::SingleTenant,
+        authorized_writes: true,
+    }
+    .build()
     .await;
+    let scenario =
+        SmartPullExistingEvolvedDatasetScenario::prepare(client_harness, server_harness).await;
     let dataset_handle = &scenario.server_create_result.dataset_handle;
     let server_commits = scenario.server_harness.server_commits();
     let stored_heads = scenario.server_harness.stored_heads();
@@ -409,20 +378,16 @@ struct HeadMovedConcurrentlyCase {
 
 impl HeadMovedConcurrentlyCase {
     async fn assert_pull_fails(self) {
-        let scenario = SmartPullExistingEvolvedDatasetScenario::prepare(
-            ClientSideHarness::new(ClientSideHarnessOptions {
-                tenancy_config: TenancyConfig::SingleTenant,
-                authenticated_remotely: true,
-            })
-            .await,
-            ServerSideLocalFsHarness::new(ServerSideHarnessOptions {
-                tenancy_config: TenancyConfig::SingleTenant,
-                authorized_writes: true,
-                ..ServerSideHarnessOptions::default()
-            })
-            .await,
-        )
+        let (client_harness, server_harness) = LocalFsTransferOptions {
+            client_tenancy: TenancyConfig::SingleTenant,
+            authenticated_remotely: true,
+            server_tenancy: TenancyConfig::SingleTenant,
+            authorized_writes: true,
+        }
+        .build()
         .await;
+        let scenario =
+            SmartPullExistingEvolvedDatasetScenario::prepare(client_harness, server_harness).await;
 
         let api_server_handle = scenario.server_harness.api_server_run();
 
@@ -473,20 +438,15 @@ struct MissingObjectsCase {
 
 impl MissingObjectsCase {
     async fn assert_pull_fails(self) {
-        let scenario = SmartPullNewDatasetScenario::prepare(
-            ClientSideHarness::new(ClientSideHarnessOptions {
-                tenancy_config: TenancyConfig::SingleTenant,
-                authenticated_remotely: false,
-            })
-            .await,
-            ServerSideLocalFsHarness::new(ServerSideHarnessOptions {
-                tenancy_config: TenancyConfig::SingleTenant,
-                authorized_writes: true,
-                ..ServerSideHarnessOptions::default()
-            })
-            .await,
-        )
+        let (client_harness, server_harness) = LocalFsTransferOptions {
+            client_tenancy: TenancyConfig::SingleTenant,
+            authenticated_remotely: false,
+            server_tenancy: TenancyConfig::SingleTenant,
+            authorized_writes: true,
+        }
+        .build()
         .await;
+        let scenario = SmartPullNewDatasetScenario::prepare(client_harness, server_harness).await;
         let dataset_registry = scenario.server_harness.cli_dataset_registry();
         let server = if self.mislabeled {
             ScriptedPullServer::mislabeling_objects(
@@ -541,20 +501,15 @@ enum CorruptedSourceCase {
 
 impl CorruptedSourceCase {
     async fn assert_pull_fails(self, expected_message: &str) {
-        let scenario = SmartPullNewDatasetScenario::prepare(
-            ClientSideHarness::new(ClientSideHarnessOptions {
-                tenancy_config: TenancyConfig::SingleTenant,
-                authenticated_remotely: false,
-            })
-            .await,
-            ServerSideLocalFsHarness::new(ServerSideHarnessOptions {
-                tenancy_config: TenancyConfig::SingleTenant,
-                authorized_writes: true,
-                ..ServerSideHarnessOptions::default()
-            })
-            .await,
-        )
+        let (client_harness, server_harness) = LocalFsTransferOptions {
+            client_tenancy: TenancyConfig::SingleTenant,
+            authenticated_remotely: false,
+            server_tenancy: TenancyConfig::SingleTenant,
+            authorized_writes: true,
+        }
+        .build()
         .await;
+        let scenario = SmartPullNewDatasetScenario::prepare(client_harness, server_harness).await;
         let dataset_registry = scenario.server_harness.cli_dataset_registry();
         let dataset_handle = &scenario.server_dataset_handle;
         let server = match self {

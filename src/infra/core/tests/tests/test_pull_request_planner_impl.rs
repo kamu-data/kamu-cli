@@ -839,13 +839,9 @@ async fn test_pull_dataset_with_several_pull_aliases_is_ambiguous() {
     )
     .await;
 
-    let mut aliases = harness.get_remote_aliases(&rl!("a")).await;
-    for remote_ref in ["kamu.dev/a", "other.dev/a"] {
-        aliases
-            .add(&rr!(remote_ref), RemoteAliasKind::Pull)
-            .await
-            .unwrap();
-    }
+    harness
+        .add_pull_aliases(&rl!("a"), &["kamu.dev/a", "other.dev/a"])
+        .await;
 
     let responses = harness
         .pull(refs!["a"], PullOptions::default())

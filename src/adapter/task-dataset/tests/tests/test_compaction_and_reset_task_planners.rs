@@ -52,15 +52,25 @@ async fn test_hard_compaction_plans_for_the_dataset() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[tokio::test]
-async fn test_hard_compaction_of_deleted_dataset_fails_unrecoverably() {
-    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
-    let harness = CompactionAndResetTaskPlannersHarness::new();
-    let foo = harness.create_root_dataset(&alias_foo).await;
-    harness.delete_dataset(&foo).await;
+async fn test_planning_for_deleted_dataset_fails_unrecoverably() {
+    for planned_task in [
+        PlannedTask::HardCompaction,
+        PlannedTask::Reset,
+        PlannedTask::ResetToMetadata,
+    ] {
+        let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+        let harness = CompactionAndResetTaskPlannersHarness::new();
+        let foo = harness.create_root_dataset(&alias_foo).await;
+        harness.delete_dataset(&foo).await;
 
-    let failure = harness.plan_hard_compaction(&foo).await.unwrap_err();
+        let failure = harness.plan(planned_task, &foo).await.unwrap_err();
 
-    assert_eq!(TaskError::empty_unrecoverable(), failure);
+        assert_eq!(
+            TaskError::empty_unrecoverable(),
+            failure,
+            "{planned_task:?}"
+        );
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -109,77 +119,36 @@ async fn test_reset_with_mismatching_old_head_fails_unrecoverably() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[tokio::test]
-async fn test_reset_of_deleted_dataset_fails_unrecoverably() {
-    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
-    let harness = CompactionAndResetTaskPlannersHarness::new();
-    let foo = harness.create_root_dataset(&alias_foo).await;
-    harness.delete_dataset(&foo).await;
-
-    let failure = harness.plan_reset(&foo, None).await.unwrap_err();
-
-    assert_eq!(TaskError::empty_unrecoverable(), failure);
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[tokio::test]
-async fn test_reset_to_metadata_of_deleted_dataset_fails_unrecoverably() {
-    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
-    let harness = CompactionAndResetTaskPlannersHarness::new();
-    let foo = harness.create_root_dataset(&alias_foo).await;
-    harness.delete_dataset(&foo).await;
-
-    let failure = harness.plan_reset_to_metadata(&foo).await.unwrap_err();
-
-    assert_eq!(TaskError::empty_unrecoverable(), failure);
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[tokio::test]
-async fn test_hard_compaction_merges_slices_up_to_max_slice_records() {
+async fn test_hard_compaction_merges_slices_up_to_the_limits() {
     let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
     let harness = CompactionAndResetTaskPlannersHarness::new();
     let foo = harness
         .create_root_dataset_with_two_slices(&alias_foo)
         .await;
 
-    let unlimited = harness
-        .plan_hard_compaction_merged_batches(&foo, None, None)
-        .await;
-    let limited = harness
-        .plan_hard_compaction_merged_batches(
-            &foo,
+    for (case, max_slice_size, max_slice_records, expected_merged_batches) in [
+        ("unlimited", None, None, 1),
+        (
+            "max_slice_records",
             None,
             Some(CompactionAndResetTaskPlannersHarness::SLICE_RECORDS),
-        )
-        .await;
-
-    assert_eq!((1, 0), (unlimited, limited));
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[tokio::test]
-async fn test_hard_compaction_merges_slices_up_to_max_slice_size() {
-    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
-    let harness = CompactionAndResetTaskPlannersHarness::new();
-    let foo = harness
-        .create_root_dataset_with_two_slices(&alias_foo)
-        .await;
-
-    let unlimited = harness
-        .plan_hard_compaction_merged_batches(&foo, None, None)
-        .await;
-    let limited = harness
-        .plan_hard_compaction_merged_batches(
-            &foo,
+            0,
+        ),
+        (
+            "max_slice_size",
             Some(CompactionAndResetTaskPlannersHarness::SLICE_SIZE),
             None,
-        )
-        .await;
-
-    assert_eq!((1, 0), (unlimited, limited));
+            0,
+        ),
+    ] {
+        assert_eq!(
+            expected_merged_batches,
+            harness
+                .plan_hard_compaction_merged_batches(&foo, max_slice_size, max_slice_records)
+                .await,
+            "{case}",
+        );
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -200,6 +169,15 @@ async fn test_reset_to_metadata_of_derived_dataset_plans_for_the_dataset() {
         .downcast::<TaskDefinitionDatasetResetToMetadata>()
         .unwrap();
     assert_eq!(bar.dataset_handle, *task_reset.target.get_handle());
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Clone, Copy)]
+enum PlannedTask {
+    HardCompaction,
+    Reset,
+    ResetToMetadata,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -232,6 +210,18 @@ impl CompactionAndResetTaskPlannersHarness {
     const SLICE_RECORDS: u64 = 10;
     /// Bytes in each slice of [`Self::create_root_dataset_with_two_slices`]
     const SLICE_SIZE: u64 = 100;
+
+    async fn plan(
+        &self,
+        planned_task: PlannedTask,
+        created: &CreateDatasetResult,
+    ) -> Result<TaskDefinition, TaskError> {
+        match planned_task {
+            PlannedTask::HardCompaction => self.plan_hard_compaction(created).await,
+            PlannedTask::Reset => self.plan_reset(created, None).await,
+            PlannedTask::ResetToMetadata => self.plan_reset_to_metadata(created).await,
+        }
+    }
 
     async fn plan_hard_compaction(
         &self,

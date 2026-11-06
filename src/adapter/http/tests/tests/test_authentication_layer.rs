@@ -34,15 +34,18 @@ use crate::harness::await_client_server_flow;
 async fn test_anonymous_api_access() {
     let server_harness = ServerHarness::new(MockAuthenticationService::new(), None).await;
     let test_url = server_harness.test_url();
+    let principal_url = server_harness.principal_url();
 
     let api_server_handle = server_harness.api_server_run();
 
     let client_handle = async {
-        let client = reqwest::Client::new();
-        let response = client.get(test_url).send().await.unwrap();
         assert_eq!(
             format!("{:?}", AnonymousAccountReason::NoAuthenticationProvided),
-            response.text().await.unwrap()
+            ServerHarness::get_text(&test_url, None).await
+        );
+        assert_eq!(
+            format!("{:?}", Principal::Anonymous),
+            ServerHarness::get_text(&principal_url, None).await
         );
     };
 
@@ -54,26 +57,27 @@ async fn test_anonymous_api_access() {
 #[test_log::test(tokio::test)]
 async fn test_non_anonymous_api_valid_access() {
     let server_harness = ServerHarness::new(
-        MockAuthenticationService::resolving_token(
-            kamu_accounts::DUMMY_ACCESS_TOKEN,
-            kamu_accounts::Account::dummy(),
-        ),
+        MockAuthenticationService::resolving_token(DUMMY_ACCESS_TOKEN, Account::dummy()),
         None,
     )
     .await;
     let test_url = server_harness.test_url();
+    let principal_url = server_harness.principal_url();
 
     let api_server_handle = server_harness.api_server_run();
 
     let client_handle = async {
-        let client = reqwest::Client::new();
-        let response = client
-            .get(test_url)
-            .bearer_auth(kamu_accounts::DUMMY_ACCESS_TOKEN)
-            .send()
-            .await
-            .unwrap();
-        assert_eq!(DEFAULT_ACCOUNT_NAME_STR, response.text().await.unwrap());
+        assert_eq!(
+            DEFAULT_ACCOUNT_NAME_STR,
+            ServerHarness::get_text(&test_url, Some(DUMMY_ACCESS_TOKEN)).await
+        );
+        assert_eq!(
+            format!(
+                "{:?}",
+                Principal::User(AccountHandle::from(&Account::dummy()))
+            ),
+            ServerHarness::get_text(&principal_url, Some(DUMMY_ACCESS_TOKEN)).await
+        );
     };
 
     await_client_server_flow!(api_server_handle, client_handle);
@@ -130,81 +134,15 @@ async fn test_correct_handle_empty_bearer_token() {
 async fn test_non_anonymous_api_access_invalid_token() {
     let server_harness = ServerHarness::new(MockAuthenticationService::invalid_token(), None).await;
     let test_url = server_harness.test_url();
+    let principal_url = server_harness.principal_url();
 
     let api_server_handle = server_harness.api_server_run();
 
     let client_handle = async {
-        let client = reqwest::Client::new();
-        let response = client
-            .get(test_url)
-            .bearer_auth(kamu_accounts::DUMMY_ACCESS_TOKEN)
-            .send()
-            .await
-            .unwrap();
         assert_eq!(
             format!("{:?}", AnonymousAccountReason::AuthenticationInvalid),
-            response.text().await.unwrap()
+            ServerHarness::get_text(&test_url, Some(DUMMY_ACCESS_TOKEN)).await
         );
-    };
-
-    await_client_server_flow!(api_server_handle, client_handle);
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[test_log::test(tokio::test)]
-async fn test_anonymous_api_access_registers_anonymous_principal() {
-    let server_harness = ServerHarness::new(MockAuthenticationService::new(), None).await;
-    let principal_url = server_harness.principal_url();
-
-    let api_server_handle = server_harness.api_server_run();
-
-    let client_handle = async {
-        assert_eq!(
-            format!("{:?}", Principal::Anonymous),
-            ServerHarness::get_text(&principal_url, None).await
-        );
-    };
-
-    await_client_server_flow!(api_server_handle, client_handle);
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[test_log::test(tokio::test)]
-async fn test_non_anonymous_api_valid_access_registers_user_principal() {
-    let server_harness = ServerHarness::new(
-        MockAuthenticationService::resolving_token(DUMMY_ACCESS_TOKEN, Account::dummy()),
-        None,
-    )
-    .await;
-    let principal_url = server_harness.principal_url();
-
-    let api_server_handle = server_harness.api_server_run();
-
-    let client_handle = async {
-        assert_eq!(
-            format!(
-                "{:?}",
-                Principal::User(AccountHandle::from(&Account::dummy()))
-            ),
-            ServerHarness::get_text(&principal_url, Some(DUMMY_ACCESS_TOKEN)).await
-        );
-    };
-
-    await_client_server_flow!(api_server_handle, client_handle);
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[test_log::test(tokio::test)]
-async fn test_non_anonymous_api_access_invalid_token_registers_anonymous_principal() {
-    let server_harness = ServerHarness::new(MockAuthenticationService::invalid_token(), None).await;
-    let principal_url = server_harness.principal_url();
-
-    let api_server_handle = server_harness.api_server_run();
-
-    let client_handle = async {
         assert_eq!(
             format!("{:?}", Principal::Anonymous),
             ServerHarness::get_text(&principal_url, Some(DUMMY_ACCESS_TOKEN)).await

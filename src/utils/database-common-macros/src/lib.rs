@@ -876,8 +876,9 @@ pub fn database_transactional_test(input: TokenStream) -> TokenStream {
 
 /// Like `database_transactional_test!`, but the fixture runs outside any
 /// transaction and gets the harness catalog with its transaction manager, to
-/// open several transactions itself. `storage = inmem` builds the harness with
-/// `new_transactional()`.
+/// open several transactions itself. `storage` is `inmem`, which builds the
+/// harness with `new_transactional()`, or `postgres`; there is no `sqlite`, as
+/// SQLite serialises writers and a race there reduces to a sequential test.
 #[proc_macro]
 pub fn database_concurrent_transactions_test(input: TokenStream) -> TokenStream {
     let DatabaseTransactionalTestInputArgs {
@@ -914,19 +915,10 @@ pub fn database_concurrent_transactions_test(input: TokenStream) -> TokenStream 
                 #fixture (&harness.catalog).await;
             }
         },
-        "sqlite" => quote! {
-            #[test_group::group(sqlite, #extra_test_groups)]
-            #[test_log::test(sqlx::test(migrations = "../../../../migrations/sqlite"))]
-            async fn #test_function_name (sqlite_pool: sqlx::SqlitePool) {
-                let harness = #harness ::new(sqlite_pool);
-
-                #fixture (&harness.catalog).await;
-            }
-        },
         unexpected => {
             panic!(
-                "Unexpected storage: \"{unexpected}\"!\nAllowable values: \"inmem\", \
-                 \"postgres\", and \"sqlite\"."
+                "Unexpected storage: \"{unexpected}\"!\nAllowable values: \"inmem\" and \
+                 \"postgres\"."
             );
         }
     };

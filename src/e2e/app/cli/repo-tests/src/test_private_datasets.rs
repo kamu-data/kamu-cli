@@ -1830,7 +1830,7 @@ pub async fn test_dataset_role_is_correctly_displayed_for_the_current_user(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn test_only_owner_and_editor_can_ingest_into_a_private_dataset(
+pub async fn test_a_private_dataset_is_found_by_id_and_ingested_into_only_by_authorized_users(
     anonymous: KamuApiServerClient,
 ) {
     let [not_owner, mut reader, mut editor, mut maintainer, owner] = make_logged_clients(
@@ -1858,6 +1858,21 @@ pub async fn test_only_owner_and_editor_can_ingest_into_a_private_dataset(
         &mut maintainer,
     )
     .await;
+
+    for (tag, client) in [("anonymous", &anonymous), ("not_owner", &not_owner)] {
+        assert_matches!(
+            client.dataset().by_id(&dataset_id).await,
+            Err(DatasetByIdError::NotFound),
+            "Tag: {tag}",
+        );
+    }
+    for (tag, client) in [("reader", &reader), ("owner", &owner)] {
+        assert_matches!(
+            client.dataset().by_id(&dataset_id).await,
+            Ok(info) if info.id == dataset_id,
+            "Tag: {tag}",
+        );
+    }
 
     let mut last_head = owner_head(&owner, &dataset_alias).await;
 
@@ -1910,51 +1925,6 @@ pub async fn test_only_owner_and_editor_can_ingest_into_a_private_dataset(
             tag,
         );
         last_head = head;
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub async fn test_a_private_dataset_info_by_id_is_available_only_to_authorized_users(
-    anonymous: KamuApiServerClient,
-) {
-    let [not_owner, mut reader, mut editor, mut maintainer, owner] = make_logged_clients(
-        &anonymous,
-        ["not-owner", "reader", "editor", "maintainer", "owner"],
-    )
-    .await;
-
-    let CreateDatasetResponse { dataset_id, .. } = owner
-        .dataset()
-        .create_dataset_from_snapshot_with_visibility(
-            MetadataFactory::dataset_snapshot().name("private").build(),
-            odf::DatasetVisibility::Private,
-        )
-        .await;
-
-    authorize_users_by_roles(
-        &owner,
-        &[&dataset_id],
-        &mut reader,
-        &mut editor,
-        &mut maintainer,
-    )
-    .await;
-
-    for (tag, client) in [("anonymous", &anonymous), ("not_owner", &not_owner)] {
-        assert_matches!(
-            client.dataset().by_id(&dataset_id).await,
-            Err(DatasetByIdError::NotFound),
-            "Tag: {tag}",
-        );
-    }
-
-    for (tag, client) in [("reader", &reader), ("owner", &owner)] {
-        assert_matches!(
-            client.dataset().by_id(&dataset_id).await,
-            Ok(info) if info.id == dataset_id,
-            "Tag: {tag}",
-        );
     }
 }
 

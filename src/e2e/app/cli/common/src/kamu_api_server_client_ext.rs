@@ -218,6 +218,34 @@ pub static DATASET_DERIVATIVE_CITY_POPULATION_SNAPSHOT: LazyLock<String> = LazyL
         .to_string()
 });
 
+/// Root dataset `dataset_name` appending CSV rows of `city` and `population`
+/// from a polling source whose fetch step is the YAML flow mapping `fetch`
+pub fn city_population_root_snapshot(dataset_name: &str, fetch: &str) -> String {
+    indoc::formatdoc!(
+        r#"
+        kind: DatasetSnapshot
+        version: 1
+        content:
+          name: {dataset_name}
+          kind: Root
+          metadata:
+            - kind: SetPollingSource
+              fetch: {fetch}
+              read:
+                kind: Csv
+                header: true
+                schema:
+                  fields:
+                    - name: city
+                      type: String
+                    - name: population
+                      type: Int64
+              merge:
+                kind: Append
+        "#
+    )
+}
+
 pub static E2E_USER_ACCOUNT_NAME: LazyLock<odf::AccountName> =
     LazyLock::new(|| odf::AccountName::new_unchecked(E2E_USER_ACCOUNT_NAME_STR));
 

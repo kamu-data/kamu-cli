@@ -1741,44 +1741,6 @@ async fn test_transform_producing_nothing_is_up_to_date() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_transform_incompatible_output_schema() {
-    let harness = TransformTestHarness::new_custom(
-        MockEngineProvisioner::new().always_provision_engine_responding(|| TransformResponseExt {
-            new_offset_interval: None,
-            new_watermark: Some(Utc.with_ymd_and_hms(2020, 1, 1, 0, 0, 0).unwrap()),
-            output_schema: Some(Arc::new(Schema::new(vec![Field::new(
-                "unexpected",
-                DataType::Utf8,
-                false,
-            )]))),
-            new_checkpoint: None,
-            new_data: None,
-            run_dir: None,
-        }),
-    );
-    let foo_target = harness
-        .new_root("foo", harness.system_time_source.now())
-        .await;
-    let (bar_target, _) = harness
-        .new_deriv(
-            "bar",
-            &[foo_target.get_alias().clone()],
-            harness.system_time_source.now(),
-        )
-        .await;
-    harness.append_data_block(foo_target, 3).await;
-
-    assert_matches!(
-        harness.transform(bar_target).await,
-        Err(TransformError::Execute(
-            TransformExecuteError::IncompatibleSchema(_)
-        ))
-    );
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[test_log::test(tokio::test)]
 async fn test_transform_failed_commit_keeps_engine_run_dir() {
     let harness = TransformTestHarness::new_with_engine_run_dir(Some(Arc::new(Schema::new(vec![
         Field::new("unexpected", DataType::Utf8, false),

@@ -498,29 +498,20 @@ mod tests {
 
     #[test]
     fn test_commit_fails_on_a_key_another_transaction_committed() {
-        let harness = MapHarness::with_committed(&[("a", 1)]);
-        let first = harness.begin();
-        let second = harness.begin();
-        harness.map.write(Some(first), |write| write.put("a", 10));
-        harness.map.write(Some(second), |write| write.put("a", 20));
-        harness.commit(first);
+        for (starting_state, committed) in [("existing key", &[("a", 1)][..]), ("new key", &[])] {
+            let harness = MapHarness::with_committed(committed);
+            let first = harness.begin();
+            let second = harness.begin();
+            harness.map.write(Some(first), |write| write.put("a", 10));
+            harness.map.write(Some(second), |write| write.put("a", 20));
+            harness.commit(first);
 
-        assert_matches!(
-            harness.check_commit(second),
-            Err(InMemoryWriteConflictError { key }) if key == "\"a\""
-        );
-    }
-
-    #[test]
-    fn test_commit_fails_on_a_key_another_transaction_created() {
-        let harness = MapHarness::with_committed(&[]);
-        let first = harness.begin();
-        let second = harness.begin();
-        harness.map.write(Some(first), |write| write.put("a", 10));
-        harness.map.write(Some(second), |write| write.put("a", 20));
-        harness.commit(first);
-
-        assert_matches!(harness.check_commit(second), Err(_));
+            assert_matches!(
+                harness.check_commit(second),
+                Err(InMemoryWriteConflictError { key }) if key == "\"a\"",
+                "{starting_state}"
+            );
+        }
     }
 
     #[test]

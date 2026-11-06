@@ -59,10 +59,11 @@ Use `database_common_macros::database_transactional_test`.
 
 A fixture that needs several transactions, such as a race between two writers, is wired with
 `database_concurrent_transactions_test!` instead. It takes the same arguments, with `storage` one
-of `inmem`, `postgres` and `sqlite`, and passes the harness catalog with its transaction manager,
+of `inmem` and `postgres`, and passes the harness catalog with its transaction manager,
 outside any transaction; `inmem` builds the harness with `new_transactional()`. The fixture opens
 transactions through `database_common::testing` (`race_transactions`, `in_committed_transaction`),
-which the repo-tests crate gets through `database-common`'s `testing` feature.
+which the repo-tests crate gets through `database-common`'s `testing` feature. SQLite has no race
+wiring: it serialises writers, so a race there only repeats the fixture's sequential twin.
 
 A race fixture belongs in the shared suite where every storage gives the second writer the same
 outcome. `InMemoryTransactionalMap::put` and `delete` fail the second commit on the same key; where

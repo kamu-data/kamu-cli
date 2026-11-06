@@ -135,3 +135,71 @@ pub enum VerifyTransformExecuteError {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[cfg(test)]
+mod tests {
+    use datafusion::arrow::datatypes::Schema;
+    use internal_error::ErrorIntoInternal;
+
+    use super::*;
+    use crate::UnsupportedEngineError;
+    use crate::engine::ProcessError;
+
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+    #[test]
+    fn test_transform_execute_error_recoverability() {
+        let cases = [
+            (
+                TransformExecuteError::EngineProvisioningError(
+                    UnsupportedEngineError {
+                        engine_id: "cobol".to_string(),
+                    }
+                    .into(),
+                ),
+                false,
+            ),
+            (
+                TransformExecuteError::EngineProvisioningError(EngineProvisioningError::Internal(
+                    "provisioning failed".int_err(),
+                )),
+                true,
+            ),
+            (
+                TransformExecuteError::EngineError(EngineError::invalid_query(
+                    "unknown column",
+                    Vec::new(),
+                )),
+                false,
+            ),
+            (
+                TransformExecuteError::EngineError(ProcessError::new(Some(1), Vec::new()).into()),
+                true,
+            ),
+            (
+                TransformExecuteError::IncompatibleSchema(IncompatibleSchemaError::new(
+                    "Schema of the new slice is not compatible",
+                    Arc::new(Schema::empty()),
+                    Arc::new(Schema::empty()),
+                )),
+                false,
+            ),
+            (
+                TransformExecuteError::CommitError(odf::dataset::CommitError::Internal(
+                    "storage unavailable".int_err(),
+                )),
+                true,
+            ),
+            (
+                TransformExecuteError::Internal("engine container exited".int_err()),
+                true,
+            ),
+        ];
+
+        for (error, recoverable) in cases {
+            assert_eq!(error.is_recoverable(), recoverable, "{error:?}");
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

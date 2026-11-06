@@ -38,73 +38,34 @@ fn test_output_with_claimed_records() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test]
-fn test_output_with_more_records_than_claimed() {
-    let harness = EngineTransformOutputHarness::new();
-    harness.write_data_file(5);
+fn test_output_with_records_disagreeing_with_claimed_offsets() {
+    // (case, records in the data file or no file, claimed offsets)
+    let cases = [
+        ("more records than claimed", Some(5), Some((10, 12))),
+        ("claimed records but empty file", Some(0), Some((0, 99))),
+        ("inverted claimed offsets", Some(3), Some((12, 10))),
+        (
+            "unrepresentable claimed offsets",
+            Some(0),
+            Some((0, u64::MAX)),
+        ),
+        ("records but no claimed offsets", Some(2), None),
+        ("claimed records but no file", None, Some((0, 2))),
+    ];
 
-    let response = harness.respond_with(Some((10, 12)));
+    for (case, num_records, claimed_offsets) in cases {
+        let harness = EngineTransformOutputHarness::new();
+        if let Some(num_records) = num_records {
+            harness.write_data_file(num_records);
+        }
 
-    assert_matches!(response, Err(EngineError::ContractError(_)));
+        let response = harness.respond_with(claimed_offsets);
+
+        assert_matches!(response, Err(EngineError::ContractError(_)), "{case}");
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[test_log::test]
-fn test_output_with_claimed_records_but_empty_file() {
-    let harness = EngineTransformOutputHarness::new();
-    harness.write_data_file(0);
-
-    let response = harness.respond_with(Some((0, 99)));
-
-    assert_matches!(response, Err(EngineError::ContractError(_)));
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[test_log::test]
-fn test_output_with_inverted_claimed_offsets() {
-    let harness = EngineTransformOutputHarness::new();
-    harness.write_data_file(3);
-
-    let response = harness.respond_with(Some((12, 10)));
-
-    assert_matches!(response, Err(EngineError::ContractError(_)));
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[test_log::test]
-fn test_output_with_unrepresentable_claimed_offsets() {
-    let harness = EngineTransformOutputHarness::new();
-    harness.write_data_file(0);
-
-    let response = harness.respond_with(Some((0, u64::MAX)));
-
-    assert_matches!(response, Err(EngineError::ContractError(_)));
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[test_log::test]
-fn test_output_with_records_but_no_claimed_offsets() {
-    let harness = EngineTransformOutputHarness::new();
-    harness.write_data_file(2);
-
-    let response = harness.respond_with(None);
-
-    assert_matches!(response, Err(EngineError::ContractError(_)));
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[test_log::test]
-fn test_output_with_claimed_records_but_no_file() {
-    let harness = EngineTransformOutputHarness::new();
-
-    let response = harness.respond_with(Some((0, 2)));
-
-    assert_matches!(response, Err(EngineError::ContractError(_)));
-}
 
 #[test_log::test]
 fn test_output_data_as_symlink() {

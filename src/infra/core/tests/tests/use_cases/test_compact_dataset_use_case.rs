@@ -125,48 +125,29 @@ async fn test_try_compact_not_found_dataset() {
 
 #[tokio::test]
 async fn test_compact_dataset_unauthorized() {
-    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
-    let (_, dataset_id_foo) = odf::DatasetID::new_generated_ed25519();
+    for (operation, options) in CompactUseCaseHarness::compact_and_reset_to_metadata() {
+        let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+        let (_, dataset_id_foo) = odf::DatasetID::new_generated_ed25519();
 
-    let harness = CompactUseCaseHarness::new(
-        MockDatasetPermissionChecker::new()
-            .expect_authorize_for(DatasetPermission::Maintain, &dataset_id_foo, 1, false)
-            .expect_readable(&dataset_id_foo, 1),
-        MockDidGenerator::predefined_dataset_ids(vec![dataset_id_foo]),
-    );
+        let harness = CompactUseCaseHarness::new(
+            MockDatasetPermissionChecker::new().expect_denied_but_readable(
+                DatasetPermission::Maintain,
+                &dataset_id_foo,
+                1,
+            ),
+            MockDidGenerator::predefined_dataset_ids(vec![dataset_id_foo]),
+        );
 
-    let foo = harness.create_root_dataset(&alias_foo).await;
+        let foo = harness.create_root_dataset(&alias_foo).await;
 
-    assert_matches!(
-        harness
-            .compact_dataset(ResolvedDataset::from_created(&foo))
-            .await,
-        Err(CompactionError::Access(_))
-    );
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[tokio::test]
-async fn test_reset_dataset_to_metadata_requires_maintain() {
-    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
-    let (_, dataset_id_foo) = odf::DatasetID::new_generated_ed25519();
-
-    let harness = CompactUseCaseHarness::new(
-        MockDatasetPermissionChecker::new()
-            .expect_authorize_for(DatasetPermission::Maintain, &dataset_id_foo, 1, false)
-            .expect_readable(&dataset_id_foo, 1),
-        MockDidGenerator::predefined_dataset_ids(vec![dataset_id_foo]),
-    );
-
-    let foo = harness.create_root_dataset(&alias_foo).await;
-
-    assert_matches!(
-        harness
-            .reset_dataset_to_metadata(ResolvedDataset::from_created(&foo))
-            .await,
-        Err(CompactionError::Access(_))
-    );
+        assert_matches!(
+            harness
+                .compact_dataset_with(ResolvedDataset::from_created(&foo), options)
+                .await,
+            Err(CompactionError::Access(_)),
+            "{operation}"
+        );
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -180,8 +161,7 @@ async fn test_compact_dataset_mixed_authorization_outcome() {
 
     let harness = CompactUseCaseHarness::new(
         MockDatasetPermissionChecker::new()
-            .expect_authorize_for(DatasetPermission::Maintain, &dataset_id_foo, 1, false)
-            .expect_readable(&dataset_id_foo, 1)
+            .expect_denied_but_readable(DatasetPermission::Maintain, &dataset_id_foo, 1)
             .expect_authorize_for(DatasetPermission::Maintain, &dataset_id_bar, 1, true),
         MockDidGenerator::predefined_dataset_ids(vec![dataset_id_foo, dataset_id_bar]),
     );
@@ -219,73 +199,41 @@ async fn test_compact_dataset_mixed_authorization_outcome() {
 
 #[tokio::test]
 async fn test_compact_dataset_commits_head() {
-    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
-    let (_, dataset_id_foo) = odf::DatasetID::new_generated_ed25519();
-    let reported_heads = ReportedHeads::default();
+    for (operation, options) in CompactUseCaseHarness::compact_and_reset_to_metadata() {
+        let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+        let (_, dataset_id_foo) = odf::DatasetID::new_generated_ed25519();
+        let reported_heads = ReportedHeads::default();
 
-    let harness = CompactUseCaseHarness::with_compaction_executor(
-        MockDatasetPermissionChecker::new().expect_authorize_for(
-            DatasetPermission::Maintain,
-            &dataset_id_foo,
-            1,
-            true,
-        ),
-        MockDidGenerator::predefined_dataset_ids(vec![dataset_id_foo]),
-        MockCompactionExecutor::new()
-            .make_expect_compaction_success(alias_foo.clone(), reported_heads.clone()),
-    );
-    let foo = harness.create_root_dataset(&alias_foo).await;
-    let compacted_head = harness.append_unreferenced_block(&foo, "compacted").await;
-    reported_heads.set(&foo.head, &compacted_head);
+        let harness = CompactUseCaseHarness::with_compaction_executor(
+            MockDatasetPermissionChecker::new().expect_authorize_for(
+                DatasetPermission::Maintain,
+                &dataset_id_foo,
+                1,
+                true,
+            ),
+            MockDidGenerator::predefined_dataset_ids(vec![dataset_id_foo]),
+            MockCompactionExecutor::new()
+                .make_expect_compaction_success(alias_foo.clone(), reported_heads.clone()),
+        );
+        let foo = harness.create_root_dataset(&alias_foo).await;
+        let compacted_head = harness.append_unreferenced_block(&foo, "compacted").await;
+        reported_heads.set(&foo.head, &compacted_head);
 
-    let (result, events) = harness
-        .compact_dataset_recording(ResolvedDataset::from_created(&foo))
-        .await;
-    assert_matches!(
-        result,
-        Ok(CompactionResult::Success {
-            old_head,
-            new_head,
-            ..
-        }) if old_head == foo.head && new_head == compacted_head
-    );
-    assert_eq!(harness.get_head(&foo).await, compacted_head);
-    assert_eq!(events, vec!["begin", "success"]);
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[tokio::test]
-async fn test_reset_dataset_to_metadata_commits_head() {
-    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
-    let (_, dataset_id_foo) = odf::DatasetID::new_generated_ed25519();
-    let reported_heads = ReportedHeads::default();
-
-    let harness = CompactUseCaseHarness::with_compaction_executor(
-        MockDatasetPermissionChecker::new().expect_authorize_for(
-            DatasetPermission::Maintain,
-            &dataset_id_foo,
-            1,
-            true,
-        ),
-        MockDidGenerator::predefined_dataset_ids(vec![dataset_id_foo]),
-        MockCompactionExecutor::new()
-            .make_expect_compaction_success(alias_foo.clone(), reported_heads.clone()),
-    );
-    let foo = harness.create_root_dataset(&alias_foo).await;
-    let reset_head = harness.append_unreferenced_block(&foo, "reset").await;
-    reported_heads.set(&foo.head, &reset_head);
-
-    assert_matches!(
-        harness
-            .reset_dataset_to_metadata(ResolvedDataset::from_created(&foo))
-            .await,
-        Ok(CompactionResult::Success {
-            new_head,
-            ..
-        }) if new_head == reset_head
-    );
-    assert_eq!(harness.get_head(&foo).await, reset_head);
+        let (result, events) = harness
+            .compact_dataset_recording(ResolvedDataset::from_created(&foo), options)
+            .await;
+        assert_matches!(
+            result,
+            Ok(CompactionResult::Success {
+                old_head,
+                new_head,
+                ..
+            }) if old_head == foo.head && new_head == compacted_head,
+            "{operation}"
+        );
+        assert_eq!(harness.get_head(&foo).await, compacted_head, "{operation}");
+        assert_eq!(events, vec!["begin", "success"], "{operation}");
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -309,12 +257,14 @@ async fn test_compact_dataset_head_moved_concurrently() {
     );
     let foo = harness.create_root_dataset(&alias_foo).await;
     let compacted_head = harness.append_unreferenced_block(&foo, "compacted").await;
-    let concurrent_head = harness.append_unreferenced_block(&foo, "concurrent").await;
     reported_heads.set(&foo.head, &compacted_head);
-    harness.move_head(&foo, &foo.head, &concurrent_head).await;
+    let concurrent_head = harness.move_head_concurrently(&foo).await;
 
     let (result, events) = harness
-        .compact_dataset_recording(ResolvedDataset::from_created(&foo))
+        .compact_dataset_recording(
+            ResolvedDataset::from_created(&foo),
+            CompactionOptions::default(),
+        )
         .await;
     assert_matches!(
         result,
@@ -400,18 +350,19 @@ impl CompactUseCaseHarness {
             .await
     }
 
-    async fn reset_dataset_to_metadata(
-        &self,
-        target: ResolvedDataset,
-    ) -> Result<CompactionResult, CompactionError> {
-        self.compact_dataset_with(
-            target,
-            CompactionOptions {
-                keep_metadata_only: true,
-                ..CompactionOptions::default()
-            },
-        )
-        .await
+    /// Both operations the use case runs: a compaction and a reset to
+    /// metadata only
+    fn compact_and_reset_to_metadata() -> [(&'static str, CompactionOptions); 2] {
+        [
+            ("compact", CompactionOptions::default()),
+            (
+                "reset to metadata",
+                CompactionOptions {
+                    keep_metadata_only: true,
+                    ..CompactionOptions::default()
+                },
+            ),
+        ]
     }
 
     async fn compact_dataset_with(
@@ -427,15 +378,12 @@ impl CompactUseCaseHarness {
     async fn compact_dataset_recording(
         &self,
         target: ResolvedDataset,
+        options: CompactionOptions,
     ) -> (Result<CompactionResult, CompactionError>, Vec<&'static str>) {
         let listener = Arc::new(RecordingListener::default());
         let result = self
             .use_case
-            .execute(
-                target.get_handle(),
-                CompactionOptions::default(),
-                Some(listener.clone()),
-            )
+            .execute(target.get_handle(), options, Some(listener.clone()))
             .await;
         (result, listener.events())
     }

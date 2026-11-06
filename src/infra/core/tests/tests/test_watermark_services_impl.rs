@@ -300,10 +300,7 @@ async fn test_set_watermark_head_moved_after_planning() {
         )
         .await;
 
-    let concurrent_head = harness.append_unreferenced_block(&foo, "concurrent").await;
-    harness
-        .move_head(&foo, &planned_head, &concurrent_head)
-        .await;
+    let concurrent_head = harness.move_head_concurrently(&foo).await;
 
     assert_matches!(
         harness

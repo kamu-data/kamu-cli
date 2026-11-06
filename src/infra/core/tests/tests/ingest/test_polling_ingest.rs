@@ -1472,54 +1472,43 @@ async fn test_ingest_polling_savepoints_are_not_shared_between_datasets() {
 
 #[test_group::group(engine, ingest, datafusion)]
 #[test_log::test(tokio::test)]
-async fn test_ingest_polling_savepoint_without_its_data_downloads_again() {
-    let harness = IngestTestHarness::new();
-    let url = harness
-        .serve_file("data.csv", "city,population\nA,not-a-number\n")
-        .await;
-    let target = harness.create_csv_url_polling_dataset(url, None).await;
+async fn test_ingest_polling_unusable_savepoint_downloads_again() {
+    /// Case name and the step that makes the savepoint unusable
+    type Corruption = (&'static str, fn(&IngestTestHarness));
+    let corruptions: [Corruption; 2] = [
+        (
+            "data files removed",
+            IngestTestHarness::remove_downloaded_files,
+        ),
+        (
+            "savepoint truncated",
+            IngestTestHarness::truncate_savepoints,
+        ),
+    ];
 
-    assert_matches!(harness.ingest(target.clone()).await, Err(_));
-    assert_eq!(harness.savepoints_left(), 1);
+    for (corruption, corrupt) in corruptions {
+        let harness = IngestTestHarness::new();
+        let url = harness
+            .serve_file("data.csv", "city,population\nA,not-a-number\n")
+            .await;
+        let target = harness.create_csv_url_polling_dataset(url, None).await;
 
-    harness.remove_downloaded_files();
-    harness.write_served_file("data.csv", "city,population\nA,1000\n");
-    let res = harness.ingest(target).await.unwrap();
+        assert_matches!(harness.ingest(target.clone()).await, Err(_));
+        assert_eq!(harness.savepoints_left(), 1);
 
-    assert_matches!(
-        res,
-        PollingIngestResult::Updated {
-            increment: odf::dataset::MetadataChainIncrementInterval { num_records: 1, .. },
-            ..
-        }
-    );
-}
+        corrupt(&harness);
+        harness.write_served_file("data.csv", "city,population\nA,1000\n");
+        let res = harness.ingest(target).await.unwrap();
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[test_group::group(engine, ingest, datafusion)]
-#[test_log::test(tokio::test)]
-async fn test_ingest_polling_unreadable_savepoint_downloads_again() {
-    let harness = IngestTestHarness::new();
-    let url = harness
-        .serve_file("data.csv", "city,population\nA,not-a-number\n")
-        .await;
-    let target = harness.create_csv_url_polling_dataset(url, None).await;
-
-    assert_matches!(harness.ingest(target.clone()).await, Err(_));
-    assert_eq!(harness.savepoints_left(), 1);
-    harness.truncate_savepoints();
-
-    harness.write_served_file("data.csv", "city,population\nA,1000\n");
-    let res = harness.ingest(target).await.unwrap();
-
-    assert_matches!(
-        res,
-        PollingIngestResult::Updated {
-            increment: odf::dataset::MetadataChainIncrementInterval { num_records: 1, .. },
-            ..
-        }
-    );
+        assert_matches!(
+            res,
+            PollingIngestResult::Updated {
+                increment: odf::dataset::MetadataChainIncrementInterval { num_records: 1, .. },
+                ..
+            },
+            "{corruption}"
+        );
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

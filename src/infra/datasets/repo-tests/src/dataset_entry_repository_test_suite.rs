@@ -808,6 +808,44 @@ pub async fn test_update_dataset_entry_name(catalog: &dill::Catalog) {
 
         assert_matches!(count_res, Ok(1));
     }
+    {
+        // A second rename wins, and the name it leaves is free again
+        let newer_name = odf::DatasetName::new_unchecked("newer-name");
+        dataset_entry_repo
+            .update_dataset_entry_name(&dataset_entry.id, &newer_name)
+            .await
+            .unwrap();
+        let stored = dataset_entry_repo
+            .get_dataset_entry(&dataset_entry.id)
+            .await
+            .unwrap();
+        assert_eq!(stored.name, newer_name);
+
+        let other_entry = new_dataset_entry_with(&account, "new-name", odf::DatasetKind::Root);
+        assert_matches!(
+            dataset_entry_repo.save_dataset_entry(&other_entry).await,
+            Ok(())
+        );
+    }
+    {
+        // Renaming the owner keeps the entry's own name
+        let new_owner_name = odf::AccountName::new_unchecked("renamed-owner");
+        dataset_entry_repo
+            .update_owner_entries_after_rename(&account.id, &new_owner_name)
+            .await
+            .unwrap();
+        let stored = dataset_entry_repo
+            .get_dataset_entry(&dataset_entry.id)
+            .await
+            .unwrap();
+        assert_eq!(
+            (stored.name, stored.owner_name),
+            (
+                odf::DatasetName::new_unchecked("newer-name"),
+                new_owner_name
+            )
+        );
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1189,32 +1227,6 @@ pub async fn test_rename_in_concurrent_transactions(catalog: &dill::Catalog) {
         .await;
     assert_eq!(committed_name, odf::DatasetName::new_unchecked("baz"));
     assert_matches!(other_entry_saved, Ok(()));
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-/// Two transactions rename the owner of one entry: both commit, and the one
-/// that commits last sets the owner name
-pub async fn test_rename_owner_in_concurrent_transactions(catalog: &dill::Catalog) {
-    let (owner, entries) =
-        init_committed_entries(catalog, &[("foo", odf::DatasetKind::Root)]).await;
-    let owner_id = owner.id.clone();
-
-    let outcome = race_transactions(
-        catalog,
-        |catalog| async move {
-            rename_owner(&catalog, &owner.id, "alice").await.unwrap();
-        },
-        move |catalog| async move { rename_owner(&catalog, &owner_id, "bob").await },
-    )
-    .await;
-
-    assert_matches!(outcome, RacingTransactionOutcome::Committed);
-    let committed_entry = get_committed_entry(catalog, &entries[0].id).await;
-    assert_eq!(
-        committed_entry.owner_name,
-        odf::AccountName::new_unchecked("bob")
-    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

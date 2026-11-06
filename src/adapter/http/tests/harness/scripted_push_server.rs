@@ -7,30 +7,21 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::future::IntoFuture;
-use std::net::SocketAddr;
 use std::sync::{Arc, Mutex};
 
 use axum::extract::ws::{WebSocket, WebSocketUpgrade};
 use axum::routing::{get, put};
-use kamu_adapter_http::smart_protocol::ErrorReplyClose;
-use kamu_adapter_http::smart_protocol::axum_server_protocol_common::{
-    axum_read_payload,
-    axum_write_error_close,
-    axum_write_payload,
-};
 use kamu_adapter_http::smart_protocol::messages::*;
-use serde::Serialize;
-use serde::de::DeserializeOwned;
 use url::Url;
+
+use super::{ScriptedServerListener, ScriptedSocket};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// Answers one smart push by script and stores nothing. It has no route for
 /// `refs`, so the client finds no `HEAD` and pushes its whole chain
 pub(crate) struct ScriptedPushServer {
-    listener: tokio::net::TcpListener,
-    local_addr: SocketAddr,
+    listener: ScriptedServerListener,
     script: PushScript,
     state: Arc<ScriptState>,
 }
@@ -65,20 +56,15 @@ impl ScriptedPushServer {
     }
 
     async fn new(script: PushScript) -> Self {
-        let listener = tokio::net::TcpListener::bind(SocketAddr::from(([127, 0, 0, 1], 0)))
-            .await
-            .unwrap();
-        let local_addr = listener.local_addr().unwrap();
         Self {
-            listener,
-            local_addr,
+            listener: ScriptedServerListener::bind().await,
             script,
             state: Arc::new(ScriptState::default()),
         }
     }
 
     pub fn dataset_url(&self, dataset_name: &str) -> Url {
-        Url::parse(&format!("odf+http://{}/{dataset_name}", self.local_addr)).unwrap()
+        self.listener.dataset_url(dataset_name)
     }
 
     /// Taken before `run`, which consumes the server
@@ -92,7 +78,7 @@ impl ScriptedPushServer {
         let session = ScriptedPushSession {
             script: self.script,
             state: self.state.clone(),
-            uploads_base_url: Url::parse(&format!("http://{}/uploads/", self.local_addr)).unwrap(),
+            uploads_base_url: self.listener.http_url("uploads/"),
         };
         let uploads_released = self.state.uploads_released.subscribe();
 
@@ -116,9 +102,7 @@ impl ScriptedPushServer {
                     }
                 }),
             );
-        axum::serve(self.listener, router.into_make_service())
-            .into_future()
-            .await
+        self.listener.serve(router).await
     }
 }
 
@@ -145,40 +129,41 @@ struct ScriptedPushSession {
 }
 
 impl ScriptedPushSession {
-    async fn run(self, mut socket: WebSocket) {
-        Self::receive::<DatasetPushRequest>(&mut socket).await;
-        Self::send::<DatasetPushResponse>(&mut socket, Ok(DatasetPushRequestAccepted {})).await;
+    async fn run(self, socket: WebSocket) {
+        let mut socket = ScriptedSocket::new(socket);
+        socket.receive::<DatasetPushRequest>().await;
+        socket
+            .send::<DatasetPushResponse>(Ok(DatasetPushRequestAccepted {}))
+            .await;
 
-        Self::receive::<DatasetPushMetadataRequest>(&mut socket).await;
-        Self::send(
-            &mut socket,
-            DatasetPushMetadataResponse::Ok(DatasetPushMetadataAccepted {}),
-        )
-        .await;
+        socket.receive::<DatasetPushMetadataRequest>().await;
+        socket
+            .send(DatasetPushMetadataResponse::Ok(
+                DatasetPushMetadataAccepted {},
+            ))
+            .await;
 
-        let objects_request = Self::receive::<DatasetPushObjectsTransferRequest>(&mut socket).await;
+        let objects_request = socket.receive::<DatasetPushObjectsTransferRequest>().await;
 
         match self.script {
             PushScript::StaleProgressRequest => {
-                Self::send::<DatasetPushObjectsTransferResponse>(
-                    &mut socket,
-                    Ok(DatasetPushObjectsTransferAccepted {
-                        object_transfer_strategies: Vec::new(),
-                    }),
-                )
-                .await;
+                socket
+                    .send::<DatasetPushObjectsTransferResponse>(Ok(
+                        DatasetPushObjectsTransferAccepted {
+                            object_transfer_strategies: Vec::new(),
+                        },
+                    ))
+                    .await;
 
                 self.receive_progress(&mut socket).await;
                 Self::send_progress_request(&mut socket).await;
 
-                Self::receive::<DatasetPushComplete>(&mut socket).await;
-                Self::close_with_completion_error(
-                    &mut socket,
-                    DatasetPushCompleteError::UpdatedConcurrently(
+                socket.receive::<DatasetPushComplete>().await;
+                socket
+                    .close_push_not_completed(DatasetPushCompleteError::UpdatedConcurrently(
                         DatasetPushUpdatedConcurrentlyError {},
-                    ),
-                )
-                .await;
+                    ))
+                    .await;
             }
             PushScript::ProgressDuringUpload => {
                 if objects_request.object_files.is_empty() {
@@ -189,25 +174,23 @@ impl ScriptedPushSession {
                     .into_iter()
                     .map(|object_file| self.upload_strategy(object_file))
                     .collect();
-                Self::send::<DatasetPushObjectsTransferResponse>(
-                    &mut socket,
-                    Ok(DatasetPushObjectsTransferAccepted {
-                        object_transfer_strategies,
-                    }),
-                )
-                .await;
+                socket
+                    .send::<DatasetPushObjectsTransferResponse>(Ok(
+                        DatasetPushObjectsTransferAccepted {
+                            object_transfer_strategies,
+                        },
+                    ))
+                    .await;
 
                 Self::send_progress_request(&mut socket).await;
                 self.receive_progress(&mut socket).await;
                 self.state.uploads_released.send_replace(true);
                 self.receive_progress(&mut socket).await;
 
-                Self::receive::<DatasetPushComplete>(&mut socket).await;
-                Self::send::<DatasetPushCompleteResponse>(
-                    &mut socket,
-                    Ok(DatasetPushCompleteConfirmed {}),
-                )
-                .await;
+                socket.receive::<DatasetPushComplete>().await;
+                socket
+                    .send::<DatasetPushCompleteResponse>(Ok(DatasetPushCompleteConfirmed {}))
+                    .await;
             }
         }
     }
@@ -228,36 +211,23 @@ impl ScriptedPushSession {
         }
     }
 
-    async fn send_progress_request(socket: &mut WebSocket) {
-        Self::send(
-            socket,
-            DatasetPushObjectsUploadProgressRequest {
+    async fn send_progress_request(socket: &mut ScriptedSocket) {
+        socket
+            .send(DatasetPushObjectsUploadProgressRequest {
                 progress_requested: true,
-            },
-        )
-        .await;
+            })
+            .await;
     }
 
-    async fn receive_progress(&self, socket: &mut WebSocket) {
-        let progress = Self::receive::<DatasetPushObjectsUploadProgressResponse>(socket).await;
+    async fn receive_progress(&self, socket: &mut ScriptedSocket) {
+        let progress = socket
+            .receive::<DatasetPushObjectsUploadProgressResponse>()
+            .await;
         self.state
             .progress_reports
             .lock()
             .unwrap()
             .push(progress.details);
-    }
-
-    async fn receive<T: DeserializeOwned>(socket: &mut WebSocket) -> T {
-        axum_read_payload::<T>(socket).await.unwrap()
-    }
-
-    async fn send<T: Serialize>(socket: &mut WebSocket, payload: T) {
-        axum_write_payload(socket, payload).await.unwrap();
-    }
-
-    /// Fails the completion as a real server does
-    async fn close_with_completion_error(socket: &mut WebSocket, error: DatasetPushCompleteError) {
-        axum_write_error_close(socket, ErrorReplyClose::push_not_completed(error)).await;
     }
 }
 

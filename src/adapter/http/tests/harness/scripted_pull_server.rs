@@ -7,22 +7,15 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::future::IntoFuture;
-use std::net::SocketAddr;
-
 use axum::extract::Path;
 use axum::extract::ws::{WebSocket, WebSocketUpgrade};
 use axum::routing::get;
-use kamu_adapter_http::smart_protocol::axum_server_protocol_common::{
-    axum_read_payload,
-    axum_write_payload,
-};
 use kamu_adapter_http::smart_protocol::messages::*;
 use kamu_adapter_http::smart_protocol::protocol_dataset_helper::prepare_dataset_metadata_batch;
 use kamu_datasets::{DatasetRegistry, ResolvedDataset};
-use serde::Serialize;
-use serde::de::DeserializeOwned;
 use url::Url;
+
+use super::{ScriptedServerListener, ScriptedSocket};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -30,8 +23,7 @@ use url::Url;
 /// `HEAD` and blocks and plans its whole chain, then breaks the transfer in
 /// the way the script says
 pub(crate) struct ScriptedPullServer {
-    listener: tokio::net::TcpListener,
-    local_addr: SocketAddr,
+    listener: ScriptedServerListener,
     dataset: ResolvedDataset,
     session: ScriptedPullSession,
 }
@@ -161,26 +153,23 @@ impl ScriptedPullServer {
             .unwrap(),
         };
 
-        let listener = tokio::net::TcpListener::bind(SocketAddr::from(([127, 0, 0, 1], 0)))
-            .await
-            .unwrap();
-        let local_addr = listener.local_addr().unwrap();
+        let listener = ScriptedServerListener::bind().await;
+        let session = ScriptedPullSession {
+            script,
+            planned_num_blocks,
+            sent_blocks,
+            unreachable_url: listener.http_url("unreachable"),
+            corrupted_url: listener.http_url("corrupted"),
+        };
         Self {
             listener,
-            local_addr,
             dataset,
-            session: ScriptedPullSession {
-                script,
-                planned_num_blocks,
-                sent_blocks,
-                unreachable_url: Url::parse(&format!("http://{local_addr}/unreachable")).unwrap(),
-                corrupted_url: Url::parse(&format!("http://{local_addr}/corrupted")).unwrap(),
-            },
+            session,
         }
     }
 
     pub fn dataset_url(&self, dataset_name: &str) -> Url {
-        Url::parse(&format!("odf+http://{}/{dataset_name}", self.local_addr)).unwrap()
+        self.listener.dataset_url(dataset_name)
     }
 
     pub async fn run(self) -> Result<(), std::io::Error> {
@@ -213,9 +202,7 @@ impl ScriptedPullServer {
                     },
                 ),
             );
-        axum::serve(self.listener, router.into_make_service())
-            .into_future()
-            .await
+        self.listener.serve(router).await
     }
 
     async fn head(dataset: &ResolvedDataset) -> odf::Multihash {
@@ -239,11 +226,11 @@ struct ScriptedPullSession {
 }
 
 impl ScriptedPullSession {
-    async fn run(self, mut socket: WebSocket) {
-        Self::receive::<DatasetPullRequest>(&mut socket).await;
-        Self::send::<DatasetPullResponse>(
-            &mut socket,
-            Ok(DatasetPullSuccessResponse {
+    async fn run(self, socket: WebSocket) {
+        let mut socket = ScriptedSocket::new(socket);
+        socket.receive::<DatasetPullRequest>().await;
+        socket
+            .send::<DatasetPullResponse>(Ok(DatasetPullSuccessResponse {
                 transfer_plan: TransferPlan {
                     num_blocks: self.planned_num_blocks,
                     num_objects: 0,
@@ -251,25 +238,22 @@ impl ScriptedPullSession {
                     bytes_in_raw_blocks: 0,
                     bytes_in_raw_objects: 0,
                 },
-            }),
-        )
-        .await;
+            }))
+            .await;
 
-        Self::receive::<DatasetPullMetadataRequest>(&mut socket).await;
-        Self::send(
-            &mut socket,
-            DatasetMetadataPullResponse {
+        socket.receive::<DatasetPullMetadataRequest>().await;
+        socket
+            .send(DatasetMetadataPullResponse {
                 blocks: self.sent_blocks.clone(),
-            },
-        )
-        .await;
+            })
+            .await;
 
         let objects_script = match self.script {
             PullScript::Objects(objects_script) => objects_script,
             PullScript::Metadata(_) => return,
         };
 
-        let objects_request = Self::receive::<DatasetPullObjectsTransferRequest>(&mut socket).await;
+        let objects_request = socket.receive::<DatasetPullObjectsTransferRequest>().await;
         let object_transfer_strategies = match objects_script {
             ObjectsScript::Omit => Vec::new(),
             ObjectsScript::Mislabel => objects_request
@@ -283,13 +267,11 @@ impl ScriptedPullSession {
                 .map(|object_file| self.corrupted_strategy(object_file))
                 .collect(),
         };
-        Self::send(
-            &mut socket,
-            DatasetPullObjectsTransferResponse {
+        socket
+            .send(DatasetPullObjectsTransferResponse {
                 object_transfer_strategies,
-            },
-        )
-        .await;
+            })
+            .await;
     }
 
     fn mislabeled_strategy(&self, object_file: ObjectFileReference) -> PullObjectTransferStrategy {
@@ -321,14 +303,6 @@ impl ScriptedPullSession {
                 expires_at: None,
             },
         }
-    }
-
-    async fn receive<T: DeserializeOwned>(socket: &mut WebSocket) -> T {
-        axum_read_payload::<T>(socket).await.unwrap()
-    }
-
-    async fn send<T: Serialize>(socket: &mut WebSocket, payload: T) {
-        axum_write_payload(socket, payload).await.unwrap();
     }
 }
 

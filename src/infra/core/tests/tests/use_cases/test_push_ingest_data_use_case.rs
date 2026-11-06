@@ -87,9 +87,11 @@ async fn test_push_ingest_data_denied_without_write() {
     let (_, dataset_id_foo) = odf::DatasetID::new_generated_ed25519();
 
     let harness = PushIngestDataUseCaseHarness::new(
-        MockDatasetPermissionChecker::new()
-            .expect_authorize_for(DatasetPermission::Write, &dataset_id_foo, 1, false)
-            .expect_readable(&dataset_id_foo, 1),
+        MockDatasetPermissionChecker::new().expect_denied_but_readable(
+            DatasetPermission::Write,
+            &dataset_id_foo,
+            1,
+        ),
         MockDidGenerator::predefined_dataset_ids(vec![dataset_id_foo]),
     );
 
@@ -429,10 +431,7 @@ async fn test_push_ingest_data_head_moved_concurrently() {
         .await;
     let planned_head = harness.get_head(&foo).await;
 
-    let concurrent_head = harness.append_unreferenced_block(&foo, "concurrent").await;
-    harness
-        .move_head(&foo, &planned_head, &concurrent_head)
-        .await;
+    let concurrent_head = harness.move_head_concurrently(&foo).await;
 
     assert_matches!(
         harness.ingest_ndjson(&foo, Some(planned_head.clone()), false).await,
@@ -500,10 +499,7 @@ async fn test_push_ingest_data_execute_multi_head_moved_concurrently() {
         .await;
     let planned_head = harness.get_head(&foo).await;
 
-    let concurrent_head = harness.append_unreferenced_block(&foo, "concurrent").await;
-    harness
-        .move_head(&foo, &planned_head, &concurrent_head)
-        .await;
+    let concurrent_head = harness.move_head_concurrently(&foo).await;
 
     assert_matches!(
         harness
@@ -702,7 +698,7 @@ async fn test_push_ingest_data_head_moved_before_commit_reports_error_not_succes
 async fn test_push_ingest_data_execute_multi_counts_staged_slices_towards_quota() {
     let harness = PushIngestDataUseCaseHarness::with_room_for_one_slice().await;
     let target = harness.create_quota_owner_dataset("foo").await;
-    let initial_head = harness.head(&target).await;
+    let initial_head = harness.get_head(&target).await;
 
     assert_matches!(
         harness.ingest_slices(&target, &["foo", "bar"]).await,
@@ -710,7 +706,7 @@ async fn test_push_ingest_data_execute_multi_counts_staged_slices_towards_quota(
             PushIngestError::QuotaExceeded(QuotaError::Exceeded(_))
         ))
     );
-    assert_eq!(harness.head(&target).await, initial_head);
+    assert_eq!(harness.get_head(&target).await, initial_head);
 
     // Each slice fits on its own
     assert_matches!(
@@ -964,9 +960,9 @@ impl PushIngestDataUseCaseHarness {
     }
 
     async fn head_event(&self, created: &CreateDatasetResult) -> odf::MetadataEvent {
-        let target = ResolvedDataset::from_created(created);
-        let head = self.head(&target).await;
-        target
+        let head = self.get_head(created).await;
+        created
+            .dataset
             .as_metadata_chain()
             .get_block(&head)
             .await
@@ -985,12 +981,12 @@ impl PushIngestDataUseCaseHarness {
             .await
     }
 
-    async fn create_quota_owner_dataset(&self, name: &str) -> ResolvedDataset {
+    async fn create_quota_owner_dataset(&self, name: &str) -> CreateDatasetResult {
         let alias = odf::DatasetAlias::new(
             Some(odf::AccountName::new_unchecked(Self::QUOTA_OWNER)),
             odf::DatasetName::new_unchecked(name),
         );
-        ResolvedDataset::from_created(&self.create_root_dataset_with_push_source(&alias).await)
+        self.create_root_dataset_with_push_source(&alias).await
     }
 
     /// One record, so that every slice of it has about the same size
@@ -1002,11 +998,11 @@ impl PushIngestDataUseCaseHarness {
 
     async fn ingest_slices(
         &self,
-        target: &ResolvedDataset,
+        target: &CreateDatasetResult,
         cities: &[&'static str],
     ) -> Result<PushIngestResult, PushIngestDataError> {
         self.ingest_multi_data(
-            target.clone(),
+            ResolvedDataset::from_created(target),
             cities.iter().copied().map(Self::slice_source).collect(),
             PushIngestDataUseCaseOptions {
                 media_type: None,
@@ -1022,22 +1018,15 @@ impl PushIngestDataUseCaseHarness {
         self.ingest_slices(&target, &["foo"]).await.unwrap();
 
         let block = target
+            .dataset
             .as_metadata_chain()
-            .get_block(&self.head(&target).await)
+            .get_block(&self.get_head(&target).await)
             .await
             .unwrap();
         let odf::MetadataEvent::AddData(add_data) = block.event else {
             panic!("Expected AddData, got: {block:?}");
         };
         add_data.new_data.unwrap().size
-    }
-
-    async fn head(&self, target: &ResolvedDataset) -> odf::Multihash {
-        target
-            .as_metadata_chain()
-            .resolve_ref(&odf::BlockRef::Head)
-            .await
-            .unwrap()
     }
 }
 

@@ -78,18 +78,11 @@ use url::Url;
 
 #[tokio::test]
 async fn test_ingest_head_moved_concurrently_fails_recoverably() {
-    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
-    let reported_heads = ReportedHeads::default();
-
-    let harness = UpdateDatasetTaskRunnerHarness::new(UpdateDatasetTaskRunnerMocks {
-        mock_polling_ingest_service: MockPollingIngestService::new()
-            .make_expect_ingest_updated(alias_foo.clone(), reported_heads.clone()),
-        ..UpdateDatasetTaskRunnerMocks::default()
-    });
-    let foo = harness.create_root_dataset(&alias_foo).await;
-    let ingested_head = harness.append_unreferenced_block(&foo, "ingested").await;
+    let (harness, foo, _) = UpdateDatasetTaskRunnerHarness::new_ingesting_new_root(
+        &UpdateDatasetTaskRunnerHarness::alias("foo"),
+    )
+    .await;
     let concurrent_head = harness.append_unreferenced_block(&foo, "concurrent").await;
-    reported_heads.set(&foo.head, &ingested_head);
     harness.move_head(&foo, &foo.head, &concurrent_head).await;
 
     let outcome = harness.run_ingest_update(&foo).await;
@@ -112,7 +105,7 @@ async fn test_ingest_head_moved_concurrently_fails_recoverably() {
 
 #[tokio::test]
 async fn test_ingest_reports_increment_from_its_result() {
-    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let alias_foo = UpdateDatasetTaskRunnerHarness::alias("foo");
     let reported_heads = ReportedHeads::default();
 
     let harness = UpdateDatasetTaskRunnerHarness::new(UpdateDatasetTaskRunnerMocks {
@@ -151,7 +144,7 @@ async fn test_ingest_reports_increment_from_its_result() {
 
 #[tokio::test]
 async fn test_ingest_of_uncacheable_source_succeeds_up_to_date_without_increment() {
-    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let alias_foo = UpdateDatasetTaskRunnerHarness::alias("foo");
 
     let harness = UpdateDatasetTaskRunnerHarness::new(UpdateDatasetTaskRunnerMocks {
         mock_polling_ingest_service: MockPollingIngestService::new()
@@ -178,7 +171,7 @@ async fn test_ingest_of_uncacheable_source_succeeds_up_to_date_without_increment
 
 #[tokio::test]
 async fn test_ingest_passes_fetch_uncacheable_to_the_ingest() {
-    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let alias_foo = UpdateDatasetTaskRunnerHarness::alias("foo");
 
     let harness = UpdateDatasetTaskRunnerHarness::new(UpdateDatasetTaskRunnerMocks {
         mock_polling_ingest_service: MockPollingIngestService::new()
@@ -196,10 +189,10 @@ async fn test_ingest_passes_fetch_uncacheable_to_the_ingest() {
 
 #[tokio::test]
 async fn test_ingest_without_polling_source_fails_unrecoverably() {
-    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
-
     let harness = UpdateDatasetTaskRunnerHarness::new(UpdateDatasetTaskRunnerMocks::default());
-    let foo = harness.create_root_dataset_without_source(&alias_foo).await;
+    let foo = harness
+        .create_root_dataset_without_source(&UpdateDatasetTaskRunnerHarness::alias("foo"))
+        .await;
 
     let outcome = harness.run_ingest_update(&foo).await;
 
@@ -213,7 +206,7 @@ async fn test_ingest_without_polling_source_fails_unrecoverably() {
 
 #[tokio::test]
 async fn test_ingest_from_unreachable_source_fails_recoverably() {
-    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let alias_foo = UpdateDatasetTaskRunnerHarness::alias("foo");
 
     let harness = UpdateDatasetTaskRunnerHarness::new(UpdateDatasetTaskRunnerMocks {
         mock_polling_ingest_service: MockPollingIngestService::new()
@@ -232,12 +225,10 @@ async fn test_ingest_from_unreachable_source_fails_recoverably() {
 
 #[tokio::test]
 async fn test_ingest_with_real_planner_and_service_commits_and_reports_increment() {
-    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
-
     let harness = UpdateDatasetTaskRunnerHarness::new_with_real_ingest();
     let src_path = harness.write_source_file("city,population\nA,1000\nB,2000\nC,3000\n");
     let foo = harness
-        .create_root_dataset_polling_csv(&alias_foo, &src_path)
+        .create_root_dataset_polling_csv(&UpdateDatasetTaskRunnerHarness::alias("foo"), &src_path)
         .await;
 
     let outcome = harness.run_ingest_update(&foo).await;
@@ -263,12 +254,10 @@ async fn test_ingest_with_real_planner_and_service_commits_and_reports_increment
 
 #[tokio::test]
 async fn test_ingest_with_real_service_of_unreadable_data_fails_unrecoverably() {
-    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
-
     let harness = UpdateDatasetTaskRunnerHarness::new_with_real_ingest();
     let src_path = harness.write_source_file("city,population\nA,not-a-number\n");
     let foo = harness
-        .create_root_dataset_polling_csv(&alias_foo, &src_path)
+        .create_root_dataset_polling_csv(&UpdateDatasetTaskRunnerHarness::alias("foo"), &src_path)
         .await;
 
     let outcome = harness.run_ingest_update(&foo).await;
@@ -283,46 +272,11 @@ async fn test_ingest_with_real_service_of_unreadable_data_fails_unrecoverably() 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[tokio::test]
-async fn test_transform_head_moved_concurrently_fails_recoverably() {
-    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
-    let alias_bar = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("bar"));
-    let reported_heads = ReportedHeads::default();
-
-    let harness = UpdateDatasetTaskRunnerHarness::new_transforming(&alias_bar, &reported_heads);
-    let foo = harness.create_root_dataset(&alias_foo).await;
-    let bar = harness
-        .create_derived_dataset(&alias_bar, vec![foo.dataset_handle.as_local_ref()])
-        .await;
-    let transformed_head = harness.append_unreferenced_block(&bar, "transformed").await;
-    let concurrent_head = harness.append_unreferenced_block(&bar, "concurrent").await;
-    reported_heads.set(&bar.head, &transformed_head);
-    harness.move_head_before_next_commit(concurrent_head.clone());
-
-    let outcome = harness.run_transform_update(&bar).await;
-
-    assert_eq!(
-        TaskOutcome::Failed(
-            TaskErrorDatasetCommit::HeadMoved(DatasetHeadMovedError {
-                dataset_id: bar.dataset_handle.id.clone(),
-                expected_head: Some(bar.head.clone()),
-                actual_head: Some(concurrent_head.clone()),
-            })
-            .into_task_error()
-        ),
-        outcome,
-    );
-    assert_eq!(harness.get_head(&bar).await, concurrent_head);
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[tokio::test]
 async fn test_transform_input_not_pulled_succeeds_as_up_to_date() {
-    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
-    let alias_bar = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("bar"));
-    let foo_handle = odf::DatasetHandle::new(
+    let alias_bar = UpdateDatasetTaskRunnerHarness::alias("bar");
+    let input_handle = odf::DatasetHandle::new(
         odf::DatasetID::new_seeded_ed25519(b"foo"),
-        alias_foo.clone(),
+        UpdateDatasetTaskRunnerHarness::alias("foo"),
         odf::DatasetKind::Root,
     );
 
@@ -331,16 +285,13 @@ async fn test_transform_input_not_pulled_succeeds_as_up_to_date() {
             mock_transform_planner: MockTransformPlanner::new()
                 .make_expect_elaborate_transform_error(alias_bar.clone(), move || {
                     InputNotPulledError {
-                        dataset_handle: foo_handle.clone(),
+                        dataset_handle: input_handle.clone(),
                     }
                     .into()
                 }),
             ..UpdateDatasetTaskRunnerMocks::default()
         });
-    let foo = harness.create_root_dataset(&alias_foo).await;
-    let bar = harness
-        .create_derived_dataset(&alias_bar, vec![foo.dataset_handle.as_local_ref()])
-        .await;
+    let bar = harness.create_derivative(&alias_bar).await;
 
     let outcome = harness.run_transform_update(&bar).await;
 
@@ -357,18 +308,14 @@ async fn test_transform_input_not_pulled_succeeds_as_up_to_date() {
 
 #[tokio::test]
 async fn test_transform_diverged_input_fails_as_input_compacted() {
-    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
-    let alias_bar = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("bar"));
+    let alias_bar = UpdateDatasetTaskRunnerHarness::alias("bar");
 
     let harness = UpdateDatasetTaskRunnerHarness::new(UpdateDatasetTaskRunnerMocks {
         mock_transform_planner: MockTransformPlanner::new()
             .make_expect_elaborate_transform_diverged(alias_bar.clone()),
         ..UpdateDatasetTaskRunnerMocks::default()
     });
-    let foo = harness.create_root_dataset(&alias_foo).await;
-    let bar = harness
-        .create_derived_dataset(&alias_bar, vec![foo.dataset_handle.as_local_ref()])
-        .await;
+    let bar = harness.create_derivative(&alias_bar).await;
 
     let outcome = harness.run_transform_update(&bar).await;
 
@@ -388,15 +335,11 @@ async fn test_transform_diverged_input_fails_as_input_compacted() {
 
 #[tokio::test]
 async fn test_transform_success_carries_increment_from_executor() {
-    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
-    let alias_bar = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("bar"));
+    let alias_bar = UpdateDatasetTaskRunnerHarness::alias("bar");
     let reported_heads = ReportedHeads::default();
 
     let harness = UpdateDatasetTaskRunnerHarness::new_transforming(&alias_bar, &reported_heads);
-    let foo = harness.create_root_dataset(&alias_foo).await;
-    let bar = harness
-        .create_derived_dataset(&alias_bar, vec![foo.dataset_handle.as_local_ref()])
-        .await;
+    let bar = harness.create_derivative(&alias_bar).await;
     let transformed_head = harness.append_unreferenced_block(&bar, "transformed").await;
     reported_heads.set(&bar.head, &transformed_head);
 
@@ -420,69 +363,54 @@ async fn test_transform_success_carries_increment_from_executor() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[tokio::test]
-async fn test_transform_incompatible_schema_fails_unrecoverably() {
-    let outcome = UpdateDatasetTaskRunnerHarness::run_transform_failing_with(|| {
-        IncompatibleSchemaError::new(
-            "Schema of the new slice is not compatible",
-            Arc::new(Schema::empty()),
-            Arc::new(Schema::empty()),
-        )
-        .into()
-    })
-    .await;
+async fn test_transform_execution_failure_fails_as_recoverable_as_its_error() {
+    /// Case name, the failure, and whether the task may be retried
+    type Case = (&'static str, fn() -> TransformExecuteError, bool);
+    let cases: [Case; 2] = [
+        (
+            "engine_crash",
+            || TransformExecuteError::Internal("Engine container exited unexpectedly".int_err()),
+            true,
+        ),
+        (
+            "incompatible_schema",
+            || {
+                IncompatibleSchemaError::new(
+                    "Schema of the new slice is not compatible",
+                    Arc::new(Schema::empty()),
+                    Arc::new(Schema::empty()),
+                )
+                .into()
+            },
+            false,
+        ),
+    ];
 
-    assert_eq!(
-        TaskOutcome::Failed(TaskError::empty_unrecoverable()),
-        outcome
-    );
-}
+    for (case, make_error, recoverable) in cases {
+        let outcome = UpdateDatasetTaskRunnerHarness::run_transform_failing_with(make_error).await;
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[tokio::test]
-async fn test_transform_engine_crash_fails_recoverably() {
-    let outcome = UpdateDatasetTaskRunnerHarness::run_transform_failing_with(|| {
-        TransformExecuteError::Internal("Engine container exited unexpectedly".int_err())
-    })
-    .await;
-
-    assert_eq!(TaskOutcome::Failed(TaskError::empty_recoverable()), outcome);
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[tokio::test]
-async fn test_transform_unsupported_engine_fails_unrecoverably() {
-    let outcome = UpdateDatasetTaskRunnerHarness::run_transform_failing_with(|| {
-        EngineProvisioningError::from(UnsupportedEngineError {
-            engine_id: "cobol".to_string(),
-        })
-        .into()
-    })
-    .await;
-
-    assert_eq!(
-        TaskOutcome::Failed(TaskError::empty_unrecoverable()),
-        outcome
-    );
+        assert_eq!(
+            TaskOutcome::Failed(UpdateDatasetTaskRunnerHarness::empty_task_error(
+                recoverable
+            )),
+            outcome,
+            "{case}",
+        );
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[tokio::test]
 async fn test_transform_up_to_date_reports_up_to_date() {
-    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
-    let alias_bar = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("bar"));
+    let alias_bar = UpdateDatasetTaskRunnerHarness::alias("bar");
 
     let harness = UpdateDatasetTaskRunnerHarness::new(UpdateDatasetTaskRunnerMocks {
         mock_transform_planner: MockTransformPlanner::new()
             .make_expect_elaborate_transform_up_to_date(alias_bar.clone()),
         ..UpdateDatasetTaskRunnerMocks::default()
     });
-    let foo = harness.create_root_dataset(&alias_foo).await;
-    let bar = harness
-        .create_derived_dataset(&alias_bar, vec![foo.dataset_handle.as_local_ref()])
-        .await;
+    let bar = harness.create_derivative(&alias_bar).await;
 
     let outcome = harness.run_transform_update(&bar).await;
 
@@ -513,37 +441,21 @@ async fn test_transform_not_defined_fails_unrecoverably() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[tokio::test]
-async fn test_transform_inputs_changed_fails_unrecoverably() {
-    let outcome =
-        UpdateDatasetTaskRunnerHarness::run_transform_elaboration_failing_with(|target| {
-            TransformInputsChangedError {
-                dataset_handle: target.clone(),
-            }
-            .into()
-        })
-        .await;
-
-    assert_eq!(
-        TaskOutcome::Failed(TaskError::empty_unrecoverable()),
-        outcome
-    );
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[tokio::test]
 async fn test_transform_with_real_planner_and_executor_commits_and_reports_increment() {
-    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
-    let alias_bar = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("bar"));
     let watermark = Utc.with_ymd_and_hms(2050, 1, 1, 12, 0, 0).unwrap();
 
     let harness = UpdateDatasetTaskRunnerHarness::new_with_real_transform(watermark);
-    let foo = harness.create_root_dataset(&alias_foo).await;
+    let foo = harness
+        .create_root_dataset(&UpdateDatasetTaskRunnerHarness::alias("foo"))
+        .await;
     harness
         .append_schema_and_watermark(&foo, Utc.with_ymd_and_hms(2050, 1, 1, 0, 0, 0).unwrap())
         .await;
     let bar = harness
-        .create_derived_dataset(&alias_bar, vec![foo.dataset_handle.as_local_ref()])
+        .create_derived_dataset(
+            &UpdateDatasetTaskRunnerHarness::alias("bar"),
+            vec![foo.dataset_handle.as_local_ref()],
+        )
         .await;
 
     let outcome = harness.run_transform_update(&bar).await;
@@ -572,13 +484,10 @@ async fn test_transform_with_real_planner_and_executor_commits_and_reports_incre
 
 #[tokio::test]
 async fn test_sync_commits_and_reports_increment() {
-    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
-    let synced_heads = ReportedHeads::default();
-
-    let harness = UpdateDatasetTaskRunnerHarness::new_syncing(&alias_foo, Some(&synced_heads));
-    let foo = harness.create_root_dataset(&alias_foo).await;
-    let synced_head = harness.append_unreferenced_block(&foo, "synced").await;
-    synced_heads.set(&foo.head, &synced_head);
+    let (harness, foo, synced_head) = UpdateDatasetTaskRunnerHarness::new_syncing_new_root(
+        &UpdateDatasetTaskRunnerHarness::alias("foo"),
+    )
+    .await;
 
     let outcome = harness.run_sync_update(&foo).await;
 
@@ -601,7 +510,7 @@ async fn test_sync_commits_and_reports_increment() {
 
 #[tokio::test]
 async fn test_sync_expects_head_read_when_it_runs() {
-    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let alias_foo = UpdateDatasetTaskRunnerHarness::alias("foo");
     let synced_heads = ReportedHeads::default();
 
     let harness = UpdateDatasetTaskRunnerHarness::new_syncing(&alias_foo, Some(&synced_heads));
@@ -627,7 +536,7 @@ async fn test_sync_expects_head_read_when_it_runs() {
 
 #[test]
 fn test_sync_into_missing_dataset_is_not_an_update_task_job() {
-    let alias_bar = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("bar"));
+    let alias_bar = UpdateDatasetTaskRunnerHarness::alias("bar");
 
     assert_matches!(
         UpdateDatasetTaskRunnerHarness::sync_job_into_new(&alias_bar),
@@ -639,7 +548,7 @@ fn test_sync_into_missing_dataset_is_not_an_update_task_job() {
 
 #[tokio::test]
 async fn test_sync_up_to_date() {
-    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let alias_foo = UpdateDatasetTaskRunnerHarness::alias("foo");
 
     let harness = UpdateDatasetTaskRunnerHarness::new_syncing(&alias_foo, None);
     let foo = harness.create_root_dataset(&alias_foo).await;
@@ -659,10 +568,10 @@ async fn test_sync_up_to_date() {
 
 #[tokio::test]
 async fn test_sync_with_real_service_commits_and_reports_increment() {
-    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
-
     let harness = UpdateDatasetTaskRunnerHarness::new_with_real_sync();
-    let foo = harness.create_root_dataset_with_schema(&alias_foo).await;
+    let foo = harness
+        .create_root_dataset_with_schema(&UpdateDatasetTaskRunnerHarness::alias("foo"))
+        .await;
     harness.push_to_repo(&foo).await;
     let repo_head = harness.append_data_in_repo(&foo).await;
 
@@ -691,10 +600,10 @@ async fn test_sync_with_real_service_commits_and_reports_increment() {
 
 #[tokio::test]
 async fn test_sync_with_real_service_from_repo_in_sync_is_up_to_date() {
-    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
-
     let harness = UpdateDatasetTaskRunnerHarness::new_with_real_sync();
-    let foo = harness.create_root_dataset_with_schema(&alias_foo).await;
+    let foo = harness
+        .create_root_dataset_with_schema(&UpdateDatasetTaskRunnerHarness::alias("foo"))
+        .await;
     harness.push_to_repo(&foo).await;
 
     let outcome = harness.run_sync_update_from_repo(&foo).await;
@@ -712,14 +621,11 @@ async fn test_sync_with_real_service_from_repo_in_sync_is_up_to_date() {
 
 #[tokio::test]
 async fn test_sync_head_moved_concurrently_fails_recoverably() {
-    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
-    let synced_heads = ReportedHeads::default();
-
-    let harness = UpdateDatasetTaskRunnerHarness::new_syncing(&alias_foo, Some(&synced_heads));
-    let foo = harness.create_root_dataset(&alias_foo).await;
-    let synced_head = harness.append_unreferenced_block(&foo, "synced").await;
+    let (harness, foo, _) = UpdateDatasetTaskRunnerHarness::new_syncing_new_root(
+        &UpdateDatasetTaskRunnerHarness::alias("foo"),
+    )
+    .await;
     let concurrent_head = harness.append_unreferenced_block(&foo, "concurrent").await;
-    synced_heads.set(&foo.head, &synced_head);
     harness.move_head_before_next_commit(concurrent_head.clone());
 
     let outcome = harness.run_sync_update(&foo).await;
@@ -743,13 +649,10 @@ async fn test_sync_head_moved_concurrently_fails_recoverably() {
 
 #[tokio::test]
 async fn test_sync_commit_not_allowed_fails_unrecoverably() {
-    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
-    let synced_heads = ReportedHeads::default();
-
-    let harness = UpdateDatasetTaskRunnerHarness::new_syncing(&alias_foo, Some(&synced_heads));
-    let foo = harness.create_root_dataset(&alias_foo).await;
-    let synced_head = harness.append_unreferenced_block(&foo, "synced").await;
-    synced_heads.set(&foo.head, &synced_head);
+    let (harness, foo, _) = UpdateDatasetTaskRunnerHarness::new_syncing_new_root(
+        &UpdateDatasetTaskRunnerHarness::alias("foo"),
+    )
+    .await;
     harness.deny_next_commit();
 
     let outcome = harness.run_sync_update(&foo).await;
@@ -765,17 +668,10 @@ async fn test_sync_commit_not_allowed_fails_unrecoverably() {
 
 #[tokio::test]
 async fn test_ingest_commit_not_allowed_fails_unrecoverably() {
-    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
-    let reported_heads = ReportedHeads::default();
-
-    let harness = UpdateDatasetTaskRunnerHarness::new(UpdateDatasetTaskRunnerMocks {
-        mock_polling_ingest_service: MockPollingIngestService::new()
-            .make_expect_ingest_updated(alias_foo.clone(), reported_heads.clone()),
-        ..UpdateDatasetTaskRunnerMocks::default()
-    });
-    let foo = harness.create_root_dataset(&alias_foo).await;
-    let ingested_head = harness.append_unreferenced_block(&foo, "ingested").await;
-    reported_heads.set(&foo.head, &ingested_head);
+    let (harness, foo, _) = UpdateDatasetTaskRunnerHarness::new_ingesting_new_root(
+        &UpdateDatasetTaskRunnerHarness::alias("foo"),
+    )
+    .await;
     harness.deny_next_commit();
 
     let outcome = harness.run_ingest_update(&foo).await;
@@ -813,41 +709,49 @@ async fn test_sync_head_moved_without_heads_fails_recoverably() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[tokio::test]
-async fn test_sync_from_diverged_source_fails_unrecoverably() {
-    let outcome = UpdateDatasetTaskRunnerHarness::run_sync_failing_with(|| {
-        SyncError::DatasetsDiverged(DatasetsDivergedError {
-            src_head: odf::Multihash::from_digest_sha3_256(b"src"),
-            dst_head: odf::Multihash::from_digest_sha3_256(b"dst"),
-            detail: None,
-        })
-    })
-    .await;
+async fn test_sync_transfer_failure_fails_as_recoverable_as_its_error() {
+    /// Case name, the failure, and whether the task may be retried
+    type Case = (&'static str, fn() -> SyncError, bool);
+    let cases: [Case; 2] = [
+        (
+            "diverged_source",
+            || {
+                SyncError::DatasetsDiverged(DatasetsDivergedError {
+                    src_head: odf::Multihash::from_digest_sha3_256(b"src"),
+                    dst_head: odf::Multihash::from_digest_sha3_256(b"dst"),
+                    detail: None,
+                })
+            },
+            false,
+        ),
+        (
+            "unreachable_source",
+            || SyncError::Internal("connection refused".int_err()),
+            true,
+        ),
+    ];
 
-    assert_eq!(
-        TaskOutcome::Failed(TaskError::empty_unrecoverable()),
-        outcome
-    );
-}
+    for (case, make_error, recoverable) in cases {
+        let outcome = UpdateDatasetTaskRunnerHarness::run_sync_failing_with(make_error).await;
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[tokio::test]
-async fn test_sync_from_unreachable_source_fails_recoverably() {
-    let outcome = UpdateDatasetTaskRunnerHarness::run_sync_failing_with(|| {
-        SyncError::Internal("connection refused".int_err())
-    })
-    .await;
-
-    assert_eq!(TaskOutcome::Failed(TaskError::empty_recoverable()), outcome);
+        assert_eq!(
+            TaskOutcome::Failed(UpdateDatasetTaskRunnerHarness::empty_task_error(
+                recoverable
+            )),
+            outcome,
+            "{case}",
+        );
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[tokio::test]
 async fn test_ingest_of_deleted_dataset_fails_unrecoverably() {
-    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
     let harness = UpdateDatasetTaskRunnerHarness::new(UpdateDatasetTaskRunnerMocks::default());
-    let foo = harness.create_root_dataset(&alias_foo).await;
+    let foo = harness
+        .create_root_dataset(&UpdateDatasetTaskRunnerHarness::alias("foo"))
+        .await;
     harness.delete_dataset(&foo).await;
 
     let outcome = harness.run_ingest_update(&foo).await;
@@ -862,12 +766,9 @@ async fn test_ingest_of_deleted_dataset_fails_unrecoverably() {
 
 #[tokio::test]
 async fn test_transform_of_deleted_dataset_fails_unrecoverably() {
-    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
-    let alias_bar = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("bar"));
     let harness = UpdateDatasetTaskRunnerHarness::new(UpdateDatasetTaskRunnerMocks::default());
-    let foo = harness.create_root_dataset(&alias_foo).await;
     let bar = harness
-        .create_derived_dataset(&alias_bar, vec![foo.dataset_handle.as_local_ref()])
+        .create_derivative(&UpdateDatasetTaskRunnerHarness::alias("bar"))
         .await;
     harness.delete_dataset(&bar).await;
 
@@ -883,9 +784,10 @@ async fn test_transform_of_deleted_dataset_fails_unrecoverably() {
 
 #[tokio::test]
 async fn test_sync_into_deleted_dataset_fails_unrecoverably() {
-    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
     let harness = UpdateDatasetTaskRunnerHarness::new(UpdateDatasetTaskRunnerMocks::default());
-    let foo = harness.create_root_dataset(&alias_foo).await;
+    let foo = harness
+        .create_root_dataset(&UpdateDatasetTaskRunnerHarness::alias("foo"))
+        .await;
     harness.delete_dataset(&foo).await;
 
     let outcome = harness.run_sync_update(&foo).await;
@@ -900,7 +802,7 @@ async fn test_sync_into_deleted_dataset_fails_unrecoverably() {
 
 #[tokio::test]
 async fn test_ingest_passes_resolved_env_vars_to_the_ingest() {
-    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let alias_foo = UpdateDatasetTaskRunnerHarness::alias("foo");
 
     let harness = UpdateDatasetTaskRunnerHarness::new_ingesting_expecting_env_var(
         &alias_foo,
@@ -917,13 +819,13 @@ async fn test_ingest_passes_resolved_env_vars_to_the_ingest() {
 
 #[tokio::test]
 async fn test_ingest_planning_failure_fails_recoverably() {
-    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
-
     let harness = UpdateDatasetTaskRunnerHarness::new(UpdateDatasetTaskRunnerMocks {
         env_var_resolution: Some(EnvVarResolution::Failing),
         ..UpdateDatasetTaskRunnerMocks::default()
     });
-    let foo = harness.create_root_dataset(&alias_foo).await;
+    let foo = harness
+        .create_root_dataset(&UpdateDatasetTaskRunnerHarness::alias("foo"))
+        .await;
 
     let outcome = harness.run_ingest_update(&foo).await;
 
@@ -935,45 +837,13 @@ async fn test_ingest_planning_failure_fails_recoverably() {
 
 #[tokio::test]
 async fn test_ingest_of_dataset_deleted_before_commit_fails_unrecoverably() {
-    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
-    let reported_heads = ReportedHeads::default();
-
-    let harness = UpdateDatasetTaskRunnerHarness::new(UpdateDatasetTaskRunnerMocks {
-        mock_polling_ingest_service: MockPollingIngestService::new()
-            .make_expect_ingest_updated(alias_foo.clone(), reported_heads.clone()),
-        ..UpdateDatasetTaskRunnerMocks::default()
-    });
-    let foo = harness.create_root_dataset(&alias_foo).await;
-    let ingested_head = harness.append_unreferenced_block(&foo, "ingested").await;
-    reported_heads.set(&foo.head, &ingested_head);
+    let (harness, foo, _) = UpdateDatasetTaskRunnerHarness::new_ingesting_new_root(
+        &UpdateDatasetTaskRunnerHarness::alias("foo"),
+    )
+    .await;
     harness.delete_dataset_before_next_commit();
 
     let outcome = harness.run_ingest_update(&foo).await;
-
-    assert_eq!(
-        TaskOutcome::Failed(TaskError::empty_unrecoverable()),
-        outcome
-    );
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[tokio::test]
-async fn test_transform_of_dataset_deleted_before_commit_fails_unrecoverably() {
-    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
-    let alias_bar = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("bar"));
-    let reported_heads = ReportedHeads::default();
-
-    let harness = UpdateDatasetTaskRunnerHarness::new_transforming(&alias_bar, &reported_heads);
-    let foo = harness.create_root_dataset(&alias_foo).await;
-    let bar = harness
-        .create_derived_dataset(&alias_bar, vec![foo.dataset_handle.as_local_ref()])
-        .await;
-    let transformed_head = harness.append_unreferenced_block(&bar, "transformed").await;
-    reported_heads.set(&bar.head, &transformed_head);
-    harness.delete_dataset_before_next_commit();
-
-    let outcome = harness.run_transform_update(&bar).await;
 
     assert_eq!(
         TaskOutcome::Failed(TaskError::empty_unrecoverable()),
@@ -1242,7 +1112,7 @@ impl UpdateDatasetTaskRunnerHarness {
     async fn run_sync_failing_with(
         make_error: impl Fn() -> SyncError + Send + 'static,
     ) -> TaskOutcome {
-        let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+        let alias_foo = Self::alias("foo");
         let harness = Self::new(UpdateDatasetTaskRunnerMocks {
             mock_sync_service: MockSyncService::new()
                 .make_expect_transfer_error(alias_foo.clone(), make_error),
@@ -1258,8 +1128,7 @@ impl UpdateDatasetTaskRunnerHarness {
     async fn run_transform_failing_with(
         make_error: impl Fn() -> TransformExecuteError + Send + 'static,
     ) -> TaskOutcome {
-        let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
-        let alias_bar = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("bar"));
+        let alias_bar = Self::alias("bar");
         let harness = Self::new(UpdateDatasetTaskRunnerMocks {
             mock_transform_planner: MockTransformPlanner::new()
                 .make_expect_elaborate_transform(alias_bar.clone()),
@@ -1267,10 +1136,7 @@ impl UpdateDatasetTaskRunnerHarness {
                 .make_expect_transform_error(alias_bar.clone(), make_error),
             ..UpdateDatasetTaskRunnerMocks::default()
         });
-        let foo = harness.create_root_dataset(&alias_foo).await;
-        let bar = harness
-            .create_derived_dataset(&alias_bar, vec![foo.dataset_handle.as_local_ref()])
-            .await;
+        let bar = harness.create_derivative(&alias_bar).await;
 
         harness.run_transform_update(&bar).await
     }
@@ -1280,8 +1146,7 @@ impl UpdateDatasetTaskRunnerHarness {
     async fn run_transform_elaboration_failing_with(
         make_error: impl Fn(&odf::DatasetHandle) -> TransformElaborateError + Send + Sync + 'static,
     ) -> TaskOutcome {
-        let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
-        let alias_bar = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("bar"));
+        let alias_bar = Self::alias("bar");
         let mut mock_transform_planner = MockTransformPlanner::new();
         mock_transform_planner
             .expect_elaborate_transform()
@@ -1291,12 +1156,63 @@ impl UpdateDatasetTaskRunnerHarness {
             mock_transform_planner,
             ..UpdateDatasetTaskRunnerMocks::default()
         });
-        let foo = harness.create_root_dataset(&alias_foo).await;
-        let bar = harness
-            .create_derived_dataset(&alias_bar, vec![foo.dataset_handle.as_local_ref()])
-            .await;
+        let bar = harness.create_derivative(&alias_bar).await;
 
         harness.run_transform_update(&bar).await
+    }
+
+    fn alias(name: &str) -> odf::DatasetAlias {
+        odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked(name))
+    }
+
+    /// The error an update task fails with when its operation fails with an
+    /// error of this recoverability
+    fn empty_task_error(recoverable: bool) -> TaskError {
+        if recoverable {
+            TaskError::empty_recoverable()
+        } else {
+            TaskError::empty_unrecoverable()
+        }
+    }
+
+    /// Creates root `alias` and expects one ingest of it reporting a new head,
+    /// appended unreferenced; returns the dataset and that head
+    async fn new_ingesting_new_root(
+        alias: &odf::DatasetAlias,
+    ) -> (Self, CreateDatasetResult, odf::Multihash) {
+        let reported_heads = ReportedHeads::default();
+        let harness = Self::new(UpdateDatasetTaskRunnerMocks {
+            mock_polling_ingest_service: MockPollingIngestService::new()
+                .make_expect_ingest_updated(alias.clone(), reported_heads.clone()),
+            ..UpdateDatasetTaskRunnerMocks::default()
+        });
+        let created = harness.create_root_dataset(alias).await;
+        let ingested_head = harness
+            .append_unreferenced_block(&created, "ingested")
+            .await;
+        reported_heads.set(&created.head, &ingested_head);
+        (harness, created, ingested_head)
+    }
+
+    /// Creates root `alias` and expects one sync of it from its remote
+    /// reporting a new head, appended unreferenced; returns the dataset and
+    /// that head
+    async fn new_syncing_new_root(
+        alias: &odf::DatasetAlias,
+    ) -> (Self, CreateDatasetResult, odf::Multihash) {
+        let synced_heads = ReportedHeads::default();
+        let harness = Self::new_syncing(alias, Some(&synced_heads));
+        let created = harness.create_root_dataset(alias).await;
+        let synced_head = harness.append_unreferenced_block(&created, "synced").await;
+        synced_heads.set(&created.head, &synced_head);
+        (harness, created, synced_head)
+    }
+
+    /// Creates derivative `alias` of a new root dataset `input`
+    async fn create_derivative(&self, alias: &odf::DatasetAlias) -> CreateDatasetResult {
+        let input = self.create_root_dataset(&Self::alias("input")).await;
+        self.create_derived_dataset(alias, vec![input.dataset_handle.as_local_ref()])
+            .await
     }
 
     fn move_head_before_next_commit(&self, concurrent_head: odf::Multihash) {

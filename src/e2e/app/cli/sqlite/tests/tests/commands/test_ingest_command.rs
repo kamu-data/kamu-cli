@@ -59,15 +59,6 @@ kamu_cli_execute_command_e2e_test!(
 
 kamu_cli_execute_command_e2e_test!(
     storage = sqlite,
-    fixture = kamu_cli_e2e_repo_tests::commands::test_ingest_into_derivative_fails,
-    options = Options::default().with_frozen_system_time(),
-    extra_test_groups = "engine, ingest, datafusion"
-);
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-kamu_cli_execute_command_e2e_test!(
-    storage = sqlite,
     fixture = kamu_cli_e2e_repo_tests::commands::test_ingest_into_other_accounts_dataset_fails,
     options = Options::default()
         .with_multi_tenant()
@@ -79,38 +70,10 @@ kamu_cli_execute_command_e2e_test!(
 
 kamu_cli_execute_command_e2e_test!(
     storage = sqlite,
-    fixture = kamu_cli_e2e_repo_tests::commands::test_ingest_without_files_or_stdin_fails,
+    fixture = kamu_cli_e2e_repo_tests::commands::test_ingest_of_invalid_request_fails,
     options = Options::default().with_frozen_system_time(),
     extra_test_groups = "engine, ingest, datafusion",
-    sqlite_only = "checks a CLI error message; the repository type cannot change it"
-);
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-kamu_cli_execute_command_e2e_test!(
-    storage = sqlite,
-    fixture = kamu_cli_e2e_repo_tests::commands::test_ingest_with_unknown_source_name_fails,
-    options = Options::default().with_frozen_system_time(),
-    extra_test_groups = "engine, ingest, datafusion"
-);
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-kamu_cli_execute_command_e2e_test!(
-    storage = sqlite,
-    fixture = kamu_cli_e2e_repo_tests::commands::test_ingest_of_unparsable_value_fails,
-    options = Options::default().with_frozen_system_time(),
-    extra_test_groups = "engine, ingest, datafusion"
-);
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-kamu_cli_execute_command_e2e_test!(
-    storage = sqlite,
-    fixture = kamu_cli_e2e_repo_tests::commands::test_ingest_into_dataset_with_pull_alias_fails,
-    options = Options::default().with_frozen_system_time(),
-    extra_test_groups = "engine, ingest, datafusion",
-    sqlite_only = "pull aliases are workspace files; the repository type cannot change them"
+    sqlite_only = "checks why the CLI rejects ingests; the repository type cannot change it"
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

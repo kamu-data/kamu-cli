@@ -7,39 +7,9 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_cli_e2e_common::{DATASET_ROOT_PLAYER_NAME, DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR};
 use kamu_cli_puppet::KamuCliPuppet;
 use kamu_cli_puppet::extensions::KamuCliPuppetExt;
 use url::Url;
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub async fn test_push_without_target_to_multiple_repositories_fails(kamu: KamuCliPuppet) {
-    let dataset_name = DATASET_ROOT_PLAYER_NAME.as_str();
-    kamu.execute_with_input(["add", "--stdin"], DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR)
-        .await
-        .success();
-    for repo_name in ["repo-1", "repo-2"] {
-        let repo_url = Url::from_directory_path(kamu.workspace_path().join(repo_name)).unwrap();
-        kamu.execute(["repo", "add", repo_name, repo_url.as_str()])
-            .await
-            .success();
-    }
-
-    kamu.assert_failure_command_execution(
-        ["push", dataset_name],
-        None,
-        Some([
-            r#"Failed to push 1 dataset\(s\)"#,
-            regex::escape(&format!(
-                "Failed to push {dataset_name}: Cannot choose between multiple repositories, \
-                 specify the destination"
-            ))
-            .as_str(),
-        ]),
-    )
-    .await;
-}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

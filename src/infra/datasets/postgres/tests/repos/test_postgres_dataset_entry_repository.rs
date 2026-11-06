@@ -147,14 +147,6 @@ database_concurrent_transactions_test!(
 
 database_concurrent_transactions_test!(
     storage = postgres,
-    fixture = dataset_entry_repo::test_rename_owner_in_concurrent_transactions,
-    harness = PostgresDatasetEntryRepositoryHarness
-);
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-database_concurrent_transactions_test!(
-    storage = postgres,
     fixture = dataset_entry_repo::test_rename_and_rename_owner_in_concurrent_transactions,
     harness = PostgresDatasetEntryRepositoryHarness
 );

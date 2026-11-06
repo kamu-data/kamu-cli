@@ -40,22 +40,6 @@ database_transactional_test!(
 
 database_transactional_test!(
     storage = inmem_with_transaction,
-    fixture = dataset_reference_repo::test_update_reference_from_stale_hash_provoke_cas_violation,
-    harness = InMemoryDatasetRepositoriesHarness
-);
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-database_transactional_test!(
-    storage = inmem_with_transaction,
-    fixture = dataset_reference_repo::test_update_missing_reference_provoke_cas_violation,
-    harness = InMemoryDatasetRepositoriesHarness
-);
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-database_transactional_test!(
-    storage = inmem_with_transaction,
     fixture = dataset_reference_repo::test_set_and_remove_reference,
     harness = InMemoryDatasetRepositoriesHarness
 );

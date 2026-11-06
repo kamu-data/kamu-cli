@@ -83,19 +83,19 @@ async fn test_alias_kinds_are_independent() {
 
     let aliases = harness.remote_aliases(&foo).await;
     assert!(aliases.contains(
-        &RemoteAliasesHarness::remote_ref("https://example.com/pull"),
+        &BaseRepoHarness::remote_ref("https://example.com/pull"),
         RemoteAliasKind::Pull
     ));
     assert!(!aliases.contains(
-        &RemoteAliasesHarness::remote_ref("https://example.com/pull"),
+        &BaseRepoHarness::remote_ref("https://example.com/pull"),
         RemoteAliasKind::Push
     ));
     assert!(aliases.contains(
-        &RemoteAliasesHarness::remote_ref("https://example.com/both"),
+        &BaseRepoHarness::remote_ref("https://example.com/both"),
         RemoteAliasKind::Pull
     ));
     assert!(aliases.contains(
-        &RemoteAliasesHarness::remote_ref("https://example.com/both"),
+        &BaseRepoHarness::remote_ref("https://example.com/both"),
         RemoteAliasKind::Push
     ));
 
@@ -195,15 +195,11 @@ async fn test_single_alias_is_chosen_per_kind() {
 
     assert_eq!(
         aliases.single_by_kind(RemoteAliasKind::Pull).unwrap(),
-        Some(&RemoteAliasesHarness::remote_ref(
-            "https://example.com/pull"
-        ))
+        Some(&BaseRepoHarness::remote_ref("https://example.com/pull"))
     );
     assert_eq!(
         aliases.single_by_kind(RemoteAliasKind::Push).unwrap(),
-        Some(&RemoteAliasesHarness::remote_ref(
-            "https://example.com/push"
-        ))
+        Some(&BaseRepoHarness::remote_ref("https://example.com/push"))
     );
 }
 
@@ -233,9 +229,7 @@ async fn test_several_aliases_of_a_kind_are_ambiguous_only_for_that_kind() {
     );
     assert_eq!(
         aliases.single_by_kind(RemoteAliasKind::Pull).unwrap(),
-        Some(&RemoteAliasesHarness::remote_ref(
-            "https://example.com/pull"
-        ))
+        Some(&BaseRepoHarness::remote_ref("https://example.com/pull"))
     );
 }
 
@@ -249,10 +243,6 @@ struct RemoteAliasesHarness {
 }
 
 impl RemoteAliasesHarness {
-    fn remote_ref(remote_ref: &str) -> odf::DatasetRefRemote {
-        odf::DatasetRefRemote::try_from(remote_ref).unwrap()
-    }
-
     fn new() -> Self {
         let base_repo_harness = BaseRepoHarness::builder()
             .tenancy_config(TenancyConfig::SingleTenant)
@@ -266,16 +256,6 @@ impl RemoteAliasesHarness {
             base_repo_harness,
             remote_aliases_registry: catalog.get_one().unwrap(),
         }
-    }
-
-    async fn create_root(&self, name: &str) -> odf::DatasetHandle {
-        self.base_repo_harness
-            .create_root_dataset(&odf::DatasetAlias::new(
-                None,
-                odf::DatasetName::new_unchecked(name),
-            ))
-            .await
-            .dataset_handle
     }
 
     async fn remote_aliases(&self, target: &odf::DatasetHandle) -> Box<dyn RemoteAliases> {
@@ -301,7 +281,7 @@ impl RemoteAliasesHarness {
     ) -> bool {
         self.remote_aliases(target)
             .await
-            .add(&Self::remote_ref(alias), kind)
+            .add(&BaseRepoHarness::remote_ref(alias), kind)
             .await
             .unwrap()
     }
@@ -314,7 +294,7 @@ impl RemoteAliasesHarness {
     ) -> bool {
         self.remote_aliases(target)
             .await
-            .delete(&Self::remote_ref(alias), kind)
+            .delete(&BaseRepoHarness::remote_ref(alias), kind)
             .await
             .unwrap()
     }

@@ -17,65 +17,53 @@ use kamu_core::*;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[tokio::test]
-async fn test_root_without_pull_alias_is_ingested() {
-    let harness = UpdateKindHarness::new();
-    let root = harness.create_root("root").await;
+async fn test_update_kind_follows_dataset_kind_unless_pulled_from_remote() {
+    let cases = [
+        (
+            odf::DatasetKind::Root,
+            None,
+            DatasetUpdateKind::PollingIngest,
+        ),
+        (
+            odf::DatasetKind::Root,
+            Some("kamu.dev/root"),
+            DatasetUpdateKind::SyncFrom {
+                remote_ref: BaseRepoHarness::remote_ref("kamu.dev/root"),
+            },
+        ),
+        (
+            odf::DatasetKind::Derivative,
+            None,
+            DatasetUpdateKind::Transform,
+        ),
+        (
+            odf::DatasetKind::Derivative,
+            Some("kamu.dev/derivative"),
+            DatasetUpdateKind::SyncFrom {
+                remote_ref: BaseRepoHarness::remote_ref("kamu.dev/derivative"),
+            },
+        ),
+    ];
 
-    assert_eq!(
-        harness.resolve(&root).await.unwrap(),
-        DatasetUpdateKind::PollingIngest
-    );
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[tokio::test]
-async fn test_root_with_pull_alias_is_synced() {
-    let harness = UpdateKindHarness::new();
-    let root = harness.create_root("root").await;
-    harness
-        .add_remote_alias(&root, "kamu.dev/root", RemoteAliasKind::Pull)
-        .await;
-
-    assert_eq!(
-        harness.resolve(&root).await.unwrap(),
-        DatasetUpdateKind::SyncFrom {
-            remote_ref: remote_ref("kamu.dev/root")
+    for (kind, pull_alias, expected) in cases {
+        let harness = UpdateKindHarness::new();
+        let root = harness.create_root("root").await;
+        let target = match kind {
+            odf::DatasetKind::Root => root,
+            odf::DatasetKind::Derivative => harness.create_derivative("derivative", "root").await,
+        };
+        if let Some(pull_alias) = pull_alias {
+            harness
+                .add_remote_alias(&target, pull_alias, RemoteAliasKind::Pull)
+                .await;
         }
-    );
-}
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[tokio::test]
-async fn test_derivative_without_pull_alias_is_transformed() {
-    let harness = UpdateKindHarness::new();
-    harness.create_root("root").await;
-    let derivative = harness.create_derivative("derivative", "root").await;
-
-    assert_eq!(
-        harness.resolve(&derivative).await.unwrap(),
-        DatasetUpdateKind::Transform
-    );
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[tokio::test]
-async fn test_derivative_with_pull_alias_is_synced() {
-    let harness = UpdateKindHarness::new();
-    harness.create_root("root").await;
-    let derivative = harness.create_derivative("derivative", "root").await;
-    harness
-        .add_remote_alias(&derivative, "kamu.dev/derivative", RemoteAliasKind::Pull)
-        .await;
-
-    assert_eq!(
-        harness.resolve(&derivative).await.unwrap(),
-        DatasetUpdateKind::SyncFrom {
-            remote_ref: remote_ref("kamu.dev/derivative")
-        }
-    );
+        assert_eq!(
+            harness.resolve(&target).await.unwrap(),
+            expected,
+            "{kind:?} with pull alias {pull_alias:?}"
+        );
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -95,36 +83,6 @@ async fn test_several_pull_aliases_are_ambiguous() {
         harness.resolve(&root).await,
         Err(ResolveDatasetUpdateKindError::AmbiguousSource(_))
     );
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[tokio::test]
-async fn test_push_aliases_are_ignored() {
-    let harness = UpdateKindHarness::new();
-    let root = harness.create_root("root").await;
-    let derivative = harness.create_derivative("derivative", "root").await;
-    harness
-        .add_remote_alias(&root, "kamu.dev/root", RemoteAliasKind::Push)
-        .await;
-    harness
-        .add_remote_alias(&derivative, "kamu.dev/derivative", RemoteAliasKind::Push)
-        .await;
-
-    assert_eq!(
-        harness.resolve(&root).await.unwrap(),
-        DatasetUpdateKind::PollingIngest
-    );
-    assert_eq!(
-        harness.resolve(&derivative).await.unwrap(),
-        DatasetUpdateKind::Transform
-    );
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-fn remote_ref(remote_ref: &str) -> odf::DatasetRefRemote {
-    odf::DatasetRefRemote::try_from(remote_ref).unwrap()
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -158,22 +116,11 @@ impl UpdateKindHarness {
         }
     }
 
-    fn alias(name: &str) -> odf::DatasetAlias {
-        odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked(name))
-    }
-
-    async fn create_root(&self, name: &str) -> odf::DatasetHandle {
-        self.base_repo_harness
-            .create_root_dataset(&Self::alias(name))
-            .await
-            .dataset_handle
-    }
-
     async fn create_derivative(&self, name: &str, input_name: &str) -> odf::DatasetHandle {
         self.base_repo_harness
             .create_derived_dataset(
-                &Self::alias(name),
-                vec![Self::alias(input_name).as_local_ref()],
+                &BaseRepoHarness::alias(name),
+                vec![BaseRepoHarness::alias(input_name).as_local_ref()],
             )
             .await
             .dataset_handle

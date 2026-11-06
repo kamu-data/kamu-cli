@@ -144,14 +144,6 @@ database_concurrent_transactions_test!(
 
 database_concurrent_transactions_test!(
     storage = inmem,
-    fixture = dataset_entry_repo::test_rename_owner_in_concurrent_transactions,
-    harness = InMemoryDatasetRepositoriesHarness
-);
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-database_concurrent_transactions_test!(
-    storage = inmem,
     fixture = dataset_entry_repo::test_rename_and_rename_owner_in_concurrent_transactions,
     harness = InMemoryDatasetRepositoriesHarness
 );

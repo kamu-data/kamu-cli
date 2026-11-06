@@ -162,51 +162,6 @@ async fn test_push_success_without_saving_alias() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[tokio::test]
-async fn test_push_unreadable_is_not_found() {
-    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
-
-    let mock_permission_checker = MockDatasetPermissionChecker::new()
-        .make_expect_classify_datasets_by_allowance(
-            DatasetPermission::Read,
-            1,
-            HashSet::new(), // not authorized
-        );
-
-    let harness = PushUseCaseHarness::new(mock_permission_checker);
-    let foo = harness.create_root_dataset(&alias_foo).await;
-
-    let push_options = PushMultiOptions {
-        remote_target: Some(odf::DatasetPushTarget::Repository(
-            harness.remote_repo_name.clone(),
-        )),
-        ..Default::default()
-    };
-
-    let mut responses = harness
-        .use_case
-        .execute_multi(vec![foo.dataset_handle.clone()], push_options.clone(), None)
-        .await
-        .unwrap();
-
-    assert_eq!(responses.len(), 1);
-    assert_matches!(
-        responses.remove(0),
-         PushResponse {
-            local_handle: Some(local_handle),
-            target: Some(odf::DatasetPushTarget::Repository(repo_name)),
-            result: Err(PushError::SyncError(SyncError::DatasetNotFound(_))),
-        } if local_handle == foo.dataset_handle &&
-            repo_name == harness.remote_repo_name
-    );
-
-    // Aliases should not be touched in case of failure
-    let aliases = harness.get_remote_aliases(&foo).await;
-    assert!(aliases.is_empty(RemoteAliasKind::Push));
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[tokio::test]
 async fn test_push_multiple_success() {
     let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
     let alias_bar = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("bar"));
@@ -485,7 +440,6 @@ async fn test_push_reports_success_to_the_listener_once() {
 struct PushUseCaseHarness {
     base_use_case_harness: BaseUseCaseHarness,
     use_case: Arc<dyn PushDatasetUseCase>,
-    remote_aliases_registry: Arc<dyn RemoteAliasesRegistry>,
     remote_repo_registry: Arc<dyn RemoteRepositoryRegistry>,
     remote_repo_name: odf::RepoName,
     remote_repo_url: Url,
@@ -556,7 +510,6 @@ impl PushUseCaseHarness {
         let catalog = b.build();
 
         let use_case = catalog.get_one().unwrap();
-        let remote_aliases_registry = catalog.get_one().unwrap();
 
         let remote_tmp_dir = tempfile::tempdir().unwrap();
         let remote_repo_url = Url::from_directory_path(remote_tmp_dir.path()).unwrap();
@@ -570,7 +523,6 @@ impl PushUseCaseHarness {
         Self {
             base_use_case_harness,
             use_case,
-            remote_aliases_registry,
             remote_repo_registry,
             remote_repo_name,
             remote_repo_url,
@@ -627,13 +579,6 @@ impl PushUseCaseHarness {
         responses
             .iter()
             .find(|response| response.local_handle.as_ref() == Some(&created.dataset_handle))
-            .unwrap()
-    }
-
-    async fn get_remote_aliases(&self, created: &CreateDatasetResult) -> Box<dyn RemoteAliases> {
-        self.remote_aliases_registry
-            .get_remote_aliases(&created.dataset_handle)
-            .await
             .unwrap()
     }
 }

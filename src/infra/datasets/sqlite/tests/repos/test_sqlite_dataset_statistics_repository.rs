@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use database_common::SqliteTransactionManager;
-use database_common_macros::{database_concurrent_transactions_test, database_transactional_test};
+use database_common_macros::database_transactional_test;
 use dill::{Catalog, CatalogBuilder};
 use kamu_accounts_sqlite::SqliteAccountRepository;
 use kamu_datasets_repo_tests::dataset_statistics_repo;
@@ -52,14 +52,6 @@ database_transactional_test!(
 database_transactional_test!(
     storage = sqlite,
     fixture = dataset_statistics_repo::test_remove_dataset_entry_removes_statistics,
-    harness = SqliteDatasetStatisticsRepositoryHarness
-);
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-database_concurrent_transactions_test!(
-    storage = sqlite,
-    fixture = dataset_statistics_repo::test_set_statistics_in_concurrent_transactions,
     harness = SqliteDatasetStatisticsRepositoryHarness
 );
 

@@ -128,6 +128,7 @@ async fn test_dataset_compact() {
             old_num_blocks: 6,
         }) if new_head != old_head,
     );
+    pretty_assertions::assert_eq!(harness.run_dir_entries(), Vec::<std::path::PathBuf>::new());
 
     assert!(harness.verify_dataset(target).await);
 
@@ -594,30 +595,6 @@ async fn test_dataset_compaction_limits_restart_after_metadata_event() {
         merged.new_data.unwrap().offset_interval,
         odf::metadata::OffsetInterval { start: 0, end: 2 }
     );
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[test_group::group(ingest, datafusion, compact)]
-#[tokio::test]
-async fn test_dataset_compaction_removes_its_run_directory() {
-    let harness = CompactTestHarness::new();
-    let target = harness.create_test_root_dataset().await;
-
-    harness
-        .ingest_data(CITIES_1_TO_3.to_string(), target.clone())
-        .await;
-    harness
-        .ingest_data(CITIES_4_TO_6.to_string(), target.clone())
-        .await;
-
-    assert_matches!(
-        harness
-            .compact_dataset(target, CompactionOptions::default())
-            .await,
-        Ok(CompactionResult::Success { .. })
-    );
-    pretty_assertions::assert_eq!(harness.run_dir_entries(), Vec::<std::path::PathBuf>::new());
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

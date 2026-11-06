@@ -18,6 +18,7 @@ use kamu_core::{
     DidGeneratorDefault,
     MockDidGenerator,
     RemoteAliasKind,
+    RemoteAliases,
     RemoteAliasesRegistry,
     RunInfoDir,
     TenancyConfig,
@@ -128,6 +129,22 @@ impl BaseRepoHarness {
             .get_dataset_by_ref(&alias.as_local_ref())
             .await?;
         Ok(())
+    }
+
+    /// An alias without an account, for single-tenant workspaces
+    pub fn alias(name: &str) -> odf::DatasetAlias {
+        odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked(name))
+    }
+
+    pub fn remote_ref(remote_ref: &str) -> odf::DatasetRefRemote {
+        odf::DatasetRefRemote::try_from(remote_ref).unwrap()
+    }
+
+    /// A root dataset with a polling source, named without an account
+    pub async fn create_root(&self, name: &str) -> odf::DatasetHandle {
+        self.create_root_dataset(&Self::alias(name))
+            .await
+            .dataset_handle
     }
 
     pub async fn create_root_dataset(&self, alias: &odf::DatasetAlias) -> CreateDatasetResult {
@@ -333,6 +350,17 @@ impl BaseRepoHarness {
             .unwrap();
     }
 
+    /// Appends a block after the current `HEAD` and moves `HEAD` to it, the
+    /// way a concurrent writer would; returns the new `HEAD`
+    pub async fn move_head_concurrently(&self, created: &CreateDatasetResult) -> odf::Multihash {
+        let old_head = self.get_head(created).await;
+        let new_head = self
+            .append_unreferenced_block_after(created, &old_head, "concurrent")
+            .await;
+        self.move_head(created, &old_head, &new_head).await;
+        new_head
+    }
+
     /// Adds a remote alias to the dataset; `false` when it already has it
     pub async fn add_remote_alias(
         &self,
@@ -340,17 +368,28 @@ impl BaseRepoHarness {
         remote_ref: &str,
         kind: RemoteAliasKind,
     ) -> bool {
-        let remote_aliases_registry = dill::CatalogBuilder::new_chained(&self.catalog)
+        self.remote_aliases_of(target)
+            .await
+            .add(&Self::remote_ref(remote_ref), kind)
+            .await
+            .unwrap()
+    }
+
+    /// The stored remote aliases of the dataset
+    pub async fn get_remote_aliases(
+        &self,
+        created: &CreateDatasetResult,
+    ) -> Box<dyn RemoteAliases> {
+        self.remote_aliases_of(&created.dataset_handle).await
+    }
+
+    async fn remote_aliases_of(&self, target: &odf::DatasetHandle) -> Box<dyn RemoteAliases> {
+        dill::CatalogBuilder::new_chained(&self.catalog)
             .add::<RemoteAliasesRegistryImpl>()
             .build()
             .get_one::<dyn RemoteAliasesRegistry>()
-            .unwrap();
-
-        remote_aliases_registry
-            .get_remote_aliases(target)
-            .await
             .unwrap()
-            .add(&odf::DatasetRefRemote::try_from(remote_ref).unwrap(), kind)
+            .get_remote_aliases(target)
             .await
             .unwrap()
     }

@@ -291,3 +291,56 @@ pub struct TransformPlanMismatchError {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[cfg(test)]
+mod tests {
+    use internal_error::ErrorIntoInternal;
+
+    use super::*;
+
+    #[test]
+    fn test_transform_elaborate_error_recoverability() {
+        let input = odf::DatasetHandle::new(
+            odf::DatasetID::new_seeded_ed25519(b"input"),
+            odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("input")),
+            odf::DatasetKind::Root,
+        );
+        let cases = [
+            (TransformNotDefinedError {}.into(), false),
+            (
+                TransformInputsChangedError {
+                    dataset_handle: input.clone(),
+                }
+                .into(),
+                false,
+            ),
+            (
+                InvalidInputIntervalError {
+                    input_dataset: input.clone(),
+                    head: odf::Multihash::from_digest_sha3_256(b"head"),
+                    tail: odf::Multihash::from_digest_sha3_256(b"tail"),
+                }
+                .into(),
+                false,
+            ),
+            (
+                InputNotPulledError {
+                    dataset_handle: input,
+                }
+                .into(),
+                true,
+            ),
+            (
+                TransformElaborateError::Internal("storage unavailable".int_err()),
+                true,
+            ),
+        ];
+
+        for (error, recoverable) in cases {
+            let error: TransformElaborateError = error;
+            assert_eq!(error.is_recoverable(), recoverable, "{error:?}");
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

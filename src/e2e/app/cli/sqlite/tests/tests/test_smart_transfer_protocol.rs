@@ -493,29 +493,7 @@ kamu_cli_run_api_server_e2e_test!(
 
 kamu_cli_run_api_server_e2e_test!(
     storage = sqlite,
-    fixture = kamu_cli_e2e_repo_tests::test_smart_push_several_datasets_pushes_the_ones_it_can_st,
-    options = Options::default()
-        .with_multi_tenant()
-        .with_today_as_frozen_system_time(),
-    extra_test_groups = "engine, ingest, datafusion"
-);
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-kamu_cli_run_api_server_e2e_test!(
-    storage = sqlite,
-    fixture = kamu_cli_e2e_repo_tests::test_smart_push_several_datasets_pushes_the_ones_it_can_mt,
-    options = Options::default()
-        .with_multi_tenant()
-        .with_today_as_frozen_system_time(),
-    extra_test_groups = "engine, ingest, datafusion"
-);
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-kamu_cli_run_api_server_e2e_test!(
-    storage = sqlite,
-    fixture = kamu_cli_e2e_repo_tests::test_smart_push_several_datasets_reports_unreachable_and_unreadable_ones,
+    fixture = kamu_cli_e2e_repo_tests::test_smart_push_several_datasets_pushes_the_ones_it_can,
     options = Options::default()
         .with_multi_tenant()
         .with_today_as_frozen_system_time(),

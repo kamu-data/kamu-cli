@@ -11,7 +11,6 @@ use std::assert_matches;
 
 use kamu_cli_e2e_common::{
     DATASET_DERIVATIVE_LEADERBOARD_NAME,
-    DATASET_DERIVATIVE_LEADERBOARD_SNAPSHOT_STR,
     DATASET_ROOT_PLAYER_NAME,
     DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_1,
     DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_2,
@@ -19,6 +18,8 @@ use kamu_cli_e2e_common::{
 };
 use kamu_cli_puppet::KamuCliPuppet;
 use kamu_cli_puppet::extensions::KamuCliPuppetExt;
+
+use crate::utils::add_player_scores_with_derivative;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -169,21 +170,7 @@ pub async fn test_compact_partial_failure_keeps_storage_in_sync(kamu: KamuCliPup
     let root_name = DATASET_ROOT_PLAYER_NAME.clone();
     let derivative_name = DATASET_DERIVATIVE_LEADERBOARD_NAME.clone();
 
-    kamu.execute_with_input(["add", "--stdin"], DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR)
-        .await
-        .success();
-    kamu.execute_with_input(
-        ["add", "--stdin"],
-        DATASET_DERIVATIVE_LEADERBOARD_SNAPSHOT_STR,
-    )
-    .await
-    .success();
-
-    kamu.ingest_data(
-        &root_name,
-        DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_1,
-    )
-    .await;
+    add_player_scores_with_derivative(&kamu).await;
     kamu.ingest_data(
         &root_name,
         DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_2,

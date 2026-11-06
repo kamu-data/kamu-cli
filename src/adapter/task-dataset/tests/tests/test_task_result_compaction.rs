@@ -14,45 +14,8 @@ use pretty_assertions::assert_eq;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// Compaction results are stored with finished tasks, so results written
-// before the breaking flag existed must still be read
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 #[test]
-fn test_hard_compact_result_stored_without_breaking_flag_reads_as_breaking() {
-    let task_result =
-        Fixture::stored_result(TaskResultDatasetHardCompact::TYPE_ID, "compaction_result");
-
-    assert_eq!(
-        Fixture::expected_success(),
-        TaskResultDatasetHardCompact::from_task_result(&task_result)
-            .unwrap()
-            .compaction_result,
-    );
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[test]
-fn test_reset_to_metadata_result_stored_without_breaking_flag_reads_as_breaking() {
-    let task_result = Fixture::stored_result(
-        TaskResultDatasetResetToMetadata::TYPE_ID,
-        "compaction_metadata_only_result",
-    );
-
-    assert_eq!(
-        Fixture::expected_success(),
-        TaskResultDatasetResetToMetadata::from_task_result(&task_result)
-            .unwrap()
-            .compaction_metadata_only_result,
-    );
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[test]
-fn test_compaction_result_json_is_stable() {
+fn test_compaction_results_round_trip_through_stored_json() {
     assert_eq!(
         serde_json::json!({
             "Success": {
@@ -63,6 +26,26 @@ fn test_compaction_result_json_is_stable() {
             }
         }),
         serde_json::to_value(Fixture::expected_success()).unwrap(),
+    );
+
+    let hard_compact =
+        Fixture::stored_result(TaskResultDatasetHardCompact::TYPE_ID, "compaction_result");
+    assert_eq!(
+        Fixture::expected_success(),
+        TaskResultDatasetHardCompact::from_task_result(&hard_compact)
+            .unwrap()
+            .compaction_result,
+    );
+
+    let reset_to_metadata = Fixture::stored_result(
+        TaskResultDatasetResetToMetadata::TYPE_ID,
+        "compaction_metadata_only_result",
+    );
+    assert_eq!(
+        Fixture::expected_success(),
+        TaskResultDatasetResetToMetadata::from_task_result(&reset_to_metadata)
+            .unwrap()
+            .compaction_metadata_only_result,
     );
 }
 

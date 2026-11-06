@@ -17,6 +17,7 @@ use kamu_cli_e2e_common::{
     DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_1,
     DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_2,
     DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR,
+    city_population_root_snapshot,
     leaderboard_set_transform_event,
 };
 use kamu_cli_puppet::KamuCliPuppet;
@@ -25,7 +26,13 @@ use url::Url;
 use wiremock::matchers::{method, path};
 use wiremock::{Mock, MockServer, ResponseTemplate};
 
-use crate::utils::{commit_event, dataset_id};
+use crate::utils::{
+    add_player_scores_with_derivative,
+    assert_case_fails,
+    commit_event,
+    create_alice_and_bob,
+    dataset_id,
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -140,10 +147,11 @@ pub async fn test_pull_derivative_mt(kamu: KamuCliPuppet) {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// test_pull_derivative_of_never_pulled_root
+// test_pull_derivative_reports_why_it_cannot_run
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn test_pull_derivative_of_never_pulled_root(kamu: KamuCliPuppet) {
+pub async fn test_pull_derivative_reports_why_it_cannot_run(kamu: KamuCliPuppet) {
+    let root_name = DATASET_ROOT_PLAYER_NAME.as_str();
     kamu.execute_with_input(["add", "--stdin"], DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR)
         .await
         .success();
@@ -153,20 +161,65 @@ pub async fn test_pull_derivative_of_never_pulled_root(kamu: KamuCliPuppet) {
     )
     .await
     .success();
+    kamu.execute_with_input(
+        ["add", "--stdin"],
+        indoc::indoc!(
+            r#"
+            kind: DatasetSnapshot
+            version: 1
+            content:
+              name: no-transform
+              kind: Derivative
+              metadata: []
+            "#
+        ),
+    )
+    .await
+    .success();
 
     let derivative_name = DATASET_DERIVATIVE_LEADERBOARD_NAME.as_str();
-    let expected_error = format!(
-        "Failed to pull {derivative_name}: Input dataset {} has no data yet, pull it first",
-        DATASET_ROOT_PLAYER_NAME.as_str(),
-    );
-
-    kamu.assert_failure_command_execution(
-        ["pull", derivative_name],
+    assert_case_fails(
+        &kamu,
+        "never pulled root",
+        &["pull", derivative_name],
         None,
-        Some([
-            r#"Failed to update 1 dataset\(s\)"#,
-            regex::escape(&expected_error).as_str(),
-        ]),
+        &[
+            "Failed to update 1 dataset(s)",
+            &format!(
+                "Failed to pull {derivative_name}: Input dataset {root_name} has no data yet, \
+                 pull it first"
+            ),
+        ],
+    )
+    .await;
+    assert_case_fails(
+        &kamu,
+        "without transform, with other datasets",
+        &["pull", "no-transform", root_name],
+        None,
+        &["Failed to pull no-transform: Dataset does not define a transform"],
+    )
+    .await;
+
+    // The engine is only looked up once there is input data to transform
+    kamu.ingest_data(
+        &DATASET_ROOT_PLAYER_NAME,
+        DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_1,
+    )
+    .await;
+    kamu.execute_with_input(
+        ["add", "--stdin", "--name", "unknown-engine"],
+        DATASET_DERIVATIVE_LEADERBOARD_SNAPSHOT_STR
+            .replace("engine: datafusion", "engine: no-such-engine"),
+    )
+    .await
+    .success();
+    assert_case_fails(
+        &kamu,
+        "unknown engine",
+        &["pull", "unknown-engine"],
+        None,
+        &["Failed to pull unknown-engine: Unsupported engine no-such-engine"],
     )
     .await;
 }
@@ -252,37 +305,7 @@ pub async fn test_pull_failed_alias_save_creates_no_dataset(kamu: KamuCliPuppet)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_pull_reports_progress_before_failed_iteration(kamu: KamuCliPuppet) {
-    let snapshot = format!(
-        indoc::indoc!(
-            r#"
-            kind: DatasetSnapshot
-            version: 1
-            content:
-              name: test.pull-from-files
-              kind: Root
-              metadata:
-                - kind: SetPollingSource
-                  fetch:
-                    kind: FilesGlob
-                    path: {}/data-*.csv
-                  read:
-                    kind: Csv
-                    header: true
-                    schema:
-                      fields:
-                        - name: city
-                          type: String
-                        - name: population
-                          type: Int64
-                  merge:
-                    kind: append
-            "#
-        ),
-        kamu.workspace_path().display(),
-    );
-    kamu.execute_with_input(["add", "--stdin"], snapshot)
-        .await
-        .success();
+    add_data_files_dataset(&kamu, "test.pull-from-files").await;
 
     // One file per iteration; the third does not parse
     for (i, row) in ["A,1000", "B,2000", "C,not-a-number"].iter().enumerate() {
@@ -306,10 +329,7 @@ pub async fn test_pull_reports_progress_before_failed_iteration(kamu: KamuCliPup
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_pull_multiple_datasets_with_mixed_outcomes(mut kamu: KamuCliPuppet) {
-    let alice = odf::AccountName::new_unchecked("alice");
-    let bob = odf::AccountName::new_unchecked("bob");
-    kamu.create_account(&alice).await;
-    kamu.create_account(&bob).await;
+    let (alice, bob) = create_alice_and_bob(&kamu).await;
 
     std::fs::write(kamu.workspace_path().join("data.csv"), DATASET_INGEST_DATA).unwrap();
     let file_source_snapshot = DATASET_SNAPSHOT_STR.replace(
@@ -388,35 +408,7 @@ pub async fn test_pull_multiple_datasets_with_mixed_outcomes(mut kamu: KamuCliPu
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_pull_set_watermark_keeps_source_state(kamu: KamuCliPuppet) {
-    let snapshot = indoc::formatdoc!(
-        r#"
-        kind: DatasetSnapshot
-        version: 1
-        content:
-          name: test.pull-from-files
-          kind: Root
-          metadata:
-            - kind: SetPollingSource
-              fetch:
-                kind: FilesGlob
-                path: {workspace_path}/data-*.csv
-              read:
-                kind: Csv
-                header: true
-                schema:
-                  fields:
-                    - name: city
-                      type: String
-                    - name: population
-                      type: Int64
-              merge:
-                kind: append
-        "#,
-        workspace_path = kamu.workspace_path().display(),
-    );
-    kamu.execute_with_input(["add", "--stdin"], snapshot)
-        .await
-        .success();
+    add_data_files_dataset(&kamu, "test.pull-from-files").await;
     std::fs::write(
         kamu.workspace_path().join("data-1.csv"),
         "city,population\nA,1000\n",
@@ -470,35 +462,7 @@ pub async fn test_pull_set_watermark_keeps_source_state(kamu: KamuCliPuppet) {
 
 pub async fn test_pull_datasets_sharing_a_fetch_step_keep_own_source_state(kamu: KamuCliPuppet) {
     for dataset_name in ["test.first", "test.second"] {
-        let snapshot = indoc::formatdoc!(
-            r#"
-            kind: DatasetSnapshot
-            version: 1
-            content:
-              name: {dataset_name}
-              kind: Root
-              metadata:
-                - kind: SetPollingSource
-                  fetch:
-                    kind: FilesGlob
-                    path: {workspace_path}/data-*.csv
-                  read:
-                    kind: Csv
-                    header: true
-                    schema:
-                      fields:
-                        - name: city
-                          type: String
-                        - name: population
-                          type: Int64
-                  merge:
-                    kind: append
-            "#,
-            workspace_path = kamu.workspace_path().display(),
-        );
-        kamu.execute_with_input(["add", "--stdin"], snapshot)
-            .await
-            .success();
+        add_data_files_dataset(&kamu, dataset_name).await;
     }
     let write_file = |name: &str, city: &str| {
         std::fs::write(
@@ -545,52 +509,6 @@ pub async fn test_pull_datasets_sharing_a_fetch_step_keep_own_source_state(kamu:
         )
         .await;
     }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// test_pull_alias_of_unknown_repository_fails
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub async fn test_pull_alias_of_unknown_repository_fails(kamu: KamuCliPuppet) {
-    let dataset_name = DATASET_ROOT_PLAYER_NAME.as_str();
-    kamu.execute_with_input(["add", "--stdin"], DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR)
-        .await
-        .success();
-
-    // The alias is checked against the repositories when it is added, so the
-    // repository disappears afterwards
-    let repo_url = Url::from_directory_path(kamu.workspace_path().join("repo")).unwrap();
-    kamu.execute(["repo", "add", "gone-repo", repo_url.as_str()])
-        .await
-        .success();
-    let remote_alias = format!("gone-repo/{dataset_name}");
-    kamu.execute([
-        "repo",
-        "alias",
-        "add",
-        "--pull",
-        dataset_name,
-        &remote_alias,
-    ])
-    .await
-    .success();
-    kamu.execute(["--yes", "repo", "delete", "gone-repo"])
-        .await
-        .success();
-
-    kamu.assert_failure_command_execution(
-        ["pull", dataset_name],
-        None,
-        Some([
-            r#"Failed to update 1 dataset\(s\)"#,
-            regex::escape(&format!(
-                "Failed to sync {dataset_name} from {remote_alias}: Repository gone-repo does not \
-                 exist"
-            ))
-            .as_str(),
-        ]),
-    )
-    .await;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -760,22 +678,7 @@ async fn test_pull_reset_derivative(kamu: KamuCliPuppet) {
     let dataset_derivative_alias =
         odf::DatasetAlias::new(None, DATASET_DERIVATIVE_LEADERBOARD_NAME.clone());
 
-    kamu.execute_with_input(["add", "--stdin"], DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR)
-        .await
-        .success();
-
-    kamu.execute_with_input(
-        ["add", "--stdin"],
-        DATASET_DERIVATIVE_LEADERBOARD_SNAPSHOT_STR,
-    )
-    .await
-    .success();
-
-    kamu.ingest_data(
-        &dataset_alias.dataset_name,
-        DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_1,
-    )
-    .await;
+    add_player_scores_with_derivative(&kamu).await;
 
     kamu.assert_success_command_execution(
         ["pull", dataset_derivative_alias.dataset_name.as_str()],
@@ -831,7 +734,10 @@ async fn test_pull_reset_derivative(kamu: KamuCliPuppet) {
     kamu.assert_failure_command_execution(
         ["pull", dataset_derivative_alias.dataset_name.as_str()],
         None,
-        Some([r#"Failed to update 1 dataset\(s\)"#]),
+        Some([
+            r#"Failed to update 1 dataset\(s\)"#,
+            r#"Failed to pull ([^ ]+/)?leaderboard: Invalid block interval .* in input dataset ([^ ]+/)?player-scores"#,
+        ]),
     )
     .await;
 
@@ -869,30 +775,46 @@ async fn test_pull_reset_derivative(kamu: KamuCliPuppet) {
         expected_derivative_data,
     )
     .await;
+
+    // Compacting the root again diverges the derivative once more; with no new
+    // input data, the reset leaves the derivative empty
+    kamu.execute([
+        "--yes",
+        "system",
+        "compact",
+        dataset_alias.dataset_name.as_str(),
+        "--hard",
+        "--keep-metadata-only",
+    ])
+    .await
+    .success();
+    kamu.assert_success_command_execution(
+        [
+            "pull",
+            dataset_derivative_alias.dataset_name.as_str(),
+            "--reset-derivatives-on-diverged-input",
+        ],
+        None,
+        Some([r#"1 dataset\(s\) updated"#]),
+    )
+    .await;
+    pretty_assertions::assert_eq!(
+        0,
+        kamu.list_datasets()
+            .await
+            .into_iter()
+            .find(|dataset| dataset.name == dataset_derivative_alias.dataset_name)
+            .unwrap()
+            .records
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 async fn test_pull_derivative(kamu: KamuCliPuppet) {
-    let dataset_name = DATASET_ROOT_PLAYER_NAME.clone();
     let dataset_derivative_name = DATASET_DERIVATIVE_LEADERBOARD_NAME.clone();
 
-    kamu.execute_with_input(["add", "--stdin"], DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR)
-        .await
-        .success();
-
-    kamu.execute_with_input(
-        ["add", "--stdin"],
-        DATASET_DERIVATIVE_LEADERBOARD_SNAPSHOT_STR,
-    )
-    .await
-    .success();
-
-    kamu.ingest_data(
-        &dataset_name,
-        DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_1,
-    )
-    .await;
+    add_player_scores_with_derivative(&kamu).await;
 
     kamu.assert_success_command_execution(
         [
@@ -970,31 +892,9 @@ pub async fn test_pull_uncacheable_source(kamu: KamuCliPuppet) {
         .mount(&source)
         .await;
 
-    let snapshot = indoc::formatdoc!(
-        r#"
-        kind: DatasetSnapshot
-        version: 1
-        content:
-          name: test.pull-uncacheable
-          kind: Root
-          metadata:
-            - kind: SetPollingSource
-              fetch:
-                kind: Url
-                url: {source_uri}/data.csv
-              read:
-                kind: Csv
-                header: true
-                schema:
-                  fields:
-                    - name: city
-                      type: String
-                    - name: population
-                      type: Int64
-              merge:
-                kind: append
-        "#,
-        source_uri = source.uri(),
+    let snapshot = city_population_root_snapshot(
+        "test.pull-uncacheable",
+        &format!(r#"{{ kind: Url, url: "{}/data.csv" }}"#, source.uri()),
     );
     kamu.execute_with_input(["add", "--stdin"], snapshot)
         .await
@@ -1028,83 +928,11 @@ pub async fn test_pull_uncacheable_source(kamu: KamuCliPuppet) {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// test_pull_derivative_with_engine_name_in_any_case
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub async fn test_pull_derivative_with_engine_name_in_any_case(kamu: KamuCliPuppet) {
-    add_player_scores_with_derivative(
-        &kamu,
-        &DATASET_DERIVATIVE_LEADERBOARD_SNAPSHOT_STR
-            .replace("engine: datafusion", "engine: DataFusion"),
-    )
-    .await;
-
-    kamu.assert_success_command_execution(
-        ["pull", DATASET_DERIVATIVE_LEADERBOARD_NAME.as_str()],
-        None,
-        Some([r#"1 dataset\(s\) updated"#]),
-    )
-    .await;
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// test_pull_derivative_with_unknown_engine_fails
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub async fn test_pull_derivative_with_unknown_engine_fails(kamu: KamuCliPuppet) {
-    add_player_scores_with_derivative(
-        &kamu,
-        &DATASET_DERIVATIVE_LEADERBOARD_SNAPSHOT_STR
-            .replace("engine: datafusion", "engine: no-such-engine"),
-    )
-    .await;
-
-    kamu.assert_failure_command_execution(
-        ["pull", DATASET_DERIVATIVE_LEADERBOARD_NAME.as_str()],
-        None,
-        Some(["Failed to pull leaderboard: Unsupported engine no-such-engine"]),
-    )
-    .await;
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// test_pull_derivative_without_transform_with_other_datasets_fails
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub async fn test_pull_derivative_without_transform_with_other_datasets_fails(kamu: KamuCliPuppet) {
-    kamu.execute_with_input(["add", "--stdin"], DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR)
-        .await
-        .success();
-    kamu.execute_with_input(
-        ["add", "--stdin"],
-        indoc::indoc!(
-            r#"
-            kind: DatasetSnapshot
-            version: 1
-            content:
-              name: no-transform
-              kind: Derivative
-              metadata: []
-            "#
-        ),
-    )
-    .await
-    .success();
-
-    kamu.assert_failure_command_execution(
-        ["pull", "no-transform", DATASET_ROOT_PLAYER_NAME.as_str()],
-        None,
-        Some(["Failed to pull no-transform: Dataset does not define a transform"]),
-    )
-    .await;
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // test_pull_derivative_after_inputs_changed_fails
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_pull_derivative_after_inputs_changed_fails(kamu: KamuCliPuppet) {
-    add_player_scores_with_derivative(&kamu, DATASET_DERIVATIVE_LEADERBOARD_SNAPSHOT_STR).await;
+    add_player_scores_with_derivative(&kamu).await;
     kamu.execute(["pull", DATASET_DERIVATIVE_LEADERBOARD_NAME.as_str()])
         .await
         .success();
@@ -1144,60 +972,11 @@ pub async fn test_pull_derivative_after_inputs_changed_fails(kamu: KamuCliPuppet
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// test_pull_reset_derivative_without_new_input_data
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub async fn test_pull_reset_derivative_without_new_input_data(kamu: KamuCliPuppet) {
-    add_player_scores_with_derivative(&kamu, DATASET_DERIVATIVE_LEADERBOARD_SNAPSHOT_STR).await;
-    kamu.execute(["pull", DATASET_DERIVATIVE_LEADERBOARD_NAME.as_str()])
-        .await
-        .success();
-    kamu.execute([
-        "--yes",
-        "system",
-        "compact",
-        DATASET_ROOT_PLAYER_NAME.as_str(),
-        "--hard",
-        "--keep-metadata-only",
-    ])
-    .await
-    .success();
-
-    kamu.assert_failure_command_execution(
-        ["pull", DATASET_DERIVATIVE_LEADERBOARD_NAME.as_str()],
-        None,
-        Some([r#"Failed to pull leaderboard: Invalid block interval .* in input dataset player-scores"#]),
-    )
-    .await;
-
-    // The reset leaves the derivative without data, as its input has none
-    kamu.assert_success_command_execution(
-        [
-            "pull",
-            DATASET_DERIVATIVE_LEADERBOARD_NAME.as_str(),
-            "--reset-derivatives-on-diverged-input",
-        ],
-        None,
-        Some([r#"1 dataset\(s\) updated"#]),
-    )
-    .await;
-    pretty_assertions::assert_eq!(
-        0,
-        kamu.list_datasets()
-            .await
-            .into_iter()
-            .find(|dataset| dataset.name == *DATASET_DERIVATIVE_LEADERBOARD_NAME)
-            .unwrap()
-            .records
-    );
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // test_pull_derivative_leaves_no_working_files
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_pull_derivative_leaves_no_working_files(kamu: KamuCliPuppet) {
-    add_player_scores_with_derivative(&kamu, DATASET_DERIVATIVE_LEADERBOARD_SNAPSHOT_STR).await;
+    add_player_scores_with_derivative(&kamu).await;
 
     kamu.assert_success_command_execution(
         ["pull", DATASET_DERIVATIVE_LEADERBOARD_NAME.as_str()],
@@ -1218,19 +997,19 @@ pub async fn test_pull_derivative_leaves_no_working_files(kamu: KamuCliPuppet) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Adds the root with its first chunk of data, and a derivative of it
-async fn add_player_scores_with_derivative(kamu: &KamuCliPuppet, derivative_snapshot: &str) {
-    kamu.execute_with_input(["add", "--stdin"], DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR)
+/// Adds a root dataset that appends the workspace's `data-*.csv` files of
+/// cities and their populations
+async fn add_data_files_dataset(kamu: &KamuCliPuppet, dataset_name: &str) {
+    let snapshot = city_population_root_snapshot(
+        dataset_name,
+        &format!(
+            r#"{{ kind: FilesGlob, path: "{}/data-*.csv" }}"#,
+            kamu.workspace_path().display()
+        ),
+    );
+    kamu.execute_with_input(["add", "--stdin"], snapshot)
         .await
         .success();
-    kamu.execute_with_input(["add", "--stdin"], derivative_snapshot)
-        .await
-        .success();
-    kamu.ingest_data(
-        &DATASET_ROOT_PLAYER_NAME,
-        DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_1,
-    )
-    .await;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

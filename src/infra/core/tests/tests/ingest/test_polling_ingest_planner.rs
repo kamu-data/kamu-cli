@@ -34,7 +34,9 @@ use serde_json::json;
 #[tokio::test]
 async fn test_plan_ingest_at_current_head() {
     let harness = PollingIngestPlannerHarness::new();
-    let foo = harness.create_root_dataset(&alias("foo")).await;
+    let foo = harness
+        .create_root_dataset(&BaseRepoHarness::alias("foo"))
+        .await;
 
     let plan = harness.plan(&foo).await.unwrap();
 
@@ -47,28 +49,25 @@ async fn test_plan_ingest_at_current_head() {
 
 #[tokio::test]
 async fn test_plan_ingest_without_polling_source() {
-    let harness = PollingIngestPlannerHarness::new();
-    let foo = harness
-        .create_root_dataset_without_source(&alias("foo"))
-        .await;
+    for with_push_source in [false, true] {
+        let harness = PollingIngestPlannerHarness::new();
+        let alias_foo = BaseRepoHarness::alias("foo");
+        let foo = if with_push_source {
+            harness
+                .create_root_dataset_with_push_source(&alias_foo)
+                .await
+        } else {
+            harness.create_root_dataset_without_source(&alias_foo).await
+        };
 
-    let res = harness.plan(&foo).await;
+        let res = harness.plan(&foo).await;
 
-    assert_matches!(res, Err(PollingIngestPlanError::SourceNotDefined(_)));
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[tokio::test]
-async fn test_plan_ingest_with_push_source_only() {
-    let harness = PollingIngestPlannerHarness::new();
-    let foo = harness
-        .create_root_dataset_with_push_source(&alias("foo"))
-        .await;
-
-    let res = harness.plan(&foo).await;
-
-    assert_matches!(res, Err(PollingIngestPlanError::SourceNotDefined(_)));
+        assert_matches!(
+            res,
+            Err(PollingIngestPlanError::SourceNotDefined(_)),
+            "with push source: {with_push_source}"
+        );
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -76,7 +75,9 @@ async fn test_plan_ingest_with_push_source_only() {
 #[tokio::test]
 async fn test_rebuild_ingest_at_expected_head() {
     let harness = PollingIngestPlannerHarness::new();
-    let foo = harness.create_root_dataset(&alias("foo")).await;
+    let foo = harness
+        .create_root_dataset(&BaseRepoHarness::alias("foo"))
+        .await;
     harness
         .append_schema_and_watermark(&foo, Utc.with_ymd_and_hms(2050, 1, 1, 0, 0, 0).unwrap())
         .await;
@@ -92,10 +93,11 @@ async fn test_rebuild_ingest_at_expected_head() {
 #[tokio::test]
 async fn test_rebuild_ingest_after_head_moved() {
     let harness = PollingIngestPlannerHarness::new();
-    let foo = harness.create_root_dataset(&alias("foo")).await;
+    let foo = harness
+        .create_root_dataset(&BaseRepoHarness::alias("foo"))
+        .await;
     let stored = harness.payload(&foo).await;
-    let new_head = harness.append_unreferenced_block(&foo, "concurrent").await;
-    harness.move_head(&foo, &foo.head, &new_head).await;
+    let new_head = harness.move_head_concurrently(&foo).await;
 
     let res = harness.rebuild(&foo, &stored).await;
 
@@ -111,7 +113,9 @@ async fn test_rebuild_ingest_after_head_moved() {
 #[tokio::test]
 async fn test_rebuild_ingest_that_differs_from_stored_plan() {
     let harness = PollingIngestPlannerHarness::new();
-    let foo = harness.create_root_dataset(&alias("foo")).await;
+    let foo = harness
+        .create_root_dataset(&BaseRepoHarness::alias("foo"))
+        .await;
     let stored = PollingIngestPlanPayload {
         prev_offset: Some(10),
         ..harness.payload(&foo).await
@@ -127,8 +131,12 @@ async fn test_rebuild_ingest_that_differs_from_stored_plan() {
 #[tokio::test]
 async fn test_rebuild_ingest_of_plan_for_another_dataset() {
     let harness = PollingIngestPlannerHarness::new();
-    let foo = harness.create_root_dataset(&alias("foo")).await;
-    let bar = harness.create_root_dataset(&alias("bar")).await;
+    let foo = harness
+        .create_root_dataset(&BaseRepoHarness::alias("foo"))
+        .await;
+    let bar = harness
+        .create_root_dataset(&BaseRepoHarness::alias("bar"))
+        .await;
     let stored = harness.payload(&foo).await;
 
     let res = harness.rebuild(&bar, &stored).await;
@@ -141,9 +149,11 @@ async fn test_rebuild_ingest_of_plan_for_another_dataset() {
 #[tokio::test]
 async fn test_rebuild_ingest_without_polling_source() {
     let harness = PollingIngestPlannerHarness::new();
-    let foo = harness.create_root_dataset(&alias("foo")).await;
+    let foo = harness
+        .create_root_dataset(&BaseRepoHarness::alias("foo"))
+        .await;
     let bar = harness
-        .create_root_dataset_without_source(&alias("bar"))
+        .create_root_dataset_without_source(&BaseRepoHarness::alias("bar"))
         .await;
     // A plan pinned to a head that has no polling source
     let stored = PollingIngestPlanPayload {
@@ -240,7 +250,9 @@ async fn test_resolve_env_vars_when_disabled() {
         enabled: false,
         encryption_key: None,
     });
-    let foo = harness.create_root_dataset(&alias("foo")).await;
+    let foo = harness
+        .create_root_dataset(&BaseRepoHarness::alias("foo"))
+        .await;
 
     let env_vars = harness.resolve_env_vars(&foo).await;
 
@@ -253,7 +265,9 @@ async fn test_resolve_env_vars_when_disabled() {
 #[tokio::test]
 async fn test_resolve_env_vars_when_enabled() {
     let harness = PollingIngestPlannerHarness::with_env_vars(SecretsEncryptionConfig::sample());
-    let foo = harness.create_root_dataset(&alias("foo")).await;
+    let foo = harness
+        .create_root_dataset(&BaseRepoHarness::alias("foo"))
+        .await;
 
     let env_vars = harness.resolve_env_vars(&foo).await;
 
@@ -264,12 +278,6 @@ async fn test_resolve_env_vars_when_enabled() {
     assert_eq!(harness.env_var_resolver_calls(), 1);
     // Values never show in logs
     assert_eq!(format!("{env_vars:?}"), r#"IngestEnvVars(["API_KEY"])"#);
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-fn alias(name: &str) -> odf::DatasetAlias {
-    odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked(name))
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

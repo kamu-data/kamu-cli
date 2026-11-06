@@ -69,7 +69,7 @@ async fn test_commit_head_advances_from_expected_head() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[tokio::test]
-async fn test_commit_head_from_stale_head_is_a_conflict() {
+async fn test_commit_head_from_other_than_the_stored_head_is_a_conflict() {
     let harness = DatasetHeadCommitterHarness::new().await;
     let foo = harness.create_foo().await;
     let concurrent_head = harness
@@ -78,6 +78,30 @@ async fn test_commit_head_from_stale_head_is_a_conflict() {
     let new_head = harness
         .append_unreferenced_block(&foo, &foo.head, "planned")
         .await;
+
+    // -- expecting no head while a head exists
+
+    let res = harness.commit_head(&foo, None, &new_head).await;
+    assert_matches!(
+        res,
+        Err(odf::dataset::SetChainRefError::CASFailed(e))
+        if e.reference == odf::BlockRef::Head &&
+           e.expected.is_none() &&
+           e.actual == Some(foo.head.clone()),
+        "expecting no head"
+    );
+    assert_eq!(
+        harness.stored_head(&foo).await,
+        foo.head,
+        "head after expecting no head"
+    );
+    assert_eq!(
+        "",
+        harness.collected_outbox_messages(),
+        "outbox after expecting no head"
+    );
+
+    // -- expecting a head another commit has moved on from
 
     harness
         .commit_head(&foo, Some(&foo.head), &concurrent_head)
@@ -91,34 +115,19 @@ async fn test_commit_head_from_stale_head_is_a_conflict() {
         Err(odf::dataset::SetChainRefError::CASFailed(e))
         if e.reference == odf::BlockRef::Head &&
            e.expected == Some(foo.head.clone()) &&
-           e.actual == Some(concurrent_head.clone())
+           e.actual == Some(concurrent_head.clone()),
+        "expecting a stale head"
     );
-
-    assert_eq!(harness.stored_head(&foo).await, concurrent_head);
-    assert_eq!("", harness.collected_outbox_messages());
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[tokio::test]
-async fn test_commit_head_expecting_no_head_is_a_conflict_when_head_exists() {
-    let harness = DatasetHeadCommitterHarness::new().await;
-    let foo = harness.create_foo().await;
-    let new_head = harness
-        .append_unreferenced_block(&foo, &foo.head, "next")
-        .await;
-
-    let res = harness.commit_head(&foo, None, &new_head).await;
-    assert_matches!(
-        res,
-        Err(odf::dataset::SetChainRefError::CASFailed(e))
-        if e.reference == odf::BlockRef::Head &&
-           e.expected.is_none() &&
-           e.actual == Some(foo.head.clone())
+    assert_eq!(
+        harness.stored_head(&foo).await,
+        concurrent_head,
+        "head after expecting a stale head"
     );
-
-    assert_eq!(harness.stored_head(&foo).await, foo.head);
-    assert_eq!("", harness.collected_outbox_messages());
+    assert_eq!(
+        "",
+        harness.collected_outbox_messages(),
+        "outbox after expecting a stale head"
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

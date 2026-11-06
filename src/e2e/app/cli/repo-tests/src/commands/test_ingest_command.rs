@@ -20,6 +20,8 @@ use kamu_cli_e2e_common::{
 use kamu_cli_puppet::KamuCliPuppet;
 use kamu_cli_puppet::extensions::{AddDatasetOptions, KamuCliPuppetExt};
 
+use crate::utils::{assert_case_fails, create_alice_and_bob};
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_push_ingest_from_file_ledger(kamu: KamuCliPuppet) {
@@ -442,34 +444,8 @@ async fn assert_ingest_data_to_player_scores_from_stdio<I, S, T>(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn test_ingest_into_derivative_fails(kamu: KamuCliPuppet) {
-    kamu.execute_with_input(["add", "--stdin"], DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR)
-        .await
-        .success();
-    kamu.execute_with_input(
-        ["add", "--stdin"],
-        DATASET_DERIVATIVE_LEADERBOARD_SNAPSHOT_STR,
-    )
-    .await
-    .success();
-
-    kamu.assert_failure_command_execution_with_input(
-        ["ingest", "leaderboard", "--stdin"],
-        DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_1,
-        None,
-        Some(["Ingesting data available for root datasets only"]),
-    )
-    .await;
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 pub async fn test_ingest_into_other_accounts_dataset_fails(mut kamu: KamuCliPuppet) {
-    let alice = odf::AccountName::new_unchecked("alice");
-    let bob = odf::AccountName::new_unchecked("bob");
-
-    kamu.create_account(&alice).await;
-    kamu.create_account(&bob).await;
+    let (alice, bob) = create_alice_and_bob(&kamu).await;
 
     kamu.set_account(Some(bob));
     for (name, visibility) in [("bob-root", "private"), ("bob-public", "public")] {
@@ -502,93 +478,96 @@ pub async fn test_ingest_into_other_accounts_dataset_fails(mut kamu: KamuCliPupp
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn test_ingest_without_files_or_stdin_fails(kamu: KamuCliPuppet) {
+pub async fn test_ingest_of_invalid_request_fails(kamu: KamuCliPuppet) {
     kamu.execute_with_input(["add", "--stdin"], DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR)
         .await
         .success();
-
-    kamu.assert_failure_command_execution(
-        ["ingest", "player-scores"],
-        None,
-        Some(["Specify a list of files or pass --stdin"]),
+    kamu.execute_with_input(
+        ["add", "--stdin"],
+        DATASET_DERIVATIVE_LEADERBOARD_SNAPSHOT_STR,
     )
-    .await;
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub async fn test_ingest_with_unknown_source_name_fails(kamu: KamuCliPuppet) {
-    kamu.execute_with_input(["add", "--stdin"], DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR)
-        .await
-        .success();
-
-    kamu.assert_failure_command_execution_with_input(
-        [
-            "ingest",
-            "player-scores",
-            "--stdin",
-            "--source-name",
-            "unknown",
-        ],
-        DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_1,
-        None,
-        Some(["Source 'unknown' not found"]),
+    .await
+    .success();
+    kamu.execute_with_input(
+        ["add", "--stdin", "--name", "pulled-scores"],
+        DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR,
     )
-    .await;
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub async fn test_ingest_of_unparsable_value_fails(kamu: KamuCliPuppet) {
-    kamu.execute_with_input(["add", "--stdin"], DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR)
-        .await
-        .success();
-
-    let result = kamu
-        .execute_with_input(
-            ["ingest", "player-scores", "--stdin"],
-            r#"{"match_time": "2000-01-01", "match_id": "not-a-number", "player_id": "Alice", "score": 100}"#,
-        )
-        .await
-        .failure();
-    let stderr = String::from_utf8_lossy(&result.get_output().stderr).into_owned();
-
-    // The data is at fault, so it is not reported as an internal error
-    assert!(
-        stderr.contains(r#"failed to parse "not-a-number" as Int64"#),
-        "{stderr}"
-    );
-    assert!(!stderr.contains("Internal error"), "{stderr}");
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub async fn test_ingest_into_dataset_with_pull_alias_fails(kamu: KamuCliPuppet) {
-    kamu.execute_with_input(["add", "--stdin"], DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR)
-        .await
-        .success();
+    .await
+    .success();
     kamu.execute([
         "repo",
         "alias",
         "add",
-        "player-scores",
+        "pulled-scores",
         "odf+http://example.com/x",
         "--pull",
     ])
     .await
     .success();
 
-    kamu.assert_failure_command_execution_with_input(
-        ["ingest", "player-scores", "--stdin"],
-        DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_1,
-        None,
-        Some([
-            "Ingesting data into a dataset that is pulled from a remote will cause histories to \
-             diverge",
-            "kamu repo alias list",
-        ]),
-    )
-    .await;
+    let data = DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_1;
+    for (case, cmd, stdin, expected_stderr) in [
+        (
+            "into a derivative",
+            &["ingest", "leaderboard", "--stdin"][..],
+            Some(data),
+            &["Ingesting data available for root datasets only"][..],
+        ),
+        (
+            "without files or stdin",
+            &["ingest", "player-scores"],
+            None,
+            &["Specify a list of files or pass --stdin"],
+        ),
+        (
+            "unknown source name",
+            &[
+                "ingest",
+                "player-scores",
+                "--stdin",
+                "--source-name",
+                "unknown",
+            ],
+            Some(data),
+            &["Source 'unknown' not found"],
+        ),
+        (
+            "unparsable value",
+            &["ingest", "player-scores", "--stdin"],
+            Some(
+                r#"{"match_time": "2000-01-01", "match_id": "not-a-number", "player_id": "Alice", "score": 100}"#,
+            ),
+            &[r#"failed to parse "not-a-number" as Int64"#],
+        ),
+        (
+            "into a dataset with a pull alias",
+            &["ingest", "pulled-scores", "--stdin"],
+            Some(data),
+            &[
+                "Ingesting data into a dataset that is pulled from a remote will cause histories \
+                 to diverge",
+                "kamu repo alias list",
+            ],
+        ),
+    ] {
+        let stderr = assert_case_fails(&kamu, case, cmd, stdin, expected_stderr).await;
+
+        // The request is at fault, so it is not reported as an internal error
+        assert!(
+            !stderr.contains("Internal error"),
+            "Case '{case}': reported as an internal error\n{stderr}"
+        );
+    }
+
+    // No failed request leaves data behind
+    pretty_assertions::assert_eq!(
+        vec![0; 3],
+        kamu.list_datasets()
+            .await
+            .into_iter()
+            .map(|dataset| dataset.records)
+            .collect::<Vec<_>>()
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

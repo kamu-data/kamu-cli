@@ -18,7 +18,8 @@ use crate::{DatabaseTransactionManager, TransactionRef};
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// How long the second transaction gets to reach the storage before the first
-/// commits, so a database makes it wait on the first's locks
+/// commits, so a database makes it wait on the first's locks. A write that
+/// finishes earlier, not being blocked, ends the wait.
 const SECOND_WRITE_HEAD_START: Duration = Duration::from_millis(200);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -37,10 +38,11 @@ pub enum RacingTransactionOutcome<E> {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// Runs `second_write` in a transaction that starts while the transaction of
-/// `first_write` is open, and commits the first while the second is writing.
-/// The second commits only after the first, so the outcome is the same on every
-/// storage that detects the conflict: a database fails the second write once
-/// the first commits, the in-memory manager fails the second commit.
+/// `first_write` is open, and commits the first once the second has written or
+/// is still writing after a head start. The second commits only after the
+/// first, so the outcome is the same on every storage that detects the
+/// conflict: a database fails the second write once the first commits, the
+/// in-memory manager fails the second commit.
 ///
 /// `catalog` must provide a `DatabaseTransactionManager`; `first_write` must
 /// succeed. Both writes must drop everything they resolve from their catalog.
@@ -63,7 +65,7 @@ where
 
     // Begun inside the task: storage with one connection makes it wait for the
     // first to finish
-    let second = tokio::spawn({
+    let mut second = tokio::spawn({
         let catalog = catalog.clone();
         let transaction_manager = transaction_manager.clone();
         async move {
@@ -73,10 +75,16 @@ where
         }
     });
 
-    tokio::time::sleep(SECOND_WRITE_HEAD_START).await;
+    let second_written = tokio::time::timeout(SECOND_WRITE_HEAD_START, &mut second)
+        .await
+        .ok();
     transaction_manager.commit_transaction(first).await.unwrap();
 
-    let (second, result) = second.await.unwrap();
+    let (second, result) = match second_written {
+        Some(written) => written,
+        None => second.await,
+    }
+    .unwrap();
     match result {
         Err(e) => {
             transaction_manager

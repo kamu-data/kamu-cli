@@ -60,6 +60,18 @@ async fn test_compare_and_set() {
     let bar = Multihash::from_digest_sha3_256(b"bar");
     let baz = Multihash::from_digest_sha3_256(b"baz");
 
+    assert_matches!(
+        repo.compare_and_set(TEST_REF, Some(&foo), &bar).await,
+        Err(CompareAndSetRefError::Mismatch(RefMismatchError { block_ref_name }))
+            if block_ref_name == TEST_REF,
+        "missing ref expecting a hash"
+    );
+    assert_matches!(
+        repo.get(TEST_REF).await,
+        Err(GetRefError::NotFound(_)),
+        "missing ref after a mismatch"
+    );
+
     repo.compare_and_set(TEST_REF, None, &foo).await.unwrap();
     repo.compare_and_set(TEST_REF, Some(&foo), &bar)
         .await
@@ -69,11 +81,13 @@ async fn test_compare_and_set() {
     assert_matches!(
         repo.compare_and_set(TEST_REF, Some(&foo), &baz).await,
         Err(CompareAndSetRefError::Mismatch(RefMismatchError { block_ref_name }))
-            if block_ref_name == TEST_REF
+            if block_ref_name == TEST_REF,
+        "stored ref expecting a stale hash"
     );
     assert_matches!(
         repo.compare_and_set(TEST_REF, None, &baz).await,
-        Err(CompareAndSetRefError::Mismatch(_))
+        Err(CompareAndSetRefError::Mismatch(_)),
+        "stored ref expecting none"
     );
     assert_eq!(repo.get(TEST_REF).await.unwrap(), bar);
 }
@@ -105,25 +119,6 @@ async fn test_compare_and_set_accepts_another_encoding_of_the_expected_hash() {
         .await
         .unwrap();
     assert_eq!(repo.get(TEST_REF).await.unwrap(), bar);
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[tokio::test]
-async fn test_compare_and_set_on_a_missing_ref_expecting_a_hash() {
-    let harness = RefRepoHarness::new();
-    let foo = Multihash::from_digest_sha3_256(b"foo");
-    let bar = Multihash::from_digest_sha3_256(b"bar");
-
-    assert_matches!(
-        harness.repo.compare_and_set(TEST_REF, Some(&foo), &bar).await,
-        Err(CompareAndSetRefError::Mismatch(RefMismatchError { block_ref_name }))
-            if block_ref_name == TEST_REF
-    );
-    assert_matches!(
-        harness.repo.get(TEST_REF).await,
-        Err(GetRefError::NotFound(_))
-    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

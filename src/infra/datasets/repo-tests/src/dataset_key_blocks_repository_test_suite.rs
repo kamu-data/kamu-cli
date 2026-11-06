@@ -9,21 +9,17 @@
 
 use std::assert_matches;
 
-use database_common::testing::{
-    RacingTransactionOutcome,
-    in_committed_transaction,
-    race_transactions,
-};
+use database_common::testing::RacingTransactionOutcome;
 use dill::Catalog;
 use kamu_datasets::*;
 
 use crate::helpers::{
-    init_committed_entries,
     init_dataset_entry,
     init_test_account,
     make_info_block,
     make_license_block,
     make_seed_block,
+    race_block_saves,
     remove_dataset_entry,
 };
 
@@ -469,45 +465,25 @@ pub async fn test_list_unindexed_dataset_branches(catalog: &Catalog) {
 /// Two transactions save different key blocks at the same sequence number: the
 /// one that commits first stores its block, the other never commits
 pub async fn test_save_same_sequence_number_in_concurrent_transactions(catalog: &Catalog) {
-    let (_, entries) = init_committed_entries(catalog, &[("foo", odf::DatasetKind::Root)]).await;
-    let dataset_id = entries[0].id.clone();
-
     let first_block = make_info_block(1);
     let first_hash = first_block.block_hash.clone();
-    let second_dataset_id = dataset_id.clone();
 
-    let outcome = race_transactions(
+    let race = race_block_saves(
         catalog,
-        |catalog| async move {
-            save_key_block(&catalog, &dataset_id, first_block)
-                .await
-                .unwrap();
-        },
-        move |catalog| async move {
-            save_key_block(&catalog, &second_dataset_id, make_license_block(1)).await
-        },
+        first_block,
+        make_license_block(1),
+        save_key_block,
+        committed_key_block_hashes,
     )
     .await;
 
     assert_matches!(
-        outcome,
+        race.outcome,
         RacingTransactionOutcome::FailedAtWrite(DatasetKeyBlockSaveError::DuplicateSequenceNumber(
             _
         )) | RacingTransactionOutcome::FailedAtCommit(_)
     );
-    let committed_hashes = in_committed_transaction(catalog, |catalog| async move {
-        catalog
-            .get_one::<dyn DatasetKeyBlockRepository>()
-            .unwrap()
-            .get_all_key_blocks(&entries[0].id, &odf::BlockRef::Head)
-            .await
-            .unwrap()
-            .into_iter()
-            .map(|block| block.block_hash)
-            .collect::<Vec<_>>()
-    })
-    .await;
-    pretty_assertions::assert_eq!(committed_hashes, vec![first_hash]);
+    pretty_assertions::assert_eq!(race.committed_hashes, vec![first_hash]);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -515,59 +491,53 @@ pub async fn test_save_same_sequence_number_in_concurrent_transactions(catalog: 
 /// Two transactions save key blocks at different sequence numbers of one
 /// reference: both commit, and both blocks are stored
 pub async fn test_save_different_sequence_numbers_in_concurrent_transactions(catalog: &Catalog) {
-    let (_, entries) = init_committed_entries(catalog, &[("foo", odf::DatasetKind::Root)]).await;
-    let dataset_id = entries[0].id.clone();
-
     let first_block = make_info_block(1);
     let second_block = make_license_block(2);
     let expected_hashes = vec![
         first_block.block_hash.clone(),
         second_block.block_hash.clone(),
     ];
-    let second_dataset_id = dataset_id.clone();
 
-    let outcome =
-        race_transactions(
-            catalog,
-            |catalog| async move {
-                save_key_block(&catalog, &dataset_id, first_block)
-                    .await
-                    .unwrap();
-            },
-            move |catalog| async move {
-                save_key_block(&catalog, &second_dataset_id, second_block).await
-            },
-        )
-        .await;
-
-    assert_matches!(outcome, RacingTransactionOutcome::Committed);
-    let committed_hashes = in_committed_transaction(catalog, |catalog| async move {
-        catalog
-            .get_one::<dyn DatasetKeyBlockRepository>()
-            .unwrap()
-            .get_all_key_blocks(&entries[0].id, &odf::BlockRef::Head)
-            .await
-            .unwrap()
-            .into_iter()
-            .map(|block| block.block_hash)
-            .collect::<Vec<_>>()
-    })
+    let race = race_block_saves(
+        catalog,
+        first_block,
+        second_block,
+        save_key_block,
+        committed_key_block_hashes,
+    )
     .await;
-    pretty_assertions::assert_eq!(committed_hashes, expected_hashes);
+
+    assert_matches!(race.outcome, RacingTransactionOutcome::Committed);
+    pretty_assertions::assert_eq!(race.committed_hashes, expected_hashes);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 async fn save_key_block(
-    catalog: &Catalog,
-    dataset_id: &odf::DatasetID,
+    catalog: Catalog,
+    dataset_id: odf::DatasetID,
     block: DatasetBlock,
 ) -> Result<(), DatasetKeyBlockSaveError> {
     catalog
         .get_one::<dyn DatasetKeyBlockRepository>()
         .unwrap()
-        .save_key_blocks_batch(dataset_id, &odf::BlockRef::Head, &[block])
+        .save_key_blocks_batch(&dataset_id, &odf::BlockRef::Head, &[block])
         .await
+}
+
+async fn committed_key_block_hashes(
+    catalog: Catalog,
+    dataset_id: odf::DatasetID,
+) -> Vec<odf::Multihash> {
+    catalog
+        .get_one::<dyn DatasetKeyBlockRepository>()
+        .unwrap()
+        .get_all_key_blocks(&dataset_id, &odf::BlockRef::Head)
+        .await
+        .unwrap()
+        .into_iter()
+        .map(|block| block.block_hash)
+        .collect()
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
