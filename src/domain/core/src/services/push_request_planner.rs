@@ -135,6 +135,9 @@ pub enum PushError {
     #[error("Cannot choose between multiple push aliases")]
     AmbiguousTarget,
 
+    #[error("Cannot choose between multiple repositories, specify the destination")]
+    AmbiguousRepository,
+
     #[error(transparent)]
     SyncError(
         #[from]

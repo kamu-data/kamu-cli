@@ -34,3 +34,35 @@ kamu_cli_execute_command_e2e_test!(
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+kamu_cli_execute_command_e2e_test!(
+    storage = sqlite,
+    fixture = kamu_cli_e2e_repo_tests::commands::test_verify_derivative_after_query_change,
+    extra_test_groups = "containerized, engine, transform, datafusion",
+    sqlite_only =
+        "checks the replay of a transform with its own query; the repository type cannot change it"
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+kamu_cli_execute_command_e2e_test!(
+    storage = sqlite,
+    fixture =
+        kamu_cli_e2e_repo_tests::commands::test_verify_replay_denied_when_input_became_unreadable,
+    options = Options::default()
+        .with_multi_tenant()
+        .with_kamu_config(MULTITENANT_KAMU_CONFIG_WITH_DEFAULT_USER),
+    extra_test_groups = "containerized, engine, transform, datafusion"
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+kamu_cli_execute_command_e2e_test!(
+    storage = sqlite,
+    fixture = kamu_cli_e2e_repo_tests::commands::test_verify_pulled_derivative_without_its_input,
+    extra_test_groups = "containerized, engine, transform, datafusion",
+    sqlite_only =
+        "checks a CLI message when a replay lacks its input; the repository type cannot change it"
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

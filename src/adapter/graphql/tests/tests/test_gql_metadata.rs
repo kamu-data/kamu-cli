@@ -14,6 +14,7 @@ use kamu::*;
 use kamu_accounts::{
     AuthenticationService,
     CurrentAccountSubject,
+    CurrentAccountSubjectCatalogExt as _,
     DEFAULT_ACCOUNT_NAME,
     MockAuthenticationService,
 };
@@ -783,11 +784,11 @@ impl DatasetMetadataHarness {
             .await;
 
         let catalog_other_account = dill::CatalogBuilder::new_chained(&catalog_no_subject)
-            .add_value(CurrentAccountSubject::new_test_with(&"other-account"))
+            .add_current_account_subject(CurrentAccountSubject::new_test_with(&"other-account"))
             .build();
 
         let catalog_third_account = dill::CatalogBuilder::new_chained(&catalog_no_subject)
-            .add_value(CurrentAccountSubject::new_test_with(&"third-account"))
+            .add_current_account_subject(CurrentAccountSubject::new_test_with(&"third-account"))
             .build();
 
         Self {
@@ -830,7 +831,7 @@ impl DatasetMetadataHarness {
                     .build(),
                 CreateDatasetUseCaseOptions {
                     dataset_visibility: visibility,
-                    seed_block_bytes: None,
+                    ..Default::default()
                 },
             )
             .await
@@ -890,7 +891,7 @@ impl DatasetMetadataHarness {
                     .build(),
                 CreateDatasetUseCaseOptions {
                     dataset_visibility: visibility,
-                    seed_block_bytes: None,
+                    ..Default::default()
                 },
             )
             .await
@@ -1136,3 +1137,5 @@ impl DatasetMetadataHarness {
         })))
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

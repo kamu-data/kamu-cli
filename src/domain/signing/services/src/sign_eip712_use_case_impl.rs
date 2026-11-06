@@ -13,16 +13,15 @@ use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_accounts::{
     Account,
     AccountService,
-    CurrentAccountSubject,
     DidEntity,
     DidSecretEncryptionConfig,
     DidSecretKey,
     DidSecretKeyRepository,
     GetDidSecretKeyError,
-    LoggedAccount,
+    Principal,
 };
 use kamu_accounts_services::utils::AccountAuthorizationHelper;
-use kamu_datasets::DatasetActionAuthorizer;
+use kamu_datasets::{DatasetPermission, DatasetPermissionChecker};
 use kamu_signing::common::ProofType;
 use kamu_signing::entities::IdentityConfig;
 use kamu_signing::use_cases::{
@@ -40,8 +39,8 @@ use kamu_signing::use_cases::{
 pub struct SignEip712UseCaseImpl {
     did_secret_key_repo: Arc<dyn DidSecretKeyRepository>,
     did_secret_encryption_config: Arc<DidSecretEncryptionConfig>,
-    dataset_action_authorizer: Arc<dyn DatasetActionAuthorizer>,
-    current_account_subject: Arc<CurrentAccountSubject>,
+    dataset_permission_checker: Arc<dyn DatasetPermissionChecker>,
+    principal: Arc<Principal>,
     account_service: Arc<dyn AccountService>,
     account_authorization_helper: Arc<dyn AccountAuthorizationHelper>,
     identity_config: IdentityConfig,
@@ -61,11 +60,11 @@ impl SignEip712UseCaseImpl {
         &self,
         dataset_id: odf::DatasetID,
     ) -> Result<Option<DidSecretKey>, InternalError> {
-        use kamu_datasets::DatasetActionAuthorizerExt;
+        use kamu_datasets::DatasetPermissionCheckerExt;
 
         let has_read_access = self
-            .dataset_action_authorizer
-            .is_action_allowed(&dataset_id, kamu_datasets::DatasetAction::Read)
+            .dataset_permission_checker
+            .is_permission_granted(&self.principal, &dataset_id, DatasetPermission::Read)
             .await?;
 
         if !has_read_access {
@@ -89,11 +88,12 @@ impl SignEip712UseCaseImpl {
             return Ok(None);
         };
 
-        let CurrentAccountSubject::Logged(logged_account) = self.current_account_subject.as_ref()
-        else {
-            // NOTE: Only logged can search for other accounts
-            return Ok(None);
-        };
+        match self.principal.as_ref() {
+            // NOTE: Only authenticated users sign with an account key; the node
+            //       signs with its own identity
+            Principal::Anonymous | Principal::Node => return Ok(None),
+            Principal::User(_) => {}
+        }
 
         let Some(account) = self
             .account_service
@@ -103,9 +103,7 @@ impl SignEip712UseCaseImpl {
             return Ok(None);
         };
 
-        let has_access = self
-            .has_access_for_account(logged_account, &account)
-            .await?;
+        let has_access = self.has_access_for_account(&account).await?;
 
         if !has_access {
             return Ok(None);
@@ -117,20 +115,25 @@ impl SignEip712UseCaseImpl {
         get_did_secret_key(self.did_secret_key_repo.as_ref(), account_entity).await
     }
 
-    async fn has_access_for_account(
-        &self,
-        logged_account: &LoggedAccount,
-        account: &Account,
-    ) -> Result<bool, InternalError> {
-        // Admin can access any account
-        if self.account_authorization_helper.is_admin().await? {
-            return Ok(true);
-        }
+    async fn has_access_for_account(&self, account: &Account) -> Result<bool, InternalError> {
+        match self.principal.as_ref() {
+            Principal::User(account_handle) => {
+                // Admin can access any account
+                if self
+                    .account_authorization_helper
+                    .is_admin(&self.principal)
+                    .await?
+                {
+                    return Ok(true);
+                }
 
-        Ok(Self::has_access_by_account_name(
-            &logged_account.account_handle.name,
-            &account.account_name,
-        ))
+                Ok(Self::has_access_by_account_name(
+                    &account_handle.name,
+                    &account.account_name,
+                ))
+            }
+            Principal::Node | Principal::Anonymous => Ok(false),
+        }
     }
 
     async fn get_secret_key(

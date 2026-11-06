@@ -13,7 +13,8 @@ use kamu_cli_e2e_common::prelude::*;
 
 kamu_cli_execute_command_e2e_test!(
     storage = sqlite,
-    fixture = kamu_cli_e2e_repo_tests::commands::test_system_info
+    fixture = kamu_cli_e2e_repo_tests::commands::test_system_info,
+    sqlite_only = "prints system info; the repository type cannot change it"
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

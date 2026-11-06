@@ -7,12 +7,12 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-mod hard_compact_dataset_task_runner;
+mod compaction_dataset_task_runner;
 mod reset_dataset_task_runner;
-mod reset_dataset_to_metadata_runner;
+mod task_head_commit;
+mod task_span_outcome;
 mod update_dataset_task_runner;
 
-pub use hard_compact_dataset_task_runner::*;
+pub use compaction_dataset_task_runner::*;
 pub use reset_dataset_task_runner::*;
-pub use reset_dataset_to_metadata_runner::*;
 pub use update_dataset_task_runner::*;

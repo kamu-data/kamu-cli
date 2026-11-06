@@ -82,6 +82,15 @@ impl NamedObjectRepository for NamedObjectRepositoryIpfsHttp {
         Err(AccessError::ReadOnly(None).into())
     }
 
+    async fn compare_and_set(
+        &self,
+        _name: &str,
+        _expected: Option<&[u8]>,
+        _data: &[u8],
+    ) -> Result<(), CompareAndSetNamedError> {
+        Err(AccessError::ReadOnly(None).into())
+    }
+
     async fn delete(&self, _name: &str) -> Result<(), DeleteNamedError> {
         Err(AccessError::ReadOnly(None).into())
     }

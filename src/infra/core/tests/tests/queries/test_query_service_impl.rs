@@ -18,7 +18,8 @@ use datafusion::arrow::datatypes::{DataType, Field, Schema};
 use datafusion::arrow::record_batch::RecordBatch;
 use kamu::domain::*;
 use kamu::*;
-use kamu_datasets::{MockDatasetActionAuthorizer, ResolvedDataset};
+use kamu_accounts::Principal;
+use kamu_datasets::{MockDatasetPermissionChecker, ResolvedDataset};
 use kamu_ingest_datafusion::DataWriterDataFusion;
 use odf::utils::data::DataFrameExt;
 use tempfile::TempDir;
@@ -31,10 +32,10 @@ use crate::tests::queries::helpers;
 
 fn create_catalog_with_local_workspace(
     temp_dir: &Path,
-    dataset_action_authorizer: MockDatasetActionAuthorizer,
+    dataset_permission_checker: MockDatasetPermissionChecker,
 ) -> dill::Catalog {
     let base_local_catalog =
-        helpers::create_base_catalog_with_local_workspace(temp_dir, dataset_action_authorizer);
+        helpers::create_base_catalog_with_local_workspace(temp_dir, dataset_permission_checker);
 
     dill::CatalogBuilder::new_chained(&base_local_catalog)
         .add::<QueryServiceImpl>()
@@ -45,10 +46,10 @@ fn create_catalog_with_local_workspace(
 
 fn create_catalog_with_s3_workspace(
     s3: &LocalS3Server,
-    dataset_action_authorizer: MockDatasetActionAuthorizer,
+    dataset_permission_checker: MockDatasetPermissionChecker,
 ) -> dill::Catalog {
     let base_s3_catalog =
-        helpers::create_base_catalog_with_s3_workspace(s3, dataset_action_authorizer);
+        helpers::create_base_catalog_with_s3_workspace(s3, dataset_permission_checker);
 
     dill::CatalogBuilder::new_chained(&base_s3_catalog)
         .add::<QueryServiceImpl>()
@@ -109,7 +110,7 @@ async fn test_dataset_tail_local_fs() {
     let tempdir = tempfile::tempdir().unwrap();
     let catalog = create_catalog_with_local_workspace(
         tempdir.path(),
-        MockDatasetActionAuthorizer::allowing(),
+        MockDatasetPermissionChecker::allowing(),
     );
     test_dataset_tail_common(catalog, &tempdir).await;
 }
@@ -119,7 +120,7 @@ async fn test_dataset_tail_local_fs() {
 async fn test_dataset_tail_s3() {
     let tempdir = tempfile::tempdir().unwrap();
     let s3 = LocalS3Server::new().await;
-    let catalog = create_catalog_with_s3_workspace(&s3, MockDatasetActionAuthorizer::allowing());
+    let catalog = create_catalog_with_s3_workspace(&s3, MockDatasetPermissionChecker::allowing());
     test_dataset_tail_common(catalog, &tempdir).await;
 }
 
@@ -129,7 +130,7 @@ async fn test_dataset_tail_s3() {
 async fn test_dataset_tail_empty_dataset() {
     let tempdir = tempfile::tempdir().unwrap();
     let catalog =
-        create_catalog_with_local_workspace(tempdir.path(), MockDatasetActionAuthorizer::new());
+        create_catalog_with_local_workspace(tempdir.path(), MockDatasetPermissionChecker::new());
     let (created, dataset_alias) = helpers::create_empty_dataset(&catalog, "foo").await;
 
     let query_svc = catalog.get_one::<dyn QueryService>().unwrap();
@@ -154,7 +155,11 @@ async fn test_dataset_sql_authorized_common(catalog: dill::Catalog, tempdir: &Te
     let query_svc = catalog.get_one::<dyn QueryService>().unwrap();
     let statement = format!("SELECT COUNT(*) AS num_records FROM {dataset_alias}");
     let res = query_svc
-        .sql_statement(statement.as_str(), QueryOptions::default())
+        .sql_statement(
+            &Principal::new_test(),
+            statement.as_str(),
+            QueryOptions::default(),
+        )
         .await
         .unwrap();
 
@@ -179,7 +184,7 @@ async fn test_dataset_sql_authorized_local_fs() {
     let tempdir = tempfile::tempdir().unwrap();
     let catalog = create_catalog_with_local_workspace(
         tempdir.path(),
-        MockDatasetActionAuthorizer::new().expect_check_read_a_dataset(1, true),
+        MockDatasetPermissionChecker::new().expect_check_read_a_dataset(1, true),
     );
     test_dataset_sql_authorized_common(catalog, &tempdir).await;
 }
@@ -191,7 +196,7 @@ async fn test_dataset_sql_authorized_s3() {
     let s3 = LocalS3Server::new().await;
     let catalog = create_catalog_with_s3_workspace(
         &s3,
-        MockDatasetActionAuthorizer::new().expect_check_read_a_dataset(1, true),
+        MockDatasetPermissionChecker::new().expect_check_read_a_dataset(1, true),
     );
     test_dataset_sql_authorized_common(catalog, &tempdir).await;
 }
@@ -205,7 +210,11 @@ async fn test_dataset_sql_unauthorized_infer_common(catalog: dill::Catalog, temp
     let query_svc = catalog.get_one::<dyn QueryService>().unwrap();
     let statement = format!("SELECT COUNT(*) FROM {dataset_alias}");
     let result = query_svc
-        .sql_statement(statement.as_str(), QueryOptions::default())
+        .sql_statement(
+            &Principal::new_test(),
+            statement.as_str(),
+            QueryOptions::default(),
+        )
         .await;
 
     assert_matches!(
@@ -218,8 +227,10 @@ async fn test_dataset_sql_unauthorized_infer_common(catalog: dill::Catalog, temp
 #[test_log::test(tokio::test)]
 async fn test_dataset_sql_unauthorized_infer_local_fs() {
     let tempdir = tempfile::tempdir().unwrap();
-    let catalog =
-        create_catalog_with_local_workspace(tempdir.path(), MockDatasetActionAuthorizer::denying());
+    let catalog = create_catalog_with_local_workspace(
+        tempdir.path(),
+        MockDatasetPermissionChecker::denying(),
+    );
     test_dataset_sql_unauthorized_infer_common(catalog, &tempdir).await;
 }
 
@@ -228,7 +239,7 @@ async fn test_dataset_sql_unauthorized_infer_local_fs() {
 async fn test_dataset_sql_unauthorized_infer_local_s3() {
     let tempdir = tempfile::tempdir().unwrap();
     let s3 = LocalS3Server::new().await;
-    let catalog = create_catalog_with_s3_workspace(&s3, MockDatasetActionAuthorizer::denying());
+    let catalog = create_catalog_with_s3_workspace(&s3, MockDatasetPermissionChecker::denying());
     test_dataset_sql_unauthorized_infer_common(catalog, &tempdir).await;
 }
 
@@ -238,8 +249,10 @@ async fn test_dataset_sql_unauthorized_infer_local_s3() {
 #[test_log::test(tokio::test)]
 async fn test_dataset_sql_unauthorized_specific() {
     let tempdir = tempfile::tempdir().unwrap();
-    let catalog =
-        create_catalog_with_local_workspace(tempdir.path(), MockDatasetActionAuthorizer::denying());
+    let catalog = create_catalog_with_local_workspace(
+        tempdir.path(),
+        MockDatasetPermissionChecker::denying(),
+    );
 
     let target = helpers::create_test_dataset(&catalog, tempdir.path(), "foo").await;
     let dataset_alias = target.get_alias();
@@ -248,6 +261,7 @@ async fn test_dataset_sql_unauthorized_specific() {
     let statement = format!("SELECT COUNT(*) FROM {dataset_alias}");
     let result = query_svc
         .sql_statement(
+            &Principal::new_test(),
             statement.as_str(),
             QueryOptions {
                 input_datasets: Some(BTreeMap::from([(
@@ -275,7 +289,7 @@ async fn test_sql_statement_not_found() {
     let tempdir = tempfile::tempdir().unwrap();
     let catalog = create_catalog_with_local_workspace(
         tempdir.path(),
-        MockDatasetActionAuthorizer::allowing(),
+        MockDatasetPermissionChecker::allowing(),
     );
 
     let _ = helpers::create_test_dataset(&catalog, tempdir.path(), "foo").await;
@@ -283,7 +297,7 @@ async fn test_sql_statement_not_found() {
     let query_svc = catalog.get_one::<dyn QueryService>().unwrap();
     let statement = "select count(*) from does_not_exist";
     let result = query_svc
-        .sql_statement(statement, QueryOptions::default())
+        .sql_statement(&Principal::new_test(), statement, QueryOptions::default())
         .await;
 
     assert_matches!(
@@ -301,7 +315,7 @@ async fn test_sql_statement_by_alias() {
     let tempdir = tempfile::tempdir().unwrap();
     let catalog = create_catalog_with_local_workspace(
         tempdir.path(),
-        MockDatasetActionAuthorizer::allowing(),
+        MockDatasetPermissionChecker::allowing(),
     );
 
     let target = helpers::create_test_dataset(&catalog, tempdir.path(), "foo").await;
@@ -310,6 +324,7 @@ async fn test_sql_statement_by_alias() {
     let statement = "select count(*) as num_records from foobar";
     let result = query_svc
         .sql_statement(
+            &Principal::new_test(),
             statement,
             QueryOptions {
                 input_datasets: Some(BTreeMap::from([(
@@ -347,7 +362,7 @@ async fn test_sql_statement_alias_not_found() {
     let tempdir = tempfile::tempdir().unwrap();
     let catalog = create_catalog_with_local_workspace(
         tempdir.path(),
-        MockDatasetActionAuthorizer::allowing(),
+        MockDatasetPermissionChecker::allowing(),
     );
 
     let target = helpers::create_test_dataset(&catalog, tempdir.path(), "foo").await;
@@ -360,6 +375,7 @@ async fn test_sql_statement_alias_not_found() {
     let statement = format!("select count(*) as num_records from {dataset_alias}");
     let result = query_svc
         .sql_statement(
+            &Principal::new_test(),
             statement.as_str(),
             QueryOptions {
                 input_datasets: Some(BTreeMap::from([(
@@ -391,7 +407,7 @@ async fn test_sql_statement_with_state_simple() {
     let tempdir = tempfile::tempdir().unwrap();
     let catalog = create_catalog_with_local_workspace(
         tempdir.path(),
-        MockDatasetActionAuthorizer::allowing(),
+        MockDatasetPermissionChecker::allowing(),
     );
 
     let ctx = SessionContext::new();
@@ -440,6 +456,7 @@ async fn test_sql_statement_with_state_simple() {
     let query_svc = catalog.get_one::<dyn QueryService>().unwrap();
     let res = query_svc
         .sql_statement(
+            &Principal::new_test(),
             &format!(
                 r#"
                 select
@@ -515,6 +532,7 @@ async fn test_sql_statement_with_state_simple() {
     // Query: again with previous state info
     let res = query_svc
         .sql_statement(
+            &Principal::new_test(),
             &format!(
                 r#"
                 select
@@ -565,6 +583,7 @@ async fn test_sql_statement_with_state_simple() {
     // Query: again without state info
     let res = query_svc
         .sql_statement(
+            &Principal::new_test(),
             &format!(
                 r#"
                 select
@@ -606,7 +625,7 @@ async fn test_sql_statement_with_state_cte() {
     let tempdir = tempfile::tempdir().unwrap();
     let catalog = create_catalog_with_local_workspace(
         tempdir.path(),
-        MockDatasetActionAuthorizer::allowing(),
+        MockDatasetPermissionChecker::allowing(),
     );
 
     let ctx = SessionContext::new();
@@ -695,6 +714,7 @@ async fn test_sql_statement_with_state_cte() {
     let query_svc = catalog.get_one::<dyn QueryService>().unwrap();
     let res = query_svc
         .sql_statement(
+            &Principal::new_test(),
             &format!(
                 r#"
                 with concat as (
@@ -816,6 +836,7 @@ async fn test_sql_statement_with_state_cte() {
     let query_svc = catalog.get_one::<dyn QueryService>().unwrap();
     let res2 = query_svc
         .sql_statement(
+            &Principal::new_test(),
             &format!(
                 r#"
                 with concat as (
@@ -856,6 +877,7 @@ async fn test_sql_statement_with_state_cte() {
     let query_svc = catalog.get_one::<dyn QueryService>().unwrap();
     let res2 = query_svc
         .sql_statement(
+            &Principal::new_test(),
             &format!(
                 r#"
                 with concat as (
@@ -913,6 +935,7 @@ async fn test_sql_statement_with_state_cte() {
     let query_svc = catalog.get_one::<dyn QueryService>().unwrap();
     let res2 = query_svc
         .sql_statement(
+            &Principal::new_test(),
             r#"
             with concat as (
                 select * from fooz
@@ -993,7 +1016,7 @@ async fn test_sql_statement_with_schema_migration() {
     let tempdir = tempfile::tempdir().unwrap();
     let catalog = create_catalog_with_local_workspace(
         tempdir.path(),
-        MockDatasetActionAuthorizer::allowing(),
+        MockDatasetPermissionChecker::allowing(),
     );
 
     let time_source = catalog.get_one::<SystemTimeSourceStub>().unwrap();
@@ -1064,6 +1087,7 @@ async fn test_sql_statement_with_schema_migration() {
     let query_svc = catalog.get_one::<dyn QueryService>().unwrap();
     let res = query_svc
         .sql_statement(
+            &Principal::new_test(),
             &format!(
                 r#"
                 select * from {foo_alias}
@@ -1153,6 +1177,7 @@ async fn test_sql_statement_with_schema_migration() {
     let query_svc = catalog.get_one::<dyn QueryService>().unwrap();
     let res = query_svc
         .sql_statement(
+            &Principal::new_test(),
             &format!(
                 r#"
                 select * from {foo_alias}

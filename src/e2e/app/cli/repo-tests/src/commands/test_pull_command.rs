@@ -8,17 +8,24 @@
 // by the Apache License, Version 2.0.
 
 use std::ffi::OsStr;
+use std::path::PathBuf;
 
 use kamu_cli_e2e_common::{
     DATASET_DERIVATIVE_LEADERBOARD_NAME,
+    DATASET_DERIVATIVE_LEADERBOARD_QUERY,
     DATASET_DERIVATIVE_LEADERBOARD_SNAPSHOT_STR,
     DATASET_ROOT_PLAYER_NAME,
     DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_1,
     DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_2,
     DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR,
+    KamuCliPuppetFixturesExt,
+    city_population_root_snapshot,
+    leaderboard_set_transform_event,
 };
 use kamu_cli_puppet::KamuCliPuppet;
-use kamu_cli_puppet::extensions::KamuCliPuppetExt;
+use kamu_cli_puppet::extensions::{KamuCliPuppetExt, RepoAlias};
+
+use crate::mock_csv_source::MockCsvSource;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -130,6 +137,508 @@ pub async fn test_pull_derivative_st(kamu: KamuCliPuppet) {
 
 pub async fn test_pull_derivative_mt(kamu: KamuCliPuppet) {
     test_pull_derivative(kamu).await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// test_pull_derivative_reports_why_it_cannot_run
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_pull_derivative_reports_why_it_cannot_run(kamu: KamuCliPuppet) {
+    let root_name = DATASET_ROOT_PLAYER_NAME.as_str();
+    kamu.execute_with_input(["add", "--stdin"], DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR)
+        .await
+        .success();
+    kamu.execute_with_input(
+        ["add", "--stdin"],
+        DATASET_DERIVATIVE_LEADERBOARD_SNAPSHOT_STR,
+    )
+    .await
+    .success();
+    kamu.execute_with_input(
+        ["add", "--stdin"],
+        indoc::indoc!(
+            r#"
+            kind: DatasetSnapshot
+            version: 1
+            content:
+              name: no-transform
+              kind: Derivative
+              metadata: []
+            "#
+        ),
+    )
+    .await
+    .success();
+
+    let derivative_name = DATASET_DERIVATIVE_LEADERBOARD_NAME.as_str();
+    kamu.assert_failure_stderr_in_order(
+        "never pulled root",
+        &["pull", derivative_name],
+        None,
+        &[
+            "Failed to update 1 dataset(s)",
+            &format!(
+                "Failed to pull {derivative_name}: Input dataset {root_name} has no data yet, \
+                 pull it first"
+            ),
+        ],
+    )
+    .await;
+    kamu.assert_failure_stderr_in_order(
+        "without transform, with other datasets",
+        &["pull", "no-transform", root_name],
+        None,
+        &["Failed to pull no-transform: Dataset does not define a transform"],
+    )
+    .await;
+
+    // The engine is only looked up once there is input data to transform
+    kamu.ingest_data(
+        &DATASET_ROOT_PLAYER_NAME,
+        DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_1,
+    )
+    .await;
+    kamu.execute_with_input(
+        ["add", "--stdin", "--name", "unknown-engine"],
+        DATASET_DERIVATIVE_LEADERBOARD_SNAPSHOT_STR
+            .replace("engine: datafusion", "engine: no-such-engine"),
+    )
+    .await
+    .success();
+    kamu.assert_failure_stderr_in_order(
+        "unknown engine",
+        &["pull", "unknown-engine"],
+        None,
+        &["Failed to pull unknown-engine: Unsupported engine no-such-engine"],
+    )
+    .await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// test_pull_failed_alias_save_creates_no_dataset
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_pull_failed_alias_save_creates_no_dataset(kamu: KamuCliPuppet) {
+    let source = KamuCliPuppet::new_workspace_tmp_single_tenant().await;
+    source
+        .execute_with_input(["add", "--stdin"], DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR)
+        .await
+        .success();
+    let dataset_name = DATASET_ROOT_PLAYER_NAME.as_str();
+    source
+        .execute_with_input(
+            [
+                "ingest",
+                dataset_name,
+                "--stdin",
+                "--source-name",
+                "default",
+            ],
+            DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_1,
+        )
+        .await
+        .success();
+
+    let dataset_url = kamu.workspace_dataset_url("repo", dataset_name);
+    source
+        .execute(["push", dataset_name, "--to", dataset_url.as_str()])
+        .await
+        .success();
+
+    // A directory where the dataset's alias config belongs makes saving the
+    // pull alias fail after the dataset is created in the same transaction
+    let dataset_id = &source.list_datasets().await[0].id;
+    let alias_config_path = kamu.dataset_alias_config_path(dataset_id);
+    std::fs::create_dir_all(&alias_config_path).unwrap();
+
+    let sync_failure = format!(
+        "Failed to sync {dataset_name} from {}",
+        regex::escape(dataset_url.as_str())
+    );
+    kamu.assert_failure_command_execution(
+        ["pull", dataset_url.as_str()],
+        None,
+        Some([r#"Failed to update 1 dataset\(s\)"#, sync_failure.as_str()]),
+    )
+    .await;
+    std::fs::remove_dir_all(&alias_config_path).unwrap();
+    assert_eq!(kamu.list_datasets().await.len(), 0);
+
+    // The next pull continues into the transferred blocks and saves the alias
+    kamu.execute(["pull", dataset_url.as_str()]).await.success();
+
+    let datasets = kamu.list_datasets().await;
+    assert_eq!(datasets.len(), 1);
+    assert_eq!(datasets[0].name.as_str(), dataset_name);
+    pretty_assertions::assert_eq!(
+        kamu.get_list_of_repo_aliases(&odf::DatasetRef::from(datasets[0].name.clone()))
+            .await,
+        [RepoAlias {
+            dataset: odf::DatasetAlias::new(None, datasets[0].name.clone()),
+            kind: "Pull".to_string(),
+            alias: dataset_url.to_string(),
+        }]
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// test_pull_reports_progress_before_failed_iteration
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_pull_reports_progress_before_failed_iteration(kamu: KamuCliPuppet) {
+    kamu.add_city_population_files_dataset("test.pull-from-files")
+        .await;
+
+    // One file per iteration; the third does not parse
+    for (i, row) in ["A,1000", "B,2000", "C,not-a-number"].iter().enumerate() {
+        let path = kamu.workspace_path().join(format!("data-{}.csv", i + 1));
+        std::fs::write(path, format!("city,population\n{row}\n")).unwrap();
+    }
+
+    kamu.assert_failure_command_execution(
+        ["pull", "test.pull-from-files"],
+        None,
+        Some([
+            r#"Failed to update 1 dataset\(s\)"#,
+            r#"Ingested 3 block\(s\) with 2 record\(s\) before failing"#,
+        ]),
+    )
+    .await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// test_pull_multiple_datasets_with_mixed_outcomes
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_pull_multiple_datasets_with_mixed_outcomes(mut kamu: KamuCliPuppet) {
+    let [alice, bob] = kamu.create_accounts(["alice", "bob"]).await;
+
+    std::fs::write(kamu.workspace_path().join("data.csv"), DATASET_INGEST_DATA).unwrap();
+    let file_source_snapshot = DATASET_SNAPSHOT_STR.replace(
+        "${{ env.data_dir || env.workspace_dir }}",
+        &kamu.workspace_path().display().to_string(),
+    );
+    let add_dataset_with_visibility =
+        async |kamu: &KamuCliPuppet, name: &str, snapshot: &str, visibility: &str| {
+            kamu.execute_with_input(
+                ["add", "--stdin", "--name", name, "--visibility", visibility],
+                snapshot,
+            )
+            .await
+            .success();
+        };
+    let add_dataset = async |kamu: &KamuCliPuppet, name: &str, snapshot: &str| {
+        add_dataset_with_visibility(kamu, name, snapshot, "public").await;
+    };
+
+    kamu.set_account(Some(bob));
+    add_dataset(&kamu, "b", &file_source_snapshot).await;
+    add_dataset_with_visibility(&kamu, "p", &file_source_snapshot, "private").await;
+
+    kamu.set_account(Some(alice));
+    add_dataset(&kamu, "a", &file_source_snapshot).await;
+    add_dataset(&kamu, "c", DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR).await;
+    let gone_url = kamu.workspace_dataset_url("gone", "c");
+    kamu.execute([
+        "repo",
+        "alias",
+        "add",
+        "--pull",
+        "alice/c",
+        gone_url.as_str(),
+    ])
+    .await
+    .success();
+
+    // A dataset the account can read but not update keeps the permission error,
+    // one it cannot read is reported as not found
+    let gone_url_str = gone_url.as_str();
+    kamu.assert_failure_command_execution(
+        ["pull", "alice/a", "bob/b", "bob/p", "alice/c"],
+        None,
+        Some([
+            r#"1 dataset\(s\) updated"#,
+            r#"Failed to update 3 dataset\(s\)"#,
+            regex::escape("User has no 'write' permission in dataset 'bob/b'").as_str(),
+            regex::escape("Failed to pull bob/p: Dataset not found: bob/p").as_str(),
+            regex::escape(&format!(
+                "Failed to sync alice/c from {gone_url_str}: Dataset {gone_url_str}/ not found"
+            ))
+            .as_str(),
+        ]),
+    )
+    .await;
+    kamu.assert_success_command_execution(
+        [
+            "sql",
+            "--output-format",
+            "csv",
+            "-c",
+            r#"SELECT count(*) AS num_records FROM "alice/a""#,
+        ],
+        Some("num_records\n3"),
+        None::<Vec<&str>>,
+    )
+    .await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// test_pull_set_watermark_keeps_source_state
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_pull_set_watermark_keeps_source_state(kamu: KamuCliPuppet) {
+    kamu.add_city_population_files_dataset("test.pull-from-files")
+        .await;
+    std::fs::write(
+        kamu.workspace_path().join("data-1.csv"),
+        "city,population\nA,1000\n",
+    )
+    .unwrap();
+
+    kamu.assert_success_command_execution(
+        ["pull", "test.pull-from-files"],
+        None,
+        Some([r#"1 dataset\(s\) updated"#]),
+    )
+    .await;
+    kamu.assert_success_command_execution(
+        [
+            "pull",
+            "test.pull-from-files",
+            "--set-watermark",
+            "2051-01-02T03:04:05Z",
+        ],
+        None,
+        Some(["Committed new block"]),
+    )
+    .await;
+
+    // The file read before the watermark was set is not read again. Without a
+    // source state the dataset would be uncacheable and a forced fetch would
+    // read it once more
+    kamu.assert_success_command_execution(
+        ["pull", "test.pull-from-files", "--fetch-uncacheable"],
+        None,
+        Some([r#"1 dataset\(s\) up-to-date"#]),
+    )
+    .await;
+    kamu.assert_success_command_execution(
+        [
+            "sql",
+            "--output-format",
+            "csv",
+            "-c",
+            r#"SELECT count(*) AS num_records FROM "test.pull-from-files""#,
+        ],
+        Some("num_records\n1"),
+        None::<Vec<&str>>,
+    )
+    .await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// test_pull_datasets_sharing_a_fetch_step_keep_own_source_state
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_pull_datasets_sharing_a_fetch_step_keep_own_source_state(kamu: KamuCliPuppet) {
+    for dataset_name in ["test.first", "test.second"] {
+        kamu.add_city_population_files_dataset(dataset_name).await;
+    }
+    let write_file = |name: &str, city: &str| {
+        std::fs::write(
+            kamu.workspace_path().join(name),
+            format!("city,population\n{city},1000\n"),
+        )
+        .unwrap();
+    };
+
+    write_file("data-1.csv", "A");
+    kamu.assert_success_command_execution(
+        ["pull", "test.first"],
+        None,
+        Some([r#"1 dataset\(s\) updated"#]),
+    )
+    .await;
+
+    // The first dataset reads only the new file, the second one reads both
+    write_file("data-2.csv", "B");
+    kamu.assert_success_command_execution(
+        ["pull", "test.first", "test.second"],
+        None,
+        Some([r#"2 dataset\(s\) updated"#]),
+    )
+    .await;
+    kamu.assert_success_command_execution(
+        ["pull", "test.first", "test.second", "--fetch-uncacheable"],
+        None,
+        Some([r#"2 dataset\(s\) up-to-date"#]),
+    )
+    .await;
+
+    for dataset_name in ["test.first", "test.second"] {
+        kamu.assert_success_command_execution(
+            [
+                "sql",
+                "--output-format",
+                "csv",
+                "-c",
+                &format!(r#"SELECT city FROM "{dataset_name}" ORDER BY city"#),
+            ],
+            Some("city\nA\nB"),
+            None::<Vec<&str>>,
+        )
+        .await;
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// test_pull_remote_by_id_fails
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_pull_remote_by_id_fails(kamu: KamuCliPuppet) {
+    let dataset_name = DATASET_ROOT_PLAYER_NAME.as_str();
+    let repo_url = kamu.workspace_dir_url("repo");
+    kamu.execute(["repo", "add", "some-repo", repo_url.as_str()])
+        .await
+        .success();
+    let remote_ref = format!(
+        "some-repo/{}",
+        odf::DatasetID::new_seeded_ed25519(b"remote").as_did_str()
+    );
+
+    kamu.assert_failure_command_execution(
+        ["pull", &remote_ref],
+        None,
+        Some([
+            r#"Failed to update 1 dataset\(s\)"#,
+            regex::escape(&format!(
+                "Failed to sync dataset from {remote_ref}: Unable to infer a local name from \
+                 {remote_ref}, please specify the destination explicitly"
+            ))
+            .as_str(),
+        ]),
+    )
+    .await;
+
+    kamu.execute_with_input(["add", "--stdin"], DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR)
+        .await
+        .success();
+    kamu.execute(["repo", "alias", "add", "--pull", dataset_name, &remote_ref])
+        .await
+        .success();
+
+    kamu.assert_failure_command_execution(
+        ["pull", dataset_name],
+        None,
+        Some([
+            r#"Failed to update 1 dataset\(s\)"#,
+            regex::escape(&format!(
+                "Failed to sync {dataset_name} from {remote_ref}: Syncing remote dataset by ID is \
+                 not yet supported: {remote_ref}"
+            ))
+            .as_str(),
+        ]),
+    )
+    .await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// test_pull_uncacheable_source
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_pull_uncacheable_source(kamu: KamuCliPuppet) {
+    // A source without `ETag` or `Last-Modified` records no source state, so
+    // once it has data it is uncacheable
+    let source = MockCsvSource::start("city,population\nA,1000\n").await;
+
+    let snapshot = city_population_root_snapshot(
+        "test.pull-uncacheable",
+        &format!(r#"{{ kind: Url, url: "{}" }}"#, source.url()),
+    );
+    kamu.execute_with_input(["add", "--stdin"], snapshot)
+        .await
+        .success();
+
+    kamu.assert_success_command_execution(
+        ["pull", "test.pull-uncacheable"],
+        None,
+        Some([r#"1 dataset\(s\) updated"#]),
+    )
+    .await;
+
+    source.replace("city,population\nB,2000\n").await;
+    kamu.assert_success_command_execution(
+        ["pull", "test.pull-uncacheable"],
+        None,
+        Some([r#"1 dataset\(s\) up-to-date"#]),
+    )
+    .await;
+    kamu.assert_success_command_execution(
+        ["pull", "test.pull-uncacheable", "--fetch-uncacheable"],
+        None,
+        Some([r#"1 dataset\(s\) updated"#]),
+    )
+    .await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// test_pull_derivative_after_inputs_changed_fails
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_pull_derivative_after_inputs_changed_fails(kamu: KamuCliPuppet) {
+    kamu.add_player_scores_with_derivative().await;
+    kamu.execute(["pull", DATASET_DERIVATIVE_LEADERBOARD_NAME.as_str()])
+        .await
+        .success();
+
+    let other_name = odf::DatasetName::new_unchecked("other-scores");
+    kamu.execute_with_input(
+        ["add", "--stdin"],
+        DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR
+            .replace("name: player-scores", "name: other-scores"),
+    )
+    .await
+    .success();
+    kamu.ingest_data(
+        &other_name,
+        DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_2,
+    )
+    .await;
+    kamu.commit_event(
+        &DATASET_DERIVATIVE_LEADERBOARD_NAME,
+        &leaderboard_set_transform_event(
+            &kamu.get_dataset_id(&other_name).await,
+            DATASET_DERIVATIVE_LEADERBOARD_QUERY,
+        ),
+    )
+    .await;
+
+    kamu.assert_failure_command_execution(
+        ["pull", DATASET_DERIVATIVE_LEADERBOARD_NAME.as_str()],
+        None,
+        Some([
+            "Failed to pull leaderboard: Transform of leaderboard changed its inputs since it \
+             last ran, which is not supported yet",
+        ]),
+    )
+    .await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// test_pull_derivative_leaves_no_working_files
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_pull_derivative_leaves_no_working_files(kamu: KamuCliPuppet) {
+    kamu.add_player_scores_with_derivative().await;
+
+    kamu.assert_success_command_execution(
+        ["pull", DATASET_DERIVATIVE_LEADERBOARD_NAME.as_str()],
+        None,
+        Some([r#"1 dataset\(s\) updated"#]),
+    )
+    .await;
+
+    pretty_assertions::assert_eq!(Vec::<PathBuf>::new(), kamu.list_run_dir());
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -248,22 +757,7 @@ async fn test_pull_reset_derivative(kamu: KamuCliPuppet) {
     let dataset_derivative_alias =
         odf::DatasetAlias::new(None, DATASET_DERIVATIVE_LEADERBOARD_NAME.clone());
 
-    kamu.execute_with_input(["add", "--stdin"], DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR)
-        .await
-        .success();
-
-    kamu.execute_with_input(
-        ["add", "--stdin"],
-        DATASET_DERIVATIVE_LEADERBOARD_SNAPSHOT_STR,
-    )
-    .await
-    .success();
-
-    kamu.ingest_data(
-        &dataset_alias.dataset_name,
-        DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_1,
-    )
-    .await;
+    kamu.add_player_scores_with_derivative().await;
 
     kamu.assert_success_command_execution(
         ["pull", dataset_derivative_alias.dataset_name.as_str()],
@@ -319,7 +813,10 @@ async fn test_pull_reset_derivative(kamu: KamuCliPuppet) {
     kamu.assert_failure_command_execution(
         ["pull", dataset_derivative_alias.dataset_name.as_str()],
         None,
-        Some([r#"Failed to update 1 dataset\(s\)"#]),
+        Some([
+            r#"Failed to update 1 dataset\(s\)"#,
+            r#"Failed to pull ([^ ]+/)?leaderboard: Invalid block interval .* in input dataset ([^ ]+/)?player-scores"#,
+        ]),
     )
     .await;
 
@@ -357,30 +854,46 @@ async fn test_pull_reset_derivative(kamu: KamuCliPuppet) {
         expected_derivative_data,
     )
     .await;
+
+    // Compacting the root again diverges the derivative once more; with no new
+    // input data, the reset leaves the derivative empty
+    kamu.execute([
+        "--yes",
+        "system",
+        "compact",
+        dataset_alias.dataset_name.as_str(),
+        "--hard",
+        "--keep-metadata-only",
+    ])
+    .await
+    .success();
+    kamu.assert_success_command_execution(
+        [
+            "pull",
+            dataset_derivative_alias.dataset_name.as_str(),
+            "--reset-derivatives-on-diverged-input",
+        ],
+        None,
+        Some([r#"1 dataset\(s\) updated"#]),
+    )
+    .await;
+    pretty_assertions::assert_eq!(
+        0,
+        kamu.list_datasets()
+            .await
+            .into_iter()
+            .find(|dataset| dataset.name == dataset_derivative_alias.dataset_name)
+            .unwrap()
+            .records
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 async fn test_pull_derivative(kamu: KamuCliPuppet) {
-    let dataset_name = DATASET_ROOT_PLAYER_NAME.clone();
     let dataset_derivative_name = DATASET_DERIVATIVE_LEADERBOARD_NAME.clone();
 
-    kamu.execute_with_input(["add", "--stdin"], DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR)
-        .await
-        .success();
-
-    kamu.execute_with_input(
-        ["add", "--stdin"],
-        DATASET_DERIVATIVE_LEADERBOARD_SNAPSHOT_STR,
-    )
-    .await
-    .success();
-
-    kamu.ingest_data(
-        &dataset_name,
-        DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_1,
-    )
-    .await;
+    kamu.add_player_scores_with_derivative().await;
 
     kamu.assert_success_command_execution(
         [

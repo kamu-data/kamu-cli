@@ -23,7 +23,7 @@ use crate::utils::cached_object::CachedObject;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct VerificationServiceImpl {
-    transform_request_planner: Arc<dyn TransformRequestPlanner>,
+    transform_planner: Arc<dyn TransformPlanner>,
     transform_executor: Arc<dyn TransformExecutor>,
 }
 
@@ -31,11 +31,11 @@ pub struct VerificationServiceImpl {
 #[interface(dyn VerificationService)]
 impl VerificationServiceImpl {
     pub fn new(
-        transform_request_planner: Arc<dyn TransformRequestPlanner>,
+        transform_planner: Arc<dyn TransformPlanner>,
         transform_executor: Arc<dyn TransformExecutor>,
     ) -> Self {
         Self {
-            transform_request_planner,
+            transform_planner,
             transform_executor,
         }
     }
@@ -138,48 +138,48 @@ impl VerificationServiceImpl {
                         }
                     }
                 }
+            }
 
-                if let Some(checkpoint) = block.event.new_checkpoint {
-                    // Check size
-                    let size_actual = resolved_dataset
-                        .as_checkpoint_repo()
-                        .get_size(&checkpoint.physical_hash)
-                        .await
-                        .int_err()?;
+            if let Some(checkpoint) = block.event.new_checkpoint {
+                // Check size
+                let size_actual = resolved_dataset
+                    .as_checkpoint_repo()
+                    .get_size(&checkpoint.physical_hash)
+                    .await
+                    .int_err()?;
 
-                    if size_actual != checkpoint.size {
-                        return Err(VerificationError::CheckpointDoesNotMatchMetadata(
-                            CheckpointDoesNotMatchMetadata {
-                                block_hash,
-                                error: CheckpointVerificationError::SizeMismatch {
-                                    expected: checkpoint.size,
-                                    actual: size_actual,
-                                },
+                if size_actual != checkpoint.size {
+                    return Err(VerificationError::CheckpointDoesNotMatchMetadata(
+                        CheckpointDoesNotMatchMetadata {
+                            block_hash,
+                            error: CheckpointVerificationError::SizeMismatch {
+                                expected: checkpoint.size,
+                                actual: size_actual,
                             },
-                        ));
-                    }
+                        },
+                    ));
+                }
 
-                    // Check physical hash
-                    let checkpoint_hashing_helper = CachedObject::from(
-                        &checkpoint.physical_hash,
-                        resolved_dataset.as_checkpoint_repo(),
-                    )
-                    .await?;
+                // Check physical hash
+                let checkpoint_hashing_helper = CachedObject::from(
+                    &checkpoint.physical_hash,
+                    resolved_dataset.as_checkpoint_repo(),
+                )
+                .await?;
 
-                    let physical_hash_actual =
-                        checkpoint_hashing_helper.physical_hash().await.int_err()?;
+                let physical_hash_actual =
+                    checkpoint_hashing_helper.physical_hash().await.int_err()?;
 
-                    if physical_hash_actual != checkpoint.physical_hash {
-                        return Err(VerificationError::CheckpointDoesNotMatchMetadata(
-                            CheckpointDoesNotMatchMetadata {
-                                block_hash,
-                                error: CheckpointVerificationError::PhysicalHashMismatch {
-                                    expected: checkpoint.physical_hash,
-                                    actual: physical_hash_actual,
-                                },
+                if physical_hash_actual != checkpoint.physical_hash {
+                    return Err(VerificationError::CheckpointDoesNotMatchMetadata(
+                        CheckpointDoesNotMatchMetadata {
+                            block_hash,
+                            error: CheckpointVerificationError::PhysicalHashMismatch {
+                                expected: checkpoint.physical_hash,
+                                actual: physical_hash_actual,
                             },
-                        ));
-                    }
+                        },
+                    ));
                 }
             }
 
@@ -315,7 +315,7 @@ impl VerificationService for VerificationServiceImpl {
                 && request.options.replay_transformations
             {
                 let plan = self
-                    .transform_request_planner
+                    .transform_planner
                     .build_transform_verification_plan(
                         request.target.clone(),
                         request.block_range.clone(),

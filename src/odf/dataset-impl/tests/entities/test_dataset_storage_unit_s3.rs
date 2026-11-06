@@ -58,6 +58,20 @@ async fn test_store_dataset() {
 
 #[test_group::group(containerized)]
 #[tokio::test]
+async fn test_store_dataset_takes_over_headless() {
+    let s3 = LocalS3Server::new().await;
+    let harness = S3StorageUnitHarness::create(&s3, false);
+
+    test_dataset_storage_unit_shared::test_store_dataset_takes_over_headless(
+        harness.storage_unit.as_ref(),
+    )
+    .await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_group::group(containerized)]
+#[tokio::test]
 async fn test_delete_dataset() {
     let s3 = LocalS3Server::new().await;
     let harness = S3StorageUnitHarness::create(&s3, false);

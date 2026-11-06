@@ -21,10 +21,10 @@ use kamu_adapter_http::platform::{FileDownloadServiceJwt, UploadServiceLocal};
 use kamu_core::*;
 use kamu_datasets::{
     DatasetStatisticsRepository,
-    MockDatasetActionAuthorizer,
+    MockDatasetPermissionChecker,
     VersionedFilesConfig,
 };
-use kamu_datasets_services::*;
+use kamu_datasets_services::{DatasetOperationGuardImpl, *};
 use messaging_outbox::OutboxProvider;
 use serde_json::json;
 
@@ -1078,14 +1078,14 @@ impl GraphQLDatasetsHarness {
     pub async fn new(
         tenancy_config: TenancyConfig,
         outbox_provider: Option<OutboxProvider>,
-        mock_dataset_action_authorizer: Option<MockDatasetActionAuthorizer>,
+        mock_dataset_permission_checker: Option<MockDatasetPermissionChecker>,
         #[builder(default = PredefinedAccountOpts::default())]
         predefined_account_opts: PredefinedAccountOpts,
     ) -> Self {
         let base_gql_harness = BaseGQLDatasetHarness::builder()
             .tenancy_config(tenancy_config)
             .maybe_outbox_provider(outbox_provider)
-            .maybe_mock_dataset_action_authorizer(mock_dataset_action_authorizer)
+            .maybe_mock_dataset_permission_checker(mock_dataset_permission_checker)
             .build();
 
         let cache_dir = base_gql_harness.temp_dir().join("cache");
@@ -1108,6 +1108,7 @@ impl GraphQLDatasetsHarness {
             .add::<kamu::PushIngestDataUseCaseImpl>()
             .add::<FindVersionedFileVersionUseCaseImpl>()
             .add::<UpdateVersionedFileUseCaseImpl>()
+            .add::<DatasetOperationGuardImpl>()
             .add::<ViewVersionedFileHistoryUseCaseImpl>()
             .add::<UploadServiceLocal>()
             .add::<FileDownloadServiceJwt>()

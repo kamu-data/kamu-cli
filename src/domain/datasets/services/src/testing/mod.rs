@@ -8,17 +8,23 @@
 // by the Apache License, Version 2.0.
 
 mod classify_by_allowance_ids_response_test_helper;
+mod concurrent_head_move;
+mod failing_dataset_change_listener;
 mod fake_connecting_dataset_entry_writer;
 mod fake_dataset_entry_service;
 mod fake_dataset_reference_service;
 mod fake_dependency_graph_indexer;
-mod owner_by_alias_dataset_action_authorizer;
+mod racing_append_dataset_metadata_batch_use_case;
+mod racing_dataset_head_committer;
 mod test_dataset_outbox_listener;
 
 pub use classify_by_allowance_ids_response_test_helper::*;
+use concurrent_head_move::*;
+pub use failing_dataset_change_listener::*;
 pub use fake_connecting_dataset_entry_writer::*;
 pub use fake_dataset_entry_service::*;
 pub use fake_dataset_reference_service::*;
 pub use fake_dependency_graph_indexer::*;
-pub use owner_by_alias_dataset_action_authorizer::*;
+pub use racing_append_dataset_metadata_batch_use_case::*;
+pub use racing_dataset_head_committer::*;
 pub use test_dataset_outbox_listener::*;

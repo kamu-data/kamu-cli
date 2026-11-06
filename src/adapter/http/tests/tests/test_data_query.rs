@@ -1885,6 +1885,7 @@ impl DataQueryHarness {
             tenancy_config: TenancyConfig::MultiTenant,
             authorized_writes: true,
             base_catalog: Some(catalog),
+            ..ServerSideHarnessOptions::default()
         })
         .await;
 

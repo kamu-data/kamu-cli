@@ -43,11 +43,14 @@ use kamu_core::{
 use kamu_datasets::{
     DatasetRegistry,
     ExtraDataFields,
-    MockDatasetActionAuthorizer,
+    MockDatasetPermissionChecker,
     ResolvedDataset,
 };
-use kamu_datasets_inmem::InMemoryDatasetStatisticsRepository;
-use kamu_datasets_services::{AccountQuotaCheckerStorageImpl, DatasetStatisticsServiceImpl};
+use kamu_datasets_services::{
+    AccountQuotaCheckerStorageImpl,
+    DatasetHeadCommitterImpl,
+    DatasetStatisticsServiceImpl,
+};
 use messaging_outbox::DummyOutboxImpl;
 use odf::dataset::testing::create_test_dataset_from_snapshot;
 use time_source::SystemTimeSource;
@@ -73,13 +76,15 @@ impl PushSourceDatasetBaseUseCaseHarness {
         let base_use_case_harness = BaseUseCaseHarness::new(
             BaseUseCaseHarnessOptions::new()
                 .without_outbox()
-                .with_maybe_authorizer(Some(MockDatasetActionAuthorizer::new())),
+                .with_maybe_permission_checker(Some(MockDatasetPermissionChecker::allowing())),
         );
 
         let mut b = dill::CatalogBuilder::new_chained(base_use_case_harness.catalog());
+        kamu_datasets_inmem::register_dependencies(&mut b);
 
         let catalog = b
             .add::<PushIngestDataUseCaseImpl>()
+            .add::<DatasetHeadCommitterImpl>()
             .add::<PushIngestExecutorImpl>()
             .add::<PushIngestPlannerImpl>()
             .add::<DataFormatRegistryImpl>()
@@ -92,7 +97,6 @@ impl PushSourceDatasetBaseUseCaseHarness {
             .add::<InMemoryAccountRepository>()
             .add::<InMemoryAccountQuotaEventStore>()
             .add::<AccountQuotaServiceImpl>()
-            .add::<InMemoryDatasetStatisticsRepository>()
             .add::<DatasetStatisticsServiceImpl>()
             .add_value(kamu_datasets_services::QuotaDefaultsConfig::default())
             .add::<AccountQuotaCheckerStorageImpl>()

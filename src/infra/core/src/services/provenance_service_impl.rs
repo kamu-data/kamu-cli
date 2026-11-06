@@ -14,9 +14,10 @@ use std::sync::Arc;
 
 use dill::*;
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
+use kamu_accounts::Principal;
 use kamu_auth_rebac::{RebacDatasetIdUnresolvedError, RebacDatasetRegistryFacade};
 use kamu_core::*;
-use kamu_datasets::{DatasetAction, DatasetRegistry, DependencyGraphService};
+use kamu_datasets::{DatasetPermission, DatasetRegistry, DependencyGraphService};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -44,12 +45,13 @@ impl ProvenanceServiceImpl {
     #[async_recursion::async_recursion]
     async fn visit_upstream_dependencies_rec(
         &self,
+        principal: &Principal,
         dataset_handle: &odf::DatasetHandle,
         visitor: &mut dyn LineageVisitor,
     ) -> Result<(), GetLineageError> {
         let target = self
             .rebac_dataset_registry_facade
-            .resolve_dataset_by_handle(dataset_handle, DatasetAction::Read)
+            .resolve_dataset_by_handle(principal, dataset_handle, DatasetPermission::Read)
             .await
             .map_err(|e| {
                 use RebacDatasetIdUnresolvedError as E;
@@ -96,7 +98,7 @@ impl ProvenanceServiceImpl {
 
         if visitor.enter(&dataset_info) {
             for input in &resolved_inputs {
-                self.visit_upstream_dependencies_rec(&input.handle, visitor)
+                self.visit_upstream_dependencies_rec(principal, &input.handle, visitor)
                     .await?;
             }
 
@@ -111,6 +113,7 @@ impl ProvenanceServiceImpl {
 impl ProvenanceService for ProvenanceServiceImpl {
     async fn get_dataset_lineage(
         &self,
+        principal: &Principal,
         dataset_ref: &odf::DatasetRef,
         visitor: &mut dyn LineageVisitor,
         _options: LineageOptions,
@@ -119,7 +122,8 @@ impl ProvenanceService for ProvenanceServiceImpl {
             .dataset_registry
             .resolve_dataset_handle_by_ref(dataset_ref)
             .await?;
-        self.visit_upstream_dependencies_rec(&hdl, visitor).await
+        self.visit_upstream_dependencies_rec(principal, &hdl, visitor)
+            .await
     }
 }
 
@@ -225,3 +229,5 @@ impl DotStyle for DefaultStyle {
         "style=filled, fillcolor=gray".to_string()
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

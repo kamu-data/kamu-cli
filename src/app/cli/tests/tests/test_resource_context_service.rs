@@ -11,7 +11,7 @@ use std::assert_matches;
 use std::sync::Arc;
 
 use dill::{CatalogBuilder, Component as _};
-use kamu_accounts::CurrentAccountSubject;
+use kamu_accounts::{CurrentAccountSubject, CurrentAccountSubjectCatalogExt as _};
 use kamu_cli::resource_context::{
     CLIResourceContextStore,
     CurrentContextStateService,
@@ -355,7 +355,7 @@ content:
 
     let make_state_svc = |account: &str| {
         CatalogBuilder::new_chained(&base)
-            .add_value(CurrentAccountSubject::new_test_with(&account))
+            .add_current_account_subject(CurrentAccountSubject::new_test_with(&account))
             .add::<resource_context::CurrentContextStateService>()
             .build()
             .get_one::<CurrentContextStateService>()
@@ -440,7 +440,7 @@ impl ResourceContextHarness {
     /// specific.
     fn catalog(&self, account_name: &str) -> dill::Catalog {
         CatalogBuilder::new_chained(&self.base_catalog)
-            .add_value(CurrentAccountSubject::new_test_with(&account_name))
+            .add_current_account_subject(CurrentAccountSubject::new_test_with(&account_name))
             .add::<resource_context::ResourceContextRegistryService>()
             .add::<resource_context::CurrentContextStateService>()
             .add::<resource_context::ResourceContextResolver>()

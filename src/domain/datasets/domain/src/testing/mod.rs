@@ -7,5 +7,5 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-mod mock_dataset_action_authorizer;
 mod mock_dataset_increment_query_service;
+mod mock_dataset_permission_checker;

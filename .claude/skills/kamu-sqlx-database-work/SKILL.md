@@ -113,12 +113,15 @@ Rules that the patterns rely on:
   covers writers based on old events.
 - **Map only the unique violation** (`as_database_error()` + `is_unique_violation()`); other errors
   stay internal.
-- **Prove it with a race test** on Postgres: two `TransactionRefT`s on one pool, the first saves,
-  the second save is spawned, the first commits after a short sleep, and the second must return a
-  concurrent modification. Examples:
-  `src/infra/flow-system/postgres/tests/tests/test_postgres_flow_binding_concurrent_writes.rs`,
+- **Prove it with a race test** in the repo-tests suite, built on
+  `database_common::testing::race_transactions` and wired with
+  `database_concurrent_transactions_test!` (storages and wiring: `kamu-repository-tests`). The
+  second transaction writes while the first is open and commits after it, so every storage must
+  reject it: Postgres fails the write once the first commits, and the in-memory manager fails the
+  commit. Example: `test_update_reference_in_concurrent_transactions` in
+  `src/infra/datasets/repo-tests/src/dataset_reference_repository_test_suite.rs`. Some domains
+  have Postgres-only race tests, e.g.
   `src/infra/resources/postgres/tests/repos/test_postgres_resource_repository_concurrent_updates.rs`.
-  SQLite runs one connection per process, so the same test cannot race there.
 
 ## Local SQLx Setup
 

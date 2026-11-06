@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::collections::HashMap;
 use std::io::Write;
 use std::net::Ipv4Addr;
 use std::path::PathBuf;
@@ -87,6 +88,10 @@ pub trait KamuCliPuppetExt {
 
     async fn log_stdout(&self, dataset_name: &odf::DatasetName, args: &[&str]) -> String;
 
+    /// `HEAD` of every dataset as written to the workspace storage, which can
+    /// lag the database until the Outbox is processed
+    fn list_storage_heads(&self) -> Vec<odf::Multihash>;
+
     async fn ingest_data(&self, dataset_name: &odf::DatasetName, data: &str);
 
     async fn get_list_of_repo_aliases(&self, dataset_ref: &odf::DatasetRef) -> Vec<RepoAlias>;
@@ -115,6 +120,58 @@ pub trait KamuCliPuppetExt {
     async fn create_account(&self, account_name: &odf::AccountName);
 
     async fn delete_account(&self, account_name: &odf::AccountName) -> DeleteAccountResult;
+
+    /// Creates the accounts in a multi-tenant workspace, in the given order
+    async fn create_accounts<const N: usize>(
+        &self,
+        account_names: [&str; N],
+    ) -> [odf::AccountName; N];
+
+    /// The record of a dataset of the current account, or of any account with
+    /// `options` listing all accounts
+    async fn get_dataset_record(
+        &self,
+        dataset_name: &odf::DatasetName,
+        options: DatasetListOptions,
+    ) -> DatasetRecord;
+
+    async fn get_dataset_id(&self, dataset_name: &odf::DatasetName) -> odf::DatasetID;
+
+    /// `HEAD` of every dataset by its owner. Lists them as the default
+    /// account, which it leaves set
+    async fn list_heads_by_owner(&mut self) -> HashMap<odf::AccountName, odf::Multihash>;
+
+    async fn list_block_hashes(&self, dataset_name: &odf::DatasetName) -> Vec<odf::Multihash>;
+
+    /// Commits a metadata event through the workspace's GraphQL API
+    async fn commit_event(&self, dataset_name: &odf::DatasetName, event_yaml: &str);
+
+    /// Makes a dataset of the current account private through the workspace's
+    /// GraphQL API
+    async fn set_dataset_private(&self, dataset_name: &odf::DatasetName);
+
+    /// Runs a command that must fail and checks that its stderr contains each
+    /// of `expected_stderr` in that order, naming `case` in any assertion
+    /// failure
+    async fn assert_failure_stderr_in_order(
+        &self,
+        case: &str,
+        cmd: &[&str],
+        stdin: Option<&str>,
+        expected_stderr: &[&str],
+    ) -> OrderedStderr;
+
+    /// The directory `dir_name` of the workspace as a URL
+    fn workspace_dir_url(&self, dir_name: &str) -> Url;
+
+    /// A dataset URL in the directory `dir_name` of the workspace
+    fn workspace_dataset_url(&self, dir_name: &str, dataset_name: &str) -> Url;
+
+    /// Where the workspace keeps the alias config of a dataset
+    fn dataset_alias_config_path(&self, dataset_id: &odf::DatasetID) -> PathBuf;
+
+    /// The entries of the workspace's run directory
+    fn list_run_dir(&self) -> Vec<PathBuf>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -240,6 +297,20 @@ impl KamuCliPuppetExt for KamuCliPuppet {
                     .unwrap();
 
                 BlockRecord { block_hash, block }
+            })
+            .collect()
+    }
+
+    fn list_storage_heads(&self) -> Vec<odf::Multihash> {
+        let datasets_dir = self.workspace_path().join(".kamu").join("datasets");
+
+        std::fs::read_dir(datasets_dir)
+            .unwrap()
+            .map(|entry| entry.unwrap().path().join("refs").join("head"))
+            .filter(|head_path| head_path.is_file())
+            .map(|head_path| {
+                let head = std::fs::read_to_string(head_path).unwrap();
+                odf::Multihash::from_multibase(head.trim()).unwrap()
             })
             .collect()
     }
@@ -538,6 +609,155 @@ impl KamuCliPuppetExt for KamuCliPuppet {
             DeleteAccountResult::UnexpectedResult(res)
         }
     }
+
+    async fn create_accounts<const N: usize>(
+        &self,
+        account_names: [&str; N],
+    ) -> [odf::AccountName; N] {
+        let account_names = account_names.map(odf::AccountName::new_unchecked);
+        for account_name in &account_names {
+            self.create_account(account_name).await;
+        }
+        account_names
+    }
+
+    async fn get_dataset_record(
+        &self,
+        dataset_name: &odf::DatasetName,
+        options: DatasetListOptions,
+    ) -> DatasetRecord {
+        self.list_datasets_ex(options)
+            .await
+            .into_iter()
+            .find(|dataset| &dataset.name == dataset_name)
+            .unwrap()
+    }
+
+    async fn get_dataset_id(&self, dataset_name: &odf::DatasetName) -> odf::DatasetID {
+        self.get_dataset_record(dataset_name, DatasetListOptions::default())
+            .await
+            .id
+    }
+
+    async fn list_heads_by_owner(&mut self) -> HashMap<odf::AccountName, odf::Multihash> {
+        self.set_account(None);
+        self.list_datasets_ex(DatasetListOptions::builder().all_accounts(true).build())
+            .await
+            .into_iter()
+            .map(|d| (d.owner.unwrap(), d.head))
+            .collect()
+    }
+
+    async fn list_block_hashes(&self, dataset_name: &odf::DatasetName) -> Vec<odf::Multihash> {
+        self.list_blocks(dataset_name)
+            .await
+            .into_iter()
+            .map(|b| b.block_hash)
+            .collect()
+    }
+
+    async fn commit_event(&self, dataset_name: &odf::DatasetName, event_yaml: &str) {
+        let dataset_id = self.get_dataset_id(dataset_name).await;
+        let response = self
+            .gql_query(&format!(
+                r#"mutation {{ datasets {{ byId(datasetId: "{}") {{ metadata {{ chain {{ commitEvent(event: "{}", eventFormat: YAML) {{ __typename }} }} }} }} }} }}"#,
+                dataset_id.as_did_str(),
+                event_yaml.escape_default(),
+            ))
+            .await;
+
+        assert!(response.contains("CommitResultSuccess"), "{response}");
+    }
+
+    async fn set_dataset_private(&self, dataset_name: &odf::DatasetName) {
+        let dataset_id = self.get_dataset_id(dataset_name).await;
+        let response = self
+            .gql_query(&format!(
+                r#"mutation {{ datasets {{ byId(datasetId: "{}") {{ setVisibility(visibility: {{ private: {{}} }}) {{ __typename }} }} }} }}"#,
+                dataset_id.as_did_str(),
+            ))
+            .await;
+
+        assert!(
+            response.contains("SetDatasetVisibilityResultSuccess"),
+            "{response}"
+        );
+    }
+
+    async fn assert_failure_stderr_in_order(
+        &self,
+        case: &str,
+        cmd: &[&str],
+        stdin: Option<&str>,
+        expected_stderr: &[&str],
+    ) -> OrderedStderr {
+        let result = match stdin {
+            Some(input) => self.execute_with_input(cmd, input).await,
+            None => self.execute(cmd).await,
+        };
+        let output = result.get_output();
+        let stderr = String::from_utf8_lossy(&output.stderr).into_owned();
+
+        assert!(
+            !output.status.success(),
+            "Case '{case}': the command succeeded\n{stderr}"
+        );
+        let mut end_of_matches = 0;
+        for expected in expected_stderr {
+            let Some(found_at) = stderr[end_of_matches..].find(expected) else {
+                panic!(
+                    "Case '{case}': stderr has no '{expected}' after the earlier matches\n{stderr}"
+                );
+            };
+            end_of_matches += found_at + expected.len();
+        }
+
+        OrderedStderr {
+            stderr,
+            end_of_matches,
+        }
+    }
+
+    fn workspace_dir_url(&self, dir_name: &str) -> Url {
+        Url::from_directory_path(self.workspace_path().join(dir_name)).unwrap()
+    }
+
+    fn workspace_dataset_url(&self, dir_name: &str, dataset_name: &str) -> Url {
+        self.workspace_dir_url(dir_name).join(dataset_name).unwrap()
+    }
+
+    fn dataset_alias_config_path(&self, dataset_id: &odf::DatasetID) -> PathBuf {
+        self.workspace_path()
+            .join(".kamu")
+            .join("datasets")
+            .join(dataset_id.as_multibase().to_stack_string().as_str())
+            .join("info")
+            .join("config")
+    }
+
+    fn list_run_dir(&self) -> Vec<PathBuf> {
+        std::fs::read_dir(self.workspace_path().join(".kamu").join("run"))
+            .unwrap()
+            .map(|entry| entry.unwrap().path())
+            .collect()
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// The stderr of a failed command in which the expected parts were found in
+/// order
+#[derive(Debug)]
+pub struct OrderedStderr {
+    pub stderr: String,
+    end_of_matches: usize,
+}
+
+impl OrderedStderr {
+    /// The stderr after the last expected part
+    pub fn after_matches(&self) -> &str {
+        &self.stderr[self.end_of_matches..]
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -582,7 +802,7 @@ pub struct DatasetListOptions {
     all_accounts: bool,
 }
 
-#[derive(Debug, PartialEq, Eq, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "PascalCase", deny_unknown_fields)]
 pub struct RepoAlias {
     pub dataset: odf::DatasetAlias,

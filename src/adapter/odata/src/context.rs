@@ -25,11 +25,12 @@ use datafusion_odata::collection::{CollectionAddr, QueryParams};
 use datafusion_odata::context::{CollectionContext, OnUnsupported, ServiceContext};
 use datafusion_odata::error::{CollectionNotFound, ODataError};
 use internal_error::ResultIntoInternal;
+use kamu_accounts::Principal;
 use kamu_core::*;
 use kamu_datasets::{
-    DatasetAction,
-    DatasetActionAuthorizer,
-    DatasetActionAuthorizerExt,
+    DatasetPermission,
+    DatasetPermissionChecker,
+    DatasetPermissionCheckerExt,
     DatasetRegistry,
     ResolvedDataset,
 };
@@ -72,15 +73,19 @@ impl ServiceContext for ODataServiceContext {
         use futures::TryStreamExt;
 
         let registry: Arc<dyn DatasetRegistry> = self.catalog.get_one().unwrap();
-        let authorizer: Arc<dyn DatasetActionAuthorizer> = self.catalog.get_one().unwrap();
+        let permission_checker: Arc<dyn DatasetPermissionChecker> = self.catalog.get_one().unwrap();
+        let principal: Arc<Principal> = self.catalog.get_one().unwrap();
 
         let dataset_handles = if let Some(account_name) = &self.account_name {
             registry.all_dataset_handles_by_owner_name(account_name)
         } else {
             registry.all_dataset_handles()
         };
-        let mut readable_dataset_handles_stream =
-            authorizer.filtered_datasets_stream(dataset_handles, DatasetAction::Read);
+        let mut readable_dataset_handles_stream = permission_checker.filtered_datasets_stream(
+            &principal,
+            dataset_handles,
+            DatasetPermission::Read,
+        );
 
         let mut collections = Vec::new();
         while let Some(hdl) = readable_dataset_handles_stream
@@ -241,3 +246,5 @@ impl CollectionContext for ODataCollectionContext {
         OnUnsupported::Warn
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

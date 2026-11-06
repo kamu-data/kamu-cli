@@ -22,7 +22,11 @@ use kamu_datasets::DatasetRegistry;
 use url::Url;
 
 use crate::smart_protocol::messages::SMART_TRANSFER_PROTOCOL_VERSION;
-use crate::smart_protocol::{AxumServerPullProtocolInstance, AxumServerPushProtocolInstance};
+use crate::smart_protocol::{
+    AxumServerPullProtocolInstance,
+    AxumServerPushProtocolInstance,
+    SmartTransferProtocolServerConfig,
+};
 use crate::{BearerHeader, DatasetAliasInPath, OdfSmtpVersion, OdfSmtpVersionTyped};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -328,6 +332,10 @@ pub async fn dataset_push_ws_upgrade_handler(
 
     let server_url_config = catalog.get_one::<ServerUrlConfig>().unwrap();
     let dataset_url = get_base_dataset_url(uri, &server_url_config.protocols.base_url_rest, 1);
+    let upload_progress_interval = catalog
+        .get_one::<SmartTransferProtocolServerConfig>()
+        .unwrap()
+        .upload_progress_interval;
 
     let maybe_dataset_handle = {
         let dataset_ref = dataset_ref.clone();
@@ -338,6 +346,12 @@ pub async fn dataset_push_ws_upgrade_handler(
                     .await
                 {
                     Ok(dataset_handle) => Ok(Some(dataset_handle)),
+                    // Only a push by alias creates a dataset
+                    Err(odf::DatasetRefUnresolvedError::NotFound(e))
+                        if dataset_ref.alias().is_none() =>
+                    {
+                        Err(ApiError::not_found(e))
+                    }
                     Err(odf::DatasetRefUnresolvedError::NotFound(_)) => {
                         // Make sure account in dataset ref being created and token account match
                         let CurrentAccountSubject::Logged(acc) = current_account_subject.as_ref()
@@ -357,7 +371,7 @@ pub async fn dataset_push_ws_upgrade_handler(
             .await
     }?;
 
-    Ok(ws.on_upgrade(|socket| {
+    Ok(ws.on_upgrade(move |socket| {
         AxumServerPushProtocolInstance::new(
             socket,
             catalog,
@@ -365,6 +379,7 @@ pub async fn dataset_push_ws_upgrade_handler(
             maybe_dataset_handle,
             dataset_url,
             maybe_bearer_header,
+            upload_progress_interval,
         )
         .serve()
     }))
@@ -417,6 +432,8 @@ fn get_base_dataset_url(
     let path_string = format!("{}/", path.join("/"));
     base_url_rest.join(path_string.as_str()).unwrap()
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 fn ensure_version_compatibility(expected_version: i32) -> Result<(), ApiError> {
     if expected_version != SMART_TRANSFER_PROTOCOL_VERSION {

@@ -14,6 +14,7 @@ use kamu_cli_e2e_common::prelude::*;
 kamu_cli_execute_command_e2e_test!(
     storage = sqlite,
     fixture = kamu_cli_e2e_repo_tests::commands::test_new_root,
+    sqlite_only = "writes a snapshot file; it reads no repository"
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -21,6 +22,7 @@ kamu_cli_execute_command_e2e_test!(
 kamu_cli_execute_command_e2e_test!(
     storage = sqlite,
     fixture = kamu_cli_e2e_repo_tests::commands::test_new_derivative,
+    sqlite_only = "writes a snapshot file; it reads no repository"
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

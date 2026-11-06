@@ -12,7 +12,13 @@ use std::sync::{Arc, RwLock};
 
 use chrono::{DateTime, TimeZone, Utc};
 use init_on_startup::InitOnStartup;
-use kamu_accounts::{Account, AccountRepository, CurrentAccountSubject, DidSecretEncryptionConfig};
+use kamu_accounts::{
+    Account,
+    AccountRepository,
+    CurrentAccountSubject,
+    CurrentAccountSubjectCatalogExt as _,
+    DidSecretEncryptionConfig,
+};
 use kamu_accounts_inmem::{InMemoryAccountRepository, InMemoryDidSecretKeyRepository};
 use kamu_accounts_services::AccountServiceImpl;
 use kamu_core::TenancyConfig;
@@ -660,7 +666,7 @@ impl DatasetEntryServiceHarness {
                     b.bind::<dyn DatasetEntryRepository, MockDatasetEntryRepository>();
                 }
                 TestDatasetEntryRepository::InMemory => {
-                    b.add::<kamu_datasets_inmem::InMemoryDatasetEntryRepository>();
+                    kamu_datasets_inmem::register_dependencies(&mut b);
                 }
             }
 
@@ -680,7 +686,7 @@ impl DatasetEntryServiceHarness {
             ));
             b.bind::<dyn Outbox, OutboxImmediateImpl>();
 
-            b.add_value(CurrentAccountSubject::new_test());
+            b.add_current_account_subject(CurrentAccountSubject::new_test());
 
             b.add_value(tenancy_config);
 

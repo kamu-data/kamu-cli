@@ -7,9 +7,10 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use kamu_accounts::Principal;
 use kamu_adapter_flow_dataset as afs;
 use kamu_auth_rebac::RebacDatasetRegistryFacade;
-use kamu_datasets::{DatasetAction, ResolvedDataset};
+use kamu_datasets::{DatasetPermission, ResolvedDataset};
 use kamu_flow_system as fs;
 
 use super::FlowNotFound;
@@ -146,10 +147,11 @@ pub(crate) async fn ensure_flow_preconditions(
         }
 
         DatasetFlowType::ExecuteTransform => {
-            let (metadata_query_service, rebac_dataset_registry_facade) = from_catalog_n!(
+            let (metadata_query_service, rebac_dataset_registry_facade, principal) = from_catalog_n!(
                 ctx,
                 dyn kamu_core::MetadataQueryService,
-                dyn RebacDatasetRegistryFacade
+                dyn RebacDatasetRegistryFacade,
+                Principal
             );
             let source_res = metadata_query_service
                 .get_active_transform(resolved_dataset)
@@ -166,8 +168,9 @@ pub(crate) async fn ensure_flow_preconditions(
 
                     let classify_response = rebac_dataset_registry_facade
                         .classify_dataset_refs_by_allowance(
+                            &principal,
                             &inputs_dataset_refs,
-                            DatasetAction::Read,
+                            DatasetPermission::Read,
                         )
                         .await?;
 
@@ -193,17 +196,18 @@ pub(crate) async fn ensure_flow_preconditions(
         DatasetFlowType::Reset => {
             if let Some(reset_configuration) = reset_configuration {
                 use odf::dataset::MetadataChainExt as _;
+                let metadata_chain = resolved_dataset.as_metadata_chain();
+                let Some(current_head_hash) = metadata_chain
+                    .try_get_ref(&odf::BlockRef::Head)
+                    .await
+                    .int_err()?
+                else {
+                    return Ok(Some(FlowPreconditionsNotMet {
+                        preconditions: "Dataset does not contain any blocks".to_string(),
+                    }));
+                };
+
                 if let Some(new_head_hash) = &reset_configuration.new_head_hash() {
-                    let metadata_chain = resolved_dataset.as_metadata_chain();
-                    let current_head_hash_maybe = metadata_chain
-                        .try_get_ref(&odf::BlockRef::Head)
-                        .await
-                        .int_err()?;
-                    if current_head_hash_maybe.is_none() {
-                        return Ok(Some(FlowPreconditionsNotMet {
-                            preconditions: "Dataset does not contain any blocks".to_string(),
-                        }));
-                    }
                     if !metadata_chain
                         .contains_block(new_head_hash)
                         .await
@@ -214,11 +218,21 @@ pub(crate) async fn ensure_flow_preconditions(
                         }));
                     }
 
-                    if new_head_hash == &current_head_hash_maybe.unwrap().into() {
+                    if **new_head_hash == current_head_hash {
                         return Ok(Some(FlowPreconditionsNotMet {
                             preconditions: "Provided head hash is already a head block".to_string(),
                         }));
                     }
+                }
+
+                // The flow keeps the expected old head until it runs, so a stale one would
+                // only surface as a failed task
+                if let Some(old_head_hash) = &reset_configuration.old_head_hash
+                    && **old_head_hash != current_head_hash
+                {
+                    return Ok(Some(FlowPreconditionsNotMet {
+                        preconditions: "Expected old head hash is not the current head".to_string(),
+                    }));
                 }
             }
         }

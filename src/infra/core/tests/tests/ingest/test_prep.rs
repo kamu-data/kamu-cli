@@ -14,6 +14,8 @@ use indoc::indoc;
 use kamu::domain::PollingIngestError;
 use kamu::ingest::*;
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[test]
 fn test_prep_pipe() {
     let tempdir = tempfile::tempdir().unwrap();
@@ -68,6 +70,37 @@ fn test_prep_pipe() {
     );
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test]
+fn test_prep_pipe_command_fails() {
+    let tempdir = tempfile::tempdir().unwrap();
+
+    let src_path = tempdir.path().join("data.csv");
+    let target_path = tempdir.path().join("prepared.bin");
+    let run_info_dir = tempdir.path();
+
+    let prep_steps = vec![odf::metadata::PrepStep::Pipe(odf::metadata::PrepStepPipe {
+        command: ["sh", "-c", "cat > /dev/null; exit 3"]
+            .iter()
+            .map(|s| (*s).to_string())
+            .collect(),
+    })];
+
+    std::fs::write(&src_path, "city,population\nA,1000\n").unwrap();
+
+    let prep_svc = PrepService::new();
+
+    let res = prep_svc.prepare(&prep_steps, &src_path, &target_path, run_info_dir);
+    assert_matches!(
+        res,
+        Err(PollingIngestError::PipeError(e))
+            if e.to_string().contains("Command exited with code 3")
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[test]
 fn test_prep_decompress_zip_single_file() {
     let tempdir = tempfile::tempdir().unwrap();
@@ -114,6 +147,57 @@ fn test_prep_decompress_zip_single_file() {
     assert_eq!(std::fs::read_to_string(&target_path).unwrap(), content);
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test]
+fn test_prep_decompress_zip_sub_path() {
+    let tempdir = tempfile::tempdir().unwrap();
+
+    let src_path = tempdir.path().join("data.zip");
+    let target_path = tempdir.path().join("prepared.bin");
+    let run_info_dir = tempdir.path();
+
+    let prep_steps = vec![odf::metadata::PrepStep::Decompress(
+        odf::metadata::PrepStepDecompress {
+            format: odf::metadata::CompressionFormat::Zip,
+            sub_path: Some("data/b.csv".to_string()),
+        },
+    )];
+
+    let entries = [
+        ("a.csv", "city,population\nA,1000\n"),
+        ("data/b.csv", "city,population\nB,2000\n"),
+        ("c.csv", "city,population\nC,3000\n"),
+    ];
+
+    {
+        // Create archive
+        use zip::write::*;
+        let mut zip = ZipWriter::new(std::fs::File::create(&src_path).unwrap());
+
+        let options =
+            SimpleFileOptions::default().compression_method(zip::CompressionMethod::Deflated);
+        for (name, content) in entries {
+            zip.start_file(name, options).unwrap();
+            zip.write_all(content.as_bytes()).unwrap();
+        }
+        zip.finish().unwrap();
+    }
+
+    let prep_svc = PrepService::new();
+
+    prep_svc
+        .prepare(&prep_steps, &src_path, &target_path, run_info_dir)
+        .unwrap();
+
+    assert_eq!(
+        std::fs::read_to_string(&target_path).unwrap(),
+        "city,population\nB,2000\n"
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[test]
 fn test_prep_decompress_zip_bad_file() {
     let tempdir = tempfile::tempdir().unwrap();
@@ -136,6 +220,8 @@ fn test_prep_decompress_zip_bad_file() {
     let res = prep_svc.prepare(&prep_steps, &src_path, &target_path, run_info_dir);
     assert_matches!(res, Err(PollingIngestError::Internal(_)));
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test]
 fn test_prep_decompress_gzip() {
@@ -181,3 +267,5 @@ fn test_prep_decompress_gzip() {
     assert!(target_path.exists());
     assert_eq!(std::fs::read_to_string(&target_path).unwrap(), content);
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -7,11 +7,18 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::assert_matches;
+
 use kamu_auth_rebac::AccountToDatasetRelation;
 use kamu_cli_e2e_common::{
     AccountDataset,
     AccountRolesResponse,
     CreateDatasetResponse,
+    DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_1,
+    DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_2,
+    DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_3,
+    DATASET_ROOT_PLAYER_SCORES_SNAPSHOT,
+    DatasetByIdError,
     DatasetCollaborationAccountRolesError,
     DatasetDependencies,
     DatasetDependency,
@@ -21,6 +28,7 @@ use kamu_cli_e2e_common::{
     KamuApiServerClientExt,
     QueryError,
     QueryExecutionError,
+    RequestBody,
     ResolvedDatasetDependency,
     SetDatasetVisibilityError,
     UnresolvedDatasetDependency,
@@ -28,6 +36,7 @@ use kamu_cli_e2e_common::{
 use kamu_cli_puppet::KamuCliPuppet;
 use kamu_cli_puppet::extensions::{AddDatasetOptions, KamuCliPuppetExt};
 use odf::metadata::testing::MetadataFactory;
+use reqwest::{Method, StatusCode};
 
 use crate::utils::{generate_password, make_logged_clients};
 
@@ -1348,13 +1357,17 @@ pub async fn test_a_dataset_that_has_a_private_dependency_can_only_be_pulled_in_
     )
     .await;
 
-    kamu.assert_success_command_execution(
+    // Access is granted: the pull reaches the inputs, which have no data yet
+    kamu.assert_failure_command_execution(
         [
             "pull",
             alice_public_derivative_dataset_alias.dataset_name.as_str(),
         ],
         None,
-        Some([r#"1 dataset\(s\) up-to-date"#]),
+        Some([
+            r#"Failed to update 1 dataset\(s\)"#,
+            r#"Failed to pull alice/public-derivative-dataset-1: Input dataset alice/public-root-dataset has no data yet, pull it first"#,
+        ]),
     )
     .await;
 
@@ -1417,13 +1430,17 @@ pub async fn test_a_dataset_that_has_a_private_dependency_can_only_be_pulled_in_
     )
     .await;
 
-    kamu.assert_success_command_execution(
+    // Access is granted: the pull reaches the inputs, which have no data yet
+    kamu.assert_failure_command_execution(
         [
             "pull",
             admin_public_derivative_dataset_alias.dataset_name.as_str(),
         ],
         None,
-        Some([r#"1 dataset\(s\) up-to-date"#]),
+        Some([
+            r#"Failed to update 1 dataset\(s\)"#,
+            r#"Failed to pull admin/public-derivative-dataset-3: Input dataset alice/public-root-dataset has no data yet, pull it first"#,
+        ]),
     )
     .await;
 }
@@ -1812,8 +1829,118 @@ pub async fn test_dataset_role_is_correctly_displayed_for_the_current_user(
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_a_private_dataset_is_found_by_id_and_ingested_into_only_by_authorized_users(
+    anonymous: KamuApiServerClient,
+) {
+    let [not_owner, mut reader, mut editor, mut maintainer, owner] = make_logged_clients(
+        &anonymous,
+        ["not-owner", "reader", "editor", "maintainer", "owner"],
+    )
+    .await;
+
+    let CreateDatasetResponse {
+        dataset_id,
+        dataset_alias,
+    } = owner
+        .dataset()
+        .create_dataset_with_visibility(
+            &DATASET_ROOT_PLAYER_SCORES_SNAPSHOT,
+            odf::DatasetVisibility::Private,
+        )
+        .await;
+
+    authorize_users_by_roles(
+        &owner,
+        &[&dataset_id],
+        &mut reader,
+        &mut editor,
+        &mut maintainer,
+    )
+    .await;
+
+    for (tag, client) in [("anonymous", &anonymous), ("not_owner", &not_owner)] {
+        assert_matches!(
+            client.dataset().by_id(&dataset_id).await,
+            Err(DatasetByIdError::NotFound),
+            "Tag: {tag}",
+        );
+    }
+    for (tag, client) in [("reader", &reader), ("owner", &owner)] {
+        assert_matches!(
+            client.dataset().by_id(&dataset_id).await,
+            Ok(info) if info.id == dataset_id,
+            "Tag: {tag}",
+        );
+    }
+
+    let mut last_head = owner_head(&owner, &dataset_alias).await;
+
+    for (tag, client, data, expected_status) in [
+        (
+            "owner",
+            &owner,
+            DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_1,
+            StatusCode::OK,
+        ),
+        (
+            "editor",
+            &editor,
+            DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_2,
+            StatusCode::OK,
+        ),
+        (
+            "reader",
+            &reader,
+            DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_3,
+            StatusCode::FORBIDDEN,
+        ),
+        (
+            "not_owner",
+            &not_owner,
+            DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_3,
+            StatusCode::NOT_FOUND,
+        ),
+        (
+            "anonymous",
+            &anonymous,
+            DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_3,
+            StatusCode::NOT_FOUND,
+        ),
+    ] {
+        let response = client
+            .rest_api_call(
+                Method::POST,
+                &format!("{dataset_alias}/ingest"),
+                Some(RequestBody::NdJson(data.into())),
+            )
+            .await;
+        pretty_assertions::assert_eq!(expected_status, response.status(), "Tag: {tag}");
+
+        let head = owner_head(&owner, &dataset_alias).await;
+        pretty_assertions::assert_eq!(
+            expected_status == StatusCode::OK,
+            head != last_head,
+            "Tag: {tag}",
+        );
+        last_head = head;
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Helpers
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+async fn owner_head(
+    owner: &KamuApiServerClient,
+    dataset_alias: &odf::DatasetAlias,
+) -> odf::Multihash {
+    owner
+        .odf_transfer()
+        .metadata_block_hash_by_ref(dataset_alias, odf::BlockRef::Head)
+        .await
+        .unwrap()
+}
 
 async fn authorize_users_by_roles(
     owner: &KamuApiServerClient,

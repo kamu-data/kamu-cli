@@ -70,7 +70,7 @@ impl RemoteAliasesRegistry for RemoteAliasesRegistryImpl {
     async fn get_remote_aliases(
         &self,
         dataset_handle: &odf::DatasetHandle,
-    ) -> Result<Box<dyn RemoteAliases>, GetAliasesError> {
+    ) -> Result<Box<dyn RemoteAliases>, InternalError> {
         let resolved_dataset = self
             .dataset_registry
             .get_dataset_by_handle(dataset_handle)
@@ -202,13 +202,13 @@ impl RemoteAliasesRegistry for RemoteAliasesRegistryNull {
     async fn get_remote_aliases(
         &self,
         _dataset_handle: &odf::DatasetHandle,
-    ) -> Result<Box<dyn RemoteAliases>, GetAliasesError> {
+    ) -> Result<Box<dyn RemoteAliases>, InternalError> {
         #[derive(Error, Debug)]
         #[error("get_remote_aliases requested from stub implementation")]
         struct NullError {}
 
         let e = NullError {};
-        Err(GetAliasesError::Internal(e.int_err()))
+        Err(e.int_err())
     }
 }
 

@@ -19,8 +19,14 @@ use kamu_adapter_flow_dataset::{
     FLOW_TYPE_DATASET_INGEST,
 };
 use kamu_adapter_task_dataset::*;
-use kamu_core::{CompactionResult, PullResult, ResetResult};
-use kamu_datasets::MockDatasetIncrementQueryService;
+use kamu_core::{
+    CompactionResult,
+    PollingIngestResultUpToDate,
+    PullResultUpToDate,
+    PushIngestResultUpToDate,
+    ResetResult,
+};
+use kamu_datasets::{CreateDatasetResult, DatasetReferenceRepository};
 use kamu_flow_system::*;
 use kamu_task_system::{self as ts, TaskError};
 use odf::dataset::MetadataChainIncrementInterval;
@@ -30,6 +36,7 @@ use crate::utils::{
     BaseGQLFlowRunsHarness,
     FlowRunsHarnessOverrides,
     GraphQLQueryRequest,
+    ResetFlowMode,
     expect_anonymous_access_error,
 };
 
@@ -38,13 +45,7 @@ use crate::utils::{
 #[test_log::test(tokio::test)]
 async fn test_trigger_ingest_root_dataset() {
     let harness = FlowRunsHarness::with_overrides(FlowRunsHarnessOverrides {
-        dataset_changes_mock: Some(MockDatasetIncrementQueryService::with_increment_between(
-            MetadataChainIncrementInterval {
-                num_blocks: 1,
-                num_records: 12,
-                updated_watermark: None,
-            },
-        )),
+        dataset_changes_mock: None,
     })
     .await;
 
@@ -302,13 +303,15 @@ async fn test_trigger_ingest_root_dataset() {
             flow_task_metadata,
             complete_time,
             ts::TaskOutcome::Success(
-                TaskResultDatasetUpdate {
-                    pull_result: PullResult::Updated {
-                        old_head: Some(odf::Multihash::from_digest_sha3_256(b"old-slice")),
-                        new_head: odf::Multihash::from_digest_sha3_256(b"new-slice"),
-                        has_more: false,
+                TaskResultDatasetUpdate::Updated {
+                    old_head: Some(odf::Multihash::from_digest_sha3_256(b"old-slice")),
+                    new_head: odf::Multihash::from_digest_sha3_256(b"new-slice"),
+                    has_more: false,
+                    increment: MetadataChainIncrementInterval {
+                        num_blocks: 1,
+                        num_records: 12,
+                        updated_watermark: None,
                     },
-                    data_increment: None,
                 }
                 .into_task_result(),
             ),
@@ -393,7 +396,7 @@ async fn test_trigger_ingest_root_dataset() {
 #[test_log::test(tokio::test)]
 async fn test_trigger_reset_root_dataset_flow() {
     let harness = FlowRunsHarness::with_overrides(FlowRunsHarnessOverrides {
-        dataset_changes_mock: Some(MockDatasetIncrementQueryService::default()),
+        dataset_changes_mock: None,
     })
     .await;
 
@@ -413,7 +416,9 @@ async fn test_trigger_reset_root_dataset_flow() {
     let response = harness
         .trigger_reset_flow_mutation(
             &create_root_result.dataset_handle.id,
-            &root_dataset_blocks[1].0,
+            ResetFlowMode::Custom {
+                new_head_hash: &root_dataset_blocks[1].0,
+            },
             &root_dataset_blocks[0].0,
         )
         .execute(&schema, &harness.catalog_authorized)
@@ -546,7 +551,7 @@ async fn test_trigger_reset_root_dataset_flow() {
 #[test_log::test(tokio::test)]
 async fn test_trigger_reset_root_dataset_flow_with_invalid_head() {
     let harness = FlowRunsHarness::with_overrides(FlowRunsHarnessOverrides {
-        dataset_changes_mock: Some(MockDatasetIncrementQueryService::default()),
+        dataset_changes_mock: None,
     })
     .await;
 
@@ -561,7 +566,9 @@ async fn test_trigger_reset_root_dataset_flow_with_invalid_head() {
     let response = harness
         .trigger_reset_flow_mutation(
             &create_root_result.dataset_handle.id,
-            &new_invalid_head,
+            ResetFlowMode::Custom {
+                new_head_hash: &new_invalid_head,
+            },
             &old_invalid_head,
         )
         .execute(&schema, &harness.catalog_authorized)
@@ -596,7 +603,9 @@ async fn test_trigger_reset_root_dataset_flow_with_invalid_head() {
     let response = harness
         .trigger_reset_flow_mutation(
             &create_root_result.dataset_handle.id,
-            &root_dataset_blocks[0].0,
+            ResetFlowMode::Custom {
+                new_head_hash: &root_dataset_blocks[0].0,
+            },
             &root_dataset_blocks[1].0,
         )
         .execute(&schema, &harness.catalog_authorized)
@@ -619,6 +628,36 @@ async fn test_trigger_reset_root_dataset_flow_with_invalid_head() {
             }
         })
     );
+
+    // A stale expected old head is rejected before the flow is scheduled
+    let response = harness
+        .trigger_reset_flow_mutation(
+            &create_root_result.dataset_handle.id,
+            ResetFlowMode::Custom {
+                new_head_hash: &root_dataset_blocks[1].0,
+            },
+            &old_invalid_head,
+        )
+        .execute(&schema, &harness.catalog_authorized)
+        .await;
+
+    assert_eq!(
+        response.data,
+        value!({
+            "datasets": {
+                "byId": {
+                    "flows": {
+                        "runs": {
+                            "triggerResetFlow": {
+                                "__typename": "FlowPreconditionsNotMet",
+                                "message": "Flow didn't met preconditions: 'Expected old head hash is not the current head'"
+                            }
+                        }
+                    }
+                }
+            }
+        })
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -626,13 +665,7 @@ async fn test_trigger_reset_root_dataset_flow_with_invalid_head() {
 #[test_log::test(tokio::test)]
 async fn test_trigger_execute_transform_derived_dataset() {
     let harness = FlowRunsHarness::with_overrides(FlowRunsHarnessOverrides {
-        dataset_changes_mock: Some(MockDatasetIncrementQueryService::with_increment_between(
-            MetadataChainIncrementInterval {
-                num_blocks: 1,
-                num_records: 5,
-                updated_watermark: None,
-            },
-        )),
+        dataset_changes_mock: None,
     })
     .await;
 
@@ -764,13 +797,15 @@ async fn test_trigger_execute_transform_derived_dataset() {
             flow_task_metadata,
             complete_time,
             ts::TaskOutcome::Success(
-                TaskResultDatasetUpdate {
-                    pull_result: PullResult::Updated {
-                        old_head: Some(odf::Multihash::from_digest_sha3_256(b"old-slice")),
-                        new_head: odf::Multihash::from_digest_sha3_256(b"new-slice"),
-                        has_more: false,
+                TaskResultDatasetUpdate::Updated {
+                    old_head: Some(odf::Multihash::from_digest_sha3_256(b"old-slice")),
+                    new_head: odf::Multihash::from_digest_sha3_256(b"new-slice"),
+                    has_more: false,
+                    increment: MetadataChainIncrementInterval {
+                        num_blocks: 1,
+                        num_records: 5,
+                        updated_watermark: None,
                     },
-                    data_increment: None,
                 }
                 .into_task_result(),
             ),
@@ -861,13 +896,7 @@ async fn test_trigger_execute_transform_derived_dataset() {
 #[test_log::test(tokio::test)]
 async fn test_trigger_compaction_root_dataset() {
     let harness = FlowRunsHarness::with_overrides(FlowRunsHarnessOverrides {
-        dataset_changes_mock: Some(MockDatasetIncrementQueryService::with_increment_between(
-            MetadataChainIncrementInterval {
-                num_blocks: 1,
-                num_records: 12,
-                updated_watermark: None,
-            },
-        )),
+        dataset_changes_mock: None,
     })
     .await;
 
@@ -1196,7 +1225,7 @@ async fn test_trigger_compaction_root_dataset() {
 #[test_log::test(tokio::test)]
 async fn test_trigger_reset_to_metadata_root_dataset() {
     let harness = FlowRunsHarness::with_overrides(FlowRunsHarnessOverrides {
-        dataset_changes_mock: Some(MockDatasetIncrementQueryService::default()),
+        dataset_changes_mock: None,
     })
     .await;
 
@@ -3509,13 +3538,7 @@ async fn test_history_with_activation_cause_of_missing_dataset() {
 #[test_log::test(tokio::test)]
 async fn test_execute_transform_flow_error_after_compaction() {
     let harness = FlowRunsHarness::with_overrides(FlowRunsHarnessOverrides {
-        dataset_changes_mock: Some(MockDatasetIncrementQueryService::with_increment_between(
-            MetadataChainIncrementInterval {
-                num_blocks: 1,
-                num_records: 12,
-                updated_watermark: None,
-            },
-        )),
+        dataset_changes_mock: None,
     })
     .await;
 
@@ -3835,13 +3858,7 @@ async fn test_anonymous_operation_fails() {
 #[test_log::test(tokio::test)]
 async fn test_config_snapshot_returned_correctly() {
     let harness = FlowRunsHarness::with_overrides(FlowRunsHarnessOverrides {
-        dataset_changes_mock: Some(MockDatasetIncrementQueryService::with_increment_between(
-            MetadataChainIncrementInterval {
-                num_blocks: 1,
-                num_records: 12,
-                updated_watermark: None,
-            },
-        )),
+        dataset_changes_mock: None,
     })
     .await;
 
@@ -3956,13 +3973,7 @@ async fn test_config_snapshot_returned_correctly() {
 #[test_log::test(tokio::test)]
 async fn test_trigger_ingest_root_dataset_with_retry_policy() {
     let harness = FlowRunsHarness::with_overrides(FlowRunsHarnessOverrides {
-        dataset_changes_mock: Some(MockDatasetIncrementQueryService::with_increment_between(
-            MetadataChainIncrementInterval {
-                num_blocks: 1,
-                num_records: 12,
-                updated_watermark: None,
-            },
-        )),
+        dataset_changes_mock: None,
     })
     .await;
 
@@ -4253,13 +4264,15 @@ async fn test_trigger_ingest_root_dataset_with_retry_policy() {
             flow_task_metadata,
             complete_time_2,
             ts::TaskOutcome::Success(
-                TaskResultDatasetUpdate {
-                    pull_result: PullResult::Updated {
-                        old_head: Some(odf::Multihash::from_digest_sha3_256(b"old-slice")),
-                        new_head: odf::Multihash::from_digest_sha3_256(b"new-slice"),
-                        has_more: false,
+                TaskResultDatasetUpdate::Updated {
+                    old_head: Some(odf::Multihash::from_digest_sha3_256(b"old-slice")),
+                    new_head: odf::Multihash::from_digest_sha3_256(b"new-slice"),
+                    has_more: false,
+                    increment: MetadataChainIncrementInterval {
+                        num_blocks: 1,
+                        num_records: 12,
+                        updated_watermark: None,
                     },
-                    data_increment: None,
                 }
                 .into_task_result(),
             ),
@@ -4427,13 +4440,7 @@ async fn test_trigger_ingest_root_dataset_with_retry_policy() {
 #[test_log::test(tokio::test)]
 async fn test_trigger_flow_automatically_via_schedule() {
     let harness = FlowRunsHarness::with_overrides(FlowRunsHarnessOverrides {
-        dataset_changes_mock: Some(MockDatasetIncrementQueryService::with_increment_between(
-            MetadataChainIncrementInterval {
-                num_blocks: 1,
-                num_records: 12,
-                updated_watermark: None,
-            },
-        )),
+        dataset_changes_mock: None,
     })
     .await;
 
@@ -4553,6 +4560,219 @@ async fn test_trigger_flow_automatically_via_schedule() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[test_log::test(tokio::test)]
+async fn test_flows_failed_with_head_moved_are_recoverable() {
+    let harness = FlowRunsHarness::with_overrides(FlowRunsHarnessOverrides::default()).await;
+    let foo = harness.create_foo_dataset().await;
+    let foo_id = &foo.dataset_handle.id;
+    let blocks = harness.chain_hashes(&foo).await;
+
+    let flow_triggers = [
+        (
+            harness.trigger_ingest_flow_mutation(foo_id),
+            "triggerIngestFlow",
+        ),
+        (
+            harness.trigger_compaction_flow_mutation(foo_id),
+            "triggerCompactionFlow",
+        ),
+        (
+            harness.trigger_reset_flow_mutation(
+                foo_id,
+                ResetFlowMode::Custom {
+                    new_head_hash: &blocks[1],
+                },
+                &blocks[0],
+            ),
+            "triggerResetFlow",
+        ),
+    ];
+
+    for (trigger, trigger_method) in flow_triggers {
+        let flow_id = harness
+            .run_triggered_flow(
+                trigger,
+                trigger_method,
+                ts::TaskOutcome::Failed(harness.head_moved_error(foo_id)),
+            )
+            .await;
+
+        assert_eq!(
+            harness.get_flow(foo_id, &flow_id).await["outcome"],
+            serde_json::json!({
+                "reason": {
+                    "message": "Dataset head was moved by a concurrent update",
+                    "recoverable": true,
+                }
+            }),
+            "{trigger_method}"
+        );
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_reset_flows_failed_with_reset_errors_are_not_recoverable() {
+    let harness = FlowRunsHarness::with_overrides(FlowRunsHarnessOverrides::default()).await;
+    let foo = harness.create_foo_dataset().await;
+    let foo_id = &foo.dataset_handle.id;
+    let blocks = harness.chain_hashes(&foo).await;
+
+    let cases = [
+        (
+            TaskErrorDatasetReset::ResetHeadNotFound,
+            "New head hash to reset not found",
+        ),
+        (
+            TaskErrorDatasetReset::OldHeadMismatch(DatasetResetOldHeadMismatch {
+                expected_head: blocks[0].clone(),
+                actual_head: blocks[1].clone(),
+            }),
+            "Dataset head is not the expected old head",
+        ),
+    ];
+
+    for (reset_error, expected_message) in cases {
+        let trigger = harness.trigger_reset_flow_mutation(
+            foo_id,
+            ResetFlowMode::Custom {
+                new_head_hash: &blocks[1],
+            },
+            &blocks[0],
+        );
+        let flow_id = harness
+            .run_triggered_flow(
+                trigger,
+                "triggerResetFlow",
+                ts::TaskOutcome::Failed(reset_error.into_task_error()),
+            )
+            .await;
+
+        assert_eq!(
+            harness.get_flow(foo_id, &flow_id).await["outcome"],
+            serde_json::json!({
+                "reason": {
+                    "message": expected_message,
+                    "recoverable": false,
+                }
+            }),
+        );
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_ingest_up_to_date_uncacheable_per_pull_result() {
+    let harness = FlowRunsHarness::with_overrides(FlowRunsHarnessOverrides::default()).await;
+    let foo = harness.create_foo_dataset().await;
+    let foo_id = &foo.dataset_handle.id;
+
+    let cases = [
+        (
+            PullResultUpToDate::PollingIngest(PollingIngestResultUpToDate { uncacheable: true }),
+            true,
+        ),
+        (
+            PullResultUpToDate::PollingIngest(PollingIngestResultUpToDate { uncacheable: false }),
+            false,
+        ),
+        (
+            PullResultUpToDate::PushIngest(PushIngestResultUpToDate { uncacheable: true }),
+            true,
+        ),
+        (
+            PullResultUpToDate::PushIngest(PushIngestResultUpToDate { uncacheable: false }),
+            false,
+        ),
+        (PullResultUpToDate::Sync, false),
+        (PullResultUpToDate::Transform, false),
+    ];
+
+    for (up_to_date, expected_uncacheable) in cases {
+        let flow_id = harness
+            .run_triggered_flow(
+                harness.trigger_ingest_flow_mutation(foo_id),
+                "triggerIngestFlow",
+                ts::TaskOutcome::Success(
+                    TaskResultDatasetUpdate::UpToDate(up_to_date.clone()).into_task_result(),
+                ),
+            )
+            .await;
+
+        assert_eq!(
+            harness.get_flow(foo_id, &flow_id).await["description"],
+            serde_json::json!({
+                "__typename": "FlowDescriptionDatasetPollingIngest",
+                "ingestResult": {
+                    "__typename": "FlowDescriptionUpdateResultUpToDate",
+                    "uncacheable": expected_uncacheable,
+                }
+            }),
+            "{up_to_date:?}"
+        );
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_trigger_reset_to_seed_flow_checks_old_head() {
+    let harness = FlowRunsHarness::with_overrides(FlowRunsHarnessOverrides::default()).await;
+    let foo = harness.create_foo_dataset().await;
+    let foo_id = &foo.dataset_handle.id;
+    let stale_head = odf::Multihash::from_digest_sha3_256(b"stale_head");
+
+    let response = harness
+        .trigger_reset_to_seed_flow(foo_id, &stale_head)
+        .await;
+    assert_eq!(
+        response,
+        serde_json::json!({
+            "__typename": "FlowPreconditionsNotMet",
+            "message": "Flow didn't met preconditions: 'Expected old head hash is not the current head'",
+        })
+    );
+
+    let response = harness.trigger_reset_to_seed_flow(foo_id, &foo.head).await;
+    assert_eq!(
+        response,
+        serde_json::json!({
+            "__typename": "TriggerFlowSuccess",
+            "message": "Success",
+            "flow": {
+                "__typename": "Flow",
+                "flowId": "0",
+                "status": "WAITING",
+                "outcome": null,
+            }
+        })
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_trigger_reset_flow_of_dataset_without_head() {
+    let harness = FlowRunsHarness::with_overrides(FlowRunsHarnessOverrides::default()).await;
+    let foo = harness.create_foo_dataset().await;
+    let foo_id = &foo.dataset_handle.id;
+
+    harness.remove_head_reference(foo_id).await;
+
+    let response = harness.trigger_reset_to_seed_flow(foo_id, &foo.head).await;
+    assert_eq!(
+        response,
+        serde_json::json!({
+            "__typename": "FlowPreconditionsNotMet",
+            "message": "Flow didn't met preconditions: 'Dataset does not contain any blocks'",
+        })
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[oop::extend(BaseGQLFlowRunsHarness, base_gql_flow_runs_harness)]
 struct FlowRunsHarness {
     base_gql_flow_runs_harness: BaseGQLFlowRunsHarness,
@@ -4564,6 +4784,148 @@ impl FlowRunsHarness {
         Self {
             base_gql_flow_runs_harness,
         }
+    }
+
+    async fn create_foo_dataset(&self) -> CreateDatasetResult {
+        self.create_root_dataset(odf::DatasetAlias::new(
+            None,
+            odf::DatasetName::new_unchecked("foo"),
+        ))
+        .await
+    }
+
+    /// Hashes of the dataset's blocks, newest first
+    async fn chain_hashes(&self, created: &CreateDatasetResult) -> Vec<odf::Multihash> {
+        created
+            .dataset
+            .as_metadata_chain()
+            .iter_blocks_interval((&created.head).into(), None, false)
+            .map_ok(|(hash, _)| hash)
+            .try_collect()
+            .await
+            .unwrap()
+    }
+
+    fn head_moved_error(&self, dataset_id: &odf::DatasetID) -> TaskError {
+        TaskErrorDatasetCommit::HeadMoved(DatasetHeadMovedError {
+            dataset_id: dataset_id.clone(),
+            expected_head: Some(odf::Multihash::from_digest_sha3_256(b"expected_head")),
+            actual_head: Some(odf::Multihash::from_digest_sha3_256(b"actual_head")),
+        })
+        .into_task_error()
+    }
+
+    async fn remove_head_reference(&self, dataset_id: &odf::DatasetID) {
+        self.catalog_authorized
+            .get_one::<dyn DatasetReferenceRepository>()
+            .unwrap()
+            .remove_dataset_reference(dataset_id, &odf::BlockRef::Head)
+            .await
+            .unwrap();
+    }
+
+    /// Triggers a flow, finishes its task with `task_outcome` and returns the
+    /// flow ID
+    async fn run_triggered_flow(
+        &self,
+        trigger: GraphQLQueryRequest,
+        trigger_method: &'static str,
+        task_outcome: ts::TaskOutcome,
+    ) -> String {
+        let schema = kamu_adapter_graphql::schema_quiet();
+        let response_json = trigger
+            .execute(&schema, &self.catalog_authorized)
+            .await
+            .data
+            .into_json()
+            .unwrap();
+        let flow_id = self
+            .extract_flow_id_from_trigger_response(&response_json, trigger_method)
+            .to_string();
+
+        self.mimic_flow_run_with_outcome(&flow_id, task_outcome)
+            .await;
+
+        flow_id
+    }
+
+    /// Returns the `triggerResetFlow` result of a reset to the seed block
+    async fn trigger_reset_to_seed_flow(
+        &self,
+        dataset_id: &odf::DatasetID,
+        old_head_hash: &odf::Multihash,
+    ) -> serde_json::Value {
+        let schema = kamu_adapter_graphql::schema_quiet();
+        let response_json = self
+            .trigger_reset_flow_mutation(dataset_id, ResetFlowMode::ToSeed, old_head_hash)
+            .execute(&schema, &self.catalog_authorized)
+            .await
+            .data
+            .into_json()
+            .unwrap();
+
+        response_json["datasets"]["byId"]["flows"]["runs"]["triggerResetFlow"].clone()
+    }
+
+    /// Returns the flow's `description` and `outcome`
+    async fn get_flow(&self, dataset_id: &odf::DatasetID, flow_id: &str) -> serde_json::Value {
+        let query_code = indoc!(
+            r#"
+            query($datasetId: DatasetID!, $flowId: String!) {
+                datasets {
+                    byId (datasetId: $datasetId) {
+                        flows {
+                            runs {
+                                getFlow(flowId: $flowId) {
+                                    ... on GetFlowSuccess {
+                                        flow {
+                                            description {
+                                                __typename
+                                                ... on FlowDescriptionDatasetPollingIngest {
+                                                    ingestResult {
+                                                        __typename
+                                                        ... on FlowDescriptionUpdateResultUpToDate {
+                                                            uncacheable
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                            outcome {
+                                                ... on FlowFailedError {
+                                                    reason {
+                                                        ... on TaskFailureReasonGeneral {
+                                                            message
+                                                            recoverable
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            "#
+        );
+
+        let schema = kamu_adapter_graphql::schema_quiet();
+        let response_json = GraphQLQueryRequest::new(
+            query_code,
+            async_graphql::Variables::from_value(value!({
+                "datasetId": dataset_id.to_string(),
+                "flowId": flow_id,
+            })),
+        )
+        .execute(&schema, &self.catalog_authorized)
+        .await
+        .data
+        .into_json()
+        .unwrap();
+
+        response_json["datasets"]["byId"]["flows"]["runs"]["getFlow"]["flow"].clone()
     }
 
     fn extract_flow_id_from_trigger_response<'a>(

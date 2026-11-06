@@ -18,6 +18,7 @@ use kamu_accounts::AuthenticationService;
 use kamu_core::{CorruptedSourceError, OverwriteSeedBlockError};
 use kamu_datasets::{
     AppendDatasetMetadataBatchUseCase,
+    AppendDatasetMetadataBatchUseCaseError,
     AppendDatasetMetadataBatchUseCaseOptions,
     CreateDatasetError,
     CreateDatasetUseCase,
@@ -28,22 +29,17 @@ use kamu_datasets::{
     SetRefCheckRefMode,
 };
 use messaging_outbox::{Outbox, OutboxExt};
-use odf::Multihash;
+use odf::metadata::AsTypedBlock as _;
 use tracing::Instrument;
 use url::Url;
 
+use super::error_close::ErrorReplyClose;
 use super::errors::*;
 use super::messages::*;
 use super::phases::*;
 use super::protocol_dataset_helper::*;
 use crate::BearerHeader;
 use crate::smart_protocol::*;
-use crate::ws_common::ReadMessageError;
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-// Should be less than idle timeout rules in the load balancer
-const MIN_UPLOAD_PROGRESS_PING_DELAY_SEC: u64 = 10;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -54,8 +50,10 @@ pub struct AxumServerPushProtocolInstance {
     maybe_dataset_handle: Option<odf::DatasetHandle>,
     dataset_url: Url,
     maybe_bearer_header: Option<BearerHeader>,
+    upload_progress_interval: Duration,
 }
 
+#[common_macros::method_names_consts]
 impl AxumServerPushProtocolInstance {
     pub fn new(
         socket: axum::extract::ws::WebSocket,
@@ -64,6 +62,7 @@ impl AxumServerPushProtocolInstance {
         maybe_dataset_handle: Option<odf::DatasetHandle>,
         dataset_url: Url,
         maybe_bearer_header: Option<BearerHeader>,
+        upload_progress_interval: Duration,
     ) -> Self {
         Self {
             socket,
@@ -72,6 +71,7 @@ impl AxumServerPushProtocolInstance {
             maybe_dataset_handle,
             dataset_url,
             maybe_bearer_header,
+            upload_progress_interval,
         }
     }
 
@@ -81,11 +81,11 @@ impl AxumServerPushProtocolInstance {
                 tracing::debug!("Push process success");
             }
             Err(ref e @ PushServerError::Internal(ref int_err)) => {
-                let payload = Err(DatasetPushRequestError::Internal(TransferInternalError {
-                    phase: int_err.phase.clone(),
-                    error_message: "Internal error".to_string(),
-                }));
-                axum_write_close_payload::<DatasetPushResponse>(&mut self.socket, payload).await;
+                axum_write_error_close(
+                    &mut self.socket,
+                    ErrorReplyClose::internal(int_err.phase.clone()),
+                )
+                .await;
 
                 tracing::error!(
                   error = ?e,
@@ -93,24 +93,23 @@ impl AxumServerPushProtocolInstance {
                   "Push process aborted with internal error",
                 );
             }
-            Err(PushServerError::ReadFailed(err)) => {
-                if let ReadMessageError::IncompatibleVersion = err.read_error {
-                    let payload = Err(DatasetPushRequestError::Internal(TransferInternalError {
-                        phase: TransferPhase::Push(PushPhase::InitialRequest),
-                        error_message: "Incompatible version.".to_string(),
-                    }));
-                    axum_write_close_payload::<DatasetPushResponse>(&mut self.socket, payload)
-                        .await;
-                }
-            }
+            Err(PushServerError::ReadFailed(err)) => tracing::warn!(
+              error = ?err,
+              error_msg = %err,
+              "Push process aborted: reading from the client failed",
+            ),
+            Err(PushServerError::WriteFailed(err)) => tracing::warn!(
+              error = ?err,
+              error_msg = %err,
+              "Push process aborted: writing to the client failed",
+            ),
             Err(PushServerError::OverwriteSeedBlock(err)) => {
                 let payload = DatasetPushMetadataResponse::Err(
                     DatasetPushMetadataError::SeedBlockOverwriteRestricted(
                         DatasetPushMetadataSeedBlockOverwriteRestrictedError {},
                     ),
                 );
-                axum_write_close_payload::<DatasetPushMetadataResponse>(&mut self.socket, payload)
-                    .await;
+                axum_write_error_close(&mut self.socket, ErrorReplyClose::reply(payload)).await;
 
                 tracing::error!(
                   error = ?err,
@@ -118,6 +117,7 @@ impl AxumServerPushProtocolInstance {
                   "Push process aborted with error",
                 );
             }
+            // Collisions are sent as messages: an alias can be longer than a close frame allows
             Err(PushServerError::RefCollision(err)) => {
                 let payload = DatasetPushObjectsTransferResponse::Err(
                     DatasetPushObjectsTransferError::RefCollision(
@@ -126,7 +126,7 @@ impl AxumServerPushProtocolInstance {
                         },
                     ),
                 );
-                axum_write_close_payload::<DatasetPushObjectsTransferResponse>(
+                axum_write_error_message::<DatasetPushObjectsTransferResponse>(
                     &mut self.socket,
                     payload,
                 )
@@ -146,7 +146,7 @@ impl AxumServerPushProtocolInstance {
                         },
                     ),
                 );
-                axum_write_close_payload::<DatasetPushObjectsTransferResponse>(
+                axum_write_error_message::<DatasetPushObjectsTransferResponse>(
                     &mut self.socket,
                     payload,
                 )
@@ -158,25 +158,53 @@ impl AxumServerPushProtocolInstance {
                   "Push process aborted with error",
                 );
             }
-            Err(e) => tracing::error!(
-              error = ?e,
-              error_msg = %e,
-              "Push process aborted with error",
-            ),
+            // The reply was sent as a message: both heads do not fit a close frame
+            Err(PushServerError::InvalidHead(err)) => {
+                tracing::warn!(
+                  error = ?err,
+                  error_msg = %err,
+                  "Push rejected: the client's view of the dataset head is stale",
+                );
+            }
+            Err(PushServerError::UpdatedConcurrently(err)) => {
+                axum_write_error_close(
+                    &mut self.socket,
+                    ErrorReplyClose::push_not_completed(
+                        DatasetPushCompleteError::UpdatedConcurrently(
+                            DatasetPushUpdatedConcurrentlyError {},
+                        ),
+                    ),
+                )
+                .await;
+
+                tracing::warn!(
+                  error = ?err,
+                  error_msg = %err,
+                  "Push process aborted: dataset head was updated concurrently",
+                );
+            }
+            Err(PushServerError::ObjectsNotUploaded(err)) => {
+                axum_write_error_close(
+                    &mut self.socket,
+                    ErrorReplyClose::push_not_completed(
+                        DatasetPushCompleteError::ObjectsNotUploaded(
+                            DatasetPushObjectsNotUploadedError {
+                                num_objects: err.num_missing,
+                            },
+                        ),
+                    ),
+                )
+                .await;
+
+                tracing::warn!(
+                  error = ?err,
+                  error_msg = %err,
+                  "Push rejected: the client did not upload every referenced file",
+                );
+            }
         }
 
-        // After we finish processing to ensure graceful closing
-        // we wait for client acknowledgment. And to handle
-        // custom clients without logic of close acknowledgment
-        // we will give 5 secs timeout
-        let timeout_duration = Duration::from_secs(5);
-
-        if tokio::time::timeout(timeout_duration, wait_for_close(&mut self.socket))
-            .await
-            .is_err()
-        {
-            tracing::debug!("Timeout reached, closing connection");
-        }
+        axum_await_client_close(&mut self.socket).await;
     }
 
     async fn push_main_flow(&mut self) -> Result<(), PushServerError> {
@@ -184,6 +212,8 @@ impl AxumServerPushProtocolInstance {
         let force_update_if_diverged = push_request.force_update_if_diverged;
         let visibility_for_created_dataset = push_request.visibility_for_created_dataset;
         let old_head_maybe = push_request.current_head.clone();
+        // A forced commit replaces history only from the head the client observed
+        let mut expected_head = push_request.current_head.clone();
 
         let mut new_blocks = self.try_handle_push_metadata_request(push_request).await?;
         if !new_blocks.is_empty() {
@@ -193,11 +223,22 @@ impl AxumServerPushProtocolInstance {
                 let dataset_alias = self
                     .dataset_ref
                     .alias()
-                    .expect("Dataset ref is not an alias");
+                    .expect("The upgrade handler rejects a push of an unknown dataset by ID");
 
-                use odf::metadata::AsTypedBlock as _;
                 let (first_block_hash, first_block, first_block_bytes) =
                     new_blocks.pop_front().unwrap();
+
+                // Checked before the dataset is created in a transaction of its own
+                let seed_block_hash = odf::Multihash::from_digest_sha3_256(&first_block_bytes);
+                if seed_block_hash != first_block_hash {
+                    return Err(format!(
+                        "Seed block hash declared by the client {first_block_hash} didn't match \
+                         the computed {seed_block_hash}"
+                    )
+                    .protocol_int_err(PushPhase::EnsuringTargetExists)
+                    .into());
+                }
+
                 let seed_block = first_block
                     .into_typed()
                     .ok_or_else(|| {
@@ -209,7 +250,7 @@ impl AxumServerPushProtocolInstance {
                     })
                     .map_err(|e| {
                         PushServerError::Internal(PhaseInternalError {
-                            phase: TransferPhase::Push(PushPhase::ObjectsUploadProgress),
+                            phase: TransferPhase::Push(PushPhase::EnsuringTargetExists),
                             error: e.int_err(),
                         })
                     })?;
@@ -217,6 +258,7 @@ impl AxumServerPushProtocolInstance {
                 let create_options = CreateDatasetUseCaseOptions {
                     dataset_visibility: visibility_for_created_dataset,
                     seed_block_bytes: Some(first_block_bytes),
+                    ..Default::default()
                 };
                 let create_result = DatabaseTransactionRunner::new(self.catalog.clone())
                     .transactional_with(
@@ -233,7 +275,8 @@ impl AxumServerPushProtocolInstance {
                     .await;
                 match create_result {
                     Ok(res) => {
-                        assert_eq!(res.head, first_block_hash);
+                        // The remaining blocks build on the Seed just committed
+                        expected_head = Some(first_block_hash);
                         self.maybe_dataset_handle = Some(res.dataset_handle);
                     }
                     Err(CreateDatasetError::RefCollision(err)) => {
@@ -244,7 +287,14 @@ impl AxumServerPushProtocolInstance {
                     Err(CreateDatasetError::NameCollision(err)) => {
                         return Err(PushServerError::NameCollision(err));
                     }
-                    Err(e) => {
+                    // The protocol has no reply for these, so the client sees them as
+                    // internal errors
+                    Err(
+                        e @ (CreateDatasetError::EmptyDataset
+                        | CreateDatasetError::Access(_)
+                        | CreateDatasetError::CASFailed(_)
+                        | CreateDatasetError::Internal(_)),
+                    ) => {
                         return Err(PushServerError::Internal(PhaseInternalError {
                             phase: TransferPhase::Push(PushPhase::EnsuringTargetExists),
                             error: e.int_err(),
@@ -261,12 +311,27 @@ impl AxumServerPushProtocolInstance {
             }
         }
 
-        self.try_handle_push_complete(new_blocks, force_update_if_diverged, old_head_maybe)
-            .await?;
+        self.try_handle_push_complete(
+            new_blocks,
+            expected_head,
+            force_update_if_diverged,
+            old_head_maybe,
+        )
+        .await?;
 
         Ok(())
     }
 
+    #[tracing::instrument(
+        level = "info",
+        name = AxumServerPushProtocolInstance_handle_push_request_initiation,
+        skip_all,
+        fields(
+            num_blocks = tracing::field::Empty,
+            num_objects = tracing::field::Empty,
+            bytes = tracing::field::Empty,
+        )
+    )]
     async fn handle_push_request_initiation(
         &mut self,
     ) -> Result<DatasetPushRequest, PushServerError> {
@@ -275,6 +340,15 @@ impl AxumServerPushProtocolInstance {
             .map_err(|e| {
                 PushServerError::ReadFailed(PushReadError::new(e, PushPhase::InitialRequest))
             })?;
+
+        let plan = &push_request.transfer_plan;
+        tracing::Span::current()
+            .record("num_blocks", plan.num_blocks)
+            .record("num_objects", plan.num_objects)
+            .record(
+                "bytes",
+                plan.bytes_in_raw_blocks + plan.bytes_in_raw_objects,
+            );
 
         tracing::debug!(
             "Push client sent a push request: currentHead={:?} sizeEstimate={:?}",
@@ -304,24 +378,21 @@ impl AxumServerPushProtocolInstance {
                         Err(e) => Err(e),
                     }
                 })
-                .instrument(tracing::debug_span!(
-                    "AxumServerPushProtocolInstance::handle_push_request_initiation"
-                ))
                 .await
         } else {
             Ok(None)
         }
         .protocol_int_err(PushPhase::InitialRequest)?;
 
-        let response = if push_request.current_head == actual_head {
-            Ok(DatasetPushRequestAccepted {})
-        } else {
-            Err(DatasetPushRequestError::InvalidHead(
-                DatasetPushInvalidHeadError {
-                    actual_head: push_request.current_head.clone(),
-                    expected_head: actual_head,
-                },
-            ))
+        let invalid_head =
+            (push_request.current_head != actual_head).then(|| odf::dataset::RefCASError {
+                reference: odf::BlockRef::Head,
+                expected: push_request.current_head.clone(),
+                actual: actual_head,
+            });
+        let response = match &invalid_head {
+            None => Ok(DatasetPushRequestAccepted {}),
+            Some(e) => Err(DatasetPushRequestError::InvalidHead(e.into())),
         };
 
         axum_write_payload::<DatasetPushResponse>(&mut self.socket, response)
@@ -330,9 +401,18 @@ impl AxumServerPushProtocolInstance {
                 PushServerError::WriteFailed(PushWriteError::new(e, PushPhase::InitialRequest))
             })?;
 
-        Ok(push_request)
+        match invalid_head {
+            None => Ok(push_request),
+            Some(e) => Err(PushServerError::InvalidHead(e)),
+        }
     }
 
+    #[tracing::instrument(
+        level = "info",
+        name = AxumServerPushProtocolInstance_try_handle_push_metadata_request,
+        skip_all,
+        fields(num_blocks = tracing::field::Empty)
+    )]
     async fn try_handle_push_metadata_request(
         &mut self,
         push_request: DatasetPushRequest,
@@ -346,6 +426,8 @@ impl AxumServerPushProtocolInstance {
                 ))),
             }?;
 
+        tracing::Span::current().record("num_blocks", push_metadata_request.new_blocks.num_blocks);
+
         tracing::debug!(
             num_blocks = %push_metadata_request.new_blocks.num_blocks,
             media_type = %push_metadata_request.new_blocks.media_type,
@@ -354,17 +436,22 @@ impl AxumServerPushProtocolInstance {
             "Obtained compressed object batch",
         );
 
-        assert_eq!(
-            push_request.transfer_plan.num_blocks,
-            push_metadata_request.new_blocks.num_blocks
-        );
+        if push_request.transfer_plan.num_blocks != push_metadata_request.new_blocks.num_blocks {
+            return Err(format!(
+                "The push planned {} block(s) but sent {}",
+                push_request.transfer_plan.num_blocks, push_metadata_request.new_blocks.num_blocks
+            )
+            .protocol_int_err(PushPhase::MetadataRequest)
+            .into());
+        }
 
         let new_blocks = decode_metadata_batch(&push_metadata_request.new_blocks)
-            .protocol_int_err(PushPhase::InitialRequest)?;
+            .protocol_int_err(PushPhase::MetadataRequest)?;
 
+        // Checked with or without `force`: an existing dataset without `HEAD` takes
+        // a whole chain, `Seed` included
         if let Some(dataset_handle) = self.maybe_dataset_handle.as_ref()
-            && push_request.force_update_if_diverged
-            && !ensure_seed_not_in_conflict(new_blocks.front(), dataset_handle)
+            && SeedConflict::find(new_blocks.front(), dataset_handle).is_some()
         {
             return Err(PushServerError::OverwriteSeedBlock(
                 OverwriteSeedBlockError {},
@@ -383,6 +470,12 @@ impl AxumServerPushProtocolInstance {
         Ok(new_blocks)
     }
 
+    #[tracing::instrument(
+        level = "info",
+        name = AxumServerPushProtocolInstance_try_handle_push_objects_request,
+        skip_all,
+        fields(num_objects = tracing::field::Empty)
+    )]
     async fn try_handle_push_objects_request(&mut self) -> Result<bool, PushServerError> {
         let request = axum_read_payload::<DatasetPushObjectsTransferRequest>(&mut self.socket)
             .await
@@ -391,40 +484,26 @@ impl AxumServerPushProtocolInstance {
             })?;
 
         let objects_count = request.object_files.len();
+        tracing::Span::current().record("num_objects", objects_count);
 
         tracing::debug!(
             % objects_count,
             "Push client sent a push objects request",
         );
 
-        let dataset_url = self.dataset_url.clone();
-        let dataset_handle = self.maybe_dataset_handle.clone().unwrap();
-        let maybe_bearer_header = self.maybe_bearer_header.clone();
+        let dataset_handle = self.maybe_dataset_handle.clone().ok_or_else(|| {
+            "Objects were requested for a dataset that does not exist"
+                .protocol_int_err(PushPhase::ObjectsRequest)
+        })?;
 
-        let object_transfer_strategies = DatabaseTransactionRunner::new(self.catalog.clone())
-            .transactional_with(|dataset_registry: Arc<dyn DatasetRegistry>| async move {
-                let resolved_dataset = dataset_registry
-                    .get_dataset_by_handle(&dataset_handle)
-                    .await;
-
-                let mut object_transfer_strategies: Vec<PushObjectTransferStrategy> = Vec::new();
-                for r in request.object_files {
-                    let transfer_strategy = prepare_push_object_transfer_strategy(
-                        resolved_dataset.as_ref(),
-                        &r,
-                        &dataset_url,
-                        maybe_bearer_header.as_ref(),
-                    )
-                    .await?;
-
-                    object_transfer_strategies.push(transfer_strategy);
-                }
-
-                Ok::<_, InternalError>(object_transfer_strategies)
-            })
-            .instrument(tracing::debug_span!(
-                "AxumServerPushProtocolInstance::try_handle_push_objects_request",
-            ))
+        let object_transfer_strategies =
+            prepare_object_transfer_strategies::<PushObjectTransferStrategy>(
+                &self.catalog,
+                dataset_handle,
+                request.object_files,
+                self.dataset_url.clone(),
+                self.maybe_bearer_header.clone(),
+            )
             .await
             .protocol_int_err(PushPhase::ObjectsRequest)?;
 
@@ -441,16 +520,14 @@ impl AxumServerPushProtocolInstance {
             PushServerError::WriteFailed(PushWriteError::new(e, PushPhase::ObjectsRequest))
         })?;
 
-        let mut notify_interval = tokio::time::interval(std::time::Duration::from_secs(
-            MIN_UPLOAD_PROGRESS_PING_DELAY_SEC,
-        ));
+        let mut notify_interval = tokio::time::interval(self.upload_progress_interval);
         notify_interval.tick().await; // clear first immediate interval tick
 
         loop {
             tokio::select! {
                 _ = notify_interval.tick() => {
                     tracing::debug!("Time to ask client about the upload progress");
-                    axum_write_payload::<DatasetPushObjectsUploadProgressRequest>(&mut self.socket, DatasetPushObjectsUploadProgressRequest {})
+                    axum_write_payload::<DatasetPushObjectsUploadProgressRequest>(&mut self.socket, DatasetPushObjectsUploadProgressRequest { progress_requested: true })
                         .await
                         .map_err(|e| {
                             PushServerError::WriteFailed(PushWriteError::new(e, PushPhase::ObjectsUploadProgress))
@@ -481,11 +558,17 @@ impl AxumServerPushProtocolInstance {
         Ok(request.is_truncated)
     }
 
+    #[tracing::instrument(
+        level = "info",
+        name = AxumServerPushProtocolInstance_try_handle_push_complete,
+        skip_all
+    )]
     async fn try_handle_push_complete(
         &mut self,
         new_blocks: VecDeque<odf::dataset::HashedMetadataBlockBytesDecoded>,
+        expected_head: Option<odf::Multihash>,
         force_update_if_diverged: bool,
-        old_head_maybe: Option<Multihash>,
+        old_head_maybe: Option<odf::Multihash>,
     ) -> Result<(), PushServerError> {
         axum_read_payload::<DatasetPushComplete>(&mut self.socket)
             .await
@@ -495,18 +578,130 @@ impl AxumServerPushProtocolInstance {
 
         tracing::debug!("Push client sent a complete request. Committing the dataset");
 
-        let dataset_handle = self.maybe_dataset_handle.clone().unwrap();
-        let (dataset_id, new_head) = DatabaseTransactionRunner::new(self.catalog.clone())
-            .transactional_with2(
-                |dataset_registry: Arc<dyn DatasetRegistry>, append_dataset_metadata_batch: Arc<dyn AppendDatasetMetadataBatchUseCase>| async move {
-                    let resolved_dataset = dataset_registry.get_dataset_by_handle(&dataset_handle).await;
+        let dataset_handle = self.maybe_dataset_handle.clone().ok_or_else(|| {
+            "The push completed with no blocks for a dataset that does not exist"
+                .protocol_int_err(PushPhase::CompleteRequest)
+        })?;
+        self.ensure_objects_uploaded(&dataset_handle, &new_blocks)
+            .await?;
+        self.commit_pushed_blocks(
+            dataset_handle,
+            new_blocks,
+            expected_head,
+            force_update_if_diverged,
+            old_head_maybe,
+        )
+        .await?;
+
+        tracing::debug!("Sending completion confirmation");
+
+        axum_write_payload::<DatasetPushCompleteResponse>(
+            &mut self.socket,
+            Ok(DatasetPushCompleteConfirmed {}),
+        )
+        .await
+        .map_err(|e| {
+            PushServerError::WriteFailed(PushWriteError::new(e, PushPhase::CompleteRequest))
+        })?;
+
+        Ok(())
+    }
+
+    /// The client chooses which objects to upload, so the blocks must not be
+    /// committed until every file they reference is stored. Checked outside
+    /// the commit transaction, as each check may be a storage request
+    async fn ensure_objects_uploaded(
+        &mut self,
+        dataset_handle: &odf::DatasetHandle,
+        new_blocks: &VecDeque<odf::dataset::HashedMetadataBlockBytesDecoded>,
+    ) -> Result<(), PushServerError> {
+        let dataset_handle = dataset_handle.clone();
+        let resolved_dataset = DatabaseTransactionRunner::new(self.catalog.clone())
+            .transactional_with(|dataset_registry: Arc<dyn DatasetRegistry>| async move {
+                let resolved_dataset = dataset_registry
+                    .get_dataset_by_handle(&dataset_handle)
+                    .await;
+                resolved_dataset.detach_from_transaction();
+                Ok::<_, InternalError>(resolved_dataset)
+            })
+            .await
+            .protocol_int_err(PushPhase::CompleteRequest)?;
+
+        let missing =
+            collect_object_references_from_metadata(resolved_dataset.as_ref(), new_blocks, true)
+                .await
+                .protocol_int_err(PushPhase::CompleteRequest)?;
+        match missing.first() {
+            None => Ok(()),
+            Some(first_missing) => Err(PushServerError::ObjectsNotUploaded(
+                ObjectsNotUploadedError {
+                    num_missing: missing.len(),
+                    first_missing: first_missing.clone(),
+                },
+            )),
+        }
+    }
+
+    #[tracing::instrument(
+        level = "info",
+        name = AxumServerPushProtocolInstance_commit_pushed_blocks,
+        skip_all,
+        fields(
+            target = %dataset_handle,
+            num_blocks = new_blocks.len(),
+            new_head = tracing::field::Empty,
+        )
+    )]
+    async fn commit_pushed_blocks(
+        &mut self,
+        dataset_handle: odf::DatasetHandle,
+        new_blocks: VecDeque<odf::dataset::HashedMetadataBlockBytesDecoded>,
+        expected_head: Option<odf::Multihash>,
+        force_update_if_diverged: bool,
+        old_head_maybe: Option<odf::Multihash>,
+    ) -> Result<(), PushServerError> {
+        // Without `force` the batch must extend `HEAD`, so the commit expects the
+        // block the batch is appended to. With `force` the batch may replace a
+        // divergent history, so it expects the head the client observed instead
+        let set_ref_check_ref_mode = if force_update_if_diverged {
+            SetRefCheckRefMode::Explicit(expected_head)
+        } else {
+            SetRefCheckRefMode::ExtendsBase
+        };
+        // The commit and the message announcing it share one transaction, so
+        // flows hear about every push that moved `HEAD`
+        let maybe_bearer_header = self.maybe_bearer_header.clone();
+        let new_head = DatabaseTransactionRunner::new(self.catalog.clone())
+            .transactional_with4(
+                |dataset_registry: Arc<dyn DatasetRegistry>,
+                 append_dataset_metadata_batch: Arc<dyn AppendDatasetMetadataBatchUseCase>,
+                 authentication_service: Arc<dyn AuthenticationService>,
+                 outbox: Arc<dyn Outbox>| async move {
+                    let account_name = match &maybe_bearer_header {
+                        Some(bearer_header) => Some(
+                            authentication_service
+                                .account_by_token(bearer_header.token().to_owned())
+                                .await
+                                .int_err()?
+                                .account_name,
+                        ),
+                        None => None,
+                    };
+
+                    let resolved_dataset = dataset_registry
+                        .get_dataset_by_handle(&dataset_handle)
+                        .await;
 
                     append_dataset_metadata_batch
-                        .execute(resolved_dataset.as_ref(), Box::new(new_blocks.into_iter()), AppendDatasetMetadataBatchUseCaseOptions {
-                            set_ref_check_ref_mode: Some(SetRefCheckRefMode::ForceUpdateIfDiverged(force_update_if_diverged)),
-                            ..Default::default()
-                        })
-                        .await.int_err()?;
+                        .execute(
+                            &resolved_dataset,
+                            Box::new(new_blocks.into_iter()),
+                            AppendDatasetMetadataBatchUseCaseOptions {
+                                set_ref_check_ref_mode,
+                                ..Default::default()
+                            },
+                        )
+                        .await?;
 
                     let new_head = resolved_dataset
                         .as_metadata_chain()
@@ -514,64 +709,39 @@ impl AxumServerPushProtocolInstance {
                         .await
                         .int_err()?;
 
-                    Ok::<(odf::DatasetID, Multihash), InternalError>((resolved_dataset.get_id().clone(), new_head))
-                },
-            )
-            .instrument(tracing::debug_span!("AxumServerPushProtocolInstance::try_handle_push_complete"))
-            .await
-            .protocol_int_err(PushPhase::CompleteRequest)?;
-
-        tracing::debug!("Push client sent a complete request. Send outbox message");
-
-        let maybe_bearer_header = self.maybe_bearer_header.clone();
-        // Have separate transaction just for sending outbox message may be not a good
-        // idea, but it will allow us to separate push flow and outbox messaging.
-        // Ideally we may consider some kind of transactional_with_n method to be able
-        // use more than 2 different services in one transaction
-        DatabaseTransactionRunner::new(self.catalog.clone())
-            .transactional_with2(
-                |outbox: Arc<dyn Outbox>,
-                 authentication_service: Arc<dyn AuthenticationService>| async move {
-                    let account_name = if let Some(bearer_header) = &maybe_bearer_header {
-                        let account = authentication_service
-                            .account_by_token(bearer_header.token().to_owned())
-                            .await
-                            .int_err()?;
-                        Some(account.account_name)
-                    } else {
-                        None
-                    };
-
                     outbox
                         .post_message(
                             MESSAGE_PRODUCER_KAMU_HTTP_ADAPTER,
                             DatasetExternallyChangedMessage::smart_transfer_protocol_sync(
-                                &dataset_id,
+                                resolved_dataset.get_id(),
                                 old_head_maybe.as_ref(),
                                 &new_head,
                                 account_name,
                                 force_update_if_diverged,
                             ),
                         )
-                        .await
+                        .await?;
+
+                    Ok::<_, AppendDatasetMetadataBatchUseCaseError>(new_head)
                 },
             )
-            .instrument(tracing::debug_span!(
-                "AxumServerPushProtocolInstance::try_handle_push_complete send outbox message"
-            ))
             .await
-            .protocol_int_err(PushPhase::CompleteRequest)?;
+            .map_err(|e| match e {
+                AppendDatasetMetadataBatchUseCaseError::SetRefError(
+                    odf::dataset::SetChainRefError::CASFailed(e),
+                ) => PushServerError::UpdatedConcurrently(e),
+                e @ (AppendDatasetMetadataBatchUseCaseError::BlockAppendError(_)
+                | AppendDatasetMetadataBatchUseCaseError::SetRefError(
+                    odf::dataset::SetChainRefError::BlockNotFound(_)
+                    | odf::dataset::SetChainRefError::Access(_)
+                    | odf::dataset::SetChainRefError::Internal(_),
+                )
+                | AppendDatasetMetadataBatchUseCaseError::Internal(_)) => {
+                    PushServerError::Internal(e.protocol_int_err(PushPhase::CompleteRequest))
+                }
+            })?;
 
-        tracing::debug!("Sending completion confirmation");
-
-        axum_write_payload::<DatasetPushCompleteConfirmed>(
-            &mut self.socket,
-            DatasetPushCompleteConfirmed {},
-        )
-        .await
-        .map_err(|e| {
-            PushServerError::WriteFailed(PushWriteError::new(e, PushPhase::CompleteRequest))
-        })?;
+        tracing::Span::current().record("new_head", tracing::field::display(&new_head));
 
         Ok(())
     }

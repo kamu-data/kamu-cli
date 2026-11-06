@@ -17,6 +17,7 @@ use kamu_accounts::{
     AccountProvider,
     AccountService,
     MESSAGE_PRODUCER_KAMU_ACCOUNTS_SERVICE,
+    Principal,
     UpdateAccountError,
     UpdateAccountUseCase,
 };
@@ -34,6 +35,7 @@ pub struct UpdateAccountUseCaseImpl {
     outbox: Arc<dyn Outbox>,
     time_source: Arc<dyn SystemTimeSource>,
     account_authorization_helper: dill::Lazy<Arc<dyn utils::AccountAuthorizationHelper>>,
+    principal: dill::Lazy<Arc<Principal>>,
 }
 
 impl UpdateAccountUseCaseImpl {
@@ -81,8 +83,9 @@ impl UpdateAccountUseCase for UpdateAccountUseCaseImpl {
         };
 
         let account_authorization_helper = self.account_authorization_helper.get().int_err()?;
+        let principal = self.principal.get().int_err()?;
         if !account_authorization_helper
-            .can_modify_account(&original_account.account_name)
+            .can_modify_account(&principal, &original_account.account_name)
             .await?
         {
             return Err(UpdateAccountError::Access(odf::AccessError::Unauthorized(

@@ -12,7 +12,7 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use container_runtime::*;
-use internal_error::{ErrorIntoInternal, ResultIntoInternal};
+use internal_error::ResultIntoInternal;
 use kamu_core::engine::*;
 use kamu_core::*;
 use kamu_datasets::ResolvedDatasetsMap;
@@ -164,7 +164,9 @@ impl EngineProvisionerLocal {
         ) {
             (None | Some(0), NetworkNamespaceType::Host) | (Some(1), _) => 1,
             // TODO: Use available memory to determine the optimal limit
-            (None | Some(0), NetworkNamespaceType::Private) => outstanding_handles + 1,
+            (None | Some(0), NetworkNamespaceType::Private) => {
+                (outstanding_handles + 1).min(Self::default_max_concurrency())
+            }
             (Some(multi), NetworkNamespaceType::Private) => multi,
             (Some(multi), NetworkNamespaceType::Host) => {
                 tracing::warn!(
@@ -175,6 +177,13 @@ impl EngineProvisionerLocal {
                 1
             }
         }
+    }
+
+    /// Engines per private network namespace when no limit is configured: one
+    /// per CPU core
+    fn default_max_concurrency() -> u32 {
+        std::thread::available_parallelism()
+            .map_or(1, |n| u32::try_from(n.get()).unwrap_or(u32::MAX))
     }
 
     /// Called when `EngineHandle` is dropped
@@ -198,7 +207,7 @@ impl EngineProvisioner for EngineProvisionerLocal {
     ) -> Result<Arc<dyn Engine>, EngineProvisioningError> {
         let listener = maybe_listener.unwrap_or_else(|| Arc::new(NullEngineProvisioningListener));
 
-        let (engine, image) = match engine_id {
+        let (engine, image) = match engine_id.to_lowercase().as_str() {
             "spark" => Ok((self.spark_engine.clone(), &self.config.spark_image)),
             "flink" => Ok((self.flink_engine.clone(), &self.config.flink_image)),
             "datafusion" => Ok((
@@ -209,7 +218,9 @@ impl EngineProvisioner for EngineProvisionerLocal {
                 self.risingwave_engine.clone(),
                 &self.config.risingwave_image,
             )),
-            _ => Err(format!("Unsupported engine {engine_id}").int_err()),
+            _ => Err(UnsupportedEngineError {
+                engine_id: engine_id.to_string(),
+            }),
         }?;
 
         self.ensure_image(image, listener.clone()).await?;
@@ -305,9 +316,12 @@ impl Engine for EngineHandle {
     async fn execute_transform(
         &self,
         request: TransformRequestExt,
+        operation_id: &str,
         datasets_map: &ResolvedDatasetsMap,
     ) -> Result<TransformResponseExt, EngineError> {
-        self.engine.execute_transform(request, datasets_map).await
+        self.engine
+            .execute_transform(request, operation_id, datasets_map)
+            .await
     }
 }
 
@@ -316,3 +330,5 @@ impl Drop for EngineHandle {
         EngineProvisionerLocal::release_engine(&self.inner, self.engine.as_ref());
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

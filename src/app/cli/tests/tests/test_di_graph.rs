@@ -9,15 +9,22 @@
 
 use std::path::Path;
 
+use async_utils::BackgroundAgent;
 use database_common::{DatabaseConnectionSettings, SqlitePoolOptions, TransactionRef};
 use dill::CatalogBuilder;
 use kamu::domain::{KamuBackgroundCatalog, ServerUrlConfig, TenancyConfig};
-use kamu_accounts::{CurrentAccountSubject, JwtAuthenticationConfig};
+use kamu_accounts::{
+    CurrentAccountSubject,
+    CurrentAccountSubjectCatalogExt as _,
+    JwtAuthenticationConfig,
+    Principal,
+};
 use kamu_adapter_http::AccessToken;
 use kamu_adapter_oauth::GithubAuthenticationConfig;
 use kamu_cli::config::CLIConfig;
 use kamu_cli::services::config::DatabaseConfig;
 use kamu_cli::{self, Interact, OutputConfig, WorkspaceLayout, WorkspaceStatus};
+use pretty_assertions::assert_eq;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -58,6 +65,14 @@ test_di_permutations!(test_di_cli_graph_validates);
 test_di_permutations!(test_di_server_graph_validates);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+test_di_permutations!(test_di_background_catalog_acts_as_node);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+test_di_permutations!(test_di_server_background_catalog_acts_as_node);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Implementations
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -72,7 +87,68 @@ fn test_di_cli_graph_validates(
     repositories_config: RepositoriesConfig,
 ) {
     let temp_dir = tempfile::tempdir().unwrap();
-    let workspace_layout = WorkspaceLayout::new(temp_dir.path());
+    let base_catalog =
+        build_test_base_catalog(temp_dir.path(), tenancy_config, repositories_config);
+    let mut cli_catalog_builder = configure_test_cli_catalog(&base_catalog, tenancy_config);
+
+    let validate_result = cli_catalog_builder.validate();
+
+    assert!(validate_result.is_ok(), "{}", validate_result.unwrap_err());
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+fn test_di_background_catalog_acts_as_node(
+    tenancy_config: TenancyConfig,
+    repositories_config: RepositoriesConfig,
+) {
+    let temp_dir = tempfile::tempdir().unwrap();
+    let base_catalog =
+        build_test_base_catalog(temp_dir.path(), tenancy_config, repositories_config);
+    let subject = CurrentAccountSubject::new_test();
+
+    let mut background_catalog_builder =
+        kamu_cli::configure_background_catalog(&base_catalog, subject.clone(), tenancy_config);
+    add_test_command_values(&mut background_catalog_builder);
+    let validate_result = background_catalog_builder.validate();
+    assert!(validate_result.is_ok(), "{}", validate_result.unwrap_err());
+
+    let background_catalog = background_catalog_builder.build();
+    let cli_catalog = configure_test_cli_catalog(&base_catalog, tenancy_config).build();
+
+    assert_eq!(
+        *cli_catalog.get_one::<Principal>().unwrap(),
+        Principal::from(&subject)
+    );
+    assert_eq!(
+        *background_catalog.get_one::<Principal>().unwrap(),
+        Principal::Node
+    );
+    // Name scope reads the caller's subject, not the node
+    assert_eq!(
+        background_catalog
+            .get_one::<CurrentAccountSubject>()
+            .unwrap()
+            .account_handle(),
+        subject.account_handle()
+    );
+
+    let system_user_catalog =
+        KamuBackgroundCatalog::new(base_catalog, subject).system_user_catalog();
+    assert_eq!(
+        *system_user_catalog.get_one::<Principal>().unwrap(),
+        Principal::Node
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+fn build_test_base_catalog(
+    workspace_path: &Path,
+    tenancy_config: TenancyConfig,
+    repositories_config: RepositoriesConfig,
+) -> dill::Catalog {
+    let workspace_layout = WorkspaceLayout::new(workspace_path);
     let mut base_catalog_builder = kamu_cli::configure_base_catalog(
         &workspace_layout,
         WorkspaceStatus::Created(tenancy_config),
@@ -95,28 +171,18 @@ fn test_di_cli_graph_validates(
     )
     .unwrap();
     base_catalog_builder.add_value(Interact::new(false, false));
-    let base_catalog = base_catalog_builder.build();
-
-    let mut cli_catalog_builder = kamu_cli::configure_cli_catalog(&base_catalog, tenancy_config);
-
-    cli_catalog_builder.add_value(CurrentAccountSubject::new_test());
-    cli_catalog_builder.add_value(JwtAuthenticationConfig::default());
-    cli_catalog_builder.add_value(GithubAuthenticationConfig::default());
-    cli_catalog_builder.add_value(kamu_adapter_flight_sql::SessionId(String::new()));
-
-    let validate_result = cli_catalog_builder.validate();
-
-    assert!(validate_result.is_ok(), "{}", validate_result.unwrap_err());
+    base_catalog_builder.build()
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-fn test_di_server_graph_validates(
+/// The server catalog `system api-server run` chains its catalogs from
+fn build_test_server_catalog(
+    workspace_path: &Path,
     tenancy_config: TenancyConfig,
     repositories_config: RepositoriesConfig,
-) {
-    let temp_dir = tempfile::tempdir().unwrap();
-    let workspace_layout = WorkspaceLayout::new(temp_dir.path());
+) -> dill::Catalog {
+    let workspace_layout = WorkspaceLayout::new(workspace_path);
     let mut base_catalog_builder = kamu_cli::configure_base_catalog(
         &workspace_layout,
         WorkspaceStatus::Created(tenancy_config),
@@ -140,14 +206,13 @@ fn test_di_server_graph_validates(
         false,
     )
     .unwrap();
+    base_catalog_builder.add_value(Interact::new(false, false));
     let base_catalog = base_catalog_builder.build();
-
-    let system_user_subject = CurrentAccountSubject::new_test();
 
     let wrapped_catalog = dill::CatalogBuilder::new_chained(&base_catalog)
         .add_value(KamuBackgroundCatalog::new(
             base_catalog,
-            system_user_subject.clone(),
+            CurrentAccountSubject::new_test(),
         ))
         .build();
 
@@ -158,10 +223,44 @@ fn test_di_server_graph_validates(
     server_catalog_builder.add_value(ServerUrlConfig::new_test(None));
     server_catalog_builder.add_value(AccessToken::new("some-test-token"));
     server_catalog_builder.add_value(kamu_adapter_flight_sql::SessionId(String::new()));
-    let server_catalog = server_catalog_builder.build();
+    server_catalog_builder.build()
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+fn configure_test_cli_catalog(
+    base_catalog: &dill::Catalog,
+    tenancy_config: TenancyConfig,
+) -> CatalogBuilder {
+    let mut cli_catalog_builder = kamu_cli::configure_cli_catalog(base_catalog, tenancy_config);
+
+    cli_catalog_builder.add_current_account_subject(CurrentAccountSubject::new_test());
+    add_test_command_values(&mut cli_catalog_builder);
+
+    cli_catalog_builder
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+fn add_test_command_values(catalog_builder: &mut CatalogBuilder) {
+    catalog_builder.add_value(JwtAuthenticationConfig::default());
+    catalog_builder.add_value(GithubAuthenticationConfig::default());
+    catalog_builder.add_value(kamu_adapter_flight_sql::SessionId(String::new()));
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+fn test_di_server_graph_validates(
+    tenancy_config: TenancyConfig,
+    repositories_config: RepositoriesConfig,
+) {
+    let temp_dir = tempfile::tempdir().unwrap();
+    let server_catalog =
+        build_test_server_catalog(temp_dir.path(), tenancy_config, repositories_config);
+    let system_user_subject = CurrentAccountSubject::new_test();
 
     let mut cli_catalog_builder = dill::CatalogBuilder::new_chained(&server_catalog);
-    cli_catalog_builder.add_value(system_user_subject);
+    cli_catalog_builder.add_current_account_subject(system_user_subject);
 
     // TODO: We should ensure this test covers parameters requested by commands and
     // types needed for GQL/HTTP adapter that are currently being constructed
@@ -169,6 +268,38 @@ fn test_di_server_graph_validates(
     let validate_result = cli_catalog_builder.validate();
 
     assert!(validate_result.is_ok(), "{}", validate_result.unwrap_err());
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// The background catalog of `system api-server run`: built over the server
+/// catalog, it is where the server's agents are resolved
+fn test_di_server_background_catalog_acts_as_node(
+    tenancy_config: TenancyConfig,
+    repositories_config: RepositoriesConfig,
+) {
+    let temp_dir = tempfile::tempdir().unwrap();
+    let server_catalog =
+        build_test_server_catalog(temp_dir.path(), tenancy_config, repositories_config);
+
+    let mut background_catalog_builder = kamu_cli::configure_background_catalog(
+        &server_catalog,
+        CurrentAccountSubject::new_test(),
+        tenancy_config,
+    );
+    let validate_result = background_catalog_builder.validate();
+    assert!(validate_result.is_ok(), "{}", validate_result.unwrap_err());
+
+    let background_catalog = background_catalog_builder.build();
+    assert_eq!(
+        *background_catalog.get_one::<Principal>().unwrap(),
+        Principal::Node
+    );
+
+    let background_agents = background_catalog
+        .get::<dill::AllOf<dyn BackgroundAgent>>()
+        .unwrap();
+    assert!(!background_agents.is_empty());
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -207,7 +338,7 @@ async fn update_di_graph() {
 
     let mut cli_catalog_builder = kamu_cli::configure_cli_catalog(&base_catalog, tenancy_config);
 
-    cli_catalog_builder.add_value(CurrentAccountSubject::new_test());
+    cli_catalog_builder.add_current_account_subject(CurrentAccountSubject::new_test());
     cli_catalog_builder.add_value(JwtAuthenticationConfig::default());
     cli_catalog_builder.add_value(GithubAuthenticationConfig::default());
     cli_catalog_builder.add_value(kamu_adapter_flight_sql::SessionId(String::new()));

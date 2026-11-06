@@ -209,6 +209,10 @@ impl Parse for InputArgs {
         let mut fixture = None;
         let mut options = None;
         let mut extra_test_groups = None;
+        // `sqlite_only` or `postgres_only`: the fixture is wired for one
+        // database on purpose. The reason is for readers; the
+        // `e2e_storage_wiring` lint in `kamu-repo-tools` checks the other side
+        let mut single_storage: Option<Ident> = None;
 
         while !input.is_empty() {
             let key: Ident = input.parse()?;
@@ -236,9 +240,26 @@ impl Parse for InputArgs {
 
                     extra_test_groups = Some(value);
                 }
+                "sqlite_only" | "postgres_only" => {
+                    let reason: LitStr = input.parse()?;
+
+                    if reason.value().trim().is_empty() {
+                        return Err(syn::Error::new(
+                            reason.span(),
+                            format!("`{key}` needs a reason"),
+                        ));
+                    }
+                    if single_storage.replace(key.clone()).is_some() {
+                        return Err(syn::Error::new(
+                            key.span(),
+                            "Only one of `sqlite_only` and `postgres_only` is allowed",
+                        ));
+                    }
+                }
                 unexpected_key => panic!(
                     "Unexpected key: {unexpected_key}\nAllowable values: \"storage\", \
-                     \"fixture\", \"options\", and \"extra_test_groups\"."
+                     \"fixture\", \"options\", \"extra_test_groups\", \"sqlite_only\" and \
+                     \"postgres_only\"."
                 ),
             }
 
@@ -254,6 +275,16 @@ impl Parse for InputArgs {
         let Some(fixture) = fixture else {
             panic!("Mandatory parameter \"fixture\" not found");
         };
+
+        if let Some(single_storage) = &single_storage {
+            let expected_storage = single_storage.to_string().replace("_only", "");
+            if storage != expected_storage {
+                return Err(syn::Error::new(
+                    single_storage.span(),
+                    format!("`{single_storage}` needs `storage = {expected_storage}`"),
+                ));
+            }
+        }
 
         Ok(InputArgs {
             storage,

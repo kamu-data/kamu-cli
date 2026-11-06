@@ -21,6 +21,7 @@ use crate::{WorkspaceService, accounts, cli, odf_server, resource_context};
 pub fn get_command(
     base_catalog: &Catalog,
     cli_catalog: &Catalog,
+    background_catalog: &Catalog,
     args: cli::Cli,
     current_account_indication: CurrentAccountIndication,
 ) -> Result<Box<dyn TypedBuilder<dyn Command>>, CLIError> {
@@ -491,7 +492,7 @@ pub fn get_command(
                         sc.get_token,
                         args.e2e_output_data_path,
                         base_catalog.clone(),
-                        cli_catalog.clone(),
+                        background_catalog.clone(),
                     )
                     .cast(),
                 ),
@@ -589,6 +590,8 @@ pub fn get_command(
     Ok(command)
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 pub fn command_needs_transaction(args: &cli::Cli) -> bool {
     match &args.command {
         cli::Command::System(c) => match &c.subcommand {
@@ -598,8 +601,9 @@ pub fn command_needs_transaction(args: &cli::Cli) -> bool {
                     Some(cli::SystemApiServerSubCommand::GqlQuery(_))
                 )
             }
-            cli::SystemSubCommand::Compact(_)
-            | cli::SystemSubCommand::DebugToken(_)
+            // Opens short transactions of its own around the merge
+            cli::SystemSubCommand::Compact(_) => false,
+            cli::SystemSubCommand::DebugToken(_)
             | cli::SystemSubCommand::Depgraph(_)
             | cli::SystemSubCommand::Decode(_)
             | cli::SystemSubCommand::Diagnose(_)
@@ -645,6 +649,8 @@ pub fn command_needs_transaction(args: &cli::Cli) -> bool {
         | cli::Command::Version(_) => true,
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub fn command_needs_outbox_processing(args: &cli::Cli) -> bool {
     match &args.command {
@@ -697,6 +703,8 @@ pub fn command_needs_outbox_processing(args: &cli::Cli) -> bool {
         | cli::Command::Verify(_) => true,
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub fn command_needs_workspace(args: &cli::Cli) -> bool {
     match &args.command {
@@ -757,6 +765,8 @@ pub fn command_needs_workspace(args: &cli::Cli) -> bool {
     }
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 pub fn command_needs_startup_jobs(args: &cli::Cli) -> bool {
     // ToDo: Revisit and decide do all commands that require workspace
     // also require startup jobs
@@ -803,6 +813,8 @@ pub fn command_needs_startup_jobs(args: &cli::Cli) -> bool {
         | cli::Command::Version(_) => false,
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub fn command_needs_server_components(args: &cli::Cli) -> bool {
     match &args.command {
@@ -865,6 +877,8 @@ fn validate_dataset_ref(
     validate_dataset_ref_with_workspace(workspace_svc.as_ref(), dataset_ref)
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 pub(crate) fn validate_dataset_ref_with_workspace(
     workspace_svc: &WorkspaceService,
     dataset_ref: odf::DatasetRef,
@@ -880,6 +894,8 @@ pub(crate) fn validate_dataset_ref_with_workspace(
     }
     Ok(dataset_ref)
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub(crate) fn validate_dataset_ref_pattern_with_workspace(
     workspace_svc: &WorkspaceService,
@@ -902,6 +918,8 @@ pub(crate) fn validate_dataset_ref_pattern_with_workspace(
     }
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 pub(crate) fn validate_many_dataset_patterns_with_workspace<I>(
     workspace_svc: &WorkspaceService,
     dataset_ref_patterns: I,
@@ -914,6 +932,8 @@ where
         .map(|p| validate_dataset_ref_pattern_with_workspace(workspace_svc, p))
         .collect()
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 fn validate_many_dataset_refs<I>(
     catalog: &dill::Catalog,
@@ -929,6 +949,8 @@ where
 
     Ok(result_refs)
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 fn validate_many_dataset_patterns<I>(
     catalog: &dill::Catalog,

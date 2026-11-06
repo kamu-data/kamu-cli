@@ -1,0 +1,54 @@
+// Copyright Kamu Data, Inc. and contributors. All rights reserved.
+//
+// Use of this software is governed by the Business Source License
+// included in the LICENSE file.
+//
+// As of the Change Date specified in that file, in accordance with
+// the Business Source License, use of this software will be governed
+// by the Apache License, Version 2.0.
+
+use std::sync::Mutex;
+
+use crate::*;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl MockLocalSyncCommitter {
+    /// Expects one commit of a transfer up to `new_head`, answering with
+    /// `result`
+    pub fn make_expect_commit(
+        mut self,
+        new_head: odf::Multihash,
+        result: Result<SyncResult, SyncError>,
+    ) -> Self {
+        let result = Mutex::new(Some(result));
+        self.expect_commit()
+            .withf(move |transferred| transferred.new_head == new_head)
+            .times(1)
+            .returning(move |_| result.lock().unwrap().take().unwrap());
+        self
+    }
+
+    /// Expects one commit of a transfer into an existing dataset up to
+    /// `new_head`, moving `HEAD` from the head the transfer expected
+    pub fn make_expect_commit_into_existing(mut self, new_head: odf::Multihash) -> Self {
+        self.expect_commit()
+            .withf(move |transferred| transferred.new_head == new_head)
+            .times(1)
+            .returning(|transferred| {
+                let TransferredSyncTarget::Existing { expected_head, .. } = transferred.target
+                else {
+                    panic!("Expected a transfer into an existing dataset");
+                };
+                Ok(SyncResult::Updated {
+                    old_head: expected_head,
+                    new_head: transferred.new_head,
+                    num_blocks: transferred.num_blocks,
+                    increment: transferred.increment,
+                })
+            });
+        self
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

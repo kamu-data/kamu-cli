@@ -22,6 +22,7 @@ doctest = false
 
 [features]
 testing = [
+    "dep:futures",
     "dep:mockall",
     "dep:pretty_assertions",
 ]
@@ -45,6 +46,9 @@ thiserror = { version = "2", default-features = false, features = [
 ] }
 url = { version = "2", default-features = false }
 
+futures = { optional = true, version = "0.3", default-features = false, features = [
+    "alloc",
+] }
 mockall = { optional = true, version = "0.15", default-features = false }
 pretty_assertions = { optional = true, version = "1" }
 

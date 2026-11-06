@@ -109,7 +109,7 @@ impl CompleteCommand {
         {
             let mut datasets = registry.all_dataset_handles();
             while let Some(hdl) = datasets.try_next().await.int_err()? {
-                let aliases = reg.get_remote_aliases(&hdl).await.int_err()?;
+                let aliases = reg.get_remote_aliases(&hdl).await?;
                 for alias in aliases.get_by_kind(RemoteAliasKind::Pull) {
                     if alias.to_string().starts_with(prefix) {
                         writeln!(output, "{alias}").int_err()?;

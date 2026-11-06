@@ -15,11 +15,13 @@ use kamu_accounts::{
     AccountConfig,
     AccountPropertyName,
     CurrentAccountSubject,
+    CurrentAccountSubjectCatalogExt as _,
     DidEntity,
     DidSecretEncryptionConfig,
     DidSecretKey,
     DidSecretKeyRepository,
     PredefinedAccountsConfig,
+    Principal,
     SAMPLE_DID_SECRET_KEY_ENCRYPTION_KEY,
 };
 use kamu_accounts_inmem::{InMemoryAccountRepository, InMemoryDidSecretKeyRepository};
@@ -37,9 +39,9 @@ use kamu_auth_rebac_services::{
     RebacServiceImpl,
 };
 use kamu_datasets::{
-    AlwaysHappyDatasetActionAuthorizer,
-    DatasetActionAuthorizer,
-    MockDatasetActionAuthorizer,
+    AlwaysHappyDatasetPermissionChecker,
+    DatasetPermissionChecker,
+    MockDatasetPermissionChecker,
 };
 use kamu_signing::entities::IdentityConfig;
 use kamu_signing::use_cases::{SignEip712UseCase, SignEip712UseCaseOptions};
@@ -48,6 +50,8 @@ use kamu_signing_services::SignEip712UseCaseImpl;
 use pretty_assertions::assert_eq;
 use serde_json::{json, to_value};
 use time_source::SystemTimeSourceDefault;
+
+type Harness = SignEip712UseCaseHarness;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -125,8 +129,8 @@ async fn test_not_configured() {
         Err("Response signing is not configured by the node".to_string()),
         harness
             .execute_and_convert_to_json(
-                not_found_dataset_id().into(),
-                typed_data(),
+                Harness::not_found_dataset_id().into(),
+                Harness::typed_data(),
                 SignEip712UseCaseOptions {
                     include_node_proof: true,
                 },
@@ -139,85 +143,87 @@ async fn test_not_configured() {
 
 #[test_log::test(tokio::test)]
 async fn test_execute_matrix() {
-    for (subject, mock_dataset_action_authorizer, test_cases) in [
+    for (subject, mock_dataset_permission_checker, test_cases) in [
         // 1. Admin has access to all datasets / accounts
         (
             CurrentAccountSubject::logged(
                 kamu_accounts::Account::seed_resource_id_from_name(ADMIN),
-                admin_account_id(),
+                Harness::admin_account_id(),
                 odf::AccountName::new_unchecked(ADMIN),
             ),
-            mock_dataset_action_authorizer()
-                .expect_check_read_dataset(&molecule_dataset_id(), 1, true)
-                .expect_check_read_dataset(&molecule_project_dataset_id(), 1, true)
-                .expect_check_read_dataset(&molecule_dev_dataset_id(), 1, true)
-                .expect_check_read_dataset(&molecule_dev_project_dataset_id(), 1, true)
-                .expect_check_read_dataset(&user_dataset_id(), 1, true)
-                .expect_check_read_dataset(&not_found_dataset_id(), 1, false),
+            Harness::mock_dataset_permission_checker()
+                .expect_check_read_dataset(&Harness::molecule_dataset_id(), 1, true)
+                .expect_check_read_dataset(&Harness::molecule_project_dataset_id(), 1, true)
+                .expect_check_read_dataset(&Harness::molecule_dev_dataset_id(), 1, true)
+                .expect_check_read_dataset(&Harness::molecule_dev_project_dataset_id(), 1, true)
+                .expect_check_read_dataset(&Harness::user_dataset_id(), 1, true)
+                .expect_check_read_dataset(&Harness::not_found_dataset_id(), 1, false),
             [
                 // Datasets
                 (
                     "1) Test 1",
-                    odf::metadata::DidOdf::from(molecule_dataset_id()),
-                    Ok(expected_ok_response_for_molecule_dataset_id()),
+                    odf::metadata::DidOdf::from(Harness::molecule_dataset_id()),
+                    Ok(Harness::expected_ok_response_for_molecule_dataset_id()),
                 ),
                 (
                     "1) Test 2",
-                    molecule_project_dataset_id().into(),
-                    Ok(expected_ok_response_for_molecule_project_dataset_id()),
+                    Harness::molecule_project_dataset_id().into(),
+                    Ok(Harness::expected_ok_response_for_molecule_project_dataset_id()),
                 ),
                 (
                     "1) Test 3",
-                    molecule_dev_dataset_id().into(),
-                    Ok(expected_ok_response_for_molecule_dev_dataset_id()),
+                    Harness::molecule_dev_dataset_id().into(),
+                    Ok(Harness::expected_ok_response_for_molecule_dev_dataset_id()),
                 ),
                 (
                     "1) Test 4",
-                    molecule_dev_project_dataset_id().into(),
-                    Ok(expected_ok_response_for_molecule_dev_project_dataset_id()),
+                    Harness::molecule_dev_project_dataset_id().into(),
+                    Ok(Harness::expected_ok_response_for_molecule_dev_project_dataset_id()),
                 ),
                 (
                     "1) Test 5",
-                    user_dataset_id().into(),
-                    Ok(expected_ok_response_for_user_dataset_id()),
+                    Harness::user_dataset_id().into(),
+                    Ok(Harness::expected_ok_response_for_user_dataset_id()),
                 ),
                 (
                     "1) Test 6",
-                    not_found_dataset_id().into(),
-                    expected_not_found(not_found_dataset_id().into()),
+                    Harness::not_found_dataset_id().into(),
+                    Harness::expected_not_found(Harness::not_found_dataset_id().into()),
                 ),
                 // Accounts
                 (
                     "1) Test 7",
-                    to_odf_did(&molecule_account_id()),
-                    Ok(expected_ok_response_for_molecule_account_id()),
+                    Harness::to_odf_did(&Harness::molecule_account_id()),
+                    Ok(Harness::expected_ok_response_for_molecule_account_id()),
                 ),
                 // TODO: Uncomment after sku/molecule merging
                 // (
                 //     "1) Test 8",
-                //     to_odf_did(&molecule_project_account_id()),
-                //     Ok(expected_ok_response_for_molecule_project_account_id()),
+                //     Harness::to_odf_did(&Harness::molecule_project_account_id()),
+                //     Ok(Harness::expected_ok_response_for_molecule_project_account_id()),
                 // ),
                 (
                     "1) Test 9",
-                    to_odf_did(&molecule_dev_account_id()),
-                    Ok(expected_ok_response_for_molecule_dev_account_id()),
+                    Harness::to_odf_did(&Harness::molecule_dev_account_id()),
+                    Ok(Harness::expected_ok_response_for_molecule_dev_account_id()),
                 ),
                 // TODO: Uncomment after sku/molecule merging
                 // (
                 //     "1) Test 10",
-                //     to_odf_did(&molecule_dev_project_account_id()),
-                //     Ok(expected_ok_response_for_molecule_dev_project_account_id()),
+                //     Harness::to_odf_did(&Harness::molecule_dev_project_account_id()),
+                //     Ok(Harness::expected_ok_response_for_molecule_dev_project_account_id()),
                 // ),
                 (
                     "1) Test 11",
-                    to_odf_did(&user_account_id()),
-                    Ok(expected_ok_response_for_user_account_id()),
+                    Harness::to_odf_did(&Harness::user_account_id()),
+                    Ok(Harness::expected_ok_response_for_user_account_id()),
                 ),
                 (
                     "1) Test 12",
-                    to_odf_did(&not_found_account_id()),
-                    expected_not_found(to_odf_did(&not_found_account_id())),
+                    Harness::to_odf_did(&Harness::not_found_account_id()),
+                    Harness::expected_not_found(Harness::to_odf_did(
+                        &Harness::not_found_account_id(),
+                    )),
                 ),
             ],
         ),
@@ -225,80 +231,84 @@ async fn test_execute_matrix() {
         (
             CurrentAccountSubject::logged(
                 kamu_accounts::Account::seed_resource_id_from_name(MOLECULE),
-                molecule_account_id(),
+                Harness::molecule_account_id(),
                 odf::AccountName::new_unchecked(MOLECULE),
             ),
-            mock_dataset_action_authorizer()
-                .expect_check_read_dataset(&molecule_dataset_id(), 1, true)
-                .expect_check_read_dataset(&molecule_project_dataset_id(), 1, true)
-                .expect_check_read_dataset(&molecule_dev_dataset_id(), 1, false)
-                .expect_check_read_dataset(&molecule_dev_project_dataset_id(), 1, false)
-                .expect_check_read_dataset(&user_dataset_id(), 1, false)
-                .expect_check_read_dataset(&not_found_dataset_id(), 1, false),
+            Harness::mock_dataset_permission_checker()
+                .expect_check_read_dataset(&Harness::molecule_dataset_id(), 1, true)
+                .expect_check_read_dataset(&Harness::molecule_project_dataset_id(), 1, true)
+                .expect_check_read_dataset(&Harness::molecule_dev_dataset_id(), 1, false)
+                .expect_check_read_dataset(&Harness::molecule_dev_project_dataset_id(), 1, false)
+                .expect_check_read_dataset(&Harness::user_dataset_id(), 1, false)
+                .expect_check_read_dataset(&Harness::not_found_dataset_id(), 1, false),
             [
                 // Datasets
                 (
                     "2) Test 1",
-                    odf::metadata::DidOdf::from(molecule_dataset_id()),
-                    Ok(expected_ok_response_for_molecule_dataset_id()),
+                    odf::metadata::DidOdf::from(Harness::molecule_dataset_id()),
+                    Ok(Harness::expected_ok_response_for_molecule_dataset_id()),
                 ),
                 (
                     "2) Test 2",
-                    molecule_project_dataset_id().into(),
-                    Ok(expected_ok_response_for_molecule_project_dataset_id()),
+                    Harness::molecule_project_dataset_id().into(),
+                    Ok(Harness::expected_ok_response_for_molecule_project_dataset_id()),
                 ),
                 (
                     "2) Test 3",
-                    molecule_dev_dataset_id().into(),
-                    expected_not_found(molecule_dev_dataset_id().into()),
+                    Harness::molecule_dev_dataset_id().into(),
+                    Harness::expected_not_found(Harness::molecule_dev_dataset_id().into()),
                 ),
                 (
                     "2) Test 4",
-                    molecule_dev_project_dataset_id().into(),
-                    expected_not_found(molecule_dev_project_dataset_id().into()),
+                    Harness::molecule_dev_project_dataset_id().into(),
+                    Harness::expected_not_found(Harness::molecule_dev_project_dataset_id().into()),
                 ),
                 (
                     "2) Test 5",
-                    user_dataset_id().into(),
-                    expected_not_found(user_dataset_id().into()),
+                    Harness::user_dataset_id().into(),
+                    Harness::expected_not_found(Harness::user_dataset_id().into()),
                 ),
                 (
                     "2) Test 6",
-                    not_found_dataset_id().into(),
-                    expected_not_found(not_found_dataset_id().into()),
+                    Harness::not_found_dataset_id().into(),
+                    Harness::expected_not_found(Harness::not_found_dataset_id().into()),
                 ),
                 // Accounts
                 (
                     "2) Test 7",
-                    to_odf_did(&molecule_account_id()),
-                    Ok(expected_ok_response_for_molecule_account_id()),
+                    Harness::to_odf_did(&Harness::molecule_account_id()),
+                    Ok(Harness::expected_ok_response_for_molecule_account_id()),
                 ),
                 // TODO: Uncomment after sku/molecule merging
                 // (
                 //     "2) Test 8",
-                //     to_odf_did(&molecule_project_account_id()),
-                //     Ok(expected_ok_response_for_molecule_project_account_id()),
+                //     Harness::to_odf_did(&Harness::molecule_project_account_id()),
+                //     Ok(Harness::expected_ok_response_for_molecule_project_account_id()),
                 // ),
                 (
                     "2) Test 9",
-                    to_odf_did(&molecule_dev_account_id()),
-                    expected_not_found(to_odf_did(&molecule_dev_account_id())),
+                    Harness::to_odf_did(&Harness::molecule_dev_account_id()),
+                    Harness::expected_not_found(Harness::to_odf_did(
+                        &Harness::molecule_dev_account_id(),
+                    )),
                 ),
                 // TODO: Uncomment after sku/molecule merging
                 // (
                 //     "2) Test 10",
-                //     to_odf_did(&molecule_dev_project_account_id()),
-                //     expected_not_found(to_odf_did(&molecule_dev_project_account_id())),
-                // ),
+                //     Harness::to_odf_did(&Harness::molecule_dev_project_account_id()),
+                //     Harness::expected_not_found(Harness::to_odf_did(&
+                // Harness::molecule_dev_project_account_id())), ),
                 (
                     "2) Test 11",
-                    to_odf_did(&user_account_id()),
-                    expected_not_found(to_odf_did(&user_account_id())),
+                    Harness::to_odf_did(&Harness::user_account_id()),
+                    Harness::expected_not_found(Harness::to_odf_did(&Harness::user_account_id())),
                 ),
                 (
                     "2) Test 12",
-                    to_odf_did(&not_found_account_id()),
-                    expected_not_found(to_odf_did(&not_found_account_id())),
+                    Harness::to_odf_did(&Harness::not_found_account_id()),
+                    Harness::expected_not_found(Harness::to_odf_did(
+                        &Harness::not_found_account_id(),
+                    )),
                 ),
             ],
         ),
@@ -306,80 +316,84 @@ async fn test_execute_matrix() {
         (
             CurrentAccountSubject::logged(
                 kamu_accounts::Account::seed_resource_id_from_name(MOLECULE_DEV),
-                molecule_dev_account_id(),
+                Harness::molecule_dev_account_id(),
                 odf::AccountName::new_unchecked(MOLECULE_DEV),
             ),
-            mock_dataset_action_authorizer()
-                .expect_check_read_dataset(&molecule_dataset_id(), 1, false)
-                .expect_check_read_dataset(&molecule_project_dataset_id(), 1, false)
-                .expect_check_read_dataset(&molecule_dev_dataset_id(), 1, true)
-                .expect_check_read_dataset(&molecule_dev_project_dataset_id(), 1, true)
-                .expect_check_read_dataset(&user_dataset_id(), 1, false)
-                .expect_check_read_dataset(&not_found_dataset_id(), 1, false),
+            Harness::mock_dataset_permission_checker()
+                .expect_check_read_dataset(&Harness::molecule_dataset_id(), 1, false)
+                .expect_check_read_dataset(&Harness::molecule_project_dataset_id(), 1, false)
+                .expect_check_read_dataset(&Harness::molecule_dev_dataset_id(), 1, true)
+                .expect_check_read_dataset(&Harness::molecule_dev_project_dataset_id(), 1, true)
+                .expect_check_read_dataset(&Harness::user_dataset_id(), 1, false)
+                .expect_check_read_dataset(&Harness::not_found_dataset_id(), 1, false),
             [
                 // Datasets
                 (
                     "3) Test 1",
-                    odf::metadata::DidOdf::from(molecule_dataset_id()),
-                    expected_not_found(molecule_dataset_id().into()),
+                    odf::metadata::DidOdf::from(Harness::molecule_dataset_id()),
+                    Harness::expected_not_found(Harness::molecule_dataset_id().into()),
                 ),
                 (
                     "3) Test 2",
-                    molecule_project_dataset_id().into(),
-                    expected_not_found(molecule_project_dataset_id().into()),
+                    Harness::molecule_project_dataset_id().into(),
+                    Harness::expected_not_found(Harness::molecule_project_dataset_id().into()),
                 ),
                 (
                     "3) Test 3",
-                    molecule_dev_dataset_id().into(),
-                    Ok(expected_ok_response_for_molecule_dev_dataset_id()),
+                    Harness::molecule_dev_dataset_id().into(),
+                    Ok(Harness::expected_ok_response_for_molecule_dev_dataset_id()),
                 ),
                 (
                     "3) Test 4",
-                    molecule_dev_project_dataset_id().into(),
-                    Ok(expected_ok_response_for_molecule_dev_project_dataset_id()),
+                    Harness::molecule_dev_project_dataset_id().into(),
+                    Ok(Harness::expected_ok_response_for_molecule_dev_project_dataset_id()),
                 ),
                 (
                     "3) Test 5",
-                    user_dataset_id().into(),
-                    expected_not_found(user_dataset_id().into()),
+                    Harness::user_dataset_id().into(),
+                    Harness::expected_not_found(Harness::user_dataset_id().into()),
                 ),
                 (
                     "3) Test 6",
-                    not_found_dataset_id().into(),
-                    expected_not_found(not_found_dataset_id().into()),
+                    Harness::not_found_dataset_id().into(),
+                    Harness::expected_not_found(Harness::not_found_dataset_id().into()),
                 ),
                 // Accounts
                 (
                     "3) Test 7",
-                    to_odf_did(&molecule_account_id()),
-                    expected_not_found(to_odf_did(&molecule_account_id())),
+                    Harness::to_odf_did(&Harness::molecule_account_id()),
+                    Harness::expected_not_found(Harness::to_odf_did(
+                        &Harness::molecule_account_id(),
+                    )),
                 ),
                 // TODO: Uncomment after sku/molecule merging
                 // (
                 //     "3) Test 8",
-                //     to_odf_did(&molecule_project_account_id()),
-                //     expected_not_found(to_odf_did(&molecule_project_account_id())),
-                // ),
+                //     Harness::to_odf_did(&Harness::molecule_project_account_id()),
+                //     Harness::expected_not_found(Harness::to_odf_did(&
+                // Harness::molecule_project_account_id())), ),
                 (
                     "3) Test 9",
-                    to_odf_did(&molecule_dev_account_id()),
-                    Ok(expected_ok_response_for_molecule_dev_account_id()),
+                    Harness::to_odf_did(&Harness::molecule_dev_account_id()),
+                    Ok(Harness::expected_ok_response_for_molecule_dev_account_id()),
                 ),
                 // TODO: Uncomment after sku/molecule merging
                 // (
                 //     "3) Test 10",
-                //     to_odf_did(&molecule_dev_project_account_id()),
-                //     Ok(expected_ok_response_for_molecule_dev_project_account_id()),
+                //     Harness::to_odf_did(&Harness::molecule_dev_project_account_id()),
+                //     Ok(Harness::expected_ok_response_for_molecule_dev_project_account_id()),
                 // ),
                 (
                     "3) Test 11",
-                    to_odf_did(&user_account_id()),
-                    expected_not_found(to_odf_did(&user_account_id())),
+                    Harness::to_odf_did(&Harness::user_account_id()),
+                    Harness::expected_not_found(Harness::to_odf_did(&Harness::user_account_id())),
                 ),
                 (
                     "3) Test 12",
-                    to_odf_did(&not_found_account_id()),
-                    expected_not_found(to_odf_did(&not_found_account_id())),
+                    Harness::to_odf_did(&Harness::not_found_account_id()),
+                    Harness::expected_not_found(Harness::to_odf_did(
+                        &Harness::not_found_account_id(),
+                    )),
                 ),
             ],
         ),
@@ -387,164 +401,176 @@ async fn test_execute_matrix() {
         (
             CurrentAccountSubject::logged(
                 kamu_accounts::Account::seed_resource_id_from_name(USER),
-                user_account_id(),
+                Harness::user_account_id(),
                 odf::AccountName::new_unchecked(USER),
             ),
-            mock_dataset_action_authorizer()
-                .expect_check_read_dataset(&molecule_dataset_id(), 1, false)
-                .expect_check_read_dataset(&molecule_project_dataset_id(), 1, false)
-                .expect_check_read_dataset(&molecule_dev_dataset_id(), 1, false)
-                .expect_check_read_dataset(&molecule_dev_project_dataset_id(), 1, false)
-                .expect_check_read_dataset(&user_dataset_id(), 1, true)
-                .expect_check_read_dataset(&not_found_dataset_id(), 1, false),
+            Harness::mock_dataset_permission_checker()
+                .expect_check_read_dataset(&Harness::molecule_dataset_id(), 1, false)
+                .expect_check_read_dataset(&Harness::molecule_project_dataset_id(), 1, false)
+                .expect_check_read_dataset(&Harness::molecule_dev_dataset_id(), 1, false)
+                .expect_check_read_dataset(&Harness::molecule_dev_project_dataset_id(), 1, false)
+                .expect_check_read_dataset(&Harness::user_dataset_id(), 1, true)
+                .expect_check_read_dataset(&Harness::not_found_dataset_id(), 1, false),
             [
                 // Datasets
                 (
                     "4) Test 1",
-                    odf::metadata::DidOdf::from(molecule_dataset_id()),
-                    expected_not_found(molecule_dataset_id().into()),
+                    odf::metadata::DidOdf::from(Harness::molecule_dataset_id()),
+                    Harness::expected_not_found(Harness::molecule_dataset_id().into()),
                 ),
                 (
                     "4) Test 2",
-                    molecule_project_dataset_id().into(),
-                    expected_not_found(molecule_project_dataset_id().into()),
+                    Harness::molecule_project_dataset_id().into(),
+                    Harness::expected_not_found(Harness::molecule_project_dataset_id().into()),
                 ),
                 (
                     "4) Test 3",
-                    molecule_dev_dataset_id().into(),
-                    expected_not_found(molecule_dev_dataset_id().into()),
+                    Harness::molecule_dev_dataset_id().into(),
+                    Harness::expected_not_found(Harness::molecule_dev_dataset_id().into()),
                 ),
                 (
                     "4) Test 4",
-                    molecule_dev_project_dataset_id().into(),
-                    expected_not_found(molecule_dev_project_dataset_id().into()),
+                    Harness::molecule_dev_project_dataset_id().into(),
+                    Harness::expected_not_found(Harness::molecule_dev_project_dataset_id().into()),
                 ),
                 (
                     "4) Test 5",
-                    user_dataset_id().into(),
-                    Ok(expected_ok_response_for_user_dataset_id()),
+                    Harness::user_dataset_id().into(),
+                    Ok(Harness::expected_ok_response_for_user_dataset_id()),
                 ),
                 (
                     "4) Test 6",
-                    not_found_dataset_id().into(),
-                    expected_not_found(not_found_dataset_id().into()),
+                    Harness::not_found_dataset_id().into(),
+                    Harness::expected_not_found(Harness::not_found_dataset_id().into()),
                 ),
                 // Accounts
                 (
                     "4) Test 7",
-                    to_odf_did(&molecule_account_id()),
-                    expected_not_found(to_odf_did(&molecule_account_id())),
+                    Harness::to_odf_did(&Harness::molecule_account_id()),
+                    Harness::expected_not_found(Harness::to_odf_did(
+                        &Harness::molecule_account_id(),
+                    )),
                 ),
                 // TODO: Uncomment after sku/molecule merging
                 // (
                 //     "4) Test 8",
-                //     to_odf_did(&molecule_project_account_id()),
-                //     expected_not_found(to_odf_did(&molecule_project_account_id())),
-                // ),
+                //     Harness::to_odf_did(&Harness::molecule_project_account_id()),
+                //     Harness::expected_not_found(Harness::to_odf_did(&
+                // Harness::molecule_project_account_id())), ),
                 (
                     "4) Test 9",
-                    to_odf_did(&molecule_dev_account_id()),
-                    expected_not_found(to_odf_did(&molecule_dev_account_id())),
+                    Harness::to_odf_did(&Harness::molecule_dev_account_id()),
+                    Harness::expected_not_found(Harness::to_odf_did(
+                        &Harness::molecule_dev_account_id(),
+                    )),
                 ),
                 // TODO: Uncomment after sku/molecule merging
                 // (
                 //     "4) Test 10",
-                //     to_odf_did(&molecule_dev_project_account_id()),
-                //     expected_not_found(to_odf_did(&molecule_dev_project_account_id())),
-                // ),
+                //     Harness::to_odf_did(&Harness::molecule_dev_project_account_id()),
+                //     Harness::expected_not_found(Harness::to_odf_did(&
+                // Harness::molecule_dev_project_account_id())), ),
                 (
                     "4) Test 11",
-                    to_odf_did(&user_account_id()),
-                    Ok(expected_ok_response_for_user_account_id()),
+                    Harness::to_odf_did(&Harness::user_account_id()),
+                    Ok(Harness::expected_ok_response_for_user_account_id()),
                 ),
                 (
                     "4) Test 12",
-                    to_odf_did(&not_found_account_id()),
-                    expected_not_found(to_odf_did(&not_found_account_id())),
+                    Harness::to_odf_did(&Harness::not_found_account_id()),
+                    Harness::expected_not_found(Harness::to_odf_did(
+                        &Harness::not_found_account_id(),
+                    )),
                 ),
             ],
         ),
         // 5. Anonymous has no access to any datasets / accounts
         (
             CurrentAccountSubject::anonymous_no_authentication_provided(),
-            mock_dataset_action_authorizer()
-                .expect_check_read_dataset(&molecule_dataset_id(), 1, false)
-                .expect_check_read_dataset(&molecule_project_dataset_id(), 1, false)
-                .expect_check_read_dataset(&molecule_dev_dataset_id(), 1, false)
-                .expect_check_read_dataset(&molecule_dev_project_dataset_id(), 1, false)
-                .expect_check_read_dataset(&user_dataset_id(), 1, false)
-                .expect_check_read_dataset(&not_found_dataset_id(), 1, false),
+            Harness::mock_dataset_permission_checker()
+                .expect_check_read_dataset(&Harness::molecule_dataset_id(), 1, false)
+                .expect_check_read_dataset(&Harness::molecule_project_dataset_id(), 1, false)
+                .expect_check_read_dataset(&Harness::molecule_dev_dataset_id(), 1, false)
+                .expect_check_read_dataset(&Harness::molecule_dev_project_dataset_id(), 1, false)
+                .expect_check_read_dataset(&Harness::user_dataset_id(), 1, false)
+                .expect_check_read_dataset(&Harness::not_found_dataset_id(), 1, false),
             [
                 // Datasets
                 (
                     "5) Test 1",
-                    odf::metadata::DidOdf::from(molecule_dataset_id()),
-                    expected_not_found(molecule_dataset_id().into()),
+                    odf::metadata::DidOdf::from(Harness::molecule_dataset_id()),
+                    Harness::expected_not_found(Harness::molecule_dataset_id().into()),
                 ),
                 (
                     "5) Test 2",
-                    molecule_project_dataset_id().into(),
-                    expected_not_found(molecule_project_dataset_id().into()),
+                    Harness::molecule_project_dataset_id().into(),
+                    Harness::expected_not_found(Harness::molecule_project_dataset_id().into()),
                 ),
                 (
                     "5) Test 3",
-                    molecule_dev_dataset_id().into(),
-                    expected_not_found(molecule_dev_dataset_id().into()),
+                    Harness::molecule_dev_dataset_id().into(),
+                    Harness::expected_not_found(Harness::molecule_dev_dataset_id().into()),
                 ),
                 (
                     "5) Test 4",
-                    molecule_dev_project_dataset_id().into(),
-                    expected_not_found(molecule_dev_project_dataset_id().into()),
+                    Harness::molecule_dev_project_dataset_id().into(),
+                    Harness::expected_not_found(Harness::molecule_dev_project_dataset_id().into()),
                 ),
                 (
                     "5) Test 5",
-                    user_dataset_id().into(),
-                    expected_not_found(user_dataset_id().into()),
+                    Harness::user_dataset_id().into(),
+                    Harness::expected_not_found(Harness::user_dataset_id().into()),
                 ),
                 (
                     "5) Test 6",
-                    not_found_dataset_id().into(),
-                    expected_not_found(not_found_dataset_id().into()),
+                    Harness::not_found_dataset_id().into(),
+                    Harness::expected_not_found(Harness::not_found_dataset_id().into()),
                 ),
                 // Accounts
                 (
                     "5) Test 7",
-                    to_odf_did(&molecule_account_id()),
-                    expected_not_found(to_odf_did(&molecule_account_id())),
+                    Harness::to_odf_did(&Harness::molecule_account_id()),
+                    Harness::expected_not_found(Harness::to_odf_did(
+                        &Harness::molecule_account_id(),
+                    )),
                 ),
                 // TODO: Uncomment after sku/molecule merging
                 // (
                 //     "5) Test 8",
-                //     to_odf_did(&molecule_project_account_id()),
-                //     expected_not_found(to_odf_did(&molecule_project_account_id())),
-                // ),
+                //     Harness::to_odf_did(&Harness::molecule_project_account_id()),
+                //     Harness::expected_not_found(Harness::to_odf_did(&
+                // Harness::molecule_project_account_id())), ),
                 (
                     "5) Test 9",
-                    to_odf_did(&molecule_dev_account_id()),
-                    expected_not_found(to_odf_did(&molecule_dev_account_id())),
+                    Harness::to_odf_did(&Harness::molecule_dev_account_id()),
+                    Harness::expected_not_found(Harness::to_odf_did(
+                        &Harness::molecule_dev_account_id(),
+                    )),
                 ),
                 // TODO: Uncomment after sku/molecule merging
                 // (
                 //     "5) Test 10",
-                //     to_odf_did(&molecule_dev_project_account_id()),
-                //     expected_not_found(to_odf_did(&molecule_dev_project_account_id())),
-                // ),
+                //     Harness::to_odf_did(&Harness::molecule_dev_project_account_id()),
+                //     Harness::expected_not_found(Harness::to_odf_did(&
+                // Harness::molecule_dev_project_account_id())), ),
                 (
                     "5) Test 11",
-                    to_odf_did(&user_account_id()),
-                    expected_not_found(to_odf_did(&user_account_id())),
+                    Harness::to_odf_did(&Harness::user_account_id()),
+                    Harness::expected_not_found(Harness::to_odf_did(&Harness::user_account_id())),
                 ),
                 (
                     "5) Test 12",
-                    to_odf_did(&not_found_account_id()),
-                    expected_not_found(to_odf_did(&not_found_account_id())),
+                    Harness::to_odf_did(&Harness::not_found_account_id()),
+                    Harness::expected_not_found(Harness::to_odf_did(
+                        &Harness::not_found_account_id(),
+                    )),
                 ),
             ],
         ),
     ] {
         let harness = SignEip712UseCaseHarness::builder()
             .current_account_subject(subject.clone())
-            .maybe_mock_dataset_action_authorizer(mock_dataset_action_authorizer)
+            .maybe_mock_dataset_permission_checker(mock_dataset_permission_checker)
             .has_identity_config(true)
             .build()
             .await;
@@ -555,7 +581,7 @@ async fn test_execute_matrix() {
                 harness
                     .execute_and_convert_to_json(
                         did_odf,
-                        typed_data(),
+                        Harness::typed_data(),
                         SignEip712UseCaseOptions {
                             include_node_proof: true,
                         },
@@ -566,6 +592,47 @@ async fn test_execute_matrix() {
                 tag
             );
         }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_node_signs_with_dataset_keys_but_not_account_keys() {
+    let harness = SignEip712UseCaseHarness::builder()
+        .current_account_subject(CurrentAccountSubject::new_test())
+        .maybe_principal(Principal::Node)
+        .has_identity_config(true)
+        .build()
+        .await;
+
+    for (did_odf, expected_response) in [
+        (
+            odf::metadata::DidOdf::from(Harness::molecule_dataset_id()),
+            Ok(Harness::expected_ok_response_for_molecule_dataset_id()),
+        ),
+        (
+            Harness::to_odf_did(&Harness::molecule_account_id()),
+            Harness::expected_not_found(Harness::to_odf_did(&Harness::molecule_account_id())),
+        ),
+        (
+            Harness::to_odf_did(&Harness::admin_account_id()),
+            Harness::expected_not_found(Harness::to_odf_did(&Harness::admin_account_id())),
+        ),
+    ] {
+        assert_eq!(
+            expected_response,
+            harness
+                .execute_and_convert_to_json(
+                    did_odf,
+                    Harness::typed_data(),
+                    SignEip712UseCaseOptions {
+                        include_node_proof: true,
+                    },
+                )
+                .await,
+            "DID: {did_odf:?}",
+        );
     }
 }
 
@@ -582,8 +649,10 @@ impl SignEip712UseCaseHarness {
     #[builder]
     pub async fn new(
         current_account_subject: CurrentAccountSubject,
-        maybe_mock_dataset_action_authorizer: Option<MockDatasetActionAuthorizer>,
+        maybe_mock_dataset_permission_checker: Option<MockDatasetPermissionChecker>,
         has_identity_config: bool,
+        /// Acts as this principal instead of the one the subject authenticates
+        maybe_principal: Option<Principal>,
     ) -> Self {
         let mut b = dill::CatalogBuilder::new();
 
@@ -650,13 +719,20 @@ impl SignEip712UseCaseHarness {
             b.add_value(identity_config);
         }
 
-        b.add_value(current_account_subject);
+        match maybe_principal {
+            Some(principal) => {
+                b.add_value(current_account_subject).add_value(principal);
+            }
+            None => {
+                b.add_current_account_subject(current_account_subject);
+            }
+        }
 
-        if let Some(mock_dataset_action_authorizer) = maybe_mock_dataset_action_authorizer {
-            b.add_value(mock_dataset_action_authorizer)
-                .bind::<dyn DatasetActionAuthorizer, MockDatasetActionAuthorizer>();
+        if let Some(mock_dataset_permission_checker) = maybe_mock_dataset_permission_checker {
+            b.add_value(mock_dataset_permission_checker)
+                .bind::<dyn DatasetPermissionChecker, MockDatasetPermissionChecker>();
         } else {
-            b.add::<AlwaysHappyDatasetActionAuthorizer>();
+            b.add::<AlwaysHappyDatasetPermissionChecker>();
         }
 
         NoOpDatabasePlugin::init_database_components(&mut b);
@@ -671,23 +747,23 @@ impl SignEip712UseCaseHarness {
         // For accounts, DID secrets are already saved -- add for datasets
         for (did_entity, private_key_bytes) in [
             (
-                DidEntity::new_dataset(molecule_dataset_id().to_string()),
+                DidEntity::new_dataset(Self::molecule_dataset_id().to_string()),
                 [1; _],
             ),
             (
-                DidEntity::new_dataset(molecule_project_dataset_id().to_string()),
+                DidEntity::new_dataset(Self::molecule_project_dataset_id().to_string()),
                 [2; _],
             ),
             (
-                DidEntity::new_dataset(molecule_dev_dataset_id().to_string()),
+                DidEntity::new_dataset(Self::molecule_dev_dataset_id().to_string()),
                 [3; _],
             ),
             (
-                DidEntity::new_dataset(molecule_dev_project_dataset_id().to_string()),
+                DidEntity::new_dataset(Self::molecule_dev_project_dataset_id().to_string()),
                 [4; _],
             ),
             (
-                DidEntity::new_dataset(user_dataset_id().to_string()),
+                DidEntity::new_dataset(Self::user_dataset_id().to_string()),
                 [5; _],
             ),
         ] {
@@ -718,308 +794,322 @@ impl SignEip712UseCaseHarness {
             .map(|res| to_value(res).unwrap())
             .map_err(|e| e.to_string())
     }
+
+    fn mock_dataset_permission_checker() -> MockDatasetPermissionChecker {
+        MockDatasetPermissionChecker::new()
+            // NOTE: At the time of the request, we don't know what the DID is, so we can check it
+            //       for the account as well
+            .expect_check_read_dataset(&Self::to_dataset_id(&Self::molecule_account_id()), 1, false)
+            // TODO: Uncomment after sku/molecule merging
+            // .expect_check_read_dataset(&Self::to_dataset_id(&
+            // Self::molecule_project_account_id()), 1, false)
+            .expect_check_read_dataset(
+                &Self::to_dataset_id(&Self::molecule_dev_account_id()),
+                1,
+                false,
+            )
+            // TODO: Uncomment after sku/molecule merging
+            // .expect_check_read_dataset(&Self::to_dataset_id(&
+            // Self::molecule_dev_project_account_id()), 1, false)
+            .expect_check_read_dataset(&Self::to_dataset_id(&Self::user_account_id()), 1, false)
+            .expect_check_read_dataset(
+                &Self::to_dataset_id(&Self::not_found_account_id()),
+                1,
+                false,
+            )
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Helpers
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// Account IDs
-fn molecule_account_id() -> odf::AccountID {
-    odf::AccountID::from_signing_key(&odf::metadata::PrivateKey::from_bytes(&MOLECULE_KEY))
-}
+impl SignEip712UseCaseHarness {
+    // Account IDs
+    fn molecule_account_id() -> odf::AccountID {
+        odf::AccountID::from_signing_key(&odf::metadata::PrivateKey::from_bytes(&MOLECULE_KEY))
+    }
 
-#[expect(
-    unused,
-    reason = "used by test cases disabled until sku/molecule merging (see TODO above)"
-)]
-fn molecule_project_account_id() -> odf::AccountID {
-    odf::AccountID::from_signing_key(&odf::metadata::PrivateKey::from_bytes(
-        &MOLECULE_PROJECT_KEY,
-    ))
-}
+    #[expect(
+        unused,
+        reason = "used by test cases disabled until sku/molecule merging (see TODO above)"
+    )]
+    fn molecule_project_account_id() -> odf::AccountID {
+        odf::AccountID::from_signing_key(&odf::metadata::PrivateKey::from_bytes(
+            &MOLECULE_PROJECT_KEY,
+        ))
+    }
 
-fn molecule_dev_account_id() -> odf::AccountID {
-    odf::AccountID::from_signing_key(&odf::metadata::PrivateKey::from_bytes(&MOLECULE_DEV_KEY))
-}
+    fn molecule_dev_account_id() -> odf::AccountID {
+        odf::AccountID::from_signing_key(&odf::metadata::PrivateKey::from_bytes(&MOLECULE_DEV_KEY))
+    }
 
-#[expect(
-    unused,
-    reason = "used by test cases disabled until sku/molecule merging (see TODO above)"
-)]
-fn molecule_dev_project_account_id() -> odf::AccountID {
-    odf::AccountID::from_signing_key(&odf::metadata::PrivateKey::from_bytes(
-        &MOLECULE_DEV_PROJECT_KEY,
-    ))
-}
+    #[expect(
+        unused,
+        reason = "used by test cases disabled until sku/molecule merging (see TODO above)"
+    )]
+    fn molecule_dev_project_account_id() -> odf::AccountID {
+        odf::AccountID::from_signing_key(&odf::metadata::PrivateKey::from_bytes(
+            &MOLECULE_DEV_PROJECT_KEY,
+        ))
+    }
 
-fn user_account_id() -> odf::AccountID {
-    odf::AccountID::from_signing_key(&odf::metadata::PrivateKey::from_bytes(&USER_KEY))
-}
+    fn user_account_id() -> odf::AccountID {
+        odf::AccountID::from_signing_key(&odf::metadata::PrivateKey::from_bytes(&USER_KEY))
+    }
 
-fn admin_account_id() -> odf::AccountID {
-    odf::AccountID::from_signing_key(&odf::metadata::PrivateKey::from_bytes(&ADMIN_KEY))
-}
+    fn admin_account_id() -> odf::AccountID {
+        odf::AccountID::from_signing_key(&odf::metadata::PrivateKey::from_bytes(&ADMIN_KEY))
+    }
 
-fn not_found_account_id() -> odf::AccountID {
-    odf::metadata::testing::account_id(&"not_found_account_id")
-}
+    fn not_found_account_id() -> odf::AccountID {
+        odf::metadata::testing::account_id(&"not_found_account_id")
+    }
 
-fn to_odf_did(account_id: &odf::AccountID) -> odf::metadata::DidOdf {
-    *account_id.as_did_odf().unwrap()
-}
+    fn to_odf_did(account_id: &odf::AccountID) -> odf::metadata::DidOdf {
+        *account_id.as_did_odf().unwrap()
+    }
 
-fn to_dataset_id(account_id: &odf::AccountID) -> odf::DatasetID {
-    (*account_id.as_did_odf().unwrap()).into()
-}
+    fn to_dataset_id(account_id: &odf::AccountID) -> odf::DatasetID {
+        (*account_id.as_did_odf().unwrap()).into()
+    }
 
-// Dataset IDs
+    // Dataset IDs
 
-fn molecule_dataset_id() -> odf::DatasetID {
-    odf::DatasetID::new_seeded_ed25519("dataset1".as_bytes())
-}
+    fn molecule_dataset_id() -> odf::DatasetID {
+        odf::DatasetID::new_seeded_ed25519("dataset1".as_bytes())
+    }
 
-fn molecule_project_dataset_id() -> odf::DatasetID {
-    odf::DatasetID::new_seeded_ed25519("dataset2".as_bytes())
-}
+    fn molecule_project_dataset_id() -> odf::DatasetID {
+        odf::DatasetID::new_seeded_ed25519("dataset2".as_bytes())
+    }
 
-fn molecule_dev_dataset_id() -> odf::DatasetID {
-    odf::DatasetID::new_seeded_ed25519("dataset3".as_bytes())
-}
+    fn molecule_dev_dataset_id() -> odf::DatasetID {
+        odf::DatasetID::new_seeded_ed25519("dataset3".as_bytes())
+    }
 
-fn molecule_dev_project_dataset_id() -> odf::DatasetID {
-    odf::DatasetID::new_seeded_ed25519("dataset4".as_bytes())
-}
+    fn molecule_dev_project_dataset_id() -> odf::DatasetID {
+        odf::DatasetID::new_seeded_ed25519("dataset4".as_bytes())
+    }
 
-fn user_dataset_id() -> odf::DatasetID {
-    odf::DatasetID::new_seeded_ed25519("dataset5".as_bytes())
-}
+    fn user_dataset_id() -> odf::DatasetID {
+        odf::DatasetID::new_seeded_ed25519("dataset5".as_bytes())
+    }
 
-fn not_found_dataset_id() -> odf::DatasetID {
-    odf::DatasetID::new_seeded_ed25519("not_found_dataset_id".as_bytes())
-}
+    fn not_found_dataset_id() -> odf::DatasetID {
+        odf::DatasetID::new_seeded_ed25519("not_found_dataset_id".as_bytes())
+    }
 
-fn typed_data() -> Eip712TypedData {
-    // Adapted from:
-    // EIP-712 LinkDidRequest — Handoff for Kamu
-    // https://github.com/moleculeprotocol/onchainlabs/blob/main/docs/identity/kamu-eip712-linkdidrequest-handoff.md
-    Eip712TypedData::from_json(json!({
-        "domain": {
-            "name": "MoleculeOclDidRegistry",
-            "version": "1",
-            "chainId": 8453,
-            "verifyingContract": "0x00000000000000000000000000000000DeaDBeeF"
-        },
-        "types": {
-            "LinkDidRequest": [
-                {
-                    "name": "oclId",
-                    "type": "bytes32"
-                },
-                {
-                    "name": "provider",
-                    "type": "bytes32"
-                },
-                {
-                    "name": "subject",
-                    "type": "bytes32"
-                },
-                {
-                    "name": "did",
-                    "type": "string"
-                },
-                {
-                    "name": "requestId",
-                    "type": "bytes32"
-                },
-                {
-                    "name": "deadline",
-                    "type": "uint256"
-                }
-            ]
-        },
-        "primaryType": "LinkDidRequest",
-        "message": {
-            "oclId": "0x0101000000000000000000000000000000000000000000000000000000000042",
-            "provider": "0xd025eab60676ea26fe9a9a945c991e6d0f3f06e3a940bb5123899345a9b2a413",
-            "subject": "0xd844bb55167ab332117049e2ccd3d8863d241bcc80f46302310a6d942a90e851",
-            "did": "did:odf:ed25519:z6MkhaXgBZDvotAccount",
-            "requestId": "0xad68a4a8b76681274554d59f863c35d7abcef09a798c99e9717a2582037764a5",
-            "deadline": "1893456000",
-        },
-    }))
-    .unwrap()
-}
-
-fn mock_dataset_action_authorizer() -> MockDatasetActionAuthorizer {
-    MockDatasetActionAuthorizer::new()
-        // NOTE: At the time of the request, we don't know what the DID is, so we can check it
-        //       for the account as well
-        .expect_check_read_dataset(&to_dataset_id(&molecule_account_id()), 1, false)
-        // TODO: Uncomment after sku/molecule merging
-        // .expect_check_read_dataset(&to_dataset_id(&molecule_project_account_id()), 1, false)
-        .expect_check_read_dataset(&to_dataset_id(&molecule_dev_account_id()), 1, false)
-        // TODO: Uncomment after sku/molecule merging
-        // .expect_check_read_dataset(&to_dataset_id(&molecule_dev_project_account_id()), 1, false)
-        .expect_check_read_dataset(&to_dataset_id(&user_account_id()), 1, false)
-        .expect_check_read_dataset(&to_dataset_id(&not_found_account_id()), 1, false)
+    fn typed_data() -> Eip712TypedData {
+        // Adapted from:
+        // EIP-712 LinkDidRequest — Handoff for Kamu
+        // https://github.com/moleculeprotocol/onchainlabs/blob/main/docs/identity/kamu-eip712-linkdidrequest-handoff.md
+        Eip712TypedData::from_json(json!({
+            "domain": {
+                "name": "MoleculeOclDidRegistry",
+                "version": "1",
+                "chainId": 8453,
+                "verifyingContract": "0x00000000000000000000000000000000DeaDBeeF"
+            },
+            "types": {
+                "LinkDidRequest": [
+                    {
+                        "name": "oclId",
+                        "type": "bytes32"
+                    },
+                    {
+                        "name": "provider",
+                        "type": "bytes32"
+                    },
+                    {
+                        "name": "subject",
+                        "type": "bytes32"
+                    },
+                    {
+                        "name": "did",
+                        "type": "string"
+                    },
+                    {
+                        "name": "requestId",
+                        "type": "bytes32"
+                    },
+                    {
+                        "name": "deadline",
+                        "type": "uint256"
+                    }
+                ]
+            },
+            "primaryType": "LinkDidRequest",
+            "message": {
+                "oclId": "0x0101000000000000000000000000000000000000000000000000000000000042",
+                "provider": "0xd025eab60676ea26fe9a9a945c991e6d0f3f06e3a940bb5123899345a9b2a413",
+                "subject": "0xd844bb55167ab332117049e2ccd3d8863d241bcc80f46302310a6d942a90e851",
+                "did": "did:odf:ed25519:z6MkhaXgBZDvotAccount",
+                "requestId": "0xad68a4a8b76681274554d59f863c35d7abcef09a798c99e9717a2582037764a5",
+                "deadline": "1893456000",
+            },
+        }))
+        .unwrap()
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Responses
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// Accounts
+impl SignEip712UseCaseHarness {
+    // Accounts
 
-fn expected_ok_response_for_molecule_account_id() -> serde_json::Value {
-    json!({
-        "type": "Ed25519Signature2020",
-        "verificationMethod": "did:key:z6Mkon3Necd6NkkyfoGoHxid2znGc59LU3K7mubaRcFbLfLX",
-        "signature": "uP2Wm1caUZkB2h0eF5uWMohhOV1JBeFdpJuPJhp8JFmIZlShUwsCta13xf1r6jyRnqiwLyNYNG4ByirYTtjQGBA",
-        "proof": {
-            "type": "EcdsaSecp256k1Signature2019",
-            "verificationMethod": "0x03993fbdd2f7a840b78202496af7e699dc9fcd1667f16dcce73887d563f448cc31",
-            "signature": "0x1d16b5f09481dcb5e7a8e58d9d7585c00d930d551b6c693894ebb74319f0f04f6792c9bbbc00cf3a8bca166dc7054e9b8da615b21be89e914b8074776a79f3f01c"
-        }
-    })
-}
+    fn expected_ok_response_for_molecule_account_id() -> serde_json::Value {
+        json!({
+            "type": "Ed25519Signature2020",
+            "verificationMethod": "did:key:z6Mkon3Necd6NkkyfoGoHxid2znGc59LU3K7mubaRcFbLfLX",
+            "signature": "uP2Wm1caUZkB2h0eF5uWMohhOV1JBeFdpJuPJhp8JFmIZlShUwsCta13xf1r6jyRnqiwLyNYNG4ByirYTtjQGBA",
+            "proof": {
+                "type": "EcdsaSecp256k1Signature2019",
+                "verificationMethod": "0x03993fbdd2f7a840b78202496af7e699dc9fcd1667f16dcce73887d563f448cc31",
+                "signature": "0x1d16b5f09481dcb5e7a8e58d9d7585c00d930d551b6c693894ebb74319f0f04f6792c9bbbc00cf3a8bca166dc7054e9b8da615b21be89e914b8074776a79f3f01c"
+            }
+        })
+    }
 
-#[expect(
-    unused,
-    reason = "used by test cases disabled until sku/molecule merging (see TODO above)"
-)]
-fn expected_ok_response_for_molecule_project_account_id() -> serde_json::Value {
-    json!({
-        "type": "Ed25519Signature2020",
-        "verificationMethod": "did:key:z6MkvDqGT54cXesYGvABpF1UapVNwjCqRcafi4Px6Thv5T3Z",
-        "signature": "uDvYYfeTTyCHDN7yiejdz2FBBQeugEb5XeYSAQn7Dtu4zW1N1c1c20r5PHRXXSKgnQrhZIbF3eqPQHh5JJQZBAg",
-        "proof": {
-            "type": "EcdsaSecp256k1Signature2019",
-            "verificationMethod": "0x03993fbdd2f7a840b78202496af7e699dc9fcd1667f16dcce73887d563f448cc31",
-            "signature": "0xaeeb5aa5680969eccfc1ccc71cb3eb17873eaef29dcda27d7c5e8ebdbf4a43c53ca5879367481281d50eaa766bd8ffd7510f50c2d3f4813161894862942ed8281b"
-        }
-    })
-}
+    #[expect(
+        unused,
+        reason = "used by test cases disabled until sku/molecule merging (see TODO above)"
+    )]
+    fn expected_ok_response_for_molecule_project_account_id() -> serde_json::Value {
+        json!({
+            "type": "Ed25519Signature2020",
+            "verificationMethod": "did:key:z6MkvDqGT54cXesYGvABpF1UapVNwjCqRcafi4Px6Thv5T3Z",
+            "signature": "uDvYYfeTTyCHDN7yiejdz2FBBQeugEb5XeYSAQn7Dtu4zW1N1c1c20r5PHRXXSKgnQrhZIbF3eqPQHh5JJQZBAg",
+            "proof": {
+                "type": "EcdsaSecp256k1Signature2019",
+                "verificationMethod": "0x03993fbdd2f7a840b78202496af7e699dc9fcd1667f16dcce73887d563f448cc31",
+                "signature": "0xaeeb5aa5680969eccfc1ccc71cb3eb17873eaef29dcda27d7c5e8ebdbf4a43c53ca5879367481281d50eaa766bd8ffd7510f50c2d3f4813161894862942ed8281b"
+            }
+        })
+    }
 
-fn expected_ok_response_for_molecule_dev_account_id() -> serde_json::Value {
-    json!({
-        "type": "Ed25519Signature2020",
-        "verificationMethod": "did:key:z6MkvRXNYcE7MMduynWTgeKbDaT1iijDSC8pZqXZc8rHPrf2",
-        "signature": "ujeZTyGt6emrpISPWgwD-bbxAD69vCVXgIvzAjKcAQwi66K4FcoYd8z7sMt6MwJf8n2jPG7cQtoo59EF5fBD6CA",
-        "proof": {
-            "type": "EcdsaSecp256k1Signature2019",
-            "verificationMethod": "0x03993fbdd2f7a840b78202496af7e699dc9fcd1667f16dcce73887d563f448cc31",
-            "signature": "0xa303ef06e8fc3cc01beddcaeab7c32a5d17c70e3b5c55f54879c5c4940e9e2f653343bc05c6a2cc4c704aace774cc805d47042667e6143335d1074bc9d5ca0c51b"
-        }
-    })
-}
+    fn expected_ok_response_for_molecule_dev_account_id() -> serde_json::Value {
+        json!({
+            "type": "Ed25519Signature2020",
+            "verificationMethod": "did:key:z6MkvRXNYcE7MMduynWTgeKbDaT1iijDSC8pZqXZc8rHPrf2",
+            "signature": "ujeZTyGt6emrpISPWgwD-bbxAD69vCVXgIvzAjKcAQwi66K4FcoYd8z7sMt6MwJf8n2jPG7cQtoo59EF5fBD6CA",
+            "proof": {
+                "type": "EcdsaSecp256k1Signature2019",
+                "verificationMethod": "0x03993fbdd2f7a840b78202496af7e699dc9fcd1667f16dcce73887d563f448cc31",
+                "signature": "0xa303ef06e8fc3cc01beddcaeab7c32a5d17c70e3b5c55f54879c5c4940e9e2f653343bc05c6a2cc4c704aace774cc805d47042667e6143335d1074bc9d5ca0c51b"
+            }
+        })
+    }
 
-#[expect(
-    unused,
-    reason = "used by test cases disabled until sku/molecule merging (see TODO above)"
-)]
-fn expected_ok_response_for_molecule_dev_project_account_id() -> serde_json::Value {
-    json!({
-        "type": "Ed25519Signature2020",
-        "verificationMethod": "did:key:z6MkwVDfCg9LbbY6xjH3EZk8YSFQZujV5Y4y1ZWeER9tDiN3",
-        "signature": "uFTIojN2XAPslAtHYHGEhlkIp_LyK8IcJZgsPn9B2yII-VDkAHNTnYKrM7ejpwwEEZN3JL88yFAOAyJ6TDcoLAQ",
-        "proof": {
-            "type": "EcdsaSecp256k1Signature2019",
-            "verificationMethod": "0x03993fbdd2f7a840b78202496af7e699dc9fcd1667f16dcce73887d563f448cc31",
-            "signature": "0x37e23c26b4383f38225269bd3a38724952fb24b2c20f3f022540a9b62ef6c369652b00ec6a98a15902334cbc992dc5bca6c11f8e615a376e6e1d809499d07a2a1c"
-        }
-    })
-}
+    #[expect(
+        unused,
+        reason = "used by test cases disabled until sku/molecule merging (see TODO above)"
+    )]
+    fn expected_ok_response_for_molecule_dev_project_account_id() -> serde_json::Value {
+        json!({
+            "type": "Ed25519Signature2020",
+            "verificationMethod": "did:key:z6MkwVDfCg9LbbY6xjH3EZk8YSFQZujV5Y4y1ZWeER9tDiN3",
+            "signature": "uFTIojN2XAPslAtHYHGEhlkIp_LyK8IcJZgsPn9B2yII-VDkAHNTnYKrM7ejpwwEEZN3JL88yFAOAyJ6TDcoLAQ",
+            "proof": {
+                "type": "EcdsaSecp256k1Signature2019",
+                "verificationMethod": "0x03993fbdd2f7a840b78202496af7e699dc9fcd1667f16dcce73887d563f448cc31",
+                "signature": "0x37e23c26b4383f38225269bd3a38724952fb24b2c20f3f022540a9b62ef6c369652b00ec6a98a15902334cbc992dc5bca6c11f8e615a376e6e1d809499d07a2a1c"
+            }
+        })
+    }
 
-fn expected_ok_response_for_user_account_id() -> serde_json::Value {
-    json!({
-        "type": "Ed25519Signature2020",
-        "verificationMethod": "did:key:z6MkmtWtY63GQVBrpMyRJWEzsnxfsGkemu6CtMDwGTv4RYj2",
-        "signature": "u5LoI2Nv7HkxihalcMhkNq7PKh39FR_doSNE-IpNAsVK3-Mozp5REKvdk2N19BF3l5nr3YtYABV-spDC0qdl6Cg",
-        "proof": {
-            "type": "EcdsaSecp256k1Signature2019",
-            "verificationMethod": "0x03993fbdd2f7a840b78202496af7e699dc9fcd1667f16dcce73887d563f448cc31",
-            "signature": "0x9cb3b2bfe670e16ab19670d7a5bfd5fb159a1cf3bb4d3948c8015eb1dbd87bf775fe66258964416cf9e0f74e11f926b1bedb1ab450da72f5698f0c5ea68653001b"
-        }
-    })
-}
+    fn expected_ok_response_for_user_account_id() -> serde_json::Value {
+        json!({
+            "type": "Ed25519Signature2020",
+            "verificationMethod": "did:key:z6MkmtWtY63GQVBrpMyRJWEzsnxfsGkemu6CtMDwGTv4RYj2",
+            "signature": "u5LoI2Nv7HkxihalcMhkNq7PKh39FR_doSNE-IpNAsVK3-Mozp5REKvdk2N19BF3l5nr3YtYABV-spDC0qdl6Cg",
+            "proof": {
+                "type": "EcdsaSecp256k1Signature2019",
+                "verificationMethod": "0x03993fbdd2f7a840b78202496af7e699dc9fcd1667f16dcce73887d563f448cc31",
+                "signature": "0x9cb3b2bfe670e16ab19670d7a5bfd5fb159a1cf3bb4d3948c8015eb1dbd87bf775fe66258964416cf9e0f74e11f926b1bedb1ab450da72f5698f0c5ea68653001b"
+            }
+        })
+    }
 
-// Datasets
+    // Datasets
 
-// 1) Ok
+    // 1) Ok
 
-fn expected_ok_response_for_molecule_dataset_id() -> serde_json::Value {
-    json!({
-        "type": "Ed25519Signature2020",
-        "verificationMethod": "did:key:z6Mkon3Necd6NkkyfoGoHxid2znGc59LU3K7mubaRcFbLfLX",
-        "signature": "uP2Wm1caUZkB2h0eF5uWMohhOV1JBeFdpJuPJhp8JFmIZlShUwsCta13xf1r6jyRnqiwLyNYNG4ByirYTtjQGBA",
-        "proof": {
-            "type": "EcdsaSecp256k1Signature2019",
-            "verificationMethod": "0x03993fbdd2f7a840b78202496af7e699dc9fcd1667f16dcce73887d563f448cc31",
-            "signature": "0x1d16b5f09481dcb5e7a8e58d9d7585c00d930d551b6c693894ebb74319f0f04f6792c9bbbc00cf3a8bca166dc7054e9b8da615b21be89e914b8074776a79f3f01c"
-        }
-    })
-}
+    fn expected_ok_response_for_molecule_dataset_id() -> serde_json::Value {
+        json!({
+            "type": "Ed25519Signature2020",
+            "verificationMethod": "did:key:z6Mkon3Necd6NkkyfoGoHxid2znGc59LU3K7mubaRcFbLfLX",
+            "signature": "uP2Wm1caUZkB2h0eF5uWMohhOV1JBeFdpJuPJhp8JFmIZlShUwsCta13xf1r6jyRnqiwLyNYNG4ByirYTtjQGBA",
+            "proof": {
+                "type": "EcdsaSecp256k1Signature2019",
+                "verificationMethod": "0x03993fbdd2f7a840b78202496af7e699dc9fcd1667f16dcce73887d563f448cc31",
+                "signature": "0x1d16b5f09481dcb5e7a8e58d9d7585c00d930d551b6c693894ebb74319f0f04f6792c9bbbc00cf3a8bca166dc7054e9b8da615b21be89e914b8074776a79f3f01c"
+            }
+        })
+    }
 
-fn expected_ok_response_for_molecule_project_dataset_id() -> serde_json::Value {
-    json!({
-        "type": "Ed25519Signature2020",
-        "verificationMethod": "did:key:z6Mko9hTggMwjSTEaJaPUfE6tqcy2xvU6BnNq3e3o8qVBiyH",
-        "signature": "uNMrt0vM--o3MG4Oz39lBtSVSJ9gZYAY5a-kM6IJqCEAyrHXlqkrvV4Jo4V0NwbXssrL9QkN-nWwG83kkk7mbAw",
-        "proof": {
-            "type": "EcdsaSecp256k1Signature2019",
-            "verificationMethod": "0x03993fbdd2f7a840b78202496af7e699dc9fcd1667f16dcce73887d563f448cc31",
-            "signature": "0xc5058b3334b01617293815af7fb8d8db17cba8b8140f497bc0adaf3e71d570777e7b55ac818898114ad1eeb4ad9a2afd2a653b3ab208141ce223c788ec0f9e6a1c"
-        }
-    })
-}
+    fn expected_ok_response_for_molecule_project_dataset_id() -> serde_json::Value {
+        json!({
+            "type": "Ed25519Signature2020",
+            "verificationMethod": "did:key:z6Mko9hTggMwjSTEaJaPUfE6tqcy2xvU6BnNq3e3o8qVBiyH",
+            "signature": "uNMrt0vM--o3MG4Oz39lBtSVSJ9gZYAY5a-kM6IJqCEAyrHXlqkrvV4Jo4V0NwbXssrL9QkN-nWwG83kkk7mbAw",
+            "proof": {
+                "type": "EcdsaSecp256k1Signature2019",
+                "verificationMethod": "0x03993fbdd2f7a840b78202496af7e699dc9fcd1667f16dcce73887d563f448cc31",
+                "signature": "0xc5058b3334b01617293815af7fb8d8db17cba8b8140f497bc0adaf3e71d570777e7b55ac818898114ad1eeb4ad9a2afd2a653b3ab208141ce223c788ec0f9e6a1c"
+            }
+        })
+    }
 
-fn expected_ok_response_for_molecule_dev_dataset_id() -> serde_json::Value {
-    json!({
-        "type": "Ed25519Signature2020",
-        "verificationMethod": "did:key:z6MkvRXNYcE7MMduynWTgeKbDaT1iijDSC8pZqXZc8rHPrf2",
-        "signature": "ujeZTyGt6emrpISPWgwD-bbxAD69vCVXgIvzAjKcAQwi66K4FcoYd8z7sMt6MwJf8n2jPG7cQtoo59EF5fBD6CA",
-        "proof": {
-            "type": "EcdsaSecp256k1Signature2019",
-            "verificationMethod": "0x03993fbdd2f7a840b78202496af7e699dc9fcd1667f16dcce73887d563f448cc31",
-            "signature": "0xa303ef06e8fc3cc01beddcaeab7c32a5d17c70e3b5c55f54879c5c4940e9e2f653343bc05c6a2cc4c704aace774cc805d47042667e6143335d1074bc9d5ca0c51b"
-        }
-    })
-}
+    fn expected_ok_response_for_molecule_dev_dataset_id() -> serde_json::Value {
+        json!({
+            "type": "Ed25519Signature2020",
+            "verificationMethod": "did:key:z6MkvRXNYcE7MMduynWTgeKbDaT1iijDSC8pZqXZc8rHPrf2",
+            "signature": "ujeZTyGt6emrpISPWgwD-bbxAD69vCVXgIvzAjKcAQwi66K4FcoYd8z7sMt6MwJf8n2jPG7cQtoo59EF5fBD6CA",
+            "proof": {
+                "type": "EcdsaSecp256k1Signature2019",
+                "verificationMethod": "0x03993fbdd2f7a840b78202496af7e699dc9fcd1667f16dcce73887d563f448cc31",
+                "signature": "0xa303ef06e8fc3cc01beddcaeab7c32a5d17c70e3b5c55f54879c5c4940e9e2f653343bc05c6a2cc4c704aace774cc805d47042667e6143335d1074bc9d5ca0c51b"
+            }
+        })
+    }
 
-fn expected_ok_response_for_molecule_dev_project_dataset_id() -> serde_json::Value {
-    json!({
-        "type": "Ed25519Signature2020",
-        "verificationMethod": "did:key:z6Mkt6316e2PN3mZdB6N9CrzomJYUd1s5yBZi1XYHmwT9TUP",
-        "signature": "ulIf24QdmjFyuBJMopZpTZ6Ehjpk8z1i0Am8rxBP6_9S23YNsnVCnHIhtjrbIuR76mACCFQfE1gjW75pKgjaSAw",
-        "proof": {
-            "type": "EcdsaSecp256k1Signature2019",
-            "verificationMethod": "0x03993fbdd2f7a840b78202496af7e699dc9fcd1667f16dcce73887d563f448cc31",
-            "signature": "0xe47b0b9f0017e32fd0de8f3378b2252f29fec678725e8937df5d3d07801d3cc749012a21722b96b53a46f1c64dab0cad3340aa18fc93965eab056740198155331b"
-        }
-    })
-}
+    fn expected_ok_response_for_molecule_dev_project_dataset_id() -> serde_json::Value {
+        json!({
+            "type": "Ed25519Signature2020",
+            "verificationMethod": "did:key:z6Mkt6316e2PN3mZdB6N9CrzomJYUd1s5yBZi1XYHmwT9TUP",
+            "signature": "ulIf24QdmjFyuBJMopZpTZ6Ehjpk8z1i0Am8rxBP6_9S23YNsnVCnHIhtjrbIuR76mACCFQfE1gjW75pKgjaSAw",
+            "proof": {
+                "type": "EcdsaSecp256k1Signature2019",
+                "verificationMethod": "0x03993fbdd2f7a840b78202496af7e699dc9fcd1667f16dcce73887d563f448cc31",
+                "signature": "0xe47b0b9f0017e32fd0de8f3378b2252f29fec678725e8937df5d3d07801d3cc749012a21722b96b53a46f1c64dab0cad3340aa18fc93965eab056740198155331b"
+            }
+        })
+    }
 
-fn expected_ok_response_for_user_dataset_id() -> serde_json::Value {
-    json!({
-        "type": "Ed25519Signature2020",
-        "verificationMethod": "did:key:z6MkmtWtY63GQVBrpMyRJWEzsnxfsGkemu6CtMDwGTv4RYj2",
-        "signature": "u5LoI2Nv7HkxihalcMhkNq7PKh39FR_doSNE-IpNAsVK3-Mozp5REKvdk2N19BF3l5nr3YtYABV-spDC0qdl6Cg",
-        "proof": {
-            "type": "EcdsaSecp256k1Signature2019",
-            "verificationMethod": "0x03993fbdd2f7a840b78202496af7e699dc9fcd1667f16dcce73887d563f448cc31",
-            "signature": "0x9cb3b2bfe670e16ab19670d7a5bfd5fb159a1cf3bb4d3948c8015eb1dbd87bf775fe66258964416cf9e0f74e11f926b1bedb1ab450da72f5698f0c5ea68653001b"
-        }
-    })
-}
+    fn expected_ok_response_for_user_dataset_id() -> serde_json::Value {
+        json!({
+            "type": "Ed25519Signature2020",
+            "verificationMethod": "did:key:z6MkmtWtY63GQVBrpMyRJWEzsnxfsGkemu6CtMDwGTv4RYj2",
+            "signature": "u5LoI2Nv7HkxihalcMhkNq7PKh39FR_doSNE-IpNAsVK3-Mozp5REKvdk2N19BF3l5nr3YtYABV-spDC0qdl6Cg",
+            "proof": {
+                "type": "EcdsaSecp256k1Signature2019",
+                "verificationMethod": "0x03993fbdd2f7a840b78202496af7e699dc9fcd1667f16dcce73887d563f448cc31",
+                "signature": "0x9cb3b2bfe670e16ab19670d7a5bfd5fb159a1cf3bb4d3948c8015eb1dbd87bf775fe66258964416cf9e0f74e11f926b1bedb1ab450da72f5698f0c5ea68653001b"
+            }
+        })
+    }
 
-// 2) Err
+    // 2) Err
 
-fn expected_not_found(did_odf: odf::metadata::DidOdf) -> Result<serde_json::Value, String> {
-    Err(format!(
-        "Secret key was not found for DID '{}'",
-        did_odf.as_did_str()
-    ))
+    fn expected_not_found(did_odf: odf::metadata::DidOdf) -> Result<serde_json::Value, String> {
+        Err(format!(
+            "Secret key was not found for DID '{}'",
+            did_odf.as_did_str()
+        ))
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

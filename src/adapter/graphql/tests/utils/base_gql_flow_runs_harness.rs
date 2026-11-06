@@ -13,7 +13,7 @@ use std::num::NonZeroUsize;
 use async_graphql::value;
 use chrono::{DateTime, Duration, DurationRound, Utc};
 use indoc::indoc;
-use kamu::TransformRequestPlannerImpl;
+use kamu::TransformPlannerImpl;
 use kamu_adapter_flow_dataset::*;
 use kamu_adapter_flow_webhook::webhook_deliver_binding;
 use kamu_core::TenancyConfig;
@@ -49,6 +49,24 @@ pub struct BaseGQLFlowRunsHarness {
 #[derive(Default)]
 pub struct FlowRunsHarnessOverrides {
     pub dataset_changes_mock: Option<MockDatasetIncrementQueryService>,
+}
+
+/// Block a triggered reset flow moves the dataset head to
+#[derive(Clone, Copy)]
+pub enum ResetFlowMode<'a> {
+    Custom { new_head_hash: &'a odf::Multihash },
+    ToSeed,
+}
+
+impl ResetFlowMode<'_> {
+    fn to_input_value(self) -> async_graphql::Value {
+        match self {
+            Self::Custom { new_head_hash } => value!({
+                "custom": { "newHeadHash": new_head_hash.to_string() }
+            }),
+            Self::ToSeed => value!({ "toSeed": {} }),
+        }
+    }
 }
 
 impl BaseGQLFlowRunsHarness {
@@ -109,7 +127,7 @@ impl BaseGQLFlowRunsHarness {
             .add::<TaskSchedulerImpl>()
             .add::<InMemoryTaskEventStore>()
             .add::<InMemoryTaskQueueWakeupSource>()
-            .add::<TransformRequestPlannerImpl>()
+            .add::<TransformPlannerImpl>()
             .add::<FakeDependencyGraphIndexer>()
             .add::<DeleteDatasetUseCaseImpl>();
 
@@ -275,23 +293,19 @@ impl BaseGQLFlowRunsHarness {
     pub fn trigger_reset_flow_mutation(
         &self,
         id: &odf::DatasetID,
-        new_head_hash: &odf::Multihash,
+        mode: ResetFlowMode<'_>,
         old_head_hash: &odf::Multihash,
     ) -> GraphQLQueryRequest {
         let mutation_code = indoc!(
             r#"
-            mutation($datasetId: DatasetID!, $newHeadHash: String!, $oldHeadHash: String!) {
+            mutation($datasetId: DatasetID!, $mode: FlowConfigInputResetPropagationMode!, $oldHeadHash: String!) {
                 datasets {
                     byId (datasetId: $datasetId) {
                         flows {
                             runs {
                                 triggerResetFlow (
                                     resetConfigInput: {
-                                        mode: {
-                                            custom: {
-                                                newHeadHash: $newHeadHash
-                                            }
-                                        },
+                                        mode: $mode,
                                         oldHeadHash: $oldHeadHash,
                                     }
                                 ) {
@@ -339,7 +353,7 @@ impl BaseGQLFlowRunsHarness {
             mutation_code,
             async_graphql::Variables::from_value(value!({
                 "datasetId": id.to_string(),
-                "newHeadHash": new_head_hash.to_string(),
+                "mode": mode.to_input_value(),
                 "oldHeadHash": old_head_hash.to_string()
             })),
         )

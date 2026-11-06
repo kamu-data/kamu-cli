@@ -288,7 +288,7 @@ impl Command for AddCommand {
 
         let create_options = CreateDatasetUseCaseOptions {
             dataset_visibility: self.dataset_visibility,
-            seed_block_bytes: None,
+            ..Default::default()
         };
         let mut add_results = self
             .create_datasets_from_snapshots(snapshots, create_options)

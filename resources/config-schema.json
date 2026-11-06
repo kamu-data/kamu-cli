@@ -488,7 +488,7 @@
           "description": "UNSTABLE: Default engine images"
         },
         "maxConcurrency": {
-          "description": "Maximum number of engine operations that can be performed concurrently",
+          "description": "Maximum number of engine operations that can be performed concurrently.\nDefaults to the number of CPU cores, and is always one with host networking",
           "format": "uint32",
           "minimum": 0,
           "type": [
@@ -891,6 +891,13 @@
             "preResolveDnslink": true
           },
           "description": "IPFS configuration"
+        },
+        "smartTransferProtocol": {
+          "$ref": "#/$defs/SmartTransferProtocolConfig",
+          "default": {
+            "uploadProgressInterval": "10s"
+          },
+          "description": "Smart transfer protocol configuration"
         }
       },
       "type": "object"
@@ -1101,6 +1108,17 @@
             "string",
             "null"
           ]
+        }
+      },
+      "type": "object"
+    },
+    "SmartTransferProtocolConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "uploadProgressInterval": {
+          "$ref": "#/$defs/DurationString",
+          "default": "10s",
+          "description": "How often the server asks a pushing client for upload progress. Keep it\nbelow the idle timeout of load balancers in front of the server, or\nthey close the connection during long uploads"
         }
       },
       "type": "object"
@@ -1322,6 +1340,9 @@
         "ipfs": {
           "httpGateway": "http://localhost:8080/",
           "preResolveDnslink": true
+        },
+        "smartTransferProtocol": {
+          "uploadProgressInterval": "10s"
         }
       },
       "description": "Network protocols configuration"

@@ -15,6 +15,8 @@ use kamu_datasets::DatasetRegistry;
 
 use super::{CLIError, Command};
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[dill::component]
 #[dill::interface(dyn Command)]
 pub struct SetWatermarkCommand {
@@ -97,6 +99,7 @@ impl Command for SetWatermarkCommand {
                 e @ (SetWatermarkError::Planning(
                     SetWatermarkPlanningError::IsRemote | SetWatermarkPlanningError::IsDerivative,
                 )
+                | SetWatermarkError::Execution(SetWatermarkExecutionError::RefCASFailed(_))
                 | SetWatermarkError::Access(_)),
             ) => Err(CLIError::failure(e)),
             Err(
@@ -108,3 +111,5 @@ impl Command for SetWatermarkCommand {
         }
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

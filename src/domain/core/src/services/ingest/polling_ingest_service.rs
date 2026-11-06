@@ -8,14 +8,13 @@
 // by the Apache License, Version 2.0.
 
 use std::backtrace::Backtrace;
-use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
 use container_runtime::ImagePullError;
 use internal_error::{BoxedError, InternalError};
-use kamu_datasets::{DatasetEnvVar, FindDatasetEnvVarError, ResolvedDataset};
+use kamu_datasets::{FindDatasetEnvVarError, ResolvedDataset};
 use thiserror::Error;
 
 use crate::engine::{EngineError, ProcessError, normalize_logs};
@@ -28,15 +27,20 @@ use crate::*;
 #[cfg_attr(feature = "testing", mockall::automock)]
 #[async_trait::async_trait]
 pub trait PollingIngestService: Send + Sync {
-    /// Uses polling source definition in metadata to ingest data from an
-    /// external source
+    /// Runs one iteration of a plan from [`PollingIngestPlanner`] and appends
+    /// the new blocks without moving `HEAD`; the caller commits `HEAD` from
+    /// `old_head` to `new_head` and reports the outcome. The listener gets
+    /// `begin` and progress. `operation_id` names the attempt's working
+    /// directory, which only a failed attempt keeps.
     async fn ingest(
         &self,
         target: ResolvedDataset,
-        metadata_state: Box<DataWriterMetadataState>,
+        plan: PollingIngestPlan,
         options: PollingIngestOptions,
+        env_vars: &IngestEnvVars,
+        operation_id: &str,
         maybe_listener: Option<Arc<dyn PollingIngestListener>>,
-    ) -> Result<PollingIngestResponse, PollingIngestError>;
+    ) -> Result<PollingIngestResult, PollingIngestError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -45,12 +49,6 @@ pub trait PollingIngestService: Send + Sync {
 pub struct PollingIngestOptions {
     /// Fetch latest data from uncacheable data sources
     pub fetch_uncacheable: bool,
-    /// Pull sources that yield multiple data files until they are
-    /// fully exhausted
-    pub exhaust_sources: bool,
-    /// Dataset env vars to use if such presented in dataset metadata
-    /// to use during fetch phase
-    pub dataset_env_vars: HashMap<String, DatasetEnvVar>,
     /// Schema inference configuration
     pub schema_inference: SchemaInferenceOpts,
 }
@@ -77,23 +75,26 @@ impl Default for SchemaInferenceOpts {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug)]
-pub struct PollingIngestResponse {
-    pub result: PollingIngestResult,
-    pub metadata_state: Option<Box<DataWriterMetadataState>>,
-}
-
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum PollingIngestResult {
     UpToDate {
-        no_source_defined: bool,
+        /// The dataset has data but its source records no state to compare
+        /// with, so a change cannot be detected without fetching
         uncacheable: bool,
     },
     Updated {
         old_head: odf::Multihash,
         new_head: odf::Multihash,
+        /// The source has more data than this iteration fetched
         has_more: bool,
         uncacheable: bool,
+        /// Blocks, records and watermark between `old_head` and `new_head`
+        increment: odf::dataset::MetadataChainIncrementInterval,
+        /// Source state recorded by the new blocks
+        new_source_state: Option<odf::metadata::SourceState>,
+        /// Writer state after the new blocks, to plan the next iteration from
+        /// once `HEAD` is committed
+        metadata_state: Box<DataWriterMetadataState>,
     },
 }
 
@@ -112,12 +113,17 @@ pub enum PollingIngestStage {
     Commit,
 }
 
+/// Progress of a polling ingest. The ingest service reports `begin` and the
+/// progress of each iteration; the pull reports `success` once an iteration
+/// is committed, and ends with `error` or `no_polling_source` otherwise
 pub trait PollingIngestListener: Send + Sync {
     fn begin(&self) {}
     fn on_cache_hit(&self, _created_at: &DateTime<Utc>) {}
     fn on_stage_progress(&self, _stage: PollingIngestStage, _progress: u64, _out_of: TotalSteps) {}
     fn success(&self, _result: &PollingIngestResult) {}
-    fn error(&self, _error: &PollingIngestError) {}
+    fn error(&self, _error: &PullError) {}
+    /// The dataset defines no polling source, so there is nothing to ingest
+    fn no_polling_source(&self) {}
 
     fn get_pull_image_listener(self: Arc<Self>) -> Option<Arc<dyn PullImageListener>> {
         None
@@ -147,9 +153,6 @@ pub trait PollingIngestMultiListener: Send + Sync {
     }
 }
 
-pub struct NullPollingIngestMultiListener;
-impl PollingIngestMultiListener for NullPollingIngestMultiListener {}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Errors
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -178,6 +181,23 @@ impl InvalidIngestParameterFormat {
         Self {
             name: name.into(),
             value: value.into(),
+        }
+    }
+}
+
+/// The fetch step cannot be carried out as written, so fetching again fails
+/// the same way
+#[derive(Error, Debug)]
+#[error("Invalid fetch step")]
+pub struct InvalidFetchStepError {
+    #[source]
+    pub source: BoxedError,
+}
+
+impl InvalidFetchStepError {
+    pub fn new(source: impl Into<BoxedError>) -> Self {
+        Self {
+            source: source.into(),
         }
     }
 }
@@ -342,6 +362,13 @@ pub enum PollingIngestError {
     ),
 
     #[error(transparent)]
+    InvalidFetchStep(
+        #[from]
+        #[backtrace]
+        InvalidFetchStepError,
+    ),
+
+    #[error(transparent)]
     Internal(
         #[from]
         #[backtrace]
@@ -361,6 +388,35 @@ impl From<FindDatasetEnvVarError> for PollingIngestError {
 }
 
 impl PollingIngestError {
+    /// Whether running the same ingest again could succeed. Errors caused by
+    /// the source definition or by the fetched data fail the same way on a
+    /// retry, which resumes from the same savepoint.
+    pub fn is_recoverable(&self) -> bool {
+        match self {
+            Self::EngineError(e) => e.is_recoverable(),
+            Self::EngineProvisioningError(e) => e.is_recoverable(),
+
+            Self::ParameterNotFound(_)
+            | Self::InvalidParameterFormat(_)
+            | Self::TemplateError(_)
+            | Self::InvalidFetchStep(_)
+            | Self::ReadError(_)
+            | Self::BadInputSchema(_)
+            | Self::IncompatibleSchema(_)
+            | Self::MergeError(_)
+            | Self::ExecutionError(_)
+            | Self::DataValidation(_) => false,
+
+            Self::Unreachable { .. }
+            | Self::NotFound { .. }
+            | Self::ImagePull(_)
+            | Self::ProcessError(_)
+            | Self::PipeError(_)
+            | Self::CommitError(_)
+            | Self::Internal(_) => true,
+        }
+    }
+
     pub fn unreachable(path: impl Into<String>, source: Option<BoxedError>) -> Self {
         Self::Unreachable {
             path: path.into(),
@@ -417,3 +473,5 @@ impl std::fmt::Display for PipeError {
         Ok(())
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

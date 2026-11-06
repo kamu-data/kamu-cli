@@ -7,13 +7,30 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::sync::Mutex;
+
 use async_graphql::*;
 use kamu_accounts::CurrentAccountSubject;
 use kamu_adapter_graphql::data_loader::account_entity_data_loader;
 use kamu_core::*;
 use kamu_datasets::*;
+use kamu_search::{
+    HybridSearchRequest,
+    ListingSearchRequest,
+    SearchContext,
+    SearchEntityId,
+    SearchEntitySchemaName,
+    SearchError,
+    SearchIndexUpdateOperation,
+    SearchResponse,
+    SearchSecurityContext,
+    SearchService,
+    TextSearchRequest,
+    VectorSearchRequest,
+};
 use odf::metadata::testing::MetadataFactory;
-use pretty_assertions::assert_eq;
+use pretty_assertions::{assert_eq, assert_matches};
+use strum::{EnumIter, IntoEnumIterator};
 
 use crate::utils::{BaseGQLDatasetHarness, PredefinedAccountOpts, authentication_catalogs};
 
@@ -488,6 +505,57 @@ async fn test_name_lookup_accounts_with_excluding() {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[tokio::test]
+async fn test_search_security_context_of_anonymous() {
+    let harness = SearchSecurityHarness::new(PredefinedAccountOpts::default()).await;
+
+    for search in [SearchKind::FullText, SearchKind::FullTextListing] {
+        assert_matches!(
+            harness.security_of_anonymous_search(search).await,
+            SearchSecurityContext::Anonymous,
+            "{search:?}"
+        );
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[tokio::test]
+async fn test_search_security_context_of_user() {
+    let harness = SearchSecurityHarness::new(PredefinedAccountOpts::default()).await;
+    let account_id = harness.logged_account_id();
+
+    for search in SearchKind::iter() {
+        assert_matches!(
+            harness.security_of_authorized_search(search).await,
+            SearchSecurityContext::Restricted { current_principal_ids }
+                if current_principal_ids == [account_id.clone()],
+            "{search:?}"
+        );
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[tokio::test]
+async fn test_search_security_context_of_admin() {
+    let harness = SearchSecurityHarness::new(PredefinedAccountOpts {
+        is_admin: true,
+        ..Default::default()
+    })
+    .await;
+
+    for search in SearchKind::iter() {
+        assert_matches!(
+            harness.security_of_authorized_search(search).await,
+            SearchSecurityContext::Unrestricted,
+            "{search:?}"
+        );
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Harness
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -660,6 +728,205 @@ impl GqlSearchHarness {
 struct SearchOptions {
     page: Option<usize>,
     per_page: Option<usize>,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[oop::extend(BaseGQLDatasetHarness, base_gql_harness)]
+struct SearchSecurityHarness {
+    base_gql_harness: BaseGQLDatasetHarness,
+    catalog_anonymous: dill::Catalog,
+    catalog_authorized: dill::Catalog,
+}
+
+impl SearchSecurityHarness {
+    async fn new(predefined_account_opts: PredefinedAccountOpts) -> Self {
+        let base_gql_harness = BaseGQLDatasetHarness::builder()
+            .tenancy_config(TenancyConfig::MultiTenant)
+            .build();
+
+        let base_catalog = dill::CatalogBuilder::new_chained(base_gql_harness.catalog())
+            .add_value(SecurityRecordingSearchService::default())
+            .bind::<dyn SearchService, SecurityRecordingSearchService>()
+            .bind::<dyn DatasetSearchService, SecurityRecordingSearchService>()
+            .build();
+
+        let (catalog_anonymous, catalog_authorized) =
+            authentication_catalogs(&base_catalog, predefined_account_opts).await;
+
+        Self {
+            base_gql_harness,
+            catalog_anonymous,
+            catalog_authorized,
+        }
+    }
+
+    fn logged_account_id(&self) -> String {
+        self.logged_account_from_catalog(&self.catalog_authorized)
+            .account_handle
+            .id
+            .to_string()
+    }
+
+    async fn security_of_anonymous_search(&self, search: SearchKind) -> SearchSecurityContext {
+        self.security_of_search(search, &self.catalog_anonymous)
+            .await
+    }
+
+    async fn security_of_authorized_search(&self, search: SearchKind) -> SearchSecurityContext {
+        self.security_of_search(search, &self.catalog_authorized)
+            .await
+    }
+
+    /// Runs the search and returns the security context the search service
+    /// received
+    async fn security_of_search(
+        &self,
+        search: SearchKind,
+        catalog: &dill::Catalog,
+    ) -> SearchSecurityContext {
+        let res = self.execute_query(search.request_code(), catalog).await;
+        assert!(res.is_ok(), "{res:?}");
+
+        catalog
+            .get_one::<SecurityRecordingSearchService>()
+            .unwrap()
+            .take_single_recorded()
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Clone, Copy, EnumIter)]
+enum SearchKind {
+    FullText,
+    FullTextListing,
+    NaturalLanguage,
+    Hybrid,
+}
+
+impl SearchKind {
+    fn request_code(self) -> &'static str {
+        match self {
+            Self::FullText => r#"{ search { queryFullText(prompt: "foo") { totalHits } } }"#,
+            Self::FullTextListing => r#"{ search { queryFullText(prompt: "") { totalHits } } }"#,
+            Self::NaturalLanguage => {
+                r#"{ search { queryNaturalLanguage(prompt: "foo") { totalCount } } }"#
+            }
+            Self::Hybrid => r#"{ search { queryHybrid(prompt: "foo") { totalCount } } }"#,
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Answers every search with no hits, recording the security context of each
+#[derive(Default)]
+struct SecurityRecordingSearchService {
+    recorded: Mutex<Vec<SearchSecurityContext>>,
+}
+
+impl SecurityRecordingSearchService {
+    fn record(&self, ctx: &SearchContext<'_>) {
+        self.recorded.lock().unwrap().push(ctx.security.clone());
+    }
+
+    fn take_single_recorded(&self) -> SearchSecurityContext {
+        let mut recorded = std::mem::take(&mut *self.recorded.lock().unwrap());
+        assert_eq!(recorded.len(), 1, "{recorded:?}");
+        recorded.pop().unwrap()
+    }
+
+    fn empty_response() -> SearchResponse {
+        SearchResponse {
+            took_ms: 0,
+            timeout: false,
+            total_hits: Some(0),
+            hits: Vec::new(),
+        }
+    }
+}
+
+#[async_trait::async_trait]
+impl SearchService for SecurityRecordingSearchService {
+    async fn health(&self, _ctx: SearchContext<'_>) -> Result<serde_json::Value, SearchError> {
+        unimplemented!()
+    }
+
+    async fn find_document_by_id(
+        &self,
+        _ctx: SearchContext<'_>,
+        _schema_name: SearchEntitySchemaName,
+        _id: &SearchEntityId,
+    ) -> Result<Option<serde_json::Value>, SearchError> {
+        unimplemented!()
+    }
+
+    async fn bulk_update(
+        &self,
+        _ctx: SearchContext<'_>,
+        _schema_name: SearchEntitySchemaName,
+        _operations: Vec<SearchIndexUpdateOperation>,
+    ) -> Result<(), SearchError> {
+        unimplemented!()
+    }
+
+    async fn listing_search(
+        &self,
+        ctx: SearchContext<'_>,
+        _req: ListingSearchRequest,
+    ) -> Result<SearchResponse, SearchError> {
+        self.record(&ctx);
+        Ok(Self::empty_response())
+    }
+
+    async fn text_search(
+        &self,
+        ctx: SearchContext<'_>,
+        _req: TextSearchRequest,
+    ) -> Result<SearchResponse, SearchError> {
+        self.record(&ctx);
+        Ok(Self::empty_response())
+    }
+
+    async fn vector_search(
+        &self,
+        _ctx: SearchContext<'_>,
+        _req: VectorSearchRequest,
+    ) -> Result<SearchResponse, SearchError> {
+        unimplemented!()
+    }
+
+    async fn hybrid_search(
+        &self,
+        _ctx: SearchContext<'_>,
+        _req: HybridSearchRequest,
+    ) -> Result<SearchResponse, SearchError> {
+        unimplemented!()
+    }
+}
+
+#[async_trait::async_trait]
+impl DatasetSearchService for SecurityRecordingSearchService {
+    async fn vector_search(
+        &self,
+        ctx: SearchContext<'_>,
+        _prompt: String,
+        _limit: usize,
+    ) -> Result<DatasetSearchResponse, DatasetSearchError> {
+        self.record(&ctx);
+        Ok(DatasetSearchResponse::default())
+    }
+
+    async fn hybrid_search(
+        &self,
+        ctx: SearchContext<'_>,
+        _prompt: String,
+        _limit: usize,
+    ) -> Result<DatasetSearchResponse, DatasetSearchError> {
+        self.record(&ctx);
+        Ok(DatasetSearchResponse::default())
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

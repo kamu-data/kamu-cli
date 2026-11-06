@@ -20,6 +20,7 @@ mod did_secret_encryption_config;
 mod did_secret_key;
 mod password;
 mod predefined_accounts_config;
+mod principal;
 
 pub use access_token::*;
 pub use account::*;
@@ -34,3 +35,4 @@ pub use did_secret_encryption_config::*;
 pub use did_secret_key::*;
 pub use password::*;
 pub use predefined_accounts_config::*;
+pub use principal::*;

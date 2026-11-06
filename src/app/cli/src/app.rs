@@ -250,15 +250,25 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
             None
         };
 
-        let cli_catalog = build_cli_catalog(
-            &wrapped_base_catalog,
-            maybe_server_catalog.as_ref(),
-            cli_account_subject,
+        let cli_base_catalog = maybe_server_catalog
+            .as_ref()
+            .unwrap_or(&wrapped_base_catalog);
+
+        // System singletons are first resolved from here, so their background work runs as
+        // the node, not as the CLI user
+        let background_catalog = &configure_background_catalog(
+            cli_base_catalog,
+            cli_account_subject.clone(),
             tenancy_config,
-        );
+        )
+        .build();
+
+        let cli_catalog = configure_cli_catalog(cli_base_catalog, tenancy_config)
+            .add_current_account_subject(cli_account_subject)
+            .build();
 
         // Register metrics
-        maybe_metrics_registry = Some(observability::metrics::register_all(&cli_catalog));
+        maybe_metrics_registry = Some(observability::metrics::register_all(background_catalog));
 
         let is_workspace_upgrade_needed = workspace_svc.is_upgrade_needed()?;
 
@@ -288,14 +298,14 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
 
         if cli_commands::command_needs_startup_jobs(&args) {
             run_startup_initializations(
-                &cli_catalog,
+                background_catalog,
                 // Registrator was already called on base_catalog
                 JobSelector::NoneOf(HashSet::from([
                     JOB_KAMU_ACCOUNTS_PREDEFINED_ACCOUNTS_REGISTRATOR,
                 ])),
             )
             .instrument(tracing::debug_span!(
-                "app::run_startup_initializations(cli_catalog)"
+                "app::run_startup_initializations(background_catalog)"
             ))
             .await?;
         }
@@ -304,19 +314,17 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
             && cli_commands::command_needs_transaction(&args);
         let is_outbox_processing_required = maybe_db_connection_settings.is_some()
             && cli_commands::command_needs_outbox_processing(&args);
-        let work_catalog = maybe_server_catalog
-            .as_ref()
-            .unwrap_or(&wrapped_base_catalog);
 
         let tx_runner = DatabaseTransactionRunner::new(cli_catalog.clone());
 
-        tx_runner
+        let command_run_result = tx_runner
             .maybe_transactional(
                 is_transactional,
                 |maybe_transactional_cli_catalog: dill::Catalog| async move {
                     let command_builder = cli_commands::get_command(
-                        work_catalog,
+                        cli_base_catalog,
                         &maybe_transactional_cli_catalog,
+                        background_catalog,
                         args,
                         current_account,
                     )?;
@@ -340,19 +348,27 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
                 },
             )
             .instrument(tracing::debug_span!("app::run_command"))
-            .await?;
+            .await;
 
+        // A failed command may still have committed some of its work in
+        // transactions of its own, so the Outbox is processed either way
         if is_outbox_processing_required {
-            // Process the Outbox messages while they are present
-            let outbox_agent = cli_catalog
-                .get_one::<dyn messaging_outbox::OutboxAgent>()
-                .int_err()?;
-            outbox_agent
-                .run_while_has_tasks()
-                .instrument(tracing::debug_span!(
-                    "Consume accumulated the Outbox messages"
-                ))
-                .await?;
+            let outbox_result = async {
+                let outbox_agent = background_catalog
+                    .get_one::<dyn messaging_outbox::OutboxAgent>()
+                    .int_err()?;
+                outbox_agent
+                    .run_while_has_tasks()
+                    .instrument(tracing::debug_span!(
+                        "Consume accumulated the Outbox messages"
+                    ))
+                    .await
+            }
+            .await;
+
+            command_with_outbox_result(command_run_result, outbox_result)?;
+        } else {
+            command_run_result?;
         }
 
         let post_command_actions = cli_catalog.get_one::<PostCommandActions>().int_err()?;
@@ -408,6 +424,25 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
     }
 
     command_result
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// The result of a command once the Outbox was processed after it: the
+/// command's own error wins, and an Outbox failure fails a command that
+/// succeeded
+fn command_with_outbox_result(
+    command_result: Result<(), CLIError>,
+    outbox_result: Result<(), InternalError>,
+) -> Result<(), CLIError> {
+    match (command_result, outbox_result) {
+        (command_result, Ok(())) => command_result,
+        (Ok(()), Err(e)) => Err(e.into()),
+        (Err(command_error), Err(e)) => {
+            tracing::error!(error = ?e, error_msg = %e, "Outbox processing failed after a failed command");
+            Err(command_error)
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -475,6 +510,8 @@ pub fn configure_base_catalog(
     b.add::<RemoteAliasesRegistryImpl>();
 
     b.add::<RemoteAliasResolverImpl>();
+    b.add::<RemoteDatasetUrlResolverImpl>();
+    b.add::<DatasetPullSourceResolverImpl>();
 
     b.add::<ResourceLoaderImpl>();
 
@@ -484,13 +521,13 @@ pub fn configure_base_catalog(
 
     b.add::<FetchService>();
 
+    b.add::<PollingIngestPlannerImpl>();
     b.add::<PollingIngestServiceImpl>();
 
     b.add::<PushIngestExecutorImpl>();
     b.add::<PushIngestPlannerImpl>();
 
-    b.add::<TransformRequestPlannerImpl>();
-    b.add::<TransformElaborationServiceImpl>();
+    b.add::<TransformPlannerImpl>();
     b.add::<TransformExecutorImpl>();
 
     b.add::<VerificationServiceImpl>();
@@ -501,9 +538,12 @@ pub fn configure_base_catalog(
     b.add_builder(SearchServiceRemoteImpl::builder(None));
 
     b.add::<SyncServiceImpl>();
+    b.add::<IpfsServiceImpl>();
+    b.add::<LocalSyncCommitterImpl>();
     b.add::<SyncRequestBuilder>();
 
     b.add::<PullRequestPlannerImpl>();
+    b.add::<DatasetUpdateKindResolverImpl>();
 
     b.add::<PushRequestPlannerImpl>();
 
@@ -536,6 +576,7 @@ pub fn configure_base_catalog(
     b.add::<GetDatasetSchemaUseCaseImpl>();
     b.add::<PushIngestDataUseCaseImpl>();
     b.add::<PullDatasetUseCaseImpl>();
+    b.add::<DatasetUpdateStepsImpl>();
     b.add::<PushDatasetUseCaseImpl>();
     b.add::<QueryDatasetDataUseCaseImpl>();
     b.add::<ResetDatasetUseCaseImpl>();
@@ -653,6 +694,8 @@ pub fn configure_base_catalog(
     b
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 // Public only for tests
 pub fn configure_cli_catalog(
     base_catalog: &dill::Catalog,
@@ -675,18 +718,24 @@ pub fn configure_cli_catalog(
     b
 }
 
-fn build_cli_catalog(
-    base_catalog: &dill::Catalog,
-    maybe_server_catalog: Option<&dill::Catalog>,
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Catalog of background work (agents, startup jobs, the outbox), a sibling of
+/// the CLI catalog acting as [`Principal::Node`]. It still holds the CLI
+/// subject, which name scope and ownership read.
+// Public only for tests
+pub fn configure_background_catalog(
+    cli_base_catalog: &dill::Catalog,
     cli_account_subject: CurrentAccountSubject,
     tenancy_config: TenancyConfig,
-) -> dill::Catalog {
-    let cli_base_catalog = maybe_server_catalog.unwrap_or(base_catalog);
-
-    configure_cli_catalog(cli_base_catalog, tenancy_config)
-        .add_value(cli_account_subject)
-        .build()
+) -> dill::CatalogBuilder {
+    let mut b = configure_cli_catalog(cli_base_catalog, tenancy_config);
+    b.add_value(cli_account_subject);
+    b.add_value(Principal::Node);
+    b
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 // Public only for tests
 pub fn configure_server_catalog(
@@ -750,6 +799,8 @@ pub fn configure_server_catalog(
     b
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 async fn run_startup_initializations(
     catalog: &dill::Catalog,
     job_selector: JobSelector,
@@ -786,6 +837,8 @@ fn load_config(workspace_layout: &WorkspaceLayout) -> Result<config::CLIConfig, 
     tracing::info!(?config, "Loaded configuration");
     Ok(config)
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub fn register_config_in_catalog(
     config: &config::CLIConfig,
@@ -849,6 +902,10 @@ pub fn register_config_in_catalog(
     // Flight SQL configuration
     catalog_builder.add_value(config.protocol.flight_sql.to_session_auth_config());
     catalog_builder.add_value(config.protocol.flight_sql.to_session_caching_config());
+    //
+
+    // Smart transfer protocol configuration
+    catalog_builder.add_value(config.protocol.smart_transfer_protocol.to_server_config()?);
     //
 
     // Tenancy configuration
@@ -1107,6 +1164,8 @@ pub fn register_config_in_catalog(
     Ok(())
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub enum WorkspaceStatus {
     NoWorkspace,
@@ -1148,6 +1207,8 @@ fn prepare_run_dir(run_dir: &Path) {
         });
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 fn configure_logging(
     output_config: &OutputConfig,
@@ -1300,6 +1361,47 @@ fn configure_output_format(args: &cli::Cli, workspace_svc: &WorkspaceService) ->
 struct Guards {
     _appender: Option<tracing_appender::non_blocking::WorkerGuard>,
     _perfetto: Option<tracing_perfetto::FlushGuard>,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[cfg(test)]
+mod tests {
+    use std::assert_matches;
+
+    use internal_error::InternalError;
+
+    use super::command_with_outbox_result;
+    use crate::CLIError;
+
+    #[test]
+    fn test_outbox_failure_fails_a_successful_command() {
+        let result = command_with_outbox_result(Ok(()), Err(InternalError::new("outbox")));
+
+        assert_matches!(
+            result,
+            Err(CLIError::CriticalFailure { source, .. }) if format!("{source:?}").contains("outbox")
+        );
+    }
+
+    #[test]
+    fn test_command_error_wins_over_outbox_failure() {
+        let result = command_with_outbox_result(
+            Err(CLIError::usage_error("command")),
+            Err(InternalError::new("outbox")),
+        );
+
+        assert_matches!(result, Err(CLIError::UsageError(_)));
+    }
+
+    #[test]
+    fn test_outbox_success_keeps_the_command_result() {
+        assert_matches!(command_with_outbox_result(Ok(()), Ok(())), Ok(()));
+        assert_matches!(
+            command_with_outbox_result(Err(CLIError::usage_error("command")), Ok(())),
+            Err(CLIError::UsageError(_))
+        );
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

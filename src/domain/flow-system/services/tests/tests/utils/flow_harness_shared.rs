@@ -20,7 +20,6 @@ use kamu_accounts::{DEFAULT_ACCOUNT_NAME_STR, TEST_ACCOUNT_ID};
 use kamu_adapter_flow_dataset::*;
 use kamu_adapter_flow_webhook::{DatasetRefUpdatedWatermarkProvider, FlowControllerWebhookDeliver};
 use kamu_datasets::*;
-use kamu_datasets_inmem::InMemoryDatasetDependencyRepository;
 use kamu_datasets_services::DependencyGraphServiceImpl;
 use kamu_datasets_services::testing::{FakeDatasetEntryService, FakeDatasetReferenceService};
 use kamu_flow_system::*;
@@ -131,6 +130,7 @@ impl FlowHarness {
                 b.add::<HeartbeatProbeFlowSystemEventProjector>();
             }
 
+            kamu_datasets_inmem::register_dependencies(&mut b);
             b.add_builder(messaging_outbox::OutboxImmediateImpl::builder(
                 messaging_outbox::ConsumerFilter::AllConsumers,
             ))
@@ -172,7 +172,6 @@ impl FlowHarness {
             .add_value(mock_transform_flow_evaluator)
             .bind::<dyn TransformFlowEvaluator, MockTransformFlowEvaluator>()
             .add::<DependencyGraphServiceImpl>()
-            .add::<InMemoryDatasetDependencyRepository>()
             .add::<TaskSchedulerImpl>()
             .add::<InMemoryTaskEventStore>()
             .add::<InMemoryTaskQueueWakeupSource>()
@@ -682,9 +681,14 @@ impl FlowHarness {
         self.catalog.get_one::<FlowCompletionMetrics>().unwrap()
     }
 
+    /// The listener that records the flows a scenario runs
+    pub fn flow_listener(&self) -> Arc<FlowSystemTestListener> {
+        self.catalog.get_one::<FlowSystemTestListener>().unwrap()
+    }
+
     /// Every projected activation link, rendered by the test listener
     pub async fn activation_links_report(&self) -> String {
-        let test_flow_listener = self.catalog.get_one::<FlowSystemTestListener>().unwrap();
+        let test_flow_listener = self.flow_listener();
 
         let mut links = Vec::new();
         for flow_id in test_flow_listener.flow_ids() {
@@ -828,7 +832,7 @@ impl FlowHarness {
             .await?;
 
         // Create initial snapshot - the state at moment 0 after flow agent loaded
-        let test_flow_listener = self.catalog.get_one::<FlowSystemTestListener>().unwrap();
+        let test_flow_listener = self.flow_listener();
         test_flow_listener.mark_as_loaded();
         test_flow_listener.make_a_snapshot(self.now());
 

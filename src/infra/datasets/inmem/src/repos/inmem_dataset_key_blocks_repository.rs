@@ -7,36 +7,33 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
-use std::vec;
+use std::sync::Arc;
 
-use cheap_clone::CheapClone;
+use database_common::{TransactionId, TransactionRef};
 use dill::*;
 use internal_error::InternalError;
 use kamu_datasets::*;
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Default)]
-struct State {
-    key_blocks: HashMap<(odf::DatasetID, odf::BlockRef), Vec<DatasetBlock>>,
-}
+use super::InMemoryDatasetKeyBlockState;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct InMemoryDatasetKeyBlockRepository {
-    state: Arc<Mutex<State>>,
+    state: Arc<InMemoryDatasetKeyBlockState>,
+    transaction_id: Option<TransactionId>,
 }
 
 #[component(pub)]
 #[interface(dyn DatasetKeyBlockRepository)]
 #[interface(dyn DatasetEntryRemovalListener)]
-#[scope(Singleton)]
 impl InMemoryDatasetKeyBlockRepository {
-    pub fn new() -> Self {
+    pub fn new(
+        state: Arc<InMemoryDatasetKeyBlockState>,
+        transaction_ref: Option<TransactionRef>,
+    ) -> Self {
         Self {
-            state: Arc::new(Mutex::new(State::default())),
+            state,
+            transaction_id: transaction_ref.map(|transaction_ref| transaction_ref.id()),
         }
     }
 }
@@ -57,11 +54,10 @@ impl DatasetKeyBlockRepository for InMemoryDatasetKeyBlockRepository {
         dataset_id: &odf::DatasetID,
         block_ref: &odf::BlockRef,
     ) -> Result<bool, InternalError> {
-        let guard = self.state.lock().unwrap();
-        Ok(guard
+        Ok(self
+            .state
             .key_blocks
-            .get(&(dataset_id.clone(), block_ref.cheap_clone()))
-            .is_some_and(|v| !v.is_empty()))
+            .has_blocks_for_ref(self.transaction_id, dataset_id, block_ref))
     }
 
     async fn save_key_blocks_batch(
@@ -70,30 +66,10 @@ impl DatasetKeyBlockRepository for InMemoryDatasetKeyBlockRepository {
         block_ref: &odf::BlockRef,
         blocks: &[DatasetBlock],
     ) -> Result<(), DatasetKeyBlockSaveError> {
-        if blocks.is_empty() {
-            return Ok(());
-        }
-
-        let mut guard = self.state.lock().unwrap();
-        let entry = guard
+        self.state
             .key_blocks
-            .entry((dataset_id.clone(), block_ref.cheap_clone()))
-            .or_default();
-
-        let existing: std::collections::HashSet<_> =
-            entry.iter().map(|b| b.sequence_number).collect();
-        if let Some(dup) = blocks
-            .iter()
-            .find(|b| existing.contains(&b.sequence_number))
-        {
-            return Err(DatasetKeyBlockSaveError::DuplicateSequenceNumber(vec![
-                dup.sequence_number,
-            ]));
-        }
-
-        entry.extend_from_slice(blocks);
-        entry.sort_by_key(|b| b.sequence_number);
-        Ok(())
+            .save_blocks_batch(self.transaction_id, dataset_id, block_ref, blocks)
+            .map_err(|dup| DatasetKeyBlockSaveError::DuplicateSequenceNumber(vec![dup]))
     }
 
     async fn get_all_key_blocks(
@@ -101,12 +77,10 @@ impl DatasetKeyBlockRepository for InMemoryDatasetKeyBlockRepository {
         dataset_id: &odf::DatasetID,
         block_ref: &odf::BlockRef,
     ) -> Result<Vec<DatasetBlock>, DatasetKeyBlockQueryError> {
-        let guard = self.state.lock().unwrap();
-        Ok(guard
+        Ok(self
+            .state
             .key_blocks
-            .get(&(dataset_id.clone(), block_ref.cheap_clone()))
-            .cloned()
-            .unwrap_or_default())
+            .all_blocks_for_ref(self.transaction_id, dataset_id, block_ref))
     }
 
     async fn match_datasets_having_key_blocks(
@@ -115,23 +89,22 @@ impl DatasetKeyBlockRepository for InMemoryDatasetKeyBlockRepository {
         block_ref: &odf::BlockRef,
         event_type: odf::MetadataEventType,
     ) -> Result<Vec<(odf::DatasetID, DatasetBlock)>, InternalError> {
-        let guard = self.state.lock().unwrap();
-        let mut result = Vec::new();
-
-        for dataset_id in dataset_ids {
-            if let Some(blocks) = guard
-                .key_blocks
-                .get(&(dataset_id.clone(), block_ref.cheap_clone()))
-                && let Some(block) = blocks
+        Ok(self
+            .state
+            .key_blocks
+            .read(self.transaction_id, |key_blocks| {
+                dataset_ids
                     .iter()
-                    .rev()
-                    .find(|block| block.event_kind == event_type)
-            {
-                result.push((dataset_id.clone(), block.clone()));
-            }
-        }
-
-        Ok(result)
+                    .filter_map(|dataset_id| {
+                        key_blocks
+                            .blocks_for_ref(dataset_id, block_ref)
+                            .into_iter()
+                            .rev()
+                            .find(|block| block.event_kind == event_type)
+                            .map(|block| (dataset_id.clone(), block.clone()))
+                    })
+                    .collect()
+            }))
     }
 
     async fn delete_all_key_blocks_for_ref(
@@ -139,10 +112,9 @@ impl DatasetKeyBlockRepository for InMemoryDatasetKeyBlockRepository {
         dataset_id: &odf::DatasetID,
         block_ref: &odf::BlockRef,
     ) -> Result<(), InternalError> {
-        let mut guard = self.state.lock().unwrap();
-        guard
+        self.state
             .key_blocks
-            .remove(&(dataset_id.clone(), block_ref.cheap_clone()));
+            .delete_blocks_for_ref(self.transaction_id, dataset_id, block_ref);
         Ok(())
     }
 }
@@ -155,8 +127,9 @@ impl DatasetEntryRemovalListener for InMemoryDatasetKeyBlockRepository {
         &self,
         dataset_id: &odf::DatasetID,
     ) -> Result<(), InternalError> {
-        let mut guard = self.state.lock().unwrap();
-        guard.key_blocks.retain(|(id, _), _| id != dataset_id);
+        self.state
+            .key_blocks
+            .delete_dataset_blocks(self.transaction_id, dataset_id);
         Ok(())
     }
 }

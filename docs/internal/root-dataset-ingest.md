@@ -101,11 +101,11 @@ restate them; read these first:
 
 | Layer | Crate / path | Contents |
 | --- | --- | --- |
-| Domain interfaces | `kamu-core` — [`src/domain/core/src/services/ingest/`](../../src/domain/core/src/services/ingest) | `PollingIngestService`, `PushIngestPlanner`, `PushIngestExecutor`, `DataWriter`, `MergeStrategy`, `Reader`, `DataFormatRegistry`, error types |
+| Domain interfaces | `kamu-core` — [`src/domain/core/src/services/ingest/`](../../src/domain/core/src/services/ingest) | `PollingIngestPlanner`, `PollingIngestService`, `PushIngestPlanner`, `PushIngestExecutor`, `DataWriter`, `MergeStrategy`, `Reader`, `DataFormatRegistry`, error types |
 | Writer state | `kamu-core` — [`writer_metadata_state.rs`](../../src/domain/core/src/entities/writer_metadata_state.rs) | `DataWriterMetadataState`: the projection of the chain the writer needs |
 | Use cases | `kamu-core` — [`push_ingest_data_use_case.rs`](../../src/domain/core/src/use_cases/push_ingest_data_use_case.rs), `pull_dataset_use_case.rs` | `PushIngestDataUseCase`, `PullDatasetUseCase` |
 | DataFusion writer | `kamu-ingest-datafusion` — [`src/infra/ingest-datafusion/`](../../src/infra/ingest-datafusion/src) | `DataWriterDataFusion`, merge strategies, readers |
-| Polling and push services | `kamu` — [`src/infra/core/src/services/ingest/`](../../src/infra/core/src/services/ingest) | `PollingIngestServiceImpl`, `FetchService`, `PrepService`, `PushIngestPlannerImpl`, `PushIngestExecutorImpl`, `DataFormatRegistryImpl`, `ingest_common` |
+| Polling and push services | `kamu` — [`src/infra/core/src/services/ingest/`](../../src/infra/core/src/services/ingest) | `PollingIngestPlannerImpl`, `PollingIngestServiceImpl`, `FetchService`, `PrepService`, `PushIngestPlannerImpl`, `PushIngestExecutorImpl`, `DataFormatRegistryImpl`, `ingest_common` |
 | Use case impls | `kamu` — [`src/infra/core/src/use_cases/`](../../src/infra/core/src/use_cases) | `PushIngestDataUseCaseImpl`, `PullDatasetUseCaseImpl` |
 | Task adapter | `kamu-adapter-task-dataset` | `UpdateDatasetTaskPlanner`, `UpdateDatasetTaskRunner` |
 | Flow adapter | `kamu-adapter-flow-dataset` | `FlowControllerIngest`, `FlowConfigRuleIngest` |
@@ -158,9 +158,11 @@ stage(df?, opts)                                   commit(staged)
  └─ compute_offset_and_watermark, linked objects
 ```
 
-`write` is `stage` followed by `commit`; `write_watermark` commits an `AddData` that carries no data,
-only a watermark and optionally a source state (used by `SetWatermarkExecutorImpl` on behalf of
-`SetWatermarkUseCase`, not by ingest).
+`write` is `stage` followed by `commit`. `write_watermark` commits an `AddData` that carries no data,
+only a watermark and optionally a source state. Ingest does not use it; `SetWatermarkExecutorImpl`
+(behind `SetWatermarkUseCase`) does, passing the previous source state on so the polling source
+resumes where it was. That executor moves `HEAD` through `DatasetHeadCommitter` and fails with
+`SetWatermarkExecutionError::RefCASFailed` if `HEAD` moved after planning.
 
 ### 4.3 What `stage` decides
 
@@ -224,41 +226,64 @@ keeps the records in the order they arrived.
 
 ### 5.1 Call sequence
 
-`PollingIngestServiceImpl::ingest(target, metadata_state, options, listener)` runs one
-**iteration**:
+A polling ingest has three steps, the same for every caller:
 
-1. If the state has no `SetPollingSource`, return `UpToDate { no_source_defined: true }`.
-2. **Cache check.** A source is *uncacheable* when the dataset already has data
+| Step | Who | Transaction |
+| --- | --- | --- |
+| **Plan** | `PollingIngestPlanner::plan_ingest(target)` builds the writer state at the current head into a `PollingIngestPlan`; `resolve_env_vars(dataset_id)` resolves the dataset's environment variables | one of its own, then the target is detached; `kamu pull` and the update task both plan through `DatasetUpdateSteps::plan_ingest` |
+| **Execute** | `PollingIngestService::ingest(target, plan, options, env_vars, operation_id, listener)` runs one iteration and appends blocks without moving `HEAD` | none |
+| **Commit** | the caller moves `HEAD` through `DatasetHeadCommitter` ([§8](#8-committing-and-concurrency)) | a new one |
+
+Planning fails with `SourceNotDefined` when the dataset has no `SetPollingSource`.
+`PollingIngestPlanPayload` is the plan's stored form, for a caller that stores a plan before
+running it (only tests do). It records the expected head and what planning found there, never the
+writer state itself. `rebuild_ingest` turns it back into a plan, failing with `HeadMoved` when the
+head is no longer the expected one and with `Mismatch` when what it finds differs, which only a
+defect can cause.
+
+Environment variable values are never part of a plan or a task definition. `resolve_env_vars` is
+their only path: it returns an empty map unless secrets encryption is configured and enabled
+(`SecretsEncryptionConfig::is_enabled`) and a `DatasetEnvVarResolver` is registered, and
+`IngestEnvVars` prints keys only.
+
+`PollingIngestServiceImpl::ingest` runs one **iteration**:
+
+1. **Cache check.** A source is *uncacheable* when the dataset already has data
    (`prev_offset.is_some()`) but no source state, and the fetch step is not MQTT. Without
    `fetch_uncacheable` such a source is skipped as `UpToDate { uncacheable: true }`.
-3. **Fetch** ([§5.2](#52-fetch-steps)), honoring a savepoint ([§5.3](#53-savepoints)).
+2. **Fetch** ([§5.2](#52-fetch-steps)), honoring a savepoint ([§5.3](#53-savepoints)).
    `FetchResult::UpToDate` ends the iteration.
-4. **Prepare** — optional `decompress` / `pipe` steps run on a blocking thread by `PrepService`,
+3. **Prepare** — optional `decompress` / `pipe` steps run on a blocking thread by `PrepService`,
    writing a new file into the cache directory.
-5. **Read** — the `ReadStep` picks a reader from `DataFormatRegistry`. An empty or missing input
+4. **Read** — the `ReadStep` picks a reader from `DataFormatRegistry`. An empty or missing input
    file yields an empty frame when the read step has a schema, and no frame otherwise.
-6. **Preprocess** — the source's `Transform` runs in DataFusion in-process or in a provisioned
+5. **Preprocess** — the source's `Transform` runs in DataFusion in-process or in a provisioned
    engine; without one, `preprocess_default` renames columns that clash with system columns and
    coerces an integer or string `event_time` to a timestamp, but only when the read step has no
    explicit schema.
-7. **Stage and commit** through the writer with the fetch's new source state and event time.
-8. Return `Updated { old_head, new_head, has_more, uncacheable }` and the advanced writer state.
+6. **Stage and commit** through the writer with the fetch's new source state and event time.
+7. Return `Updated` with both heads, `has_more`, the `increment` between the heads (blocks,
+   records, watermark) and the advanced writer state, so a caller that loops need not plan again.
 
-The service never moves `HEAD`; see [§8](#8-committing-and-concurrency).
+The working directory `RunInfoDir/ingest-<operation_id>/` is removed after a successful iteration
+and kept after a failed one, whose errors may point at logs in it. The service never moves
+`HEAD`; see [§8](#8-committing-and-concurrency).
 
 ### 5.2 Fetch steps
 
 `FetchService::fetch` dispatches on `FetchStep`. URL, headers, the container image, args and env
-values, the MQTT password and the EVM node URL pass through `${{ env.NAME || default }}`
-templating. With secrets encryption enabled (`DatasetKeyValueServiceImpl`), names resolve from the
-dataset's env vars only; without it (`DatasetKeyValueServiceSysEnv`), any supplied dataset env vars
-are checked first and the process environment is the fallback, which in practice means the process
-environment, since no dataset env var service is wired in that mode.
+values, the MQTT password and the EVM node URL pass through `${{ env.NAME || default }}` templating.
+A name that is not set falls through to the next option; a lookup that fails, such as a secret that
+cannot be decrypted, fails the fetch. A substituted value is inserted as it is: a template inside
+it is not expanded. With secrets encryption enabled (`DatasetKeyValueServiceImpl`), names resolve
+from the dataset's env vars only; without it (`DatasetKeyValueServiceSysEnv`), any supplied dataset
+env vars are checked first and the process environment is the fallback, which in practice means the
+process environment, since `resolve_env_vars` supplies none in that mode.
 
 | Fetch step | Source state written | `has_more` | Notes |
 | --- | --- | --- | --- |
-| `Url` `file://` | `LastModified` (file mtime) | never | Zero-copy: the savepoint references the original file |
-| `Url` `http(s)://` | `ETag` or `LastModified` from response headers, else none | never | Sends `If-None-Match` / `If-Modified-Since`; `304` is up to date |
+| `Url` `file://` | `LastModified` (file mtime) | never | Zero-copy: the original file is read in place ([§5.3](#53-savepoints)) |
+| `Url` `http(s)://` | `ETag` or `LastModified` from response headers, else none | never | Sends `If-None-Match` / `If-Modified-Since`; `304` is up to date; a `Last-Modified` that does not parse is ignored |
 | `Url` `ftp(s)://` | none | never | Uncacheable after the first ingest; behind the `ingest-ftp` feature |
 | `FilesGlob` | `ETag` = name of the file just ingested | when more files sort after it | One file per iteration, ordered by name; event time from system time or the file path |
 | `Container` | whatever the container writes to `ODF_NEW_ETAG_PATH` / `ODF_NEW_LAST_MODIFIED_PATH` | when it creates `ODF_NEW_HAS_MORE_DATA_PATH` | Receives `ODF_ETAG`, `ODF_LAST_MODIFIED`, `ODF_BATCH_SIZE`; same state as before means up to date |
@@ -268,7 +293,7 @@ environment, since no dataset env var service is wired in that mode.
 `PollingSourceState` understands only the `odf/etag` and `odf/last-modified` kinds; any other kind
 is ignored by the fetch step, which then fetches as if there were no previous state. The source
 state is read from the latest `AddData` only, so any `AddData` written without one (for example by
-`set-watermark`) makes the source look stateless as well. The `cache` (`SourceCaching`) field of
+a push ingest into the same dataset) makes the source look stateless as well. The `cache` (`SourceCaching`) field of
 `Url` and `FilesGlob` fetch steps is not consulted.
 
 ### 5.3 Savepoints
@@ -276,12 +301,21 @@ state is read from the latest `AddData` only, so any `AddData` written without o
 Fetching can be slow and expensive, while reading and merging can fail for reasons the user fixes
 by editing the source (a bad preprocess query, a schema mismatch). After a successful fetch the
 service writes a `FetchSavepoint` — creation time, new source state, event time, a reference to the
-fetched data, `has_more` — to `cache/fetch-savepoint-<hash>`, where the hash covers the
-flatbuffers form of the fetch step and the previous source state. The next iteration with the same
-fetch step and the same committed state resumes from the savepoint instead of fetching again.
+fetched data, `has_more` — to `cache/fetch-savepoint-<hash>`, where the hash covers the dataset
+ID and the flatbuffers form of the fetch step and the previous source state. The next iteration of
+the same dataset with the same fetch step and the same committed state resumes from the savepoint
+instead of fetching again; datasets with identical fetch steps never share savepoints.
 
 - A savepoint is ignored when the dataset has no source state and `fetch_uncacheable` is set, and
   always for MQTT.
+- Zero-copy fetches (`file://`, `FilesGlob`) keep no savepoint: fetching again costs nothing, and
+  resuming would pair the source state recorded then with whatever the file holds now, so a fixed
+  file would be ingested a second time on the next poll.
+- A savepoint is also ignored when its downloaded data was deleted from the cache, since resuming
+  would commit its source state without the data, and when it does not parse. The source is
+  fetched again in both cases.
+- A savepoint is written to a temporary file and renamed into place, so a failed write leaves no
+  truncated savepoint.
 - Changing the fetch step or committing a new source state changes the hash, so stale savepoints
   are never matched — they are left behind and removed by cache eviction ([§10](#10-local-files)).
 - Prepared files are deleted after staging; the fetched file and savepoint are kept on purpose so a
@@ -293,7 +327,7 @@ A source that yields data in batches (glob, container, EVM) reports `has_more`. 
 
 | Driver | Behaviour |
 | --- | --- |
-| `kamu pull` | `exhaust_sources: true`; the use case loops, moving `HEAD` after every iteration ([dataset-pull.md](dataset-pull.md#62-per-job-runners)) |
+| `kamu pull` | `PullOptions::exhaust_sources` is set; `PullIngestLoop` repeats the iteration, moving `HEAD` after each one ([dataset-pull.md](dataset-pull.md#62-per-job-runners)) |
 | Ingest flow | one iteration per task; on success with `has_more` and `fetch_next_iteration` in the flow's ingest config, `FlowControllerIngest` schedules the next flow immediately |
 
 ---
@@ -302,28 +336,47 @@ A source that yields data in batches (glob, container, EVM) reports `has_more`. 
 
 ### 6.1 Call sequence
 
-`PushIngestDataUseCaseImpl::execute(target, data_source, options, listener)`:
+`PushIngestDataUseCaseImpl::execute(target, data_source, options, listener)` first authorizes
+`PushIngest` (Write) on the target for the current `Principal` through
+[`DatasetOperationGuard`](../../src/domain/datasets/domain/src/services/dataset_operation_guard.rs),
+before anything is read; a denial on a readable dataset is `PushIngestDataError::Access`, a missing
+or unreadable dataset `NotFound`.
+Then:
 
-1. **Plan** — `PushIngestPlannerImpl::plan_ingest` builds the writer state at `HEAD` (or at
-   `expected_head` when given) for `source_name`.
-   - If there is no matching push source and `auto_create_push_source` is set (only for uploads
-     through the HTTP endpoint), it commits an `AddPushSource { source_name: "auto", merge: Append }`
-     whose read step is guessed from the media type, then rebuilds the state. This commit moves
-     `HEAD` at once (no CAS), separately from the data commit, so the source stays even if the
-     ingest that follows fails. Without a media type the push fails with `SourceNotFound`.
-   - Otherwise a missing source is `SourceNotFound`. With no `source_name` and several push
-     sources, `WriterSourceEventVisitor` reports the ambiguity as `SourceNotFound` too.
-2. **Execute** — `PushIngestExecutorImpl::execute_ingest`:
+1. **Add a push source** (uploads through the HTTP endpoint only) —
+   `PushIngestPlannerImpl::plan_push_source_creation` returns an
+   `AddPushSource { source_name: "auto", merge: Append }`, with a read step guessed from the media
+   type, when the dataset has no source at all. The use case appends it on top of `expected_head`
+   when given, or of `HEAD` as it is then, without moving `HEAD`; the data is then planned on top
+   of the new source block. Step 4 publishes the source block with the data, or alone when the
+   upload adds nothing, so the result is `Updated` either way and counts the source block. A
+   failed ingest leaves the source block unreferenced. Without a media type the push fails with
+   `SourceNotFound`.
+2. **Plan** — a derived dataset is rejected with `InvalidDatasetKind`.
+   `PushIngestPlannerImpl::plan_ingest` builds the writer state at `HEAD` (or at
+   `expected_head` when given) for `source_name`. The planner writes nothing. A missing source is
+   `SourceNotFound`; with no `source_name` and several push sources, `WriterSourceEventVisitor`
+   reports the ambiguity as `SourceNotFound` too.
+3. **Execute** — `PushIngestExecutorImpl::execute_ingest`:
    materialize the `DataSource` into a file (a `file://` URL is used in place unless it is a FIFO
    or device, which is copied first; buffers and streams are written to the operation directory),
    read it — overriding the source's read step with a compatible one when the caller supplied a
    media type — preprocess, `stage`, check the account storage quota on the staged file size unless
    `skip_quota_check` (always skipped in single-tenant workspaces), then `commit`.
-3. **Finalize** — move `HEAD` from `old_head` to `new_head` with CAS and post
+4. **Finalize** — move `HEAD` from `old_head` to `new_head` through `DatasetHeadCommitter` and post
    `DatasetExternallyChangedMessage::ingest_http`.
 
-`execute_multi` runs steps 1 and 2 for each data source in turn, threading the new head through
+A lost CAS in step 4 is `PushIngestDataError::Execution` wrapping
+`CommitError::MetadataAppendError(AppendError::RefCASFailed)` with the expected and actual heads;
+`HEAD` stays where the winner put it and the appended blocks stay unreferenced.
+
+The executor reports `begin` and progress to the listener; the use case reports `success` or `error`
+once, after step 4 or the failure ([dataset-pull.md](dataset-pull.md#63-listeners)).
+
+`execute_multi` runs steps 1 to 3 for each data source in turn, threading the new head through
 `expected_head`, and moves `HEAD` once at the end from the first `old_head` to the last `new_head`.
+The account statistics count only data reachable from the committed `HEAD`, so each quota check
+adds the sizes of the files ingested earlier in the same call (`uncommitted_bytes`).
 
 Push ingest stores no source state (`new_source_state: None`), so `AddPushSource`'s capacity for
 exactly-once resume is unused.
@@ -348,16 +401,15 @@ schema.
 
 | Entry point | Path | Authorization | Transaction scope | Moves `HEAD` | Messages |
 | --- | --- | --- | --- | --- | --- |
-| `kamu pull <root>` | `PullCommand` → `PullDatasetUseCaseImpl` → `PollingIngestService` (loop) | write check per plan iteration | short transactions: planning, env-var lookup, each ref update | after each iteration | `DatasetReferenceMessage` from the ref update |
-| Ingest flow | `FlowControllerIngest` → `LogicalPlanDatasetUpdate` → `UpdateDatasetTaskPlanner` → `UpdateDatasetTaskRunner` → `PollingIngestService` (one iteration) | system | planning in one transaction; fetch and write outside; ref update in its own | once | `DatasetReferenceMessage`; task and flow progress messages |
-| `kamu ingest <root>` | `IngestCommand` → `PushIngestDataUseCase::execute` per file | none; the command rejects derivative datasets and datasets with a pull alias | the command's | once per file | `DatasetReferenceMessage`, `DatasetExternallyChangedMessage` |
-| `POST /{dataset}/ingest` | `dataset_ingest_handler` → `PushIngestDataUseCase::execute` | `DatasetAction::Write` via ReBAC; upload token must belong to the caller | the whole request (`#[transactional_handler]`) | once; twice when a push source is auto-created | as above |
-| Collections, versioned files | `UpdateCollectionEntriesUseCaseImpl`, `UpdateVersionedFileUseCaseImpl` → `PushIngestDataUseCase` | the calling use case | the caller's | once | as above |
+| `kamu pull <root>` | `PullCommand` → `PullDatasetUseCaseImpl` → `PullIngestLoop` → `PollingIngestService` | Write, per pull iteration ([dataset-pull.md](dataset-pull.md#7-authorization)) | pull planning in its own; then [§5.1](#51-call-sequence) per ingest iteration | after each iteration | `DatasetReferenceMessage` from the ref update |
+| Ingest flow | `FlowControllerIngest` → `LogicalPlanDatasetUpdate` → `UpdateDatasetTaskPlanner` → `UpdateDatasetTaskRunner` → `PollingIngestService` (one iteration) | none; the task runs as `Principal::Node` | [§5.1](#51-call-sequence), when the task runs | once | `DatasetReferenceMessage`; task and flow progress messages |
+| `kamu ingest <root>` | `IngestCommand` → `PushIngestDataUseCase::execute` per file | Write, in the use case; the command rejects derivative datasets and datasets with a pull alias | the command's | once per file | `DatasetReferenceMessage`, `DatasetExternallyChangedMessage` |
+| `POST /{dataset}/ingest` | `dataset_ingest_handler` → `PushIngestDataUseCase::execute` | Write, in the use case; upload token must belong to the caller | the whole request (`#[transactional_handler]`) | once | as above |
+| Collections, versioned files | `UpdateCollectionEntriesUseCaseImpl`, `UpdateVersionedFileUseCaseImpl` → `PushIngestDataUseCase` | the calling use case, then Write again in the push ingest use case | the caller's | once | as above |
 
 Flow-side options reach ingest through `FlowConfigRuleIngest`: `fetch_uncacheable` becomes
 `PollingIngestOptions::fetch_uncacheable`; `fetch_next_iteration` is read by the flow controller
-only. Where dataset env vars are resolved: [dataset-pull.md](dataset-pull.md#62-per-job-runners)
-for `kamu pull`, [task-system.md](task-system.md#71-update-dataset) for flows.
+only. Dataset env vars are resolved by the planner in both paths ([§5.1](#51-call-sequence)).
 
 ---
 
@@ -368,11 +420,12 @@ Ingest separates **appending blocks** from **publishing them**:
 1. The writer appends `SetDataSchema` / `AddData` with `prev_block_hash = meta.head` and
    `update_block_ref: false`. Data files and blocks land in storage; `HEAD` does not move, so no
    reader sees them yet.
-2. The caller sets `HEAD` with `check_ref_is: Some(old_head)`. This goes through
+2. The caller moves `HEAD` from `old_head` through `DatasetHeadCommitter`, a CAS in the caller's
+   transaction. The chain's database-backed reference repository calls
    `DatasetReferenceServiceImpl::set_reference`, which writes the reference row and posts
-   `DatasetReferenceMessage::Updated` in the same transaction; consumers write the storage-level
-   reference, index the new blocks (which feeds the dependency graph), and update statistics and
-   search ([outbox.md](outbox.md)).
+   `DatasetReferenceMessage::Updated` in the same transaction; consumers
+   write the storage-level reference, index the new blocks (which feeds the dependency graph), and
+   update statistics and search ([outbox.md](outbox.md)).
 
 Consequences:
 
@@ -380,12 +433,13 @@ Consequences:
   CAS fails and its blocks and data file stay in storage unreferenced. Neither writer takes a lock.
   The polling path does not retry in-process; a flow-driven ingest is retried only as a new task
   under the flow's retry policy ([§9](#9-errors)).
-- The writer state comes from the moment it was built. For flows that is task planning time, so a
-  push that lands between planning and running makes the poll's CAS fail.
+- The writer state comes from the moment it was planned, which for both `kamu pull` and the
+  update task is just before the fetch. A push that lands while the fetch runs makes the poll's
+  CAS fail.
 - `HEAD` moves only after all of an operation's blocks are written, so readers see the blocks of
   one operation together. That can still be a `SetDataSchema` alone, when a first ingest yields no
-  rows ([§4.3](#43-what-stage-decides)), and an auto-created push source moves `HEAD` earlier
-  ([§6.1](#61-call-sequence)).
+  rows ([§4.3](#43-what-stage-decides)), or an auto-created push source alone, when an upload
+  adds no rows ([§6.1](#61-call-sequence)).
 - `DatasetExternallyChangedMessage` is posted by push ingest (and by the smart push server,
   [dataset-sync.md](dataset-sync.md#72-push-flow)); flows use it to tell user pushes from their
   own updates.
@@ -395,23 +449,33 @@ Consequences:
 ## 9. Errors
 
 `PollingIngestError` and `PushIngestError` share the input errors (`ReadError`,
-`BadInputSchema`, `IncompatibleSchema`, `MergeError`, `ExecutionError`, `DataValidation`),
-`EngineError`, `CommitError` and `Internal`. Only polling has fetch errors (`NotFound`,
-`Unreachable`, `ProcessError`, `ImagePull`, `PipeError`), `EngineProvisioningError`, and template
-and parameter errors. Only push has `UnsupportedMediaType`, `QuotaExceeded` and `Access`. Push
-planning fails separately with `PushIngestPlanningError` (`SourceNotFound`, `HeadNotFound`,
-`UnsupportedMediaType`, `CommitError`, `Internal`).
+`BadInputSchema`, `IncompatibleSchema`, `MergeError`, `ExecutionError`, `DataValidation`) and the
+engine and commit errors. Only
+polling has fetch, provisioning, template and parameter errors; only push has the media type,
+quota and access errors. Push planning fails separately with `PushIngestPlanningError`.
 
-How each `PollingIngestError` becomes a recoverable or unrecoverable task outcome is in
-[task-system.md](task-system.md#71-update-dataset). A failure to move `HEAD` after a successful
-ingest (a CAS conflict included) is returned from the runner as an internal error, which the task
-agent records as a recoverable failure. The retry plans from the new head. It reuses the fetch
-savepoint only if the winning commit left the source state unchanged; if the winner was a push or
-`set-watermark`, which write no source state, the source now looks uncacheable and the retry is
+Each error type says whether a retry could succeed: `PollingIngestError::is_recoverable` and
+`PollingIngestPlanError::is_recoverable`, built on the same methods of `EngineError` and
+`EngineProvisioningError`. Errors caused by the source definition or by the fetched data are not
+recoverable, because a retry resumes from the same savepoint and fails the same way: template and
+parameter errors, an invalid fetch step (`InvalidFetchStep`), read, schema, merge, execution and
+validation errors, an invalid preprocess query, an unsupported engine, and a dataset without a
+polling source. Fetch, process, image, commit and internal errors are recoverable. The update task
+maps the flag, and the failures to move `HEAD`, to its outcome
+([task-system.md](task-system.md#71-update-dataset)).
+
+The writer reports a value that does not parse or cast to its column's type as `ExecutionError`,
+including CSV and JSON values the readers decode only when the data is written.
+
+A retry after another writer moved `HEAD` plans from the new head. It reuses the fetch savepoint
+only if the winning commit left the source state unchanged, as `set-watermark` does; if the winner
+was a push, which writes no source state, the source now looks uncacheable and the retry is
 skipped as up to date unless `fetch_uncacheable` is set.
 
-The HTTP handler maps push errors to status codes: `SourceNotFound` and `ReadError` → 400,
-unsupported media type → 415, `QuotaExceeded` → 403, the rest → 500.
+The HTTP handler maps push errors to status codes: `SourceNotFound`, `InvalidDatasetKind`, a
+`Content-Type` header that is not visible ASCII, and the input errors other than `MergeError` →
+400, unsupported media type → 415, an exceeded quota → 403, `NotFound` and `Access` → 404 (a
+dataset the caller may not write looks missing), a `HEAD` CAS conflict → 409, the rest → 500.
 
 ---
 
@@ -419,9 +483,9 @@ unsupported media type → 415, `QuotaExceeded` → 403, the rest → 500.
 
 | Directory | Holds | Cleaned |
 | --- | --- | --- |
-| `RunInfoDir/ingest-<operation_id>/` | push input copies, reader temp files, `out/data.parquet` before commit | the staged Parquet file moves into the data repo on commit; the directory itself is cleared when the process starts |
+| `RunInfoDir/ingest-<operation_id>/` | push input copies, reader temp files, `out/data.parquet` before commit | the staged Parquet file moves into the data repo on commit; polling and push ingest remove the directory on success; any left are cleared when the process starts |
 | `RunInfoDir/fetch-<operation_id>/`, `RunInfoDir/raw-query-<operation_id>/` | container fetch output and logs; preprocess engine I/O and logs | cleared when the process starts |
-| `CacheDir/fetch-*`, `prepare-*` | fetched and prepared input | prepared files after staging; fetched files by eviction |
+| `CacheDir/fetch-*`, `prepare-*` | fetched and prepared input | prepared files after staging, or when reading or preprocessing fails; a fetch target no savepoint refers to (failed, up-to-date or zero-copy fetch) right away; other fetched files by eviction |
 | `CacheDir/fetch-savepoint-<hash>` | savepoints | by eviction |
 
 Eviction (`GcService::evict_cache`) runs at process start and removes cache entries older than 24
@@ -433,11 +497,25 @@ hours. A long-running server does not evict while it runs.
 
 ### Testing
 
-- Writer and merge strategy tests live in `src/infra/ingest-datafusion/tests/`; polling and push
-  service tests in `src/infra/core/tests/tests/ingest/`; CLI scenarios in
-  `src/e2e/app/cli/repo-tests/src/commands/` (`test_ingest_command.rs`, `test_pull_command.rs`).
+- Merge strategy and reader tests live in `src/infra/ingest-datafusion/tests/`; writer, fetch,
+  prepare, polling planner, polling and push service tests in `src/infra/core/tests/tests/ingest/`;
+  CLI scenarios in
+  `src/e2e/app/cli/repo-tests/src/commands/` (`test_ingest_command.rs`, `test_pull_command.rs`),
+  wired for SQLite only when they check only CLI output.
+- Server-side ingest flows run end to end in `src/e2e/app/cli/repo-tests/src/test_flow.rs` on SQLite
+  and Postgres: env vars from a `VariableSet`, failure without and with retries,
+  `fetchNextIteration`, and a manual trigger forcing `fetchUncacheable`. With the system time
+  frozen, a follow-up flow waits out its throttling period only when the test advances the time.
+- The pull loop (`exhaust_sources`, `IngestStopped`, head moved) is tested in
+  `test_pull_dataset_use_case.rs`; the update task runner in
+  `src/adapter/task-dataset/tests/`, including a real planner and service over a `file://` source
+  (`BaseRepoHarness::create_root_dataset_polling_csv`).
 - `MockPollingIngestService` (helpers in `src/domain/core/src/testing/mock_polling_ingest_service.rs`)
-  stands in for the polling service where a test needs no fetching.
+  stands in for the polling service where a test needs no fetching;
+  `make_expect_ingest_iterations` reports a sequence of `MockIngestIteration`s.
+- Zero-copy sources keep no savepoints ([§5.3](#53-savepoints)), so tests of downloaded data and
+  savepoints serve files over HTTP in-process with `test_utils::HttpFileServer`, which sends
+  `Last-Modified` but no `ETag`.
 - Containerized fetch and preprocess tests need Podman or Docker and are grouped separately; see
   [`DEVELOPER.md`](../../DEVELOPER.md).
 - Changing what `stage` considers an empty commit changes which runs produce blocks — and so which
@@ -463,6 +541,9 @@ hours. A long-running server does not evict while it runs.
 
 | Concern | File |
 | --- | --- |
+| Polling planner trait, plan, env vars, planning errors | [`polling_ingest_planner.rs`](../../src/domain/core/src/services/ingest/polling_ingest_planner.rs) |
+| Stored plan form | [`polling_ingest_plan_payload.rs`](../../src/domain/core/src/services/ingest/polling_ingest_plan_payload.rs) |
+| Polling planner impl, env var gate | [`polling_ingest_planner_impl.rs`](../../src/infra/core/src/services/ingest/polling_ingest_planner_impl.rs) |
 | Polling service trait, options, result, errors | [`polling_ingest_service.rs`](../../src/domain/core/src/services/ingest/polling_ingest_service.rs) |
 | Polling service impl, savepoints | [`polling_ingest_service_impl.rs`](../../src/infra/core/src/services/ingest/polling_ingest_service_impl.rs) |
 | Source state and savepoint types | [`polling_source_state.rs`](../../src/infra/core/src/services/ingest/polling_source_state.rs) |
@@ -473,7 +554,8 @@ hours. A long-running server does not evict while it runs.
 | Push planner / executor traits | [`push_ingest_planner.rs`](../../src/domain/core/src/services/ingest/push_ingest_planner.rs), [`push_ingest_executor.rs`](../../src/domain/core/src/services/ingest/push_ingest_executor.rs) |
 | Push planner / executor impls | [`push_ingest_planner_impl.rs`](../../src/infra/core/src/services/ingest/push_ingest_planner_impl.rs), [`push_ingest_executor_impl.rs`](../../src/infra/core/src/services/ingest/push_ingest_executor_impl.rs) |
 | Push use case | [`push_ingest_data_use_case_impl.rs`](../../src/infra/core/src/use_cases/push_ingest_data_use_case_impl.rs) |
-| Pull use case (polling loop, ref update) | [`pull_dataset_use_case_impl.rs`](../../src/infra/core/src/use_cases/pull_dataset_use_case_impl.rs) |
+| Pull use case | [`pull_dataset_use_case_impl.rs`](../../src/infra/core/src/use_cases/pull_dataset_use_case_impl.rs) |
+| Pull polling loop, ref update | [`pull_ingest_loop.rs`](../../src/infra/core/src/use_cases/pull_ingest_loop.rs) |
 | Writer trait and errors | [`data_writer.rs`](../../src/domain/core/src/services/ingest/data_writer.rs) |
 | Writer state | [`writer_metadata_state.rs`](../../src/domain/core/src/entities/writer_metadata_state.rs) |
 | DataFusion writer | [`writer.rs`](../../src/infra/ingest-datafusion/src/writer.rs) |

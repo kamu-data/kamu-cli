@@ -10,9 +10,10 @@
 use std::sync::Arc;
 
 use dill::{component, interface};
-use internal_error::ErrorIntoInternal;
+use internal_error::{ErrorIntoInternal, ResultIntoInternal};
+use kamu_accounts::Principal;
 use kamu_auth_rebac::{RebacDatasetRefUnresolvedError, RebacDatasetRegistryFacade};
-use kamu_datasets::{CommitDatasetEventUseCase, DatasetAction};
+use kamu_datasets::{CommitDatasetEventUseCase, DatasetHeadCommitter, DatasetPermission};
 use odf::dataset::{AppendError, CommitError, InvalidEventError};
 use odf::metadata::EnumWithVariants;
 use time_source::SystemTimeSource;
@@ -23,6 +24,8 @@ use time_source::SystemTimeSource;
 #[interface(dyn CommitDatasetEventUseCase)]
 pub struct CommitDatasetEventUseCaseImpl {
     rebac_dataset_registry_facade: Arc<dyn RebacDatasetRegistryFacade>,
+    principal: Arc<Principal>,
+    dataset_head_committer: Arc<dyn DatasetHeadCommitter>,
     system_time_source: Arc<dyn SystemTimeSource>,
 }
 
@@ -40,7 +43,11 @@ impl CommitDatasetEventUseCaseImpl {
 
             let classify_response = self
                 .rebac_dataset_registry_facade
-                .classify_dataset_refs_by_allowance(&inputs_dataset_refs, DatasetAction::Read)
+                .classify_dataset_refs_by_allowance(
+                    &self.principal,
+                    &inputs_dataset_refs,
+                    DatasetPermission::Read,
+                )
                 .await?;
 
             if !classify_response.inaccessible_refs.is_empty() {
@@ -77,7 +84,11 @@ impl CommitDatasetEventUseCase for CommitDatasetEventUseCaseImpl {
 
         let resolved_dataset = self
             .rebac_dataset_registry_facade
-            .resolve_dataset_by_ref(&dataset_handle.as_local_ref(), DatasetAction::Write)
+            .resolve_dataset_by_ref(
+                &self.principal,
+                &dataset_handle.as_local_ref(),
+                DatasetPermission::Write,
+            )
             .await
             .map_err(|e| {
                 use RebacDatasetRefUnresolvedError as E;
@@ -88,15 +99,27 @@ impl CommitDatasetEventUseCase for CommitDatasetEventUseCaseImpl {
             })?;
         let event = self.validate_event(event).await?;
 
-        use odf::dataset::CommitOpts;
+        // The event goes on top of `HEAD` as it is now
+        let old_head = resolved_dataset
+            .as_metadata_chain()
+            .resolve_ref(&odf::BlockRef::Head)
+            .await
+            .int_err()?;
+
         let commit_result = resolved_dataset
             .commit_event(
                 event,
-                CommitOpts {
+                odf::dataset::CommitOpts {
                     system_time: Some(self.system_time_source.now()),
-                    ..CommitOpts::default()
+                    prev_block_hash: Some(Some(&old_head)),
+                    update_block_ref: false,
+                    ..odf::dataset::CommitOpts::default()
                 },
             )
+            .await?;
+
+        self.dataset_head_committer
+            .commit_head(&resolved_dataset, Some(&old_head), &commit_result.new_head)
             .await?;
 
         Ok(commit_result)

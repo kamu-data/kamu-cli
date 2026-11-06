@@ -14,17 +14,15 @@ use dill::*;
 use futures::{StreamExt, future};
 use internal_error::ResultIntoInternal;
 use kamu::DatasetRegistrySoloUnitBridge;
-use kamu_accounts::{CurrentAccountSubject, DidSecretEncryptionConfig};
+use kamu_accounts::{
+    CurrentAccountSubject,
+    CurrentAccountSubjectCatalogExt as _,
+    DidSecretEncryptionConfig,
+};
 use kamu_accounts_inmem::InMemoryDidSecretKeyRepository;
 use kamu_auth_rebac_services::RebacDatasetRegistryFacadeImpl;
 use kamu_core::*;
 use kamu_datasets::*;
-use kamu_datasets_inmem::{
-    InMemoryDatasetDataBlockRepository,
-    InMemoryDatasetDependencyRepository,
-    InMemoryDatasetKeyBlockRepository,
-    InMemoryDatasetReferenceRepository,
-};
 use kamu_datasets_services::testing::FakeConnectingDatasetEntryWriter;
 use kamu_datasets_services::utils::CreateDatasetUseCaseHelper;
 use kamu_datasets_services::*;
@@ -687,25 +685,23 @@ impl DependencyGraphHarness {
             .add::<RebacDatasetRegistryFacadeImpl>()
             .add::<SystemTimeSourceDefault>();
 
+        kamu_datasets_inmem::register_dependencies(&mut b);
         b.add_builder(messaging_outbox::OutboxImmediateImpl::builder(
             messaging_outbox::ConsumerFilter::AllConsumers,
         ))
         .bind::<dyn Outbox, OutboxImmediateImpl>()
-        .add::<AlwaysHappyDatasetActionAuthorizer>()
+        .add::<AlwaysHappyDatasetPermissionChecker>()
         .add::<DependencyGraphServiceImpl>()
         .add::<InMemoryDidSecretKeyRepository>()
         .add_value(DidSecretEncryptionConfig::sample())
-        .add::<InMemoryDatasetDependencyRepository>()
         .add::<DependencyGraphImmediateListener>()
         .add::<CreateDatasetFromSnapshotUseCaseImpl>()
         .add::<CommitDatasetEventUseCaseImpl>()
         .add::<DeleteDatasetUseCaseImpl>()
         .add::<FakeConnectingDatasetEntryWriter>()
         .add::<CreateDatasetUseCaseHelper>()
+        .add::<DatasetHeadCommitterImpl>()
         .add::<DatasetReferenceServiceImpl>()
-        .add::<InMemoryDatasetReferenceRepository>()
-        .add::<InMemoryDatasetKeyBlockRepository>()
-        .add::<InMemoryDatasetDataBlockRepository>()
         .add::<DatasetBlockUpdateHandler>();
 
         register_message_dispatcher::<DatasetLifecycleMessage>(
@@ -730,7 +726,7 @@ impl DependencyGraphHarness {
 
         let catalog_without_subject = b.build();
         let catalog = CatalogBuilder::new_chained(&catalog_without_subject)
-            .add_value(CurrentAccountSubject::new_test())
+            .add_current_account_subject(CurrentAccountSubject::new_test())
             .build();
 
         Self {
@@ -1135,7 +1131,7 @@ impl DependencyGraphHarness {
         // authorization.
         if let Some(account_name) = account_name {
             CatalogBuilder::new_chained(&self.catalog_without_subject)
-                .add_value(CurrentAccountSubject::new_test_with(account_name))
+                .add_current_account_subject(CurrentAccountSubject::new_test_with(account_name))
                 .build()
         } else {
             self.catalog.clone()

@@ -13,6 +13,187 @@ Recommendation: for ease of reading, use the following format:
 ### Fixed
 -->
 
+## [Unreleased]
+### Added
+- Config: `protocol.smartTransferProtocol.uploadProgressInterval` sets how often the server asks a
+  pushing client for upload progress (default `10s`). Keep it below the idle timeout of load
+  balancers in front of the server, or they close the connection during long uploads
+- GraphQL: `setWatermark` can return `SetWatermarkCasFailed` with the expected and actual heads
+  when the dataset's head moves concurrently, instead of an internal error
+### Changed
+- Upgrading clears the history of tasks and flow runs, including pending manual runs. Flow
+  configurations and triggers are kept, and enabled flows are scheduled again when the node starts
+- Concurrent changes to a dataset are no longer overwritten: when its head moves while `kamu pull`,
+  `kamu push`, `kamu system compact`, or an update, compaction or reset task works on it, the
+  command or task fails with a head-moved conflict that names the expected and actual heads where
+  they are known (`kamu pull` and `kamu push` print "Dataset head was moved concurrently"), instead
+  of an internal error, an unrelated WebSocket error or a silent overwrite. This holds for forced
+  pulls and pushes (`--force`) too, and for pushes over the smart protocol and to S3 and local file
+  system repositories. Tasks that fail this way are retried. A server older than this release, and
+  storage without conditional writes, still overwrite such a change
+- A long `kamu system compact` no longer blocks other writers to the node's database. Each dataset
+  is committed as soon as it is compacted, so a failure in one dataset no longer undoes the
+  compaction of the others
+- Tasks no longer retry failures that a retry cannot fix:
+  - update tasks pulling from a remote with diverged histories, an unknown repository, a missing
+    remote dataset, a remote dataset named by ID, or metadata from the server that cannot be read
+  - update and compaction tasks whose commit the account is not allowed to make
+  - compaction tasks of a derived dataset, and reset tasks whose expected old head no longer
+    matches
+  - update, compaction and reset tasks of a dataset deleted after they were scheduled, which were
+    retried or crashed
+  - transforms whose output schema is incompatible with the dataset's schema, or whose engine is
+    unknown
+  - ingests whose data fails validation or does not parse as its column's type, preprocess
+    steps that name an unsupported engine, fetch URLs that are not valid once variables are
+    substituted, and event times that cannot be taken from the fetched source
+
+  Network and other transient failures are still retried
+- `kamu verify` with transform replay requires read permission on every input it replays; an
+  unreadable input fails as not found before anything is replayed
+- `kamu ingest` in a multi-tenant workspace requires write permission on the dataset, as ingesting
+  through the API does
+- Pulls, pushes, ingests, verification, compaction, reset and setting a watermark report a dataset
+  the account may not read as not found, so a denial does not reveal that a private dataset
+  exists. A dataset the account can read but may not change fails with the missing permission;
+  `kamu pull` used to report it as not found
+- `kamu pull` of a derivative fails with "Input dataset … has no data yet, pull it first" when an
+  input has never received data, instead of reporting the derivative as up to date
+- `kamu pull --reset-derivatives-on-diverged-input` resets a derivative only for an account that
+  may maintain it, as `kamu system compact` and reset flows require; otherwise the pull fails with
+  an access error and leaves the derivative as it is
+- `${{ env.NAME }}` in a polling source no longer expands templates found inside a variable's
+  value, so a variable that refers to itself no longer hangs the node, and substituted values are
+  no longer written to the debug log
+- `kamu pull --reset-derivatives-on-diverged-input` reports a reset derivative as updated, even when
+  the transform that follows the reset has no new data to process
+- `kamu pull` of several datasets still pulls the others when the remote of one is unknown or
+  cannot be reached, or when the account may not update some of them, and reports every dataset.
+  Before, an unreachable remote pulled none of them, and a denied dataset was reported alone while
+  the rest were skipped
+- `kamu pull` without `--recursive` no longer fails a requested derivative because one of its
+  inputs, which it does not pull, has an ambiguous or missing source
+- A slow or unreachable remote repository no longer delays other writers to the node's database
+  while `kamu pull` or an update task prepares to pull from it
+- Engine names in a transform are case-insensitive (`Spark` works like `spark`)
+- Without `engine.maxConcurrency`, at most one engine per CPU core runs at a time, instead of one
+  per transform or preprocess step that is ready to run
+- GraphQL (breaking): `FlowDescriptionUpdateResultUnknown` is removed from
+  `FlowDescriptionUpdateResult`; a flow that updated a dataset always reports the blocks and
+  records it added
+- GraphQL: a transform flow that found nothing to do reports `FlowDescriptionUpdateResultUpToDate`,
+  as ingest flows do, instead of no result
+### Fixed
+- A polling source with an unsupported URL scheme (such as `s3://`) or fetch kind, an invalid
+  header, an MQTT port out of range, a files glob ordered by event time or matching a file name that
+  is not UTF-8, or an Ethereum source with neither a node URL nor a chain ID fails its ingest with
+  an invalid fetch step error that is not retried, instead of crashing the node. An HTTP source
+  whose `Last-Modified` header cannot be parsed is ingested as if the header were absent
+- A smart protocol push whose metadata unpacks to more than 256 MiB, or holds more blocks than it
+  declares, is rejected instead of exhausting the server's memory
+- `kamu system compact` and compaction flows keep blocks that only set a watermark or source state
+  when they cannot be merged, and a merged block takes the source state of the newest block it
+  replaces, even when that block has none. Previously such a block could be dropped, moving the
+  watermark back and making the next poll re-ingest data, and a dataset that was already compacted
+  could be reported as compacted again, resetting its derivatives for nothing
+- `kamu system compact` splits data into fewer merged blocks after a metadata event, which no longer
+  counts the records before it towards the size limits
+- `kamu system compact` shows which dataset failed instead of leaving its spinner running, and no
+  longer shows a dataset as compacted before its new head is set
+- Compaction removes its temporary files when it ends, instead of leaving them until the node
+  restarts
+- GraphQL: triggering a reset flow with an expected old head that is not the current head fails
+  with `FlowPreconditionsNotMet`, and a reset task that fails because its old head no longer
+  matches says so instead of a generic failure
+- `kamu push` and `kamu pull` over the smart protocol report a destination that is ahead of the
+  source as ahead, and diverged histories as diverged with the number of blocks on each side, as
+  the other protocols do, instead of reporting any mismatch as diverged or, for a push, as an
+  invalid interval
+- `kamu pull` of a dataset whose pull alias names an unknown repository fails with "Repository …
+  does not exist", and one whose pull alias names a remote dataset by ID fails with "Syncing remote
+  dataset by ID is not yet supported: …", instead of an internal error
+- `kamu pull` no longer shows an ingest or a transform as successful when its commit then fails
+  because the dataset's head moved
+- When `kamu pull --reset-derivatives-on-diverged-input` resets a derivative and the transform that
+  follows fails, the error now says that the dataset was reset to its metadata
+- A first `kamu pull` from a remote that fails, including when saving the pull alias fails, no
+  longer leaves a dataset behind: the dataset appears only once the pull succeeds
+- Update tasks that pull over the smart protocol retry a failed object download, such as an expired
+  download link, instead of failing as a corrupted source
+- A malformed reply during a smart protocol transfer fails the transfer instead of crashing the
+  client or the server's connection
+- `kamu push` over the smart protocol to a dataset ID that does not exist fails with "not found"
+- `kamu push` of several datasets pushes the ones it can when others fail authorization or target
+  resolution, reports every dataset, and stores a push alias for each one pushed
+- `kamu push` with several repositories configured and no target says so ("Cannot choose between
+  multiple repositories"), instead of blaming multiple push aliases
+- A smart protocol push or pull no longer commits blocks whose data or checkpoint files were not
+  transferred; the push or pull fails with nothing committed
+- `kamu pull` over the simple protocol retried after a failure no longer downloads again the files
+  it already copied, and its progress counts only the files it copies
+- In a multi-tenant workspace, `kamu pull` from a remote no longer picks another account's dataset
+  that has the same pull alias, which failed the pull and revealed that dataset's name
+- `kamu pull` of a remote dataset by ID without a local name fails with an error asking for the
+  destination instead of crashing
+- `kamu pull` and `kamu push` into a dataset left without a head by an interrupted transfer fail
+  when the incoming dataset is a different one, instead of writing its history
+- `kamu push` over the smart protocol no longer reports success when the server's commit failed
+  while it was asking for upload progress
+- A dataset updated by a smart protocol push always notifies the node's flows; a failure to record
+  the change now fails the push with nothing committed
+- `kamu push` over the smart protocol reports a name collision for a long dataset alias, instead of
+  a retried internal error
+- `kamu push` from an older `kamu` to this node reports a failure, instead of success, when the node
+  could not commit the push
+- When a smart protocol transfer fails on the server, the error names the failed step instead of
+  showing a JSON parse error
+- When `kamu pull` or `kamu system compact` fails for some datasets, the follow-up updates of the
+  datasets that did change, such as the dependency graph, complete before the command exits instead
+  of on the next command
+- Transform flows now run for a derivative whose input has a single record, or whose input only
+  advanced its watermark; before, the flow treated them as up to date
+- `kamu pull` of a derivative that defines no transform, together with other datasets or with
+  `--recursive` or `--all`, fails with "Dataset does not define a transform" instead of crashing
+- Changing the inputs of a derivative's transform makes its pulls, flows and verification fail with
+  an error that names the dataset, instead of crashing the process
+- `kamu verify` of a derivative whose query was changed no longer reports the blocks produced by
+  the earlier query as not reproducible
+- `kamu verify` of a derivative that ran its transform more than once no longer fails with an
+  internal engine error: the input data of later transforms was skipped when they were replayed
+- A transform whose engine output adds nothing no longer crashes the process; it is reported as up
+  to date
+- Transform, polling ingest and push ingest runs no longer leave their working files behind after
+  success, and a failed fetch no longer leaves its partial download in the cache. A failed
+  transform keeps only its logs and output, not its copies of the input data
+- `kamu verify` checks the checkpoint of a block that adds no data, which it skipped before
+- An ingest flow of a root dataset without a polling source fails instead of reporting success on
+  every run
+- `kamu pull` and `kamu ingest` report a CSV or JSON value that does not parse with its own message
+  instead of an internal error
+- When `kamu pull` fails part-way through a source that yields several batches, it reports how many
+  blocks and records it ingested before the failure, along with the actual error
+- Ingest flows no longer fail after their data was committed, which left downstream flows
+  untriggered
+- Failures to read a dataset environment variable used in a fetch step, such as a secret that
+  cannot be decrypted, are reported instead of being treated as a missing value
+- Re-running an ingest after its downloaded data was deleted from the cache downloads it again
+  instead of recording the source as ingested without its data
+- A local source file (`file://` or `FilesGlob`) that failed to ingest and was then fixed is no
+  longer ingested a second time on the next poll
+- A fetch savepoint left truncated by a crash or a full disk is fetched again instead of failing
+  every later run until the cache is cleared
+- Two datasets with the same fetch step no longer share fetched data: on a node where tenants'
+  datasets polled the same URL, one dataset's first ingest could commit the data another had
+  fetched with its own secrets instead of fetching
+- Setting a watermark (`kamu pull --set-watermark`, GraphQL `setWatermark`) keeps the polling
+  source's progress: the next poll no longer skips the source as uncacheable, or ingests again the
+  files a `FilesGlob` source had already read
+- Pushing data over HTTP (`POST /ingest`) returns 400 for a derived dataset, for data that does not
+  match the dataset's schema or does not parse, and for a `Content-Type` header that is not valid
+  text, and 409 when the dataset's head moved concurrently, instead of a server error or a crash
+- The first upload into a dataset without a source no longer fails when its `odf-event-time` is
+  earlier than the dataset's last change
+
 ## [0.272.1] - 2026-11-05
 ### Added
 - Versioned files can be viewed and downloaded on nodes with local storage, including every

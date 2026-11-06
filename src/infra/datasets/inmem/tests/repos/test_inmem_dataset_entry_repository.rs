@@ -7,133 +7,145 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use database_common_macros::database_transactional_test;
-use dill::{Catalog, CatalogBuilder};
-use kamu_accounts_inmem::InMemoryAccountRepository;
-use kamu_datasets_inmem::InMemoryDatasetEntryRepository;
+use database_common_macros::{database_concurrent_transactions_test, database_transactional_test};
 use kamu_datasets_repo_tests::dataset_entry_repo;
 
+use super::InMemoryDatasetRepositoriesHarness;
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 database_transactional_test!(
-    storage = inmem,
+    storage = inmem_with_transaction,
     fixture = dataset_entry_repo::test_get_dataset_entry,
-    harness = InMemoryDatasetEntryRepositoryHarness
+    harness = InMemoryDatasetRepositoriesHarness
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 database_transactional_test!(
-    storage = inmem,
+    storage = inmem_with_transaction,
     fixture = dataset_entry_repo::test_stream_many_entries,
-    harness = InMemoryDatasetEntryRepositoryHarness
+    harness = InMemoryDatasetRepositoriesHarness
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 database_transactional_test!(
-    storage = inmem,
+    storage = inmem_with_transaction,
     fixture = dataset_entry_repo::test_get_multiple_entries,
-    harness = InMemoryDatasetEntryRepositoryHarness
+    harness = InMemoryDatasetRepositoriesHarness
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 database_transactional_test!(
-    storage = inmem,
+    storage = inmem_with_transaction,
     fixture = dataset_entry_repo::test_get_dataset_entry_by_name,
-    harness = InMemoryDatasetEntryRepositoryHarness
+    harness = InMemoryDatasetRepositoriesHarness
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 database_transactional_test!(
-    storage = inmem,
+    storage = inmem_with_transaction,
     fixture = dataset_entry_repo::test_get_dataset_entries_by_owner_id,
-    harness = InMemoryDatasetEntryRepositoryHarness
+    harness = InMemoryDatasetRepositoriesHarness
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 database_transactional_test!(
-    storage = inmem,
+    storage = inmem_with_transaction,
     fixture = dataset_entry_repo::test_get_dataset_entries_by_owner_and_name,
-    harness = InMemoryDatasetEntryRepositoryHarness
+    harness = InMemoryDatasetRepositoriesHarness
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 database_transactional_test!(
-    storage = inmem,
+    storage = inmem_with_transaction,
     fixture = dataset_entry_repo::test_try_save_duplicate_dataset_entry,
-    harness = InMemoryDatasetEntryRepositoryHarness
+    harness = InMemoryDatasetRepositoriesHarness
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 database_transactional_test!(
-    storage = inmem,
+    storage = inmem_with_transaction,
     fixture = dataset_entry_repo::test_try_save_dataset_entry_with_name_collision,
-    harness = InMemoryDatasetEntryRepositoryHarness
+    harness = InMemoryDatasetRepositoriesHarness
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 database_transactional_test!(
-    storage = inmem,
+    storage = inmem_with_transaction,
     fixture = dataset_entry_repo::test_try_set_same_dataset_name_for_another_owned_dataset_entry,
-    harness = InMemoryDatasetEntryRepositoryHarness
+    harness = InMemoryDatasetRepositoriesHarness
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 database_transactional_test!(
-    storage = inmem,
+    storage = inmem_with_transaction,
     fixture = dataset_entry_repo::test_update_dataset_entry_name,
-    harness = InMemoryDatasetEntryRepositoryHarness
+    harness = InMemoryDatasetRepositoriesHarness
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 database_transactional_test!(
-    storage = inmem,
+    storage = inmem_with_transaction,
     fixture = dataset_entry_repo::test_owner_of_entries_renamed,
-    harness = InMemoryDatasetEntryRepositoryHarness
+    harness = InMemoryDatasetRepositoriesHarness
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 database_transactional_test!(
-    storage = inmem,
+    storage = inmem_with_transaction,
     fixture = dataset_entry_repo::test_delete_dataset_entry,
-    harness = InMemoryDatasetEntryRepositoryHarness
+    harness = InMemoryDatasetRepositoriesHarness
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 database_transactional_test!(
-    storage = inmem,
+    storage = inmem_with_transaction,
     fixture = dataset_entry_repo::test_delete_multiple_dataset_entries,
-    harness = InMemoryDatasetEntryRepositoryHarness
+    harness = InMemoryDatasetRepositoriesHarness
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-struct InMemoryDatasetEntryRepositoryHarness {
-    catalog: Catalog,
-}
+database_concurrent_transactions_test!(
+    storage = inmem,
+    fixture = dataset_entry_repo::test_save_same_name_in_concurrent_transactions,
+    harness = InMemoryDatasetRepositoriesHarness
+);
 
-impl InMemoryDatasetEntryRepositoryHarness {
-    pub fn new() -> Self {
-        let mut catalog_builder = CatalogBuilder::new();
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-        catalog_builder.add::<InMemoryAccountRepository>();
-        catalog_builder.add::<InMemoryDatasetEntryRepository>();
+database_concurrent_transactions_test!(
+    storage = inmem,
+    fixture = dataset_entry_repo::test_rename_to_same_name_in_concurrent_transactions,
+    harness = InMemoryDatasetRepositoriesHarness
+);
 
-        Self {
-            catalog: catalog_builder.build(),
-        }
-    }
-}
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_concurrent_transactions_test!(
+    storage = inmem,
+    fixture = dataset_entry_repo::test_rename_in_concurrent_transactions,
+    harness = InMemoryDatasetRepositoriesHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_concurrent_transactions_test!(
+    storage = inmem,
+    fixture = dataset_entry_repo::test_rename_and_rename_owner_in_concurrent_transactions,
+    harness = InMemoryDatasetRepositoriesHarness
+);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

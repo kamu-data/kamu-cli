@@ -12,7 +12,7 @@ use std::sync::Arc;
 
 use chrono::{TimeZone, Utc};
 use kamu_core::MockDidGenerator;
-use kamu_datasets::{MockDatasetActionAuthorizer, RenameDatasetError, RenameDatasetUseCase};
+use kamu_datasets::{MockDatasetPermissionChecker, RenameDatasetError, RenameDatasetUseCase};
 use kamu_datasets_services::RenameDatasetUseCaseImpl;
 use time_source::{SystemTimeSourceProvider, SystemTimeSourceStub};
 
@@ -29,11 +29,11 @@ async fn test_rename_dataset_success_via_ref() {
     let alias_bar = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("bar"));
     let (_, foo_id) = odf::DatasetID::new_generated_ed25519();
 
-    let mock_authorizer =
-        MockDatasetActionAuthorizer::new().expect_check_maintain_dataset(&foo_id, 1, true);
+    let mock_permission_checker =
+        MockDatasetPermissionChecker::new().expect_check_maintain_dataset(&foo_id, 1, true);
 
     let harness = RenameUseCaseHarness::new(
-        mock_authorizer,
+        mock_permission_checker,
         Some(MockDidGenerator::predefined_dataset_ids(vec![
             foo_id.clone(),
         ])),
@@ -81,7 +81,7 @@ async fn test_rename_dataset_success_via_ref() {
 
 #[tokio::test]
 async fn test_rename_dataset_not_found() {
-    let harness = RenameUseCaseHarness::new(MockDatasetActionAuthorizer::new(), None).await;
+    let harness = RenameUseCaseHarness::new(MockDatasetPermissionChecker::new(), None).await;
 
     let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
     assert_matches!(
@@ -106,7 +106,11 @@ async fn test_rename_dataset_unauthorized() {
     let (_, dataset_id_foo) = odf::DatasetID::new_generated_ed25519();
 
     let harness = RenameUseCaseHarness::new(
-        MockDatasetActionAuthorizer::new().expect_check_maintain_dataset(&dataset_id_foo, 1, false),
+        MockDatasetPermissionChecker::new().expect_check_maintain_dataset(
+            &dataset_id_foo,
+            1,
+            false,
+        ),
         Some(MockDidGenerator::predefined_dataset_ids(vec![
             dataset_id_foo,
         ])),
@@ -145,7 +149,7 @@ struct RenameUseCaseHarness {
 
 impl RenameUseCaseHarness {
     async fn new(
-        mock_dataset_action_authorizer: MockDatasetActionAuthorizer,
+        mock_dataset_permission_checker: MockDatasetPermissionChecker,
         maybe_mock_did_generator: Option<MockDidGenerator>,
     ) -> Self {
         let dataset_base_use_case_harness =
@@ -156,7 +160,7 @@ impl RenameUseCaseHarness {
                     ),
                 ),
                 maybe_mock_did_generator,
-                maybe_mock_dataset_action_authorizer: Some(mock_dataset_action_authorizer),
+                maybe_mock_dataset_permission_checker: Some(mock_dataset_permission_checker),
                 ..DatasetBaseUseCaseHarnessOpts::default()
             })
             .await;

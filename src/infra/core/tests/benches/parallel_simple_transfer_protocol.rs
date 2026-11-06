@@ -22,14 +22,15 @@ use kamu::utils::simple_transfer_protocol::{
 };
 use kamu::{
     DatasetRegistrySoloUnitBridge,
+    IpfsServiceImpl,
+    RemoteDatasetUrlResolverImpl,
     RemoteReposDir,
     RemoteRepositoryRegistryImpl,
     SyncRequestBuilder,
     SyncServiceImpl,
 };
-use kamu_accounts::CurrentAccountSubject;
-use kamu_datasets::{AlwaysHappyDatasetActionAuthorizer, DatasetRegistry};
-use kamu_datasets_inmem::InMemoryDatasetDependencyRepository;
+use kamu_accounts::{CurrentAccountSubject, CurrentAccountSubjectCatalogExt as _};
+use kamu_datasets::{AlwaysHappyDatasetPermissionChecker, DatasetRegistry, DatasetRegistryExt};
 use kamu_datasets_services::DependencyGraphServiceImpl;
 use odf::dataset::testing::create_test_dataset_from_snapshot;
 use odf::dataset::{DatasetFactoryImpl, IpfsGateway};
@@ -62,12 +63,13 @@ async fn setup_dataset(
     let repos_dir = tmp_workspace_dir.join("repos");
     std::fs::create_dir(&repos_dir).unwrap();
 
-    let catalog = dill::CatalogBuilder::new()
+    let mut b = dill::CatalogBuilder::new();
+    kamu_datasets_inmem::register_dependencies(&mut b);
+    let catalog = b
         .add::<DependencyGraphServiceImpl>()
-        .add::<InMemoryDatasetDependencyRepository>()
         .add_value(ipfs_gateway)
         .add_value(ipfs_client)
-        .add_value(CurrentAccountSubject::new_test())
+        .add_current_account_subject(CurrentAccountSubject::new_test())
         .add_value(TenancyConfig::SingleTenant)
         .add_builder(odf::dataset::DatasetStorageUnitLocalFs::builder(
             datasets_dir,
@@ -78,10 +80,12 @@ async fn setup_dataset(
         .add::<odf::dataset::DummyOdfServerAccessTokenResolver>()
         .add::<DatasetFactoryImpl>()
         .add::<SyncServiceImpl>()
+        .add::<IpfsServiceImpl>()
+        .add::<RemoteDatasetUrlResolverImpl>()
         .add::<SyncRequestBuilder>()
         .add::<SystemTimeSourceDefault>()
         .add::<DummySmartTransferProtocolClient>()
-        .add::<AlwaysHappyDatasetActionAuthorizer>()
+        .add::<AlwaysHappyDatasetPermissionChecker>()
         .add::<SimpleTransferProtocol>()
         .build();
 
@@ -121,6 +125,8 @@ async fn setup_dataset(
     (sync_svc, sync_request_builder, dataset_registry)
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 async fn append_data_to_dataset(
     block_amount: usize,
     dataset_registry: &dyn DatasetRegistry,
@@ -136,6 +142,8 @@ async fn append_data_to_dataset(
     }
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 async fn do_test_sync(
     sync_svc: Arc<dyn SyncService>,
     sync_request_builder: Arc<SyncRequestBuilder>,
@@ -147,7 +155,7 @@ async fn do_test_sync(
     let _push_res = sync_svc
         .sync(
             sync_request_builder
-                .build_sync_request(dataset_alias.as_any_ref(), push_repo_url.as_any_ref(), true)
+                .build_sync_request(dataset_alias.as_local_ref(), push_repo_url.clone(), true)
                 .await
                 .unwrap(),
             SyncOptions::default(),
@@ -156,11 +164,18 @@ async fn do_test_sync(
         .await;
 
     let _pull_res = sync_svc
-        .sync(
-            sync_request_builder
-                .build_sync_request(pull_repo_url.as_any_ref(), dataset_alias.as_any_ref(), true)
+        .transfer_into_local(
+            LocalSyncRequest {
+                src: pull_repo_url.clone(),
+                dst: LocalSyncTarget::existing(
+                    dataset_registry
+                        .get_dataset_by_ref(&dataset_alias.as_local_ref())
+                        .await
+                        .unwrap(),
+                )
                 .await
                 .unwrap(),
+            },
             SyncOptions::default(),
             None,
         )
@@ -175,6 +190,8 @@ async fn do_test_sync(
     )
     .await;
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 async fn build_temp_dirs(rt: &tokio::runtime::Runtime) -> (odf::DatasetAlias, Url, Url) {
     let tmp_repo_dir = tempfile::tempdir().unwrap();
@@ -226,6 +243,8 @@ fn bench_with_1_parallel(c: &mut Criterion) {
         });
     });
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 fn bench_with_10_parallels(c: &mut Criterion) {
     unsafe {

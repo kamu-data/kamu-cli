@@ -29,7 +29,12 @@ impl FetchService {
     ) -> Result<FetchResult, PollingIngestError> {
         match &fglob.order {
             None | Some(odf::metadata::SourceOrdering::ByName) => (),
-            Some(ord) => panic!("Files glob source can only be ordered by name, found: {ord:?}"),
+            Some(ord) => {
+                return Err(InvalidFetchStepError::new(format!(
+                    "Files glob source can only be ordered by name, found: {ord:?}"
+                ))
+                .into());
+            }
         }
 
         let last_filename = match prev_source_state {
@@ -42,18 +47,19 @@ impl FetchService {
             .collect::<Result<Vec<_>, _>>()
             .int_err()?;
 
-        let mut matched_files: Vec<(String, PathBuf)> = matched_paths
-            .into_iter()
-            .filter(|p| p.is_file())
-            .map(|p| (p.file_name().unwrap().to_str().unwrap().to_owned(), p))
-            .filter(|(name, _)| {
-                if let Some(lfn) = last_filename {
-                    name > lfn
-                } else {
-                    true
-                }
-            })
-            .collect();
+        let mut matched_files: Vec<(String, PathBuf)> = Vec::new();
+        for path in matched_paths.into_iter().filter(|p| p.is_file()) {
+            let Some(name) = path.file_name().and_then(|name| name.to_str()) else {
+                return Err(InvalidFetchStepError::new(format!(
+                    "Files glob source matched a file whose name is not valid UTF-8: {}",
+                    path.display()
+                ))
+                .into());
+            };
+            if last_filename.is_none_or(|lfn| name > lfn.as_str()) {
+                matched_files.push((name.to_owned(), path));
+            }
+        }
 
         matched_files.sort_by(|a, b| b.0.cmp(&a.0));
 
@@ -64,15 +70,13 @@ impl FetchService {
             "Matched the glob pattern"
         );
 
-        if matched_files.is_empty() {
+        let Some((first_filename, first_path)) = matched_files.pop() else {
             return if prev_source_state.is_some() {
                 Ok(FetchResult::UpToDate)
             } else {
                 Err(PollingIngestError::not_found(&fglob.path, None))
             };
-        }
-
-        let (first_filename, first_path) = matched_files.pop().unwrap();
+        };
 
         let source_event_time = match &fglob.event_time {
             None | Some(odf::metadata::EventTimeSource::FromSystemTime(_)) => Some(*system_time),
@@ -91,7 +95,9 @@ impl FetchService {
         let FetchResult::Updated(fetch_res) =
             Self::fetch_file(&first_path, None, None, target_path, system_time, listener)?
         else {
-            panic!("Glob rule should be caching individual files")
+            return Err("A file without a previous state is always fetched"
+                .int_err()
+                .into());
         };
 
         Ok(FetchResult::Updated(FetchResultUpdated {
@@ -126,7 +132,7 @@ impl FetchService {
         let mod_time: DateTime<Utc> = meta
             .modified()
             .map(|t| -> DateTime<Utc> { t.into() })
-            .expect("File modification time is not available on this platform")
+            .int_err()?
             .round_subsecs(3);
 
         if let Some(PollingSourceState::LastModified(last_modified)) = prev_source_state
@@ -158,7 +164,7 @@ impl FetchService {
         filename: &str,
         src: &odf::metadata::EventTimeSourceFromPath,
     ) -> Result<DateTime<Utc>, PollingIngestError> {
-        let time_re = regex::Regex::new(&src.pattern).int_err()?;
+        let time_re = regex::Regex::new(&src.pattern).map_err(InvalidFetchStepError::new)?;
 
         let time_fmt = match src.timestamp_format {
             Some(ref fmt) => fmt,

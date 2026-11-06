@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use proc_macro::{Span, TokenStream};
-use quote::quote;
+use quote::{format_ident, quote};
 use syn::parse::{Parse, ParseStream};
 use syn::{
     ExprArray,
@@ -749,15 +749,7 @@ pub fn transactional_static_method4(attr: TokenStream, item: TokenStream) -> Tok
 
 #[proc_macro]
 pub fn database_transactional_test(input: TokenStream) -> TokenStream {
-    // Preliminary actions to clean up tables as migrations add rows.
-    let tables_for_cleanup = parse_str::<ExprArray>(
-        r#"
-        [
-            "outbox_message_consumptions",
-        ]
-        "#,
-    )
-    .unwrap();
+    let tables_for_cleanup = tables_for_cleanup();
 
     let DatabaseTransactionalTestInputArgs {
         storage,
@@ -784,6 +776,35 @@ pub fn database_transactional_test(input: TokenStream) -> TokenStream {
                 #fixture (&harness.catalog).await;
             }
         },
+        // Runs the fixture both as `inmem` and inside one transaction of
+        // `InMemoryTransactionManager`, which the harness registers in `new_transactional()`
+        "inmem_with_transaction" => {
+            let in_transaction_function_name = format_ident!("{test_function_name}_in_transaction");
+            quote! {
+                #[test_group::group(#extra_test_groups)]
+                #[test_log::test(tokio::test)]
+                async fn #test_function_name () {
+                    let harness = #harness ::new();
+
+                    #fixture (&harness.catalog).await;
+                }
+
+                #[test_group::group(#extra_test_groups)]
+                #[test_log::test(tokio::test)]
+                async fn #in_transaction_function_name () {
+                    let harness = #harness ::new_transactional();
+
+                    database_common::DatabaseTransactionRunner::from(harness.catalog)
+                        .transactional(|catalog| async move {
+                            #fixture (&catalog).await;
+
+                            Ok::<_, internal_error::InternalError>(())
+                        })
+                        .await
+                        .unwrap();
+                }
+            }
+        }
         "postgres" => quote! {
             #[test_group::group(database, postgres, #extra_test_groups)]
             #[test_log::test(sqlx::test(migrations = "../../../../migrations/postgres"))]
@@ -833,12 +854,91 @@ pub fn database_transactional_test(input: TokenStream) -> TokenStream {
         unexpected => {
             panic!(
                 "Unexpected E2E test storage: \"{unexpected}\"!\nAllowable values: \"inmem\", \
-                 \"postgres\", and \"sqlite\"."
+                 \"inmem_with_transaction\", \"postgres\", and \"sqlite\"."
             );
         }
     };
 
     output.into()
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// #[database_concurrent_transactions_test]
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Like `database_transactional_test!`, but the fixture runs outside any
+/// transaction and gets the harness catalog with its transaction manager, to
+/// open several transactions itself. `storage` is `inmem`, which builds the
+/// harness with `new_transactional()`, or `postgres`; there is no `sqlite`, as
+/// SQLite serialises writers and a race there reduces to a sequential test.
+#[proc_macro]
+pub fn database_concurrent_transactions_test(input: TokenStream) -> TokenStream {
+    let tables_for_cleanup = tables_for_cleanup();
+
+    let DatabaseTransactionalTestInputArgs {
+        storage,
+        fixture,
+        harness,
+        extra_test_groups,
+    } = parse_macro_input!(input as DatabaseTransactionalTestInputArgs);
+
+    let test_function_name = fixture.segments.last().unwrap().ident.clone();
+
+    let extra_test_groups = if let Some(extra_test_groups) = extra_test_groups {
+        parse_str(extra_test_groups.value().as_str()).unwrap()
+    } else {
+        quote! {}
+    };
+
+    let output = match storage.to_string().as_str() {
+        "inmem" => quote! {
+            #[test_group::group(#extra_test_groups)]
+            #[test_log::test(tokio::test)]
+            async fn #test_function_name () {
+                let harness = #harness ::new_transactional();
+
+                #fixture (&harness.catalog).await;
+            }
+        },
+        "postgres" => quote! {
+            #[test_group::group(database, postgres, #extra_test_groups)]
+            #[test_log::test(sqlx::test(migrations = "../../../../migrations/postgres"))]
+            async fn #test_function_name (pg_pool: sqlx::PgPool) {
+                for table in #tables_for_cleanup {
+                    sqlx::query(sqlx::AssertSqlSafe(format!("DELETE FROM {table}")))
+                    .execute(&pg_pool)
+                    .await
+                    .unwrap();
+                }
+
+                let harness = #harness ::new(pg_pool);
+
+                #fixture (&harness.catalog).await;
+            }
+        },
+        unexpected => {
+            panic!(
+                "Unexpected storage: \"{unexpected}\"!\nAllowable values: \"inmem\" and \
+                 \"postgres\"."
+            );
+        }
+    };
+
+    output.into()
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Tables to clean up before a database test, as migrations add rows to them
+fn tables_for_cleanup() -> ExprArray {
+    parse_str::<ExprArray>(
+        r#"
+        [
+            "outbox_message_consumptions",
+        ]
+        "#,
+    )
+    .unwrap()
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

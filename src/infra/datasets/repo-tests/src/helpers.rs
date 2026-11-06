@@ -8,9 +8,16 @@
 // by the Apache License, Version 2.0.
 
 use std::assert_matches;
+use std::fmt::Debug;
+use std::future::Future;
 use std::sync::Arc;
 
 use chrono::{SubsecRound, Utc};
+use database_common::testing::{
+    RacingTransactionOutcome,
+    in_committed_transaction,
+    race_transactions,
+};
 use email_utils::Email;
 use kamu_accounts::{Account, AccountRepository, AccountType};
 use kamu_datasets::{DatasetBlock, DatasetEntry, DatasetEntryRepository};
@@ -217,6 +224,79 @@ fn make_block(
         sequence_number,
         block_hash,
         block_payload,
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Commits a new account with one entry per `(name, kind)`, for fixtures that
+/// race their own transactions
+pub(crate) async fn init_committed_entries(
+    catalog: &dill::Catalog,
+    entries: &[(&str, odf::DatasetKind)],
+) -> (Account, Vec<DatasetEntry>) {
+    in_committed_transaction(catalog, |catalog| async move {
+        let account = new_account(&catalog.get_one::<dyn AccountRepository>().unwrap()).await;
+        let entry_repo = catalog.get_one::<dyn DatasetEntryRepository>().unwrap();
+
+        let mut saved = Vec::new();
+        for (name, kind) in entries {
+            let entry = new_dataset_entry_with(&account, name, *kind);
+            entry_repo.save_dataset_entry(&entry).await.unwrap();
+            saved.push(entry);
+        }
+
+        (account, saved)
+    })
+    .await
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// What two racing transactions left behind after saving one block each to the
+/// `Head` of the same new dataset
+pub(crate) struct BlockSaveRace<E> {
+    pub outcome: RacingTransactionOutcome<E>,
+    pub committed_hashes: Vec<odf::Multihash>,
+}
+
+/// Races `save` of `first_block` against `save` of `second_block` (see
+/// `race_transactions`), then reads the committed block hashes with
+/// `committed_hashes`
+pub(crate) async fn race_block_saves<E, Save, SaveFut, List, ListFut>(
+    catalog: &dill::Catalog,
+    first_block: DatasetBlock,
+    second_block: DatasetBlock,
+    save: Save,
+    committed_hashes: List,
+) -> BlockSaveRace<E>
+where
+    Save: Fn(dill::Catalog, odf::DatasetID, DatasetBlock) -> SaveFut + Copy + Send + 'static,
+    SaveFut: Future<Output = Result<(), E>> + Send,
+    E: Debug + Send + 'static,
+    List: FnOnce(dill::Catalog, odf::DatasetID) -> ListFut,
+    ListFut: Future<Output = Vec<odf::Multihash>>,
+{
+    let (_, entries) = init_committed_entries(catalog, &[("foo", odf::DatasetKind::Root)]).await;
+    let dataset_id = entries[0].id.clone();
+    let second_dataset_id = dataset_id.clone();
+
+    let outcome = race_transactions(
+        catalog,
+        |catalog| async move {
+            save(catalog, dataset_id, first_block).await.unwrap();
+        },
+        move |catalog| save(catalog, second_dataset_id, second_block),
+    )
+    .await;
+
+    let dataset_id = entries[0].id.clone();
+    let committed_hashes =
+        in_committed_transaction(catalog, |catalog| committed_hashes(catalog, dataset_id)).await;
+
+    BlockSaveRace {
+        outcome,
+        committed_hashes,
     }
 }
 

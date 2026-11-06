@@ -13,14 +13,6 @@ use kamu_cli_e2e_common::prelude::*;
 
 kamu_cli_execute_command_e2e_test!(
     storage = postgres,
-    fixture = kamu_cli_e2e_repo_tests::commands::test_account_argument_is_not_valid_account_name_mt,
-    options = Options::default().with_multi_tenant(),
-);
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-kamu_cli_execute_command_e2e_test!(
-    storage = postgres,
     fixture = kamu_cli_e2e_repo_tests::commands::test_account_argument_is_not_registered_account_mt,
     options = Options::default().with_multi_tenant(),
 );

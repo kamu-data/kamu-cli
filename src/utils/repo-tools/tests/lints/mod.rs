@@ -9,4 +9,6 @@
 
 mod agent_harness;
 mod dividing_lines;
+mod e2e_storage_wiring;
 mod license_header;
+mod reference_writes;

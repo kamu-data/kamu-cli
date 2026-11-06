@@ -9,16 +9,23 @@
 
 use std::sync::Arc;
 
-use chrono::Utc;
+use chrono::{DateTime, Utc};
 use dill::{component, interface};
-use internal_error::ResultIntoInternal;
+use internal_error::{ErrorIntoInternal, ResultIntoInternal};
+use kamu_accounts::Principal;
 use kamu_core::*;
 use kamu_datasets::{
     DatasetExternallyChangedMessage,
+    DatasetHeadCommitter,
+    DatasetOperation,
+    DatasetOperationGuard,
+    DatasetOperationRequest,
+    DatasetPermissionError,
     MESSAGE_PRODUCER_KAMU_HTTP_ADAPTER,
     ResolvedDataset,
 };
 use messaging_outbox::{Outbox, OutboxExt};
+use time_source::SystemTimeSource;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -27,15 +34,41 @@ use messaging_outbox::{Outbox, OutboxExt};
 pub struct PushIngestDataUseCaseImpl {
     push_ingest_planner: Arc<dyn PushIngestPlanner>,
     push_ingest_executor: Arc<dyn PushIngestExecutor>,
+    dataset_head_committer: Arc<dyn DatasetHeadCommitter>,
+    dataset_operation_guard: Arc<dyn DatasetOperationGuard>,
+    principal: Arc<Principal>,
     outbox: Arc<dyn Outbox>,
+    time_source: Arc<dyn SystemTimeSource>,
 }
 
 impl PushIngestDataUseCaseImpl {
+    async fn authorize(&self, target: &ResolvedDataset) -> Result<(), PushIngestDataError> {
+        self.dataset_operation_guard
+            .check_operation(
+                &self.principal,
+                &DatasetOperationRequest::new(
+                    target.get_handle().clone(),
+                    DatasetOperation::PushIngest,
+                ),
+            )
+            .await
+            .map_err(|e| {
+                use DatasetPermissionError as E;
+
+                match e {
+                    E::NotFound(e) => PushIngestDataError::NotFound(e),
+                    E::Access(e) => PushIngestDataError::Access(e),
+                    e @ E::Internal(_) => PushIngestDataError::Internal(e.int_err()),
+                }
+            })
+    }
+
     async fn run_single_ingest(
         &self,
         target: ResolvedDataset,
         data_source: DataSource,
         options: PushIngestDataUseCaseOptions,
+        uncommitted_bytes: u64,
         listener_maybe: Option<Arc<dyn PushIngestListener>>,
     ) -> Result<PushIngestResult, PushIngestDataError> {
         let PushIngestDataUseCaseOptions {
@@ -47,26 +80,123 @@ impl PushIngestDataUseCaseImpl {
             skip_quota_check,
         } = options;
 
+        let mut opts = PushIngestOpts {
+            media_type,
+            source_event_time,
+            schema_inference: SchemaInferenceOpts::default(),
+            expected_head,
+            skip_quota_check,
+            uncommitted_bytes,
+        };
+
+        // The auto-created source block, with the head it was committed on
+        let mut created_source = None;
+        if is_ingest_from_upload
+            && let Some(push_source) = self
+                .push_ingest_planner
+                .plan_push_source_creation(target.clone(), source_name.as_deref(), &opts)
+                .await?
+        {
+            let source_commit = self
+                .add_push_source(&target, push_source, opts.expected_head.as_ref())
+                .await?;
+
+            // The data is planned on top of the new source block
+            opts.expected_head = Some(source_commit.new_head.clone());
+            created_source = Some(source_commit);
+        }
+
         let ingest_plan = self
             .push_ingest_planner
-            .plan_ingest(
-                target.clone(),
-                source_name.as_deref(),
-                PushIngestOpts {
-                    media_type,
-                    source_event_time,
-                    auto_create_push_source: is_ingest_from_upload,
-                    schema_inference: SchemaInferenceOpts::default(),
-                    expected_head,
-                    skip_quota_check,
-                },
-            )
+            .plan_ingest(target.clone(), source_name.as_deref(), opts)
             .await?;
 
-        self.push_ingest_executor
+        let ingest_result = self
+            .push_ingest_executor
             .execute_ingest(target, ingest_plan, data_source, listener_maybe)
+            .await?;
+
+        let Some(source_commit) = created_source else {
+            return Ok(ingest_result);
+        };
+
+        // `HEAD` moves over the source block too, even when the data added nothing
+        Ok(match ingest_result {
+            PushIngestResult::Updated {
+                new_head,
+                num_blocks,
+                system_time,
+                ..
+            } => PushIngestResult::Updated {
+                old_head: source_commit.old_head,
+                new_head,
+                num_blocks: num_blocks + 1,
+                system_time,
+            },
+            PushIngestResult::UpToDate => PushIngestResult::Updated {
+                old_head: source_commit.old_head,
+                new_head: source_commit.new_head,
+                num_blocks: 1,
+                system_time: source_commit.system_time,
+            },
+        })
+    }
+
+    /// Appends the push source block after `expected_head`, or after the
+    /// current `HEAD`, without moving `HEAD`
+    async fn add_push_source(
+        &self,
+        target: &ResolvedDataset,
+        push_source: odf::metadata::AddPushSource,
+        expected_head: Option<&odf::Multihash>,
+    ) -> Result<SourceBlockCommit, PushIngestDataError> {
+        let old_head = match expected_head {
+            Some(expected_head) => expected_head.clone(),
+            None => target
+                .as_metadata_chain()
+                .resolve_ref(&odf::BlockRef::Head)
+                .await
+                .int_err()?,
+        };
+        let system_time = self.time_source.now();
+
+        let commit_result = target
+            .commit_event(
+                odf::MetadataEvent::AddPushSource(push_source),
+                odf::dataset::CommitOpts {
+                    system_time: Some(system_time),
+                    prev_block_hash: Some(Some(&old_head)),
+                    update_block_ref: false,
+                    ..Default::default()
+                },
+            )
             .await
-            .map_err(Into::into)
+            .map_err(|e| PushIngestDataError::Execution(e.into()))?;
+
+        Ok(SourceBlockCommit {
+            old_head,
+            new_head: commit_result.new_head,
+            system_time,
+        })
+    }
+
+    /// Size of the data file the block adds, if any
+    async fn new_data_size(
+        &self,
+        target: &ResolvedDataset,
+        block_hash: &odf::Multihash,
+    ) -> Result<u64, PushIngestDataError> {
+        let block = target
+            .as_metadata_chain()
+            .get_block(block_hash)
+            .await
+            .int_err()?;
+
+        let odf::MetadataEvent::AddData(add_data) = block.event else {
+            return Ok(0);
+        };
+
+        Ok(add_data.new_data.map_or(0, |data| data.size))
     }
 
     async fn finalize_head_update(
@@ -76,21 +206,11 @@ impl PushIngestDataUseCaseImpl {
         old_head: &odf::Multihash,
         new_head: &odf::Multihash,
     ) -> Result<(), PushIngestDataError> {
-        target
-            .as_metadata_chain()
-            .set_ref(
-                &odf::BlockRef::Head,
-                new_head,
-                odf::dataset::SetRefOpts {
-                    validate_block_present: true,
-                    check_ref_is: Some(Some(old_head)),
-                },
-            )
+        self.dataset_head_committer
+            .commit_head(target, Some(old_head), new_head)
             .await
             .map_err(|e| {
-                PushIngestDataError::Execution(
-                    odf::dataset::CommitError::MetadataAppendError(e.into()).into(),
-                )
+                PushIngestDataError::Execution(odf::dataset::CommitError::from(e).into())
             })?;
 
         self.outbox
@@ -108,27 +228,19 @@ impl PushIngestDataUseCaseImpl {
 
         Ok(())
     }
-}
 
-#[common_macros::method_names_consts]
-#[async_trait::async_trait]
-impl PushIngestDataUseCase for PushIngestDataUseCaseImpl {
-    #[tracing::instrument(
-        level = "info",
-        name = PushIngestDataUseCaseImpl_execute,
-        skip_all,
-        fields(dataset_id = %target.get_id())
-    )]
-    async fn execute(
+    async fn ingest_and_commit(
         &self,
         target: ResolvedDataset,
         data_source: DataSource,
         options: PushIngestDataUseCaseOptions,
         listener_maybe: Option<Arc<dyn PushIngestListener>>,
     ) -> Result<PushIngestResult, PushIngestDataError> {
+        self.authorize(&target).await?;
+
         let source_name = options.source_name.clone();
         let push_execute_result = self
-            .run_single_ingest(target.clone(), data_source, options, listener_maybe)
+            .run_single_ingest(target.clone(), data_source, options, 0, listener_maybe)
             .await?;
 
         if let PushIngestResult::Updated {
@@ -142,19 +254,17 @@ impl PushIngestDataUseCase for PushIngestDataUseCaseImpl {
         Ok(push_execute_result)
     }
 
-    #[tracing::instrument(
-        level = "info",
-        name = PushIngestDataUseCaseImpl_execute_multi,
-        skip_all,
-        fields(dataset_id = %target.get_id())
-    )]
-    async fn execute_multi(
+    /// Ingests the sources one after another and commits `HEAD` once, after
+    /// the last of them
+    async fn ingest_all_and_commit(
         &self,
         target: ResolvedDataset,
         data_sources: Vec<DataSource>,
         options: PushIngestDataUseCaseOptions,
         listener_maybe: Option<Arc<dyn PushIngestListener>>,
     ) -> Result<PushIngestResult, PushIngestDataError> {
+        self.authorize(&target).await?;
+
         if data_sources.is_empty() {
             return Ok(PushIngestResult::UpToDate);
         }
@@ -163,7 +273,8 @@ impl PushIngestDataUseCase for PushIngestDataUseCaseImpl {
         let source_name = base_options.source_name.clone();
         let mut next_expected_head = base_options.expected_head.clone();
         let mut total_blocks = 0usize;
-        let mut last_system_time = Utc::now();
+        let mut uncommitted_bytes = 0u64;
+        let mut last_system_time = self.time_source.now();
         let mut head_transition: Option<(odf::Multihash, odf::Multihash)> = None;
 
         for data_source in data_sources {
@@ -177,6 +288,7 @@ impl PushIngestDataUseCase for PushIngestDataUseCaseImpl {
                     target.clone(),
                     data_source,
                     iteration_options,
+                    uncommitted_bytes,
                     listener_maybe.clone(),
                 )
                 .await?;
@@ -190,6 +302,8 @@ impl PushIngestDataUseCase for PushIngestDataUseCaseImpl {
             {
                 total_blocks += num_blocks;
                 last_system_time = system_time;
+                uncommitted_bytes =
+                    uncommitted_bytes.saturating_add(self.new_data_size(&target, &new_head).await?);
 
                 match &mut head_transition {
                     None => head_transition = Some((old_head, new_head.clone())),
@@ -214,6 +328,72 @@ impl PushIngestDataUseCase for PushIngestDataUseCaseImpl {
             Ok(PushIngestResult::UpToDate)
         }
     }
+
+    /// Ends the listener's progress once `HEAD` is committed or the ingest
+    /// failed
+    fn report(
+        listener_maybe: Option<&dyn PushIngestListener>,
+        result: &Result<PushIngestResult, PushIngestDataError>,
+    ) {
+        if let Some(listener) = listener_maybe {
+            match result {
+                Ok(ingest_result) => listener.success(ingest_result),
+                Err(e) => listener.error(e),
+            }
+        }
+    }
+}
+
+#[common_macros::method_names_consts]
+#[async_trait::async_trait]
+impl PushIngestDataUseCase for PushIngestDataUseCaseImpl {
+    #[tracing::instrument(
+        level = "info",
+        name = PushIngestDataUseCaseImpl_execute,
+        skip_all,
+        fields(dataset_id = %target.get_id())
+    )]
+    async fn execute(
+        &self,
+        target: ResolvedDataset,
+        data_source: DataSource,
+        options: PushIngestDataUseCaseOptions,
+        listener_maybe: Option<Arc<dyn PushIngestListener>>,
+    ) -> Result<PushIngestResult, PushIngestDataError> {
+        let result = self
+            .ingest_and_commit(target, data_source, options, listener_maybe.clone())
+            .await;
+        Self::report(listener_maybe.as_deref(), &result);
+        result
+    }
+
+    #[tracing::instrument(
+        level = "info",
+        name = PushIngestDataUseCaseImpl_execute_multi,
+        skip_all,
+        fields(dataset_id = %target.get_id())
+    )]
+    async fn execute_multi(
+        &self,
+        target: ResolvedDataset,
+        data_sources: Vec<DataSource>,
+        options: PushIngestDataUseCaseOptions,
+        listener_maybe: Option<Arc<dyn PushIngestListener>>,
+    ) -> Result<PushIngestResult, PushIngestDataError> {
+        let result = self
+            .ingest_all_and_commit(target, data_sources, options, listener_maybe.clone())
+            .await;
+        Self::report(listener_maybe.as_deref(), &result);
+        result
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+struct SourceBlockCommit {
+    old_head: odf::Multihash,
+    new_head: odf::Multihash,
+    system_time: DateTime<Utc>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -9,32 +9,45 @@
 
 use std::collections::HashSet;
 use std::sync::Arc;
+use std::time::Duration;
 
 use chrono::Utc;
 use email_utils::Email;
 use internal_error::InternalError;
-use kamu_accounts::{Account, AccountProvider, AccountType, CurrentAccountSubject};
+use kamu_accounts::{
+    Account,
+    AccountProvider,
+    AccountType,
+    CurrentAccountSubject,
+    CurrentAccountSubjectCatalogExt as _,
+};
+use kamu_adapter_http::smart_protocol::SmartTransferProtocolServerConfig;
 use kamu_core::{CompactionExecutor, CompactionPlanner, TenancyConfig};
 use kamu_datasets::{
-    AlwaysHappyDatasetActionAuthorizer,
+    AlwaysHappyDatasetPermissionChecker,
     CommitDatasetEventUseCase,
     CreateDatasetFromSnapshotUseCase,
     CreateDatasetUseCase,
-    DatasetActionAuthorizer,
+    DatasetPermissionChecker,
     DatasetReferenceService,
     DatasetRegistry,
-    MockDatasetActionAuthorizer,
+    MockDatasetPermissionChecker,
 };
 use kamu_datasets_services::DatasetEntryWriter;
+use kamu_datasets_services::utils::CreateDatasetUseCaseHelper;
 use reqwest::Url;
 use time_source::SystemTimeSourceStub;
 
-use super::ServerSideDatasetFixture;
+use super::{DatasetCommits, HeadlessDatasets, ServerSideDatasetFixture, StoredHeads};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub(crate) const SERVER_ACCOUNT_NAME: &str = "kamu-server";
 pub(crate) const SERVER_ACCOUNT_EMAIL_ADDRESS: &str = "kamu-server@example.com";
+
+/// Longer than any test upload, so no progress request is sent unless a test
+/// sets a shorter interval
+const DEFAULT_UPLOAD_PROGRESS_INTERVAL: Duration = Duration::from_secs(10);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -64,6 +77,31 @@ pub(crate) trait ServerSideHarness {
 
     fn cli_dataset_reference_service(&self) -> Arc<dyn DatasetReferenceService>;
 
+    fn cli_create_dataset_use_case_helper(&self) -> Arc<CreateDatasetUseCaseHelper>;
+
+    /// A dataset of the operating account with its own `Seed` but no `HEAD`
+    async fn create_headless_dataset(&self, dataset_name: &str) -> odf::DatasetHandle {
+        HeadlessDatasets::new(self.cli_create_dataset_use_case_helper())
+            .create(
+                &self.server_account_id(),
+                &odf::DatasetAlias::new(
+                    self.operating_account_name(),
+                    odf::DatasetName::new_unchecked(dataset_name),
+                ),
+            )
+            .await
+    }
+
+    /// Taken before `api_server_run`, which consumes the harness
+    fn stored_heads(&self) -> StoredHeads {
+        StoredHeads::new(self.cli_dataset_reference_service())
+    }
+
+    /// Taken before `api_server_run`, which consumes the harness
+    fn server_commits(&self) -> DatasetCommits {
+        DatasetCommits::new(self.cli_commit_dataset_event_use_case())
+    }
+
     fn dataset_url_with_scheme(&self, dataset_alias: &odf::DatasetAlias, scheme: &str) -> Url;
 
     fn dataset_url(&self, dataset_alias: &odf::DatasetAlias) -> Url {
@@ -86,7 +124,25 @@ pub(crate) trait ServerSideHarness {
 pub(crate) struct ServerSideHarnessOptions {
     pub tenancy_config: TenancyConfig,
     pub authorized_writes: bool,
+    /// Builds the permission checker of web requests in place of the one
+    /// `authorized_writes` selects
+    pub web_permission_checker: Option<fn() -> MockDatasetPermissionChecker>,
     pub base_catalog: Option<dill::Catalog>,
+    pub smart_transfer_protocol_config: SmartTransferProtocolServerConfig,
+}
+
+impl Default for ServerSideHarnessOptions {
+    fn default() -> Self {
+        Self {
+            tenancy_config: TenancyConfig::SingleTenant,
+            authorized_writes: false,
+            web_permission_checker: None,
+            base_catalog: None,
+            smart_transfer_protocol_config: SmartTransferProtocolServerConfig {
+                upload_progress_interval: DEFAULT_UPLOAD_PROGRESS_INTERVAL,
+            },
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -125,8 +181,8 @@ pub(crate) fn create_cli_user_catalog(
     };
 
     dill::CatalogBuilder::new_chained(base_catalog)
-        .add_value(current_account_subject)
-        .add::<AlwaysHappyDatasetActionAuthorizer>()
+        .add_current_account_subject(current_account_subject)
+        .add::<AlwaysHappyDatasetPermissionChecker>()
         .build()
 }
 
@@ -137,16 +193,20 @@ pub(crate) fn create_web_user_catalog(
     options: &ServerSideHarnessOptions,
 ) -> dill::Catalog {
     let mut web_catalog_builder = dill::CatalogBuilder::new_chained(base_catalog);
-    if options.authorized_writes {
-        web_catalog_builder.add::<AlwaysHappyDatasetActionAuthorizer>();
-    } else {
-        let mut mock_dataset_action_authorizer = MockDatasetActionAuthorizer::new();
-        mock_dataset_action_authorizer
-            .expect_get_allowed_actions()
-            .returning(|_dataset_id| Ok(HashSet::new()));
+    if let Some(make_checker) = options.web_permission_checker {
         web_catalog_builder
-            .add_value(mock_dataset_action_authorizer)
-            .bind::<dyn DatasetActionAuthorizer, MockDatasetActionAuthorizer>();
+            .add_value(make_checker())
+            .bind::<dyn DatasetPermissionChecker, MockDatasetPermissionChecker>();
+    } else if options.authorized_writes {
+        web_catalog_builder.add::<AlwaysHappyDatasetPermissionChecker>();
+    } else {
+        let mut mock_dataset_permission_checker = MockDatasetPermissionChecker::new();
+        mock_dataset_permission_checker
+            .expect_get_granted_permissions()
+            .returning(|_, _| Ok(HashSet::new()));
+        web_catalog_builder
+            .add_value(mock_dataset_permission_checker)
+            .bind::<dyn DatasetPermissionChecker, MockDatasetPermissionChecker>();
     }
 
     web_catalog_builder.build()

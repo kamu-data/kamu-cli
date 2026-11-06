@@ -63,13 +63,18 @@ impl FetchService {
 
         {
             let mut target_file = std::fs::File::create(&target_path_tmp).int_err()?;
+            let mut write_error = None;
 
             let mut transfer = h.transfer();
 
             transfer
-                .write_function(|data| {
-                    let written = target_file.write(data).unwrap();
-                    Ok(written)
+                // A short count makes curl fail the transfer with a write error
+                .write_function(|data| match target_file.write_all(data) {
+                    Ok(()) => Ok(data.len()),
+                    Err(e) => {
+                        write_error = Some(e);
+                        Ok(0)
+                    }
                 })
                 .int_err()?;
 
@@ -90,8 +95,14 @@ impl FetchService {
                 })
                 .int_err()?;
 
-            transfer.perform().map_err(|e| {
-                std::fs::remove_file(&target_path_tmp).unwrap();
+            let perform_result = transfer.perform();
+            drop(transfer);
+
+            perform_result.map_err(|e| {
+                std::fs::remove_file(&target_path_tmp).ok();
+                if let Some(write_error) = write_error {
+                    return write_error.int_err().into();
+                }
                 match e.code() {
                     curl_sys::CURLE_COULDNT_RESOLVE_HOST | curl_sys::CURLE_COULDNT_CONNECT => {
                         PollingIngestError::unreachable(url.as_str(), Some(e.into()))
