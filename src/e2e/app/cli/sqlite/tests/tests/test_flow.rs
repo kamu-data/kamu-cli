@@ -71,6 +71,29 @@ kamu_cli_run_api_server_e2e_test!(
 
 kamu_cli_run_api_server_e2e_test!(
     storage = sqlite,
+    fixture = kamu_cli_e2e_repo_tests::test_trigger_flow_ingest_with_self_referencing_env_var,
+    options = Options::default().with_multi_tenant().with_kamu_config(
+        kamu_cli_e2e_repo_tests::resources::fixtures::SECRETS_ENCRYPTION_WITH_FAST_FLOW_SYSTEM_KAMU_CONFIG
+    ),
+    extra_test_groups = "engine, ingest, datafusion"
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+kamu_cli_run_api_server_e2e_test!(
+    storage = sqlite,
+    fixture =
+        kamu_cli_e2e_repo_tests::test_trigger_flow_ingest_of_invalid_fetch_step_fails_without_retries,
+    options = Options::default()
+        .with_frozen_system_time()
+        .with_kamu_config(KAMU_CONFIG_WITH_FAST_FLOW_SYSTEM),
+    extra_test_groups = "engine, ingest, datafusion"
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+kamu_cli_run_api_server_e2e_test!(
+    storage = sqlite,
     fixture =
         kamu_cli_e2e_repo_tests::test_trigger_flow_ingest_of_unparsable_data_fails_without_retries,
     options = Options::default()

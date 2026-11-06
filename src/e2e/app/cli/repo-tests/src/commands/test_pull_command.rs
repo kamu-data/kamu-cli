@@ -302,6 +302,259 @@ pub async fn test_pull_reports_progress_before_failed_iteration(kamu: KamuCliPup
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// test_pull_multiple_datasets_with_mixed_outcomes
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_pull_multiple_datasets_with_mixed_outcomes(mut kamu: KamuCliPuppet) {
+    let alice = odf::AccountName::new_unchecked("alice");
+    let bob = odf::AccountName::new_unchecked("bob");
+    kamu.create_account(&alice).await;
+    kamu.create_account(&bob).await;
+
+    std::fs::write(kamu.workspace_path().join("data.csv"), DATASET_INGEST_DATA).unwrap();
+    let file_source_snapshot = DATASET_SNAPSHOT_STR.replace(
+        "${{ env.data_dir || env.workspace_dir }}",
+        &kamu.workspace_path().display().to_string(),
+    );
+    let add_dataset = async |kamu: &KamuCliPuppet, name: &str, snapshot: &str| {
+        kamu.execute_with_input(
+            ["add", "--stdin", "--name", name, "--visibility", "public"],
+            snapshot,
+        )
+        .await
+        .success();
+    };
+
+    kamu.set_account(Some(bob));
+    add_dataset(&kamu, "b", &file_source_snapshot).await;
+
+    kamu.set_account(Some(alice));
+    add_dataset(&kamu, "a", &file_source_snapshot).await;
+    add_dataset(&kamu, "c", DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR).await;
+    let gone_url = Url::from_directory_path(kamu.workspace_path().join("gone"))
+        .unwrap()
+        .join("c")
+        .unwrap();
+    kamu.execute([
+        "repo",
+        "alias",
+        "add",
+        "--pull",
+        "alice/c",
+        gone_url.as_str(),
+    ])
+    .await
+    .success();
+
+    // A dataset the account may not update is reported as not found
+    let gone_url_str = gone_url.as_str();
+    kamu.assert_failure_command_execution(
+        ["pull", "alice/a", "bob/b", "alice/c"],
+        None,
+        Some([
+            r#"1 dataset\(s\) updated"#,
+            r#"Failed to update 2 dataset\(s\)"#,
+            regex::escape("Failed to pull bob/b: Dataset not found: bob/b").as_str(),
+            regex::escape(&format!(
+                "Failed to sync alice/c from {gone_url_str}: Dataset {gone_url_str}/ not found"
+            ))
+            .as_str(),
+        ]),
+    )
+    .await;
+    kamu.assert_success_command_execution(
+        [
+            "sql",
+            "--output-format",
+            "csv",
+            "-c",
+            r#"SELECT count(*) AS num_records FROM "alice/a""#,
+        ],
+        Some("num_records\n3"),
+        None::<Vec<&str>>,
+    )
+    .await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// test_pull_set_watermark_keeps_source_state
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_pull_set_watermark_keeps_source_state(kamu: KamuCliPuppet) {
+    let snapshot = indoc::formatdoc!(
+        r#"
+        kind: DatasetSnapshot
+        version: 1
+        content:
+          name: test.pull-from-files
+          kind: Root
+          metadata:
+            - kind: SetPollingSource
+              fetch:
+                kind: FilesGlob
+                path: {workspace_path}/data-*.csv
+              read:
+                kind: Csv
+                header: true
+                schema:
+                  fields:
+                    - name: city
+                      type: String
+                    - name: population
+                      type: Int64
+              merge:
+                kind: append
+        "#,
+        workspace_path = kamu.workspace_path().display(),
+    );
+    kamu.execute_with_input(["add", "--stdin"], snapshot)
+        .await
+        .success();
+    std::fs::write(
+        kamu.workspace_path().join("data-1.csv"),
+        "city,population\nA,1000\n",
+    )
+    .unwrap();
+
+    kamu.assert_success_command_execution(
+        ["pull", "test.pull-from-files"],
+        None,
+        Some([r#"1 dataset\(s\) updated"#]),
+    )
+    .await;
+    kamu.assert_success_command_execution(
+        [
+            "pull",
+            "test.pull-from-files",
+            "--set-watermark",
+            "2051-01-02T03:04:05Z",
+        ],
+        None,
+        Some(["Committed new block"]),
+    )
+    .await;
+
+    // The file read before the watermark was set is not read again. Without a
+    // source state the dataset would be uncacheable and a forced fetch would
+    // read it once more
+    kamu.assert_success_command_execution(
+        ["pull", "test.pull-from-files", "--fetch-uncacheable"],
+        None,
+        Some([r#"1 dataset\(s\) up-to-date"#]),
+    )
+    .await;
+    kamu.assert_success_command_execution(
+        [
+            "sql",
+            "--output-format",
+            "csv",
+            "-c",
+            r#"SELECT count(*) AS num_records FROM "test.pull-from-files""#,
+        ],
+        Some("num_records\n1"),
+        None::<Vec<&str>>,
+    )
+    .await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// test_pull_alias_of_unknown_repository_fails
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_pull_alias_of_unknown_repository_fails(kamu: KamuCliPuppet) {
+    let dataset_name = DATASET_ROOT_PLAYER_NAME.as_str();
+    kamu.execute_with_input(["add", "--stdin"], DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR)
+        .await
+        .success();
+
+    // The alias is checked against the repositories when it is added, so the
+    // repository disappears afterwards
+    let repo_url = Url::from_directory_path(kamu.workspace_path().join("repo")).unwrap();
+    kamu.execute(["repo", "add", "gone-repo", repo_url.as_str()])
+        .await
+        .success();
+    let remote_alias = format!("gone-repo/{dataset_name}");
+    kamu.execute([
+        "repo",
+        "alias",
+        "add",
+        "--pull",
+        dataset_name,
+        &remote_alias,
+    ])
+    .await
+    .success();
+    kamu.execute(["--yes", "repo", "delete", "gone-repo"])
+        .await
+        .success();
+
+    kamu.assert_failure_command_execution(
+        ["pull", dataset_name],
+        None,
+        Some([
+            r#"Failed to update 1 dataset\(s\)"#,
+            regex::escape(&format!(
+                "Failed to sync {dataset_name} from {remote_alias}: Repository gone-repo does not \
+                 exist"
+            ))
+            .as_str(),
+        ]),
+    )
+    .await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// test_pull_remote_by_id_fails
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_pull_remote_by_id_fails(kamu: KamuCliPuppet) {
+    let dataset_name = DATASET_ROOT_PLAYER_NAME.as_str();
+    let repo_url = Url::from_directory_path(kamu.workspace_path().join("repo")).unwrap();
+    kamu.execute(["repo", "add", "some-repo", repo_url.as_str()])
+        .await
+        .success();
+    let remote_ref = format!(
+        "some-repo/{}",
+        odf::DatasetID::new_seeded_ed25519(b"remote").as_did_str()
+    );
+
+    kamu.assert_failure_command_execution(
+        ["pull", &remote_ref],
+        None,
+        Some([
+            r#"Failed to update 1 dataset\(s\)"#,
+            regex::escape(&format!(
+                "Failed to sync dataset from {remote_ref}: Unable to infer a local name from \
+                 {remote_ref}, please specify the destination explicitly"
+            ))
+            .as_str(),
+        ]),
+    )
+    .await;
+
+    kamu.execute_with_input(["add", "--stdin"], DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR)
+        .await
+        .success();
+    kamu.execute(["repo", "alias", "add", "--pull", dataset_name, &remote_ref])
+        .await
+        .success();
+
+    kamu.assert_failure_command_execution(
+        ["pull", dataset_name],
+        None,
+        Some([
+            r#"Failed to update 1 dataset\(s\)"#,
+            regex::escape(&format!(
+                "Failed to sync {dataset_name} from {remote_ref}: Syncing remote dataset by ID is \
+                 not yet supported: {remote_ref}"
+            ))
+            .as_str(),
+        ]),
+    )
+    .await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Implementations
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

@@ -1563,6 +1563,12 @@ pub struct DatasetBlocksResponse {
     pub blocks: Vec<DatasetBlock>,
 }
 
+impl DatasetBlocksResponse {
+    pub fn block_hashes(&self) -> Vec<odf::Multihash> {
+        self.blocks.iter().map(|b| b.block_hash.clone()).collect()
+    }
+}
+
 #[derive(Debug, Deserialize, PartialEq, Eq)]
 pub struct AccountDataset {
     pub id: odf::DatasetID,

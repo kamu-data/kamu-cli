@@ -196,16 +196,62 @@ mod tests {
         );
     }
 
+    #[tokio::test]
+    async fn test_conflict_in_one_map_commits_no_map() {
+        let harness = ManagerHarness::new();
+        let transaction = harness.manager.make_transaction_ref().await.unwrap();
+        harness
+            .map
+            .write(Some(transaction.id()), |write| write.put("a", 1));
+        harness
+            .other_map
+            .write(Some(transaction.id()), |write| write.put("b", 1));
+
+        // Another transaction commits the same key of the second map first
+        let concurrent = harness.manager.make_transaction_ref().await.unwrap();
+        harness
+            .other_map
+            .write(Some(concurrent.id()), |write| write.put("b", 2));
+        harness
+            .manager
+            .commit_transaction(concurrent)
+            .await
+            .unwrap();
+
+        assert!(
+            harness
+                .manager
+                .commit_transaction(transaction)
+                .await
+                .is_err()
+        );
+        pretty_assertions::assert_eq!(
+            (
+                harness.map.read(None, |view| view.get(&"a").copied()),
+                harness.other_map.read(None, |view| view.get(&"b").copied()),
+            ),
+            (None, Some(2))
+        );
+    }
+
     struct ManagerHarness {
         map: Arc<InMemoryTransactionalMap<&'static str, i32>>,
+        /// Registered after `map`, so its conflicts are found after `map` was
+        /// checked
+        other_map: Arc<InMemoryTransactionalMap<&'static str, i32>>,
         manager: InMemoryTransactionManager,
     }
 
     impl ManagerHarness {
         fn new() -> Self {
             let map = Arc::new(InMemoryTransactionalMap::new());
-            let manager = InMemoryTransactionManager::new(vec![map.clone()]);
-            Self { map, manager }
+            let other_map = Arc::new(InMemoryTransactionalMap::new());
+            let manager = InMemoryTransactionManager::new(vec![map.clone(), other_map.clone()]);
+            Self {
+                map,
+                other_map,
+                manager,
+            }
         }
     }
 }

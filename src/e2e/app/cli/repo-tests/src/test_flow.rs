@@ -1138,6 +1138,155 @@ pub async fn test_trigger_flow_ingest_with_env_var_from_variable_set(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+pub async fn test_trigger_flow_ingest_with_self_referencing_env_var(
+    mut kamu_api_server_client: KamuApiServerClient,
+) {
+    const SELF_REFERENCE: &str = "${{ env.data_file }}";
+
+    // A substituted value is inserted as it is, so the URL names a file called
+    // after the template itself. The reader takes the format from the extension,
+    // which the template would otherwise provide
+    let temp_dir = tempfile::tempdir().unwrap();
+    std::fs::write(
+        temp_dir.path().join(format!("{SELF_REFERENCE}.csv")),
+        CITY_POPULATION_CSV,
+    )
+    .unwrap();
+
+    let ctx = ResourceCtx::remote_from_server(
+        &mut kamu_api_server_client,
+        ResourceCtx::DEFAULT_REMOTE_CONTEXT,
+    )
+    .await;
+
+    let CreateDatasetResponse { dataset_id, .. } = kamu_api_server_client
+        .dataset()
+        .create_dataset(&city_population_snapshot(
+            "Url",
+            "url",
+            &format!("file://{}/{SELF_REFERENCE}.csv", temp_dir.path().display()),
+        ))
+        .await;
+
+    let variable_set = indoc::formatdoc!(
+        r#"
+        $schema: https://opendatafabric.org/schemas/config/v1alpha1/VariableSet
+        headers:
+          name: ingest-vars
+          labels:
+            legacy-config-target-dataset: {dataset_id}
+        spec:
+          variables:
+            data_file: "{SELF_REFERENCE}"
+        "#
+    );
+    ctx.assert_success_with_stdin(["apply", "--stdin"], &variable_set, None)
+        .await;
+    wait_until_ready(&ctx, "ingest-vars").await;
+
+    assert_matches!(
+        kamu_api_server_client
+            .flow()
+            .trigger_ingest(&dataset_id)
+            .await,
+        FlowTriggerResponse::Success(_)
+    );
+    kamu_api_server_client.flow().wait(&dataset_id, 1).await;
+
+    let flows = kamu_api_server_client.flow().list_flows(&dataset_id).await;
+    pretty_assertions::assert_eq!(
+        vec![Some("FlowSuccessResult")],
+        flows
+            .iter()
+            .map(|f| f.outcome.as_deref())
+            .collect::<Vec<_>>()
+    );
+    pretty_assertions::assert_eq!(vec!["A", "B"], query_cities(&kamu_api_server_client).await);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_trigger_flow_ingest_of_invalid_fetch_step_fails_without_retries(
+    mut kamu_api_server_client: KamuApiServerClient,
+) {
+    kamu_api_server_client.auth().login_as_kamu().await;
+
+    for (dataset_name, fetch) in [
+        (
+            "unsupported-url-scheme",
+            r#"{ kind: Url, url: "s3://bucket/data.csv" }"#,
+        ),
+        (
+            "invalid-header-name",
+            r#"{ kind: Url, url: "http://127.0.0.1:1/data.csv", headers: [{ name: "bad header", value: "x" }] }"#,
+        ),
+    ] {
+        let CreateDatasetResponse { dataset_id, .. } = kamu_api_server_client
+            .dataset()
+            .create_dataset(&city_population_snapshot_with_fetch(dataset_name, fetch))
+            .await;
+        kamu_api_server_client
+            .flow()
+            .set_ingest_config(&dataset_id, false, false, 3)
+            .await;
+
+        assert_matches!(
+            kamu_api_server_client
+                .flow()
+                .trigger_ingest(&dataset_id)
+                .await,
+            FlowTriggerResponse::Success(_)
+        );
+        kamu_api_server_client.flow().wait(&dataset_id, 1).await;
+
+        let flows = kamu_api_server_client.flow().list_flows(&dataset_id).await;
+        pretty_assertions::assert_eq!(1, flows.len(), "{dataset_name}");
+        pretty_assertions::assert_eq!(
+            (Some("FlowFailedError"), Some(false), 1),
+            (
+                flows[0].outcome.as_deref(),
+                flows[0].failure_recoverable,
+                flows[0].task_ids.len()
+            ),
+            "{dataset_name}"
+        );
+    }
+
+    // The node survives the failed ingests and still runs valid ones
+    let temp_dir = tempfile::tempdir().unwrap();
+    let src_path = temp_dir.path().join("data.csv");
+    std::fs::write(&src_path, CITY_POPULATION_CSV).unwrap();
+    let CreateDatasetResponse { dataset_id, .. } = kamu_api_server_client
+        .dataset()
+        .create_dataset(&city_population_snapshot(
+            "Url",
+            "url",
+            &format!("file://{}", src_path.display()),
+        ))
+        .await;
+
+    assert_matches!(
+        kamu_api_server_client
+            .flow()
+            .trigger_ingest(&dataset_id)
+            .await,
+        FlowTriggerResponse::Success(_)
+    );
+    kamu_api_server_client.flow().wait(&dataset_id, 1).await;
+
+    let flows = kamu_api_server_client.flow().list_flows(&dataset_id).await;
+    pretty_assertions::assert_eq!(
+        vec![Some("FlowSuccessResult")],
+        flows
+            .iter()
+            .map(|f| f.outcome.as_deref())
+            .collect::<Vec<_>>()
+    );
+    pretty_assertions::assert_eq!(vec!["A", "B"], query_cities(&kamu_api_server_client).await);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 pub async fn test_trigger_flow_ingest_of_unparsable_data_fails_without_retries(
     mut kamu_api_server_client: KamuApiServerClient,
 ) {
@@ -1340,18 +1489,25 @@ const CITY_POPULATION_CSV: &str = "city,population\nA,1000\nB,2000\n";
 /// A root dataset `city-population` reading CSV with `city` and `population`
 /// from a polling source of `fetch_kind`, whose `fetch_key` is `fetch_value`
 fn city_population_snapshot(fetch_kind: &str, fetch_key: &str, fetch_value: &str) -> String {
+    city_population_snapshot_with_fetch(
+        "city-population",
+        &format!(r#"{{ kind: {fetch_kind}, {fetch_key}: "{fetch_value}" }}"#),
+    )
+}
+
+/// A root dataset `dataset_name` reading CSV with `city` and `population`
+/// from a polling source whose fetch step is the YAML flow mapping `fetch`
+fn city_population_snapshot_with_fetch(dataset_name: &str, fetch: &str) -> String {
     indoc::formatdoc!(
         r#"
         kind: DatasetSnapshot
         version: 1
         content:
-          name: city-population
+          name: {dataset_name}
           kind: Root
           metadata:
             - kind: SetPollingSource
-              fetch:
-                kind: {fetch_kind}
-                {fetch_key}: "{fetch_value}"
+              fetch: {fetch}
               read:
                 kind: Csv
                 header: true
