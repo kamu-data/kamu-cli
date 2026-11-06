@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use chrono::{DateTime, Utc};
+use kamu_core::{FileDownload, FileDownloadService};
 
 use crate::prelude::*;
 
@@ -78,11 +79,29 @@ impl VersionedFileEntry {
         ExtraData::new(self.entity.extra_data.as_map().clone())
     }
 
-    /// Returns encoded content in-band. Should be used for small files only and
-    /// will return an error if called on large data.
+    /// Returns encoded content in-band. Should be used for small files only:
+    /// files over the node's in-band size limit fail with an error whose
+    /// `extensions.code` is `CONTENT_TOO_LARGE`
     #[tracing::instrument(level = "info", name = VersionedFileEntry_content, skip_all)]
-    pub async fn content(&self) -> Result<Base64Usnp> {
-        // TODO: Restrict by content size
+    pub async fn content(&self, ctx: &Context<'_>) -> Result<Base64Usnp> {
+        let config = from_catalog_n!(ctx, kamu_datasets::VersionedFilesConfig);
+        let limit = config.max_in_band_content_size_in_bytes;
+        let content_length = self.entity.content_length;
+
+        if content_length > limit {
+            return Err(GqlError::Gql(
+                async_graphql::Error::new(format!(
+                    "Content of {content_length} bytes exceeds the in-band limit of {limit} \
+                     bytes, use contentUrl instead"
+                ))
+                .extend_with(|_, ext| {
+                    ext.set("code", "CONTENT_TOO_LARGE");
+                    ext.set("contentLength", content_length);
+                    ext.set("limit", limit);
+                }),
+            ));
+        }
+
         let data_repo = self.file_dataset.as_data_repo();
         let data = data_repo
             .get_bytes(&self.entity.content_hash)
@@ -91,9 +110,10 @@ impl VersionedFileEntry {
         Ok(Base64Usnp(data))
     }
 
-    /// Returns a direct download URL
+    /// Returns a direct download URL. When the storage cannot issue one, the
+    /// URL points to the node itself and needs no extra headers
     #[tracing::instrument(level = "info", name = VersionedFileEntry_content_url, skip_all)]
-    pub async fn content_url(&self) -> Result<VersionedFileContentDownload> {
+    pub async fn content_url(&self, ctx: &Context<'_>) -> Result<VersionedFileContentDownload> {
         let data_repo = self.file_dataset.as_data_repo();
         let download_data = match data_repo
             .get_external_download_url(
@@ -103,8 +123,17 @@ impl VersionedFileEntry {
             .await
         {
             Ok(res) => res,
-            Err(err @ odf::storage::GetExternalUrlError::NotSupported) => {
-                return Err(GqlError::Gql(err.into()));
+            Err(odf::storage::GetExternalUrlError::NotSupported) => {
+                let download_service = from_catalog_n!(ctx, dyn FileDownloadService);
+                download_service.make_download_url(
+                    FileDownload {
+                        dataset_id: self.file_dataset.get_id().clone(),
+                        content_hash: self.entity.content_hash.clone(),
+                        content_type: self.entity.content_type.clone(),
+                        content_length: self.entity.content_length,
+                    },
+                    odf::storage::ExternalTransferOpts::default(),
+                )?
             }
             Err(err) => return Err(err.int_err().into()),
         };

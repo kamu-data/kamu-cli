@@ -15,7 +15,7 @@ use chrono::Duration;
 use kamu::utils::docker_images;
 use kamu_accounts::*;
 use kamu_adapter_http::smart_protocol::SmartTransferProtocolServerConfig;
-use kamu_datasets::SecretsEncryptionConfig;
+use kamu_datasets::{SecretsEncryptionConfig, VersionedFilesConfig};
 use setty::types::DurationString;
 use url::Url;
 
@@ -75,6 +75,10 @@ pub struct CLIConfig {
     /// Uploads configuration
     #[config(default)]
     pub uploads: UploadsConfig,
+
+    /// Versioned files configuration
+    #[config(default)]
+    pub versioned_files: VersionedFilesConfig,
 
     /// Did secret key encryption configuration
     #[config(default)]

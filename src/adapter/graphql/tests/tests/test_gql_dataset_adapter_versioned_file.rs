@@ -9,11 +9,21 @@
 
 use base64::Engine;
 use bon::bon;
+use file_utils::MediaType;
 use indoc::indoc;
-use kamu_accounts::{AccountQuotaService, CurrentAccountSubject, QuotaType};
-use kamu_adapter_http::platform::UploadServiceLocal;
+use kamu_accounts::{
+    AccountQuotaService,
+    CurrentAccountSubject,
+    JwtAuthenticationConfig,
+    QuotaType,
+};
+use kamu_adapter_http::platform::{FileDownloadServiceJwt, UploadServiceLocal};
 use kamu_core::*;
-use kamu_datasets::{DatasetStatisticsRepository, MockDatasetPermissionChecker};
+use kamu_datasets::{
+    DatasetStatisticsRepository,
+    MockDatasetPermissionChecker,
+    VersionedFilesConfig,
+};
 use kamu_datasets_services::{DatasetOperationGuardImpl, *};
 use messaging_outbox::OutboxProvider;
 use serde_json::json;
@@ -955,6 +965,102 @@ async fn test_versioned_file_quota_ignored_for_admin() {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_versioned_file_content_too_large() {
+    let harness = GraphQLDatasetsHarness::builder()
+        .tenancy_config(TenancyConfig::MultiTenant)
+        .outbox_provider(OutboxProvider::Immediate {
+            force_immediate: true,
+        })
+        .build()
+        .await;
+
+    let did = harness
+        .create_versioned_file(&odf::DatasetAlias::new(
+            None,
+            odf::DatasetName::new_unchecked("x"),
+        ))
+        .await;
+
+    // One byte over the harness limit of 8 bytes
+    harness
+        .in_band_upload_versioned_file(&did, base64usnp_encode(b"123456789").as_str())
+        .await;
+
+    let res = harness.query_latest_version(&did, "content").await;
+
+    pretty_assertions::assert_eq!(
+        res.errors
+            .iter()
+            .map(|e| json!({
+                "message": e.message,
+                "extensions": e.extensions,
+            }))
+            .collect::<Vec<_>>(),
+        vec![json!({
+            "message": "Content of 9 bytes exceeds the in-band limit of 8 bytes, use contentUrl \
+                        instead",
+            "extensions": {
+                "code": "CONTENT_TOO_LARGE",
+                "contentLength": 9,
+                "limit": 8,
+            },
+        })],
+    );
+
+    // The rest of the entry is still readable
+    let res = harness.query_latest_version(&did, "contentLength").await;
+    assert!(res.is_ok(), "{res:#?}");
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_versioned_file_content_url_served_by_node() {
+    let harness = GraphQLDatasetsHarness::builder()
+        .tenancy_config(TenancyConfig::MultiTenant)
+        .outbox_provider(OutboxProvider::Immediate {
+            force_immediate: true,
+        })
+        .build()
+        .await;
+
+    let did = harness
+        .create_versioned_file(&odf::DatasetAlias::new(
+            None,
+            odf::DatasetName::new_unchecked("x"),
+        ))
+        .await;
+
+    harness
+        .in_band_upload_versioned_file(&did, base64usnp_encode(b"hello").as_str())
+        .await;
+
+    let res = harness
+        .query_latest_version(&did, "contentUrl { url headers { key value } expiresAt }")
+        .await;
+
+    assert!(res.is_ok(), "{res:#?}");
+    let content_url = res.data.into_json().unwrap()["datasets"]["byId"]["asVersionedFile"]
+        ["latest"]["contentUrl"]
+        .clone();
+
+    pretty_assertions::assert_eq!(content_url["headers"], json!([]));
+    assert!(content_url["expiresAt"].is_string(), "{content_url:#?}");
+
+    pretty_assertions::assert_eq!(
+        harness.decode_download_url(content_url["url"].as_str().unwrap()),
+        FileDownload {
+            dataset_id: odf::DatasetID::from_did_str(&did).unwrap(),
+            content_hash: odf::Multihash::from_digest_sha3_256(b"hello"),
+            content_type: MediaType("application/octet-stream".to_string()),
+            content_length: b"hello".len(),
+        }
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Harness
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -966,6 +1072,8 @@ struct GraphQLDatasetsHarness {
 
 #[bon]
 impl GraphQLDatasetsHarness {
+    const MAX_IN_BAND_CONTENT_SIZE_IN_BYTES: usize = 8;
+
     #[builder]
     pub async fn new(
         tenancy_config: TenancyConfig,
@@ -1003,6 +1111,11 @@ impl GraphQLDatasetsHarness {
             .add::<DatasetOperationGuardImpl>()
             .add::<ViewVersionedFileHistoryUseCaseImpl>()
             .add::<UploadServiceLocal>()
+            .add::<FileDownloadServiceJwt>()
+            .add_value(JwtAuthenticationConfig::new(None))
+            .add_value(VersionedFilesConfig::new_in_bytes(
+                Self::MAX_IN_BAND_CONTENT_SIZE_IN_BYTES,
+            ))
             .add_value(ServerUrlConfig::new_test(None))
             .add_value(CacheDir::new(cache_dir))
             .build();
@@ -1194,6 +1307,48 @@ impl GraphQLDatasetsHarness {
             )
             .await
             .unwrap();
+    }
+
+    /// Queries the given fields of the latest file version
+    pub async fn query_latest_version(
+        &self,
+        dataset_did_str: &str,
+        fields: &str,
+    ) -> async_graphql::Response {
+        self.execute_authorized_query(
+            async_graphql::Request::new(format!(
+                r#"
+                query ($datasetId: DatasetID!) {{
+                    datasets {{
+                        byId(datasetId: $datasetId) {{
+                            asVersionedFile {{
+                                latest {{
+                                    {fields}
+                                }}
+                            }}
+                        }}
+                    }}
+                }}
+                "#
+            ))
+            .variables(async_graphql::Variables::from_json(json!({
+                "datasetId": dataset_did_str,
+            }))),
+        )
+        .await
+    }
+
+    /// Decodes the token at the end of a node-served download URL
+    pub fn decode_download_url(&self, url: &str) -> FileDownload {
+        let token = url
+            .strip_prefix("http://example.com/platform/file/download/")
+            .unwrap_or_else(|| panic!("unexpected download URL: {url}"));
+
+        self.catalog_authorized
+            .get_one::<dyn FileDownloadService>()
+            .unwrap()
+            .decode_download_token(token)
+            .unwrap()
     }
 
     /// Records the dataset size the quota checker sees as used storage.

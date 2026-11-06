@@ -7,12 +7,14 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+mod download_handler;
 mod login_handler;
 mod token_device_authorization_handler;
 mod token_device_handler;
 mod token_validate_handler;
 mod upload_handler;
 
+pub use download_handler::*;
 pub use login_handler::*;
 pub use token_device_authorization_handler::*;
 pub use token_device_handler::*;

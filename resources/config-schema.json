@@ -760,7 +760,7 @@
           "type": "integer"
         },
         "userAgent": {
-          "default": "kamu-cli/0.272.0",
+          "default": "kamu-cli/0.272.1",
           "description": "Value to use for User-Agent header",
           "type": "string"
         }
@@ -1141,7 +1141,7 @@
           "default": {
             "connectTimeout": "30s",
             "maxRedirects": 10,
-            "userAgent": "kamu-cli/0.272.0"
+            "userAgent": "kamu-cli/0.272.1"
           },
           "description": "HTTP-specific configuration"
         },
@@ -1167,6 +1167,19 @@
       "properties": {
         "maxFileSizeInMb": {
           "default": 50,
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "type": "object"
+    },
+    "VersionedFilesConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "maxInBandContentSizeInBytes": {
+          "default": 10485760,
+          "description": "Largest file version, in bytes, whose content is returned in-band in a\nGraphQL response. Larger files are downloaded through their content URL",
           "format": "uint",
           "minimum": 0,
           "type": "integer"
@@ -1381,7 +1394,7 @@
         "http": {
           "connectTimeout": "30s",
           "maxRedirects": 10,
-          "userAgent": "kamu-cli/0.272.0"
+          "userAgent": "kamu-cli/0.272.1"
         },
         "mqtt": {
           "brokerIdleTimeout": "1s"
@@ -1396,6 +1409,13 @@
         "maxFileSizeInMb": 50
       },
       "description": "Uploads configuration"
+    },
+    "versionedFiles": {
+      "$ref": "#/$defs/VersionedFilesConfig",
+      "default": {
+        "maxInBandContentSizeInBytes": 10485760
+      },
+      "description": "Versioned files configuration"
     },
     "webhooks": {
       "$ref": "#/$defs/WebhooksConfig",

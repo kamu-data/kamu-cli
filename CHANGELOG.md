@@ -191,6 +191,26 @@ Recommendation: for ease of reading, use the following format:
 - The first upload into a dataset without a source no longer fails when its `odf-event-time` is
   earlier than the dataset's last change
 
+## [0.272.1] - 2026-11-05
+### Added
+- Versioned files can be viewed and downloaded on nodes with local storage, including every
+  kamu-cli workspace: `VersionedFileEntry.contentUrl` returns a short-lived URL served by the node
+  itself, which works without request headers
+- `versionedFiles.maxInBandContentSizeInBytes` config (default 10 MiB) limits the size of files
+  returned in-band by `VersionedFileEntry.content`. `/ui-config` returns it as
+  `versionedFiles.maxInBandContentSizeInBytes`
+### Changed
+- GraphQL (breaking): `VersionedFileEntry.content` fails with an error coded `CONTENT_TOO_LARGE` for
+  files over the in-band limit. Use `contentUrl` for those
+### Fixed
+- `/query` (breaking): commitment hashes and signatures are computed over RFC 8785 (JCS) canonical
+  JSON, as the ODF spec requires, so standard JCS clients can reproduce them. Commitments signed by
+  earlier versions fail `/verify`
+- GraphQL: `TransformInput.alias` returns the query alias the input has in `SetTransform`, not the
+  input dataset's alias, and inputs keep their order. Read the dataset alias from
+  `TransformInput.inputDataset`. Encoded metadata blocks (`encoded`, `blockByHashEncoded`) now match
+  the stored block
+
 ## [0.272.0] - 2026-11-02
 ### Added
 - `/ui-config` returns `webhooks.loopbackTargetsOnly`, so the Web UI validates webhook target URLs by

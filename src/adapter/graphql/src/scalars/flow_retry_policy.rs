@@ -12,7 +12,8 @@ use crate::prelude::*;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// How a flow retries after a recoverable failure
-#[derive(SimpleObject, PartialEq, Eq)]
+#[derive(SimpleObject, InputObject, Debug, PartialEq, Eq)]
+#[graphql(input_name = "FlowRetryPolicyInput")]
 pub struct FlowRetryPolicy {
     /// Maximum number of retries after the first attempt
     pub max_attempts: u32,
@@ -53,21 +54,10 @@ pub enum FlowRetryBackoffType {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// How a flow retries after a recoverable failure
-#[derive(InputObject)]
-pub struct FlowRetryPolicyInput {
-    /// Maximum number of retries after the first attempt
-    pub max_attempts: u32,
-    /// Base delay before a retry
-    pub min_delay: TimeDeltaInput,
-    /// How the delay grows with each retry
-    pub backoff_type: FlowRetryBackoffType,
-}
-
-impl TryFrom<FlowRetryPolicyInput> for kamu_flow_system::RetryPolicy {
+impl TryFrom<FlowRetryPolicy> for kamu_flow_system::RetryPolicy {
     type Error = String;
 
-    fn try_from(value: FlowRetryPolicyInput) -> std::result::Result<Self, Self::Error> {
+    fn try_from(value: FlowRetryPolicy) -> std::result::Result<Self, Self::Error> {
         let duration: chrono::Duration = value.min_delay.into();
         let min_delay_seconds = u32::try_from(duration.num_seconds()).map_err(|_| {
             format!(

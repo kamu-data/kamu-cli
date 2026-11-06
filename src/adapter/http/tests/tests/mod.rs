@@ -13,6 +13,7 @@ mod test_data_ingest;
 mod test_data_query;
 mod test_dataset_authorization_layer;
 mod test_dataset_info;
+mod test_download_local;
 mod test_node_info;
 mod test_platform_login_validate;
 mod test_protocol_dataset_helpers;

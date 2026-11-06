@@ -39,8 +39,8 @@ impl<'a> DatasetFlowConfigsMut<'a> {
     pub async fn set_ingest_config(
         &self,
         ctx: &Context<'_>,
-        ingest_config_input: FlowConfigIngestInput,
-        retry_policy_input: Option<FlowRetryPolicyInput>,
+        ingest_config_input: FlowConfigRuleIngest,
+        retry_policy_input: Option<FlowRetryPolicy>,
     ) -> Result<SetFlowConfigResult> {
         let resolved_dataset = self.dataset_request_state.resolved_dataset(ctx).await?;
         if let Err(e) =
@@ -97,8 +97,8 @@ impl<'a> DatasetFlowConfigsMut<'a> {
     pub async fn set_compaction_config(
         &self,
         ctx: &Context<'_>,
-        compaction_config_input: FlowConfigCompactionInput,
-        retry_policy_input: Option<FlowRetryPolicyInput>,
+        compaction_config_input: FlowConfigRuleCompaction,
+        retry_policy_input: Option<FlowRetryPolicy>,
     ) -> Result<SetFlowConfigResult> {
         let resolved_dataset = self.dataset_request_state.resolved_dataset(ctx).await?;
         if let Err(e) =

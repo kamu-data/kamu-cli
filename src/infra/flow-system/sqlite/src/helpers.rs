@@ -78,11 +78,10 @@ pub(crate) fn flow_bindings_to_json(
         .iter()
         .enumerate()
         .map(|(idx, flow_binding)| {
-            let scope_json = serde_json::to_value(&flow_binding.scope).int_err()?;
             Ok(json!({
                 "idx": idx,
                 "flow_type": flow_binding.flow_type,
-                "scope_data": canonical_json::to_string(&scope_json).int_err()?,
+                "scope_data": serde_jcs::to_string(&flow_binding.scope).int_err()?,
             }))
         })
         .collect::<Result<Vec<_>, InternalError>>()?;

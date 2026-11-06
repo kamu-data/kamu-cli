@@ -21,6 +21,7 @@ use kamu::domain::{FileUploadLimitConfig, Protocols, ServerUrlConfig, TenancyCon
 use kamu_accounts_services::PasswordPolicyConfig;
 use kamu_adapter_http::DatasetAuthorizationLayer;
 use kamu_adapter_http::e2e::e2e_router;
+use kamu_datasets::VersionedFilesConfig;
 use kamu_webhooks::WebhooksConfig;
 use observability::axum::{panic_handler, unknown_fallback_handler};
 use tokio::sync::Notify;
@@ -28,7 +29,13 @@ use tower_http::catch_panic::CatchPanicLayer;
 use url::Url;
 use utoipa_axum::router::OpenApiRouter;
 
-use super::{UIConfiguration, UIFeatureFlags, UIWebhooksConfiguration, graphql_handler};
+use super::{
+    UIConfiguration,
+    UIFeatureFlags,
+    UIVersionedFilesConfiguration,
+    UIWebhooksConfiguration,
+    graphql_handler,
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -47,6 +54,7 @@ impl APIServer {
         address: Option<IpAddr>,
         port: Option<u16>,
         file_upload_limit_config: &FileUploadLimitConfig,
+        versioned_files_config: &VersionedFilesConfig,
         enable_dataset_env_vars_management: bool,
         allow_anonymous: bool,
         external_address: Option<IpAddr>,
@@ -103,6 +111,10 @@ impl APIServer {
             },
             webhooks: UIWebhooksConfiguration {
                 loopback_targets_only: webhooks_config.loopback_targets_only,
+            },
+            versioned_files: UIVersionedFilesConfiguration {
+                max_in_band_content_size_in_bytes: versioned_files_config
+                    .max_in_band_content_size_in_bytes,
             },
         };
 

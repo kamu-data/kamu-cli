@@ -33,6 +33,18 @@ impl MediaType {
     /// See: <https://en.wikipedia.org/wiki/Shapefile>
     pub const ESRI_SHAPEFILE: MediaTypeRef<'static> = MediaTypeRef("application/vnd.shp");
     pub const OCTET_STREAM: MediaTypeRef<'static> = MediaTypeRef("application/octet-stream");
+    pub const PDF: MediaTypeRef<'static> = MediaTypeRef("application/pdf");
+
+    /// Type and subtype without parameters: `text/plain` for
+    /// `text/plain; charset=utf-8`
+    pub fn essence(&self) -> MediaTypeRef<'_> {
+        MediaTypeRef(self.0.split(';').next().unwrap_or_default().trim())
+    }
+
+    /// Compares the type and subtype case-insensitively, ignoring parameters
+    pub fn has_essence(&self, other: MediaTypeRef<'_>) -> bool {
+        self.essence().0.eq_ignore_ascii_case(other.0)
+    }
 }
 
 impl MediaTypeRef<'_> {
@@ -76,3 +88,20 @@ impl PartialEq<MediaType> for MediaTypeRef<'_> {
         self.0 == other.0
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_has_essence() {
+        assert!(MediaType::from("application/pdf").has_essence(MediaType::PDF));
+        assert!(MediaType::from("Application/PDF; name=x.pdf").has_essence(MediaType::PDF));
+        assert!(!MediaType::from("text/html").has_essence(MediaType::PDF));
+        assert!(!MediaType::from("application/pdfx").has_essence(MediaType::PDF));
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

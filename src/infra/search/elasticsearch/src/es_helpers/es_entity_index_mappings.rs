@@ -369,7 +369,7 @@ impl ElasticsearchIndexMappings {
 
     fn hash_json_normalized(value: &serde_json::Value) -> String {
         // Step 1: normalize to canonical JSON string
-        let normalized = canonical_json::to_string(value).unwrap();
+        let normalized = serde_jcs::to_string(value).unwrap();
 
         // Step 2: hash it
         use sha2::Digest;

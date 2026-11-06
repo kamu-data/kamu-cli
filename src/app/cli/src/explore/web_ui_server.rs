@@ -26,6 +26,7 @@ use kamu_accounts::{
 };
 use kamu_accounts_services::{PasswordLoginCredentials, PasswordPolicyConfig};
 use kamu_adapter_http::DatasetAuthorizationLayer;
+use kamu_datasets::VersionedFilesConfig;
 use kamu_webhooks::WebhooksConfig;
 use observability::axum::panic_handler;
 use rust_embed::RustEmbed;
@@ -34,7 +35,13 @@ use tower_http::catch_panic::CatchPanicLayer;
 use url::Url;
 use utoipa_axum::router::OpenApiRouter;
 
-use super::{UIConfiguration, UIFeatureFlags, UIWebhooksConfiguration, graphql_handler};
+use super::{
+    UIConfiguration,
+    UIFeatureFlags,
+    UIVersionedFilesConfiguration,
+    UIWebhooksConfiguration,
+    graphql_handler,
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -76,6 +83,7 @@ impl WebUIServer {
         current_account_name: odf::AccountName,
         predefined_accounts_config: &PredefinedAccountsConfig,
         file_upload_limit_config: &FileUploadLimitConfig,
+        versioned_files_config: &VersionedFilesConfig,
         enable_dataset_env_vars_management: bool,
         allow_anonymous: bool,
         address: Option<IpAddr>,
@@ -131,6 +139,10 @@ impl WebUIServer {
             },
             webhooks: UIWebhooksConfiguration {
                 loopback_targets_only: webhooks_config.loopback_targets_only,
+            },
+            versioned_files: UIVersionedFilesConfiguration {
+                max_in_band_content_size_in_bytes: versioned_files_config
+                    .max_in_band_content_size_in_bytes,
             },
         };
 

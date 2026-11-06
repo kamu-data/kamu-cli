@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::pin::pin;
 use std::sync::{Arc, RwLock};
 
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
@@ -609,7 +610,7 @@ where
 
         Box::pin(async_stream::try_stream! {
             if let Some(stream) = self.iter_blocks_cached(head_boundary, tail_boundary, ignore_missing_tail).await? {
-                futures::pin_mut!(stream);
+                let mut stream = pin!(stream);
 
                 while let Some((block_hash, block, _)) = stream.try_next().await? {
                     yield (block_hash, block);
@@ -634,7 +635,7 @@ where
 
         Box::pin(async_stream::try_stream! {
             if let Some(stream) = self.iter_blocks_cached(head_boundary, tail_boundary, ignore_missing_tail).await? {
-                futures::pin_mut!(stream);
+                let mut stream = pin!(stream);
 
                 while let Some((block_hash, block, block_bytes)) = stream.try_next().await? {
                     yield (block_hash, odf::MetadataBlockHeader::from(&block), block_bytes);

@@ -100,8 +100,7 @@ impl SqliteFlowEventStore {
 
         let flow_id: i64 = e.flow_id.try_into().unwrap();
 
-        let scope_json = serde_json::to_value(&e.flow_binding.scope).int_err()?;
-        let scope_json_str = canonical_json::to_string(&scope_json).int_err()?;
+        let scope_json_str = serde_jcs::to_string(&e.flow_binding.scope).int_err()?;
 
         sqlx::query!(
             r#"
@@ -522,8 +521,7 @@ impl FlowEventStore for SqliteFlowEventStore {
 
         let flow_type = flow_binding.flow_type.as_str();
 
-        let scope_json = serde_json::to_value(&flow_binding.scope).int_err()?;
-        let scope_json_str = canonical_json::to_string(&scope_json).int_err()?;
+        let scope_json_str = serde_jcs::to_string(&flow_binding.scope).int_err()?;
 
         let maybe_flow_id = sqlx::query!(
             r#"
@@ -554,8 +552,7 @@ impl FlowEventStore for SqliteFlowEventStore {
         let mut tr = self.transaction.lock().await;
         let connection_mut = tr.connection_mut().await?;
 
-        let scope_json = serde_json::to_value(flow_scope).int_err()?;
-        let scope_json_str = canonical_json::to_string(&scope_json).int_err()?;
+        let scope_json_str = serde_jcs::to_string(flow_scope).int_err()?;
 
         let flow_ids = sqlx::query!(
             r#"

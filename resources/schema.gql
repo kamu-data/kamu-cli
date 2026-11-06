@@ -3979,12 +3979,12 @@ Settings of an ingest flow
 """
 input FlowConfigIngestInput {
 	"""
-	Flag indicates to ignore cache during ingest step for API calls
+	Whether to ignore the cache for API calls during ingest
 	"""
 	fetchUncacheable: Boolean!
 	"""
-	Flag indicates to trigger next flow iteration right if `has_more` is
-	true
+	Whether to run the next ingest right away when the source has more
+	data
 	"""
 	fetchNextIteration: Boolean!
 }
@@ -4018,7 +4018,8 @@ Reset the dataset head to its seed block
 """
 input FlowConfigInputResetPropagationModeToSeed {
 	"""
-	Placeholder without meaning, the value is ignored
+	Placeholder without meaning: always null in responses, ignored in
+	requests
 	"""
 	dummy: String
 }
@@ -4058,7 +4059,8 @@ Reset the dataset head to its seed block
 """
 type FlowConfigResetPropagationModeToSeed {
 	"""
-	Placeholder without meaning, always null
+	Placeholder without meaning: always null in responses, ignored in
+	requests
 	"""
 	dummy: String
 }
@@ -5216,7 +5218,8 @@ Run the flow as soon as new input data appears
 """
 type FlowTriggerBatchingRuleImmediate {
 	"""
-	Placeholder without meaning, always true
+	Placeholder without meaning: always true in responses, ignored in
+	requests
 	"""
 	dummy: Boolean!
 }
@@ -5226,7 +5229,8 @@ Run the flow as soon as new input data appears
 """
 input FlowTriggerBatchingRuleImmediateInput {
 	"""
-	Placeholder without meaning, the value is ignored
+	Placeholder without meaning: always true in responses, ignored in
+	requests
 	"""
 	dummy: Boolean!
 }
@@ -5330,7 +5334,7 @@ Trigger stops after a number of failed runs in a row
 """
 type FlowTriggerStopPolicyAfterConsecutiveFailures {
 	"""
-	Number of failed runs in a row that stops the trigger
+	Number of failed runs in a row that stops the trigger, from 1 to 10
 	"""
 	maxFailures: Int!
 }
@@ -5364,7 +5368,8 @@ Trigger never stops because of failures
 """
 type FlowTriggerStopPolicyNever {
 	"""
-	Placeholder without meaning, always true
+	Placeholder without meaning: always true in responses, ignored in
+	requests
 	"""
 	dummy: Boolean!
 }
@@ -5374,7 +5379,8 @@ Trigger never stops because of failures
 """
 input FlowTriggerStopPolicyNeverInput {
 	"""
-	Placeholder without meaning, the value is ignored
+	Placeholder without meaning: always true in responses, ignored in
+	requests
 	"""
 	dummy: Boolean!
 }
@@ -9450,12 +9456,14 @@ type VersionedFileEntry {
 	"""
 	extraData: ExtraData!
 	"""
-	Returns encoded content in-band. Should be used for small files only and
-	will return an error if called on large data.
+	Returns encoded content in-band. Should be used for small files only:
+	files over the node's in-band size limit fail with an error whose
+	`extensions.code` is `CONTENT_TOO_LARGE`
 	"""
 	content: Base64Usnp!
 	"""
-	Returns a direct download URL
+	Returns a direct download URL. When the storage cannot issue one, the
+	URL points to the node itself and needs no extra headers
 	"""
 	contentUrl: VersionedFileContentDownload!
 }
