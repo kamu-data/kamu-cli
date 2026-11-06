@@ -20,6 +20,7 @@ use super::InMemoryDatasetEntryState;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 type Rows<'a> = InMemoryMapView<'a, odf::DatasetID, DatasetEntry>;
+type NameClaims<'a> = InMemoryMapView<'a, (odf::AccountID, odf::DatasetName), odf::DatasetID>;
 
 pub struct InMemoryDatasetEntryRepository {
     state: Arc<InMemoryDatasetEntryState>,
@@ -63,6 +64,19 @@ impl InMemoryDatasetEntryRepository {
         rows.iter()
             .map(|(_, entry)| entry)
             .find(|entry| &entry.owner_id == owner_id && &entry.name == name)
+    }
+
+    /// The dataset holding a name claim, unless the claim is stale: its
+    /// dataset is gone or has another name now
+    fn name_holder<'a>(
+        names: &NameClaims<'a>,
+        rows: &Rows<'_>,
+        name_key: &(odf::AccountID, odf::DatasetName),
+    ) -> Option<&'a odf::DatasetID> {
+        names.get(name_key).filter(|dataset_id| {
+            rows.get(dataset_id)
+                .is_some_and(|entry| entry.owner_id == name_key.0 && entry.name == name_key.1)
+        })
     }
 }
 
@@ -202,7 +216,7 @@ impl DatasetEntryRepository for InMemoryDatasetEntryRepository {
                         SaveDatasetEntryErrorDuplicate::new(dataset_entry.id.clone()).into(),
                     );
                 }
-                if names.view().contains_key(&name_key) {
+                if Self::name_holder(&names.view(), &rows.view(), &name_key).is_some() {
                     return Err(
                         DatasetEntryNameCollisionError::new(dataset_entry.name.clone()).into(),
                     );
@@ -222,28 +236,28 @@ impl DatasetEntryRepository for InMemoryDatasetEntryRepository {
     ) -> Result<(), UpdateDatasetEntryNameError> {
         self.state.names.write(self.transaction_id, |names| {
             self.state.rows.write(self.transaction_id, |rows| {
-                let Some(found_dataset_entry) = rows.view().get(dataset_id).cloned() else {
+                let Some(owner_id) = rows.view().get(dataset_id).map(|e| e.owner_id.clone()) else {
                     return Err(DatasetEntryNotFoundError::new(dataset_id.clone()).into());
                 };
-                let new_name_key = (found_dataset_entry.owner_id.clone(), new_name.clone());
-                if let Some(existing_id) = names.view().get(&new_name_key)
-                    && existing_id != dataset_id
-                {
-                    return Err(DatasetEntryNameCollisionError::new(new_name.clone()).into());
+                let new_name_key = (owner_id, new_name.clone());
+                let held_by_this_dataset =
+                    Self::name_holder(&names.view(), &rows.view(), &new_name_key)
+                        .map(|holder_id| holder_id == dataset_id);
+                match held_by_this_dataset {
+                    Some(true) => {}
+                    Some(false) => {
+                        return Err(DatasetEntryNameCollisionError::new(new_name.clone()).into());
+                    }
+                    None => names.put(new_name_key, dataset_id.clone()),
                 }
 
-                names.delete((
-                    found_dataset_entry.owner_id.clone(),
-                    found_dataset_entry.name.clone(),
-                ));
-                names.put(new_name_key, dataset_id.clone());
-                rows.put(
-                    dataset_id.clone(),
-                    DatasetEntry {
-                        name: new_name.clone(),
-                        ..found_dataset_entry
-                    },
-                );
+                // The claim on the old name is left to go stale: deleting it would
+                // conflict with a concurrent rename, which Postgres lets win
+                let new_name = new_name.clone();
+                rows.update(dataset_id.clone(), move |entry| DatasetEntry {
+                    name: new_name.clone(),
+                    ..entry.clone()
+                });
                 Ok(())
             })
         })
@@ -255,15 +269,16 @@ impl DatasetEntryRepository for InMemoryDatasetEntryRepository {
         new_owner_name: &odf::AccountName,
     ) -> Result<(), InternalError> {
         self.state.rows.write(self.transaction_id, |rows| {
-            let renamed_entries: Vec<_> = Self::owned_entries(&rows.view(), owner_id)
+            let owned_ids: Vec<_> = Self::owned_entries(&rows.view(), owner_id)
                 .into_iter()
-                .map(|entry| DatasetEntry {
+                .map(|entry| entry.id.clone())
+                .collect();
+            for dataset_id in owned_ids {
+                let new_owner_name = new_owner_name.clone();
+                rows.update(dataset_id, move |entry| DatasetEntry {
                     owner_name: new_owner_name.clone(),
                     ..entry.clone()
-                })
-                .collect();
-            for entry in renamed_entries {
-                rows.put(entry.id.clone(), entry);
+                });
             }
         });
         Ok(())

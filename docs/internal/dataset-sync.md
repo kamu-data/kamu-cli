@@ -129,10 +129,8 @@ the reference carries an alias.
   an existing dataset deleted since planning.
 - `LocalSyncHelper::build_request` (`kamu::testing`) does the same from a local reference, for
   tests; it never opens the source.
-- `SyncRequestBuilder::build_sync_request(src, dst, create_dst_if_not_exists)` builds a push and
-  refuses a local destination. A reference counts as local when `DatasetRefAny::as_local_ref`
-  accepts it (a repo-like prefix that is not a registered repository is read as an account);
-  otherwise it is resolved to a URL by `RemoteDatasetUrlResolver`
+- `SyncRequestBuilder::build_sync_request(src, dst, create_dst_if_not_exists)` builds a push to a
+  `DatasetRefRemote`, which `RemoteDatasetUrlResolver` resolves to a URL
   ([§9](#9-remote-repositories-and-aliases)). The source must have a `HEAD`.
 
 **Pull into a local dataset** reads the target, transfers, then commits:
@@ -340,7 +338,7 @@ sequenceDiagram
     C->>S: DatasetPushMetadataRequest { blocks as tar.gz }
     S-->>C: Accepted (or SeedBlockOverwriteRestricted)
     opt dataset does not exist on the server
-        Note over S: create it from the Seed block, owner = caller, given visibility
+        Note over S: check the Seed block's declared hash, then create the dataset from it, owner = caller, given visibility
     end
     C->>S: DatasetPushObjectsTransferRequest { objects }
     S-->>C: per object: SkipUpload (already present) or an upload URL

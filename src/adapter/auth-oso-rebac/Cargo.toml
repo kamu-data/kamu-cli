@@ -71,6 +71,7 @@ time-source = { workspace = true }
 
 chrono = "0.4"
 indoc = { version = "2" }
+oop = "0.0.2"
 pretty_assertions = { version = "1", default-features = false, features = [
     "std",
     "unstable",

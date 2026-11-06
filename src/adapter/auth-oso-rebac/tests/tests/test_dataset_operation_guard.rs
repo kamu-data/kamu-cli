@@ -9,60 +9,20 @@
 
 use std::sync::Arc;
 
-use chrono::Utc;
-use init_on_startup::InitOnStartup;
 use kamu_accounts::testing::CurrentAccountSubjectTestHelper;
-use kamu_accounts::{
-    AccountConfig,
-    CurrentAccountSubject,
-    CurrentAccountSubjectCatalogExt as _,
-    DidSecretEncryptionConfig,
-    PredefinedAccountsConfig,
-    Principal,
-};
-use kamu_accounts_inmem::{InMemoryAccountRepository, InMemoryDidSecretKeyRepository};
-use kamu_accounts_services::{
-    AccountServiceImpl,
-    CreateAccountUseCaseImpl,
-    LoginPasswordAuthProvider,
-    PredefinedAccountsRegistrator,
-    UpdateAccountUseCaseImpl,
-};
-use kamu_adapter_auth_oso_rebac::register_dependencies;
+use kamu_accounts::{CurrentAccountSubject, CurrentAccountSubjectCatalogExt as _, Principal};
 use kamu_auth_rebac::{AccountToDatasetRelation, RebacService};
-use kamu_auth_rebac_inmem::InMemoryRebacRepository;
-use kamu_auth_rebac_services::{
-    DefaultAccountProperties,
-    DefaultDatasetProperties,
-    DeleteDatasetRebacPropertiesUseCaseImpl,
-    RebacDatasetLifecycleMessageConsumer,
-    RebacServiceImpl,
-    SetDatasetRebacPropertiesUseCaseImpl,
-};
-use kamu_core::TenancyConfig;
 use kamu_datasets::{
-    DatasetLifecycleMessage,
     DatasetOperation,
     DatasetOperationGuard,
     DatasetOperationRequest,
     DatasetPermissionError,
     DatasetPermissionMissingError,
-    MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
 };
-use kamu_datasets_services::{
-    DatasetEntryServiceImpl,
-    DatasetEntryWriter,
-    DatasetOperationGuardImpl,
-};
-use messaging_outbox::{
-    ConsumerFilter,
-    Outbox,
-    OutboxExt,
-    OutboxImmediateImpl,
-    register_message_dispatcher,
-};
+use kamu_datasets_services::DatasetOperationGuardImpl;
 use pretty_assertions::{assert_eq, assert_matches};
-use time_source::SystemTimeSourceDefault;
+
+use crate::harness::BaseOsoRebacHarness;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -321,113 +281,32 @@ async fn test_batch_keeps_request_order() {
 
 const ACCOUNTS: [&str; 5] = ["owner", "reader", "editor", "maintainer", "stranger"];
 
+#[oop::extend(BaseOsoRebacHarness, base)]
 struct OperationGuardHarness {
+    base: BaseOsoRebacHarness,
     operation_guard: Arc<dyn DatasetOperationGuard>,
     rebac_service: Arc<dyn RebacService>,
-    dataset_entry_writer: Arc<dyn DatasetEntryWriter>,
-    outbox: Arc<dyn Outbox>,
 }
 
 impl OperationGuardHarness {
     /// `current_account_subject` is the catalog's subject; each check names
     /// its principal on its own
     async fn new(current_account_subject: CurrentAccountSubject) -> Self {
-        let mut predefined_accounts_config = PredefinedAccountsConfig::new();
-        for account_name in ACCOUNTS {
-            predefined_accounts_config.predefined.push(
-                AccountConfig::test_config_from_name_with_id(odf::AccountName::new_unchecked(
-                    account_name,
-                )),
-            );
-        }
+        let base =
+            BaseOsoRebacHarness::new(BaseOsoRebacHarness::predefined_accounts(&ACCOUNTS), |b| {
+                b.add_current_account_subject(current_account_subject);
+            })
+            .await;
 
-        let catalog = {
-            let mut b = dill::CatalogBuilder::new();
-
-            kamu_datasets_inmem::register_dependencies(&mut b);
-            b.add::<SystemTimeSourceDefault>()
-                .add_current_account_subject(current_account_subject)
-                .add_value(predefined_accounts_config)
-                .add::<PredefinedAccountsRegistrator>()
-                .add::<RebacServiceImpl>()
-                .add_value(DefaultAccountProperties::default())
-                .add_value(DefaultDatasetProperties::default())
-                .add::<RebacDatasetLifecycleMessageConsumer>()
-                .add::<SetDatasetRebacPropertiesUseCaseImpl>()
-                .add::<DeleteDatasetRebacPropertiesUseCaseImpl>()
-                .add::<UpdateAccountUseCaseImpl>()
-                .add::<CreateAccountUseCaseImpl>()
-                .add::<InMemoryRebacRepository>()
-                .add_builder(OutboxImmediateImpl::builder(ConsumerFilter::AllConsumers))
-                .bind::<dyn Outbox, OutboxImmediateImpl>()
-                .add_value(odf::dataset::MockDatasetStorageUnit::new())
-                .bind::<dyn odf::DatasetStorageUnit, odf::dataset::MockDatasetStorageUnit>()
-                .add_value(TenancyConfig::MultiTenant)
-                .add::<DatasetEntryServiceImpl>()
-                .add::<InMemoryDidSecretKeyRepository>()
-                .add_value(DidSecretEncryptionConfig::sample())
-                .add::<AccountServiceImpl>()
-                .add::<InMemoryAccountRepository>()
-                .add::<LoginPasswordAuthProvider>()
-                .add::<DatasetOperationGuardImpl>();
-
-            register_dependencies(&mut b);
-
-            register_message_dispatcher::<DatasetLifecycleMessage>(
-                &mut b,
-                MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
-            );
-
-            b.build()
-        };
-
-        {
-            catalog
-                .get_one::<PredefinedAccountsRegistrator>()
-                .unwrap()
-                .run_initialization()
-                .await
-                .unwrap();
-        };
+        let catalog = dill::CatalogBuilder::new_chained(base.catalog())
+            .add::<DatasetOperationGuardImpl>()
+            .build();
 
         Self {
             operation_guard: catalog.get_one().unwrap(),
             rebac_service: catalog.get_one().unwrap(),
-            dataset_entry_writer: catalog.get_one().unwrap(),
-            outbox: catalog.get_one().unwrap(),
+            base,
         }
-    }
-
-    async fn create_private_dataset(&self, owner: &str, name: &str) -> odf::DatasetHandle {
-        let handle = odf::metadata::testing::handle(&owner, &name, odf::DatasetKind::Root);
-        let owner_id = odf::metadata::testing::account_id(&owner);
-
-        self.dataset_entry_writer
-            .create_entry(
-                &handle.id,
-                &owner_id,
-                &odf::AccountName::new_unchecked(owner),
-                &handle.alias.dataset_name,
-                odf::DatasetKind::Root,
-            )
-            .await
-            .unwrap();
-
-        self.outbox
-            .post_message(
-                MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
-                DatasetLifecycleMessage::created(
-                    Utc::now(),
-                    handle.id.clone(),
-                    owner_id,
-                    odf::DatasetVisibility::Private,
-                    handle.alias.dataset_name.clone(),
-                ),
-            )
-            .await
-            .unwrap();
-
-        handle
     }
 
     async fn grant(
@@ -452,7 +331,7 @@ impl OperationGuardHarness {
         target: &odf::DatasetHandle,
         operation: DatasetOperation,
     ) -> Result<(), DatasetPermissionError> {
-        self.authorize_as(&Self::user(principal), target, operation)
+        self.authorize_as(&BaseOsoRebacHarness::user(principal), target, operation)
             .await
     }
 
@@ -476,13 +355,9 @@ impl OperationGuardHarness {
         requests: Vec<DatasetOperationRequest>,
     ) -> Vec<Result<(), DatasetPermissionError>> {
         self.operation_guard
-            .check_operations(&Self::user(principal), &requests)
+            .check_operations(&BaseOsoRebacHarness::user(principal), &requests)
             .await
             .unwrap()
-    }
-
-    fn user(account_name: &str) -> Principal {
-        Principal::from(&CurrentAccountSubjectTestHelper::logged(account_name))
     }
 
     /// The dataset a permission denial names

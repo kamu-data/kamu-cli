@@ -227,6 +227,18 @@ impl AxumServerPushProtocolInstance {
 
                 let (first_block_hash, first_block, first_block_bytes) =
                     new_blocks.pop_front().unwrap();
+
+                // Checked before the dataset is created in a transaction of its own
+                let seed_block_hash = odf::Multihash::from_digest_sha3_256(&first_block_bytes);
+                if seed_block_hash != first_block_hash {
+                    return Err(format!(
+                        "Seed block hash declared by the client {first_block_hash} didn't match \
+                         the computed {seed_block_hash}"
+                    )
+                    .protocol_int_err(PushPhase::EnsuringTargetExists)
+                    .into());
+                }
+
                 let seed_block = first_block
                     .into_typed()
                     .ok_or_else(|| {
@@ -262,15 +274,6 @@ impl AxumServerPushProtocolInstance {
                     ))
                     .await;
                 match create_result {
-                    Ok(res) if res.head != first_block_hash => {
-                        return Err(format!(
-                            "Seed block hash declared by the client {first_block_hash} didn't \
-                             match the computed {}",
-                            res.head
-                        )
-                        .protocol_int_err(PushPhase::EnsuringTargetExists)
-                        .into());
-                    }
                     Ok(res) => {
                         // The remaining blocks build on the Seed just committed
                         expected_head = Some(first_block_hash);

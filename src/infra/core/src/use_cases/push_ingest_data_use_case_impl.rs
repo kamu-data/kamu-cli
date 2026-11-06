@@ -9,6 +9,7 @@
 
 use std::sync::Arc;
 
+use chrono::{DateTime, Utc};
 use dill::{component, interface};
 use internal_error::{ErrorIntoInternal, ResultIntoInternal};
 use kamu_accounts::Principal;
@@ -88,20 +89,21 @@ impl PushIngestDataUseCaseImpl {
             uncommitted_bytes,
         };
 
+        // The auto-created source block, with the head it was committed on
+        let mut created_source = None;
         if is_ingest_from_upload
             && let Some(push_source) = self
                 .push_ingest_planner
                 .plan_push_source_creation(target.clone(), source_name.as_deref(), &opts)
                 .await?
         {
-            let source_head = self
+            let source_commit = self
                 .add_push_source(&target, push_source, opts.expected_head.as_ref())
                 .await?;
 
             // The data is planned on top of the new source block
-            if opts.expected_head.is_some() {
-                opts.expected_head = Some(source_head);
-            }
+            opts.expected_head = Some(source_commit.new_head.clone());
+            created_source = Some(source_commit);
         }
 
         let ingest_plan = self
@@ -109,20 +111,45 @@ impl PushIngestDataUseCaseImpl {
             .plan_ingest(target.clone(), source_name.as_deref(), opts)
             .await?;
 
-        self.push_ingest_executor
+        let ingest_result = self
+            .push_ingest_executor
             .execute_ingest(target, ingest_plan, data_source, listener_maybe)
-            .await
-            .map_err(Into::into)
+            .await?;
+
+        let Some(source_commit) = created_source else {
+            return Ok(ingest_result);
+        };
+
+        // `HEAD` moves over the source block too, even when the data added nothing
+        Ok(match ingest_result {
+            PushIngestResult::Updated {
+                new_head,
+                num_blocks,
+                system_time,
+                ..
+            } => PushIngestResult::Updated {
+                old_head: source_commit.old_head,
+                new_head,
+                num_blocks: num_blocks + 1,
+                system_time,
+            },
+            PushIngestResult::UpToDate => PushIngestResult::Updated {
+                old_head: source_commit.old_head,
+                new_head: source_commit.new_head,
+                num_blocks: 1,
+                system_time: source_commit.system_time,
+            },
+        })
     }
 
-    /// Commits the push source on top of `expected_head`, or of `HEAD` as it
-    /// is now, and returns the new head
+    /// Commits the push source block on top of `expected_head`, or of `HEAD`
+    /// as it is now, without moving `HEAD`
     async fn add_push_source(
         &self,
         target: &ResolvedDataset,
         push_source: odf::metadata::AddPushSource,
         expected_head: Option<&odf::Multihash>,
-    ) -> Result<odf::Multihash, PushIngestDataError> {
+    ) -> Result<SourceBlockCommit, PushIngestDataError> {
         let old_head = match expected_head {
             Some(expected_head) => expected_head.clone(),
             None => target
@@ -131,12 +158,13 @@ impl PushIngestDataUseCaseImpl {
                 .await
                 .int_err()?,
         };
+        let system_time = self.time_source.now();
 
         let commit_result = target
             .commit_event(
                 odf::MetadataEvent::AddPushSource(push_source),
                 odf::dataset::CommitOpts {
-                    system_time: Some(self.time_source.now()),
+                    system_time: Some(system_time),
                     prev_block_hash: Some(Some(&old_head)),
                     update_block_ref: false,
                     ..Default::default()
@@ -145,14 +173,11 @@ impl PushIngestDataUseCaseImpl {
             .await
             .map_err(|e| PushIngestDataError::Execution(e.into()))?;
 
-        self.dataset_head_committer
-            .commit_head(target, Some(&old_head), &commit_result.new_head)
-            .await
-            .map_err(|e| {
-                PushIngestDataError::Execution(odf::dataset::CommitError::from(e).into())
-            })?;
-
-        Ok(commit_result.new_head)
+        Ok(SourceBlockCommit {
+            old_head,
+            new_head: commit_result.new_head,
+            system_time,
+        })
     }
 
     /// Size of the data file the block adds, if any
@@ -361,6 +386,16 @@ impl PushIngestDataUseCase for PushIngestDataUseCaseImpl {
         Self::report(listener_maybe.as_deref(), &result);
         result
     }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+struct SourceBlockCommit {
+    old_head: odf::Multihash,
+    new_head: odf::Multihash,
+    system_time: DateTime<Utc>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

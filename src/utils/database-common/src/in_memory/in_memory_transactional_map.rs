@@ -25,16 +25,18 @@ use crate::{
 /// `InMemoryTransactionManager` form a working set: the transaction reads its
 /// own changes over the committed entries, other transactions see them only
 /// after the commit, and a rollback drops them. A commit fails if another
-/// transaction committed a key after this one first changed it.
+/// transaction committed a key after this one first changed it with
+/// [`InMemoryMapWrite::put`] or [`InMemoryMapWrite::delete`].
 ///
 /// Unlike a database, a write never waits for another transaction: two
 /// transactions changing one key both succeed at write time, and the later
 /// commit fails with a conflict. In Postgres the later writer would wait for
-/// the first and fail its own check, such as a compare-and-set.
+/// the first and fail its own check, such as a compare-and-set. Where Postgres
+/// lets the later writer apply its change after the first instead, the change
+/// is made with [`InMemoryMapWrite::overwrite`] (an upsert) or
+/// [`InMemoryMapWrite::update`] (an `UPDATE` of an existing row).
 ///
 /// Conflicts are found per key only, so unlike a database:
-/// - two transactions writing one key always conflict, even where Postgres serialises them, as with
-///   an upsert;
 /// - a transaction deleting the keys that match a condition does not stop another from adding a key
 ///   that matches it;
 /// - a uniqueness rule over other keys holds only if the repository keeps it as keys of its own.
@@ -109,7 +111,15 @@ where
         let state = self.state.lock().unwrap();
         if let Some(working_set) = state.working_sets.get(&transaction_id) {
             for (key, change) in &working_set.changes {
-                if state.committed_version(key) != change.base_version {
+                if state.committed_version(key) == change.base_version {
+                    continue;
+                }
+                let conflicts = match change.on_concurrent_commit {
+                    OnConcurrentCommit::Fail => true,
+                    OnConcurrentCommit::Overwrite => false,
+                    OnConcurrentCommit::Reapply(_) => !state.committed.contains_key(key),
+                };
+                if conflicts {
                     return Err(InMemoryWriteConflictError {
                         key: format!("{key:?}"),
                     });
@@ -144,7 +154,9 @@ impl<K: Eq + Hash, V> InMemoryPreparedCommit for PreparedMapCommit<'_, K, V> {
             return;
         };
         for (key, change) in working_set.changes {
-            match change.value {
+            let moved = self.state.committed_version(&key) != change.base_version;
+            let committed = self.state.committed.get(&key).map(|v| &v.value);
+            match change.resolve(moved, committed) {
                 ChangedValue::Put(value) => self.state.commit_put(key, value),
                 ChangedValue::Delete => self.state.commit_delete(key),
             }
@@ -212,11 +224,34 @@ impl<K: Eq + Hash, V> InMemoryMapWrite<'_, K, V> {
     }
 
     pub fn put(&mut self, key: K, value: V) {
-        self.change(key, ChangedValue::Put(value));
+        self.change(key, ChangedValue::Put(value), OnConcurrentCommit::Fail);
+    }
+
+    /// Puts the value as a database upsert does: a key another transaction
+    /// commits meanwhile is overwritten at commit instead of failing it
+    pub fn overwrite(&mut self, key: K, value: V) {
+        self.change(key, ChangedValue::Put(value), OnConcurrentCommit::Overwrite);
+    }
+
+    /// Replaces the value the transaction sees with `update` of it, as a
+    /// database `UPDATE` does: if another transaction commits the key
+    /// meanwhile, `update` is applied to that transaction's value at commit, and
+    /// the commit fails only if that transaction deleted the key. Returns
+    /// `false` when the transaction sees no value for the key
+    pub fn update(&mut self, key: K, update: impl Fn(&V) -> V + Send + 'static) -> bool {
+        let Some(value) = self.view().get(&key).map(&update) else {
+            return false;
+        };
+        self.change(
+            key,
+            ChangedValue::Put(value),
+            OnConcurrentCommit::Reapply(vec![Box::new(update)]),
+        );
+        true
     }
 
     pub fn delete(&mut self, key: K) {
-        self.change(key, ChangedValue::Delete);
+        self.change(key, ChangedValue::Delete, OnConcurrentCommit::Fail);
     }
 
     /// Deletes every key the transaction sees that matches `predicate`
@@ -235,7 +270,12 @@ impl<K: Eq + Hash, V> InMemoryMapWrite<'_, K, V> {
         }
     }
 
-    fn change(&mut self, key: K, value: ChangedValue<V>) {
+    fn change(
+        &mut self,
+        key: K,
+        value: ChangedValue<V>,
+        on_concurrent_commit: OnConcurrentCommit<V>,
+    ) {
         let Some(transaction_id) = self.transaction_id else {
             match value {
                 ChangedValue::Put(value) => self.state.commit_put(key, value),
@@ -247,17 +287,19 @@ impl<K: Eq + Hash, V> InMemoryMapWrite<'_, K, V> {
         let base_version = self.state.committed_version(&key);
         let working_set = self.state.working_sets.get_mut(&transaction_id).unwrap();
         // A key changed twice keeps the version its first change was based on
-        let base_version = working_set
-            .changes
-            .get(&key)
-            .map_or(base_version, |change| change.base_version);
-        working_set.changes.insert(
-            key,
-            Change {
+        let change = match working_set.changes.remove(&key) {
+            None => Change {
                 base_version,
+                on_concurrent_commit,
                 value,
             },
-        );
+            Some(earlier) => Change {
+                base_version: earlier.base_version,
+                on_concurrent_commit: earlier.on_concurrent_commit.then(on_concurrent_commit),
+                value,
+            },
+        };
+        working_set.changes.insert(key, change);
     }
 }
 
@@ -329,7 +371,61 @@ struct Change<V> {
     /// Version of the committed key, or of its last delete, when the
     /// transaction first changed it; `None` when it never existed
     base_version: Option<u64>,
+    on_concurrent_commit: OnConcurrentCommit<V>,
     value: ChangedValue<V>,
+}
+
+impl<V> Change<V> {
+    /// The change to commit when the key's committed value is `committed`;
+    /// `moved` tells whether another transaction committed the key since
+    fn resolve(self, moved: bool, committed: Option<&V>) -> ChangedValue<V> {
+        match self.on_concurrent_commit {
+            OnConcurrentCommit::Reapply(updates) if moved => {
+                let Some(committed) = committed else {
+                    return self.value;
+                };
+                let mut updated = None;
+                for update in &updates {
+                    updated = Some(update(updated.as_ref().unwrap_or(committed)));
+                }
+                updated.map_or(self.value, ChangedValue::Put)
+            }
+            OnConcurrentCommit::Fail
+            | OnConcurrentCommit::Overwrite
+            | OnConcurrentCommit::Reapply(_) => self.value,
+        }
+    }
+}
+
+/// What the commit does when another transaction committed the key after this
+/// one first changed it
+enum OnConcurrentCommit<V> {
+    Fail,
+    /// Commits this transaction's value over the other's
+    Overwrite,
+    /// Applies the updates, in order, to the other transaction's value; fails
+    /// if that transaction deleted the key
+    Reapply(Vec<ValueUpdate<V>>),
+}
+
+/// A change of a value computed from the value it replaces
+type ValueUpdate<V> = Box<dyn Fn(&V) -> V + Send>;
+
+impl<V> OnConcurrentCommit<V> {
+    /// The rule for a key changed by `self` and then by `later` in one
+    /// transaction: a change that must fail on a conflict keeps failing, and a
+    /// later overwrite discards the updates before it
+    fn then(self, later: Self) -> Self {
+        match (self, later) {
+            (Self::Fail, _) | (_, Self::Fail) => Self::Fail,
+            (Self::Reapply(mut updates), Self::Reapply(later_updates)) => {
+                updates.extend(later_updates);
+                Self::Reapply(updates)
+            }
+            (Self::Overwrite | Self::Reapply(_), Self::Overwrite)
+            | (Self::Overwrite, Self::Reapply(_)) => Self::Overwrite,
+        }
+    }
 }
 
 enum ChangedValue<V> {
@@ -450,6 +546,85 @@ mod tests {
         harness.commit(second);
 
         pretty_assertions::assert_eq!(harness.entries(None), [("a", 10), ("b", 20)]);
+    }
+
+    #[test]
+    fn test_overwrite_wins_over_a_key_another_transaction_committed() {
+        let harness = MapHarness::with_committed(&[("a", 1)]);
+        let first = harness.begin();
+        let second = harness.begin();
+        harness
+            .map
+            .write(Some(first), |write| write.overwrite("a", 10));
+        harness
+            .map
+            .write(Some(second), |write| write.overwrite("a", 20));
+
+        harness.commit(first);
+        harness.commit(second);
+
+        pretty_assertions::assert_eq!(harness.entries(None), [("a", 20)]);
+    }
+
+    #[test]
+    fn test_update_is_applied_again_to_a_value_another_transaction_committed() {
+        let harness = MapHarness::with_committed(&[("a", 1)]);
+        let first = harness.begin();
+        let second = harness.begin();
+        harness.map.write(Some(first), |write| write.put("a", 10));
+        harness.map.write(Some(second), |write| {
+            assert!(write.update("a", |value| value + 5));
+            assert!(write.update("a", |value| value * 2));
+        });
+
+        pretty_assertions::assert_eq!(harness.get(Some(second), "a"), Some(12));
+
+        harness.commit(first);
+        harness.commit(second);
+
+        pretty_assertions::assert_eq!(harness.entries(None), [("a", 30)]);
+    }
+
+    #[test]
+    fn test_update_fails_the_commit_on_a_key_another_transaction_deleted() {
+        let harness = MapHarness::with_committed(&[("a", 1)]);
+        let first = harness.begin();
+        let second = harness.begin();
+        harness.map.write(Some(first), |write| write.delete("a"));
+        harness.map.write(Some(second), |write| {
+            assert!(write.update("a", |value| value + 1));
+        });
+        harness.commit(first);
+
+        assert_matches!(harness.check_commit(second), Err(_));
+    }
+
+    #[test]
+    fn test_update_of_a_missing_key_changes_nothing() {
+        let harness = MapHarness::with_committed(&[]);
+        let transaction = harness.begin();
+
+        let updated = harness.map.write(Some(transaction), |write| {
+            write.update("a", |value| value + 1)
+        });
+
+        assert!(!updated);
+        pretty_assertions::assert_eq!(harness.entries(Some(transaction)), []);
+    }
+
+    #[test]
+    fn test_put_after_update_fails_on_a_key_another_transaction_committed() {
+        let harness = MapHarness::with_committed(&[("a", 1)]);
+        let first = harness.begin();
+        let second = harness.begin();
+        harness.map.write(Some(first), |write| write.put("a", 10));
+        harness.map.write(Some(second), |write| {
+            write.update("a", |value| value + 1);
+            write.put("a", 20);
+        });
+        harness.commit(first);
+
+        assert_matches!(harness.check_commit(second), Err(_));
     }
 
     #[test]

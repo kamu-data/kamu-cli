@@ -7,18 +7,51 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::collections::HashSet;
-
 use cheap_clone::CheapClone;
-use database_common::{InMemoryTransactionalMap, TransactionId};
+use database_common::{InMemoryMapView, InMemoryTransactionalMap, TransactionId};
 use kamu_datasets::DatasetBlock;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// The blocks of each dataset reference, ordered by sequence number. Key
-/// blocks and data blocks are stored the same way
-pub(crate) type DatasetBlocksMap =
-    InMemoryTransactionalMap<(odf::DatasetID, odf::BlockRef), Vec<DatasetBlock>>;
+/// A block by dataset, reference and sequence number
+pub(crate) type DatasetBlockKey = (odf::DatasetID, odf::BlockRef, u64);
+
+/// The blocks of every dataset reference, a key per block as a database keeps a
+/// row per block: transactions saving blocks of one reference conflict only
+/// over the same sequence number. Key blocks and data blocks are stored the
+/// same way
+pub(crate) type DatasetBlocksMap = InMemoryTransactionalMap<DatasetBlockKey, DatasetBlock>;
+
+pub(crate) type DatasetBlocksView<'a> = InMemoryMapView<'a, DatasetBlockKey, DatasetBlock>;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub(crate) trait DatasetBlocksViewExt<'a> {
+    /// The blocks of the reference, ordered by sequence number
+    fn blocks_for_ref(
+        &self,
+        dataset_id: &odf::DatasetID,
+        block_ref: &odf::BlockRef,
+    ) -> Vec<&'a DatasetBlock>;
+}
+
+impl<'a> DatasetBlocksViewExt<'a> for DatasetBlocksView<'a> {
+    fn blocks_for_ref(
+        &self,
+        dataset_id: &odf::DatasetID,
+        block_ref: &odf::BlockRef,
+    ) -> Vec<&'a DatasetBlock> {
+        let mut blocks: Vec<_> = self
+            .iter()
+            .filter(|((id, r, _), _)| id == dataset_id && r == block_ref)
+            .map(|(_, block)| block)
+            .collect();
+        blocks.sort_by_key(|block| block.sequence_number);
+        blocks
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// The operations the key-block and data-block repositories share
 pub(crate) trait DatasetBlocksMapExt {
@@ -68,8 +101,8 @@ impl DatasetBlocksMapExt for DatasetBlocksMap {
     ) -> bool {
         self.read(transaction_id, |blocks| {
             blocks
-                .get(&(dataset_id.clone(), block_ref.cheap_clone()))
-                .is_some_and(|blocks| !blocks.is_empty())
+                .iter()
+                .any(|((id, r, _), _)| id == dataset_id && r == block_ref)
         })
     }
 
@@ -81,9 +114,10 @@ impl DatasetBlocksMapExt for DatasetBlocksMap {
     ) -> Vec<DatasetBlock> {
         self.read(transaction_id, |blocks| {
             blocks
-                .get(&(dataset_id.clone(), block_ref.cheap_clone()))
+                .blocks_for_ref(dataset_id, block_ref)
+                .into_iter()
                 .cloned()
-                .unwrap_or_default()
+                .collect()
         })
     }
 
@@ -98,21 +132,22 @@ impl DatasetBlocksMapExt for DatasetBlocksMap {
             return Ok(());
         }
 
-        let key = (dataset_id.clone(), block_ref.cheap_clone());
+        let key_of = |block: &DatasetBlock| {
+            (
+                dataset_id.clone(),
+                block_ref.cheap_clone(),
+                block.sequence_number,
+            )
+        };
         self.write(transaction_id, |all_blocks| {
-            let mut saved = all_blocks.view().get(&key).cloned().unwrap_or_default();
-
-            let existing: HashSet<_> = saved.iter().map(|b| b.sequence_number).collect();
-            if let Some(dup) = blocks
-                .iter()
-                .find(|b| existing.contains(&b.sequence_number))
-            {
+            let saved = all_blocks.view();
+            if let Some(dup) = blocks.iter().find(|b| saved.contains_key(&key_of(b))) {
                 return Err(dup.sequence_number);
             }
 
-            saved.extend_from_slice(blocks);
-            saved.sort_by_key(|b| b.sequence_number);
-            all_blocks.put(key, saved);
+            for block in blocks {
+                all_blocks.put(key_of(block), block.clone());
+            }
             Ok(())
         })
     }
@@ -124,7 +159,7 @@ impl DatasetBlocksMapExt for DatasetBlocksMap {
         block_ref: &odf::BlockRef,
     ) {
         self.write(transaction_id, |blocks| {
-            blocks.delete((dataset_id.clone(), block_ref.cheap_clone()));
+            blocks.delete_where(|(id, r, _)| id == dataset_id && r == block_ref);
         });
     }
 
@@ -134,7 +169,7 @@ impl DatasetBlocksMapExt for DatasetBlocksMap {
         dataset_id: &odf::DatasetID,
     ) {
         self.write(transaction_id, |blocks| {
-            blocks.delete_where(|(id, _)| id == dataset_id);
+            blocks.delete_where(|(id, _, _)| id == dataset_id);
         });
     }
 }

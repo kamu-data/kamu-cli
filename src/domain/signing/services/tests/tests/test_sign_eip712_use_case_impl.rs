@@ -21,6 +21,7 @@ use kamu_accounts::{
     DidSecretKey,
     DidSecretKeyRepository,
     PredefinedAccountsConfig,
+    Principal,
     SAMPLE_DID_SECRET_KEY_ENCRYPTION_KEY,
 };
 use kamu_accounts_inmem::{InMemoryAccountRepository, InMemoryDidSecretKeyRepository};
@@ -570,6 +571,45 @@ async fn test_execute_matrix() {
     }
 }
 
+#[test_log::test(tokio::test)]
+async fn test_node_signs_with_dataset_keys_but_not_account_keys() {
+    let harness = SignEip712UseCaseHarness::builder()
+        .current_account_subject(CurrentAccountSubject::new_test())
+        .maybe_principal(Principal::Node)
+        .has_identity_config(true)
+        .build()
+        .await;
+
+    for (did_odf, expected_response) in [
+        (
+            odf::metadata::DidOdf::from(molecule_dataset_id()),
+            Ok(expected_ok_response_for_molecule_dataset_id()),
+        ),
+        (
+            to_odf_did(&molecule_account_id()),
+            expected_not_found(to_odf_did(&molecule_account_id())),
+        ),
+        (
+            to_odf_did(&admin_account_id()),
+            expected_not_found(to_odf_did(&admin_account_id())),
+        ),
+    ] {
+        assert_eq!(
+            expected_response,
+            harness
+                .execute_and_convert_to_json(
+                    did_odf,
+                    typed_data(),
+                    SignEip712UseCaseOptions {
+                        include_node_proof: true,
+                    },
+                )
+                .await,
+            "DID: {did_odf:?}",
+        );
+    }
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Harness
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -585,6 +625,8 @@ impl SignEip712UseCaseHarness {
         current_account_subject: CurrentAccountSubject,
         maybe_mock_dataset_permission_checker: Option<MockDatasetPermissionChecker>,
         has_identity_config: bool,
+        /// Acts as this principal instead of the one the subject authenticates
+        maybe_principal: Option<Principal>,
     ) -> Self {
         let mut b = dill::CatalogBuilder::new();
 
@@ -651,7 +693,14 @@ impl SignEip712UseCaseHarness {
             b.add_value(identity_config);
         }
 
-        b.add_current_account_subject(current_account_subject);
+        match maybe_principal {
+            Some(principal) => {
+                b.add_value(current_account_subject).add_value(principal);
+            }
+            None => {
+                b.add_current_account_subject(current_account_subject);
+            }
+        }
 
         if let Some(mock_dataset_permission_checker) = maybe_mock_dataset_permission_checker {
             b.add_value(mock_dataset_permission_checker)

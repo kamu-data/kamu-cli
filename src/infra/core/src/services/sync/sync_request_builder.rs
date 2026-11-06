@@ -12,9 +12,7 @@ use std::sync::Arc;
 use dill::component;
 use kamu_core::{
     DatasetAnyRefUnresolvedError,
-    InvalidSyncDestinationError,
     RemoteDatasetUrlResolver,
-    RemoteRepositoryRegistry,
     SyncError,
     SyncRefRemote,
     SyncRequest,
@@ -28,40 +26,25 @@ use kamu_datasets::{DatasetRegistry, DatasetRegistryExt};
 pub struct SyncRequestBuilder {
     dataset_registry: Arc<dyn DatasetRegistry>,
     dataset_factory: Arc<dyn odf::dataset::DatasetFactory>,
-    remote_repo_registry: Arc<dyn RemoteRepositoryRegistry>,
     remote_dataset_url_resolver: Arc<dyn RemoteDatasetUrlResolver>,
 }
 
 #[common_macros::method_names_consts]
 impl SyncRequestBuilder {
-    /// Builds a push of a local dataset to a remote destination; a local
-    /// destination is rejected
-    #[tracing::instrument(name = SyncRequestBuilder_build_sync_request, level = "debug", skip_all, fields(%src_ref, ?dst_ref, %create_dst_if_not_exists))]
+    /// Builds a push of a local dataset to a remote destination
+    #[tracing::instrument(name = SyncRequestBuilder_build_sync_request, level = "debug", skip_all, fields(%src_ref, %dst_ref, %create_dst_if_not_exists))]
     pub async fn build_sync_request(
         &self,
         src_ref: odf::DatasetRef,
-        dst_ref: odf::DatasetRefAny,
+        dst_ref: odf::DatasetRefRemote,
         create_dst_if_not_exists: bool,
     ) -> Result<SyncRequest, SyncError> {
         let src = self.dataset_registry.get_dataset_by_ref(&src_ref).await?;
         self.ensure_dataset_head_present(src_ref.as_any_ref(), src.as_ref())
             .await?;
 
-        let remote_ref = match dst_ref
-            .as_local_ref(|repo| self.remote_repo_registry.get_repository(repo).is_ok())
-        {
-            Ok(local_ref) => {
-                return Err(InvalidSyncDestinationError {
-                    dst_ref: local_ref.as_any_ref(),
-                    reason: "it is a local dataset, pull into it instead".to_owned(),
-                }
-                .into());
-            }
-            Err(remote_ref) => remote_ref,
-        };
-
         let dst = self
-            .resolve_dest_sync_ref_remote(remote_ref, create_dst_if_not_exists)
+            .resolve_dest_sync_ref_remote(dst_ref, create_dst_if_not_exists)
             .await?;
 
         Ok(SyncRequest { src, dst })

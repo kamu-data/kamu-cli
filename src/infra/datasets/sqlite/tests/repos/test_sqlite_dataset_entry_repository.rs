@@ -137,6 +137,30 @@ database_concurrent_transactions_test!(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+database_concurrent_transactions_test!(
+    storage = sqlite,
+    fixture = dataset_entry_repo::test_rename_in_concurrent_transactions,
+    harness = SqliteDatasetEntryRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_concurrent_transactions_test!(
+    storage = sqlite,
+    fixture = dataset_entry_repo::test_rename_owner_in_concurrent_transactions,
+    harness = SqliteDatasetEntryRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_concurrent_transactions_test!(
+    storage = sqlite,
+    fixture = dataset_entry_repo::test_rename_and_rename_owner_in_concurrent_transactions,
+    harness = SqliteDatasetEntryRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 struct SqliteDatasetEntryRepositoryHarness {
     catalog: Catalog,
 }

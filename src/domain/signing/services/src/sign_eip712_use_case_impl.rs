@@ -89,9 +89,10 @@ impl SignEip712UseCaseImpl {
         };
 
         match self.principal.as_ref() {
-            // NOTE: Only authenticated principals can search for other accounts
-            Principal::Anonymous => return Ok(None),
-            Principal::User(_) | Principal::Node => {}
+            // NOTE: Only authenticated users sign with an account key; the node
+            //       signs with its own identity
+            Principal::Anonymous | Principal::Node => return Ok(None),
+            Principal::User(_) => {}
         }
 
         let Some(account) = self
@@ -115,22 +116,23 @@ impl SignEip712UseCaseImpl {
     }
 
     async fn has_access_for_account(&self, account: &Account) -> Result<bool, InternalError> {
-        // Admin can access any account
-        if self
-            .account_authorization_helper
-            .is_admin(&self.principal)
-            .await?
-        {
-            return Ok(true);
-        }
-
         match self.principal.as_ref() {
-            Principal::User(account_handle) => Ok(Self::has_access_by_account_name(
-                &account_handle.name,
-                &account.account_name,
-            )),
-            Principal::Node => Ok(true),
-            Principal::Anonymous => Ok(false),
+            Principal::User(account_handle) => {
+                // Admin can access any account
+                if self
+                    .account_authorization_helper
+                    .is_admin(&self.principal)
+                    .await?
+                {
+                    return Ok(true);
+                }
+
+                Ok(Self::has_access_by_account_name(
+                    &account_handle.name,
+                    &account.account_name,
+                ))
+            }
+            Principal::Node | Principal::Anonymous => Ok(false),
         }
     }
 

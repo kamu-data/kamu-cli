@@ -512,6 +512,52 @@ pub async fn test_save_same_sequence_number_in_concurrent_transactions(catalog: 
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Two transactions save key blocks at different sequence numbers of one
+/// reference: both commit, and both blocks are stored
+pub async fn test_save_different_sequence_numbers_in_concurrent_transactions(catalog: &Catalog) {
+    let (_, entries) = init_committed_entries(catalog, &[("foo", odf::DatasetKind::Root)]).await;
+    let dataset_id = entries[0].id.clone();
+
+    let first_block = make_info_block(1);
+    let second_block = make_license_block(2);
+    let expected_hashes = vec![
+        first_block.block_hash.clone(),
+        second_block.block_hash.clone(),
+    ];
+    let second_dataset_id = dataset_id.clone();
+
+    let outcome =
+        race_transactions(
+            catalog,
+            |catalog| async move {
+                save_key_block(&catalog, &dataset_id, first_block)
+                    .await
+                    .unwrap();
+            },
+            move |catalog| async move {
+                save_key_block(&catalog, &second_dataset_id, second_block).await
+            },
+        )
+        .await;
+
+    assert_matches!(outcome, RacingTransactionOutcome::Committed);
+    let committed_hashes = in_committed_transaction(catalog, |catalog| async move {
+        catalog
+            .get_one::<dyn DatasetKeyBlockRepository>()
+            .unwrap()
+            .get_all_key_blocks(&entries[0].id, &odf::BlockRef::Head)
+            .await
+            .unwrap()
+            .into_iter()
+            .map(|block| block.block_hash)
+            .collect::<Vec<_>>()
+    })
+    .await;
+    pretty_assertions::assert_eq!(committed_hashes, expected_hashes);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 async fn save_key_block(
     catalog: &Catalog,
     dataset_id: &odf::DatasetID,

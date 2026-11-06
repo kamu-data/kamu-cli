@@ -9,13 +9,12 @@
 
 use std::sync::Arc;
 
-use cheap_clone::CheapClone;
 use database_common::{TransactionId, TransactionRef};
 use dill::*;
 use internal_error::InternalError;
 use kamu_datasets::*;
 
-use super::{DatasetBlocksMapExt, InMemoryDatasetKeyBlockState};
+use super::{DatasetBlocksMapExt, DatasetBlocksViewExt, InMemoryDatasetKeyBlockState};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -98,8 +97,8 @@ impl DatasetKeyBlockRepository for InMemoryDatasetKeyBlockRepository {
                     .iter()
                     .filter_map(|dataset_id| {
                         key_blocks
-                            .get(&(dataset_id.clone(), block_ref.cheap_clone()))?
-                            .iter()
+                            .blocks_for_ref(dataset_id, block_ref)
+                            .into_iter()
                             .rev()
                             .find(|block| block.event_kind == event_type)
                             .map(|block| (dataset_id.clone(), block.clone()))

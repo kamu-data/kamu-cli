@@ -64,9 +64,12 @@ outside any transaction; `inmem` builds the harness with `new_transactional()`. 
 transactions through `database_common::testing` (`race_transactions`, `in_committed_transaction`),
 which the repo-tests crate gets through `database-common`'s `testing` feature.
 
-A race fixture belongs in the shared suite only where every storage rejects the second writer.
-Where a database lets the last writer win (an upsert, an unconditional `UPDATE`), the in-memory map
-still fails the second commit, so the storages disagree.
+A race fixture belongs in the shared suite where every storage gives the second writer the same
+outcome. `InMemoryTransactionalMap::put` and `delete` fail the second commit on the same key; where
+a database lets the second writer apply its change after the first instead, the in-memory
+repository writes with `overwrite` (an upsert) or `update` (an `UPDATE` of an existing row), and the
+fixture asserts that the second transaction commits. A repository that still writes such a change
+with `put` fails that fixture.
 
 Example:
 

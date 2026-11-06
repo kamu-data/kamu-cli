@@ -1047,8 +1047,7 @@ impl UpdateDatasetTaskRunnerHarness {
             .unwrap()
             .build_sync_request(
                 created.dataset_handle.as_local_ref(),
-                odf::DatasetRefRemote::from(&self.repo_dataset_url(&created.dataset_handle.alias))
-                    .as_any_ref(),
+                odf::DatasetRefRemote::from(&self.repo_dataset_url(&created.dataset_handle.alias)),
                 true,
             )
             .await

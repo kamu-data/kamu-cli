@@ -103,7 +103,7 @@ impl DatasetStatisticsRepository for InMemoryDatasetStatisticsRepository {
         statistics: DatasetStatistics,
     ) -> Result<(), SetDatasetStatisticsError> {
         self.state.statistics.write(self.transaction_id, |stored| {
-            stored.put((dataset_id.clone(), block_ref.cheap_clone()), statistics);
+            stored.overwrite((dataset_id.clone(), block_ref.cheap_clone()), statistics);
         });
         Ok(())
     }

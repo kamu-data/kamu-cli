@@ -31,6 +31,7 @@ use kamu_adapter_http::smart_protocol::messages::{
     DatasetPushMetadataRequest,
     DatasetPushRequest,
     DatasetPushResponse,
+    MetadataBlocksBatch,
     SMART_TRANSFER_PROTOCOL_VERSION,
 };
 use kamu_adapter_http::smart_protocol::protocol_dataset_helper::{
@@ -603,6 +604,70 @@ impl ClientSideHarness {
             self.raw_push_requests(dataset_handle, &seed_hash).await;
         push_request.current_head = None;
         (push_request, metadata_request)
+    }
+
+    /// The requests that push the dataset's whole chain to a server that has
+    /// no dataset under its alias, declaring `declared_seed_hash` as the hash
+    /// of its `Seed`
+    pub async fn raw_new_dataset_push_requests_with_seed_hash(
+        &self,
+        dataset_handle: &odf::DatasetHandle,
+        declared_seed_hash: &odf::Multihash,
+    ) -> (DatasetPushRequest, DatasetPushMetadataRequest) {
+        let resolved_dataset = self
+            .dataset_registry()
+            .get_dataset_by_handle(dataset_handle)
+            .await;
+        let chain = resolved_dataset.as_metadata_chain();
+        let head = chain.resolve_ref(&odf::BlockRef::Head).await.unwrap();
+
+        let transfer_plan = prepare_dataset_transfer_plan(chain, &head, None, false)
+            .await
+            .unwrap();
+
+        let mut hashes = chain
+            .iter_blocks()
+            .map_ok(|(hash, _)| hash)
+            .try_collect::<Vec<_>>()
+            .await
+            .unwrap();
+        hashes.reverse();
+
+        let mut tarball_builder = tar::Builder::new(flate2::write::GzEncoder::new(
+            Vec::new(),
+            flate2::Compression::default(),
+        ));
+        for (i, hash) in hashes.iter().enumerate() {
+            let block_bytes = chain.get_block_bytes(hash).await.unwrap();
+            let entry_name = if i == 0 { declared_seed_hash } else { hash };
+
+            let mut header = tar::Header::new_gnu();
+            header.set_size(u64::try_from(block_bytes.len()).unwrap());
+            tarball_builder
+                .append_data(
+                    &mut header,
+                    entry_name.as_multibase().to_stack_string(),
+                    &block_bytes[..],
+                )
+                .unwrap();
+        }
+
+        (
+            DatasetPushRequest {
+                current_head: None,
+                transfer_plan,
+                force_update_if_diverged: false,
+                visibility_for_created_dataset: odf::DatasetVisibility::Private,
+            },
+            DatasetPushMetadataRequest {
+                new_blocks: MetadataBlocksBatch {
+                    num_blocks: u32::try_from(hashes.len()).unwrap(),
+                    media_type: "application/tar+gzip".to_owned(),
+                    encoding: "raw".to_owned(),
+                    payload: tarball_builder.into_inner().unwrap().finish().unwrap(),
+                },
+            },
+        )
     }
 
     pub async fn open_raw_push_session(&self, url: &Url) -> RawPushSession {

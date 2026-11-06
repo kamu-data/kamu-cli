@@ -9,13 +9,17 @@
 
 use std::sync::Arc;
 
-use cheap_clone::CheapClone;
-use database_common::{InMemoryMapView, TransactionId, TransactionRef};
+use database_common::{TransactionId, TransactionRef};
 use dill::*;
 use internal_error::InternalError;
 use kamu_datasets::*;
 
-use super::{DatasetBlocksMapExt, InMemoryDatasetDataBlockState};
+use super::{
+    DatasetBlocksMapExt,
+    DatasetBlocksView,
+    DatasetBlocksViewExt,
+    InMemoryDatasetDataBlockState,
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -54,13 +58,13 @@ impl InMemoryDatasetDataBlockRepository {
     }
 
     fn dataset_blocks<'a>(
-        data_blocks: &InMemoryMapView<'a, (odf::DatasetID, odf::BlockRef), Vec<DatasetBlock>>,
+        data_blocks: &DatasetBlocksView<'a>,
         dataset_id: &'a odf::DatasetID,
     ) -> impl Iterator<Item = &'a DatasetBlock> {
         data_blocks
             .iter()
-            .filter(move |((id, _), _)| id == dataset_id)
-            .flat_map(|(_, blocks)| blocks.iter())
+            .filter(move |((id, _, _), _)| id == dataset_id)
+            .map(|(_, block)| block)
     }
 }
 
@@ -117,17 +121,13 @@ impl DatasetDataBlockRepository for InMemoryDatasetDataBlockRepository {
                 .data_blocks
                 .read(self.transaction_id, |data_blocks| {
                     data_blocks
-                        .get(&(dataset_id.clone(), block_ref.cheap_clone()))
-                        .map(|blocks| {
-                            blocks
-                                .iter()
-                                .rev()
-                                .filter(|b| b.sequence_number <= upper_sequence_number_inclusive)
-                                .take(page_size)
-                                .cloned()
-                                .collect()
-                        })
-                        .unwrap_or_default()
+                        .blocks_for_ref(dataset_id, block_ref)
+                        .into_iter()
+                        .rev()
+                        .filter(|b| b.sequence_number <= upper_sequence_number_inclusive)
+                        .take(page_size)
+                        .cloned()
+                        .collect()
                 });
 
         // The page is scanned backwards until we take N values,

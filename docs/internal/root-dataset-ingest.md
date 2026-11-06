@@ -346,10 +346,11 @@ Then:
    `PushIngestPlannerImpl::plan_push_source_creation` returns an
    `AddPushSource { source_name: "auto", merge: Append }`, with a read step guessed from the media
    type, when the dataset has no source at all. The use case appends it on top of `expected_head`
-   when given, or of `HEAD` as it is then, and moves `HEAD` through `DatasetHeadCommitter`; the
-   data is then planned on top of the new source block. `POST /ingest` runs in one transaction,
-   so when the ingest that follows fails the reference move is rolled back and the source is not
-   kept. Without a media type the push fails with `SourceNotFound`.
+   when given, or of `HEAD` as it is then, without moving `HEAD`; the data is then planned on top
+   of the new source block. Step 4 publishes the source block with the data, or alone when the
+   upload adds nothing, so the result is `Updated` either way and counts the source block. A
+   failed ingest leaves the source block unreferenced. Without a media type the push fails with
+   `SourceNotFound`.
 2. **Plan** — a derived dataset is rejected with `InvalidDatasetKind`.
    `PushIngestPlannerImpl::plan_ingest` builds the writer state at `HEAD` (or at
    `expected_head` when given) for `source_name`. The planner writes nothing. A missing source is
@@ -364,7 +365,7 @@ Then:
 4. **Finalize** — move `HEAD` from `old_head` to `new_head` through `DatasetHeadCommitter` and post
    `DatasetExternallyChangedMessage::ingest_http`.
 
-A lost CAS in step 1 or 4 is
+A lost CAS in step 4 is
 `PushIngestError::CommitError(CommitError::MetadataAppendError(AppendError::RefCASFailed))` with
 the expected and actual heads; nothing is committed.
 
@@ -402,7 +403,7 @@ schema.
 | `kamu pull <root>` | `PullCommand` → `PullDatasetUseCaseImpl` → `PullIngestLoop` → `PollingIngestService` | write check per plan iteration | short transactions: pull planning; ingest planning with env-var lookup; each ref update | after each iteration | `DatasetReferenceMessage` from the ref update |
 | Ingest flow | `FlowControllerIngest` → `LogicalPlanDatasetUpdate` → `UpdateDatasetTaskPlanner` → `UpdateDatasetTaskRunner` → `PollingIngestService` (one iteration) | system | ingest planning with env-var lookup in one transaction, when the task runs; fetch and write outside; ref update in its own | once | `DatasetReferenceMessage`; task and flow progress messages |
 | `kamu ingest <root>` | `IngestCommand` → `PushIngestDataUseCase::execute` per file | Write, in the use case; the command rejects derivative datasets and datasets with a pull alias | the command's | once per file | `DatasetReferenceMessage`, `DatasetExternallyChangedMessage` |
-| `POST /{dataset}/ingest` | `dataset_ingest_handler` → `PushIngestDataUseCase::execute` | Write, in the use case; upload token must belong to the caller | the whole request (`#[transactional_handler]`) | once; twice when a push source is auto-created | as above |
+| `POST /{dataset}/ingest` | `dataset_ingest_handler` → `PushIngestDataUseCase::execute` | Write, in the use case; upload token must belong to the caller | the whole request (`#[transactional_handler]`) | once | as above |
 | Collections, versioned files | `UpdateCollectionEntriesUseCaseImpl`, `UpdateVersionedFileUseCaseImpl` → `PushIngestDataUseCase` | the calling use case, then Write again in the push ingest use case | the caller's | once | as above |
 
 Flow-side options reach ingest through `FlowConfigRuleIngest`: `fetch_uncacheable` becomes
@@ -435,8 +436,8 @@ Consequences:
   CAS fail.
 - `HEAD` moves only after all of an operation's blocks are written, so readers see the blocks of
   one operation together. That can still be a `SetDataSchema` alone, when a first ingest yields no
-  rows ([§4.3](#43-what-stage-decides)), and an auto-created push source moves `HEAD` earlier
-  ([§6.1](#61-call-sequence)).
+  rows ([§4.3](#43-what-stage-decides)), or an auto-created push source alone, when an upload
+  adds no rows ([§6.1](#61-call-sequence)).
 - `DatasetExternallyChangedMessage` is posted by push ingest (and by the smart push server,
   [dataset-sync.md](dataset-sync.md#72-push-flow)); flows use it to tell user pushes from their
   own updates.

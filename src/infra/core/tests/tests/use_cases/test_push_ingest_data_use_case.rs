@@ -286,9 +286,10 @@ async fn test_push_ingest_data_upload_adds_push_source() {
     let foo = harness.create_root_dataset_without_source(&alias_foo).await;
     let seed_head = harness.get_head(&foo).await;
 
+    // The source block and the data block move `HEAD` together
     assert_matches!(
         harness.ingest_ndjson(&foo, None, true).await,
-        Ok(PushIngestResult::Updated { old_head, .. }) if old_head != seed_head
+        Ok(PushIngestResult::Updated { old_head, num_blocks: 2, .. }) if old_head == seed_head
     );
 
     // The first ingest committed the source, so one not allowed to create it still finds it
@@ -316,7 +317,37 @@ async fn test_push_ingest_data_upload_with_expected_head_adds_push_source() {
 
     assert_matches!(
         harness.ingest_ndjson(&foo, Some(seed_head.clone()), true).await,
-        Ok(PushIngestResult::Updated { old_head, .. }) if old_head != seed_head
+        Ok(PushIngestResult::Updated { old_head, num_blocks: 2, .. }) if old_head == seed_head
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[tokio::test]
+#[test_group::group(engine, ingest, datafusion)]
+async fn test_push_ingest_data_empty_upload_reports_the_added_push_source() {
+    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let (_, dataset_id_foo) = odf::DatasetID::new_generated_ed25519();
+
+    let harness = PushIngestDataUseCaseHarness::new(
+        MockDatasetPermissionChecker::allowing(),
+        MockDidGenerator::predefined_dataset_ids(vec![dataset_id_foo]),
+    );
+
+    let foo = harness.create_root_dataset_without_source(&alias_foo).await;
+    let seed_head = harness.get_head(&foo).await;
+
+    let result = harness.ingest_empty_upload(&foo).await;
+
+    let head = harness.get_head(&foo).await;
+    assert_matches!(
+        result,
+        Ok(PushIngestResult::Updated { old_head, new_head, num_blocks: 1, .. })
+            if old_head == seed_head && new_head == head
+    );
+    assert_matches!(
+        harness.head_event(&foo).await,
+        odf::MetadataEvent::AddPushSource(_)
     );
 }
 
@@ -920,6 +951,30 @@ impl PushIngestDataUseCaseHarness {
             },
         )
         .await
+    }
+
+    /// Uploads a zero-length NDJSON file
+    async fn ingest_empty_upload(
+        &self,
+        created: &CreateDatasetResult,
+    ) -> Result<PushIngestResult, PushIngestDataError> {
+        self.ingest_data(
+            ResolvedDataset::from_created(created),
+            DataSource::Stream(Box::new(std::io::Cursor::new(""))),
+            Self::ndjson_options(None, true),
+        )
+        .await
+    }
+
+    async fn head_event(&self, created: &CreateDatasetResult) -> odf::MetadataEvent {
+        let target = ResolvedDataset::from_created(created);
+        let head = self.head(&target).await;
+        target
+            .as_metadata_chain()
+            .get_block(&head)
+            .await
+            .unwrap()
+            .event
     }
 
     async fn ingest_multi_data(

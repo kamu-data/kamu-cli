@@ -81,6 +81,15 @@ database_concurrent_transactions_test!(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+database_concurrent_transactions_test!(
+    storage = sqlite,
+    fixture =
+        dataset_key_blocks_repo::test_save_different_sequence_numbers_in_concurrent_transactions,
+    harness = SqliteDatasetKeyBlockRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 struct SqliteDatasetKeyBlockRepositoryHarness {
     catalog: Catalog,
 }
