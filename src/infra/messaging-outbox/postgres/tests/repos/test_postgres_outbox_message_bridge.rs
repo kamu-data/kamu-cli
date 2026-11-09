@@ -9,7 +9,11 @@
 
 use chrono::Utc;
 use database_common::{DatabaseTransactionManager, PostgresTransactionManager};
-use database_common_macros::{database_transactional_test, transactional_method};
+use database_common_macros::{
+    database_concurrent_transactions_test,
+    database_transactional_test,
+    transactional_method,
+};
 use dill::{Catalog, CatalogBuilder};
 use kamu_messaging_outbox_postgres::PostgresOutboxMessageBridge;
 use kamu_wakeup_listener_postgres::PostgresNotificationHub;
@@ -184,6 +188,14 @@ async fn test_tx_id_priority_over_message_id_in_ordering(pg_pool: PgPool) {
         .collect::<Vec<_>>();
     assert_eq!(tail_seq, vec![2]);
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_concurrent_transactions_test!(
+    storage = postgres,
+    fixture = kamu_messaging_outbox_repo_tests::test_first_consumption_boundaries_in_concurrent_transactions,
+    harness = PostgresOutboxMessageBridgeHarness
+);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
