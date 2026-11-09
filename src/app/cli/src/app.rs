@@ -24,15 +24,7 @@ use kamu_accounts_services::PasswordPolicyConfig;
 use kamu_adapter_http::platform::{FileDownloadServiceJwt, UploadServiceLocal};
 use kamu_adapter_oauth::GithubAuthenticationConfig;
 use kamu_datasets_services::QuotaDefaultsConfig;
-use kamu_flow_system::{
-    MESSAGE_PRODUCER_KAMU_FLOW_CONFIGURATION_SERVICE,
-    MESSAGE_PRODUCER_KAMU_FLOW_PROCESS_STATE_PROJECTOR,
-    MESSAGE_PRODUCER_KAMU_FLOW_TRIGGER_SERVICE,
-};
 use kamu_search_services::EmbeddingsProviderImpl;
-use kamu_task_system_inmem::domain::MESSAGE_PRODUCER_KAMU_TASK_AGENT;
-use kamu_webhooks::MESSAGE_PRODUCER_KAMU_WEBHOOK_SUBSCRIPTION_SERVICE;
-use messaging_outbox::{Outbox, OutboxDispatchingImpl, register_message_dispatcher};
 use time_source::{SystemTimeSource, SystemTimeSourceDefault, SystemTimeSourceStub};
 use tracing::{Instrument, warn};
 
@@ -60,6 +52,7 @@ use crate::{
     get_app_database_config,
     move_initial_database_to_workspace,
     odf_server,
+    outbox,
     resource_context,
     resources,
     spawn_password_refreshing_job,
@@ -353,20 +346,7 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
         // A failed command may still have committed some of its work in
         // transactions of its own, so the Outbox is processed either way
         if is_outbox_processing_required {
-            let outbox_result = async {
-                let outbox_agent = background_catalog
-                    .get_one::<dyn messaging_outbox::OutboxAgent>()
-                    .int_err()?;
-                outbox_agent
-                    .run_while_has_tasks()
-                    .instrument(tracing::debug_span!(
-                        "Consume accumulated the Outbox messages"
-                    ))
-                    .await
-            }
-            .await;
-
-            command_with_outbox_result(command_run_result, outbox_result)?;
+            outbox::process_outbox_after_command(background_catalog, command_run_result).await?;
         } else {
             command_run_result?;
         }
@@ -428,24 +408,6 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// The result of a command once the Outbox was processed after it: the
-/// command's own error wins, and an Outbox failure fails a command that
-/// succeeded
-fn command_with_outbox_result(
-    command_result: Result<(), CLIError>,
-    outbox_result: Result<(), InternalError>,
-) -> Result<(), CLIError> {
-    match (command_result, outbox_result) {
-        (command_result, Ok(())) => command_result,
-        (Ok(()), Err(e)) => Err(e.into()),
-        (Err(command_error), Err(e)) => {
-            tracing::error!(error = ?e, error_msg = %e, "Outbox processing failed after a failed command");
-            Err(command_error)
-        }
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Catalog
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -630,14 +592,7 @@ pub fn configure_base_catalog(
     );
     b.add::<kamu_adapter_flight_sql::KamuFlightSqlService>();
 
-    b.add_builder(messaging_outbox::OutboxImmediateImpl::builder(
-        messaging_outbox::ConsumerFilter::ImmediateConsumers,
-    ));
-    b.add::<messaging_outbox::OutboxTransactionalImpl>();
-    b.add::<messaging_outbox::OutboxDispatchingImpl>();
-    b.bind::<dyn Outbox, OutboxDispatchingImpl>();
-    b.add::<messaging_outbox::OutboxAgentImpl>();
-    b.add::<messaging_outbox::OutboxAgentMetrics>();
+    outbox::register_outbox_components(&mut b);
     b.add::<wakeup_listener::WakeupListenerMetrics>();
 
     kamu_auth_web3_services::register_dependencies(&mut b);
@@ -646,50 +601,7 @@ pub fn configure_base_catalog(
 
     explore::register_dependencies(&mut b);
 
-    register_message_dispatcher::<AccountLifecycleMessage>(
-        &mut b,
-        MESSAGE_PRODUCER_KAMU_ACCOUNTS_SERVICE,
-    );
-
-    register_message_dispatcher::<kamu_datasets::DatasetLifecycleMessage>(
-        &mut b,
-        kamu_datasets::MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
-    );
-
-    register_message_dispatcher::<kamu_datasets::DatasetReferenceMessage>(
-        &mut b,
-        kamu_datasets::MESSAGE_PRODUCER_KAMU_DATASET_REFERENCE_SERVICE,
-    );
-
-    register_message_dispatcher::<kamu_datasets::DatasetDependenciesMessage>(
-        &mut b,
-        kamu_datasets::MESSAGE_PRODUCER_KAMU_DATASET_DEPENDENCY_GRAPH_SERVICE,
-    );
-
-    register_message_dispatcher::<kamu_datasets::DatasetKeyBlocksMessage>(
-        &mut b,
-        kamu_datasets::MESSAGE_PRODUCER_KAMU_DATASET_KEY_BLOCK_UPDATE_HANDLER,
-    );
-
-    register_message_dispatcher::<kamu_datasets::DatasetExternallyChangedMessage>(
-        &mut b,
-        kamu_datasets::MESSAGE_PRODUCER_KAMU_HTTP_ADAPTER,
-    );
-
-    register_message_dispatcher::<kamu_auth_rebac::RebacDatasetPropertiesMessage>(
-        &mut b,
-        kamu_auth_rebac::MESSAGE_PRODUCER_KAMU_REBAC_DATASET_PROPERTIES_SERVICE,
-    );
-
-    register_message_dispatcher::<kamu_auth_rebac::RebacDatasetRelationsMessage>(
-        &mut b,
-        kamu_auth_rebac::MESSAGE_PRODUCER_KAMU_REBAC_DATASET_RELATIONS_SERVICE,
-    );
-
-    register_message_dispatcher::<kamu_resources::ResourceLifecycleMessage>(
-        &mut b,
-        kamu_resources::MESSAGE_PRODUCER_KAMU_RESOURCE_SERVICE,
-    );
+    outbox::register_base_message_dispatchers(&mut b);
 
     b
 }
@@ -765,36 +677,7 @@ pub fn configure_server_catalog(
 
     b.add_value(kamu_adapter_graphql::GqlFeatureFlags::new());
 
-    register_message_dispatcher::<kamu_flow_system::FlowConfigurationUpdatedMessage>(
-        &mut b,
-        MESSAGE_PRODUCER_KAMU_FLOW_CONFIGURATION_SERVICE,
-    );
-    register_message_dispatcher::<kamu_flow_system::FlowTriggerUpdatedMessage>(
-        &mut b,
-        MESSAGE_PRODUCER_KAMU_FLOW_TRIGGER_SERVICE,
-    );
-    register_message_dispatcher::<kamu_flow_system::FlowProcessLifecycleMessage>(
-        &mut b,
-        MESSAGE_PRODUCER_KAMU_FLOW_PROCESS_STATE_PROJECTOR,
-    );
-    register_message_dispatcher::<kamu_task_system::TaskProgressMessage>(
-        &mut b,
-        MESSAGE_PRODUCER_KAMU_TASK_AGENT,
-    );
-
-    register_message_dispatcher::<AccessTokenLifecycleMessage>(
-        &mut b,
-        MESSAGE_PRODUCER_KAMU_ACCESS_TOKEN_SERVICE,
-    );
-
-    register_message_dispatcher::<kamu_webhooks::WebhookSubscriptionLifecycleMessage>(
-        &mut b,
-        MESSAGE_PRODUCER_KAMU_WEBHOOK_SUBSCRIPTION_SERVICE,
-    );
-    register_message_dispatcher::<kamu_webhooks::WebhookSubscriptionEventChangesMessage>(
-        &mut b,
-        kamu_webhooks::MESSAGE_PRODUCER_KAMU_WEBHOOK_SUBSCRIPTION_EVENT_CHANGES_SERVICE,
-    );
+    outbox::register_server_message_dispatchers(&mut b);
 
     b
 }
@@ -1361,47 +1244,6 @@ fn configure_output_format(args: &cli::Cli, workspace_svc: &WorkspaceService) ->
 struct Guards {
     _appender: Option<tracing_appender::non_blocking::WorkerGuard>,
     _perfetto: Option<tracing_perfetto::FlushGuard>,
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[cfg(test)]
-mod tests {
-    use std::assert_matches;
-
-    use internal_error::InternalError;
-
-    use super::command_with_outbox_result;
-    use crate::CLIError;
-
-    #[test]
-    fn test_outbox_failure_fails_a_successful_command() {
-        let result = command_with_outbox_result(Ok(()), Err(InternalError::new("outbox")));
-
-        assert_matches!(
-            result,
-            Err(CLIError::CriticalFailure { source, .. }) if format!("{source:?}").contains("outbox")
-        );
-    }
-
-    #[test]
-    fn test_command_error_wins_over_outbox_failure() {
-        let result = command_with_outbox_result(
-            Err(CLIError::usage_error("command")),
-            Err(InternalError::new("outbox")),
-        );
-
-        assert_matches!(result, Err(CLIError::UsageError(_)));
-    }
-
-    #[test]
-    fn test_outbox_success_keeps_the_command_result() {
-        assert_matches!(command_with_outbox_result(Ok(()), Ok(())), Ok(()));
-        assert_matches!(
-            command_with_outbox_result(Err(CLIError::usage_error("command")), Ok(())),
-            Err(CLIError::UsageError(_))
-        );
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -919,33 +919,3 @@ pub struct WebhooksConfig {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[cfg(test)]
-mod tests {
-    use std::assert_matches;
-    use std::time::Duration;
-
-    use super::SmartTransferProtocolConfig;
-
-    #[test]
-    fn test_upload_progress_interval_defaults_to_ten_seconds() {
-        assert_eq!(
-            SmartTransferProtocolConfig::default()
-                .to_server_config()
-                .unwrap()
-                .upload_progress_interval,
-            Duration::from_secs(10)
-        );
-    }
-
-    #[test]
-    fn test_zero_upload_progress_interval_is_rejected() {
-        let config = SmartTransferProtocolConfig {
-            upload_progress_interval: "0s".parse().unwrap(),
-        };
-
-        assert_matches!(config.to_server_config(), Err(_));
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

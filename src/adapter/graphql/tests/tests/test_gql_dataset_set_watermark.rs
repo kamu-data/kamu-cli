@@ -126,6 +126,7 @@ async fn test_set_watermark_head_removed_concurrently() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[oop::extend(BaseGQLDatasetHarness, base_gql_harness)]
 struct SetWatermarkHarness {
     base_gql_harness: BaseGQLDatasetHarness,
     catalog_authorized: dill::Catalog,
@@ -252,8 +253,7 @@ impl SetWatermarkHarness {
         )
         .replace("<id>", &created.dataset_handle.id.to_string());
 
-        self.base_gql_harness
-            .execute_query(request_code, &self.catalog_authorized)
+        self.execute_query(request_code, &self.catalog_authorized)
             .await
     }
 }

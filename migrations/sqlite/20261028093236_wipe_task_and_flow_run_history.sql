@@ -23,4 +23,8 @@ DELETE FROM flow_ids;
 
 UPDATE flow_process_states SET running_since = NULL;
 
+-- Flow process lifecycle messages name the wiped flows
+DELETE FROM outbox_messages
+WHERE producer_name = 'dev.kamu.domain.flow-system.FlowProcessStateProjector';
+
 /* ------------------------------ */

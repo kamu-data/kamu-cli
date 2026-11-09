@@ -21,6 +21,11 @@ workspace = true
 doctest = false
 
 
+[features]
+testing = [
+]
+
+
 [dependencies]
 database-common = { workspace = true }
 kamu-accounts = { workspace = true }
@@ -52,6 +57,9 @@ uuid = { version = "1", default-features = false }
 
 [dev-dependencies]
 kamu-accounts = { workspace = true, features = [
+    "testing",
+] }
+kamu-adapter-flight-sql = { workspace = true, features = [
     "testing",
 ] }
 kamu-core = { workspace = true, features = [

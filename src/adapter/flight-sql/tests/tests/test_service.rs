@@ -23,6 +23,7 @@ use kamu_accounts::{
     MockAuthenticationService,
     Principal,
 };
+use kamu_adapter_flight_sql::testing::{SessionManagerSingleton, SessionManagerSingletonState};
 use kamu_adapter_flight_sql::*;
 use kamu_core::{MockQueryService, QueryService};
 use odf::utils::data::DataFrameExt;
