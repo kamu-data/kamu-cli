@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use database_common::PostgresTransactionManager;
-use database_common_macros::database_transactional_test;
+use database_common_macros::{database_concurrent_transactions_test, database_transactional_test};
 use dill::{Catalog, CatalogBuilder};
 use kamu_resources_postgres::{
     PostgresResourceLabelProjectionRepository,
@@ -54,6 +54,14 @@ database_transactional_test!(
 database_transactional_test!(
     storage = postgres,
     fixture = label_projection_repo_suite::test_entries_isolated_by_resource_id,
+    harness = PostgresResourceLabelProjectionRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_concurrent_transactions_test!(
+    storage = postgres,
+    fixture = label_projection_repo_suite::test_rolled_back_replace_keeps_previous_entries,
     harness = PostgresResourceLabelProjectionRepositoryHarness
 );
 

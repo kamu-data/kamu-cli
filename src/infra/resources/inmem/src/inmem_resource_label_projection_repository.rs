@@ -7,26 +7,56 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::collections::HashMap;
-use std::sync::Mutex;
+use std::sync::Arc;
 
+use database_common::{
+    InMemoryTransactionParticipant,
+    InMemoryTransactionalMap,
+    TransactionId,
+    TransactionRef,
+    in_memory_transaction_participant,
+};
 use dill::*;
 use internal_error::InternalError;
 use kamu_resources::{ResourceID, ResourceLabelProjectionRepository};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Default)]
+pub struct InMemoryResourceLabelProjectionState {
+    entries_by_resource_id: InMemoryTransactionalMap<ResourceID, Vec<(String, String)>>,
+}
+
+#[component(pub)]
+#[interface(dyn InMemoryTransactionParticipant)]
+#[scope(Singleton)]
+impl InMemoryResourceLabelProjectionState {
+    pub fn new() -> Self {
+        Self {
+            entries_by_resource_id: InMemoryTransactionalMap::new(),
+        }
+    }
+}
+
+in_memory_transaction_participant!(InMemoryResourceLabelProjectionState, entries_by_resource_id);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 pub struct InMemoryResourceLabelProjectionRepository {
-    entries_by_resource_id: Mutex<HashMap<ResourceID, Vec<(String, String)>>>,
+    state: Arc<InMemoryResourceLabelProjectionState>,
+    transaction_id: Option<TransactionId>,
 }
 
 #[component(pub)]
 #[interface(dyn ResourceLabelProjectionRepository)]
-#[scope(Singleton)]
 impl InMemoryResourceLabelProjectionRepository {
-    pub fn new() -> Self {
-        Self::default()
+    pub fn new(
+        state: Arc<InMemoryResourceLabelProjectionState>,
+        transaction_ref: Option<TransactionRef>,
+    ) -> Self {
+        Self {
+            state,
+            transaction_id: transaction_ref.map(|transaction_ref| transaction_ref.id()),
+        }
     }
 }
 
@@ -39,15 +69,17 @@ impl ResourceLabelProjectionRepository for InMemoryResourceLabelProjectionReposi
         resource_id: &ResourceID,
         entries: &[(String, String)],
     ) -> Result<(), InternalError> {
-        let mut guard = self.entries_by_resource_id.lock().unwrap();
-
-        if entries.is_empty() {
-            guard.remove(resource_id);
-        } else {
-            let mut sorted_entries = entries.to_vec();
-            sorted_entries.sort();
-            guard.insert(*resource_id, sorted_entries);
-        }
+        self.state
+            .entries_by_resource_id
+            .write(self.transaction_id, |entries_by_resource_id| {
+                if entries.is_empty() {
+                    entries_by_resource_id.delete(*resource_id);
+                } else {
+                    let mut sorted_entries = entries.to_vec();
+                    sorted_entries.sort();
+                    entries_by_resource_id.put(*resource_id, sorted_entries);
+                }
+            });
 
         Ok(())
     }
@@ -56,9 +88,15 @@ impl ResourceLabelProjectionRepository for InMemoryResourceLabelProjectionReposi
         &self,
         resource_id: &ResourceID,
     ) -> Result<Vec<(String, String)>, InternalError> {
-        let guard = self.entries_by_resource_id.lock().unwrap();
-
-        Ok(guard.get(resource_id).cloned().unwrap_or_default())
+        Ok(self
+            .state
+            .entries_by_resource_id
+            .read(self.transaction_id, |entries_by_resource_id| {
+                entries_by_resource_id
+                    .get(resource_id)
+                    .cloned()
+                    .unwrap_or_default()
+            }))
     }
 }
 

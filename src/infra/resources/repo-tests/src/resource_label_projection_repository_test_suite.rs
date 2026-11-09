@@ -9,6 +9,7 @@
 
 use std::sync::LazyLock;
 
+use database_common::testing::{in_committed_transaction, in_rolled_back_transaction};
 use dill::Catalog;
 use kamu_resources::{ResourceID, ResourceLabelProjectionRepository, ResourceRepository, TypeUri};
 
@@ -158,6 +159,43 @@ pub async fn test_entries_isolated_by_resource_id(catalog: &Catalog) {
         repo.find_entries(&id_b).await.unwrap(),
         vec![("env".to_string(), "staging".to_string())]
     );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_rolled_back_replace_keeps_previous_entries(catalog: &Catalog) {
+    let id = in_committed_transaction(catalog, |catalog| async move {
+        let id = create_test_resource(&catalog, "rolled-back-labels").await;
+        catalog
+            .get_one::<dyn ResourceLabelProjectionRepository>()
+            .unwrap()
+            .replace_entries(&id, &[("env".to_string(), "prod".to_string())])
+            .await
+            .unwrap();
+        id
+    })
+    .await;
+
+    in_rolled_back_transaction(catalog, |catalog| async move {
+        catalog
+            .get_one::<dyn ResourceLabelProjectionRepository>()
+            .unwrap()
+            .replace_entries(&id, &[])
+            .await
+            .unwrap();
+    })
+    .await;
+
+    let entries = in_committed_transaction(catalog, |catalog| async move {
+        catalog
+            .get_one::<dyn ResourceLabelProjectionRepository>()
+            .unwrap()
+            .find_entries(&id)
+            .await
+            .unwrap()
+    })
+    .await;
+    assert_eq!(entries, vec![("env".to_string(), "prod".to_string())]);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
