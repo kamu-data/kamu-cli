@@ -454,6 +454,7 @@ impl ReconcileTestHarness {
         let base = ResourceUseCaseBaseHarness::new_with_opts(ResourceUseCaseBaseHarnessOpts {
             base_opts: BaseResourceServiceHarnessOpts {
                 outbox_provider: OutboxProvider::Dispatching,
+                ..Default::default()
             },
             controller_provider,
             sanitizer: SanitizerKind::None,

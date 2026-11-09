@@ -12,7 +12,7 @@ use dill::{Catalog, CatalogBuilder};
 use kamu_accounts_inmem::InMemoryAccountRepository;
 use kamu_configuration_inmem::InMemoryVariableSetProjectionRepository;
 use kamu_configuration_repo_tests::variable_set_projection_repository_test_suite as variable_set_repo;
-use kamu_resources_inmem::InMemoryResourceRepository;
+use kamu_resources_inmem::{InMemoryResourceRepository, InMemoryResourceState};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -119,6 +119,7 @@ struct InMemoryVariableSetProjectionRepositoryHarness {
 impl InMemoryVariableSetProjectionRepositoryHarness {
     pub fn new() -> Self {
         let mut catalog_builder = CatalogBuilder::new();
+        catalog_builder.add::<InMemoryResourceState>();
         catalog_builder.add::<InMemoryResourceRepository>();
         catalog_builder.add::<InMemoryAccountRepository>();
         catalog_builder.add::<InMemoryVariableSetProjectionRepository>();

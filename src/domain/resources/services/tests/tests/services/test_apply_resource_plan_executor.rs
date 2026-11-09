@@ -291,6 +291,7 @@ impl ApplyResourcePlanExecutorHarness {
     fn new(mock_outbox: MockOutbox) -> Self {
         let base = BaseResourceServiceHarness::new_with_opts(BaseResourceServiceHarnessOpts {
             outbox_provider: OutboxProvider::Mock(mock_outbox),
+            ..Default::default()
         });
 
         let mut b = CatalogBuilder::new_chained(base.catalog());

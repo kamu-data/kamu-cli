@@ -12,6 +12,12 @@ use std::sync::LazyLock;
 
 use chrono::{DateTime, TimeZone, Utc};
 use database_common::PaginationOpts;
+use database_common::testing::{
+    RacingTransactionOutcome,
+    in_committed_transaction,
+    in_rolled_back_transaction,
+    race_transactions,
+};
 use dill::Catalog;
 use event_sourcing::EventID;
 use futures::TryStreamExt;
@@ -3558,6 +3564,79 @@ pub async fn test_find_resource_ids_by_schema_and_label_any_account_discriminate
         vec![wanted],
         "spanning accounts must not relax the liveness or label-pair filters"
     );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_rolled_back_create_leaves_no_resource(catalog: &Catalog) {
+    let account_handle = odf::ResourceOwnerHandle::new_test("test-account");
+    let snapshot = make_test_snapshot(&account_handle, &TEST_KIND, "rolled-back");
+    let id = snapshot.id;
+
+    in_rolled_back_transaction(catalog, |catalog| async move {
+        let repo = catalog.get_one::<dyn ResourceRepository>().unwrap();
+        repo.create_resource(&snapshot).await.unwrap();
+    })
+    .await;
+
+    let (found, found_id) = in_committed_transaction(catalog, |catalog| async move {
+        let repo = catalog.get_one::<dyn ResourceRepository>().unwrap();
+        let found = repo.find_resource_snapshot_by_id(&id).await.unwrap();
+        let found_id = repo
+            .find_resource_id_by_name(
+                &account_handle.did,
+                &TEST_KIND,
+                &"rolled-back".parse().unwrap(),
+            )
+            .await
+            .unwrap();
+        (found, found_id)
+    })
+    .await;
+    assert_eq!(found, None);
+    assert_eq!(found_id, None);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_create_same_name_in_concurrent_transactions(catalog: &Catalog) {
+    let account_handle = odf::ResourceOwnerHandle::new_test("test-account");
+    let first = make_test_snapshot(&account_handle, &TEST_KIND, "contested");
+    let second = make_test_snapshot(&account_handle, &TEST_KIND, "contested");
+    let first_id = first.id;
+
+    let outcome = race_transactions(
+        catalog,
+        |catalog| async move {
+            let repo = catalog.get_one::<dyn ResourceRepository>().unwrap();
+            repo.create_resource(&first).await.unwrap();
+        },
+        move |catalog| async move {
+            let repo = catalog.get_one::<dyn ResourceRepository>().unwrap();
+            repo.create_resource(&second).await
+        },
+    )
+    .await;
+
+    assert_matches!(
+        outcome,
+        RacingTransactionOutcome::FailedAtWrite(CreateResourceError::Duplicate(_))
+            | RacingTransactionOutcome::FailedAtCommit(_)
+    );
+    let committed_id = in_committed_transaction(catalog, |catalog| async move {
+        catalog
+            .get_one::<dyn ResourceRepository>()
+            .unwrap()
+            .find_resource_id_by_name(
+                &account_handle.did,
+                &TEST_KIND,
+                &"contested".parse().unwrap(),
+            )
+            .await
+            .unwrap()
+    })
+    .await;
+    assert_eq!(committed_id, Some(first_id));
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
