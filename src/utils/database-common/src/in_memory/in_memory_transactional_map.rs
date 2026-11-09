@@ -33,7 +33,8 @@ use crate::{
 /// commit fails with a conflict. In Postgres the later writer would wait for
 /// the first and fail its own check, such as a compare-and-set. Where Postgres
 /// lets the later writer apply its change after the first instead, the change
-/// is made with [`InMemoryMapWrite::overwrite`] (an upsert) or
+/// is made with [`InMemoryMapWrite::overwrite`] (an upsert replacing the
+/// value), [`InMemoryMapWrite::upsert`] (an upsert updating it) or
 /// [`InMemoryMapWrite::update`] (an `UPDATE` of an existing row).
 ///
 /// Conflicts are found per key only, so unlike a database:
@@ -116,7 +117,7 @@ where
                 }
                 let conflicts = match change.on_concurrent_commit {
                     OnConcurrentCommit::Fail => true,
-                    OnConcurrentCommit::Overwrite => false,
+                    OnConcurrentCommit::Overwrite | OnConcurrentCommit::Upsert { .. } => false,
                     OnConcurrentCommit::Reapply(_) => !state.committed.contains_key(key),
                 };
                 if conflicts {
@@ -227,8 +228,9 @@ impl<K: Eq + Hash, V> InMemoryMapWrite<'_, K, V> {
         self.change(key, ChangedValue::Put(value), OnConcurrentCommit::Fail);
     }
 
-    /// Puts the value as a database upsert does: a key another transaction
-    /// commits meanwhile is overwritten at commit instead of failing it
+    /// Puts the value as a database upsert replacing the row does: a key
+    /// another transaction commits meanwhile is overwritten at commit instead
+    /// of failing it
     pub fn overwrite(&mut self, key: K, value: V) {
         self.change(key, ChangedValue::Put(value), OnConcurrentCommit::Overwrite);
     }
@@ -248,6 +250,30 @@ impl<K: Eq + Hash, V> InMemoryMapWrite<'_, K, V> {
             OnConcurrentCommit::Reapply(vec![Box::new(update)]),
         );
         true
+    }
+
+    /// Inserts `value`, or replaces the value the transaction sees with
+    /// `update` of it, as a database `INSERT ... ON CONFLICT DO UPDATE` does:
+    /// if another transaction commits the key meanwhile, `update` is applied
+    /// to that transaction's value at commit, and if it deleted the key,
+    /// `value` is inserted. The commit never fails on this key
+    pub fn upsert(&mut self, key: K, value: V, update: impl Fn(&V) -> V + Send + 'static)
+    where
+        V: Clone,
+    {
+        let seen = match self.view().get(&key) {
+            Some(current) => update(current),
+            None => value.clone(),
+        };
+        self.change(
+            key,
+            ChangedValue::Put(seen),
+            OnConcurrentCommit::Upsert {
+                insert: value,
+                update: Box::new(update),
+                later_updates: Vec::new(),
+            },
+        );
     }
 
     pub fn delete(&mut self, key: K) {
@@ -390,9 +416,25 @@ impl<V> Change<V> {
                 }
                 updated.map_or(self.value, ChangedValue::Put)
             }
+            OnConcurrentCommit::Upsert {
+                insert,
+                update,
+                later_updates,
+            } if moved => {
+                let base = match committed {
+                    Some(committed) => update(committed),
+                    None => insert,
+                };
+                ChangedValue::Put(
+                    later_updates
+                        .iter()
+                        .fold(base, |value, later_update| later_update(&value)),
+                )
+            }
             OnConcurrentCommit::Fail
             | OnConcurrentCommit::Overwrite
-            | OnConcurrentCommit::Reapply(_) => self.value,
+            | OnConcurrentCommit::Reapply(_)
+            | OnConcurrentCommit::Upsert { .. } => self.value,
         }
     }
 }
@@ -406,6 +448,13 @@ enum OnConcurrentCommit<V> {
     /// Applies the updates, in order, to the other transaction's value; fails
     /// if that transaction deleted the key
     Reapply(Vec<ValueUpdate<V>>),
+    /// Applies `update` to the other transaction's value, or inserts `insert`
+    /// if that transaction deleted the key; then applies the later updates
+    Upsert {
+        insert: V,
+        update: ValueUpdate<V>,
+        later_updates: Vec<ValueUpdate<V>>,
+    },
 }
 
 /// A change of a value computed from the value it replaces
@@ -422,8 +471,54 @@ impl<V> OnConcurrentCommit<V> {
                 updates.extend(later_updates);
                 Self::Reapply(updates)
             }
-            (Self::Overwrite | Self::Reapply(_), Self::Overwrite)
-            | (Self::Overwrite, Self::Reapply(_)) => Self::Overwrite,
+            // The key exists after the first upsert, so a later upsert only
+            // updates it
+            (
+                Self::Upsert {
+                    insert,
+                    update,
+                    mut later_updates,
+                },
+                Self::Upsert {
+                    update: later_update,
+                    ..
+                },
+            ) => {
+                later_updates.push(later_update);
+                Self::Upsert {
+                    insert,
+                    update,
+                    later_updates,
+                }
+            }
+            (
+                Self::Upsert {
+                    insert,
+                    update,
+                    mut later_updates,
+                },
+                Self::Reapply(updates),
+            ) => {
+                later_updates.extend(updates);
+                Self::Upsert {
+                    insert,
+                    update,
+                    later_updates,
+                }
+            }
+            // The key existed at the first update, which fails on a delete
+            (
+                Self::Reapply(mut updates),
+                Self::Upsert {
+                    update: later_update,
+                    ..
+                },
+            ) => {
+                updates.push(later_update);
+                Self::Reapply(updates)
+            }
+            (Self::Overwrite | Self::Reapply(_) | Self::Upsert { .. }, Self::Overwrite)
+            | (Self::Overwrite, Self::Reapply(_) | Self::Upsert { .. }) => Self::Overwrite,
         }
     }
 }
@@ -616,6 +711,52 @@ mod tests {
         harness.commit(first);
 
         assert_matches!(harness.check_commit(second), Err(_));
+    }
+
+    #[test]
+    fn test_upserts_of_a_missing_key_in_concurrent_transactions_both_apply() {
+        let harness = MapHarness::with_committed(&[]);
+        let first = harness.begin();
+        let second = harness.begin();
+        harness.map.write(Some(first), |write| {
+            write.upsert("a", 20, |value| *value.max(&20));
+        });
+        harness.map.write(Some(second), |write| {
+            write.upsert("a", 10, |value| *value.max(&10));
+        });
+
+        harness.commit(first);
+        harness.commit(second);
+
+        pretty_assertions::assert_eq!(harness.entries(None), [("a", 20)]);
+    }
+
+    #[test]
+    fn test_upsert_updates_a_value_the_transaction_sees() {
+        let harness = MapHarness::with_committed(&[("a", 1)]);
+        let transaction = harness.begin();
+
+        harness.map.write(Some(transaction), |write| {
+            write.upsert("a", 10, |value| value + 5);
+        });
+
+        pretty_assertions::assert_eq!(harness.get(Some(transaction), "a"), Some(6));
+    }
+
+    #[test]
+    fn test_upsert_inserts_its_value_over_a_key_another_transaction_deleted() {
+        let harness = MapHarness::with_committed(&[("a", 1)]);
+        let first = harness.begin();
+        let second = harness.begin();
+        harness.map.write(Some(first), |write| write.delete("a"));
+        harness.map.write(Some(second), |write| {
+            write.upsert("a", 10, |value| value + 5);
+        });
+
+        harness.commit(first);
+        harness.commit(second);
+
+        pretty_assertions::assert_eq!(harness.entries(None), [("a", 10)]);
     }
 
     #[test]

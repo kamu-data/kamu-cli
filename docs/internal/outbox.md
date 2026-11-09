@@ -421,7 +421,7 @@ the catch-up reads, which then delivers the released rows, or leaves the answer 
 | --- | --- | --- | --- |
 | Postgres | `kamu-messaging-outbox-postgres` | `(tx_id xid8, message_id)`, index `idx_om_tx_order` | `outbox_notify` trigger → `outbox_messages_ready` |
 | SQLite | `kamu-messaging-outbox-sqlite` | `message_id` only (`tx_id` is always `0`): one connection, so transactions never interleave | `SqlitePollingHub`: `SELECT MAX(message_id)` |
-| In-memory | `kamu-messaging-outbox-inmem` | `message_id` only | `InMemoryWakeupHub` signal on push |
+| In-memory | `kamu-messaging-outbox-inmem` | `message_id`; under `InMemoryTransactionManager`, read only below another open transaction's lowest ID | `InMemoryWakeupHub` signal on commit, or on push outside a transaction |
 
 Tables: `outbox_messages(message_id, producer_name, content_json, occurred_on, version, tx_id)` and
 `outbox_message_consumptions(consumer_name, producer_name, last_consumed_message_id, last_tx_id)`.
