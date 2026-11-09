@@ -11,7 +11,13 @@ use event_sourcing::ConcurrentModificationError;
 use internal_error::{ErrorIntoInternal, InternalError};
 use thiserror::Error;
 
-use crate::{DeclarativeResource, FindOwnedResourceError, ResourceID};
+use crate::{
+    DeclarativeResource,
+    EventSourcedResource,
+    FindOwnedResourceError,
+    ResourceID,
+    ResourceLifecycleTransitionError,
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -50,6 +56,34 @@ impl From<FindOwnedResourceError> for RequestResourcesDeletionError {
             FindOwnedResourceError::Access(err) => Self::Access(err),
             FindOwnedResourceError::TypeMismatch(err) => Self::Internal(err.int_err()),
             FindOwnedResourceError::Internal(err) => Self::Internal(err),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl<R> From<ResourceLifecycleTransitionError<R>> for RequestResourcesDeletionError
+where
+    R: EventSourcedResource,
+    R::LifecycleError: std::fmt::Display,
+{
+    fn from(err: ResourceLifecycleTransitionError<R>) -> Self {
+        use ResourceLifecycleTransitionError as E;
+
+        match err {
+            E::ConcurrentModification(err) => Self::ConcurrentModification(err),
+            E::LoadFailed(err) => Self::Internal(
+                format!("{err}")
+                    .int_err()
+                    .with_context("Failed to load resources"),
+            ),
+            E::Lifecycle(err) => Self::Internal(
+                format!("{err}")
+                    .int_err()
+                    .with_context("Failed to request deletion of resources"),
+            ),
+            E::Stale(err) => Self::Internal(err.int_err()),
+            E::Internal(err) => Self::Internal(err),
         }
     }
 }

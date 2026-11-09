@@ -10,11 +10,15 @@
 mod generic_resource_query_service;
 mod resource_aggregate_loader;
 mod resource_controller;
+mod resource_lifecycle_primitives;
+mod resource_lifecycle_transition_error;
 mod resource_persistence_service;
 mod typed_resource_query_service;
 
 pub use generic_resource_query_service::*;
 pub use resource_aggregate_loader::*;
 pub use resource_controller::*;
+pub use resource_lifecycle_primitives::*;
+pub use resource_lifecycle_transition_error::*;
 pub use resource_persistence_service::*;
 pub use typed_resource_query_service::*;

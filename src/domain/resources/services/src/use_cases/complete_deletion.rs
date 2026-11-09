@@ -10,26 +10,21 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use internal_error::{ErrorIntoInternal, InternalError};
-use messaging_outbox::{Outbox, OutboxExt};
-use serde::Serialize;
-use time_source::SystemTimeSource;
+use internal_error::InternalError;
 
 use crate::domain::{
     CompleteResourceDeletionUseCaseError,
-    DeclarativeResource,
     EventSourcedResource,
-    InvariantViolationOf,
-    MESSAGE_PRODUCER_KAMU_RESOURCE_SERVICE,
     ResourceAggregateLoader,
     ResourceCleanupError,
+    ResourceCleanupFailure,
     ResourceController,
+    ResourceDeletionCompletion,
     ResourceID,
-    ResourceLifecycleMessage,
+    ResourceLifecyclePrimitives,
     ResourceLoadError,
-    ResourcePersistenceService,
-    ResourceSchemaProvider,
-    StatusConflictOf,
+    ResourceTransitionSkip,
+    ResourceTransitionSkipReason,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -62,35 +57,26 @@ impl<R: EventSourcedResource> From<InternalError> for ResourceCleanupTransaction
 
 pub struct CompleteResourceDeletionUseCaseHelper<'a, R>
 where
-    R: EventSourcedResource + ResourceSchemaProvider,
+    R: EventSourcedResource,
 {
     resource_aggregate_loader: &'a dyn ResourceAggregateLoader<R>,
-    resource_persistence_service: &'a dyn ResourcePersistenceService<R>,
-    outbox: &'a dyn Outbox,
+    lifecycle_primitives: &'a dyn ResourceLifecyclePrimitives<R>,
     controller: &'a dyn ResourceController<R>,
-    time_source: &'a dyn SystemTimeSource,
 }
 
 impl<'a, R> CompleteResourceDeletionUseCaseHelper<'a, R>
 where
-    R: EventSourcedResource + ResourceSchemaProvider,
-    R::LifecycleError:
-        InvariantViolationOf<<R as DeclarativeResource>::ResourceState> + std::fmt::Display,
-    R::Spec: Serialize,
+    R: EventSourcedResource,
 {
     pub fn new(
         resource_aggregate_loader: &'a dyn ResourceAggregateLoader<R>,
-        resource_persistence_service: &'a dyn ResourcePersistenceService<R>,
-        outbox: &'a dyn Outbox,
+        lifecycle_primitives: &'a dyn ResourceLifecyclePrimitives<R>,
         controller: &'a dyn ResourceController<R>,
-        time_source: &'a dyn SystemTimeSource,
     ) -> Self {
         Self {
             resource_aggregate_loader,
-            resource_persistence_service,
-            outbox,
+            lifecycle_primitives,
             controller,
-            time_source,
         }
     }
 
@@ -139,84 +125,73 @@ where
     /// Runs within one transaction: the outcomes and the `Deleted` message of
     /// the completed deletions commit together. A resource whose deletion
     /// completed meanwhile is skipped, and so is a failed cleanup of a resource
-    /// whose status another writer updated since.
+    /// whose status another writer updated since. When the same resource was
+    /// cleaned up more than once, its last attempt counts.
     pub async fn record_outcomes(
         &self,
         attempts: &[ResourceCleanupAttempt],
     ) -> Result<(), CompleteResourceDeletionUseCaseError<R>> {
-        let now = self.time_source.now();
-        let attempts_by_id = attempts
-            .iter()
-            .map(|attempt| (attempt.id, attempt))
-            .collect::<HashMap<_, _>>();
-        let ids = attempts_by_id.keys().copied().collect::<Vec<_>>();
-
-        let mut changed = Vec::new();
-        for mut resource in self.load_many(&ids).await? {
-            let attempt = attempts_by_id[resource.id()];
-            if !resource.needs_cleanup() {
-                continue;
-            }
-
-            let outcome = match &attempt.failure {
-                None => resource.try_complete_deletion(now),
-                Some(err) => resource.try_mark_cleanup_failed(now, attempt.status_generation, err),
-            };
-            match outcome {
-                Ok(()) => changed.push(resource),
-                Err(err) if err.as_status_conflict().is_some() => {
-                    tracing::info!(
-                        resource_id = %attempt.id,
-                        error = %err,
-                        "Skipping cleanup outcome: status was updated concurrently"
-                    );
-                }
-                Err(err) => return Err(CompleteResourceDeletionUseCaseError::Lifecycle(err)),
+        let mut completions = Vec::new();
+        let mut failures = Vec::new();
+        for attempt in last_attempt_per_resource(attempts) {
+            match &attempt.failure {
+                None => completions.push(ResourceDeletionCompletion {
+                    id: attempt.id,
+                    expected_status_generation: None,
+                }),
+                Some(error) => failures.push(ResourceCleanupFailure {
+                    id: attempt.id,
+                    expected_status_generation: attempt.status_generation,
+                    error: Arc::clone(error),
+                }),
             }
         }
 
-        if changed.is_empty() {
-            return Ok(());
-        }
-
-        self.resource_persistence_service
-            .save_many(&mut changed)
+        // Failures first, so the `Deleted` message is the last write
+        let failed = self
+            .lifecycle_primitives
+            .record_cleanup_failure(&failures)
+            .await?;
+        let completed = self
+            .lifecycle_primitives
+            .complete_deletion(&completions)
             .await?;
 
-        let deleted = changed
-            .iter()
-            .filter(|resource| resource.headers().deleted_at.is_some())
-            .map(EventSourcedResource::make_resource_snapshot)
-            .collect::<Result<Vec<_>, _>>()?;
-
-        if deleted.is_empty() {
-            return Ok(());
+        for skip in failed.skipped.iter().chain(&completed.skipped) {
+            log_skipped_outcome(skip);
         }
 
-        self.outbox
-            .post_message(
-                MESSAGE_PRODUCER_KAMU_RESOURCE_SERVICE,
-                ResourceLifecycleMessage::deleted(now, deleted),
-            )
-            .await
-            .map_err(CompleteResourceDeletionUseCaseError::Internal)
+        Ok(())
     }
+}
 
-    async fn load_many(
-        &self,
-        ids: &[ResourceID],
-    ) -> Result<Vec<R>, CompleteResourceDeletionUseCaseError<R>> {
-        self.resource_aggregate_loader
-            .load_many(ids)
-            .await
-            .map_err(|err| CompleteResourceDeletionUseCaseError::Internal(err.int_err()))?
-            .into_iter()
-            .map(|result| {
-                result
-                    .map_err(ResourceLoadError)
-                    .map_err(CompleteResourceDeletionUseCaseError::LoadFailed)
-            })
-            .collect()
+/// The batch primitives take each resource at most once
+fn last_attempt_per_resource(
+    attempts: &[ResourceCleanupAttempt],
+) -> impl Iterator<Item = &ResourceCleanupAttempt> {
+    let last_index_by_id = attempts
+        .iter()
+        .enumerate()
+        .map(|(index, attempt)| (attempt.id, index))
+        .collect::<HashMap<_, _>>();
+
+    attempts
+        .iter()
+        .enumerate()
+        .filter(move |(index, attempt)| last_index_by_id[&attempt.id] == *index)
+        .map(|(_, attempt)| attempt)
+}
+
+fn log_skipped_outcome(skip: &ResourceTransitionSkip) {
+    match skip.reason {
+        ResourceTransitionSkipReason::NotAwaitingCleanup => {}
+        ResourceTransitionSkipReason::StatusConflict(conflict) => {
+            tracing::info!(
+                resource_id = %skip.id,
+                error = %conflict,
+                "Skipping cleanup outcome: status was updated concurrently"
+            );
+        }
     }
 }
 
@@ -319,19 +294,16 @@ macro_rules! declare_complete_resource_deletion_use_case {
         #[dill::interface(dyn kamu_resources::CompleteResourceDeletionUseCase<$resource>)]
         pub struct $use_case {
             catalog: dill::Catalog,
-            time_source: std::sync::Arc<dyn time_source::SystemTimeSource>,
         }
 
         impl $use_case {
-            #[::database_common_macros::transactional_method4(
+            #[::database_common_macros::transactional_method3(
                         resource_aggregate_loader:
                             std::sync::Arc<dyn kamu_resources::ResourceAggregateLoader<$resource>>,
-                        resource_persistence_service:
-                            std::sync::Arc<dyn kamu_resources::ResourcePersistenceService<$resource>>,
+                        lifecycle_primitives:
+                            std::sync::Arc<dyn kamu_resources::ResourceLifecyclePrimitives<$resource>>,
                         controller:
-                            std::sync::Arc<dyn kamu_resources::ResourceController<$resource>>,
-                        outbox:
-                            std::sync::Arc<dyn $crate::messaging_outbox::Outbox>
+                            std::sync::Arc<dyn kamu_resources::ResourceController<$resource>>
                     )]
             async fn cleanup_in_transaction(
                 &self,
@@ -342,24 +314,20 @@ macro_rules! declare_complete_resource_deletion_use_case {
             > {
                 let helper = $crate::CompleteResourceDeletionUseCaseHelper::<$resource>::new(
                     resource_aggregate_loader.as_ref(),
-                    resource_persistence_service.as_ref(),
-                    outbox.as_ref(),
+                    lifecycle_primitives.as_ref(),
                     controller.as_ref(),
-                    self.time_source.as_ref(),
                 );
 
                 helper.cleanup(id).await
             }
 
-            #[::database_common_macros::transactional_method4(
+            #[::database_common_macros::transactional_method3(
                         resource_aggregate_loader:
                             std::sync::Arc<dyn kamu_resources::ResourceAggregateLoader<$resource>>,
-                        resource_persistence_service:
-                            std::sync::Arc<dyn kamu_resources::ResourcePersistenceService<$resource>>,
+                        lifecycle_primitives:
+                            std::sync::Arc<dyn kamu_resources::ResourceLifecyclePrimitives<$resource>>,
                         controller:
-                            std::sync::Arc<dyn kamu_resources::ResourceController<$resource>>,
-                        outbox:
-                            std::sync::Arc<dyn $crate::messaging_outbox::Outbox>
+                            std::sync::Arc<dyn kamu_resources::ResourceController<$resource>>
                     )]
             async fn record_in_transaction(
                 &self,
@@ -367,10 +335,8 @@ macro_rules! declare_complete_resource_deletion_use_case {
             ) -> Result<(), kamu_resources::CompleteResourceDeletionUseCaseError<$resource>> {
                 let helper = $crate::CompleteResourceDeletionUseCaseHelper::<$resource>::new(
                     resource_aggregate_loader.as_ref(),
-                    resource_persistence_service.as_ref(),
-                    outbox.as_ref(),
+                    lifecycle_primitives.as_ref(),
                     controller.as_ref(),
-                    self.time_source.as_ref(),
                 );
 
                 helper.record_outcomes(&attempts).await

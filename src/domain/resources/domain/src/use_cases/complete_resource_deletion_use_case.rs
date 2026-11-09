@@ -10,7 +10,13 @@
 use event_sourcing::ConcurrentModificationError;
 use internal_error::{ErrorIntoInternal, InternalError};
 
-use crate::{EventSourcedResource, ResourceID, ResourceLoadError, ResourcePersistenceError};
+use crate::{
+    EventSourcedResource,
+    ResourceID,
+    ResourceLifecycleTransitionError,
+    ResourceLoadError,
+    ResourcePersistenceError,
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -62,6 +68,27 @@ where
             }
             ResourcePersistenceError::InvalidDurableState(err) => Self::Internal(err.int_err()),
             ResourcePersistenceError::Internal(err) => Self::Internal(err),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Recording cleanup outcomes skips resources whose expectations no longer
+/// hold, so a stale expectation reaches it only as an internal error
+impl<R> From<ResourceLifecycleTransitionError<R>> for CompleteResourceDeletionUseCaseError<R>
+where
+    R: EventSourcedResource,
+{
+    fn from(err: ResourceLifecycleTransitionError<R>) -> Self {
+        use ResourceLifecycleTransitionError as E;
+
+        match err {
+            E::Stale(stale) => Self::Internal(stale.int_err()),
+            E::LoadFailed(err) => Self::LoadFailed(err),
+            E::ConcurrentModification(err) => Self::ConcurrentModification(err),
+            E::Lifecycle(err) => Self::Lifecycle(err),
+            E::Internal(err) => Self::Internal(err),
         }
     }
 }

@@ -599,6 +599,8 @@ This crate turns the domain traits into running code. Module layout: `services/`
 - **`ResourceAggregateLoader<R>`** — replays the event stream and projects a resource aggregate.
 - **`ResourcePersistenceService<R>`** — commits aggregate changes as events + snapshot (`create`,
   `save`, and `save_many` for one batch).
+- **`ResourceLifecyclePrimitives<R>`** — the lifecycle transitions, each joining the caller's
+  transaction ([Lifecycle primitives](#lifecycle-primitives)).
 - **`GenericResourceQueryService`** (impl `GenericResourceQueryServiceImpl`) — descriptor-agnostic
   queries (allocate UID, find by name, search identities) delegating to `ResourceRepository`.
 - **`TypedResourceQueryService<R>`** — type-safe queries for a single type.
@@ -716,6 +718,40 @@ rejected earlier. A resource whose deletion was requested is not validated, so i
 complete even when its stored extension state no longer validates. Label indexing and filtering are implemented — see
 [§10](#10-facade-kamu-resources-facade) for the resolved-filter tree and the AND-only evaluation
 boundary.
+
+### Lifecycle primitives
+
+Reconciliation and deletion transitions go through the primitives of
+[`ResourceLifecyclePrimitives<R>`](/src/domain/resources/domain/src/services/resource_lifecycle_primitives.rs).
+Each one loads the resources, checks the caller's expectations, applies the aggregate transition,
+persists its event and posts the matching lifecycle message:
+
+| Primitive | Transition | Message |
+| --- | --- | --- |
+| `begin_reconciliation(id, expected_status_generation)` | `Reconciling`, observed generation recorded | none |
+| `complete_reconciliation(id, expected)` | `Ready`, reconciled generation recorded | `ReconciliationSucceeded` |
+| `fail_reconciliation(id, expected, error)` | `Failed` or `Degraded`, `ReconciliationError` | `ReconciliationFailed` |
+| `request_deletion(ids)` | `Deleting` | one `DeletionRequested` for the batch |
+| `complete_deletion(completions)` | `Deleted`, tombstone name | one `Deleted` for the completed ones |
+| `record_cleanup_failure(failures)` | stays `Deleting`, `ReconciliationError{code: cleanup-failed}` | none |
+
+- **They join the caller's transaction.** A primitive is resolved from the transaction catalog and
+  never opens a transaction, so a caller can commit a transition together with writes of its own.
+  A rolled-back transaction leaves neither the event nor the message behind. The use cases of
+  [§13](#13-data-flow-walkthroughs) call them inside the transactions they run in.
+- **Stale expectations are typed errors.** A reconciliation outcome expects the generation and
+  status generation it started from (`ResourceExpectedVersion`). The checks run in the order an
+  outcome is discarded: a deletion request, a newer generation, then another status writer, and
+  fail with `ResourceLifecycleTransitionError::Stale` carrying the matching
+  `ResourceStaleExpectationError`. A caller can tell "someone else changed it" from a failure.
+- **Batch primitives skip instead of failing.** The deletion primitives return a
+  `ResourceBatchTransition`: the resources they transitioned, and the skipped ones with a reason
+  (`NotAwaitingCleanup`, `StatusConflict`).
+- **Completing a deletion may ignore the status.** `ResourceDeletionCompletion` takes an optional
+  expected status generation. The deletion use case passes none, so a status written during the
+  cleanup does not hold the completion back.
+- **Generated per type** by `declare_resource_lifecycle_primitives!`, part of
+  `declare_resource_service_layer!`.
 
 ---
 
@@ -1319,34 +1355,31 @@ sequenceDiagram
     participant UC as ReconcileResourceUseCase<R>
     participant L as AggregateLoader<R>
     participant Ctl as ResourceController<R>
-    participant ST as Event store + repo
-    participant OB as Outbox
+    participant P as LifecyclePrimitives<R>
 
     UC->>L: load(id)  %% needs_reconciliation()? generation not yet reconciled
-    UC->>ST: try_mark_reconciliation_started(statusGeneration) → StatusUpdated unless already Reconciling (status gen. N)
+    UC->>P: begin_reconciliation(id, statusGeneration) → StatusUpdated unless already Reconciling (status gen. N)
     UC->>Ctl: reconcile(resource)  %% e.g. SecretSet builds encrypted projection
-    UC->>L: load(id) again
-    alt deletion requested or generation moved
-        UC->>UC: discard the outcome
-    else success
-        UC->>ST: try_mark_reconciliation_succeeded(generation, N) → StatusUpdated
-        UC->>OB: produce ResourceLifecycleMessage::ReconciliationSucceeded
+    alt success
+        UC->>P: complete_reconciliation(id, generation, N) → StatusUpdated, ReconciliationSucceeded
     else failure
-        UC->>ST: try_mark_reconciliation_failed(generation, N, error) → StatusUpdated
-        UC->>OB: produce ResourceLifecycleMessage::ReconciliationFailed
+        UC->>P: fail_reconciliation(id, generation, N, error) → StatusUpdated, ReconciliationFailed
+    end
+    alt Stale: deletion requested or generation moved
+        UC->>UC: discard the outcome
     end
 ```
 
 Reconciliation runs as **two separately-committed phases**
 ([`use_cases/reconcile.rs`](/src/domain/resources/services/src/use_cases/reconcile.rs)), each writing
-the status at most once:
+the status at most once through a [lifecycle primitive](#lifecycle-primitives):
 
 - **Phase 1** commits the `Reconciling` status, a stable hand-off point, which brings
   `statusGeneration` to some N. A resource already `Reconciling` keeps its status, and N is its
   current `statusGeneration`.
-- **Phase 2** runs the `ResourceController<R>` on that resource, reloads it, and commits the outcome
-  (`Ready`, `Failed` or `Degraded`) in a separate transaction, conditional on `statusGeneration`
-  still being N.
+- **Phase 2** runs the `ResourceController<R>` on that resource, then commits the outcome (`Ready`,
+  `Failed` or `Degraded`) in a separate transaction, conditional on the generation and
+  `statusGeneration` still being the ones phase 1 left.
 - **A changed generation between the phases** (any apply between them) discards the outcome without
   saving or posting anything: it was computed for a superseded generation, and the newer `Applied`
   message reconciles again. A `ReconciliationSucceeded` message for it would also make the
@@ -1366,27 +1399,23 @@ the status at most once:
 ```mermaid
 sequenceDiagram
     participant RQ as RequestResourcesDeletionUseCase<R>
+    participant P as LifecyclePrimitives<R>
     participant OB as Outbox
     participant CD as CompleteResourceDeletionUseCase<R>
     participant Ctl as ResourceController<R>
-    participant ST as Event store + repo
 
-    RQ->>ST: try_request_deletion → DeletionRequested (Deleting)
-    RQ->>OB: produce ResourceLifecycleMessage::DeletionRequested (one per batch)
+    RQ->>P: request_deletion(ids) → DeletionRequested (Deleting)
+    P->>OB: produce ResourceLifecycleMessage::DeletionRequested (one per batch)
     OB->>CD: execute(ids), through the lifecycle dispatcher
     loop each resource that needs cleanup, in a transaction of its own
         CD->>Ctl: cleanup(resource)  %% e.g. VariableSet drops its projection entries
         Note over CD,Ctl: a failed cleanup rolls its transaction back
     end
-    loop each cleanup outcome, all in one transaction
-        alt cleaned up
-            CD->>CD: try_complete_deletion → Deleted (tombstone name)
-        else cleanup failed
-            CD->>CD: try_mark_cleanup_failed → StatusUpdated (cleanup-failed)
-        end
+    rect rgba(100, 150, 255, 0.15)
+        CD->>P: record_cleanup_failure(failed) → StatusUpdated (cleanup-failed)
+        CD->>P: complete_deletion(cleaned up) → Deleted (tombstone name)
+        P->>OB: produce ResourceLifecycleMessage::Deleted (completed deletions)
     end
-    CD->>ST: save the batch
-    CD->>OB: produce ResourceLifecycleMessage::Deleted (completed deletions)
 ```
 
 Deletion runs in two steps, as the ODF resource framework defines them
@@ -1402,7 +1431,8 @@ Deletion runs in two steps, as the ODF resource framework defines them
   message delivered twice completes a deletion once.
 - **Each cleanup runs in a transaction of its own**, so a failing one, a database error included,
   holds back only its resource and discards whatever the controller wrote before failing. The
-  outcomes are then recorded in one transaction, so one `Deleted` message covers the batch. A
+  outcomes are then recorded in one transaction, failures first and completions last, so one
+  `Deleted` message covers the batch. A
   concurrent modification of any resource in it rolls that transaction back; the outcomes are then
   recorded one by one, and a conflict there is logged and skipped: the other writer completes the
   deletion or requests it again. The orchestration lives in `CompleteResourceDeletionPhases`, which
