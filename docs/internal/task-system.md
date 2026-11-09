@@ -201,10 +201,8 @@ Why the split:
   `from_task_error`. The `recoverable` flag is the one property the flow system reads generically
   (see [§8](#8-failure-handling)).
 
-`TaskError`'s deserializer also accepts two legacy forms: a bare `"Empty"` string, read as a
-recoverable empty error, and a map without `recoverable`, read as unrecoverable. The serializer
-writes neither, and the migration `20261028093236_wipe_task_and_flow_run_history` removed the task
-history and outbox messages that held them.
+A stored `TaskError` is a map of its error type to the payload, plus a required `recoverable`
+flag.
 
 ### Dispatch
 

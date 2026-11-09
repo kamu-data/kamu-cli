@@ -27,11 +27,7 @@ impl HeadCommitTaskOutcome for HeadCommit {
             Self::Committed => None,
             Self::DatasetDeleted => Some(dataset_deleted_outcome(dataset_handle)),
             Self::HeadMoved(e) => Some(head_moved_outcome(dataset_handle.id.clone(), Some(e))),
-            // Retrying under the same account cannot gain the access
-            Self::NotAllowed(e) => {
-                tracing::error!(error = ?e, error_msg = %e, "Not allowed to commit the task's head");
-                Some(TaskOutcome::Failed(TaskError::empty_unrecoverable()))
-            }
+            Self::NotAllowed(e) => Some(head_not_allowed_outcome(&e)),
         }
     }
 }
@@ -51,6 +47,15 @@ pub(crate) fn head_moved_outcome(
         "The task's dataset head was moved concurrently"
     );
     TaskOutcome::Failed(TaskErrorDatasetCommit::HeadMoved(error).into_task_error())
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// The outcome of a task that may not move its dataset's `HEAD`: retrying
+/// under the same account cannot gain the access, so it is not retried
+pub(crate) fn head_not_allowed_outcome(error: &odf::AccessError) -> TaskOutcome {
+    tracing::error!(error = ?error, error_msg = %error, "Not allowed to move the task's head");
+    TaskOutcome::Failed(TaskError::empty_unrecoverable())
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

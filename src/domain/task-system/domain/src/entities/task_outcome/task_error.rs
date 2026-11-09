@@ -79,22 +79,7 @@ impl<'de> Deserialize<'de> for TaskError {
             type Value = TaskError;
 
             fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-                formatter.write_str(
-                    "either a string \"Empty\" or a map with error type and optional recoverable \
-                     flag",
-                )
-            }
-
-            fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
-            where
-                E: serde::de::Error,
-            {
-                // Backward compatibility: old empty results are recoverable
-                if v == TaskError::TASK_ERROR_EMPTY {
-                    Ok(TaskError::empty_recoverable())
-                } else {
-                    Err(E::custom(format!("Unknown string variant: {v}")))
-                }
+                formatter.write_str("a map with an error type and a recoverable flag")
             }
 
             fn visit_map<M>(self, mut map: M) -> Result<TaskError, M::Error>
@@ -103,11 +88,14 @@ impl<'de> Deserialize<'de> for TaskError {
             {
                 let mut error_type: Option<String> = None;
                 let mut payload: Option<serde_json::Value> = None;
-                let mut recoverable = false; // Default to unrecoverable for backwards compatibility
+                let mut recoverable: Option<bool> = None;
 
                 while let Some(key) = map.next_key::<String>()? {
                     if key == "recoverable" {
-                        recoverable = map.next_value()?;
+                        if recoverable.is_some() {
+                            return Err(serde::de::Error::duplicate_field("recoverable"));
+                        }
+                        recoverable = Some(map.next_value()?);
                     } else {
                         // This is the error type key
                         if error_type.is_some() {
@@ -122,6 +110,8 @@ impl<'de> Deserialize<'de> for TaskError {
                     error_type.ok_or_else(|| serde::de::Error::custom("No error type found"))?;
                 let payload =
                     payload.ok_or_else(|| serde::de::Error::custom("No payload found"))?;
+                let recoverable =
+                    recoverable.ok_or_else(|| serde::de::Error::missing_field("recoverable"))?;
 
                 Ok(TaskError {
                     error_type,
@@ -131,7 +121,7 @@ impl<'de> Deserialize<'de> for TaskError {
             }
         }
 
-        deserializer.deserialize_any(TaskErrorVisitor)
+        deserializer.deserialize_map(TaskErrorVisitor)
     }
 }
 
@@ -174,6 +164,42 @@ macro_rules! task_error_enum {
             }
         }
     };
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_task_error_round_trips() {
+        for error in [
+            TaskError::empty_recoverable(),
+            TaskError::empty_unrecoverable(),
+            TaskError {
+                error_type: String::from("Test"),
+                payload: serde_json::json!({ "reason": "bad" }),
+                recoverable: true,
+            },
+        ] {
+            let value = serde_json::to_value(&error).unwrap();
+            assert_eq!(serde_json::from_value::<TaskError>(value).unwrap(), error);
+        }
+    }
+
+    #[test]
+    fn test_task_error_requires_recoverable_flag() {
+        let error =
+            serde_json::from_value::<TaskError>(serde_json::json!({ "Empty": null })).unwrap_err();
+
+        assert_eq!(error.to_string(), "missing field `recoverable`");
+    }
+
+    #[test]
+    fn test_task_error_rejects_bare_string() {
+        serde_json::from_value::<TaskError>(serde_json::json!("Empty")).unwrap_err();
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

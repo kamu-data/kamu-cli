@@ -465,8 +465,13 @@ calls it with no transaction held:
 | --- | --- |
 | `has_pull_source` | whether the dataset has any pull alias, several included; reads the alias registry only. `kamu ingest` and setting a watermark refuse such a dataset, since its history comes from the remote; `kamu verify` replays its transforms only when all its inputs exist locally |
 | `find_pull_alias` | the dataset's single pull alias, `None` without one, `AmbiguousPullSourceError` with several; reads the alias registry only |
-| `resolve_remote_source`, `resolve_pull_source` | a `DatasetPullSource { remote_ref, url }`, the URL from `RemoteDatasetUrlResolver::resolve_dataset_url`. A pull does not use them: its transfer resolves the source URL itself ([§4](#4-sync-requests)) |
+| `resolve_remote_source` | a `DatasetPullSource { remote_ref, url }`, the URL from `RemoteDatasetUrlResolver::resolve_dataset_url`; an unknown repository is `RepositoryNotFound`, a remote named only by ID is `ByIdUnsupported` |
+| `resolve_pull_source` | both of the above for one dataset |
 | `find_dataset_by_pull_alias` | the current account's dataset whose pull aliases contain a remote ref: the dataset named as the remote one first, then a scan of the account's datasets |
+
+`DatasetPullSource::to_sync_endpoint` gives the `SyncEndpoint` a sync task reads, without
+credentials. A pull does not use the resolver for its source URL: its transfer resolves it with
+`RemoteDatasetUrlResolver` ([§4](#4-sync-requests)).
 
 How `kamu pull` uses pull aliases to decide that a dataset is synced belongs to
 [dataset-pull.md](dataset-pull.md#51-resolving-each-request).
