@@ -728,7 +728,7 @@ persists its event and posts the matching lifecycle message:
 
 | Primitive | Transition | Message |
 | --- | --- | --- |
-| `begin_reconciliation(id, expected_status_generation)` | `Reconciling`, observed generation recorded | none |
+| `begin_reconciliation(id, expected_status_generation?)` | `Reconciling`, observed generation recorded; nothing when no reconciliation is needed | none |
 | `complete_reconciliation(id, expected)` | `Ready`, reconciled generation recorded | `ReconciliationSucceeded` |
 | `fail_reconciliation(id, expected, error)` | `Failed` or `Degraded`, `ReconciliationError` | `ReconciliationFailed` |
 | `request_deletion(ids)` | `Deleting` | one `DeletionRequested` for the batch |
@@ -1353,12 +1353,10 @@ lines rather than two whole-object dumps — the property that motivated this de
 ```mermaid
 sequenceDiagram
     participant UC as ReconcileResourceUseCase<R>
-    participant L as AggregateLoader<R>
     participant Ctl as ResourceController<R>
     participant P as LifecyclePrimitives<R>
 
-    UC->>L: load(id)  %% needs_reconciliation()? generation not yet reconciled
-    UC->>P: begin_reconciliation(id, statusGeneration) → StatusUpdated unless already Reconciling (status gen. N)
+    UC->>P: begin_reconciliation(id) → StatusUpdated if the generation is not yet reconciled and not already Reconciling (status gen. N)
     UC->>Ctl: reconcile(resource)  %% e.g. SecretSet builds encrypted projection
     alt success
         UC->>P: complete_reconciliation(id, generation, N) → StatusUpdated, ReconciliationSucceeded

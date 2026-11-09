@@ -32,13 +32,15 @@ use crate::{
 #[async_trait::async_trait]
 pub trait ResourceLifecyclePrimitives<R: EventSourcedResource>: Send + Sync {
     /// Moves the resource to `Reconciling` and records the generation it
-    /// observed. Posts no message. Does nothing to a resource that does not
-    /// need reconciliation or is already reconciling
+    /// observed. Posts no message. Returns `None`, changing nothing, when the
+    /// resource does not need reconciliation, and a resource already
+    /// reconciling as it is. The expected status generation, when given, is
+    /// checked only when the start is recorded
     async fn begin_reconciliation(
         &self,
         id: &ResourceID,
-        expected_status_generation: u64,
-    ) -> Result<R, ResourceLifecycleTransitionError<R>>;
+        expected_status_generation: Option<u64>,
+    ) -> Result<Option<R>, ResourceLifecycleTransitionError<R>>;
 
     /// Moves the resource to `Ready` with the expected generation reconciled,
     /// and posts `ReconciliationSucceeded`
