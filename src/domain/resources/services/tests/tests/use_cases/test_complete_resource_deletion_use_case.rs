@@ -169,6 +169,47 @@ async fn test_completing_deletion_twice_records_it_once() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
+async fn test_repeated_id_in_one_call_completes_deletion_once() {
+    let mut mock_outbox = MockOutbox::new();
+    BaseResourceServiceHarness::expect_applied_messages(&mut mock_outbox, 1, None);
+    BaseResourceServiceHarness::expect_deletion_requested_message(&mut mock_outbox, 1);
+    BaseResourceServiceHarness::expect_deleted_message(&mut mock_outbox, 1);
+
+    let harness = ResourceUseCaseBaseHarness::new_with_mock_outbox(mock_outbox);
+    let account_handle = odf::ResourceOwnerHandle::new_test("test-owner");
+    let id = harness.apply_and_get_id(&account_handle, "res-a").await;
+    harness
+        .request_resources_deletion(account_handle.did, vec![id])
+        .await;
+
+    harness.complete_deletion(&[id, id]).await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_repeated_id_in_one_call_records_last_cleanup_attempt() {
+    let harness = CompleteDeletionTestHarness::dispatching(
+        TestResourceControllerProvider::FailingCleanupOnce,
+    );
+    let account_handle = odf::ResourceOwnerHandle::new_test("test-owner");
+    let id = harness.apply_and_get_id(&account_handle, "res-a").await;
+    harness
+        .request_resources_deletion(account_handle.did, vec![id])
+        .await;
+
+    // The first cleanup fails, the second succeeds
+    harness.complete_deletion(&[id, id]).await;
+
+    assert_eq!(
+        harness.load(&id).await.status().phase,
+        ResourcePhase::Deleted
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
 async fn test_batch_posts_one_deleted_message() {
     let mut mock_outbox = MockOutbox::new();
     BaseResourceServiceHarness::expect_applied_messages(&mut mock_outbox, 2, None);

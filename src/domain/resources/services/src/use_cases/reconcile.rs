@@ -7,58 +7,43 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use messaging_outbox::{Outbox, OutboxExt};
-use serde::Serialize;
-use time_source::SystemTimeSource;
-
 use crate::domain::{
-    DeclarativeResource,
     EventSourcedResource,
-    InvariantViolationOf,
-    MESSAGE_PRODUCER_KAMU_RESOURCE_SERVICE,
     ReconcileResourceUseCaseError,
     ResourceAggregateLoader,
     ResourceController,
+    ResourceExpectedVersion,
     ResourceID,
-    ResourceLifecycleMessage,
+    ResourceLifecyclePrimitives,
+    ResourceLifecycleTransitionError,
     ResourceLoadError,
-    ResourcePersistenceService,
-    ResourceSchemaProvider,
-    StatusConflictOf,
+    ResourceStaleExpectationError,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct ReconcileResourceUseCaseHelper<'a, R>
 where
-    R: EventSourcedResource + ResourceSchemaProvider,
+    R: EventSourcedResource,
 {
     resource_aggregate_loader: &'a dyn ResourceAggregateLoader<R>,
-    resource_persistence_service: &'a dyn ResourcePersistenceService<R>,
-    outbox: &'a dyn Outbox,
+    lifecycle_primitives: &'a dyn ResourceLifecyclePrimitives<R>,
     controller: &'a dyn ResourceController<R>,
-    time_source: &'a dyn SystemTimeSource,
 }
 
 impl<'a, R> ReconcileResourceUseCaseHelper<'a, R>
 where
-    R: EventSourcedResource + ResourceSchemaProvider,
-    R::LifecycleError: InvariantViolationOf<<R as DeclarativeResource>::ResourceState>,
-    R::Spec: Serialize,
+    R: EventSourcedResource,
 {
     pub fn new(
         resource_aggregate_loader: &'a dyn ResourceAggregateLoader<R>,
-        resource_persistence_service: &'a dyn ResourcePersistenceService<R>,
-        outbox: &'a dyn Outbox,
+        lifecycle_primitives: &'a dyn ResourceLifecyclePrimitives<R>,
         controller: &'a dyn ResourceController<R>,
-        time_source: &'a dyn SystemTimeSource,
     ) -> Self {
         Self {
             resource_aggregate_loader,
-            resource_persistence_service,
-            outbox,
+            lifecycle_primitives,
             controller,
-            time_source,
         }
     }
 
@@ -66,21 +51,24 @@ where
         &self,
         id: ResourceID,
     ) -> Result<Option<R>, ReconcileResourceUseCaseError<R>> {
-        let mut resource = self.load(&id).await?;
+        let resource = self
+            .resource_aggregate_loader
+            .load(&id)
+            .await
+            .map_err(ResourceLoadError)
+            .map_err(ReconcileResourceUseCaseError::LoadFailed)?;
         if !resource.needs_reconciliation() {
             return Ok(None);
         }
 
         // Phase 1 commits the "started" transition before the actual reconciliation
         // work, giving the second phase a stable persisted hand-off point.
-        let status_generation = resource.headers().status_generation;
-        resource
-            .try_mark_reconciliation_started(self.time_source.now(), status_generation)
-            .map_err(Self::lifecycle_error)?;
+        let started = self
+            .lifecycle_primitives
+            .begin_reconciliation(&id, resource.headers().status_generation)
+            .await?;
 
-        self.persist_resource_state(&mut resource).await?;
-
-        Ok(Some(resource))
+        Ok(Some(started))
     }
 
     /// Records the outcome of reconciling `started`, the resource as phase 1
@@ -91,90 +79,56 @@ where
         &self,
         started: R,
     ) -> Result<(), ReconcileResourceUseCaseError<R>> {
-        let generation = started.headers().generation;
-        let status_generation = started.headers().status_generation;
-
-        let outcome = self.controller.reconcile(&started).await;
+        let id = *started.id();
+        let expected = ResourceExpectedVersion {
+            generation: started.headers().generation,
+            status_generation: started.headers().status_generation,
+        };
 
         // Phase 2 runs in a separate transaction after the started state was
         // committed, so the resource may have changed in between.
-        let mut resource = self.load(started.id()).await?;
-        if resource.headers().deletion_requested_at.is_some() {
-            tracing::info!(
-                resource_id = %resource.id(),
-                "Discarding reconciliation outcome of a resource being deleted"
-            );
-            return Ok(());
-        }
-        if resource.headers().generation != generation {
-            tracing::info!(
-                resource_id = %resource.id(),
-                reconciled_generation = generation,
-                current_generation = resource.headers().generation,
-                "Discarding reconciliation outcome of a superseded generation"
-            );
-            return Ok(());
-        }
-
-        let now = self.time_source.now();
-        let lifecycle_message = match outcome {
+        let recorded = match self.controller.reconcile(&started).await {
             Ok(()) => {
-                resource
-                    .try_mark_reconciliation_succeeded(now, generation, status_generation)
-                    .map_err(Self::lifecycle_error)?;
-                self.persist_resource_state(&mut resource).await?;
-
-                ResourceLifecycleMessage::reconciliation_succeeded(
-                    now,
-                    resource
-                        .make_resource_snapshot()
-                        .map_err(ReconcileResourceUseCaseError::Internal)?,
-                )
+                self.lifecycle_primitives
+                    .complete_reconciliation(&id, expected)
+                    .await
             }
             Err(err) => {
-                resource
-                    .try_mark_reconciliation_failed(now, generation, status_generation, &err)
-                    .map_err(Self::lifecycle_error)?;
-                self.persist_resource_state(&mut resource).await?;
-
-                ResourceLifecycleMessage::reconciliation_failed(
-                    now,
-                    resource
-                        .make_resource_snapshot()
-                        .map_err(ReconcileResourceUseCaseError::Internal)?,
-                )
+                self.lifecycle_primitives
+                    .fail_reconciliation(&id, expected, &err)
+                    .await
             }
         };
 
-        self.outbox
-            .post_message(MESSAGE_PRODUCER_KAMU_RESOURCE_SERVICE, lifecycle_message)
-            .await
-            .map_err(ReconcileResourceUseCaseError::Internal)
-    }
+        use ResourceLifecycleTransitionError as E;
+        use ResourceStaleExpectationError as Stale;
 
-    async fn load(&self, id: &ResourceID) -> Result<R, ReconcileResourceUseCaseError<R>> {
-        self.resource_aggregate_loader
-            .load(id)
-            .await
-            .map_err(ResourceLoadError)
-            .map_err(ReconcileResourceUseCaseError::LoadFailed)
-    }
-
-    fn lifecycle_error(err: R::LifecycleError) -> ReconcileResourceUseCaseError<R> {
-        match err.as_status_conflict() {
-            Some(conflict) => ReconcileResourceUseCaseError::StatusConflict(*conflict),
-            None => ReconcileResourceUseCaseError::Lifecycle(err),
+        match recorded {
+            Ok(_) => Ok(()),
+            Err(E::Stale(Stale::DeletionRequested(_))) => {
+                tracing::info!(
+                    resource_id = %id,
+                    "Discarding reconciliation outcome of a resource being deleted"
+                );
+                Ok(())
+            }
+            Err(E::Stale(Stale::GenerationChanged(conflict))) => {
+                tracing::info!(
+                    resource_id = %id,
+                    reconciled_generation = conflict.expected,
+                    current_generation = conflict.actual,
+                    "Discarding reconciliation outcome of a superseded generation"
+                );
+                Ok(())
+            }
+            Err(
+                err @ (E::Stale(Stale::StatusGenerationChanged(_))
+                | E::LoadFailed(_)
+                | E::ConcurrentModification(_)
+                | E::Lifecycle(_)
+                | E::Internal(_)),
+            ) => Err(err.into()),
         }
-    }
-
-    async fn persist_resource_state(
-        &self,
-        resource: &mut R,
-    ) -> Result<(), ReconcileResourceUseCaseError<R>> {
-        self.resource_persistence_service
-            .save(resource)
-            .await
-            .map_err(ReconcileResourceUseCaseError::from)
     }
 }
 
@@ -190,19 +144,16 @@ macro_rules! declare_reconcile_resource_use_case {
         #[dill::interface(dyn kamu_resources::ReconcileResourceUseCase<$resource>)]
         pub struct $use_case {
             catalog: dill::Catalog,
-            time_source: std::sync::Arc<dyn time_source::SystemTimeSource>,
         }
 
         impl $use_case {
-            #[::database_common_macros::transactional_method4(
+            #[::database_common_macros::transactional_method3(
                         resource_aggregate_loader:
                             std::sync::Arc<dyn kamu_resources::ResourceAggregateLoader<$resource>>,
-                        resource_persistence_service:
-                            std::sync::Arc<dyn kamu_resources::ResourcePersistenceService<$resource>>,
+                        lifecycle_primitives:
+                            std::sync::Arc<dyn kamu_resources::ResourceLifecyclePrimitives<$resource>>,
                         controller:
-                            std::sync::Arc<dyn kamu_resources::ResourceController<$resource>>,
-                        outbox:
-                            std::sync::Arc<dyn $crate::messaging_outbox::Outbox>
+                            std::sync::Arc<dyn kamu_resources::ResourceController<$resource>>
                     )]
             async fn start_reconciliation_phase(
                 &self,
@@ -211,24 +162,20 @@ macro_rules! declare_reconcile_resource_use_case {
             {
                 let helper = $crate::ReconcileResourceUseCaseHelper::<$resource>::new(
                     resource_aggregate_loader.as_ref(),
-                    resource_persistence_service.as_ref(),
-                    outbox.as_ref(),
+                    lifecycle_primitives.as_ref(),
                     controller.as_ref(),
-                    self.time_source.as_ref(),
                 );
 
                 helper.start_reconciliation_phase(id).await
             }
 
-            #[::database_common_macros::transactional_method4(
+            #[::database_common_macros::transactional_method3(
                         resource_aggregate_loader:
                             std::sync::Arc<dyn kamu_resources::ResourceAggregateLoader<$resource>>,
-                        resource_persistence_service:
-                            std::sync::Arc<dyn kamu_resources::ResourcePersistenceService<$resource>>,
+                        lifecycle_primitives:
+                            std::sync::Arc<dyn kamu_resources::ResourceLifecyclePrimitives<$resource>>,
                         controller:
-                            std::sync::Arc<dyn kamu_resources::ResourceController<$resource>>,
-                        outbox:
-                            std::sync::Arc<dyn $crate::messaging_outbox::Outbox>
+                            std::sync::Arc<dyn kamu_resources::ResourceController<$resource>>
                     )]
             async fn finish_reconciliation_phase(
                 &self,
@@ -238,10 +185,8 @@ macro_rules! declare_reconcile_resource_use_case {
                 // outcome in a new transaction.
                 let helper = $crate::ReconcileResourceUseCaseHelper::<$resource>::new(
                     resource_aggregate_loader.as_ref(),
-                    resource_persistence_service.as_ref(),
-                    outbox.as_ref(),
+                    lifecycle_primitives.as_ref(),
                     controller.as_ref(),
-                    self.time_source.as_ref(),
                 );
 
                 helper.finish_reconciliation_phase(resource).await

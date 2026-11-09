@@ -90,15 +90,14 @@ construction.
 Inject `dill::CatalogWeakRef` instead and resolve the repository per call:
 
 ```rust
-pub struct InMemoryResourceRepository {
-    state: Arc<Mutex<State>>,
+pub struct MyAgent {
     catalog: CatalogWeakRef,
 }
 
 #[component(pub)]
-#[interface(dyn ResourceRepository)]
+#[interface(dyn BackgroundAgent)]
 #[scope(Singleton)]
-impl InMemoryResourceRepository {
+impl MyAgent {
     pub fn new(catalog: CatalogWeakRef) -> Self { /* ... */ }
 
     fn account_repository(&self) -> Option<Arc<dyn AccountRepository>> {
@@ -107,14 +106,16 @@ impl InMemoryResourceRepository {
 }
 ```
 
-`FlowAgentImpl` and `FlowSystemEventAgentImpl` use the same idiom.
+`FlowAgentImpl` and `FlowSystemEventAgentImpl` use this idiom.
 
-Note that in-memory repositories are themselves singletons, so this applies to
-them too. A violation may stay dormant for a long time: it only fires in a
-configuration that pairs the singleton with a *real* transactional
-implementation of its dependency, e.g. an in-memory repository wired next to a
-database-backed one (see `configure_database_components` for the per-provider
-wiring).
+An in-memory repository that keeps its state itself is a singleton, so this
+applies to it too. The transactional ones (`kamu-datasets-inmem`,
+`kamu-resources-inmem`) are transient components over a singleton state, as a
+database-backed repository is over its pool. A violation may stay dormant for a
+long time: it only fires in a configuration that pairs the singleton with a
+*real* transactional implementation of its dependency, e.g. an in-memory
+repository wired next to a database-backed one (see
+`configure_database_components` for the per-provider wiring).
 
 To audit, parse `#[component]` / `#[interface(dyn ...)]` / `#[scope(Singleton)]`,
 treat any component whose body mentions `TransactionRef` as transaction-scoped,
