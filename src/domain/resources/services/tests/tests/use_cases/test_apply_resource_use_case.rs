@@ -219,6 +219,7 @@ async fn test_apply_create_initial_status_is_pending() {
     let harness = ResourceUseCaseBaseHarness::new_with_opts(ResourceUseCaseBaseHarnessOpts {
         base_opts: BaseResourceServiceHarnessOpts {
             outbox_provider: OutboxProvider::Dispatching,
+            ..Default::default()
         },
         ..Default::default()
     });
@@ -253,6 +254,7 @@ async fn test_apply_update_resets_status_to_pending() {
     let harness = ResourceUseCaseBaseHarness::new_with_opts(ResourceUseCaseBaseHarnessOpts {
         base_opts: BaseResourceServiceHarnessOpts {
             outbox_provider: OutboxProvider::Dispatching,
+            ..Default::default()
         },
         ..Default::default()
     });

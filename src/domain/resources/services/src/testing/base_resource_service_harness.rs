@@ -11,7 +11,7 @@ use std::collections::BTreeMap;
 use std::sync::Arc;
 
 use chrono::Utc;
-use database_common::NoOpDatabasePlugin;
+use database_common::{InMemoryTransactionManager, NoOpDatabasePlugin};
 use dill::CatalogBuilder;
 use kamu_accounts::{Account, AccountRepository, AccountType};
 use kamu_accounts_inmem::InMemoryAccountRepository;
@@ -28,11 +28,6 @@ use kamu_resources::{
     ResourceStatus,
     TypeUri,
     reconciliation_error_type_ref,
-};
-use kamu_resources_inmem::{
-    InMemoryRawResourceEventStore,
-    InMemoryResourceLabelProjectionRepository,
-    InMemoryResourceRepository,
 };
 use messaging_outbox::{MockOutbox, Outbox, OutboxProvider, register_message_dispatcher};
 use time_source::{SystemTimeSource, SystemTimeSourceStub};
@@ -53,6 +48,10 @@ pub struct BaseResourceServiceHarness {
 
 pub struct BaseResourceServiceHarnessOpts {
     pub outbox_provider: OutboxProvider,
+    /// Runs transactions on `InMemoryTransactionManager`, so a rolled-back
+    /// transaction leaves no resource, event or outbox message behind. Needs
+    /// `OutboxProvider::Dispatching`, whose messages wait in the outbox
+    pub transactional: bool,
 }
 
 impl Default for BaseResourceServiceHarnessOpts {
@@ -61,6 +60,7 @@ impl Default for BaseResourceServiceHarnessOpts {
             outbox_provider: OutboxProvider::Immediate {
                 force_immediate: true,
             },
+            transactional: false,
         }
     }
 }
@@ -101,12 +101,18 @@ impl BaseResourceServiceHarness {
             b.add::<WakeupListenerMetrics>();
         }
 
-        b.add::<InMemoryResourceRepository>()
-            .add::<InMemoryResourceLabelProjectionRepository>()
-            .add::<InMemoryRawResourceEventStore>()
-            .add::<InMemoryAccountRepository>();
+        kamu_resources_inmem::register_dependencies(&mut b);
+        b.add::<InMemoryAccountRepository>();
 
-        NoOpDatabasePlugin::init_database_components(&mut b);
+        if opts.transactional {
+            assert!(
+                needs_bridge,
+                "an immediate outbox delivers messages before the transaction ends"
+            );
+            b.add::<InMemoryTransactionManager>();
+        } else {
+            NoOpDatabasePlugin::init_database_components(&mut b);
+        }
 
         crate::register_dependencies(&mut b);
         register_additional_dependencies(&mut b);

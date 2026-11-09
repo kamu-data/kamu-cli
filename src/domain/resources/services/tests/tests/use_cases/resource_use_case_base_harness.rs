@@ -62,6 +62,7 @@ impl Default for ResourceUseCaseBaseHarnessOpts {
                 outbox_provider: OutboxProvider::Immediate {
                     force_immediate: true,
                 },
+                ..Default::default()
             },
             controller_provider: TestResourceControllerProvider::default(),
             sanitizer: SanitizerKind::None,
@@ -86,6 +87,7 @@ impl ResourceUseCaseBaseHarness {
         Self::new_with_opts(ResourceUseCaseBaseHarnessOpts {
             base_opts: BaseResourceServiceHarnessOpts {
                 outbox_provider: OutboxProvider::Mock(mock_outbox),
+                ..Default::default()
             },
             ..Default::default()
         })
@@ -98,6 +100,7 @@ impl ResourceUseCaseBaseHarness {
         Self::new_with_opts(ResourceUseCaseBaseHarnessOpts {
             base_opts: BaseResourceServiceHarnessOpts {
                 outbox_provider: OutboxProvider::Mock(mock_outbox),
+                ..Default::default()
             },
             controller_provider,
             sanitizer: SanitizerKind::None,
