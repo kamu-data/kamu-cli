@@ -40,7 +40,8 @@ use crate::{
 /// Conflicts are found per key only, so unlike a database:
 /// - a transaction deleting the keys that match a condition does not stop another from adding a key
 ///   that matches it;
-/// - a uniqueness rule over other keys holds only if the repository keeps it as keys of its own.
+/// - a uniqueness rule over other keys holds only if the repository keeps it as keys of its own,
+///   taken with [`InMemoryMapWrite::claim`].
 ///
 /// Changes made outside such a transaction, or under the ID of one that has
 /// ended, are committed at once
@@ -112,13 +113,12 @@ where
         let state = self.state.lock().unwrap();
         if let Some(working_set) = state.working_sets.get(&transaction_id) {
             for (key, change) in &working_set.changes {
-                if state.committed_version(key) == change.base_version {
-                    continue;
-                }
+                let moved = state.committed_version(key) != change.base_version;
                 let conflicts = match change.on_concurrent_commit {
-                    OnConcurrentCommit::Fail => true,
+                    OnConcurrentCommit::Fail => moved,
                     OnConcurrentCommit::Overwrite | OnConcurrentCommit::Upsert { .. } => false,
-                    OnConcurrentCommit::Reapply(_) => !state.committed.contains_key(key),
+                    OnConcurrentCommit::Reapply(_) => moved && !state.committed.contains_key(key),
+                    OnConcurrentCommit::Claim => state.committed.contains_key(key),
                 };
                 if conflicts {
                     return Err(InMemoryWriteConflictError {
@@ -226,6 +226,41 @@ impl<K: Eq + Hash, V> InMemoryMapWrite<'_, K, V> {
 
     pub fn put(&mut self, key: K, value: V) {
         self.change(key, ChangedValue::Put(value), OnConcurrentCommit::Fail);
+    }
+
+    /// Puts the value under a key that must be free when the transaction
+    /// commits, as an insert into a unique index does: the commit fails if
+    /// the key is committed then, whatever the transaction saw at write time.
+    /// Together with [`Self::is_deleted_by_another_transaction`], it takes
+    /// over a key that another open transaction is freeing
+    pub fn claim(&mut self, key: K, value: V) {
+        self.change(key, ChangedValue::Put(value), OnConcurrentCommit::Claim);
+    }
+
+    /// Whether another open transaction has deleted the key, as a unique index
+    /// sees an entry that an uncommitted transaction removes. Always `false`
+    /// for a key this transaction has changed itself, whose own change is what
+    /// it sees, and for a change made outside a tracked transaction
+    pub fn is_deleted_by_another_transaction(&self, key: &K) -> bool {
+        let Some(transaction_id) = self.transaction_id else {
+            return false;
+        };
+        if self.state.working_sets[&transaction_id]
+            .changes
+            .contains_key(key)
+        {
+            return false;
+        }
+        self.state
+            .working_sets
+            .iter()
+            .filter(|(other_id, _)| **other_id != transaction_id)
+            .any(|(_, working_set)| {
+                working_set
+                    .changes
+                    .get(key)
+                    .is_some_and(|change| change.value.as_put().is_none())
+            })
     }
 
     /// Puts the value as a database upsert replacing the row does: a key
@@ -434,7 +469,8 @@ impl<V> Change<V> {
             OnConcurrentCommit::Fail
             | OnConcurrentCommit::Overwrite
             | OnConcurrentCommit::Reapply(_)
-            | OnConcurrentCommit::Upsert { .. } => self.value,
+            | OnConcurrentCommit::Upsert { .. }
+            | OnConcurrentCommit::Claim => self.value,
         }
     }
 }
@@ -455,6 +491,8 @@ enum OnConcurrentCommit<V> {
         update: ValueUpdate<V>,
         later_updates: Vec<ValueUpdate<V>>,
     },
+    /// Fails if the key is committed at all, even if it did not move
+    Claim,
 }
 
 /// A change of a value computed from the value it replaces
@@ -466,7 +504,9 @@ impl<V> OnConcurrentCommit<V> {
     /// later overwrite discards the updates before it
     fn then(self, later: Self) -> Self {
         match (self, later) {
-            (Self::Fail, _) | (_, Self::Fail) => Self::Fail,
+            // The key must still be free at commit, whatever came after
+            (Self::Claim, _) => Self::Claim,
+            (Self::Fail, _) | (_, Self::Fail | Self::Claim) => Self::Fail,
             (Self::Reapply(mut updates), Self::Reapply(later_updates)) => {
                 updates.extend(later_updates);
                 Self::Reapply(updates)
@@ -757,6 +797,84 @@ mod tests {
         harness.commit(second);
 
         pretty_assertions::assert_eq!(harness.entries(None), [("a", 10)]);
+    }
+
+    #[test]
+    fn test_claim_takes_over_a_key_another_transaction_freed() {
+        let harness = MapHarness::with_committed(&[("a", 1)]);
+        let releasing = harness.begin();
+        let claiming = harness.begin();
+        harness
+            .map
+            .write(Some(releasing), |write| write.delete("a"));
+        let seen_freed = harness.map.write(Some(claiming), |write| {
+            let freed = write.is_deleted_by_another_transaction(&"a");
+            write.claim("a", 2);
+            freed
+        });
+
+        harness.commit(releasing);
+        harness.commit(claiming);
+
+        assert!(seen_freed);
+        pretty_assertions::assert_eq!(harness.entries(None), [("a", 2)]);
+    }
+
+    #[test]
+    fn test_own_claim_hides_another_transaction_freeing_the_key() {
+        let harness = MapHarness::with_committed(&[("a", 1)]);
+        let releasing = harness.begin();
+        let claiming = harness.begin();
+        harness
+            .map
+            .write(Some(releasing), |write| write.delete("a"));
+
+        let seen_freed_after_claim = harness.map.write(Some(claiming), |write| {
+            write.claim("a", 2);
+            write.is_deleted_by_another_transaction(&"a")
+        });
+
+        assert!(!seen_freed_after_claim);
+    }
+
+    #[test]
+    fn test_claim_fails_the_commit_while_the_key_is_committed() {
+        for (case, roll_back_release) in
+            [("release still open", false), ("release rolled back", true)]
+        {
+            let harness = MapHarness::with_committed(&[("a", 1)]);
+            let releasing = harness.begin();
+            let claiming = harness.begin();
+            harness
+                .map
+                .write(Some(releasing), |write| write.delete("a"));
+            harness
+                .map
+                .write(Some(claiming), |write| write.claim("a", 2));
+            if roll_back_release {
+                harness.map.rollback(releasing);
+            }
+
+            assert_matches!(
+                harness.check_commit(claiming),
+                Err(InMemoryWriteConflictError { key }) if key == "\"a\"",
+                "{case}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_claims_of_a_free_key_in_concurrent_transactions_fail_the_second_commit() {
+        let harness = MapHarness::with_committed(&[]);
+        let first = harness.begin();
+        let second = harness.begin();
+        harness.map.write(Some(first), |write| write.claim("a", 1));
+        harness.map.write(Some(second), |write| write.claim("a", 2));
+
+        harness.commit(first);
+
+        assert_matches!(harness.check_commit(second), Err(_));
+        pretty_assertions::assert_eq!(harness.entries(None), [("a", 1)]);
     }
 
     #[test]

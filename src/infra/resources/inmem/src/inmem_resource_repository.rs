@@ -10,7 +10,7 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use database_common::{PaginationOpts, TransactionId, TransactionRef};
+use database_common::{InMemoryMapWrite, PaginationOpts, TransactionId, TransactionRef};
 use dill::*;
 use event_sourcing::EventID;
 use futures::StreamExt;
@@ -193,7 +193,7 @@ impl ResourceRepository for InMemoryResourceRepository {
         self.state
             .write(self.transaction_id, |snapshots_by_id, ids_by_lookup_key| {
                 if snapshots_by_id.view().contains_key(&resource_snapshot.id)
-                    || holds_name && ids_by_lookup_key.view().contains_key(&lookup_key)
+                    || holds_name && name_is_taken(ids_by_lookup_key, &lookup_key, None)
                 {
                     return Err(CreateResourceError::Duplicate(ResourceDuplicateError {
                         account_id: resource_snapshot.headers.account.did.clone(),
@@ -203,7 +203,7 @@ impl ResourceRepository for InMemoryResourceRepository {
                 }
 
                 if holds_name {
-                    ids_by_lookup_key.put(lookup_key, resource_snapshot.id);
+                    ids_by_lookup_key.claim(lookup_key, resource_snapshot.id);
                 }
                 snapshots_by_id.put(resource_snapshot.id, resource_snapshot.clone());
 
@@ -253,9 +253,11 @@ impl ResourceRepository for InMemoryResourceRepository {
                     let holds_name = resource_snapshot.headers.deletion_requested_at.is_none();
 
                     if holds_name
-                        && let Some(existing_resource_id) =
-                            ids_by_lookup_key.view().get(&next_lookup_key)
-                        && *existing_resource_id != resource_snapshot.id
+                        && name_is_taken(
+                            ids_by_lookup_key,
+                            &next_lookup_key,
+                            Some(&resource_snapshot.id),
+                        )
                     {
                         return Err(UpdateResourceError::Duplicate(ResourceDuplicateError {
                             account_id: resource_snapshot.headers.account.did.clone(),
@@ -273,13 +275,16 @@ impl ResourceRepository for InMemoryResourceRepository {
 
                 for (resource_snapshot, previous_lookup_key, next_lookup_key) in prepared_updates {
                     // A newer resource may hold the name this one gave up
-                    if ids_by_lookup_key.view().get(&previous_lookup_key)
-                        == Some(&resource_snapshot.id)
-                    {
+                    let held_previous = ids_by_lookup_key.view().get(&previous_lookup_key)
+                        == Some(&resource_snapshot.id);
+                    let keeps_previous = next_lookup_key.as_ref() == Some(&previous_lookup_key);
+                    if held_previous && !keeps_previous {
                         ids_by_lookup_key.delete(previous_lookup_key);
                     }
-                    if let Some(next_lookup_key) = next_lookup_key {
-                        ids_by_lookup_key.put(next_lookup_key, resource_snapshot.id);
+                    if let Some(next_lookup_key) = next_lookup_key
+                        && !(held_previous && keeps_previous)
+                    {
+                        ids_by_lookup_key.claim(next_lookup_key, resource_snapshot.id);
                     }
                     snapshots_by_id.put(resource_snapshot.id, resource_snapshot);
                 }
@@ -800,6 +805,24 @@ fn snapshot_matches_label_pairs(
             .iter()
             .any(|(entry_key, entry_value)| *entry_key == key && entry_value == value)
     })
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Whether another resource than `holder` holds the name. A name that another
+/// open transaction frees counts as free, as a database unique index makes the
+/// writer wait for that transaction: [`InMemoryMapWrite::claim`] then fails
+/// the commit unless the name was freed by then
+fn name_is_taken(
+    ids_by_lookup_key: &InMemoryMapWrite<'_, ResourceLookupKey, ResourceID>,
+    lookup_key: &ResourceLookupKey,
+    holder: Option<&ResourceID>,
+) -> bool {
+    ids_by_lookup_key
+        .view()
+        .get(lookup_key)
+        .is_some_and(|existing_id| Some(existing_id) != holder)
+        && !ids_by_lookup_key.is_deleted_by_another_transaction(lookup_key)
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -73,7 +73,9 @@ a database lets the second writer apply its change after the first instead, the 
 repository writes with `overwrite` (an upsert replacing the row), `upsert` (an upsert updating it,
 `INSERT ... ON CONFLICT DO UPDATE`) or `update` (an `UPDATE` of an existing row), and the fixture
 asserts that the second transaction commits. A repository that writes such a change
-with `put` fails that fixture.
+with `put` fails that fixture. A key standing for a unique index entry is taken with `claim`, and
+`is_deleted_by_another_transaction` tells the writer that another open transaction frees it, so a
+writer can take over a name being released, as Postgres lets it after waiting.
 
 Example:
 
