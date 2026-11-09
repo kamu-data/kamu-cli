@@ -9612,12 +9612,15 @@ name = "kamu-messaging-outbox-inmem"
 version = "0.273.0"
 dependencies = [
  "async-trait",
+ "chrono",
+ "database-common",
  "database-common-macros",
  "dill",
  "internal-error",
  "kamu-messaging-outbox-repo-tests",
  "kamu-wakeup-listener-inmem",
  "messaging-outbox",
+ "pretty_assertions",
  "serde_json",
  "test-group",
  "test-log",
@@ -9655,8 +9658,10 @@ name = "kamu-messaging-outbox-repo-tests"
 version = "0.273.0"
 dependencies = [
  "chrono",
+ "database-common",
  "dill",
  "futures",
+ "internal-error",
  "messaging-outbox",
  "serde",
  "serde_json",
