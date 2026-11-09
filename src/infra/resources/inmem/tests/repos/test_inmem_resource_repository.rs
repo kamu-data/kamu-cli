@@ -337,6 +337,23 @@ database_concurrent_transactions_test!(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+database_concurrent_transactions_test!(
+    storage = inmem,
+    fixture = resource_repo_suite::test_create_name_freed_by_concurrent_deletion_request,
+    harness = InMemoryResourceRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_concurrent_transactions_test!(
+    storage = inmem,
+    fixture =
+        resource_repo_suite::test_create_name_twice_while_concurrent_deletion_request_frees_it,
+    harness = InMemoryResourceRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 struct InMemoryResourceRepositoryHarness {
     catalog: Catalog,
 }
