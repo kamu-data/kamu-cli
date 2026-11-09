@@ -491,7 +491,6 @@ impl ReconcileTestHarness {
 
     fn make_reconcile_helper(&self) -> ReconcileResourceUseCaseHelper<'_, TestResource> {
         ReconcileResourceUseCaseHelper::new(
-            self.loader.as_ref(),
             self.lifecycle_primitives.as_ref(),
             self.controller.as_ref(),
         )
