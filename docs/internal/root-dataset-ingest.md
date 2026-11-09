@@ -122,18 +122,10 @@ services share: the session context factory, the preprocess step and the default
 ### 4.1 Writer state
 
 `DataWriterMetadataState::build(target, block_ref, source_name, head)` walks the chain once from
-`head` (or from the resolved `block_ref` when `head` is `None`) with a set of visitors and
-collects:
-
-| Field | From |
-| --- | --- |
-| `head` | the starting block; every commit is chained onto it |
-| `schema` | latest `SetDataSchema` |
-| `source_event`, `merge_strategy` | the active source selected by `WriterSourceEventVisitor` for `source_name` |
-| `vocab` | latest `SetVocab`, or the default vocabulary |
-| `data_slices` | physical hashes of every data slice ever added, newest first |
-| `prev_offset`, `prev_watermark`, `prev_checkpoint` | latest `AddData` |
-| `prev_source_state` | source state of the latest `AddData` (none if that block has none) |
+`head` (or from the resolved `block_ref` when `head` is `None`) and collects what a commit needs:
+the schema, the active source for `source_name` and its merge strategy, the vocabulary, the hashes
+of data slices already added, and the offset, watermark, checkpoint and source state of the latest
+`AddData`. Every commit is chained onto `head`.
 
 `build` asserts the seed's kind is `Root`; callers must reject derivative datasets before calling
 it. The state is built once per operation and updated in memory by each commit, so a multi-step
@@ -327,7 +319,7 @@ A source that yields data in batches (glob, container, EVM) reports `has_more`. 
 
 | Driver | Behaviour |
 | --- | --- |
-| `kamu pull` | `PullOptions::exhaust_sources` is set; `PullIngestLoop` repeats the iteration, moving `HEAD` after each one ([dataset-pull.md](dataset-pull.md#62-per-job-runners)) |
+| `kamu pull` | repeats iterations until `has_more` is false ([dataset-pull.md](dataset-pull.md#62-per-job-runners)) |
 | Ingest flow | one iteration per task; on success with `has_more` and `fetch_next_iteration` in the flow's ingest config, `FlowControllerIngest` schedules the next flow immediately |
 
 ---

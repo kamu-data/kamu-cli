@@ -5,7 +5,7 @@ Two values describe who is behind a piece of work, and they are not the same thi
 | Value | What it is | Read by |
 |---|---|---|
 | `CurrentAccountSubject` | The **caller**: whoever authenticated the request or started the command | Name scope of unqualified aliases, the account new resources are placed in, adapter guards (`LoggedInGuard`, `AdminGuard`, `CanProvisionAccountsGuard`) |
-| `Principal` | The identity whose **permissions are checked** (RFC-020, "Principals") | The permission layer: `DatasetPermissionChecker`, `DatasetOperationGuard`, `RebacDatasetRegistryFacade`, `AccountAuthorizationHelper`, `ResourceAccountResolver`, `QueryService`, `ProvenanceService` |
+| `Principal` | The identity whose **permissions are checked** ([RFC-020, Principals](https://github.com/open-data-fabric/open-data-fabric/blob/master/rfcs/020-auth.md#principals)) | The permission layer: `DatasetPermissionChecker`, `DatasetOperationGuard`, `RebacDatasetRegistryFacade`, `AccountAuthorizationHelper`, `ResourceAccountResolver`, `QueryService`, `ProvenanceService` |
 
 For a request or a CLI command the principal is derived from the caller. Background work keeps the
 caller of the process but runs as `Principal::Node`.
@@ -82,12 +82,14 @@ built in `app.rs`:
 
 The command itself still resolves from the CLI catalog and runs as the caller.
 
-## What comes next
+## Not modelled
 
-The rest of the RFC-020 model is not implemented yet: name scope and ownership on the principal,
-`ServiceAccount`, the node as an account resource, and keeping the caller out of the domain layer.
-Running a task under the principal it was created for builds on the explicit permission services
-above.
+These parts of the [RFC-020](https://github.com/open-data-fabric/open-data-fabric/blob/master/rfcs/020-auth.md) model have no counterpart in `Principal`:
+
+- name scope and ownership, which come from the caller;
+- a `ServiceAccount` variant;
+- the node as an account;
+- a domain layer free of the caller.
 
 ## Rejected approaches
 

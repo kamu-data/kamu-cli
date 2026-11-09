@@ -104,7 +104,7 @@ history and treats the metadata chain as append-only. The pieces compaction work
 | Entry point | Path | Authorization | Moves `HEAD` |
 | --- | --- | --- | --- |
 | `kamu system compact --hard <pattern>…` | `CompactCommand` → `CompactDatasetUseCase::execute_multi` | Maintain, per dataset, in the use case | the use case, CAS on the planned head |
-| Compaction flow, manual or scheduled | GraphQL `runs.triggerCompactionFlow` or a schedule set with `triggers.setTrigger` → `FlowControllerCompact` → hard compaction task | Maintain, checked by the GraphQL mutations ([flow-system.md](flow-system.md#12-graphql-api)); the task runs as the system | the task runner, CAS on the planned head |
+| Compaction flow, manual or scheduled | GraphQL `runs.triggerCompactionFlow` or a schedule set with `triggers.setTrigger` → `FlowControllerCompact` → hard compaction task | Maintain, checked by the GraphQL mutations ([flow-system.md](flow-system.md#12-graphql-api)); the task runs as `Principal::Node` ([identity.md](identity.md#background-work-runs-as-the-node)) | the task runner, CAS on the planned head |
 | Metadata-only, from `kamu pull` or a reset-to-metadata flow | see [dataset-reset.md](dataset-reset.md#6-reset-to-metadata) | | |
 
 **CLI.** `kamu system compact` requires `--hard`; without it the command fails with "Soft

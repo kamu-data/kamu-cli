@@ -289,6 +289,7 @@ and then discarded.
 Engine stdout and stderr go to `logs/`. ODF adapters log JSON lines tagged by process; when an
 `EngineError` is built, the stdout log is demultiplexed into one file per process and stream
 (`engine-<process>.<stream>.txt`), and the error carries the log paths so the CLI can show them.
+The `ContractError`s from the checks of the engine's output files carry no log paths.
 A successful run leaves nothing behind ([§10](#10-local-files)).
 
 ---
@@ -340,7 +341,7 @@ compared across the rewrite, so the derivative cannot continue.
 | Path | Detection | What happens |
 | --- | --- | --- |
 | `kamu pull` | elaboration fails with `InvalidInputIntervalError` | error, unless `--reset-derivatives-on-diverged-input`: then `PullTransformJob` resets the derivative to metadata ([dataset-reset.md](dataset-reset.md#6-reset-to-metadata)), moves `HEAD` to the reset head through `DatasetHeadCommitter` (CAS), re-plans and elaborates once more. The pull reports one update from the head before the reset to the final head |
-| Transform task | elaboration fails with `InvalidInputIntervalError` | task fails with `InputDatasetCompacted`, which is unrecoverable |
+| Transform task | elaboration fails with `InvalidInputIntervalError` | the task fails unrecoverably ([task-system.md](task-system.md#71-update-dataset)) |
 | Flow sensor | `evaluate_transform_status` returns `InputBreakingChange` (checked before new data); or an upstream flow reports a `Breaking` change | with the `Recover` rule, a reset-to-metadata flow; with `NoAction`, a warning ([flow-system.md](flow-system.md#8-sensors-and-propagation)) |
 
 After a reset to metadata the derivative has no `ExecuteTransform`, so the next transform consumes
@@ -373,9 +374,8 @@ Consequences specific to transforms:
 
 `TransformError` wraps the errors of the three phases (`TransformPlanError`,
 `TransformElaborateError`, `TransformExecuteError`); `rebuild_transform`, `evaluate_transform_status`
-and the verification plan have error types of their own. Engine errors raised while the container
-runs carry the paths of its logs ([§5.2](#52-one-transform-one-container)); the response contract
-checks carry none.
+and the verification plan have error types of their own. Which engine errors carry log paths is in
+[§5.2](#52-one-transform-one-container).
 
 Each phase error's `is_recoverable` says whether a retry could succeed, and the engine part comes
 from `EngineError::is_recoverable` and `EngineProvisioningError::is_recoverable`, which ingest

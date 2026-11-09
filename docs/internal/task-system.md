@@ -201,9 +201,10 @@ Why the split:
   `from_task_error`. The `recoverable` flag is the one property the flow system reads generically
   (see [§8](#8-failure-handling)).
 
-`TaskError`'s deserializer keeps older stored forms readable: a bare `"Empty"` string is a
-recoverable empty error, and a map without `recoverable` is unrecoverable. Do not change these
-defaults — they decide how stored history replays.
+`TaskError`'s deserializer also accepts two legacy forms: a bare `"Empty"` string, read as a
+recoverable empty error, and a map without `recoverable`, read as unrecoverable. The serializer
+writes neither, and the migration `20261028093236_wipe_task_and_flow_run_history` removed the task
+history and outbox messages that held them.
 
 ### Dispatch
 
@@ -316,7 +317,7 @@ heavy work runs between them. This keeps long ingests from holding a database tr
 | --- | --- | --- |
 | Recover running tasks | one for the whole recovery | `transactional_method2` on `recover_running_tasks` |
 | Take a task + post `Running` | one per attempt | `transactional_method2` on `take_task_non_blocking` |
-| Plan the task | the planner's choice — dataset planners open their own | `transactional_method2` in each dataset planner |
+| Plan the task | the planner's choice — dataset planners open their own | a `transactional_method*` macro in each dataset planner |
 | Run the task | the runner's choice — see [§7](#7-task-types) | runner |
 | Record outcome + post `Finished` | one | `transactional_method2` on `process_task_outcome` |
 
@@ -410,11 +411,8 @@ fails the task with an empty error whose recoverability is `PullError::is_recove
   ([derived-dataset-transform.md](derived-dataset-transform.md#44-transactions)). An up-to-date
   elaboration ends the task with an `UpToDate` result, as does an executor run that appends
   nothing. Otherwise `TransformExecutor::execute_transform` runs with no transaction open, and
-  `commit_head` moves `HEAD`. The runner never resets the derivative, so a diverged input is not
-  repaired here: `InvalidInputInterval` (the previously processed input block is no longer an
-  ancestor, usually because the input was compacted) becomes the typed
-  `TaskErrorDatasetUpdate::InputDatasetCompacted`, and the transform flow controller decides what
-  to do about it.
+  `commit_head` moves `HEAD`. The runner never resets the derivative: a diverged input fails the
+  task unrecoverably, and the transform flow controller decides what to do about it.
 - **Sync** — `resolve_sync_target` reads the destination's `HEAD` in one transaction; then
   `transfer_and_commit_sync` copies blocks and objects from the remote with
   `SyncService::transfer_into_local`, without moving `HEAD` and with no transaction open, and
