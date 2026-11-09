@@ -143,4 +143,8 @@ ignore = [
     # Pulled via alloy-provider -> wasmtimer 0.4.3 (latest), no release drops it yet
     # https://rustsec.org/advisories/RUSTSEC-2026-0441
     "RUSTSEC-2026-0441",
+    # libsqlite3-sys 0.37 bundles SQLite < 3.54: uninitialized memory with a crafted -wal file
+    # Pulled via sqlx-sqlite 0.9.0 (latest), which caps libsqlite3-sys below 0.38; the fix is 0.39
+    # https://rustsec.org/advisories/RUSTSEC-2026-0459
+    "RUSTSEC-2026-0459",
 ]
