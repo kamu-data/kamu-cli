@@ -13,8 +13,10 @@ use internal_error::{ErrorIntoInternal, InternalError};
 use crate::{
     EventSourcedResource,
     ResourceID,
+    ResourceLifecycleTransitionError,
     ResourceLoadError,
     ResourcePersistenceError,
+    ResourceStaleExpectationError,
     ResourceStatusConflictError,
 };
 
@@ -63,6 +65,34 @@ where
             }
             ResourcePersistenceError::InvalidDurableState(err) => Self::Internal(err.int_err()),
             ResourcePersistenceError::Internal(err) => Self::Internal(err),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// The reconciliation discards its outcome on a deletion request or a newer
+/// generation before converting, so those expectations reach it only as
+/// internal errors
+impl<R> From<ResourceLifecycleTransitionError<R>> for ReconcileResourceUseCaseError<R>
+where
+    R: EventSourcedResource,
+{
+    fn from(err: ResourceLifecycleTransitionError<R>) -> Self {
+        use ResourceLifecycleTransitionError as E;
+
+        match err {
+            E::Stale(ResourceStaleExpectationError::StatusGenerationChanged(conflict)) => {
+                Self::StatusConflict(conflict)
+            }
+            E::Stale(
+                stale @ (ResourceStaleExpectationError::DeletionRequested(_)
+                | ResourceStaleExpectationError::GenerationChanged(_)),
+            ) => Self::Internal(stale.int_err()),
+            E::LoadFailed(err) => Self::LoadFailed(err),
+            E::ConcurrentModification(err) => Self::ConcurrentModification(err),
+            E::Lifecycle(err) => Self::Lifecycle(err),
+            E::Internal(err) => Self::Internal(err),
         }
     }
 }
