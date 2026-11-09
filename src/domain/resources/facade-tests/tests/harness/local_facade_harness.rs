@@ -57,11 +57,6 @@ use kamu_resources::{
     ResourceVisibility,
 };
 use kamu_resources_facade::{ListResourcesError, ResourceFacade, SearchResourcesRequest};
-use kamu_resources_inmem::{
-    InMemoryRawResourceEventStore,
-    InMemoryResourceLabelProjectionRepository,
-    InMemoryResourceRepository,
-};
 use messaging_outbox::{OutboxAgent, OutboxProvider, register_message_dispatcher};
 use strum::IntoEnumIterator;
 use time_source::SystemTimeSourceProvider;
@@ -208,9 +203,7 @@ impl LocalFacadeHarness {
             .add_value(DefaultDatasetProperties::default());
 
         // Resources
-        b.add::<InMemoryResourceRepository>()
-            .add::<InMemoryResourceLabelProjectionRepository>()
-            .add::<InMemoryRawResourceEventStore>();
+        kamu_resources_inmem::register_dependencies(&mut b);
 
         // Configuration
         b.add::<InMemoryVariableSetProjectionRepository>()

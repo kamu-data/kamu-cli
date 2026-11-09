@@ -20,7 +20,7 @@ use kamu_resources::{
     ResourceRawEventStore,
     TypeUri,
 };
-use kamu_resources_inmem::InMemoryRawResourceEventStore;
+use kamu_resources_inmem::{InMemoryRawResourceEventState, InMemoryRawResourceEventStore};
 use tokio_stream::StreamExt;
 
 use crate::tests::utils::{
@@ -232,6 +232,7 @@ struct RawResourceEventStoreBridgeHarness {
 impl RawResourceEventStoreBridgeHarness {
     fn new() -> Self {
         let mut b = CatalogBuilder::new();
+        b.add::<InMemoryRawResourceEventState>();
         b.add::<InMemoryRawResourceEventStore>();
         NoOpDatabasePlugin::init_database_components(&mut b);
         register_test_resource_resource_service_layer(&mut b);

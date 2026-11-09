@@ -10,6 +10,7 @@
 use std::assert_matches;
 
 use chrono::Utc;
+use database_common::testing::{in_committed_transaction, in_rolled_back_transaction};
 use dill::Catalog;
 use event_sourcing::{EventID, GetEventsOpts, SaveEventsError, SaveEventsItem};
 use futures::TryStreamExt;
@@ -654,6 +655,35 @@ pub async fn test_save_events_multi_rejects_empty_item(catalog: &Catalog) {
         Err(SaveEventsError::NothingToSave),
         "expected NothingToSave, got {result:?}"
     );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_rolled_back_save_leaves_no_events(catalog: &Catalog) {
+    in_rolled_back_transaction(catalog, |catalog| async move {
+        let event_store = catalog.get_one::<dyn ResourceRawEventStore>().unwrap();
+        let query = make_resource(&catalog, "TestKind").await;
+        event_store
+            .save_events(
+                &query,
+                None,
+                vec![make_raw_event(&query, "Created", serde_json::json!({}))],
+            )
+            .await
+            .unwrap();
+    })
+    .await;
+
+    let total = in_committed_transaction(catalog, |catalog| async move {
+        catalog
+            .get_one::<dyn ResourceRawEventStore>()
+            .unwrap()
+            .total_events_stored()
+            .await
+            .unwrap()
+    })
+    .await;
+    assert_eq!(0, total);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

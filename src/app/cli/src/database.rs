@@ -234,9 +234,7 @@ pub fn configure_in_memory_components(b: &mut CatalogBuilder) {
 
     kamu_datasets_inmem::register_dependencies(b);
 
-    b.add::<kamu_resources_inmem::InMemoryRawResourceEventStore>();
-    b.add::<kamu_resources_inmem::InMemoryResourceRepository>();
-    b.add::<kamu_resources_inmem::InMemoryResourceLabelProjectionRepository>();
+    kamu_resources_inmem::register_dependencies(b);
 
     b.add::<kamu_configuration_inmem::InMemoryVariableSetProjectionRepository>();
     b.add::<kamu_configuration_inmem::InMemorySecretSetProjectionRepository>();

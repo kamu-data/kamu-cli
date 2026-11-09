@@ -9,6 +9,8 @@
 
 mod committed_transaction;
 mod racing_transactions;
+mod rolled_back_transaction;
 
 pub use committed_transaction::*;
 pub use racing_transactions::*;
+pub use rolled_back_transaction::*;
