@@ -48,6 +48,11 @@ macro_rules! declare_resource_service_layer {
                 resource = $resource
             );
 
+            $crate::declare_resource_lifecycle_primitives!(
+                primitives = [<$name ResourceLifecyclePrimitivesImpl>],
+                resource = $resource
+            );
+
             $crate::declare_request_resources_deletion_use_case!(
                 use_case = [<$name RequestResourcesDeletionUseCaseImpl>],
                 resource = $resource
@@ -77,6 +82,7 @@ macro_rules! declare_resource_service_layer {
                 catalog_builder.add::<[<$name EventStoreBridge>]>();
                 catalog_builder.add::<[<$name ResourceAggregateLoaderImpl>]>();
                 catalog_builder.add::<[<$name ResourceLifecycleDispatcher>]>();
+                catalog_builder.add::<[<$name ResourceLifecyclePrimitivesImpl>]>();
                 catalog_builder.add::<[<$name ResourcePersistenceServiceImpl>]>();
                 catalog_builder.add::<[<$name TypedResourceQueryServiceImpl>]>();
                 catalog_builder.add::<[<$name ReconcileResourceUseCaseImpl>]>();

@@ -19,6 +19,7 @@ use kamu_resources::{
     ResourceAggregateLoader,
     ResourceController,
     ResourceID,
+    ResourceLifecyclePrimitives,
     ResourcePersistenceService,
     ResourcePhase,
     ResourceStatusConflictError,
@@ -446,6 +447,7 @@ struct ReconcileTestHarness {
     base: ResourceUseCaseBaseHarness,
     loader: Arc<dyn ResourceAggregateLoader<TestResource>>,
     persistence: Arc<dyn ResourcePersistenceService<TestResource>>,
+    lifecycle_primitives: Arc<dyn ResourceLifecyclePrimitives<TestResource>>,
     controller: Arc<dyn ResourceController<TestResource>>,
 }
 
@@ -465,6 +467,7 @@ impl ReconcileTestHarness {
         Self {
             loader: catalog.get_one().unwrap(),
             persistence: catalog.get_one().unwrap(),
+            lifecycle_primitives: catalog.get_one().unwrap(),
             controller: catalog.get_one().unwrap(),
             base,
         }
@@ -489,10 +492,8 @@ impl ReconcileTestHarness {
     fn make_reconcile_helper(&self) -> ReconcileResourceUseCaseHelper<'_, TestResource> {
         ReconcileResourceUseCaseHelper::new(
             self.loader.as_ref(),
-            self.persistence.as_ref(),
-            self.outbox(),
+            self.lifecycle_primitives.as_ref(),
             self.controller.as_ref(),
-            self.time_source(),
         )
     }
 }

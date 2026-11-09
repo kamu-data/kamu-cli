@@ -70,7 +70,9 @@ uuid = { version = "1", default-features = false }
 
 
 [dev-dependencies]
-database-common = { workspace = true }
+database-common = { workspace = true, features = [
+    "testing",
+] }
 database-common-macros = { workspace = true }
 email-utils = { workspace = true }
 event-sourcing = { workspace = true }
