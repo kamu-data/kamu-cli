@@ -54,13 +54,40 @@ async fn test_begin_reconciliation_marks_reconciling_without_message() {
     let mark = harness.message_count().await;
 
     let version = harness.version(&id).await;
-    harness
-        .commit(|p| async move { p.begin_reconciliation(&id, version.status_generation).await })
+    let started = harness
+        .commit(|p| async move {
+            p.begin_reconciliation(&id, Some(version.status_generation))
+                .await
+        })
         .await
         .unwrap();
 
+    assert!(started.is_some());
     pretty_assertions::assert_eq!(harness.phase(&id).await, ResourcePhase::Reconciling);
     pretty_assertions::assert_eq!(harness.message_kinds_since(mark).await, [] as [&str; 0]);
+}
+
+#[test_log::test(tokio::test)]
+async fn test_begin_reconciliation_of_reconciled_resource_changes_nothing() {
+    let harness = LifecyclePrimitivesHarness::new().await;
+    let id = harness.apply_and_begin("res-a").await;
+    let version = harness.version(&id).await;
+    harness
+        .commit(|p| async move { p.complete_reconciliation(&id, version).await })
+        .await
+        .unwrap();
+    let ready = harness.version(&id).await;
+
+    // A stale expectation does not matter when there is nothing to start
+    let stale = ready.status_generation + 1;
+    let started = harness
+        .commit(|p| async move { p.begin_reconciliation(&id, Some(stale)).await })
+        .await
+        .unwrap();
+
+    assert!(started.is_none());
+    pretty_assertions::assert_eq!(harness.version(&id).await, ready);
+    pretty_assertions::assert_eq!(harness.phase(&id).await, ResourcePhase::Ready);
 }
 
 #[test_log::test(tokio::test)]
@@ -70,7 +97,7 @@ async fn test_begin_reconciliation_rejects_stale_status_generation() {
 
     let stale = harness.version(&id).await.status_generation + 1;
     let result = harness
-        .commit(|p| async move { p.begin_reconciliation(&id, stale).await })
+        .commit(|p| async move { p.begin_reconciliation(&id, Some(stale)).await })
         .await;
 
     assert_matches!(
@@ -347,7 +374,7 @@ impl Transition {
         match self {
             Self::BeginReconciliation => {
                 primitives
-                    .begin_reconciliation(&id, version.status_generation)
+                    .begin_reconciliation(&id, Some(version.status_generation))
                     .await
                     .unwrap();
             }
@@ -473,7 +500,7 @@ impl LifecyclePrimitivesHarness {
     async fn apply_and_begin(&self, name: &str) -> ResourceID {
         let id = self.apply(name).await;
         let status_generation = self.version(&id).await.status_generation;
-        self.commit(|p| async move { p.begin_reconciliation(&id, status_generation).await })
+        self.commit(|p| async move { p.begin_reconciliation(&id, Some(status_generation)).await })
             .await
             .unwrap();
         id

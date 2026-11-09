@@ -76,11 +76,15 @@ where
     pub async fn begin_reconciliation(
         &self,
         id: &ResourceID,
-        expected_status_generation: u64,
-    ) -> TransitionResult<R, R> {
+        expected_status_generation: Option<u64>,
+    ) -> TransitionResult<Option<R>, R> {
         let mut resource = self.load(id).await?;
-        ensure_status_generation(&resource, expected_status_generation)?;
+        if !resource.needs_reconciliation() {
+            return Ok(None);
+        }
 
+        let expected_status_generation =
+            expected_status_generation.unwrap_or(resource.headers().status_generation);
         resource
             .try_mark_reconciliation_started(self.time_source.now(), expected_status_generation)
             .map_err(lifecycle_error)?;
@@ -88,7 +92,7 @@ where
             .save(&mut resource)
             .await?;
 
-        Ok(resource)
+        Ok(Some(resource))
     }
 
     pub async fn complete_reconciliation(
@@ -153,9 +157,14 @@ where
         let now = self.time_source.now();
         let mut resources = self.load_many(ids).await?;
         for resource in &mut resources {
-            resource
-                .try_request_deletion(now)
-                .map_err(ResourceLifecycleTransitionError::Lifecycle)?;
+            resource.try_request_deletion(now).map_err(|err| {
+                // The lifecycle error does not name the resource
+                tracing::error!(
+                    resource_id = %resource.id(),
+                    "Failed to request deletion of a resource"
+                );
+                ResourceLifecycleTransitionError::Lifecycle(err)
+            })?;
         }
 
         self.resource_persistence_service
@@ -324,7 +333,13 @@ where
             .await
             .map_err(ErrorIntoInternal::int_err)?
             .into_iter()
-            .map(|result| result.map_err(|err| ResourceLoadError(err).into()))
+            .zip(ids)
+            .map(|(result, id)| {
+                result.map_err(|err| {
+                    tracing::error!(resource_id = %id, error = %err, "Failed to load a resource");
+                    ResourceLoadError(err).into()
+                })
+            })
             .collect()
     }
 
@@ -419,9 +434,11 @@ macro_rules! declare_resource_lifecycle_primitives {
             async fn begin_reconciliation(
                 &self,
                 id: &kamu_resources::ResourceID,
-                expected_status_generation: u64,
-            ) -> Result<$resource, kamu_resources::ResourceLifecycleTransitionError<$resource>>
-            {
+                expected_status_generation: Option<u64>,
+            ) -> Result<
+                Option<$resource>,
+                kamu_resources::ResourceLifecycleTransitionError<$resource>,
+            > {
                 self.helper()
                     .begin_reconciliation(id, expected_status_generation)
                     .await

@@ -10,13 +10,11 @@
 use crate::domain::{
     EventSourcedResource,
     ReconcileResourceUseCaseError,
-    ResourceAggregateLoader,
     ResourceController,
     ResourceExpectedVersion,
     ResourceID,
     ResourceLifecyclePrimitives,
     ResourceLifecycleTransitionError,
-    ResourceLoadError,
     ResourceStaleExpectationError,
 };
 
@@ -26,7 +24,6 @@ pub struct ReconcileResourceUseCaseHelper<'a, R>
 where
     R: EventSourcedResource,
 {
-    resource_aggregate_loader: &'a dyn ResourceAggregateLoader<R>,
     lifecycle_primitives: &'a dyn ResourceLifecyclePrimitives<R>,
     controller: &'a dyn ResourceController<R>,
 }
@@ -36,12 +33,10 @@ where
     R: EventSourcedResource,
 {
     pub fn new(
-        resource_aggregate_loader: &'a dyn ResourceAggregateLoader<R>,
         lifecycle_primitives: &'a dyn ResourceLifecyclePrimitives<R>,
         controller: &'a dyn ResourceController<R>,
     ) -> Self {
         Self {
-            resource_aggregate_loader,
             lifecycle_primitives,
             controller,
         }
@@ -51,24 +46,14 @@ where
         &self,
         id: ResourceID,
     ) -> Result<Option<R>, ReconcileResourceUseCaseError<R>> {
-        let resource = self
-            .resource_aggregate_loader
-            .load(&id)
-            .await
-            .map_err(ResourceLoadError)
-            .map_err(ReconcileResourceUseCaseError::LoadFailed)?;
-        if !resource.needs_reconciliation() {
-            return Ok(None);
-        }
-
         // Phase 1 commits the "started" transition before the actual reconciliation
         // work, giving the second phase a stable persisted hand-off point.
         let started = self
             .lifecycle_primitives
-            .begin_reconciliation(&id, resource.headers().status_generation)
+            .begin_reconciliation(&id, None)
             .await?;
 
-        Ok(Some(started))
+        Ok(started)
     }
 
     /// Records the outcome of reconciling `started`, the resource as phase 1
@@ -147,9 +132,7 @@ macro_rules! declare_reconcile_resource_use_case {
         }
 
         impl $use_case {
-            #[::database_common_macros::transactional_method3(
-                        resource_aggregate_loader:
-                            std::sync::Arc<dyn kamu_resources::ResourceAggregateLoader<$resource>>,
+            #[::database_common_macros::transactional_method2(
                         lifecycle_primitives:
                             std::sync::Arc<dyn kamu_resources::ResourceLifecyclePrimitives<$resource>>,
                         controller:
@@ -161,7 +144,6 @@ macro_rules! declare_reconcile_resource_use_case {
             ) -> Result<Option<$resource>, kamu_resources::ReconcileResourceUseCaseError<$resource>>
             {
                 let helper = $crate::ReconcileResourceUseCaseHelper::<$resource>::new(
-                    resource_aggregate_loader.as_ref(),
                     lifecycle_primitives.as_ref(),
                     controller.as_ref(),
                 );
@@ -169,9 +151,7 @@ macro_rules! declare_reconcile_resource_use_case {
                 helper.start_reconciliation_phase(id).await
             }
 
-            #[::database_common_macros::transactional_method3(
-                        resource_aggregate_loader:
-                            std::sync::Arc<dyn kamu_resources::ResourceAggregateLoader<$resource>>,
+            #[::database_common_macros::transactional_method2(
                         lifecycle_primitives:
                             std::sync::Arc<dyn kamu_resources::ResourceLifecyclePrimitives<$resource>>,
                         controller:
@@ -184,7 +164,6 @@ macro_rules! declare_reconcile_resource_use_case {
                 // Reconcile the aggregate returned by phase 1 and record the
                 // outcome in a new transaction.
                 let helper = $crate::ReconcileResourceUseCaseHelper::<$resource>::new(
-                    resource_aggregate_loader.as_ref(),
                     lifecycle_primitives.as_ref(),
                     controller.as_ref(),
                 );
