@@ -8,3 +8,4 @@
 // by the Apache License, Version 2.0.
 
 mod test_inmem_outbox_message_bridge;
+mod test_inmem_outbox_message_bridge_transactions;
