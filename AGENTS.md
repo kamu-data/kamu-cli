@@ -167,6 +167,7 @@ change invalidates what it says.
 | Exported Prometheus metrics, recommended alerts, adding metrics | [`docs/internal/metrics.md`](docs/internal/metrics.md) |
 | Task scheduling and execution, the task agent, planners and runners, new task types | [`docs/internal/task-system.md`](docs/internal/task-system.md) |
 | Flows, triggers, configurations, scheduling, sensors, flow process state, new flow types | [`docs/internal/flow-system.md`](docs/internal/flow-system.md) |
+| What every dataset operation shares: plan, execute and commit steps, `HEAD` CAS commits, races, who an operation runs as | [`docs/internal/dataset-operations.md`](docs/internal/dataset-operations.md) |
 | Root dataset ingest: polling and push sources, fetch steps, savepoints, the DataFusion data writer, merge strategies | [`docs/internal/root-dataset-ingest.md`](docs/internal/root-dataset-ingest.md) |
 | Dataset pull: `kamu pull` flags, pull planning and depth ordering, iteration execution, authorization, how the update task reuses the planner | [`docs/internal/dataset-pull.md`](docs/internal/dataset-pull.md) |
 | Dataset sync: `SyncService`, Simple and Smart Transfer Protocols (client and server), `kamu push`, remote repositories and aliases, IPFS | [`docs/internal/dataset-sync.md`](docs/internal/dataset-sync.md) |

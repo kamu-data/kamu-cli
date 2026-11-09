@@ -11,20 +11,25 @@
 
 ## Agent / newcomer quick-start
 
-**One-paragraph mental model.** A dataset is a content-addressed metadata chain plus data and
-checkpoint objects named by their hashes, so copying it means: find which blocks the destination
-lacks, copy the objects those blocks reference, append the blocks, and move the destination's
-`HEAD`. **`SyncService`** does exactly that between two **sync refs** — a local dataset, a local
-dataset to be created, or a remote dataset behind a URL — and picks a protocol from the URLs. A
-pull into a local dataset stops before `HEAD`: the transfer leaves the new blocks unreferenced, and
-the caller commits them in its own transaction with **`LocalSyncCommitter`**. The
-**Simple Transfer Protocol** needs nothing from the remote but readable files (`refs/head`,
-`blocks/`, `data/`, `checkpoints/`), works over the local filesystem, S3 and HTTP, and does all
-the comparison work on the client. The **Smart Transfer Protocol** (`odf+http(s)://` URLs) talks
-to a Kamu node over a WebSocket: the server computes the block delta, ships the blocks as one
-tarball, and hands out URLs (often presigned S3 URLs) for the objects, which the client transfers
-in parallel; it is the only way to *write* to a remote node. `kamu pull` uses sync for datasets
-with a pull alias, `kamu push` always syncs, and the Kamu node serves both protocols.
+**At a glance.**
+
+- A dataset is a content-addressed metadata chain plus data and checkpoint objects named by their
+  hashes. Copying it means: find the blocks the destination lacks, copy the objects they reference,
+  append the blocks, and move the destination's `HEAD`.
+- **`SyncService`** does that between two **sync refs** — a local dataset, a local dataset to be
+  created, or a remote dataset behind a URL — and picks a protocol from the URLs
+  ([§5](#5-choosing-a-protocol)).
+- A pull into a local dataset stops before `HEAD`: the caller commits the new blocks in its own
+  transaction with **`LocalSyncCommitter`** ([dataset-operations.md](dataset-operations.md)).
+- The **Simple Transfer Protocol** needs only readable files on the remote (`refs/head`, `blocks/`,
+  `data/`, `checkpoints/`) over the local filesystem, S3 or HTTP; the client does all the
+  comparison work.
+- The **Smart Transfer Protocol** (`odf+http(s)://`) talks to a Kamu node over a WebSocket: the
+  server computes the block delta, ships the blocks as one tarball, and hands out URLs (often
+  presigned S3 URLs) for the objects, which the client transfers in parallel. It is the only way to
+  *write* to a remote node.
+- `kamu pull` syncs datasets with a pull alias, `kamu push` always syncs, and the Kamu node serves
+  both protocols.
 
 **Where to start reading, by intent:**
 
@@ -40,24 +45,6 @@ with a pull alias, `kamu push` always syncs, and the Kamu node serves both proto
 
 ---
 
-## Table of contents
-
-- [1. Purpose \& scope](#1-purpose--scope)
-- [2. ODF concepts](#2-odf-concepts)
-- [3. Layers and crates](#3-layers-and-crates)
-- [4. Sync requests](#4-sync-requests)
-- [5. Choosing a protocol](#5-choosing-a-protocol)
-- [6. Simple Transfer Protocol](#6-simple-transfer-protocol)
-- [7. Smart Transfer Protocol](#7-smart-transfer-protocol)
-- [8. Push](#8-push)
-- [9. Remote repositories and aliases](#9-remote-repositories-and-aliases)
-- [10. Authorization](#10-authorization)
-- [11. Committing, validation and errors](#11-committing-validation-and-errors)
-- [12. Testing \& gotchas](#12-testing--gotchas)
-- [13. File/crate reference map](#13-filecrate-reference-map)
-
----
-
 ## 1. Purpose & scope
 
 This page covers how one dataset is copied from a source to a destination, whichever side is
@@ -70,7 +57,7 @@ Out of scope, each with its own owner:
 | When `kamu pull` syncs a dataset, how pull requests and local aliases are resolved, how sync jobs are scheduled and authorized among other jobs | [dataset-pull.md](dataset-pull.md) |
 | How the update task runs a sync job on the server | [task-system.md](task-system.md) |
 | How the server reacts to a dataset changed by a push: flows, sensors | [flow-system.md](flow-system.md) |
-| How `HEAD` updates post `DatasetReferenceMessage` | [root-dataset-ingest.md](root-dataset-ingest.md#8-committing-and-concurrency) |
+| How `HEAD` updates post `DatasetReferenceMessage` | [dataset-operations.md](dataset-operations.md#3-committing-head) |
 | The wire format of the Smart Transfer Protocol messages | the ODF [OpenAPI](https://github.com/open-data-fabric/open-data-fabric/blob/master/contracts/transfer/smart-transfer-protocol.openapi.yaml) and [AsyncAPI](https://github.com/open-data-fabric/open-data-fabric/blob/master/contracts/transfer/smart-transfer-protocol.asyncapi.yaml) specs |
 
 ---
@@ -139,8 +126,12 @@ the reference carries an alias.
 | Step | Transaction | Does |
 | --- | --- | --- |
 | Target | the caller's | `PullLocalTarget::resolve_sync_target`: read `expected_head`; no remote is contacted |
-| Transfer | none held across it | `transfer_into_local`: resolve the source's URL with `RemoteDatasetUrlResolver`, open it and check it has a `HEAD` (an unknown repository is `RepositoryNotFound`, a remote named only by ID is `RemoteByIdUnsupported`, a source without `HEAD` is `DatasetNotFound`), compare the chains, store the `Seed` of a new dataset, copy objects, append blocks; no reference moves. Returns `SyncTransfer::UpToDate` or `Transferred(TransferredSync)` |
+| Transfer | none held across it | `transfer_into_local`: resolve and open the source, compare the chains, store the `Seed` of a new dataset, copy objects, append blocks; no reference moves. Returns `SyncTransfer::UpToDate` or `Transferred(TransferredSync)` |
 | Commit | the caller's | `LocalSyncCommitter::commit`: for an existing dataset, `DatasetHeadCommitter` moves `HEAD` from `expected_head` to the new head; for a new one, `CreateDatasetUseCase` creates the entry with `HEAD` already at the new head (`CreateDatasetUseCaseOptions::initial_head`) |
+
+Opening the source fails with `RepositoryNotFound` for an unknown repository,
+`RemoteByIdUnsupported` for a remote named only by ID, and `DatasetNotFound` for a source without
+`HEAD`.
 
 The `Seed` of a new dataset is stored through `DatasetStorageUnitWriter` in a short transaction that
 writes nothing to the database: database-backed storage only needs one to build the dataset, which
@@ -173,6 +164,18 @@ new chain.
 
 `SyncServiceImpl` dispatches on the remote URL: `sync_impl` on a push's destination,
 `transfer_into_local_impl` on a pull's source:
+
+```mermaid
+flowchart LR
+    D{Direction} -->|pull| PS{Source URL}
+    D -->|push| DS{Destination URL}
+    PS -->|"odf+http(s)://"| SMP["Smart, pull flow"]
+    PS -->|other| SIM["Simple"]
+    DS -->|"odf+http(s)://"| SMH["Smart, push flow"]
+    DS -->|"ipns://"| IPFS["IPFS add + IPNS publish"]
+    DS -->|"ipfs://"| REJ(["Rejected"])
+    DS -->|other| SIM
+```
 
 | Direction and remote URL | Protocol |
 | --- | --- |
@@ -457,7 +460,18 @@ calls it with no transaction held:
 | Pull URL of `repo/name` or `repo/account/name` | `odf+` repository: the repository's `odf+http(s)` URL plus the account (asked from the server's `info` and `accounts/me` when the reference has none and the server is multi-tenant) and the name; other repositories: the repository URL joined with the alias |
 | Pull URL of a URL | the URL itself, with a trailing `/` |
 | Pull URL of an ID | not supported |
-| Push target | a `--to` URL as given; a `--to` alias or repository names the repository. Without `--to`: the dataset's single push alias, if it is a URL alias (a `repo/name` push alias is skipped; several aliases are `AmbiguousAlias`); otherwise the only configured repository (none is `EmptyRepositoryList`, several are `AmbiguousRepository`). For a repository, the account and dataset name are those of the `--to` alias when it gives them; otherwise the account comes from the server as above, and the name from a lookup of the dataset ID on the server, falling back to the local name |
+
+A push target is chosen in this order:
+
+1. a `--to` URL, as given; a `--to` alias or repository names the repository;
+2. without `--to`, the dataset's single push alias if it is a URL alias. A `repo/name` push alias
+   is skipped, and several aliases are `AmbiguousAlias`;
+3. otherwise the only configured repository. None is `EmptyRepositoryList`, several are
+   `AmbiguousRepository`.
+
+For a repository, the account and dataset name are those of the `--to` alias when it gives them.
+Otherwise the account comes from the server as for a pull URL, and the name from a lookup of the
+dataset ID on the server, falling back to the local name.
 
 `DatasetPullSourceResolverImpl` owns what a pull alias means:
 

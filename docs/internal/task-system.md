@@ -37,25 +37,6 @@ webhooks.
 
 ---
 
-## Table of contents
-
-- [1. Purpose \& scope](#1-purpose--scope)
-- [2. Layers and crates](#2-layers-and-crates)
-- [3. The task aggregate](#3-the-task-aggregate)
-- [4. Plans, definitions, outcomes](#4-plans-definitions-outcomes)
-- [5. The task agent](#5-the-task-agent)
-- [6. Transactions](#6-transactions)
-- [7. Task types](#7-task-types)
-- [8. Failure handling](#8-failure-handling)
-- [9. Storage backends](#9-storage-backends)
-- [10. Integration with the flow system](#10-integration-with-the-flow-system)
-- [11. GraphQL API](#11-graphql-api)
-- [12. Recipe: a new task type](#12-recipe-a-new-task-type)
-- [13. Testing \& gotchas](#13-testing--gotchas)
-- [14. File/crate reference map](#14-filecrate-reference-map)
-
----
-
 ## 1. Purpose & scope
 
 The flow system decides **when** something should happen — on a schedule, on upstream changes, on
@@ -352,31 +333,23 @@ before touching them.
 
 ### Who moves `HEAD`
 
-Ingest, transform and compaction share one shape: **the core service writes new blocks with
-`update_block_ref: false` outside any transaction, and the runner then moves `HEAD` in a short
-transaction with compare-and-swap** — `DatasetUpdateSteps::commit_head`, the step `kamu pull`
-also uses, re-resolves the dataset through `DatasetRegistry` and moves `HEAD` from `old_head` to
-`new_head` through `DatasetHeadCommitter`. `runners/task_head_commit.rs` turns a commit that did not
-happen into the task's outcome, for every dataset runner: a moved `HEAD` is the recoverable
-`TaskErrorDatasetCommit::HeadMoved`, a deleted dataset or a denied commit an unrecoverable empty
-error. Blocks written by an attempt that never reaches that step stay unreferenced, so a re-run
-after a crash, or a concurrent writer that moved `HEAD` first, cannot corrupt the chain. Sync and
-reset differ:
+Every dataset task follows the plan, execute, commit shape of
+[dataset-operations.md](dataset-operations.md#2-plan-execute-commit): the core service writes blocks
+with no transaction open, and the runner moves `HEAD` in a short transaction with a CAS through
+`DatasetUpdateSteps::commit_head`, the step `kamu pull` also uses. Reset is the exception: the
+reset runner moves `HEAD` through `ResetExecutor`, in one transaction for the whole reset.
 
-| Task / job | Writes blocks | Moves `HEAD` | Transaction around the work |
-| --- | --- | --- | --- |
-| Update → ingest | `PollingIngestService` | runner, CAS on `old_head` | none; short one for `HEAD` |
-| Update → transform | `TransformExecutor` | runner, CAS on `old_head` | none; short one for `HEAD` |
-| Update → sync | `SyncService::transfer_into_local` | runner, `DatasetUpdateSteps::transfer_and_commit_sync` through `LocalSyncCommitter`: CAS on the head read before the transfer ([dataset-sync.md](dataset-sync.md#4-sync-requests)) | none; short one to read `HEAD`, short one for `HEAD` |
-| Hard compact / reset to metadata | `CompactionExecutor` | runner, CAS on `old_head` | none; short one for `HEAD` |
-| Reset | — (existing block) | `ResetExecutor`, CAS on the planned `old_head` | one for the whole reset |
+`runners/task_head_commit.rs` turns a commit that did not happen into the task's outcome, for every
+dataset runner:
 
-On DB-backed datasets `set_ref` goes through `DatasetReferenceServiceImpl::set_reference`, which
-posts `DatasetReferenceMessage::Updated` in the same transaction; the read models catch up from
-that message, not from the task ([dataset-reset.md](dataset-reset.md#7-after-a-history-rewrite)).
+| Commit | Task outcome |
+| --- | --- |
+| `HEAD` moved by another writer | recoverable `TaskErrorDatasetCommit::HeadMoved`, with the expected and actual heads |
+| Dataset deleted | unrecoverable, empty |
+| Moving `HEAD` not allowed | unrecoverable, empty |
 
-A detached dataset (see [§6](#6-transactions)) can still be read but panics on `set_ref`, which is
-why every runner that moves `HEAD` re-resolves the dataset first.
+The read models catch up from `DatasetReferenceMessage`, not from the task
+([dataset-reset.md](dataset-reset.md#7-after-a-history-rewrite)).
 
 ### 7.1 Update dataset
 
@@ -605,6 +578,33 @@ not depend on it; the whole contract is:
 | `TaskScheduler::cancel_task` | aborting a flow ([§3](#3-the-task-aggregate) covers what cancellation does) |
 | `TaskProgressMessage::{Running, Finished}` on the outbox | advancing, retrying or completing the flow |
 | `TaskOutcome` with the `recoverable` flag | deciding whether to retry ([§8](#8-failure-handling)) |
+
+One attempt of a flow, end to end:
+
+```mermaid
+sequenceDiagram
+    participant F as Flow agent
+    participant S as TaskScheduler
+    participant A as Task agent
+    participant R as Planner and runner
+    participant O as Outbox
+
+    rect rgba(100, 150, 255, 0.15)
+    F->>S: create_task(plan, flow ID)
+    end
+    rect rgba(100, 150, 255, 0.15)
+    A->>S: take the queued task
+    A->>O: TaskProgressMessage::Running
+    end
+    O-->>F: on_task_running
+    A->>R: plan, then run (own transactions)
+    R-->>A: TaskOutcome
+    rect rgba(100, 150, 255, 0.15)
+    A->>S: record the outcome
+    A->>O: TaskProgressMessage::Finished
+    end
+    O-->>F: on_task_finished: complete, retry or fail the flow
+```
 
 How the flow side drives these — activation, the progress consumer, retries, propagation — is
 owned by [flow-system.md](flow-system.md#5-life-of-a-flow).

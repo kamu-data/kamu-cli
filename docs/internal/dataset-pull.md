@@ -9,17 +9,28 @@
 
 ## Agent / newcomer quick-start
 
-**One-paragraph mental model.** "Pull" means *bring these datasets up to date*, whatever that
-takes for each one. A root dataset is updated by **ingest** from its polling source, a derivative
-by **transform** of its inputs, and any dataset with a remote **pull alias** by **sync** from that
-remote. Pull itself does none of this work: it is a planner and a scheduler. The **planner**
-resolves the requested references (local names, wildcards, remote refs), optionally walks upstream
-dependencies, gives every dataset a **depth** (sources first, each derivative one deeper than its
-deepest input) and turns each one into a job: `Ingest`, `Transform` or `Sync`. The **use case**
-runs the plan one depth at a time. It checks authorization for the whole depth, runs that depth's
-jobs concurrently, moves each dataset's `HEAD` after its job commits, and stops at the first depth
-that has an error. The server's update task uses the same planner for one dataset and runs the
-single job it gets back.
+**At a glance.** "Pull" means *bring these datasets up to date*, whatever that takes for each:
+
+- A dataset with a remote **pull alias** is **synced** from that remote, a root is **ingested** from
+  its polling source, a derivative is **transformed** from its inputs.
+- Pull itself does none of this work: it plans and schedules. The **planner** resolves the
+  references, optionally walks upstream dependencies, and gives every dataset a **depth** (sources
+  first, each derivative one deeper than its deepest input).
+- The **use case** runs one depth at a time: it authorizes the whole depth, runs its jobs
+  concurrently, and stops after the first depth that has an error.
+- Every job follows the shared plan, execute, commit shape
+  ([dataset-operations.md](dataset-operations.md)).
+- The server's update task uses the same planner for one dataset and runs the single job it gets.
+
+```mermaid
+flowchart LR
+    REQ["References<br/>names, patterns, remote refs"] --> PLAN["Planner<br/>one transaction"]
+    PLAN --> D0["Depth 0<br/>syncs and ingests"]
+    D0 -->|all succeeded| D1["Depth 1<br/>transforms"]
+    D1 -->|all succeeded| DN["Depth n …"]
+    D0 -. any failed .-> STOP(["Stop: report results"])
+    D1 -. any failed .-> STOP
+```
 
 **Where to start reading, by intent:**
 
@@ -31,22 +42,6 @@ single job it gets back.
 | Know who may pull what | [§7 Authorization](#7-authorization) |
 | See how the server reuses pull | [§8 Server use](#8-server-use) |
 | Find the file for X | [§11 Reference map](#11-filecrate-reference-map) |
-
----
-
-## Table of contents
-
-- [1. Purpose \& scope](#1-purpose--scope)
-- [2. Concepts](#2-concepts)
-- [3. Layers and crates](#3-layers-and-crates)
-- [4. The CLI command](#4-the-cli-command)
-- [5. Planning](#5-planning)
-- [6. Execution](#6-execution)
-- [7. Authorization](#7-authorization)
-- [8. Server use](#8-server-use)
-- [9. Results and errors](#9-results-and-errors)
-- [10. Testing \& gotchas](#10-testing--gotchas)
-- [11. File/crate reference map](#11-filecrate-reference-map)
 
 ---
 
@@ -164,6 +159,19 @@ request, or for a `Remote` one an existing dataset or the alias to create one un
 5. **Depth.** Syncs and ingests are depth 0. A transform is one more than its deepest upstream
    dependency (`DependencyGraphService::get_upstream_dependencies`, visited recursively).
 
+How step 4 picks the job:
+
+```mermaid
+flowchart TD
+    R{"Request"} -->|Remote| SYNC["Sync"]
+    R -->|Local| A{"Pull aliases?"}
+    A -->|one| SYNC
+    A -->|two or more| ERR["AmbiguousSource"]
+    A -->|none| K{"Dataset kind"}
+    K -->|root| ING["Ingest"]
+    K -->|derivative| TR["Transform"]
+```
+
 Items are keyed by local alias, so a dataset reached twice is planned once; if a later visit is
 explicit, the item becomes explicit.
 
@@ -200,42 +208,101 @@ If any request fails to resolve, or any item fails to become a job, `execute_mul
 those errors and runs nothing. A sync source that is unknown or cannot be reached is not a planning
 error: it fails only its own job.
 
+### 5.4 Example
+
+`kamu pull --recursive report`, where `report` is a derivative of the root `orders` and of `rates`,
+a dataset with a pull alias:
+
+| Depth | Job | Why |
+| --- | --- | --- |
+| 0 | `Sync(rates)` | it has a pull alias; syncs sort before local jobs |
+| 0 | `Ingest(orders)` | a root; added by `--recursive` as an implicit item |
+| 1 | `Transform(report)` | one deeper than its deepest input |
+
+`rates` and `orders` run concurrently. If the remote of `rates` is unreachable, its job fails, the
+`orders` ingest still commits, and the pull stops after depth 0: `report` is not attempted and the
+command reports one failure and one update. Without `--recursive`, the plan holds only
+`Transform(report)` at depth 1, and its inputs are used as they are.
+
 ---
 
 ## 6. Execution
 
 ### 6.1 The iteration loop
 
-`PullDatasetUseCaseImpl::pull_by_plan` runs the iterations in depth order. For each one it:
+`PullDatasetUseCaseImpl::pull_by_plan` runs the iterations in depth order:
 
-1. checks authorization for the whole iteration in one transaction ([§7](#7-authorization)) and
-   records a failed `PullResponse` for every denied job;
-2. spawns every allowed job of the iteration on a `JoinSet` and waits for all of them;
-3. records each job's `PullResponse`; if any job was denied or failed, it stops after this
-   iteration, since later iterations may depend on it.
+```mermaid
+sequenceDiagram
+    participant U as Pull use case
+    participant G as DatasetOperationGuard
+    participant J as Jobs of the depth
 
-Jobs of one iteration run concurrently and independently: one job's failure does not cancel the
-others. Each job opens its own short transactions, and long work (fetching, engines, transfers)
-runs outside them.
+    loop each depth, until one has a failure
+        rect rgba(100, 150, 255, 0.15)
+        U->>G: authorize every job of the depth
+        G-->>U: denied jobs become failed responses
+        end
+        par each allowed job
+            U->>J: run (own short transactions)
+        end
+        J-->>U: one PullResponse per job
+    end
+```
+
+- Authorization covers the whole depth in one transaction ([§7](#7-authorization)).
+- Jobs of one depth run concurrently on a `JoinSet` and independently: one job's failure does not
+  cancel the others.
+- If any job was denied or failed, the pull stops after this depth, since later depths may depend
+  on it.
 
 ### 6.2 Per-job runners
 
-| Job | Runner | Moves `HEAD` |
-| --- | --- | --- |
-| Ingest | `PullIngestLoop::run`: plans the ingest and resolves the dataset's env vars in one transaction (`DatasetUpdateSteps::plan_ingest`) ([root-dataset-ingest.md](root-dataset-ingest.md#51-call-sequence)); then calls `PollingIngestService::ingest` until `has_more` is false (with `exhaust_sources`), adding up the results so the response spans the first old head to the last new head. A dataset without a polling source is up to date. A failure after earlier iterations committed is `PullError::IngestStopped`, carrying the committed heads and increment and the iteration's error | after every ingest iteration that returns `Updated`, `DatasetUpdateSteps::commit_head` (CAS) |
-| Transform | `PullTransformJob::run`: plans and elaborates in one transaction (`DatasetUpdateSteps::elaborate_transform`) ([derived-dataset-transform.md](derived-dataset-transform.md#44-transactions)), so it sees what earlier depths committed; on a diverged input with `reset_derivatives_on_diverged_input`, resets the derivative to metadata and elaborates once more ([derived-dataset-transform.md](derived-dataset-transform.md#7-diverged-inputs)); then executes. A failure after the reset committed is `PullError::TransformStopped`, carrying the reset's heads and the error | after the reset and after the transform, `DatasetUpdateSteps::commit_head` (CAS) |
-| Sync | `PullSyncJob::run`: reads the target's `HEAD` in a transaction of its own (`DatasetUpdateSteps::resolve_sync_target`), then `SyncService::transfer_into_local` with no transaction open (`DatasetUpdateSteps::transfer_and_commit_sync`), which resolves and opens the source. With `add_aliases` on, `transfer_and_commit_sync` stores the pull alias of a dataset the sync created (`old_head: None`) in the commit's transaction, so the dataset never exists without it | after the transfer, in `transfer_and_commit_sync`: `LocalSyncCommitter` (CAS, or creation of a new dataset) |
+Each job plans when it runs, not when the pull was planned, so it sees what earlier depths
+committed. It moves `HEAD` through `DatasetUpdateSteps`, the same steps the update task uses
+([dataset-operations.md](dataset-operations.md#2-plan-execute-commit)).
 
-`DatasetUpdateSteps::commit_head` moves `HEAD` through `DatasetHeadCommitter`, expecting the head
-the iteration started from, which posts `DatasetReferenceMessage`
-([root-dataset-ingest.md](root-dataset-ingest.md#8-committing-and-concurrency)), and returns a
-`HeadCommit`: committed, head moved, dataset deleted or not allowed. `HeadCommit::into_pull_result`
-makes any outcome but committed that dataset's error: `PullError::HeadMoved` with the expected and
-actual heads, `NotFound` or `Access`. A sync job's lost race, `SyncError::HeadMoved` from
-`LocalSyncCommitter`, becomes the same `PullError::HeadMoved`, so a conflict has one shape for every
-job; a target deleted before the commit makes `transfer_and_commit_sync` return `None`, which
-becomes the same `NotFound`. When the same job committed earlier (an ingest iteration, or a reset
-before a transform), that error becomes the `source` of `IngestStopped` or `TransformStopped`.
+**Ingest** (`PullIngestLoop::run`):
+
+- plans the ingest and resolves the dataset's environment variables in one transaction
+  ([root-dataset-ingest.md](root-dataset-ingest.md#51-call-sequence));
+- runs ingest iterations until the source reports no more data (`exhaust_sources`), committing
+  `HEAD` after every iteration that returns `Updated`;
+- reports one result spanning the first old head to the last new head. A dataset without a polling
+  source is up to date;
+- a failure after earlier iterations committed is `PullError::IngestStopped`, which carries the
+  committed heads and increment and the failing iteration's error.
+
+**Transform** (`PullTransformJob::run`):
+
+- elaborates in one transaction
+  ([derived-dataset-transform.md](derived-dataset-transform.md#44-transactions));
+- on a diverged input with `--reset-derivatives-on-diverged-input`, resets the derivative to
+  metadata, commits that, and elaborates once more
+  ([derived-dataset-transform.md](derived-dataset-transform.md#7-diverged-inputs));
+- executes and commits `HEAD`;
+- a failure after the reset committed is `PullError::TransformStopped`, which carries the reset's
+  heads and the error.
+
+**Sync** (`PullSyncJob::run`):
+
+- reads the target's `HEAD` in a transaction of its own (`resolve_sync_target`);
+- transfers with no transaction open, then commits through `LocalSyncCommitter`, which also
+  creates a new dataset (`transfer_and_commit_sync`);
+- with `add_aliases` on, stores the pull alias of a dataset the sync created in the commit's
+  transaction, so the dataset never exists without it.
+
+**How a commit that did not happen is reported.** `HeadCommit::into_pull_result` turns each
+outcome of [the shared commit](dataset-operations.md#3-committing-head) into that dataset's error:
+
+| Commit | `PullError` |
+| --- | --- |
+| `HEAD` moved by another writer | `HeadMoved`, with the expected and actual heads; a sync's `SyncError::HeadMoved` becomes the same |
+| Dataset deleted | `NotFound`; also for a sync whose target was deleted before the commit |
+| Not allowed | `Access` |
+
+When the same job committed earlier (an ingest iteration, or a reset before a transform), that error
+becomes the `source` of `IngestStopped` or `TransformStopped`.
 
 ### 6.3 Listeners
 

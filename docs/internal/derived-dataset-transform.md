@@ -10,19 +10,43 @@
 
 ## Agent / newcomer quick-start
 
-**One-paragraph mental model.** A **derivative dataset** declares a `SetTransform`: a list of
-input datasets (by ID, each with a query alias) and a SQL transform for a named **engine**. Kamu
-never runs that SQL itself: it hands it to a versioned **engine container** (Spark, Flink,
-DataFusion, RisingWave) through the ODF engine protocol. A transform run has three phases. **Plan**
-reads the derivative's chain: the transform, its schema, and the last `ExecuteTransform`, which
-records how far each input was consumed. **Elaborate** turns that into a request: for every input,
-the data slices and explicit watermarks added since the consumed block, or "up to date" when there
-are none. **Execute** provisions an engine, mounts the slices and the previous checkpoint into the
-container, runs the query, then appends `SetDataSchema` (first time only) and one
-`ExecuteTransform` block **without moving `HEAD`**. The caller moves `HEAD` with a
-compare-and-swap, exactly as ingest does. If an input's history is rewritten (compaction, reset),
-the derivative can no longer continue from the consumed block; it must be reset to metadata and
-recomputed from scratch.
+**At a glance.**
+
+- A **derivative dataset** declares a `SetTransform`: input datasets (by ID, each with a query
+  alias) and a SQL query for a named **engine**.
+- Kamu never runs that SQL itself: it hands it to a versioned **engine container** (Spark, Flink,
+  DataFusion, RisingWave) through the ODF engine protocol, one container per run.
+- **Plan** reads the derivative's chain: the transform, its schema, and the last
+  `ExecuteTransform`, which records how far each input was consumed.
+- **Elaborate** turns that into a request: per input, the slices and watermarks added since the
+  consumed block — or "up to date" when there are none.
+- **Execute** runs the engine and appends `SetDataSchema` (first time only) and one
+  `ExecuteTransform`, without moving `HEAD`; the caller commits
+  ([dataset-operations.md](dataset-operations.md)).
+- If an input's history is rewritten (compaction, reset), the derivative cannot continue from the
+  consumed block: it must be reset to metadata and recomputed ([§7](#7-diverged-inputs)).
+
+```mermaid
+sequenceDiagram
+    participant J as Caller (pull job or update task)
+    participant P as TransformPlanner
+    participant X as TransformExecutor
+    participant E as Engine container
+    participant C as DatasetHeadCommitter
+
+    rect rgba(100, 150, 255, 0.15)
+    J->>P: elaborate at current heads
+    P-->>J: request, or UpToDate
+    end
+    J->>X: execute_transform(request)
+    X->>E: provision, mount inputs, run query
+    E-->>X: data file, checkpoint, offsets
+    X->>X: append SetDataSchema?, ExecuteTransform
+    X-->>J: Updated { old_head, new_head }
+    rect rgba(100, 150, 255, 0.15)
+    J->>C: CAS HEAD old_head → new_head
+    end
+```
 
 **Where to start reading, by intent:**
 
@@ -35,23 +59,6 @@ recomputed from scratch.
 | Understand rewritten inputs and resets | [§7 Diverged inputs](#7-diverged-inputs) |
 | Know how failures map to task outcomes | [§9 Errors](#9-errors) |
 | Find the file for X | [§12 Reference map](#12-filecrate-reference-map) |
-
----
-
-## Table of contents
-
-- [1. Purpose \& scope](#1-purpose--scope)
-- [2. ODF concepts](#2-odf-concepts)
-- [3. Layers and crates](#3-layers-and-crates)
-- [4. Plan, elaborate, execute](#4-plan-elaborate-execute)
-- [5. Engines](#5-engines)
-- [6. Entry points](#6-entry-points)
-- [7. Diverged inputs](#7-diverged-inputs)
-- [8. Committing and concurrency](#8-committing-and-concurrency)
-- [9. Errors](#9-errors)
-- [10. Local files](#10-local-files)
-- [11. Testing \& gotchas](#11-testing--gotchas)
-- [12. File/crate reference map](#12-filecrate-reference-map)
 
 ---
 
@@ -166,6 +173,18 @@ blocks, moves no reference and reports to no listener.
 4. From those blocks, oldest first, it collects the physical hashes of new data slices and every
    `newWatermark` as an explicit watermark.
 
+```mermaid
+flowchart TD
+    IN["For each input"] --> SCH{"Schema at the newest<br/>block to consume?"}
+    SCH -->|none| NP(["InputNotPulled"])
+    SCH -->|yes| ANC{"Consumed block an<br/>ancestor of the input HEAD?"}
+    ANC -->|no| DIV(["InvalidInputInterval:<br/>diverged input, §7"])
+    ANC -->|yes| COL["Collect new slices<br/>and watermarks"]
+    COL --> ANY{"Anything new, or<br/>no output schema yet?"}
+    ANY -->|no| UTD(["UpToDate"])
+    ANY -->|yes| REQ(["Elaborated request"])
+```
+
 The result is `UpToDate` when every input has no new slices and no new watermarks **and** the
 derivative already has a schema. A derivative without a schema always runs, so that the engine can
 establish the output schema even from empty inputs. `InputNotPulledError` is returned to the
@@ -175,6 +194,11 @@ treat the derivative as up to date.
 
 Otherwise the request gets the current time as `system_time`, which becomes the new block's system
 time.
+
+**Example.** The last `ExecuteTransform` of `report` consumed its input `orders` up to block `o2`,
+offset 9. Since then `orders` gained `o3` (`AddData`, offsets 10–14) and `o4` (`AddData` with only
+a new watermark). Elaboration collects the slice of `o3` and the watermark of `o4`; the request asks
+the engine for input offsets 10–14, and the new `ExecuteTransform` records `o4` as consumed.
 
 ### 4.3 Execute and commit
 
@@ -338,6 +362,15 @@ When an input's history is rewritten — hard compaction, reset, a forced pull �
 `ExecuteTransform` consumed is no longer an ancestor of the input's `HEAD`. Offsets cannot be
 compared across the rewrite, so the derivative cannot continue.
 
+```mermaid
+flowchart LR
+    S[Seed] --> O1[o1] --> O2["o2<br/>consumed by report"] --> O3[o3]
+    S --> N1["compacted blocks<br/>input HEAD after compaction"]
+```
+
+Walking back from the new `HEAD` never reaches `o2`, so elaboration fails with
+`InvalidInputIntervalError`.
+
 | Path | Detection | What happens |
 | --- | --- | --- |
 | `kamu pull` | elaboration fails with `InvalidInputIntervalError` | error, unless `--reset-derivatives-on-diverged-input`: then `PullTransformJob` resets the derivative to metadata ([dataset-reset.md](dataset-reset.md#6-reset-to-metadata)), moves `HEAD` to the reset head through `DatasetHeadCommitter` (CAS), re-plans and elaborates once more. The pull reports one update from the head before the reset to the final head |
@@ -351,22 +384,16 @@ every input from its first block.
 
 ## 8. Committing and concurrency
 
-Transforms use the same split as ingest
-([root-dataset-ingest.md](root-dataset-ingest.md#8-committing-and-concurrency)): the executor
-appends `SetDataSchema` and `ExecuteTransform` with `update_block_ref: false`, and the caller moves
-`HEAD` with `check_ref_is: Some(old_head)`. That ref update posts `DatasetReferenceMessage`, which
-downstream sensors, the dependency graph and statistics react to.
+The executor appends `SetDataSchema` and `ExecuteTransform` without moving `HEAD`, and the caller
+moves it with a CAS on the head elaboration saw ([§4.4](#44-transactions)). The shared rules are in
+[dataset-operations.md](dataset-operations.md#3-committing-head). Specific to transforms:
 
-Consequences specific to transforms:
-
-- `old_head` is the head elaboration saw ([§4.4](#44-transactions)). Another writer that moves
-  the derivative's `HEAD` during execution (a manual `kamu pull`, a reset) makes the CAS fail, and
-  the appended blocks and data file stay unreferenced.
-- The CAS covers only the derivative. Inputs are read without locks: an input that moves after
-  elaboration is picked up by the next run, and an input that is compacted between elaboration and
-  execution fails inside the engine or at materialization.
-- The schema is committed in its own block before `ExecuteTransform`, but `HEAD` moves only after
-  both, so readers never see one without the other.
+- Another writer that moves the derivative's `HEAD` during execution (a manual `kamu pull`, a
+  reset) makes the CAS fail.
+- The CAS covers only the derivative. An input compacted between elaboration and execution fails
+  inside the engine or at materialization.
+- The schema is committed in its own block before `ExecuteTransform`; readers never see one without
+  the other.
 
 ---
 

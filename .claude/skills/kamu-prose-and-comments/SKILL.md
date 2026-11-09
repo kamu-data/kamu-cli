@@ -53,6 +53,12 @@ These apply to `docs/internal/*.md`, `AGENTS.md`, `CLAUDE.md` and skills.
   which task". A new skill needs a row there too, plus its `.agents/skills` symlink.
 - **Prefer tables and checklists** for decisions and procedures. Prose is for the reasoning
   behind them.
+- **Lead with behaviour, then name the code.** "Each job commits its own `HEAD`
+  (`DatasetUpdateSteps::commit_head`)" reads better than a sentence built from identifiers. A
+  table cell over about 25 words belongs in a subsection or a list instead.
+- **Diagrams are Mermaid,** small (about a dozen nodes), one per question. In sequence diagrams a
+  shaded `rect rgba(100, 150, 255, 0.15)` marks a database transaction, and a call outside one
+  holds none ([example](../../../docs/internal/dataset-operations.md#2-plan-execute-commit)).
 - **Record rejected approaches with the reason.** A "Rejected approaches" table stops the next
   session from re-proposing a dead end. Give the evidence that killed each one.
 

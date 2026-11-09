@@ -9,19 +9,34 @@
 
 ## Agent / newcomer quick-start
 
-**One-paragraph mental model.** A **root dataset** gets data from the outside world through a
-**source** declared in its metadata chain: one `SetPollingSource` (Kamu goes and fetches the data)
-or any number of named `AddPushSource` events (a client sends the data in). Both kinds share one
-pipeline: read the input into a DataFusion data frame and run an optional preprocess query, then
-hand it to the **data writer**, which **merges** it with the dataset's history according to the
-source's merge strategy, adds the system columns, writes one Parquet slice, and appends
-`SetDataSchema` (first time only) and `AddData` blocks to the metadata chain. The writer appends
-blocks **without moving the `HEAD` reference**; the caller moves `HEAD` afterwards with a
-compare-and-swap against the head it started from, and that ref update is what the dataset
-projections (blocks, dependency graph, statistics, search) react to. Polling ingest adds a fetch
-layer in front of the writer — fetch, prepare, read — with **source state** (an ETag, a
-last-modified time, a last file name, a block number) stored in `AddData` so the next run can
-resume, and a local **savepoint** so a failed run can retry without re-fetching.
+**At a glance.**
+
+- A **root dataset** gets data through a **source** declared in its chain: one `SetPollingSource`
+  (Kamu fetches the data) or any number of named `AddPushSource` events (a client sends it).
+- Both kinds share one pipeline: read the input into a DataFusion data frame, run an optional
+  preprocess query, and hand it to the **data writer**.
+- The writer **merges** the data with the dataset's history by the source's merge strategy, writes
+  one Parquet slice, and appends `SetDataSchema` (first time only) and `AddData` blocks — without
+  moving `HEAD`. The caller commits `HEAD` afterwards
+  ([dataset-operations.md](dataset-operations.md)).
+- Polling adds a fetch layer in front: fetch, prepare, read. The **source state** stored in
+  `AddData` (an ETag, a last-modified time, a last file name, a block number) lets the next run
+  resume, and a local **savepoint** lets a failed run retry without fetching again.
+
+```mermaid
+flowchart LR
+    subgraph Polling
+        F[Fetch] --> P["Prepare<br/>decompress, pipe"]
+    end
+    subgraph Push
+        M["Materialize<br/>file, stream, buffer"]
+    end
+    P --> R[Read]
+    M --> R
+    R --> PRE["Preprocess<br/>optional SQL"]
+    PRE --> W["Data writer<br/>merge, stage, append blocks"]
+    W --> C(["Caller commits HEAD"])
+```
 
 **Where to start reading, by intent:**
 
@@ -35,23 +50,6 @@ resume, and a local **savepoint** so a failed run can retry without re-fetching.
 | Understand `HEAD` updates, races and messages | [§8 Committing and concurrency](#8-committing-and-concurrency) |
 | Know how failures map to task outcomes | [§9 Errors](#9-errors) |
 | Find the file for X | [§12 Reference map](#12-filecrate-reference-map) |
-
----
-
-## Table of contents
-
-- [1. Purpose \& scope](#1-purpose--scope)
-- [2. ODF concepts](#2-odf-concepts)
-- [3. Layers and crates](#3-layers-and-crates)
-- [4. The data writer](#4-the-data-writer)
-- [5. Polling ingest](#5-polling-ingest)
-- [6. Push ingest](#6-push-ingest)
-- [7. Entry points](#7-entry-points)
-- [8. Committing and concurrency](#8-committing-and-concurrency)
-- [9. Errors](#9-errors)
-- [10. Local files](#10-local-files)
-- [11. Testing \& gotchas](#11-testing--gotchas)
-- [12. File/crate reference map](#12-filecrate-reference-map)
 
 ---
 
@@ -238,6 +236,18 @@ their only path: it returns an empty map unless secrets encryption is configured
 (`SecretsEncryptionConfig::is_enabled`) and a `DatasetEnvVarResolver` is registered, and
 `IngestEnvVars` prints keys only.
 
+```mermaid
+flowchart TD
+    CC{"Cache check:<br/>data but no source state?"} -->|"yes, no fetch_uncacheable"| UTD1(["UpToDate, uncacheable"])
+    CC -->|no| SP{"Usable savepoint?"}
+    SP -->|yes| PREP[Prepare]
+    SP -->|no| FETCH[Fetch]
+    FETCH -->|source unchanged| UTD2(["UpToDate"])
+    FETCH -->|new data| PREP
+    PREP --> READ[Read] --> PRE[Preprocess] --> STAGE["Stage and append blocks"]
+    STAGE --> UPD(["Updated: heads, has_more, increment"])
+```
+
 `PollingIngestServiceImpl::ingest` runs one **iteration**:
 
 1. **Cache check.** A source is *uncacheable* when the dataset already has data
@@ -328,6 +338,28 @@ A source that yields data in batches (glob, container, EVM) reports `has_more`. 
 
 ### 6.1 Call sequence
 
+Push ingest runs in one transaction, the command's or the request's:
+
+```mermaid
+sequenceDiagram
+    participant U as PushIngestDataUseCase
+    participant G as DatasetOperationGuard
+    participant P as PushIngestPlanner
+    participant E as PushIngestExecutor
+    participant C as DatasetHeadCommitter
+
+    rect rgba(100, 150, 255, 0.15)
+    U->>G: authorize PushIngest (Write)
+    opt upload into a dataset with no source
+        U->>U: append AddPushSource "auto"
+    end
+    U->>P: plan at HEAD or expected_head
+    U->>E: materialize, read, preprocess, stage, quota check, append
+    U->>C: CAS HEAD old_head → new_head
+    U->>U: post DatasetExternallyChangedMessage
+    end
+```
+
 `PushIngestDataUseCaseImpl::execute(target, data_source, options, listener)` first authorizes
 `PushIngest` (Write) on the target for the current `Principal` through
 [`DatasetOperationGuard`](../../src/domain/datasets/domain/src/services/dataset_operation_guard.rs),
@@ -407,34 +439,17 @@ only. Dataset env vars are resolved by the planner in both paths ([§5.1](#51-ca
 
 ## 8. Committing and concurrency
 
-Ingest separates **appending blocks** from **publishing them**:
+The writer appends `SetDataSchema` / `AddData` chained onto `meta.head` without moving `HEAD`; the
+caller then moves it with a CAS. The shared rules — the committer, the messages it posts, what a
+lost race leaves behind — are in [dataset-operations.md](dataset-operations.md#3-committing-head).
+Specific to ingest:
 
-1. The writer appends `SetDataSchema` / `AddData` with `prev_block_hash = meta.head` and
-   `update_block_ref: false`. Data files and blocks land in storage; `HEAD` does not move, so no
-   reader sees them yet.
-2. The caller moves `HEAD` from `old_head` through `DatasetHeadCommitter`, a CAS in the caller's
-   transaction. The chain's database-backed reference repository calls
-   `DatasetReferenceServiceImpl::set_reference`, which writes the reference row and posts
-   `DatasetReferenceMessage::Updated` in the same transaction; consumers
-   write the storage-level reference, index the new blocks (which feeds the dependency graph), and
-   update statistics and search ([outbox.md](outbox.md)).
-
-Consequences:
-
-- Two writers racing on one dataset both append blocks chained onto the same parent; the second
-  CAS fails and its blocks and data file stay in storage unreferenced. Neither writer takes a lock.
-  The polling path does not retry in-process; a flow-driven ingest is retried only as a new task
-  under the flow's retry policy ([§9](#9-errors)).
-- The writer state comes from the moment it was planned, which for both `kamu pull` and the
-  update task is just before the fetch. A push that lands while the fetch runs makes the poll's
-  CAS fail.
-- `HEAD` moves only after all of an operation's blocks are written, so readers see the blocks of
-  one operation together. That can still be a `SetDataSchema` alone, when a first ingest yields no
-  rows ([§4.3](#43-what-stage-decides)), or an auto-created push source alone, when an upload
-  adds no rows ([§6.1](#61-call-sequence)).
-- `DatasetExternallyChangedMessage` is posted by push ingest (and by the smart push server,
-  [dataset-sync.md](dataset-sync.md#72-push-flow)); flows use it to tell user pushes from their
-  own updates.
+- The writer state is planned just before the fetch, for both `kamu pull` and the update task. A
+  push that lands while the fetch runs makes the poll's CAS fail.
+- The blocks published together can be a `SetDataSchema` alone, when a first ingest yields no rows
+  ([§4.3](#43-what-stage-decides)), or an auto-created push source alone, when an upload adds no
+  rows ([§6.1](#61-call-sequence)).
+- Push ingest posts `DatasetExternallyChangedMessage` besides the reference message.
 
 ---
 

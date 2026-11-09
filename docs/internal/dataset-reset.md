@@ -11,18 +11,22 @@
 
 ## Agent / newcomer quick-start
 
-**One-paragraph mental model.** Kamu has two unrelated mechanisms that are both called "reset".
-**Reset to a block** moves `HEAD` to a block that already exists in the dataset's block store, by
-default the `Seed`; nothing is rewritten. Usually the target is an ancestor and the chain simply
-ends earlier, but nothing checks that, so it can also select another branch
-([§5](#5-reset-to-a-block)). **Reset to metadata** keeps the dataset's
-definition and drops its data: it runs the hard compaction services with `keep_metadata_only`,
-which rebuild the chain on the original `Seed` from every metadata event except `AddData` and
-`ExecuteTransform`. A derivative reset to metadata recomputes from its inputs' first blocks; this
-is how derivatives recover after an input's history was rewritten. Neither deletes anything:
-abandoned blocks and data stay in storage. Every history rewrite moves `HEAD` to a block that is
-not a descendant of the old one, and the read models that follow `HEAD` (block index, statistics,
-search, dependency graph) detect that and rebuild; this page owns that behaviour for all rewrites.
+**At a glance.** Two unrelated mechanisms are both called "reset":
+
+- **Reset to a block** moves `HEAD` to a block already in the dataset's block store, by default the
+  `Seed`. Nothing is rewritten. The target is usually an ancestor, but nothing checks that, so it
+  can also select another branch ([§5](#5-reset-to-a-block)).
+- **Reset to metadata** keeps the dataset's definition and drops its data. It runs the hard
+  compaction services with `keep_metadata_only`, rebuilding the chain on the original `Seed` from
+  every event except `AddData` and `ExecuteTransform` ([§6](#6-reset-to-metadata)). This is how a
+  derivative recovers after an input's history was rewritten: it recomputes from its inputs' first
+  blocks.
+- **Neither deletes anything.** Abandoned blocks and data stay in storage.
+- **Every history rewrite** — reset, compaction, forced sync — leaves `HEAD` on a block that is not
+  a descendant of the old one. The read models that follow `HEAD` detect it and rebuild; this page
+  owns that behaviour ([§7](#7-after-a-history-rewrite)).
+- Both follow the shared plan, execute, commit shape
+  ([dataset-operations.md](dataset-operations.md)).
 
 **Where to start reading, by intent:**
 
@@ -33,21 +37,6 @@ search, dependency graph) detect that and rebuild; this page owns that behaviour
 | Understand what reset to metadata keeps | [§6 Reset to metadata](#6-reset-to-metadata) |
 | Know what any history rewrite does to indexes, statistics and caches | [§7 After a history rewrite](#7-after-a-history-rewrite) |
 | Find the file for X | [§10 Reference map](#10-filecrate-reference-map) |
-
----
-
-## Table of contents
-
-- [1. Purpose \& scope](#1-purpose--scope)
-- [2. ODF concepts](#2-odf-concepts)
-- [3. Layers and crates](#3-layers-and-crates)
-- [4. Entry points](#4-entry-points)
-- [5. Reset to a block](#5-reset-to-a-block)
-- [6. Reset to metadata](#6-reset-to-metadata)
-- [7. After a history rewrite](#7-after-a-history-rewrite)
-- [8. Errors and results](#8-errors-and-results)
-- [9. Testing \& gotchas](#9-testing--gotchas)
-- [10. File/crate reference map](#10-filecrate-reference-map)
 
 ---
 
@@ -125,6 +114,15 @@ afterwards.
 
 ## 5. Reset to a block
 
+```mermaid
+flowchart LR
+    S[Seed] --> B1[block 1] --> B2[block 2] --> B3[block 3]
+    OLD(["HEAD before"]) -.-> B3
+    NEW(["HEAD after reset to block 1"]) -.-> B1
+```
+
+Blocks 2 and 3 are not deleted; another reset can move `HEAD` back to block 3.
+
 **Plan.** `ResetPlannerImpl::plan_reset` takes an optional new head and an optional expected old
 head:
 
@@ -151,6 +149,22 @@ target block's history recorded, so the next ingest or transform continues from 
 ---
 
 ## 6. Reset to metadata
+
+```mermaid
+flowchart TB
+    subgraph Before["Before"]
+        direction LR
+        A0[Seed] --> A1[SetTransform] --> A2[SetDataSchema] --> A3[ExecuteTransform] --> A4[SetInfo] --> A5["ExecuteTransform<br/>HEAD"]
+    end
+    subgraph After["After"]
+        direction LR
+        B0[Seed] --> B1["SetTransform′"] --> B2["SetDataSchema′"] --> B4["SetInfo′<br/>HEAD"]
+    end
+    Before ~~~ After
+```
+
+A derivative loses its `ExecuteTransform` blocks, a root its `AddData` blocks; `′` marks a block
+re-committed with the same event but a new hash.
 
 Reset to metadata runs `CompactionPlanner::plan_compaction` with `keep_metadata_only: true` and
 `CompactionExecutor::execute`; the compaction page owns the chain walk and the rebuild
@@ -184,6 +198,17 @@ of the current head move `HEAD` off the previous head's line. On database-backed
 `HEAD` move goes through `DatasetReferenceServiceImpl::set_reference`, which posts
 `DatasetReferenceMessage::Updated` with the previous and new heads in the same transaction. The
 consumers handle a rewrite as follows:
+
+```mermaid
+flowchart LR
+    MOVE["HEAD moves off<br/>the old line"] --> MSG[("DatasetReferenceMessage::Updated")]
+    MSG --> IDX["Block index:<br/>divergence, re-save chain"]
+    IDX --> KEY[("DatasetKeyBlocksMessage")]
+    KEY --> DEP["Dependency graph"]
+    MSG --> STATS["Statistics: recompute"]
+    MSG --> SEARCH["Search: full reindex"]
+    MSG --> REF["Storage reference file"]
+```
 
 | Consumer | On a rewrite |
 | --- | --- |

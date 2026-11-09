@@ -69,6 +69,24 @@ authorized.
 Agents, startup jobs and the outbox drain after a command resolve from the **background catalog**,
 built in `app.rs`:
 
+```mermaid
+flowchart TD
+    BASE["Base catalog<br/>no principal<br/>predefined-accounts registrator"]
+    CLIBASE["CLI base catalog<br/>+ server components when the command needs them"]
+    CLI["CLI catalog<br/>caller + Principal::from(caller)"]
+    BG["Background catalog<br/>caller + Principal::Node"]
+    CMD(["The command"])
+    AG(["Agents, startup jobs,<br/>outbox drain"])
+
+    BASE --> CLIBASE
+    CLIBASE --> CLI
+    CLIBASE --> BG
+    CLI --> CMD
+    BG --> AG
+    AG -. "CatalogWeakRef<br/>per-call resolution" .-> BG
+```
+
+
 - It is a *sibling* of the CLI catalog: the same CLI components on the same parent, with the process
   caller and `Principal::Node` instead of the caller's principal.
 - It cannot be chained from the CLI catalog: a child catalog cannot override its parent's

@@ -10,17 +10,22 @@
 
 ## Agent / newcomer quick-start
 
-**One-paragraph mental model.** A root dataset that receives many small appends ends up with many
-small Parquet files, one per `AddData` block that carries data, and queries pay for every file
-header. **Hard compaction** rewrites the dataset's history as if the data had arrived in a few
-large batches. The **planner** walks the chain from `HEAD` back to the `Seed` and groups runs of
-consecutive `AddData` blocks into batches bounded by a maximum file size and record count; every
-other metadata event ends a batch and is kept. The **executor** merges each batch's files into one
-with embedded DataFusion, then rebuilds the chain on top of the original `Seed`: kept events are
-re-committed, and each batch becomes one `AddData` covering the same offset range. The caller then
-moves `HEAD` to the new chain with a compare-and-swap. Every block hash after the `Seed` changes,
-so derivatives and remote copies that saw the old blocks can no longer continue from them. Nothing
-is deleted: the old blocks and files stay in storage.
+**At a glance.**
+
+- **Why.** A root dataset with many small appends has many small Parquet files, one per `AddData`
+  that carries data, and queries pay for every file header.
+- **What.** Hard compaction rewrites the history as if the data had arrived in a few large batches
+  (the diagram in [§6](#6-execution)).
+- **Plan.** The planner walks the chain from `HEAD` to the `Seed` and groups runs of consecutive
+  `AddData` blocks into batches bounded by a file size and a record count; any other event ends a
+  batch and is kept ([§5](#5-planning)).
+- **Execute.** The executor merges each batch's files into one with embedded DataFusion, then
+  rebuilds the chain on the original `Seed`: kept events are re-committed, each batch becomes one
+  `AddData` over the same offset range.
+- **Commit.** The caller moves `HEAD` to the new chain with a compare-and-swap
+  ([dataset-operations.md](dataset-operations.md#3-committing-head)).
+- **Consequences.** Every block hash after the `Seed` changes, so derivatives and remote copies
+  cannot continue from the old blocks ([§8](#8-after-compaction)). Nothing is deleted.
 
 **Where to start reading, by intent:**
 
@@ -32,21 +37,6 @@ is deleted: the old blocks and files stay in storage.
 | Know what happens to old files | [§7 Storage](#7-storage) |
 | Know what breaks downstream | [§8 After compaction](#8-after-compaction) |
 | Find the file for X | [§10 Reference map](#10-filecrate-reference-map) |
-
----
-
-## Table of contents
-
-- [1. Purpose \& scope](#1-purpose--scope)
-- [2. ODF concepts](#2-odf-concepts)
-- [3. Layers and crates](#3-layers-and-crates)
-- [4. Entry points](#4-entry-points)
-- [5. Planning](#5-planning)
-- [6. Execution](#6-execution)
-- [7. Storage](#7-storage)
-- [8. After compaction](#8-after-compaction)
-- [9. Testing \& gotchas](#9-testing--gotchas)
-- [10. File/crate reference map](#10-filecrate-reference-map)
 
 ---
 
@@ -171,6 +161,26 @@ count.
 ---
 
 ## 6. Execution
+
+A chain before and after hard compaction with the default limits; `′` marks a block re-committed
+with the same event but a new hash:
+
+```mermaid
+flowchart TB
+    subgraph Before["Before"]
+        direction LR
+        A0[Seed] --> A1[SetPollingSource] --> A2[SetDataSchema] --> A3["AddData s1"] --> A4["AddData s2"] --> A5["AddData s3"] --> A6[SetInfo] --> A7["AddData s4<br/>HEAD"]
+    end
+    subgraph After["After"]
+        direction LR
+        B0[Seed] --> B1["SetPollingSource′"] --> B2["SetDataSchema′"] --> B3["AddData s1+s2+s3<br/>one merged file"] --> B6["SetInfo′"] --> B7["AddData s4′<br/>HEAD"]
+    end
+    Before ~~~ After
+```
+
+The `Seed` is the same block. `s1`–`s3` merge because no other event separates them; `s4` is alone
+after `SetInfo`, so it is carried over. The old blocks and files stay in storage
+([§7](#7-storage)).
 
 `CompactionExecutorImpl::execute` returns `NothingToDo` for a plan with no effect. Otherwise:
 
