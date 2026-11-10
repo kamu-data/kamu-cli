@@ -19,6 +19,7 @@ use kamu_resources::{
     ResourcePresentation,
     ResourcePresentationDefinition,
     ResourceSchemaProvider,
+    ResourceStatusRules,
     TypeUri,
 };
 
@@ -59,6 +60,10 @@ impl DeclarativeResource for VariableSetResource {
     type SpecInput = VariableSetSpecInput;
     type ResourceState = VariableSetState;
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl ResourceStatusRules for VariableSetResource {}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

@@ -15,6 +15,7 @@ use crate::{
     ResourceDeletionInProgressError,
     ResourceReconcileError,
     ResourceStatus,
+    ResourceStatusRules,
     StatusConflictOf,
 };
 
@@ -26,7 +27,7 @@ use crate::{
 /// counts status updates. Status updates take the `status_generation` the
 /// caller read as a precondition and fail with a status conflict when it is
 /// stale.
-pub trait ManagedResource: DeclarativeResource {
+pub trait ManagedResource: DeclarativeResource + ResourceStatusRules {
     type ReconcileError: ResourceReconcileError;
     type LifecycleError: StatusConflictOf + From<ResourceDeletionInProgressError>;
 
