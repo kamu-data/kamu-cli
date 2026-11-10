@@ -92,11 +92,13 @@ impl MessageConsumerT<ResourceLifecycleMessage> for ConfigurationResourceLifecyc
                     _ => Ok(()),
                 }
             }
-            // Deletion cleanup belongs to the controllers
+            // Deletion cleanup belongs to the controllers, and the projections hold
+            // specs, not conditions
             ResourceLifecycleMessage::Applied(_)
             | ResourceLifecycleMessage::ReconciliationFailed(_)
             | ResourceLifecycleMessage::DeletionRequested(_)
-            | ResourceLifecycleMessage::Deleted(_) => Ok(()),
+            | ResourceLifecycleMessage::Deleted(_)
+            | ResourceLifecycleMessage::StatusUpdated(_) => Ok(()),
         }
     }
 }

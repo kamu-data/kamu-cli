@@ -12,6 +12,8 @@ use std::sync::Arc;
 use crate::{
     EventSourcedResource,
     ResourceCleanupError,
+    ResourceConditionUpdateError,
+    ResourceConditionsPatch,
     ResourceID,
     ResourceLifecycleTransitionError,
     ResourceStatusConflictError,
@@ -81,6 +83,18 @@ pub trait ResourceLifecyclePrimitives<R: EventSourcedResource>: Send + Sync {
         &self,
         failures: &[ResourceCleanupFailure],
     ) -> Result<ResourceBatchTransition<R>, ResourceLifecycleTransitionError<R>>;
+
+    /// Sets and removes the conditions the patch names, each checked against
+    /// its registered schema and the change against the type's status rules,
+    /// and posts `StatusUpdated` naming the conditions that changed. A patch
+    /// that changes nothing records and posts nothing. Accepted while the
+    /// deletion is in progress, so a writer can still record an outcome
+    async fn update_conditions(
+        &self,
+        id: &ResourceID,
+        expected_status_generation: u64,
+        patch: &ResourceConditionsPatch,
+    ) -> Result<R, ResourceConditionUpdateError<R>>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

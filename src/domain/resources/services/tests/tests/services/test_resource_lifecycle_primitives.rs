@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use std::assert_matches;
+use std::collections::BTreeMap;
 use std::future::Future;
 use std::sync::Arc;
 
@@ -19,14 +20,24 @@ use kamu_resources::{
     DeclarativeResource,
     MESSAGE_PRODUCER_KAMU_RESOURCE_SERVICE,
     ManagedResource,
+    RESOURCE_CONDITION_RECONCILIATION_ERROR_SCHEMA_URI,
+    RESOURCE_LABEL_ENVIRONMENT_SCHEMA_URI,
     ResourceAggregateLoader,
     ResourceBatchTransition,
     ResourceCleanupError,
     ResourceCleanupFailure,
+    ResourceConditionPatchError,
+    ResourceConditionUpdateError,
+    ResourceConditionsPatch,
     ResourceDeletionCompletion,
     ResourceExpectedVersion,
+    ResourceExtensionKind,
+    ResourceExtensionResolutionError,
+    ResourceExtensionValueError,
     ResourceID,
     ResourceLifecycleMessage,
+    ResourceLifecycleMessageConditionChange,
+    ResourceLifecycleMessageStatusUpdated,
     ResourceLifecyclePrimitives,
     ResourceLifecycleTransitionError,
     ResourcePersistenceService,
@@ -35,6 +46,8 @@ use kamu_resources::{
     ResourceStaleExpectationError,
     ResourceTransitionSkip,
     ResourceTransitionSkipReason,
+    TypeRef,
+    TypeUri,
 };
 use kamu_resources_services::testing::{
     BaseResourceServiceHarness,
@@ -43,7 +56,14 @@ use kamu_resources_services::testing::{
 use messaging_outbox::{OutboxMessageBoundary, OutboxMessageBridge, OutboxProvider};
 
 use crate::tests::use_cases::{ResourceUseCaseBaseHarness, ResourceUseCaseBaseHarnessOpts};
-use crate::tests::utils::{TestResource, TestResourceReconcileError, TestResourceSpec};
+use crate::tests::utils::{
+    TEST_OTHER_TYPE_CONDITION_URI,
+    TEST_PAYLOAD_CONDITION_URI,
+    TEST_STAGE_CONDITION_URI,
+    TestResource,
+    TestResourceReconcileError,
+    TestResourceSpec,
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -312,6 +332,313 @@ async fn test_record_cleanup_failure_with_stale_status_generation_is_skipped() {
     );
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_writers_patching_different_conditions_keep_both() {
+    let harness = LifecyclePrimitivesHarness::new().await;
+    let id = harness.apply("res-a").await;
+    let read_by_both = harness.version(&id).await.status_generation;
+
+    let first = harness
+        .update_conditions(id, read_by_both, stage_patch("running"))
+        .await
+        .unwrap();
+    let after_first = first.headers().status_generation;
+    harness
+        .update_conditions(
+            id,
+            after_first,
+            payload_patch(serde_json::json!({ "step": 1 })),
+        )
+        .await
+        .unwrap();
+
+    pretty_assertions::assert_eq!(after_first, read_by_both + 1);
+    pretty_assertions::assert_eq!(
+        harness.conditions(&id).await,
+        [
+            (
+                condition_key(TEST_STAGE_CONDITION_URI),
+                serde_json::json!("running")
+            ),
+            (
+                condition_key(TEST_PAYLOAD_CONDITION_URI),
+                serde_json::json!({ "step": 1 })
+            ),
+        ]
+        .into()
+    );
+}
+
+#[test_log::test(tokio::test)]
+async fn test_writer_with_stale_status_generation_changes_nothing() {
+    let harness = LifecyclePrimitivesHarness::new().await;
+    let id = harness.apply("res-a").await;
+    let read_by_both = harness.version(&id).await.status_generation;
+    harness
+        .update_conditions(id, read_by_both, stage_patch("running"))
+        .await
+        .unwrap();
+    let version = harness.version(&id).await;
+    let mark = harness.message_count().await;
+
+    let result = harness
+        .update_conditions(
+            id,
+            read_by_both,
+            payload_patch(serde_json::json!({ "step": 1 })),
+        )
+        .await;
+
+    assert_matches!(
+        result,
+        Err(ResourceConditionUpdateError::StatusGenerationChanged(_))
+    );
+    pretty_assertions::assert_eq!(harness.version(&id).await, version);
+    pretty_assertions::assert_eq!(harness.message_kinds_since(mark).await, [] as [&str; 0]);
+}
+
+#[test_log::test(tokio::test)]
+async fn test_invalid_condition_patch_changes_nothing() {
+    let oversized = "x".repeat(70);
+    let cases = [
+        (
+            stage_patch_value(serde_json::json!(5)),
+            ResourceConditionPatchError::InvalidValue {
+                key: uri(TEST_STAGE_CONDITION_URI),
+                error: ResourceExtensionValueError::new("stage must be a string"),
+            },
+        ),
+        (
+            stage_patch(&oversized),
+            ResourceConditionPatchError::TooLarge {
+                key: uri(TEST_STAGE_CONDITION_URI),
+                size: oversized.len() + 2,
+                max: 64,
+            },
+        ),
+        (
+            set_patch("https://test.kamu.dev/schemas/test/v1/conditions/Unknown"),
+            ResourceConditionPatchError::Resolution(ResourceExtensionResolutionError::UnknownUri {
+                kind: ResourceExtensionKind::Condition,
+                uri: uri("https://test.kamu.dev/schemas/test/v1/conditions/Unknown"),
+            }),
+        ),
+        (
+            set_patch(TEST_OTHER_TYPE_CONDITION_URI),
+            ResourceConditionPatchError::Resolution(
+                ResourceExtensionResolutionError::Inapplicable {
+                    uri: uri(TEST_OTHER_TYPE_CONDITION_URI),
+                    resource_schema: uri(TestResource::SCHEMA_STR),
+                },
+            ),
+        ),
+        (
+            set_patch(RESOURCE_LABEL_ENVIRONMENT_SCHEMA_URI),
+            ResourceConditionPatchError::Resolution(
+                ResourceExtensionResolutionError::KindMismatch {
+                    uri: uri(RESOURCE_LABEL_ENVIRONMENT_SCHEMA_URI),
+                    expected_kind: ResourceExtensionKind::Condition,
+                    actual_kind: ResourceExtensionKind::Label,
+                },
+            ),
+        ),
+        (
+            ResourceConditionsPatch::new()
+                .remove(uri(RESOURCE_CONDITION_RECONCILIATION_ERROR_SCHEMA_URI)),
+            ResourceConditionPatchError::FrameworkOwned {
+                key: uri(RESOURCE_CONDITION_RECONCILIATION_ERROR_SCHEMA_URI),
+            },
+        ),
+    ];
+
+    for (patch, expected) in cases {
+        let harness = LifecyclePrimitivesHarness::new().await;
+        let id = harness.apply("res-a").await;
+        let version = harness.version(&id).await;
+        let events = harness.event_count().await;
+        let messages = harness.message_count().await;
+
+        let result = harness
+            .update_conditions(id, version.status_generation, patch)
+            .await;
+
+        let Err(ResourceConditionUpdateError::InvalidPatch(error)) = result else {
+            panic!("expected {expected:?}, got {result:?}");
+        };
+        pretty_assertions::assert_eq!(error, expected);
+        pretty_assertions::assert_eq!(harness.version(&id).await, version, "{expected:?}");
+        pretty_assertions::assert_eq!(harness.event_count().await, events, "{expected:?}");
+        pretty_assertions::assert_eq!(harness.message_count().await, messages, "{expected:?}");
+    }
+}
+
+#[test_log::test(tokio::test)]
+async fn test_change_rejected_by_status_rules_changes_nothing() {
+    let harness = LifecyclePrimitivesHarness::new().await;
+    let id = harness.apply("res-a").await;
+    let status_generation = harness.version(&id).await.status_generation;
+    harness
+        .update_conditions(
+            id,
+            status_generation,
+            stage_patch(TestResource::FINAL_STAGE),
+        )
+        .await
+        .unwrap();
+    let version = harness.version(&id).await;
+    let events = harness.event_count().await;
+    let messages = harness.message_count().await;
+
+    for patch in [
+        stage_patch("running"),
+        ResourceConditionsPatch::new().remove(uri(TEST_STAGE_CONDITION_URI)),
+    ] {
+        let result = harness
+            .update_conditions(id, version.status_generation, patch)
+            .await;
+
+        assert_matches!(result, Err(ResourceConditionUpdateError::Rejected(_)));
+    }
+    pretty_assertions::assert_eq!(harness.version(&id).await, version);
+    pretty_assertions::assert_eq!(harness.event_count().await, events);
+    pretty_assertions::assert_eq!(harness.message_count().await, messages);
+}
+
+#[test_log::test(tokio::test)]
+async fn test_status_updated_message_carries_values_of_carried_conditions_only() {
+    let harness = LifecyclePrimitivesHarness::new().await;
+    let id = harness.apply("res-a").await;
+    let status_generation = harness.version(&id).await.status_generation;
+    let mark = harness.message_count().await;
+
+    let updated = harness
+        .update_conditions(
+            id,
+            status_generation,
+            stage_patch("running").set(
+                uri(TEST_PAYLOAD_CONDITION_URI),
+                serde_json::json!({ "step": 1 }),
+            ),
+        )
+        .await
+        .unwrap();
+
+    let [message] = harness.status_updates_since(mark).await.try_into().unwrap();
+    pretty_assertions::assert_eq!(message.resource.id, id);
+    pretty_assertions::assert_eq!(message.resource.schema, uri(TestResource::SCHEMA_STR));
+    pretty_assertions::assert_eq!(message.resource.headers, *updated.headers());
+    pretty_assertions::assert_eq!(
+        harness.raw_messages_since(mark).await[0]["StatusUpdated"]["changed_conditions"],
+        serde_json::json!({
+            TEST_PAYLOAD_CONDITION_URI: { "Set": { "value": null } },
+            TEST_STAGE_CONDITION_URI: { "Set": { "value": "running" } },
+        })
+    );
+}
+
+#[test_log::test(tokio::test)]
+async fn test_status_updated_message_names_only_conditions_that_changed() {
+    let harness = LifecyclePrimitivesHarness::new().await;
+    let id = harness.apply("res-a").await;
+    let status_generation = harness.version(&id).await.status_generation;
+    let staged = harness
+        .update_conditions(
+            id,
+            status_generation,
+            stage_patch("running").set(
+                uri(TEST_PAYLOAD_CONDITION_URI),
+                serde_json::json!({ "step": 1 }),
+            ),
+        )
+        .await
+        .unwrap();
+    let mark = harness.message_count().await;
+
+    harness
+        .update_conditions(
+            id,
+            staged.headers().status_generation,
+            stage_patch("running").remove(uri(TEST_PAYLOAD_CONDITION_URI)),
+        )
+        .await
+        .unwrap();
+
+    let [message] = harness.status_updates_since(mark).await.try_into().unwrap();
+    pretty_assertions::assert_eq!(
+        message.changed_conditions,
+        [(
+            uri(TEST_PAYLOAD_CONDITION_URI),
+            ResourceLifecycleMessageConditionChange::Removed
+        )]
+        .into()
+    );
+}
+
+#[test_log::test(tokio::test)]
+async fn test_patch_that_changes_nothing_records_nothing() {
+    let harness = LifecyclePrimitivesHarness::new().await;
+    let id = harness.apply("res-a").await;
+    let status_generation = harness.version(&id).await.status_generation;
+    harness
+        .update_conditions(id, status_generation, stage_patch("running"))
+        .await
+        .unwrap();
+    let version = harness.version(&id).await;
+    let events = harness.event_count().await;
+    let messages = harness.message_count().await;
+
+    harness
+        .update_conditions(
+            id,
+            version.status_generation,
+            stage_patch("running").remove(uri(TEST_PAYLOAD_CONDITION_URI)),
+        )
+        .await
+        .unwrap();
+
+    pretty_assertions::assert_eq!(harness.version(&id).await, version);
+    pretty_assertions::assert_eq!(harness.event_count().await, events);
+    pretty_assertions::assert_eq!(harness.message_count().await, messages);
+}
+
+#[test_log::test(tokio::test)]
+async fn test_conditions_are_patched_while_deleting_but_not_once_deleted() {
+    let harness = LifecyclePrimitivesHarness::new().await;
+    let id = harness.apply_and_request_deletion("res-a").await;
+    let status_generation = harness.version(&id).await.status_generation;
+    let mark = harness.message_count().await;
+
+    let deleting = harness
+        .update_conditions(
+            id,
+            status_generation,
+            stage_patch(TestResource::FINAL_STAGE),
+        )
+        .await
+        .unwrap();
+    pretty_assertions::assert_eq!(deleting.status().phase, ResourcePhase::Deleting);
+    pretty_assertions::assert_eq!(harness.message_kinds_since(mark).await, ["StatusUpdated"]);
+
+    harness
+        .commit(|p| async move { p.complete_deletion(&[completion(id, None)]).await })
+        .await
+        .unwrap();
+    let deleted = harness.version(&id).await;
+
+    let result = harness
+        .update_conditions(
+            id,
+            deleted.status_generation,
+            payload_patch(serde_json::json!({ "step": 1 })),
+        )
+        .await;
+
+    assert_matches!(result, Err(ResourceConditionUpdateError::Lifecycle(_)));
+    pretty_assertions::assert_eq!(harness.version(&id).await, deleted);
+}
+
 #[test_log::test(tokio::test)]
 async fn test_rolled_back_transition_leaves_no_event_and_no_message() {
     for transition in [
@@ -321,6 +648,7 @@ async fn test_rolled_back_transition_leaves_no_event_and_no_message() {
         Transition::RequestDeletion,
         Transition::CompleteDeletion,
         Transition::RecordCleanupFailure,
+        Transition::UpdateConditions,
     ] {
         let harness = LifecyclePrimitivesHarness::new().await;
         let id = harness.prepare_for(transition).await;
@@ -361,6 +689,7 @@ enum Transition {
     RequestDeletion,
     CompleteDeletion,
     RecordCleanupFailure,
+    UpdateConditions,
 }
 
 impl Transition {
@@ -407,6 +736,12 @@ impl Transition {
                     .unwrap();
                 pretty_assertions::assert_eq!(transitioned_ids(&transition), [id]);
             }
+            Self::UpdateConditions => {
+                primitives
+                    .update_conditions(&id, version.status_generation, &stage_patch("running"))
+                    .await
+                    .unwrap();
+            }
         }
     }
 }
@@ -433,6 +768,31 @@ fn cleanup_failure(id: ResourceID, expected_status_generation: u64) -> ResourceC
             "cleanup failed",
         ))),
     }
+}
+
+fn uri(uri: &str) -> TypeUri {
+    TypeUri::new_unchecked(uri)
+}
+
+fn condition_key(uri: &str) -> TypeRef {
+    TypeRef::Uri(TypeUri::new_unchecked(uri))
+}
+
+fn stage_patch(stage: &str) -> ResourceConditionsPatch {
+    stage_patch_value(serde_json::json!(stage))
+}
+
+fn stage_patch_value(value: serde_json::Value) -> ResourceConditionsPatch {
+    ResourceConditionsPatch::new().set(uri(TEST_STAGE_CONDITION_URI), value)
+}
+
+fn payload_patch(payload: serde_json::Value) -> ResourceConditionsPatch {
+    ResourceConditionsPatch::new().set(uri(TEST_PAYLOAD_CONDITION_URI), payload)
+}
+
+/// Sets the condition `key` to a valid stage
+fn set_patch(key: &str) -> ResourceConditionsPatch {
+    ResourceConditionsPatch::new().set(uri(key), serde_json::json!("running"))
 }
 
 fn transitioned_ids(transition: &ResourceBatchTransition<TestResource>) -> Vec<ResourceID> {
@@ -517,9 +877,9 @@ impl LifecyclePrimitivesHarness {
     /// Brings the resource into the state the transition applies to
     async fn prepare_for(&self, transition: Transition) -> ResourceID {
         match transition {
-            Transition::BeginReconciliation | Transition::RequestDeletion => {
-                self.apply("res-a").await
-            }
+            Transition::BeginReconciliation
+            | Transition::RequestDeletion
+            | Transition::UpdateConditions => self.apply("res-a").await,
             Transition::CompleteReconciliation | Transition::FailReconciliation => {
                 self.apply_and_begin("res-a").await
             }
@@ -575,6 +935,23 @@ impl LifecyclePrimitivesHarness {
             .save(&mut resource)
             .await
             .unwrap();
+    }
+
+    async fn update_conditions(
+        &self,
+        id: ResourceID,
+        expected_status_generation: u64,
+        patch: ResourceConditionsPatch,
+    ) -> Result<TestResource, ResourceConditionUpdateError<TestResource>> {
+        self.commit(|p| async move {
+            p.update_conditions(&id, expected_status_generation, &patch)
+                .await
+        })
+        .await
+    }
+
+    async fn conditions(&self, id: &ResourceID) -> BTreeMap<TypeRef, serde_json::Value> {
+        self.load(id).await.status().conditions.entries.clone()
     }
 
     async fn version(&self, id: &ResourceID) -> ResourceExpectedVersion {
@@ -641,11 +1018,41 @@ impl LifecyclePrimitivesHarness {
                 ResourceLifecycleMessage::Deleted(message) => {
                     format!("Deleted({})", message.resources.len())
                 }
+                ResourceLifecycleMessage::StatusUpdated(_) => "StatusUpdated".to_string(),
+            })
+            .collect()
+    }
+
+    async fn status_updates_since(
+        &self,
+        mark: usize,
+    ) -> Vec<ResourceLifecycleMessageStatusUpdated> {
+        self.lifecycle_messages()
+            .await
+            .into_iter()
+            .skip(mark)
+            .filter_map(|message| match message {
+                ResourceLifecycleMessage::StatusUpdated(message) => Some(message),
+                ResourceLifecycleMessage::Applied(_)
+                | ResourceLifecycleMessage::ReconciliationSucceeded(_)
+                | ResourceLifecycleMessage::ReconciliationFailed(_)
+                | ResourceLifecycleMessage::DeletionRequested(_)
+                | ResourceLifecycleMessage::Deleted(_) => None,
             })
             .collect()
     }
 
     async fn lifecycle_messages(&self) -> Vec<ResourceLifecycleMessage> {
+        self.raw_messages_since(0)
+            .await
+            .into_iter()
+            .map(|content| serde_json::from_value(content).unwrap())
+            .collect()
+    }
+
+    /// The JSON of every lifecycle message posted after the first `mark`, as
+    /// the outbox stores it
+    async fn raw_messages_since(&self, mark: usize) -> Vec<serde_json::Value> {
         self.catalog()
             .get_one::<dyn OutboxMessageBridge>()
             .unwrap()
@@ -658,7 +1065,8 @@ impl LifecyclePrimitivesHarness {
             .await
             .unwrap()
             .into_iter()
-            .map(|message| serde_json::from_value(message.content_json).unwrap())
+            .skip(mark)
+            .map(|message| message.content_json)
             .collect()
     }
 }
