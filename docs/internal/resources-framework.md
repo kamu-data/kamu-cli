@@ -135,11 +135,11 @@ long-term goal. This page documents what exists now.
 | **Descriptor** | Schema (`TypeUri`) + selector name/aliases identifying a type for routing/presentation; domain type `ResourceTypeDescriptor`, carried in `dill` as `ResourceDispatcherMeta`. |
 | **Manifest** | The user-authored wire document (`$schema`/`headers`/`spec`) in YAML or JSON. |
 | **Spec** | The desired-state portion authored by the user; stored as `serde_json::Value`. |
-| **Status** | Server-owned observed state (`ResourceStatus`: `phase`, optional `observedGeneration`/`observedAt`/`reconciledGeneration`/`reconciledAt`, and `conditions`), written only by controllers. `conditions` is a `TypeRef → JSON` map. `generation` lives in **headers**, not status. On a `Resource` (domain/GraphQL), `status` is always present — a resource with no reconciliation yet gets a synthesized `Pending` status with no conditions. The `Option` lives only in the persisted `ResourceSnapshot` row (`None` before the first write completes). |
+| **Status** | Server-owned observed state (`ResourceStatus`: `phase`, optional `observedGeneration`/`observedAt`/`reconciledGeneration`/`reconciledAt`, and `conditions`), written only by the lifecycle primitives ([§9](#lifecycle-primitives)). `conditions` is a `TypeRef → JSON` map. `generation` lives in **headers**, not status. On a `Resource` (domain/GraphQL), `status` is always present — a resource with no reconciliation yet gets a synthesized `Pending` status with no conditions. The `Option` lives only in the persisted `ResourceSnapshot` row (`None` before the first write completes). |
 | **Snapshot** | The persisted materialized form of a resource (`ResourceSnapshot`). |
 | **Phase** | Lifecycle stage: `Pending`, `Reconciling`, `Ready`, `Degraded`, `Failed`, `Deleting`, `Deleted` (ODF `ResourcePhase`). `Pending`, `Deleting` and `Deleted` are derived from the headers, deletion first: `Deleted` once `deletedAt` is set, `Deleting` once `deletionRequestedAt` is set, otherwise `Pending` whenever `observedGeneration` is absent or lower than `generation`. See [§13 state machine](#lifecycle-state-machine). |
 | **Two-phase deletion** | Deleting a resource requests its deletion (`Deleting`); its main controller cleans up, then the deletion completes (`Deleted`). A resource being deleted gives up its name at once. See [(c) Deletion](#c-deletion). |
-| **Condition** | A status signal keyed by a condition schema URI. The only built-in is ODF `ReconciliationError` (`code`, `message`), present while the latest reconciliation or cleanup has failed. |
+| **Condition** | A status signal keyed by a registered condition schema URI. Writers set and remove conditions one by one through [condition patches](#condition-patches). The built-in ODF `ReconciliationError` (`code`, `message`) is present while the latest reconciliation or cleanup has failed, and only the framework writes it. |
 | **generation / observedGeneration / reconciledGeneration** | `generation` bumps on each spec/headers change; `observedGeneration` is the last one a reconciliation started on, `reconciledGeneration` the last one reconciled successfully. Reconciliation is needed while `reconciledGeneration` is absent or lower than `generation`. |
 | **statusGeneration** | Header counting status updates: 1 for a new resource, +1 per `StatusUpdated`, `DeletionRequested` and `Deleted` event (the last two move the derived phase). A status writer passes the value it read as a precondition and fails with a status conflict if it is stale (compare-and-swap). |
 | **Reconciliation** | Driving actual state toward the spec (e.g. `SecretSet` materializes its encrypted read-side projection). |
@@ -175,7 +175,7 @@ not break; most are enforced in code and exercised by tests — pointers given w
 - **`headers.generation` changes only when desired state changes.** It starts at 1 on create and is
   bumped by the aggregate only when an apply produces a real headers/spec change (`Update`), once
   per apply even when both change; an unchanged apply is `Untouched` and does not bump it.
-- **Status is written only through `StatusUpdated`, by controllers.** Header and spec updates never
+- **Status is written only through `StatusUpdated`, by the lifecycle primitives.** Header and spec updates never
   write status ([`Pending` is derived](#lifecycle-state-machine)). Each `StatusUpdated` bumps
   `headers.statusGeneration`, as do `DeletionRequested` and `Deleted`, since they change the derived
   phase. Every status write is conditional on the `statusGeneration` its writer read.
@@ -351,8 +351,8 @@ and an aggregate. This is the bound that all generic use cases require.
   without conditions.
 - `HeadersUpdated` and `SpecUpdated` carry the new `generation`. `HeadersUpdated.new_generation` is
   optional; an event without it leaves the generation as is.
-- `StatusUpdated` carries the whole new status, written by a controller. It bumps
-  `statusGeneration` and `updatedAt`.
+- `StatusUpdated` carries the whole new status, written by a reconciliation or cleanup transition
+  or by a condition patch. It bumps `statusGeneration` and `updatedAt`.
 - `DeletionRequested` sets `deletionRequestedAt` and bumps `statusGeneration`. After it the
   projector accepts only `StatusUpdated` and `Deleted`.
 - `Deleted` sets `deletedAt` and the tombstone name, and bumps `statusGeneration`. Resources
@@ -703,7 +703,9 @@ dispatchers. During catalog assembly,
 `kamu_resources_services::build_catalog_with_resource_extension_schema_registry` builds a preview
 catalog, constructs `ResourceExtensionSchemaRegistry` from every registered dispatcher, attaches the
 immutable registry value, and returns the final catalog. The registry parses const-friendly metadata
-into runtime records, checks duplicate schema IDs and short-name conflicts, and precomputes lookup
+into runtime records, checks duplicate schema IDs and short-name conflicts, requires condition
+metadata (`ResourceConditionSchemaMeta`: a size limit and whether messages carry the value) on
+exactly the condition schemas, and precomputes lookup
 indexes by URI plus short-name precedence tiers (exact resource type → versioned context → context →
 any resource). `ResourceExtensionSchemaResolver` sits on top of the registry: exact URI keys are
 strict (unknown / wrong-kind / inapplicable URIs reject), while unresolved short names are preserved
@@ -738,6 +740,7 @@ persists its event and posts the matching lifecycle message:
 | `request_deletion(ids)` | `Deleting` | one `DeletionRequested` for the batch |
 | `complete_deletion(completions)` | `Deleted`, tombstone name | one `Deleted` for the completed ones |
 | `record_cleanup_failure(failures)` | stays `Deleting`, `ReconciliationError{code: cleanup-failed}` | none |
+| `update_conditions(id, expected_status_generation, patch)` | the named conditions set or removed ([below](#condition-patches)) | `StatusUpdated` naming the changed conditions |
 
 - **They join the caller's transaction.** A primitive is resolved from the transaction catalog and
   never opens a transaction, so a caller can commit a transition together with writes of its own.
@@ -756,6 +759,41 @@ persists its event and posts the matching lifecycle message:
   cleanup does not hold the completion back.
 - **Generated per type** by `declare_resource_lifecycle_primitives!`, part of
   `declare_resource_service_layer!`.
+
+### Condition patches
+
+Several writers can share the status of one resource, each owning some of its conditions. They
+write through `update_conditions`, which sets or removes the conditions a
+`ResourceConditionsPatch` names and leaves the others as they are, so no writer erases another's.
+
+1. **Status generation.** The patch expects the `statusGeneration` its writer read; a stale one fails
+   with `ResourceConditionUpdateError::StatusGenerationChanged`.
+2. **The patch** (`ResourceConditionPatchChecker`). A set condition must be registered for the
+   resource type, pass its dispatcher and stay within the size limit of its registration, because
+   every `StatusUpdated` event stores the whole status. `ReconciliationError` belongs to the
+   framework and cannot be patched. A removed condition needs no registration, so one whose schema
+   is gone can still be removed. A failure is `InvalidPatch`.
+3. **Nothing changed.** A patch that only repeats the current values records and posts nothing.
+4. **The type's rules.** `ResourceStatusRules::validate_status_change` sees the old and new status
+   and may reject the change (`Rejected`): schemas check values, this checks transitions and
+   combinations of conditions.
+5. **The write.** One `StatusUpdated` event, then a `StatusUpdated` lifecycle message in the same
+   transaction. A patch is accepted while the deletion is in progress, so a writer can still record
+   an outcome, and rejected once the resource is deleted.
+
+The message names the resource by ID, schema and headers, without spec and status, and lists every
+changed condition: `Set` with the new value when the condition's registration marks it as carried,
+`Set` without a value otherwise, or `Removed`. Consumers that need a transition read it from the
+message, so it reaches them even when the resource is gone by then.
+
+A type can also start every new resource with conditions of its own
+(`ResourceStatusRules::initial_conditions`), recorded in the `Created` event. They are checked
+against their schemas as any persisted condition, but not against the size limits or the type's
+status rules, which apply to patches.
+
+**Condition ownership.** Each type documents which writer owns which of its conditions. For
+`VariableSet`, `SecretSet` and `Storage` the framework writes their only condition,
+`ReconciliationError`, and nothing patches conditions.
 
 ---
 
@@ -1454,7 +1492,8 @@ Deletion runs in two steps, as the ODF resource framework defines them
 ### Outbox connections
 
 Producer: **`MESSAGE_PRODUCER_KAMU_RESOURCE_SERVICE`** (`dev.kamu.domain.resources.ResourceService`).
-The use cases publish `ResourceLifecycleMessage` variants:
+The apply use case and the lifecycle primitives that the other use cases call publish
+`ResourceLifecycleMessage` variants:
 
 ```mermaid
 flowchart LR
@@ -1462,6 +1501,7 @@ flowchart LR
     REC["reconcile.rs"] -->|ReconciliationSucceeded / ReconciliationFailed| MSG
     DEL["request_deletion.rs"] -->|DeletionRequested| MSG
     COMP["complete_deletion.rs"] -->|Deleted| MSG
+    PATCH["update_conditions"] -->|StatusUpdated| MSG
 
     MSG --> OB[("Outbox")]
 
@@ -1477,7 +1517,8 @@ flowchart LR
 
 - **Resource lifecycle** — `Applied` (from `use_cases/apply.rs`), `ReconciliationSucceeded` /
   `ReconciliationFailed` (`use_cases/reconcile.rs`), `DeletionRequested`
-  (`use_cases/request_deletion.rs`), `Deleted` (`use_cases/complete_deletion.rs`). Consumed by
+  (`use_cases/request_deletion.rs`), `Deleted` (`use_cases/complete_deletion.rs`), `StatusUpdated`
+  (any caller of `update_conditions`, see [condition patches](#condition-patches)). Consumed by
   the **event bridge** (routes to the per-type `ResourceLifecycleEventDispatcher` — this is what
   schedules reconciliation and completes deletions) and by the configuration crate's
   projection-maintenance consumer. See
@@ -1504,7 +1545,8 @@ consumes it, looks up the per-type `ResourceLifecycleEventDispatcher` by descrip
 reconciliation started, runs the type's `ResourceController<R>`, records the outcome in the status, and
 posts `ReconciliationSucceeded`/`Failed`). `handle_deletion_requested` calls
 `CompleteResourceDeletionUseCase::execute(ids)` with the whole batch ([(c) Deletion](#c-deletion)).
-The other `handle_*` are no-ops. The dispatcher + reconcile use case are generated together by the
+The other `handle_*` are no-ops, and `StatusUpdated` reaches no dispatcher: no controller reacts to
+condition changes. The dispatcher + reconcile use case are generated together by the
 `declare_resource_service_layer!` macro and registered from the type's crate.
 
 The **second consumer**, `ConfigurationResourceLifecycleMessageConsumer` (configuration crate),

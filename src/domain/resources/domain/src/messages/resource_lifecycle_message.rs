@@ -7,11 +7,13 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::collections::BTreeMap;
+
 use chrono::{DateTime, Utc};
 use messaging_outbox::Message;
 use serde::{Deserialize, Serialize};
 
-use crate::ResourceSnapshot;
+use crate::{ResourceHeaders, ResourceID, ResourceSnapshot, TypeUri};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -26,6 +28,7 @@ pub enum ResourceLifecycleMessage {
     ReconciliationFailed(ResourceLifecycleMessageReconciliationFailed),
     DeletionRequested(ResourceLifecycleMessageDeletionRequested),
     Deleted(ResourceLifecycleMessageDeleted),
+    StatusUpdated(ResourceLifecycleMessageStatusUpdated),
 }
 
 impl ResourceLifecycleMessage {
@@ -86,6 +89,23 @@ impl ResourceLifecycleMessage {
         Self::Deleted(ResourceLifecycleMessageDeleted {
             event_time,
             resources,
+        })
+    }
+
+    pub fn status_updated(
+        event_time: DateTime<Utc>,
+        resource: ResourceLifecycleMessageResourceRef,
+        changed_conditions: BTreeMap<TypeUri, ResourceLifecycleMessageConditionChange>,
+    ) -> Self {
+        debug_assert!(
+            !changed_conditions.is_empty(),
+            "status updated message must name at least one changed condition"
+        );
+
+        Self::StatusUpdated(ResourceLifecycleMessageStatusUpdated {
+            event_time,
+            resource,
+            changed_conditions,
         })
     }
 }
@@ -150,6 +170,44 @@ pub struct ResourceLifecycleMessageDeleted {
     pub event_time: DateTime<Utc>,
     // all resources share the same `schema`
     pub resources: Vec<ResourceSnapshot>,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Conditions of the resource were set or removed. The message names the
+/// resource without its spec and status, so a large condition never travels
+/// with it
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ResourceLifecycleMessageStatusUpdated {
+    pub event_time: DateTime<Utc>,
+    pub resource: ResourceLifecycleMessageResourceRef,
+    /// Every condition the update set or removed
+    pub changed_conditions: BTreeMap<TypeUri, ResourceLifecycleMessageConditionChange>,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// A resource named by its identity and headers, including the
+/// `statusGeneration` it reached
+#[serde_with::serde_as]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ResourceLifecycleMessageResourceRef {
+    pub id: ResourceID,
+    pub schema: TypeUri,
+    #[serde_as(as = "odf::metadata::serde::yaml::resources::ResourceHeaders")]
+    pub headers: ResourceHeaders,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum ResourceLifecycleMessageConditionChange {
+    /// The new value travels only for a condition whose schema is registered
+    /// as carried
+    Set {
+        value: Option<serde_json::Value>,
+    },
+    Removed,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

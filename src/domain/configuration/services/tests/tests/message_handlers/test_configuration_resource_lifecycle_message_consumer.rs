@@ -29,6 +29,8 @@ use kamu_resources::{
     ResourceHeadersExt,
     ResourceID,
     ResourceLifecycleMessage,
+    ResourceLifecycleMessageConditionChange,
+    ResourceLifecycleMessageResourceRef,
     ResourceSchemaProvider,
     ResourceSnapshot,
     TypeUri,
@@ -203,6 +205,39 @@ async fn test_applied_message_is_no_op() {
                 &harness.account_handle,
                 1,
             ),
+        ))
+        .await
+        .unwrap();
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_status_updated_message_is_no_op() {
+    let harness = ConfigurationResourceLifecycleConsumerHarness::new();
+    let id = harness.alloc_id();
+    let snapshot = make_snapshot(
+        id,
+        VariableSetResource::schema(),
+        &harness.account_handle,
+        1,
+    );
+
+    harness
+        .consume_message(&ResourceLifecycleMessage::status_updated(
+            Utc::now(),
+            ResourceLifecycleMessageResourceRef {
+                id,
+                schema: snapshot.schema,
+                headers: snapshot.headers,
+            },
+            [(
+                TypeUri::new_unchecked(
+                    "https://test.kamu.dev/schemas/test/v1/conditions/TestStage",
+                ),
+                ResourceLifecycleMessageConditionChange::Removed,
+            )]
+            .into(),
         ))
         .await
         .unwrap();
