@@ -35,7 +35,8 @@ declare_resource_extension_schema_dispatcher!(
     schema_id = RESOURCE_ANNOTATION_DESCRIPTION_SCHEMA_URI,
     kind = ResourceExtensionKind::Annotation,
     document = Some(RESOURCE_ANNOTATION_DESCRIPTION_SCHEMA_DOC),
-    applications = DESCRIPTION_APPLICATIONS
+    applications = DESCRIPTION_APPLICATIONS,
+    condition = None
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

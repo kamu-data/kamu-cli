@@ -13,6 +13,7 @@ use std::sync::Arc;
 use dill::{BuilderExt, Catalog};
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu_resources::{
+    ResourceConditionSchemaMeta,
     ResourceExtensionApplicationMeta,
     ResourceExtensionKind,
     ResourceExtensionResolutionError,
@@ -34,6 +35,7 @@ pub struct ResourceExtensionSchemaRegistration {
     kind: ResourceExtensionKind,
     applications: Vec<ResourceExtensionApplication>,
     document: Option<&'static str>,
+    condition: Option<ResourceConditionSchemaMeta>,
     dispatcher: Arc<dyn ResourceExtensionSchemaDispatcher>,
 }
 
@@ -48,6 +50,11 @@ impl ResourceExtensionSchemaRegistration {
 
     pub fn document(&self) -> Option<&'static str> {
         self.document
+    }
+
+    /// Present exactly when the schema is a condition
+    pub fn condition(&self) -> Option<&ResourceConditionSchemaMeta> {
+        self.condition.as_ref()
     }
 
     pub fn dispatcher(&self) -> &Arc<dyn ResourceExtensionSchemaDispatcher> {
@@ -161,13 +168,42 @@ impl ResourceExtensionSchemaRegistry {
             )));
         }
 
+        Self::check_condition_meta(meta)?;
+
         Ok(ResourceExtensionSchemaRegistration {
             schema_id,
             kind: meta.kind,
             applications,
             document: meta.document,
+            condition: meta.condition,
             dispatcher,
         })
+    }
+
+    fn check_condition_meta(meta: &ResourceExtensionSchemaMeta) -> Result<(), InternalError> {
+        match (meta.kind, meta.condition) {
+            (ResourceExtensionKind::Condition, None) => Err(InternalError::new(format!(
+                "Resource condition schema '{}' declares no condition metadata",
+                meta.schema_id
+            ))),
+            (ResourceExtensionKind::Condition, Some(condition))
+                if condition.max_serialized_size == 0 =>
+            {
+                Err(InternalError::new(format!(
+                    "Resource condition schema '{}' declares a zero size limit",
+                    meta.schema_id
+                )))
+            }
+            (ResourceExtensionKind::Label | ResourceExtensionKind::Annotation, Some(_)) => {
+                Err(InternalError::new(format!(
+                    "Resource extension schema '{}' declares condition metadata but is not a \
+                     condition",
+                    meta.schema_id
+                )))
+            }
+            (ResourceExtensionKind::Condition, Some(_))
+            | (ResourceExtensionKind::Label | ResourceExtensionKind::Annotation, None) => Ok(()),
+        }
     }
 
     fn parse_application(
