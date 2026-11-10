@@ -164,6 +164,10 @@ impl TestResource {
     /// A spec value `staged:<stage>` starts the resource with that
     /// `TestStage` condition
     pub const STAGED_VALUE_PREFIX: &'static str = "staged:";
+
+    /// The `TestStage` a resource never leaves, as a task never leaves
+    /// `Finished`
+    pub const FINAL_STAGE: &'static str = "done";
 }
 
 impl ResourceSchemaProvider for TestResource {
@@ -191,6 +195,23 @@ impl ResourceStatusRules for TestResource {
                 .insert(test_stage_condition_key(), stage.into());
         }
         conditions
+    }
+
+    fn validate_status_change(
+        old: &ResourceStatus,
+        new: &ResourceStatus,
+    ) -> Result<(), ResourceStatusChangeRejectedError> {
+        let key = test_stage_condition_key();
+        let old_stage = old.conditions.entries.get(&key);
+        let final_stage = serde_json::Value::from(Self::FINAL_STAGE);
+
+        if old_stage == Some(&final_stage) && new.conditions.entries.get(&key) != old_stage {
+            return Err(ResourceStatusChangeRejectedError::new(format!(
+                "stage '{}' is final",
+                Self::FINAL_STAGE
+            )));
+        }
+        Ok(())
     }
 }
 
