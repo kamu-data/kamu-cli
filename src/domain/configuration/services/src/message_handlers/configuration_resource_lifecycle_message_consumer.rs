@@ -65,16 +65,19 @@ impl MessageConsumerT<ResourceLifecycleMessage> for ConfigurationResourceLifecyc
         tracing::debug!(received_message = ?message, "Received resource lifecycle message");
 
         match message {
-            ResourceLifecycleMessage::ReconciliationSucceeded(succeeded_message) => {
-                match succeeded_message.resource.schema.as_str() {
+            ResourceLifecycleMessage::StatusUpdated(updated_message)
+                if updated_message.reconciled_current_generation() =>
+            {
+                let resource = &updated_message.resource;
+                match resource.schema.as_str() {
                     VariableSetResource::SCHEMA_STR => {
                         let repo = target_catalog
                             .get_one::<dyn VariableSetProjectionRepository>()
                             .map_err(ErrorIntoInternal::int_err)?;
 
                         repo.cleanup_entries_before_generation(
-                            &succeeded_message.resource.id,
-                            succeeded_message.resource.headers.generation,
+                            &resource.id,
+                            resource.headers.generation,
                         )
                         .await
                     }
@@ -84,18 +87,17 @@ impl MessageConsumerT<ResourceLifecycleMessage> for ConfigurationResourceLifecyc
                             .map_err(ErrorIntoInternal::int_err)?;
 
                         repo.cleanup_entries_before_generation(
-                            &succeeded_message.resource.id,
-                            succeeded_message.resource.headers.generation,
+                            &resource.id,
+                            resource.headers.generation,
                         )
                         .await
                     }
                     _ => Ok(()),
                 }
             }
-            // Deletion cleanup belongs to the controllers, and the projections hold
-            // specs, not conditions
+            // Only a reconciled generation supersedes projection entries, and
+            // deletion cleanup belongs to the controllers
             ResourceLifecycleMessage::Applied(_)
-            | ResourceLifecycleMessage::ReconciliationFailed(_)
             | ResourceLifecycleMessage::DeletionRequested(_)
             | ResourceLifecycleMessage::Deleted(_)
             | ResourceLifecycleMessage::StatusUpdated(_) => Ok(()),

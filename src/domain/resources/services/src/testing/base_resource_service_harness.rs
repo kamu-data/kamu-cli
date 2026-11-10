@@ -23,6 +23,7 @@ use kamu_resources::{
     ResourceID,
     ResourceLifecycleMessage,
     ResourceLifecycleMessageOutcome,
+    ResourcePhase,
     ResourceRepository,
     ResourceSnapshot,
     ResourceStatus,
@@ -308,31 +309,17 @@ impl BaseResourceServiceHarness {
             .returning(|_, _, _| Ok(()));
     }
 
-    pub fn expect_reconciliation_succeeded_message(mock_outbox: &mut MockOutbox, n: usize) {
+    /// Expects one `StatusUpdated` message that leaves the resource in `phase`
+    pub fn expect_status_updated_message(mock_outbox: &mut MockOutbox, phase: ResourcePhase) {
         mock_outbox
             .expect_post_message_as_json()
-            .times(n)
+            .times(1)
             .withf(move |producer, message, _version| {
                 producer == MESSAGE_PRODUCER_KAMU_RESOURCE_SERVICE
                     && matches!(
                         serde_json::from_value::<ResourceLifecycleMessage>(message.clone())
                             .unwrap(),
-                        ResourceLifecycleMessage::ReconciliationSucceeded(_)
-                    )
-            })
-            .returning(|_, _, _| Ok(()));
-    }
-
-    pub fn expect_reconciliation_failed_message(mock_outbox: &mut MockOutbox, n: usize) {
-        mock_outbox
-            .expect_post_message_as_json()
-            .times(n)
-            .withf(move |producer, message, _version| {
-                producer == MESSAGE_PRODUCER_KAMU_RESOURCE_SERVICE
-                    && matches!(
-                        serde_json::from_value::<ResourceLifecycleMessage>(message.clone())
-                            .unwrap(),
-                        ResourceLifecycleMessage::ReconciliationFailed(_)
+                        ResourceLifecycleMessage::StatusUpdated(ref m) if m.status.phase == phase
                     )
             })
             .returning(|_, _, _| Ok(()));

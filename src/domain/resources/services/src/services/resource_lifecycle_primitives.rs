@@ -7,9 +7,10 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 
-use internal_error::{ErrorIntoInternal, ResultIntoInternal};
+use chrono::{DateTime, Utc};
+use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use messaging_outbox::{Outbox, OutboxExt};
 use serde::Serialize;
 use time_source::SystemTimeSource;
@@ -28,6 +29,7 @@ use crate::domain::{
     ResourceDeletionCompletion,
     ResourceDeletionInProgressError,
     ResourceExpectedVersion,
+    ResourceExtensionKind,
     ResourceGenerationConflictError,
     ResourceID,
     ResourceLifecycleMessage,
@@ -39,6 +41,7 @@ use crate::domain::{
     ResourceSchemaId,
     ResourceSchemaProvider,
     ResourceStaleExpectationError,
+    ResourceStatus,
     ResourceStatusConflictError,
     ResourceTransitionSkip,
     ResourceTransitionSkipReason,
@@ -99,11 +102,15 @@ where
 
         let expected_status_generation =
             expected_status_generation.unwrap_or(resource.headers().status_generation);
+        let old_status = resource.status().clone();
+        let now = self.time_source.now();
         resource
-            .try_mark_reconciliation_started(self.time_source.now(), expected_status_generation)
+            .try_mark_reconciliation_started(now, expected_status_generation)
             .map_err(lifecycle_error)?;
         self.resource_persistence_service
             .save(&mut resource)
+            .await?;
+        self.post_status_updated(now, &resource, &old_status)
             .await?;
 
         Ok(Some(resource))
@@ -115,6 +122,7 @@ where
         expected: ResourceExpectedVersion,
     ) -> TransitionResult<R, R> {
         let mut resource = self.load_reconcilable(id, expected).await?;
+        let old_status = resource.status().clone();
         let now = self.time_source.now();
 
         resource
@@ -123,12 +131,8 @@ where
         self.resource_persistence_service
             .save(&mut resource)
             .await?;
-
-        let message = ResourceLifecycleMessage::reconciliation_succeeded(
-            now,
-            resource.make_resource_snapshot()?,
-        );
-        self.post(message).await?;
+        self.post_status_updated(now, &resource, &old_status)
+            .await?;
 
         Ok(resource)
     }
@@ -140,6 +144,7 @@ where
         error: &R::ReconcileError,
     ) -> TransitionResult<R, R> {
         let mut resource = self.load_reconcilable(id, expected).await?;
+        let old_status = resource.status().clone();
         let now = self.time_source.now();
 
         resource
@@ -153,12 +158,8 @@ where
         self.resource_persistence_service
             .save(&mut resource)
             .await?;
-
-        let message = ResourceLifecycleMessage::reconciliation_failed(
-            now,
-            resource.make_resource_snapshot()?,
-        );
-        self.post(message).await?;
+        self.post_status_updated(now, &resource, &old_status)
+            .await?;
 
         Ok(resource)
     }
@@ -205,7 +206,7 @@ where
             .map(|completion| completion.id)
             .collect::<Vec<_>>();
 
-        let transition = self
+        let (transition, _) = self
             .transition_awaiting_cleanup(&ids, |resource, index| {
                 if let Some(expected) = completions[index].expected_status_generation
                     && let Some(conflict) = status_conflict(resource, expected)
@@ -244,29 +245,42 @@ where
             .map(|failure| failure.id)
             .collect::<Vec<_>>();
 
-        self.transition_awaiting_cleanup(&ids, |resource, index| {
-            let failure = &failures[index];
-            resource
-                .try_mark_cleanup_failed(now, failure.expected_status_generation, &failure.error)
-                .map_err(TransitionStep::from_lifecycle_error)
-        })
-        .await
+        let (transition, old_statuses) = self
+            .transition_awaiting_cleanup(&ids, |resource, index| {
+                let failure = &failures[index];
+                resource
+                    .try_mark_cleanup_failed(
+                        now,
+                        failure.expected_status_generation,
+                        &failure.error,
+                    )
+                    .map_err(TransitionStep::from_lifecycle_error)
+            })
+            .await?;
+
+        for (resource, old_status) in transition.transitioned.iter().zip(&old_statuses) {
+            self.post_status_updated(now, resource, old_status).await?;
+        }
+
+        Ok(transition)
     }
 
     /// Applies `transition` to every resource still awaiting its cleanup and
     /// saves the changed ones in one batch. `transition` gets the index of the
-    /// resource in `ids`
+    /// resource in `ids`. Also returns the status each transitioned resource
+    /// had before
     async fn transition_awaiting_cleanup(
         &self,
         ids: &[ResourceID],
         transition: impl Fn(&mut R, usize) -> Result<(), TransitionStep<R>>,
-    ) -> TransitionResult<ResourceBatchTransition<R>, R> {
+    ) -> TransitionResult<(ResourceBatchTransition<R>, Vec<ResourceStatus>), R> {
         let mut batch = ResourceBatchTransition {
             transitioned: Vec::new(),
             skipped: Vec::new(),
         };
+        let mut old_statuses = Vec::new();
         if ids.is_empty() {
-            return Ok(batch);
+            return Ok((batch, old_statuses));
         }
 
         for (index, mut resource) in self.load_many(ids).await?.into_iter().enumerate() {
@@ -279,8 +293,12 @@ where
                 continue;
             }
 
+            let old_status = resource.status().clone();
             match transition(&mut resource, index) {
-                Ok(()) => batch.transitioned.push(resource),
+                Ok(()) => {
+                    batch.transitioned.push(resource);
+                    old_statuses.push(old_status);
+                }
                 Err(TransitionStep::Skip(reason)) => {
                     batch.skipped.push(ResourceTransitionSkip { id, reason });
                 }
@@ -296,7 +314,7 @@ where
                 .await?;
         }
 
-        Ok(batch)
+        Ok((batch, old_statuses))
     }
 
     pub async fn update_conditions(
@@ -316,16 +334,15 @@ where
             ));
         }
 
-        let resource_schema = ResourceSchemaId::parse(R::schema().as_str()).int_err()?;
-        let carried = ResourceConditionPatchChecker::new(self.extension_schema_registry)
-            .check(patch, &resource_schema)?;
+        ResourceConditionPatchChecker::new(self.extension_schema_registry)
+            .check(patch, &self.resource_schema()?)?;
 
-        let mut new_status = resource.status().clone();
-        let changed = patch.apply_to(&mut new_status.conditions);
-        if changed.is_empty() {
+        let old_status = resource.status().clone();
+        let mut new_status = old_status.clone();
+        if patch.apply_to(&mut new_status.conditions).is_empty() {
             return Ok(resource);
         }
-        R::validate_status_change(resource.status(), &new_status)?;
+        R::validate_status_change(&old_status, &new_status)?;
 
         let now = self.time_source.now();
         resource
@@ -334,7 +351,28 @@ where
         self.resource_persistence_service
             .save(&mut resource)
             .await?;
+        self.post_status_updated(now, &resource, &old_status)
+            .await?;
 
+        Ok(resource)
+    }
+
+    /// Announces the status write that moved the resource from `old_status`.
+    /// A write that left the status as it was recorded no event, so it posts
+    /// nothing
+    async fn post_status_updated(
+        &self,
+        now: DateTime<Utc>,
+        resource: &R,
+        old_status: &ResourceStatus,
+    ) -> Result<(), InternalError> {
+        let new_status = resource.status();
+        if new_status == old_status {
+            return Ok(());
+        }
+
+        let changed_conditions =
+            self.condition_changes(&old_status.conditions, &new_status.conditions)?;
         let message = ResourceLifecycleMessage::status_updated(
             now,
             ResourceLifecycleMessageResourceRef {
@@ -342,13 +380,62 @@ where
                 schema: R::schema().clone(),
                 headers: resource.headers().clone(),
             },
-            condition_changes(&resource.status().conditions, changed, &carried),
+            new_status,
+            changed_conditions,
         );
         self.outbox
             .post_message(MESSAGE_PRODUCER_KAMU_RESOURCE_SERVICE, message)
-            .await?;
+            .await
+    }
 
-        Ok(resource)
+    /// How each condition that differs between `old` and `new` ended up, with
+    /// the value where its registration marks it as carried
+    fn condition_changes(
+        &self,
+        old: &ResourceConditions,
+        new: &ResourceConditions,
+    ) -> Result<BTreeMap<TypeUri, ResourceLifecycleMessageConditionChange>, InternalError> {
+        let resource_schema = self.resource_schema()?;
+        let keys = old.entries.keys().chain(new.entries.keys());
+
+        let mut changes = BTreeMap::new();
+        for key in keys {
+            let new_value = new.entries.get(key);
+            if old.entries.get(key) == new_value {
+                continue;
+            }
+            let TypeRef::Uri(uri) = key else {
+                return Err(InternalError::new(format!(
+                    "Stored condition '{key}' is not keyed by its schema URI"
+                )));
+            };
+
+            let change = match new_value {
+                Some(value) => ResourceLifecycleMessageConditionChange::Set {
+                    value: self
+                        .is_carried(key, &resource_schema)
+                        .then(|| value.clone()),
+                },
+                None => ResourceLifecycleMessageConditionChange::Removed,
+            };
+            changes.insert(uri.clone(), change);
+        }
+
+        Ok(changes)
+    }
+
+    /// A condition whose schema is no longer registered is not carried
+    fn is_carried(&self, key: &TypeRef, resource_schema: &ResourceSchemaId) -> bool {
+        self.extension_schema_registry
+            .resolve(ResourceExtensionKind::Condition, key, resource_schema)
+            .ok()
+            .flatten()
+            .and_then(|registration| registration.condition().map(|condition| condition.carried))
+            .unwrap_or(false)
+    }
+
+    fn resource_schema(&self) -> Result<ResourceSchemaId, InternalError> {
+        ResourceSchemaId::parse(R::schema().as_str()).int_err()
     }
 
     /// Loads a resource whose reconciliation outcome is about to be recorded,
@@ -454,26 +541,6 @@ fn ensure_status_generation<R: EventSourcedResource>(
         )),
         None => Ok(()),
     }
-}
-
-/// How each changed condition ended up, with the value only where it is carried
-fn condition_changes(
-    conditions: &ResourceConditions,
-    changed: BTreeSet<TypeUri>,
-    carried: &BTreeSet<TypeUri>,
-) -> BTreeMap<TypeUri, ResourceLifecycleMessageConditionChange> {
-    changed
-        .into_iter()
-        .map(|key| {
-            let change = match conditions.entries.get(&TypeRef::Uri(key.clone())) {
-                Some(value) => ResourceLifecycleMessageConditionChange::Set {
-                    value: carried.contains(&key).then(|| value.clone()),
-                },
-                None => ResourceLifecycleMessageConditionChange::Removed,
-            };
-            (key, change)
-        })
-        .collect()
 }
 
 fn condition_update_lifecycle_error<R: EventSourcedResource>(

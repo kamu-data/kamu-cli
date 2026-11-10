@@ -7,8 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::collections::BTreeSet;
-
 use crate::ResourceExtensionSchemaRegistry;
 use crate::domain::{
     RESOURCE_CONDITION_RECONCILIATION_ERROR_SCHEMA_URI,
@@ -36,9 +34,6 @@ impl<'a> ResourceConditionPatchChecker<'a> {
         }
     }
 
-    /// Returns the conditions the patch sets whose value a `StatusUpdated`
-    /// message carries.
-    ///
     /// A set condition must be registered for the type, valid and within its
     /// size limit. A removed one only needs to be outside the framework's own
     /// conditions, so a condition whose schema is no longer registered can
@@ -47,9 +42,7 @@ impl<'a> ResourceConditionPatchChecker<'a> {
         &self,
         patch: &ResourceConditionsPatch,
         resource_schema: &ResourceSchemaId,
-    ) -> Result<BTreeSet<TypeUri>, ResourceConditionPatchError> {
-        let mut carried = BTreeSet::new();
-
+    ) -> Result<(), ResourceConditionPatchError> {
         for (key, change) in patch.changes() {
             if key.as_str() == RESOURCE_CONDITION_RECONCILIATION_ERROR_SCHEMA_URI {
                 return Err(ResourceConditionPatchError::FrameworkOwned { key: key.clone() });
@@ -57,24 +50,21 @@ impl<'a> ResourceConditionPatchChecker<'a> {
 
             match change {
                 ResourceConditionPatchChange::Set(value) => {
-                    if self.check_set(key, value, resource_schema)? {
-                        carried.insert(key.clone());
-                    }
+                    self.check_set(key, value, resource_schema)?;
                 }
                 ResourceConditionPatchChange::Remove => {}
             }
         }
 
-        Ok(carried)
+        Ok(())
     }
 
-    /// Returns whether a message carries the value
     fn check_set(
         &self,
         key: &TypeUri,
         value: &serde_json::Value,
         resource_schema: &ResourceSchemaId,
-    ) -> Result<bool, ResourceConditionPatchError> {
+    ) -> Result<(), ResourceConditionPatchError> {
         let registration = self
             .extension_schema_registry
             .resolve(
@@ -108,7 +98,7 @@ impl<'a> ResourceConditionPatchChecker<'a> {
             });
         }
 
-        Ok(condition.carried)
+        Ok(())
     }
 }
 

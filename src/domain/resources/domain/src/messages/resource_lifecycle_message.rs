@@ -13,19 +13,24 @@ use chrono::{DateTime, Utc};
 use messaging_outbox::Message;
 use serde::{Deserialize, Serialize};
 
-use crate::{ResourceHeaders, ResourceID, ResourceSnapshot, TypeUri};
+use crate::{
+    ResourceHeaders,
+    ResourceID,
+    ResourcePhase,
+    ResourceSnapshot,
+    ResourceStatus,
+    TypeUri,
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-const RESOURCE_LIFECYCLE_OUTBOX_VERSION: u32 = 3;
+const RESOURCE_LIFECYCLE_OUTBOX_VERSION: u32 = 4;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ResourceLifecycleMessage {
     Applied(ResourceLifecycleMessageApplied),
-    ReconciliationSucceeded(ResourceLifecycleMessageReconciliationSucceeded),
-    ReconciliationFailed(ResourceLifecycleMessageReconciliationFailed),
     DeletionRequested(ResourceLifecycleMessageDeletionRequested),
     Deleted(ResourceLifecycleMessageDeleted),
     StatusUpdated(ResourceLifecycleMessageStatusUpdated),
@@ -40,20 +45,6 @@ impl ResourceLifecycleMessage {
         Self::Applied(ResourceLifecycleMessageApplied {
             event_time,
             outcome,
-            resource,
-        })
-    }
-
-    pub fn reconciliation_succeeded(event_time: DateTime<Utc>, resource: ResourceSnapshot) -> Self {
-        Self::ReconciliationSucceeded(ResourceLifecycleMessageReconciliationSucceeded {
-            event_time,
-            resource,
-        })
-    }
-
-    pub fn reconciliation_failed(event_time: DateTime<Utc>, resource: ResourceSnapshot) -> Self {
-        Self::ReconciliationFailed(ResourceLifecycleMessageReconciliationFailed {
-            event_time,
             resource,
         })
     }
@@ -95,16 +86,13 @@ impl ResourceLifecycleMessage {
     pub fn status_updated(
         event_time: DateTime<Utc>,
         resource: ResourceLifecycleMessageResourceRef,
+        status: &ResourceStatus,
         changed_conditions: BTreeMap<TypeUri, ResourceLifecycleMessageConditionChange>,
     ) -> Self {
-        debug_assert!(
-            !changed_conditions.is_empty(),
-            "status updated message must name at least one changed condition"
-        );
-
         Self::StatusUpdated(ResourceLifecycleMessageStatusUpdated {
             event_time,
             resource,
+            status: ResourceLifecycleMessageStatus::from(status),
             changed_conditions,
         })
     }
@@ -137,22 +125,6 @@ pub struct ResourceLifecycleMessageApplied {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct ResourceLifecycleMessageReconciliationSucceeded {
-    pub event_time: DateTime<Utc>,
-    pub resource: ResourceSnapshot,
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct ResourceLifecycleMessageReconciliationFailed {
-    pub event_time: DateTime<Utc>,
-    pub resource: ResourceSnapshot,
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 /// Deletion of the resources was requested, or requested again to retry a
 /// failed cleanup. The resources are in the `Deleting` phase.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -174,15 +146,58 @@ pub struct ResourceLifecycleMessageDeleted {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Conditions of the resource were set or removed. The message names the
-/// resource without its spec and status, so a large condition never travels
-/// with it
+/// The status of the resource changed: a reconciliation started, succeeded or
+/// failed, a cleanup failed, or a writer patched conditions. The message names
+/// the resource without its spec and conditions, so a large condition never
+/// travels with it
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ResourceLifecycleMessageStatusUpdated {
     pub event_time: DateTime<Utc>,
     pub resource: ResourceLifecycleMessageResourceRef,
+    pub status: ResourceLifecycleMessageStatus,
     /// Every condition the update set or removed
     pub changed_conditions: BTreeMap<TypeUri, ResourceLifecycleMessageConditionChange>,
+}
+
+impl ResourceLifecycleMessageStatusUpdated {
+    /// Whether the update recorded the reconciliation of the resource's
+    /// current generation
+    pub fn reconciled_current_generation(&self) -> bool {
+        self.status.phase == ResourcePhase::Ready
+            && self.status.reconciled_generation == Some(self.resource.headers.generation)
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// The status fields other than the conditions, under the keys the resource
+/// status uses
+#[serde_with::serde_as]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ResourceLifecycleMessageStatus {
+    #[serde_as(as = "odf::metadata::serde::yaml::resources::ResourcePhase")]
+    pub phase: ResourcePhase,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub observed_generation: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub observed_at: Option<DateTime<Utc>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reconciled_generation: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reconciled_at: Option<DateTime<Utc>>,
+}
+
+impl From<&ResourceStatus> for ResourceLifecycleMessageStatus {
+    fn from(status: &ResourceStatus) -> Self {
+        Self {
+            phase: status.phase,
+            observed_generation: status.observed_generation,
+            observed_at: status.observed_at,
+            reconciled_generation: status.reconciled_generation,
+            reconciled_at: status.reconciled_at,
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

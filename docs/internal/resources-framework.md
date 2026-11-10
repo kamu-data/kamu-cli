@@ -734,13 +734,22 @@ persists its event and posts the matching lifecycle message:
 
 | Primitive | Transition | Message |
 | --- | --- | --- |
-| `begin_reconciliation(id, expected_status_generation?)` | `Reconciling`, observed generation recorded; nothing when no reconciliation is needed | none |
-| `complete_reconciliation(id, expected)` | `Ready`, reconciled generation recorded | `ReconciliationSucceeded` |
-| `fail_reconciliation(id, expected, error)` | `Failed` or `Degraded`, `ReconciliationError` | `ReconciliationFailed` |
+| `begin_reconciliation(id, expected_status_generation?)` | `Reconciling`, observed generation recorded; nothing when no reconciliation is needed | `StatusUpdated` |
+| `complete_reconciliation(id, expected)` | `Ready`, reconciled generation recorded | `StatusUpdated` |
+| `fail_reconciliation(id, expected, error)` | `Failed` or `Degraded`, `ReconciliationError` | `StatusUpdated` |
 | `request_deletion(ids)` | `Deleting` | one `DeletionRequested` for the batch |
 | `complete_deletion(completions)` | `Deleted`, tombstone name | one `Deleted` for the completed ones |
-| `record_cleanup_failure(failures)` | stays `Deleting`, `ReconciliationError{code: cleanup-failed}` | none |
-| `update_conditions(id, expected_status_generation, patch)` | the named conditions set or removed ([below](#condition-patches)) | `StatusUpdated` naming the changed conditions |
+| `record_cleanup_failure(failures)` | stays `Deleting`, `ReconciliationError{code: cleanup-failed}` | one `StatusUpdated` per resource |
+| `update_conditions(id, expected_status_generation, patch)` | the named conditions set or removed ([below](#condition-patches)) | `StatusUpdated` |
+
+- **Every status write is announced.** A primitive that records a `StatusUpdated` event posts a
+  `StatusUpdated` message in the same transaction; a write that leaves the status as it was records
+  and posts nothing. The message names the resource by ID, schema and headers, carries the status
+  fields other than the conditions, and lists every changed condition: `Set` with the new value when
+  the condition's registration marks it as carried, `Set` without a value otherwise, or `Removed`.
+  It leaves out the spec and the conditions, so a large condition never travels with it, and
+  consumers that need a transition read it from the message, which reaches them even when the
+  resource is gone by then. `ReconciliationError` is carried.
 
 - **They join the caller's transaction.** A primitive is resolved from the transaction catalog and
   never opens a transaction, so a caller can commit a transition together with writes of its own.
@@ -777,14 +786,9 @@ write through `update_conditions`, which sets or removes the conditions a
 4. **The type's rules.** `ResourceStatusRules::validate_status_change` sees the old and new status
    and may reject the change (`Rejected`): schemas check values, this checks transitions and
    combinations of conditions.
-5. **The write.** One `StatusUpdated` event, then a `StatusUpdated` lifecycle message in the same
-   transaction. A patch is accepted while the deletion is in progress, so a writer can still record
-   an outcome, and rejected once the resource is deleted.
-
-The message names the resource by ID, schema and headers, without spec and status, and lists every
-changed condition: `Set` with the new value when the condition's registration marks it as carried,
-`Set` without a value otherwise, or `Removed`. Consumers that need a transition read it from the
-message, so it reaches them even when the resource is gone by then.
+5. **The write.** One `StatusUpdated` event, announced by a `StatusUpdated` message as every status
+   write is. A patch is accepted while the deletion is in progress, so a writer can still record an
+   outcome, and rejected once the resource is deleted.
 
 A type can also start every new resource with conditions of its own
 (`ResourceStatusRules::initial_conditions`), recorded in the `Created` event. They are checked
@@ -1401,9 +1405,9 @@ sequenceDiagram
     UC->>P: begin_reconciliation(id) → StatusUpdated if the generation is not yet reconciled and not already Reconciling (status gen. N)
     UC->>Ctl: reconcile(resource)  %% e.g. SecretSet builds encrypted projection
     alt success
-        UC->>P: complete_reconciliation(id, generation, N) → StatusUpdated, ReconciliationSucceeded
+        UC->>P: complete_reconciliation(id, generation, N) → StatusUpdated (Ready)
     else failure
-        UC->>P: fail_reconciliation(id, generation, N, error) → StatusUpdated, ReconciliationFailed
+        UC->>P: fail_reconciliation(id, generation, N, error) → StatusUpdated (Failed or Degraded)
     end
     alt Stale: deletion requested or generation moved
         UC->>UC: discard the outcome
@@ -1422,7 +1426,7 @@ the status at most once through a [lifecycle primitive](#lifecycle-primitives):
   `statusGeneration` still being the ones phase 1 left.
 - **A changed generation between the phases** (any apply between them) discards the outcome without
   saving or posting anything: it was computed for a superseded generation, and the newer `Applied`
-  message reconciles again. A `ReconciliationSucceeded` message for it would also make the
+  message reconciles again. A `StatusUpdated` recording its reconciliation would also make the
   configuration consumer drop projection entries the new generation still needs.
 - **A resource whose deletion was requested before or between the phases** is not reconciled, or
   its outcome is discarded: a resource being deleted never needs reconciliation.
@@ -1498,10 +1502,9 @@ The apply use case and the lifecycle primitives that the other use cases call pu
 ```mermaid
 flowchart LR
     APPLY["apply.rs"] -->|Applied| MSG[["ResourceLifecycleMessage"]]
-    REC["reconcile.rs"] -->|ReconciliationSucceeded / ReconciliationFailed| MSG
     DEL["request_deletion.rs"] -->|DeletionRequested| MSG
     COMP["complete_deletion.rs"] -->|Deleted| MSG
-    PATCH["update_conditions"] -->|StatusUpdated| MSG
+    PRIM["lifecycle primitives:<br/>every status write"] -->|StatusUpdated| MSG
 
     MSG --> OB[("Outbox")]
 
@@ -1515,10 +1518,10 @@ flowchart LR
     OB3 --> DSH["configuration crate:<br/>ConfigurationDatasetLifecycleMessageConsumer<br/>→ retracts legacy-config-target-dataset"]
 ```
 
-- **Resource lifecycle** — `Applied` (from `use_cases/apply.rs`), `ReconciliationSucceeded` /
-  `ReconciliationFailed` (`use_cases/reconcile.rs`), `DeletionRequested`
-  (`use_cases/request_deletion.rs`), `Deleted` (`use_cases/complete_deletion.rs`), `StatusUpdated`
-  (any caller of `update_conditions`, see [condition patches](#condition-patches)). Consumed by
+- **Resource lifecycle** — `Applied` (from `use_cases/apply.rs`), `DeletionRequested`
+  (`use_cases/request_deletion.rs`), `Deleted` (`use_cases/complete_deletion.rs`), and
+  `StatusUpdated` for every status write of a [lifecycle primitive](#lifecycle-primitives): a
+  reconciliation started, succeeded or failed, a cleanup failed, or a condition patch. Consumed by
   the **event bridge** (routes to the per-type `ResourceLifecycleEventDispatcher` — this is what
   schedules reconciliation and completes deletions) and by the configuration crate's
   projection-maintenance consumer. See
@@ -1543,14 +1546,15 @@ above). `apply` produces `Applied`; the generic **event bridge**
 consumes it, looks up the per-type `ResourceLifecycleEventDispatcher` by descriptor, and its
 `handle_applied` calls `ReconcileResourceUseCase::execute(id)` (which loads the aggregate, marks
 reconciliation started, runs the type's `ResourceController<R>`, records the outcome in the status, and
-posts `ReconciliationSucceeded`/`Failed`). `handle_deletion_requested` calls
+posts `StatusUpdated` for each status write). `handle_deletion_requested` calls
 `CompleteResourceDeletionUseCase::execute(ids)` with the whole batch ([(c) Deletion](#c-deletion)).
-The other `handle_*` are no-ops, and `StatusUpdated` reaches no dispatcher: no controller reacts to
-condition changes. The dispatcher + reconcile use case are generated together by the
+`handle_deleted` is a no-op, and `StatusUpdated` reaches no dispatcher: no controller reacts to
+status changes. The dispatcher + reconcile use case are generated together by the
 `declare_resource_service_layer!` macro and registered from the type's crate.
 
 The **second consumer**, `ConfigurationResourceLifecycleMessageConsumer` (configuration crate),
-reacts to `ReconciliationSucceeded` to **garbage-collect read-side projections** (drop superseded
+reacts to a `StatusUpdated` that records the reconciliation of the current generation to
+**garbage-collect read-side projections** (drop superseded
 generations) — it does *not* reconcile. The projection entries of a resource being deleted are
 removed by its controller's `cleanup`. So the bridge
 **schedules reconciliation**, the configuration consumer **maintains projections**.
