@@ -29,6 +29,7 @@ use kamu_resources::{
     ResourceSchemaProvider,
     ResourceSnapshot,
     ResourceStatusConflictError,
+    new_pending_resource_status,
 };
 use messaging_outbox::{MessageConsumerT, OutboxProvider, register_message_dispatcher};
 use odf::metadata::resources::TypeUri;
@@ -351,6 +352,7 @@ impl ResourceLifecycleConsumerHarness {
                 schema: snapshot.schema,
                 headers: snapshot.headers,
             },
+            &new_pending_resource_status(),
             [(
                 TypeUri::new_unchecked(
                     "https://test.kamu.dev/schemas/test/v1/conditions/TestStage",

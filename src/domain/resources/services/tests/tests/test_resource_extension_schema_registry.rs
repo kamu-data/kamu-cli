@@ -229,7 +229,7 @@ fn test_condition_registration_exposes_condition_meta() {
         reconciliation_error.condition(),
         Some(&ResourceConditionSchemaMeta {
             max_serialized_size: 16 * 1024,
-            carried: false,
+            carried: true,
         })
     );
     assert_eq!(environment.condition(), None);

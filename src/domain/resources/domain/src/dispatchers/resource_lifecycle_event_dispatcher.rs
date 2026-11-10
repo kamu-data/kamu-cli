@@ -17,16 +17,6 @@ use crate::ResourceSnapshot;
 pub trait ResourceLifecycleEventDispatcher: Send + Sync {
     async fn handle_applied(&self, resource: &ResourceSnapshot) -> Result<(), InternalError>;
 
-    async fn handle_reconciliation_succeeded(
-        &self,
-        resource: &ResourceSnapshot,
-    ) -> Result<(), InternalError>;
-
-    async fn handle_reconciliation_failed(
-        &self,
-        resource: &ResourceSnapshot,
-    ) -> Result<(), InternalError>;
-
     /// All resources share the schema of the dispatcher.
     async fn handle_deletion_requested(
         &self,

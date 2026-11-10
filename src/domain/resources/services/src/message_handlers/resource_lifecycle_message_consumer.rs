@@ -69,24 +69,6 @@ impl MessageConsumerT<ResourceLifecycleMessage> for ResourceLifecycleMessageCons
 
                 dispatcher.handle_applied(resource).await
             }
-            ResourceLifecycleMessage::ReconciliationSucceeded(succeeded_message) => {
-                let resource = &succeeded_message.resource;
-                let dispatcher = ResourceDispatcherFactory::lifecycle_dispatcher_in(
-                    target_catalog,
-                    &resource.schema,
-                )?;
-
-                dispatcher.handle_reconciliation_succeeded(resource).await
-            }
-            ResourceLifecycleMessage::ReconciliationFailed(failed_message) => {
-                let resource = &failed_message.resource;
-                let dispatcher = ResourceDispatcherFactory::lifecycle_dispatcher_in(
-                    target_catalog,
-                    &resource.schema,
-                )?;
-
-                dispatcher.handle_reconciliation_failed(resource).await
-            }
             ResourceLifecycleMessage::DeletionRequested(requested_message) => {
                 debug_assert!(
                     !requested_message.resources.is_empty(),
@@ -121,7 +103,7 @@ impl MessageConsumerT<ResourceLifecycleMessage> for ResourceLifecycleMessageCons
 
                 Ok(())
             }
-            // Controllers do not react to condition changes
+            // Controllers do not react to status changes
             ResourceLifecycleMessage::StatusUpdated(_) => Ok(()),
         }
     }
