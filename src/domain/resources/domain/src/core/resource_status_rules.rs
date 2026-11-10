@@ -7,7 +7,13 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use crate::{DeclarativeResource, ResourceConditions, empty_resource_conditions};
+use crate::{
+    DeclarativeResource,
+    ResourceConditions,
+    ResourceStatus,
+    ResourceStatusChangeRejectedError,
+    empty_resource_conditions,
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -17,6 +23,17 @@ pub trait ResourceStatusRules: DeclarativeResource {
     /// in its `Created` event, so no status update follows creation
     fn initial_conditions(_spec: &Self::SpecInput) -> ResourceConditions {
         empty_resource_conditions()
+    }
+
+    /// Decides whether a condition patch may change the status from `old` to
+    /// `new`. Schemas check each condition's value; this checks the change,
+    /// such as a transition one condition must not make or a combination of
+    /// conditions
+    fn validate_status_change(
+        _old: &ResourceStatus,
+        _new: &ResourceStatus,
+    ) -> Result<(), ResourceStatusChangeRejectedError> {
+        Ok(())
     }
 }
 

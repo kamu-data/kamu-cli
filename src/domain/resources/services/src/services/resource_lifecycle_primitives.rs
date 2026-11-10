@@ -7,7 +7,9 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use internal_error::ErrorIntoInternal;
+use std::collections::{BTreeMap, BTreeSet};
+
+use internal_error::{ErrorIntoInternal, ResultIntoInternal};
 use messaging_outbox::{Outbox, OutboxExt};
 use serde::Serialize;
 use time_source::SystemTimeSource;
@@ -20,22 +22,31 @@ use crate::domain::{
     ResourceAggregateLoader,
     ResourceBatchTransition,
     ResourceCleanupFailure,
+    ResourceConditionUpdateError,
+    ResourceConditions,
+    ResourceConditionsPatch,
     ResourceDeletionCompletion,
     ResourceDeletionInProgressError,
     ResourceExpectedVersion,
     ResourceGenerationConflictError,
     ResourceID,
     ResourceLifecycleMessage,
+    ResourceLifecycleMessageConditionChange,
+    ResourceLifecycleMessageResourceRef,
     ResourceLifecycleTransitionError,
     ResourceLoadError,
     ResourcePersistenceService,
+    ResourceSchemaId,
     ResourceSchemaProvider,
     ResourceStaleExpectationError,
     ResourceStatusConflictError,
     ResourceTransitionSkip,
     ResourceTransitionSkipReason,
     StatusConflictOf,
+    TypeRef,
+    TypeUri,
 };
+use crate::{ResourceConditionPatchChecker, ResourceExtensionSchemaRegistry};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -49,6 +60,7 @@ where
     resource_persistence_service: &'a dyn ResourcePersistenceService<R>,
     outbox: &'a dyn Outbox,
     time_source: &'a dyn SystemTimeSource,
+    extension_schema_registry: &'a ResourceExtensionSchemaRegistry,
 }
 
 type TransitionResult<T, R> = Result<T, ResourceLifecycleTransitionError<R>>;
@@ -64,12 +76,14 @@ where
         resource_persistence_service: &'a dyn ResourcePersistenceService<R>,
         outbox: &'a dyn Outbox,
         time_source: &'a dyn SystemTimeSource,
+        extension_schema_registry: &'a ResourceExtensionSchemaRegistry,
     ) -> Self {
         Self {
             resource_aggregate_loader,
             resource_persistence_service,
             outbox,
             time_source,
+            extension_schema_registry,
         }
     }
 
@@ -285,6 +299,58 @@ where
         Ok(batch)
     }
 
+    pub async fn update_conditions(
+        &self,
+        id: &ResourceID,
+        expected_status_generation: u64,
+        patch: &ResourceConditionsPatch,
+    ) -> Result<R, ResourceConditionUpdateError<R>> {
+        let mut resource = self
+            .resource_aggregate_loader
+            .load(id)
+            .await
+            .map_err(ResourceLoadError)?;
+        if let Some(conflict) = status_conflict(&resource, expected_status_generation) {
+            return Err(ResourceConditionUpdateError::StatusGenerationChanged(
+                conflict,
+            ));
+        }
+
+        let resource_schema = ResourceSchemaId::parse(R::schema().as_str()).int_err()?;
+        let carried = ResourceConditionPatchChecker::new(self.extension_schema_registry)
+            .check(patch, &resource_schema)?;
+
+        let mut new_status = resource.status().clone();
+        let changed = patch.apply_to(&mut new_status.conditions);
+        if changed.is_empty() {
+            return Ok(resource);
+        }
+        R::validate_status_change(resource.status(), &new_status)?;
+
+        let now = self.time_source.now();
+        resource
+            .try_update_status(now, expected_status_generation, new_status)
+            .map_err(condition_update_lifecycle_error)?;
+        self.resource_persistence_service
+            .save(&mut resource)
+            .await?;
+
+        let message = ResourceLifecycleMessage::status_updated(
+            now,
+            ResourceLifecycleMessageResourceRef {
+                id: *resource.id(),
+                schema: R::schema().clone(),
+                headers: resource.headers().clone(),
+            },
+            condition_changes(&resource.status().conditions, changed, &carried),
+        );
+        self.outbox
+            .post_message(MESSAGE_PRODUCER_KAMU_RESOURCE_SERVICE, message)
+            .await?;
+
+        Ok(resource)
+    }
+
     /// Loads a resource whose reconciliation outcome is about to be recorded,
     /// checking the expectations in the order a reconciliation outcome is
     /// discarded: a deletion request, then a newer generation, then another
@@ -390,6 +456,35 @@ fn ensure_status_generation<R: EventSourcedResource>(
     }
 }
 
+/// How each changed condition ended up, with the value only where it is carried
+fn condition_changes(
+    conditions: &ResourceConditions,
+    changed: BTreeSet<TypeUri>,
+    carried: &BTreeSet<TypeUri>,
+) -> BTreeMap<TypeUri, ResourceLifecycleMessageConditionChange> {
+    changed
+        .into_iter()
+        .map(|key| {
+            let change = match conditions.entries.get(&TypeRef::Uri(key.clone())) {
+                Some(value) => ResourceLifecycleMessageConditionChange::Set {
+                    value: carried.contains(&key).then(|| value.clone()),
+                },
+                None => ResourceLifecycleMessageConditionChange::Removed,
+            };
+            (key, change)
+        })
+        .collect()
+}
+
+fn condition_update_lifecycle_error<R: EventSourcedResource>(
+    err: R::LifecycleError,
+) -> ResourceConditionUpdateError<R> {
+    match err.as_status_conflict() {
+        Some(conflict) => ResourceConditionUpdateError::StatusGenerationChanged(*conflict),
+        None => ResourceConditionUpdateError::Lifecycle(err),
+    }
+}
+
 fn lifecycle_error<R: EventSourcedResource>(
     err: R::LifecycleError,
 ) -> ResourceLifecycleTransitionError<R> {
@@ -416,6 +511,7 @@ macro_rules! declare_resource_lifecycle_primitives {
                 std::sync::Arc<dyn kamu_resources::ResourcePersistenceService<$resource>>,
             outbox: std::sync::Arc<dyn $crate::messaging_outbox::Outbox>,
             time_source: std::sync::Arc<dyn time_source::SystemTimeSource>,
+            extension_schema_registry: std::sync::Arc<$crate::ResourceExtensionSchemaRegistry>,
         }
 
         impl $primitives {
@@ -425,6 +521,7 @@ macro_rules! declare_resource_lifecycle_primitives {
                     self.resource_persistence_service.as_ref(),
                     self.outbox.as_ref(),
                     self.time_source.as_ref(),
+                    self.extension_schema_registry.as_ref(),
                 )
             }
         }
@@ -489,6 +586,17 @@ macro_rules! declare_resource_lifecycle_primitives {
                 kamu_resources::ResourceLifecycleTransitionError<$resource>,
             > {
                 self.helper().record_cleanup_failure(failures).await
+            }
+
+            async fn update_conditions(
+                &self,
+                id: &kamu_resources::ResourceID,
+                expected_status_generation: u64,
+                patch: &kamu_resources::ResourceConditionsPatch,
+            ) -> Result<$resource, kamu_resources::ResourceConditionUpdateError<$resource>> {
+                self.helper()
+                    .update_conditions(id, expected_status_generation, patch)
+                    .await
             }
         }
     };

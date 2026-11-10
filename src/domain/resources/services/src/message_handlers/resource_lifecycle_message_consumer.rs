@@ -121,6 +121,8 @@ impl MessageConsumerT<ResourceLifecycleMessage> for ResourceLifecycleMessageCons
 
                 Ok(())
             }
+            // Controllers do not react to condition changes
+            ResourceLifecycleMessage::StatusUpdated(_) => Ok(()),
         }
     }
 }

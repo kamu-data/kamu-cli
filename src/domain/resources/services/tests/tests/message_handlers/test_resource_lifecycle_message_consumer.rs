@@ -23,7 +23,9 @@ use kamu_resources::{
     ResourceHeadersExt,
     ResourceID,
     ResourceLifecycleMessage,
+    ResourceLifecycleMessageConditionChange,
     ResourceLifecycleMessageOutcome,
+    ResourceLifecycleMessageResourceRef,
     ResourceSchemaProvider,
     ResourceSnapshot,
     ResourceStatusConflictError,
@@ -168,6 +170,22 @@ async fn test_deleted_message_is_no_op_for_controller() {
             Utc::now(),
             vec![ResourceLifecycleConsumerHarness::make_snapshot(id)],
         ))
+        .await
+        .unwrap();
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_status_updated_message_is_no_op_for_controller() {
+    let id = make_id();
+
+    let harness = ResourceLifecycleConsumerHarness::new(
+        ResourceLifecycleConsumerHarness::expect_no_execute(),
+    );
+
+    harness
+        .consume_message(&ResourceLifecycleConsumerHarness::make_status_updated(id))
         .await
         .unwrap();
 }
@@ -322,6 +340,25 @@ impl ResourceLifecycleConsumerHarness {
 
     fn make_snapshot(id: ResourceID) -> ResourceSnapshot {
         Self::make_snapshot_with_schema(id, TestResource::schema())
+    }
+
+    fn make_status_updated(id: ResourceID) -> ResourceLifecycleMessage {
+        let snapshot = Self::make_snapshot(id);
+        ResourceLifecycleMessage::status_updated(
+            Utc::now(),
+            ResourceLifecycleMessageResourceRef {
+                id,
+                schema: snapshot.schema,
+                headers: snapshot.headers,
+            },
+            [(
+                TypeUri::new_unchecked(
+                    "https://test.kamu.dev/schemas/test/v1/conditions/TestStage",
+                ),
+                ResourceLifecycleMessageConditionChange::Removed,
+            )]
+            .into(),
+        )
     }
 
     fn make_snapshot_with_schema(id: ResourceID, schema: &TypeUri) -> ResourceSnapshot {
