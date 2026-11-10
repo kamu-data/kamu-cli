@@ -30,7 +30,7 @@ use crate::tests::use_cases::resource_use_case_base_harness::{
     ResourceUseCaseBaseHarnessOpts,
     SanitizerKind,
 };
-use crate::tests::utils::TestResourceSpec;
+use crate::tests::utils::{TestResourceSpec, test_stage_condition_key};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Tests
@@ -241,6 +241,38 @@ async fn test_apply_create_initial_status_is_pending() {
     assert!(
         status.reconciled_at.is_none(),
         "status.reconciledAt must be absent before first reconcile"
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_apply_create_records_initial_conditions_of_the_type() {
+    let harness = ResourceUseCaseBaseHarness::new_with_opts(ResourceUseCaseBaseHarnessOpts {
+        base_opts: BaseResourceServiceHarnessOpts {
+            outbox_provider: OutboxProvider::Dispatching,
+            ..Default::default()
+        },
+        ..Default::default()
+    });
+    let account_handle = odf::ResourceOwnerHandle::new_test("test-owner");
+
+    let result = harness
+        .apply_test_uc()
+        .apply(make_params(&account_handle, "res-a", "staged:queued"))
+        .await
+        .unwrap()
+        .expect_applied();
+
+    let snapshot = harness.get_snapshot_by_id(&result.id).await.unwrap();
+    let status = snapshot.basic_status().unwrap();
+
+    // Recorded by the `Created` event itself: no status update follows
+    assert_eq!(snapshot.headers.status_generation, 1);
+    assert_eq!(status.phase, ResourcePhase::Pending);
+    pretty_assertions::assert_eq!(
+        status.conditions.entries,
+        [(test_stage_condition_key(), serde_json::json!("queued"))].into()
     );
 }
 

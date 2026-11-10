@@ -19,6 +19,7 @@ use kamu_resources::{
     ResourcePresentation,
     ResourcePresentationDefinition,
     ResourceSchemaProvider,
+    ResourceStatusRules,
     TypeUri,
 };
 
@@ -75,6 +76,10 @@ impl DeclarativeResource for StorageResource {
     type SpecInput = StorageSpec; // first candidate for a real split once reference resolution lands
     type ResourceState = StorageState;
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl ResourceStatusRules for StorageResource {}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

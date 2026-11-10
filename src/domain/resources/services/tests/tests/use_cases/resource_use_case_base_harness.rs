@@ -33,6 +33,7 @@ use crate::tests::utils::{
     TestResourceSpec,
     TestResourceSpecClearingSanitizer,
     TestResourceSpecSanitizer,
+    register_test_condition_schema_dispatchers,
     register_test_resource_crud_dispatcher,
     register_test_resource_resource_service_layer,
 };
@@ -113,6 +114,7 @@ impl ResourceUseCaseBaseHarness {
         let mut b = CatalogBuilder::new_chained(base.catalog());
         register_test_resource_resource_service_layer(&mut b);
         register_test_resource_crud_dispatcher(&mut b);
+        register_test_condition_schema_dispatchers(&mut b);
         opts.controller_provider.embed_into_catalog(&mut b);
 
         match opts.sanitizer {
