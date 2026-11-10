@@ -68,7 +68,7 @@ use crate::tests::utils::{
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_begin_reconciliation_marks_reconciling_without_message() {
+async fn test_begin_reconciliation_marks_reconciling_and_posts_status() {
     let harness = LifecyclePrimitivesHarness::new().await;
     let id = harness.apply("res-a").await;
     let mark = harness.message_count().await;
@@ -84,7 +84,10 @@ async fn test_begin_reconciliation_marks_reconciling_without_message() {
 
     assert!(started.is_some());
     pretty_assertions::assert_eq!(harness.phase(&id).await, ResourcePhase::Reconciling);
-    pretty_assertions::assert_eq!(harness.message_kinds_since(mark).await, [] as [&str; 0]);
+    pretty_assertions::assert_eq!(
+        harness.message_kinds_since(mark).await,
+        ["StatusUpdated(Reconciling)"]
+    );
 }
 
 #[test_log::test(tokio::test)]
@@ -111,6 +114,26 @@ async fn test_begin_reconciliation_of_reconciled_resource_changes_nothing() {
 }
 
 #[test_log::test(tokio::test)]
+async fn test_begin_reconciliation_of_reconciling_resource_posts_nothing() {
+    let harness = LifecyclePrimitivesHarness::new().await;
+    let id = harness.apply_and_begin("res-a").await;
+    let reconciling = harness.version(&id).await;
+    let mark = harness.message_count().await;
+
+    let started = harness
+        .commit(|p| async move {
+            p.begin_reconciliation(&id, Some(reconciling.status_generation))
+                .await
+        })
+        .await
+        .unwrap();
+
+    assert!(started.is_some());
+    pretty_assertions::assert_eq!(harness.version(&id).await, reconciling);
+    pretty_assertions::assert_eq!(harness.message_kinds_since(mark).await, [] as [&str; 0]);
+}
+
+#[test_log::test(tokio::test)]
 async fn test_begin_reconciliation_rejects_stale_status_generation() {
     let harness = LifecyclePrimitivesHarness::new().await;
     let id = harness.apply("res-a").await;
@@ -130,7 +153,7 @@ async fn test_begin_reconciliation_rejects_stale_status_generation() {
 }
 
 #[test_log::test(tokio::test)]
-async fn test_complete_reconciliation_marks_ready_and_posts_message() {
+async fn test_complete_reconciliation_marks_ready_and_posts_status() {
     let harness = LifecyclePrimitivesHarness::new().await;
     let id = harness.apply_and_begin("res-a").await;
     let mark = harness.message_count().await;
@@ -144,12 +167,12 @@ async fn test_complete_reconciliation_marks_ready_and_posts_message() {
     pretty_assertions::assert_eq!(harness.phase(&id).await, ResourcePhase::Ready);
     pretty_assertions::assert_eq!(
         harness.message_kinds_since(mark).await,
-        ["ReconciliationSucceeded"]
+        ["StatusUpdated(Ready)"]
     );
 }
 
 #[test_log::test(tokio::test)]
-async fn test_fail_reconciliation_marks_failed_and_posts_message() {
+async fn test_fail_reconciliation_marks_failed_and_posts_status() {
     let harness = LifecyclePrimitivesHarness::new().await;
     let id = harness.apply_and_begin("res-a").await;
     let mark = harness.message_count().await;
@@ -166,7 +189,15 @@ async fn test_fail_reconciliation_marks_failed_and_posts_message() {
     pretty_assertions::assert_eq!(harness.phase(&id).await, ResourcePhase::Failed);
     pretty_assertions::assert_eq!(
         harness.message_kinds_since(mark).await,
-        ["ReconciliationFailed"]
+        ["StatusUpdated(Failed)"]
+    );
+    pretty_assertions::assert_eq!(
+        harness.raw_messages_since(mark).await[0]["StatusUpdated"]["changed_conditions"],
+        serde_json::json!({
+            RESOURCE_CONDITION_RECONCILIATION_ERROR_SCHEMA_URI: {
+                "Set": { "value": { "code": "internal-error", "message": "Internal error: Internal error" } }
+            },
+        })
     );
 }
 
@@ -306,7 +337,10 @@ async fn test_record_cleanup_failure_keeps_deletion_in_progress() {
 
     pretty_assertions::assert_eq!(transitioned_ids(&transition), [id]);
     harness.assert_cleanup_failed(&id).await;
-    pretty_assertions::assert_eq!(harness.message_kinds_since(mark).await, [] as [&str; 0]);
+    pretty_assertions::assert_eq!(
+        harness.message_kinds_since(mark).await,
+        ["StatusUpdated(Deleting)"]
+    );
 }
 
 #[test_log::test(tokio::test)]
@@ -619,7 +653,10 @@ async fn test_conditions_are_patched_while_deleting_but_not_once_deleted() {
         .await
         .unwrap();
     pretty_assertions::assert_eq!(deleting.status().phase, ResourcePhase::Deleting);
-    pretty_assertions::assert_eq!(harness.message_kinds_since(mark).await, ["StatusUpdated"]);
+    pretty_assertions::assert_eq!(
+        harness.message_kinds_since(mark).await,
+        ["StatusUpdated(Deleting)"]
+    );
 
     harness
         .commit(|p| async move { p.complete_deletion(&[completion(id, None)]).await })
@@ -1006,19 +1043,15 @@ impl LifecyclePrimitivesHarness {
             .skip(mark)
             .map(|message| match message {
                 ResourceLifecycleMessage::Applied(_) => "Applied".to_string(),
-                ResourceLifecycleMessage::ReconciliationSucceeded(_) => {
-                    "ReconciliationSucceeded".to_string()
-                }
-                ResourceLifecycleMessage::ReconciliationFailed(_) => {
-                    "ReconciliationFailed".to_string()
-                }
                 ResourceLifecycleMessage::DeletionRequested(message) => {
                     format!("DeletionRequested({})", message.resources.len())
                 }
                 ResourceLifecycleMessage::Deleted(message) => {
                     format!("Deleted({})", message.resources.len())
                 }
-                ResourceLifecycleMessage::StatusUpdated(_) => "StatusUpdated".to_string(),
+                ResourceLifecycleMessage::StatusUpdated(message) => {
+                    format!("StatusUpdated({:?})", message.status.phase)
+                }
             })
             .collect()
     }
@@ -1034,8 +1067,6 @@ impl LifecyclePrimitivesHarness {
             .filter_map(|message| match message {
                 ResourceLifecycleMessage::StatusUpdated(message) => Some(message),
                 ResourceLifecycleMessage::Applied(_)
-                | ResourceLifecycleMessage::ReconciliationSucceeded(_)
-                | ResourceLifecycleMessage::ReconciliationFailed(_)
                 | ResourceLifecycleMessage::DeletionRequested(_)
                 | ResourceLifecycleMessage::Deleted(_) => None,
             })

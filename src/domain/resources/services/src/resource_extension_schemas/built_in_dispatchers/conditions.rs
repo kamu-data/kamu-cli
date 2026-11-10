@@ -38,7 +38,7 @@ declare_resource_extension_schema_dispatcher!(
     condition = Some(ResourceConditionSchemaMeta {
         // Written by the framework's own transitions, never by a condition patch
         max_serialized_size: 16 * 1024,
-        carried: false,
+        carried: true,
     })
 );
 

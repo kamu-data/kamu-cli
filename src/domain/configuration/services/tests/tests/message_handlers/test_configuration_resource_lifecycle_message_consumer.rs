@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::collections::BTreeMap;
 use std::sync::Arc;
 
 use chrono::Utc;
@@ -29,11 +30,13 @@ use kamu_resources::{
     ResourceHeadersExt,
     ResourceID,
     ResourceLifecycleMessage,
-    ResourceLifecycleMessageConditionChange,
     ResourceLifecycleMessageResourceRef,
+    ResourcePhase,
     ResourceSchemaProvider,
     ResourceSnapshot,
+    ResourceStatus,
     TypeUri,
+    new_pending_resource_status,
 };
 use messaging_outbox::{MessageConsumerT, OutboxProvider, register_message_dispatcher};
 use uuid::Uuid;
@@ -43,58 +46,20 @@ use uuid::Uuid;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_reconciliation_succeeded_for_variable_set_cleans_up_old_entries() {
+async fn test_reconciled_variable_set_cleans_up_old_entries() {
     let harness = ConfigurationResourceLifecycleConsumerHarness::new();
     let id = harness.alloc_id();
+    harness.seed_variable_entries(&id, 1).await;
+    harness.seed_variable_entries(&id, 2).await;
 
-    let now = Utc::now();
-
-    // Seed entries for generation 1
+    // Reconciling generation 2 supersedes the entries of generation 1
     harness
-        .variable_repo()
-        .replace_entries(
-            &id,
-            1,
-            &[kamu_configuration::VariableSetEntry {
-                entry_id: Uuid::new_v4(),
-                account_id: harness.account_handle.did.clone(),
-                key: "K".to_string(),
-                value: "v1".to_string(),
-                created_at: now,
-                updated_at: now,
-            }],
-        )
-        .await
-        .unwrap();
-
-    // Seed entries for generation 2
-    harness
-        .variable_repo()
-        .replace_entries(
-            &id,
+        .consume_message(&make_status_updated(
+            id,
+            VariableSetResource::schema(),
+            &harness.account_handle,
             2,
-            &[kamu_configuration::VariableSetEntry {
-                entry_id: Uuid::new_v4(),
-                account_id: harness.account_handle.did.clone(),
-                key: "K".to_string(),
-                value: "v2".to_string(),
-                created_at: now,
-                updated_at: now,
-            }],
-        )
-        .await
-        .unwrap();
-
-    // Consume ReconciliationSucceeded for generation 2 → should clean up gen 1
-    harness
-        .consume_message(&ResourceLifecycleMessage::reconciliation_succeeded(
-            Utc::now(),
-            make_snapshot(
-                id,
-                VariableSetResource::schema(),
-                &harness.account_handle,
-                2,
-            ),
+            &ready_status(2),
         ))
         .await
         .unwrap();
@@ -111,7 +76,7 @@ async fn test_reconciliation_succeeded_for_variable_set_cleans_up_old_entries() 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_reconciliation_succeeded_for_secret_set_cleans_up_old_entries() {
+async fn test_reconciled_secret_set_cleans_up_old_entries() {
     let harness = ConfigurationResourceLifecycleConsumerHarness::new();
     let id = harness.alloc_id();
 
@@ -154,9 +119,12 @@ async fn test_reconciliation_succeeded_for_secret_set_cleans_up_old_entries() {
         .unwrap();
 
     harness
-        .consume_message(&ResourceLifecycleMessage::reconciliation_succeeded(
-            Utc::now(),
-            make_snapshot(id, SecretSetResource::schema(), &harness.account_handle, 2),
+        .consume_message(&make_status_updated(
+            id,
+            SecretSetResource::schema(),
+            &harness.account_handle,
+            2,
+            &ready_status(2),
         ))
         .await
         .unwrap();
@@ -171,7 +139,7 @@ async fn test_reconciliation_succeeded_for_secret_set_cleans_up_old_entries() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_reconciliation_succeeded_for_unknown_kind_is_no_op() {
+async fn test_reconciled_unknown_kind_is_no_op() {
     let harness = ConfigurationResourceLifecycleConsumerHarness::new();
     let id = harness.alloc_id();
 
@@ -180,9 +148,12 @@ async fn test_reconciliation_succeeded_for_unknown_kind_is_no_op() {
 
     // Must succeed without error
     harness
-        .consume_message(&ResourceLifecycleMessage::reconciliation_succeeded(
-            Utc::now(),
-            make_snapshot(id, &UNKNOWN_SCHEMA, &harness.account_handle, 1),
+        .consume_message(&make_status_updated(
+            id,
+            &UNKNOWN_SCHEMA,
+            &harness.account_handle,
+            1,
+            &ready_status(1),
         ))
         .await
         .unwrap();
@@ -213,39 +184,73 @@ async fn test_applied_message_is_no_op() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_status_updated_message_is_no_op() {
+async fn test_status_update_without_reconciled_generation_keeps_entries() {
     let harness = ConfigurationResourceLifecycleConsumerHarness::new();
     let id = harness.alloc_id();
-    let snapshot = make_snapshot(
-        id,
-        VariableSetResource::schema(),
-        &harness.account_handle,
-        1,
-    );
+    harness.seed_variable_entries(&id, 1).await;
+    harness.seed_variable_entries(&id, 2).await;
 
-    harness
-        .consume_message(&ResourceLifecycleMessage::status_updated(
-            Utc::now(),
-            ResourceLifecycleMessageResourceRef {
+    for status in [reconciling_status(2), ready_status(1)] {
+        harness
+            .consume_message(&make_status_updated(
                 id,
-                schema: snapshot.schema,
-                headers: snapshot.headers,
-            },
-            [(
-                TypeUri::new_unchecked(
-                    "https://test.kamu.dev/schemas/test/v1/conditions/TestStage",
-                ),
-                ResourceLifecycleMessageConditionChange::Removed,
-            )]
-            .into(),
-        ))
-        .await
-        .unwrap();
+                VariableSetResource::schema(),
+                &harness.account_handle,
+                2,
+                &status,
+            ))
+            .await
+            .unwrap();
+    }
+
+    let gen1 = harness.variable_repo().get_entries(&id, 1).await.unwrap();
+    assert_eq!(
+        gen1.len(),
+        1,
+        "gen-1 entries must stay until gen 2 is reconciled"
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Helpers
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+fn make_status_updated(
+    id: ResourceID,
+    schema: &'static TypeUri,
+    account: &odf::ResourceOwnerHandle,
+    generation: u64,
+    status: &ResourceStatus,
+) -> ResourceLifecycleMessage {
+    let snapshot = make_snapshot(id, schema, account, generation);
+    ResourceLifecycleMessage::status_updated(
+        Utc::now(),
+        ResourceLifecycleMessageResourceRef {
+            id,
+            schema: snapshot.schema,
+            headers: snapshot.headers,
+        },
+        status,
+        BTreeMap::new(),
+    )
+}
+
+fn ready_status(reconciled_generation: u64) -> ResourceStatus {
+    ResourceStatus {
+        phase: ResourcePhase::Ready,
+        observed_generation: Some(reconciled_generation),
+        reconciled_generation: Some(reconciled_generation),
+        ..new_pending_resource_status()
+    }
+}
+
+fn reconciling_status(observed_generation: u64) -> ResourceStatus {
+    ResourceStatus {
+        phase: ResourcePhase::Reconciling,
+        observed_generation: Some(observed_generation),
+        ..new_pending_resource_status()
+    }
+}
 
 fn make_snapshot(
     id: ResourceID,
@@ -309,6 +314,26 @@ impl ConfigurationResourceLifecycleConsumerHarness {
 
     fn secret_repo(&self) -> Arc<dyn SecretSetProjectionRepository> {
         self.catalog.get_one().unwrap()
+    }
+
+    /// Stores one variable entry for `generation`
+    async fn seed_variable_entries(&self, id: &ResourceID, generation: u64) {
+        let now = Utc::now();
+        self.variable_repo()
+            .replace_entries(
+                id,
+                generation,
+                &[kamu_configuration::VariableSetEntry {
+                    entry_id: Uuid::new_v4(),
+                    account_id: self.account_handle.did.clone(),
+                    key: "K".to_string(),
+                    value: format!("v{generation}"),
+                    created_at: now,
+                    updated_at: now,
+                }],
+            )
+            .await
+            .unwrap();
     }
 
     async fn consume_message(
