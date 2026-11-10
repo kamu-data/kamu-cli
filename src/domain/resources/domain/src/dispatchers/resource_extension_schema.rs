@@ -43,6 +43,23 @@ pub struct ResourceExtensionSchemaMeta {
     /// whose schema lives in the ODF spec
     pub document: Option<&'static str>,
     pub applications: &'static [ResourceExtensionApplicationMeta],
+    /// Declared by every condition schema and by no other kind
+    pub condition: Option<ResourceConditionSchemaMeta>,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// How a condition may be written and reported. Kamu declares it at
+/// registration, so it also covers conditions whose schema ODF publishes
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub struct ResourceConditionSchemaMeta {
+    /// Upper bound of the condition's serialized JSON, in bytes, enforced on
+    /// every condition patch. Every status event stores the whole status, so a
+    /// large condition is copied into each later event
+    pub max_serialized_size: usize,
+    /// Whether a `StatusUpdated` lifecycle message carries the condition's new
+    /// value. Otherwise the message names only its key
+    pub carried: bool,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

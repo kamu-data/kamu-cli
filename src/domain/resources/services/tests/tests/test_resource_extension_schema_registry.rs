@@ -12,6 +12,7 @@ use kamu_resources::{
     RESOURCE_ANNOTATION_DESCRIPTION_SCHEMA_URI,
     RESOURCE_CONDITION_RECONCILIATION_ERROR_SCHEMA_URI,
     RESOURCE_LABEL_ENVIRONMENT_SCHEMA_URI,
+    ResourceConditionSchemaMeta,
     ResourceExtensionApplicationMeta,
     ResourceExtensionKind,
     ResourceExtensionResolutionError,
@@ -23,7 +24,10 @@ use kamu_resources::{
     TypeRef,
     TypeUri,
 };
-use kamu_resources_services::ResourceExtensionSchemaRegistry;
+use kamu_resources_services::{
+    ResourceExtensionSchemaRegistration,
+    ResourceExtensionSchemaRegistry,
+};
 use pretty_assertions::assert_eq;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -208,6 +212,61 @@ fn test_duplicate_alias_registration_fails_registry_construction() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[test]
+fn test_condition_registration_exposes_condition_meta() {
+    let harness = ExtensionRegistryHarness::built_ins();
+
+    let reconciliation_error = harness.resolve_uri(
+        ResourceExtensionKind::Condition,
+        RESOURCE_CONDITION_RECONCILIATION_ERROR_SCHEMA_URI,
+    );
+    let environment = harness.resolve_uri(
+        ResourceExtensionKind::Label,
+        RESOURCE_LABEL_ENVIRONMENT_SCHEMA_URI,
+    );
+
+    assert_eq!(
+        reconciliation_error.condition(),
+        Some(&ResourceConditionSchemaMeta {
+            max_serialized_size: 16 * 1024,
+            carried: false,
+        })
+    );
+    assert_eq!(environment.condition(), None);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test]
+#[should_panic(expected = "declares no condition metadata")]
+fn test_condition_without_condition_meta_fails_registry_construction() {
+    ExtensionRegistryHarness::with_test_dispatchers(|b| {
+        b.add::<ConditionWithoutMetaDispatcher>();
+    });
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test]
+#[should_panic(expected = "declares condition metadata but is not a condition")]
+fn test_label_with_condition_meta_fails_registry_construction() {
+    ExtensionRegistryHarness::with_test_dispatchers(|b| {
+        b.add::<LabelWithConditionMetaDispatcher>();
+    });
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test]
+#[should_panic(expected = "declares a zero size limit")]
+fn test_condition_with_zero_size_limit_fails_registry_construction() {
+    ExtensionRegistryHarness::with_test_dispatchers(|b| {
+        b.add::<ConditionWithZeroLimitDispatcher>();
+    });
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 struct ExtensionRegistryHarness {
     registry: std::sync::Arc<ResourceExtensionSchemaRegistry>,
     default_schema: ResourceSchemaId,
@@ -240,6 +299,17 @@ impl ExtensionRegistryHarness {
 
     fn uri_ref(&self, uri: &str) -> TypeRef {
         TypeRef::Uri(TypeUri::new_unchecked(uri))
+    }
+
+    fn resolve_uri(
+        &self,
+        kind: ResourceExtensionKind,
+        uri: &str,
+    ) -> std::sync::Arc<ResourceExtensionSchemaRegistration> {
+        self.registry
+            .resolve(kind, &self.uri_ref(uri), &self.default_schema)
+            .unwrap()
+            .unwrap()
     }
 
     fn assert_resolves_to_uri(
@@ -385,7 +455,8 @@ kamu_resources_services::declare_resource_extension_schema_dispatcher!(
     schema_id = EXACT_ONLY_SCHEMA_ID,
     kind = ResourceExtensionKind::Label,
     document = None,
-    applications = EXACT_ONLY_APPLICATIONS
+    applications = EXACT_ONLY_APPLICATIONS,
+    condition = None
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -404,7 +475,8 @@ kamu_resources_services::declare_resource_extension_schema_dispatcher!(
     schema_id = ANY_TIER_SCHEMA_ID,
     kind = ResourceExtensionKind::Label,
     document = None,
-    applications = ANY_TIER_APPLICATIONS
+    applications = ANY_TIER_APPLICATIONS,
+    condition = None
 );
 
 const ANY_TIER_ALIAS_CONFLICT_SCHEMA_ID: &str =
@@ -416,7 +488,8 @@ kamu_resources_services::declare_resource_extension_schema_dispatcher!(
     schema_id = ANY_TIER_ALIAS_CONFLICT_SCHEMA_ID,
     kind = ResourceExtensionKind::Label,
     document = None,
-    applications = ANY_TIER_APPLICATIONS
+    applications = ANY_TIER_APPLICATIONS,
+    condition = None
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -440,7 +513,8 @@ kamu_resources_services::declare_resource_extension_schema_dispatcher!(
     schema_id = CONTEXT_TIER_SCHEMA_ID,
     kind = ResourceExtensionKind::Label,
     document = None,
-    applications = CONTEXT_TIER_APPLICATIONS
+    applications = CONTEXT_TIER_APPLICATIONS,
+    condition = None
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -464,7 +538,8 @@ kamu_resources_services::declare_resource_extension_schema_dispatcher!(
     schema_id = VERSIONED_CONTEXT_TIER_SCHEMA_ID,
     kind = ResourceExtensionKind::Label,
     document = None,
-    applications = VERSIONED_CONTEXT_TIER_APPLICATIONS
+    applications = VERSIONED_CONTEXT_TIER_APPLICATIONS,
+    condition = None
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -485,7 +560,8 @@ kamu_resources_services::declare_resource_extension_schema_dispatcher!(
     schema_id = EXACT_TIER_SCHEMA_ID,
     kind = ResourceExtensionKind::Label,
     document = None,
-    applications = EXACT_TIER_APPLICATIONS
+    applications = EXACT_TIER_APPLICATIONS,
+    condition = None
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -496,7 +572,49 @@ kamu_resources_services::declare_resource_extension_schema_dispatcher!(
     schema_id = RESOURCE_LABEL_ENVIRONMENT_SCHEMA_URI,
     kind = ResourceExtensionKind::Label,
     document = None,
-    applications = ANY_TIER_APPLICATIONS
+    applications = ANY_TIER_APPLICATIONS,
+    condition = None
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+const TEST_CONDITION_SCHEMA_ID: &str =
+    "https://kamu.dev/schemas/resource/v1alpha1/conditions/TestCondition";
+
+kamu_resources_services::declare_resource_extension_schema_dispatcher!(
+    dispatcher = ConditionWithoutMetaDispatcher,
+    value = TestStringValue,
+    schema_id = TEST_CONDITION_SCHEMA_ID,
+    kind = ResourceExtensionKind::Condition,
+    document = None,
+    applications = ANY_TIER_APPLICATIONS,
+    condition = None
+);
+
+kamu_resources_services::declare_resource_extension_schema_dispatcher!(
+    dispatcher = ConditionWithZeroLimitDispatcher,
+    value = TestStringValue,
+    schema_id = TEST_CONDITION_SCHEMA_ID,
+    kind = ResourceExtensionKind::Condition,
+    document = None,
+    applications = ANY_TIER_APPLICATIONS,
+    condition = Some(ResourceConditionSchemaMeta {
+        max_serialized_size: 0,
+        carried: true,
+    })
+);
+
+kamu_resources_services::declare_resource_extension_schema_dispatcher!(
+    dispatcher = LabelWithConditionMetaDispatcher,
+    value = TestStringValue,
+    schema_id = ANY_TIER_SCHEMA_ID,
+    kind = ResourceExtensionKind::Label,
+    document = None,
+    applications = ANY_TIER_APPLICATIONS,
+    condition = Some(ResourceConditionSchemaMeta {
+        max_serialized_size: 64,
+        carried: true,
+    })
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -11,6 +11,7 @@ use dill::CatalogBuilder;
 use kamu_resources::{
     RESOURCE_CONDITION_RECONCILIATION_ERROR_SCHEMA_URI,
     ReconciliationErrorCondition,
+    ResourceConditionSchemaMeta,
     ResourceExtensionApplicationMeta,
     ResourceExtensionKind,
     ResourceExtensionScopeMeta,
@@ -33,7 +34,12 @@ declare_resource_extension_schema_dispatcher!(
     schema_id = RESOURCE_CONDITION_RECONCILIATION_ERROR_SCHEMA_URI,
     kind = ResourceExtensionKind::Condition,
     document = None,
-    applications = CONDITION_APPLICATIONS
+    applications = CONDITION_APPLICATIONS,
+    condition = Some(ResourceConditionSchemaMeta {
+        // Written by the framework's own transitions, never by a condition patch
+        max_serialized_size: 16 * 1024,
+        carried: false,
+    })
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
