@@ -12,6 +12,7 @@ use chrono::{DateTime, Utc};
 use crate::{
     RECONCILIATION_ERROR_CODE_CLEANUP_FAILED,
     ReconciliationError,
+    ResourceConditions,
     ResourceConditionsReconciliationErrorExt,
     ResourceHeaders,
     ResourcePhase,
@@ -25,13 +26,17 @@ pub type ResourceStatus = odf::metadata::resources::ResourceStatus;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub fn new_pending_resource_status() -> ResourceStatus {
+    new_pending_resource_status_with(empty_resource_conditions())
+}
+
+pub fn new_pending_resource_status_with(conditions: ResourceConditions) -> ResourceStatus {
     ResourceStatus {
         phase: ResourcePhase::Pending,
         observed_generation: None,
         observed_at: None,
         reconciled_generation: None,
         reconciled_at: None,
-        conditions: empty_resource_conditions(),
+        conditions,
     }
 }
 

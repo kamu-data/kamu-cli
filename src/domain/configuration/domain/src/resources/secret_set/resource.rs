@@ -19,6 +19,7 @@ use kamu_resources::{
     ResourcePresentation,
     ResourcePresentationDefinition,
     ResourceSchemaProvider,
+    ResourceStatusRules,
     TypeUri,
 };
 
@@ -58,6 +59,10 @@ impl DeclarativeResource for SecretSetResource {
     type SpecInput = SecretSetSpecInput;
     type ResourceState = SecretSetState;
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl ResourceStatusRules for SecretSetResource {}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

@@ -62,11 +62,15 @@ pub trait EventSourcedResource:
         headers: ResourceHeadersInput,
         spec: Self::SpecInput,
     ) -> ResourceEvent<Self::SpecInput> {
+        let initial_conditions = Self::initial_conditions(&spec);
+
         ResourceEvent::Created(ResourceEventCreated {
             event_time: now,
             id,
             headers,
             spec,
+            initial_conditions: Some(initial_conditions)
+                .filter(|conditions| !conditions.entries.is_empty()),
         })
     }
 

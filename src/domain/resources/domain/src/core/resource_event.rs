@@ -12,7 +12,7 @@ use enum_variants::*;
 use event_sourcing::ProjectionEvent;
 use serde::{Deserialize, Serialize};
 
-use crate::{ResourceHeadersInput, ResourceID, ResourceName, ResourceStatus};
+use crate::{ResourceConditions, ResourceHeadersInput, ResourceID, ResourceName, ResourceStatus};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -36,6 +36,11 @@ pub struct ResourceEventCreated<TSpec> {
     #[serde_as(as = "odf::metadata::serde::yaml::resources::ResourceHeadersInput")]
     pub headers: ResourceHeadersInput,
     pub spec: TSpec,
+    /// The conditions the resource type starts every new resource with, from
+    /// `ResourceStatusRules::initial_conditions`; absent when there are none
+    #[serde_as(as = "Option<odf::metadata::serde::yaml::resources::ResourceConditions>")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub initial_conditions: Option<ResourceConditions>,
 }
 
 #[serde_with::serde_as]

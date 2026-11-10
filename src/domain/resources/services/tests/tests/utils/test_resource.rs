@@ -11,6 +11,8 @@ use event_sourcing::*;
 use kamu_resources::*;
 use serde::{Deserialize, Serialize};
 
+use crate::tests::utils::test_stage_condition_key;
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // TestResourceSpec
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -158,6 +160,10 @@ impl TestResource {
 
     pub const SELECTOR_ALIAS_STRS: &'static [&'static str] = &[];
     pub const SELECTOR_ALIASES: &'static [kamu_resources::ResourceSelectorName] = &[];
+
+    /// A spec value `staged:<stage>` starts the resource with that
+    /// `TestStage` condition
+    pub const STAGED_VALUE_PREFIX: &'static str = "staged:";
 }
 
 impl ResourceSchemaProvider for TestResource {
@@ -174,6 +180,18 @@ impl DeclarativeResource for TestResource {
     type Spec = TestResourceSpec;
     type SpecInput = TestResourceSpec;
     type ResourceState = TestResourceState;
+}
+
+impl ResourceStatusRules for TestResource {
+    fn initial_conditions(spec: &TestResourceSpec) -> ResourceConditions {
+        let mut conditions = empty_resource_conditions();
+        if let Some(stage) = spec.value.strip_prefix(Self::STAGED_VALUE_PREFIX) {
+            conditions
+                .entries
+                .insert(test_stage_condition_key(), stage.into());
+        }
+        conditions
+    }
 }
 
 impl ResourcePresentation for TestResource {
