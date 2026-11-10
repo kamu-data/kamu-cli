@@ -345,6 +345,10 @@ and an aggregate. This is the bound that all generic use cases require.
 `ResourceEvent<TSpec>` is the event-sourcing alphabet:
 `Created`, `HeadersUpdated`, `SpecUpdated`, `StatusUpdated`, `DeletionRequested`, `Deleted`.
 
+- `Created` carries the conditions the type starts every new resource with
+  (`ResourceStatusRules::initial_conditions`), so no `StatusUpdated` follows creation. The field is
+  absent when there are none, and in events stored before types could set them, which replay
+  without conditions.
 - `HeadersUpdated` and `SpecUpdated` carry the new `generation`. `HeadersUpdated.new_generation` is
   optional; an event without it leaves the generation as is.
 - `StatusUpdated` carries the whole new status, written by a controller. It bumps
