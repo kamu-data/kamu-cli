@@ -29,12 +29,15 @@ use crate::{
 /// caller can commit a transition together with writes of its own. A rolled
 /// back transaction leaves neither the event nor the message behind.
 ///
+/// Every status write posts a `StatusUpdated` message naming the changed
+/// conditions; a write that leaves the status as it was posts nothing.
+///
 /// The batch transitions take each resource at most once; a repeated id fails
 /// the whole batch.
 #[async_trait::async_trait]
 pub trait ResourceLifecyclePrimitives<R: EventSourcedResource>: Send + Sync {
     /// Moves the resource to `Reconciling` and records the generation it
-    /// observed. Posts no message. Returns `None`, changing nothing, when the
+    /// observed. Returns `None`, changing nothing, when the
     /// resource does not need reconciliation, and a resource already
     /// reconciling as it is. The expected status generation, when given, is
     /// checked only when the start is recorded
@@ -44,8 +47,7 @@ pub trait ResourceLifecyclePrimitives<R: EventSourcedResource>: Send + Sync {
         expected_status_generation: Option<u64>,
     ) -> Result<Option<R>, ResourceLifecycleTransitionError<R>>;
 
-    /// Moves the resource to `Ready` with the expected generation reconciled,
-    /// and posts `ReconciliationSucceeded`
+    /// Moves the resource to `Ready` with the expected generation reconciled
     async fn complete_reconciliation(
         &self,
         id: &ResourceID,
@@ -53,7 +55,7 @@ pub trait ResourceLifecyclePrimitives<R: EventSourcedResource>: Send + Sync {
     ) -> Result<R, ResourceLifecycleTransitionError<R>>;
 
     /// Moves the resource to `Failed` or `Degraded` with the error as its
-    /// `ReconciliationError`, and posts `ReconciliationFailed`
+    /// `ReconciliationError`
     async fn fail_reconciliation(
         &self,
         id: &ResourceID,
@@ -77,17 +79,15 @@ pub trait ResourceLifecyclePrimitives<R: EventSourcedResource>: Send + Sync {
         completions: &[ResourceDeletionCompletion],
     ) -> Result<ResourceBatchTransition<R>, ResourceLifecycleTransitionError<R>>;
 
-    /// Records failed cleanups; the deletions stay in progress. Posts no
-    /// message
+    /// Records failed cleanups; the deletions stay in progress
     async fn record_cleanup_failure(
         &self,
         failures: &[ResourceCleanupFailure],
     ) -> Result<ResourceBatchTransition<R>, ResourceLifecycleTransitionError<R>>;
 
     /// Sets and removes the conditions the patch names, each checked against
-    /// its registered schema and the change against the type's status rules,
-    /// and posts `StatusUpdated` naming the conditions that changed. A patch
-    /// that changes nothing records and posts nothing. Accepted while the
+    /// its registered schema and the change against the type's status rules.
+    /// A patch that changes nothing records and posts nothing. Accepted while the
     /// deletion is in progress, so a writer can still record an outcome
     async fn update_conditions(
         &self,

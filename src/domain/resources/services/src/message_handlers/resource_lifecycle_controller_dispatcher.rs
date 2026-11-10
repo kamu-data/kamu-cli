@@ -69,20 +69,6 @@ macro_rules! declare_resource_lifecycle_controller_dispatcher {
                 }
             }
 
-            async fn handle_reconciliation_succeeded(
-                &self,
-                _resource: &kamu_resources::ResourceSnapshot,
-            ) -> Result<(), internal_error::InternalError> {
-                Ok(())
-            }
-
-            async fn handle_reconciliation_failed(
-                &self,
-                _resource: &kamu_resources::ResourceSnapshot,
-            ) -> Result<(), internal_error::InternalError> {
-                Ok(())
-            }
-
             async fn handle_deletion_requested(
                 &self,
                 resources: &[kamu_resources::ResourceSnapshot],

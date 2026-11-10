@@ -206,10 +206,17 @@ async fn test_already_reconciled_is_no_op_and_controller_is_not_called() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_reconcile_success_posts_reconciliation_succeeded_message() {
+async fn test_reconcile_success_posts_status_updates_to_ready() {
     let mut mock_outbox = MockOutbox::new();
     BaseResourceServiceHarness::expect_applied_messages(&mut mock_outbox, 1, None);
-    BaseResourceServiceHarness::expect_reconciliation_succeeded_message(&mut mock_outbox, 1);
+    BaseResourceServiceHarness::expect_status_updated_message(
+        &mut mock_outbox,
+        ResourcePhase::Reconciling,
+    );
+    BaseResourceServiceHarness::expect_status_updated_message(
+        &mut mock_outbox,
+        ResourcePhase::Ready,
+    );
 
     let harness = ResourceUseCaseBaseHarness::new_with_mock_outbox_and_controller(
         mock_outbox,
@@ -226,10 +233,17 @@ async fn test_reconcile_success_posts_reconciliation_succeeded_message() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_reconcile_failure_posts_reconciliation_failed_message() {
+async fn test_reconcile_failure_posts_status_updates_to_failed() {
     let mut mock_outbox = MockOutbox::new();
     BaseResourceServiceHarness::expect_applied_messages(&mut mock_outbox, 1, None);
-    BaseResourceServiceHarness::expect_reconciliation_failed_message(&mut mock_outbox, 1);
+    BaseResourceServiceHarness::expect_status_updated_message(
+        &mut mock_outbox,
+        ResourcePhase::Reconciling,
+    );
+    BaseResourceServiceHarness::expect_status_updated_message(
+        &mut mock_outbox,
+        ResourcePhase::Failed,
+    );
 
     let harness = ResourceUseCaseBaseHarness::new_with_mock_outbox_and_controller(
         mock_outbox,
