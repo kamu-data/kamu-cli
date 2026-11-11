@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 
 use crate::{ResourceConditions, TypeRef, TypeUri};
 
@@ -47,11 +47,11 @@ impl ResourceConditionsPatch {
         self.changes.iter()
     }
 
-    /// Applies the patch and returns the keys whose condition it changed:
-    /// setting a condition to the value it has, or removing an absent one,
-    /// changes nothing
-    pub fn apply_to(&self, conditions: &mut ResourceConditions) -> BTreeSet<TypeUri> {
-        let mut changed = BTreeSet::new();
+    /// Applies the patch and returns whether it changed any condition: setting
+    /// a condition to the value it has, or removing an absent one, changes
+    /// nothing
+    pub fn apply_to(&self, conditions: &mut ResourceConditions) -> bool {
+        let mut changed = false;
 
         for (key, change) in &self.changes {
             let entry_key = TypeRef::Uri(key.clone());
@@ -66,9 +66,7 @@ impl ResourceConditionsPatch {
                 ResourceConditionPatchChange::Set(value) => previous.as_ref() == Some(value),
                 ResourceConditionPatchChange::Remove => previous.is_none(),
             };
-            if !unchanged {
-                changed.insert(key.clone());
-            }
+            changed |= !unchanged;
         }
 
         changed
@@ -120,10 +118,7 @@ mod tests {
                 ("Added", serde_json::json!("d")),
             ])
         );
-        assert_eq!(
-            changed,
-            [key("Added"), key("Removed"), key("Replaced")].into()
-        );
+        assert!(changed);
     }
 
     #[test]
@@ -136,7 +131,7 @@ mod tests {
             .apply_to(&mut current);
 
         assert_eq!(current, conditions(&[("Kept", serde_json::json!("a"))]));
-        assert_eq!(changed, BTreeSet::new());
+        assert!(!changed);
     }
 
     #[test]

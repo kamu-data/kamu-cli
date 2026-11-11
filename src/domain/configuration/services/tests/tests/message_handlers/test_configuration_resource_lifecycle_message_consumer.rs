@@ -10,7 +10,7 @@
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
-use chrono::Utc;
+use chrono::{DateTime, TimeDelta, Utc};
 use dill::CatalogBuilder;
 use internal_error::InternalError;
 use kamu_configuration::{
@@ -51,6 +51,7 @@ async fn test_reconciled_variable_set_cleans_up_old_entries() {
     let id = harness.alloc_id();
     harness.seed_variable_entries(&id, 1).await;
     harness.seed_variable_entries(&id, 2).await;
+    let now = Utc::now();
 
     // Reconciling generation 2 supersedes the entries of generation 1
     harness
@@ -59,7 +60,8 @@ async fn test_reconciled_variable_set_cleans_up_old_entries() {
             VariableSetResource::schema(),
             &harness.account_handle,
             2,
-            &ready_status(2),
+            now,
+            &reconciled_status(2, now),
         ))
         .await
         .unwrap();
@@ -124,7 +126,8 @@ async fn test_reconciled_secret_set_cleans_up_old_entries() {
             SecretSetResource::schema(),
             &harness.account_handle,
             2,
-            &ready_status(2),
+            now,
+            &reconciled_status(2, now),
         ))
         .await
         .unwrap();
@@ -145,6 +148,7 @@ async fn test_reconciled_unknown_kind_is_no_op() {
 
     static UNKNOWN_SCHEMA: std::sync::LazyLock<TypeUri> =
         std::sync::LazyLock::new(|| TypeUri::new_unchecked("unknown"));
+    let now = Utc::now();
 
     // Must succeed without error
     harness
@@ -153,7 +157,8 @@ async fn test_reconciled_unknown_kind_is_no_op() {
             &UNKNOWN_SCHEMA,
             &harness.account_handle,
             1,
-            &ready_status(1),
+            now,
+            &reconciled_status(1, now),
         ))
         .await
         .unwrap();
@@ -184,19 +189,26 @@ async fn test_applied_message_is_no_op() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_status_update_without_reconciled_generation_keeps_entries() {
+async fn test_status_update_not_recording_reconciliation_of_current_generation_keeps_entries() {
     let harness = ConfigurationResourceLifecycleConsumerHarness::new();
     let id = harness.alloc_id();
     harness.seed_variable_entries(&id, 1).await;
     harness.seed_variable_entries(&id, 2).await;
 
-    for status in [reconciling_status(2), ready_status(1)] {
+    // The last one is a later update of generation 2, reconciled before
+    let now = Utc::now();
+    for status in [
+        reconciling_status(2),
+        reconciled_status(1, now),
+        reconciled_status(2, now - TimeDelta::minutes(1)),
+    ] {
         harness
             .consume_message(&make_status_updated(
                 id,
                 VariableSetResource::schema(),
                 &harness.account_handle,
                 2,
+                now,
                 &status,
             ))
             .await
@@ -220,11 +232,12 @@ fn make_status_updated(
     schema: &'static TypeUri,
     account: &odf::ResourceOwnerHandle,
     generation: u64,
+    event_time: DateTime<Utc>,
     status: &ResourceStatus,
 ) -> ResourceLifecycleMessage {
     let snapshot = make_snapshot(id, schema, account, generation);
     ResourceLifecycleMessage::status_updated(
-        Utc::now(),
+        event_time,
         ResourceLifecycleMessageResourceRef {
             id,
             schema: snapshot.schema,
@@ -235,11 +248,14 @@ fn make_status_updated(
     )
 }
 
-fn ready_status(reconciled_generation: u64) -> ResourceStatus {
+/// The status a reconciliation of `reconciled_generation` records at
+/// `reconciled_at`, the time of its message
+fn reconciled_status(reconciled_generation: u64, reconciled_at: DateTime<Utc>) -> ResourceStatus {
     ResourceStatus {
         phase: ResourcePhase::Ready,
         observed_generation: Some(reconciled_generation),
         reconciled_generation: Some(reconciled_generation),
+        reconciled_at: Some(reconciled_at),
         ..new_pending_resource_status()
     }
 }

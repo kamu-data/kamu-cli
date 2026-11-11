@@ -66,7 +66,7 @@ impl MessageConsumerT<ResourceLifecycleMessage> for ConfigurationResourceLifecyc
 
         match message {
             ResourceLifecycleMessage::StatusUpdated(updated_message)
-                if updated_message.reconciled_current_generation() =>
+                if updated_message.records_reconciliation_of_current_generation() =>
             {
                 let resource = &updated_message.resource;
                 match resource.schema.as_str() {

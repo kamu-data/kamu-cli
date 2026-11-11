@@ -37,10 +37,10 @@ use crate::{
 #[async_trait::async_trait]
 pub trait ResourceLifecyclePrimitives<R: EventSourcedResource>: Send + Sync {
     /// Moves the resource to `Reconciling` and records the generation it
-    /// observed. Returns `None`, changing nothing, when the
-    /// resource does not need reconciliation, and a resource already
-    /// reconciling as it is. The expected status generation, when given, is
-    /// checked only when the start is recorded
+    /// observed. Returns `None`, changing nothing, when the resource does not
+    /// need reconciliation, and a resource already reconciling as it is. The
+    /// expected status generation, when given, is checked only when the start
+    /// is recorded
     async fn begin_reconciliation(
         &self,
         id: &ResourceID,
@@ -87,8 +87,8 @@ pub trait ResourceLifecyclePrimitives<R: EventSourcedResource>: Send + Sync {
 
     /// Sets and removes the conditions the patch names, each checked against
     /// its registered schema and the change against the type's status rules.
-    /// A patch that changes nothing records and posts nothing. Accepted while the
-    /// deletion is in progress, so a writer can still record an outcome
+    /// A patch that changes nothing records and posts nothing. Accepted while
+    /// the deletion is in progress, so a writer can still record an outcome
     async fn update_conditions(
         &self,
         id: &ResourceID,

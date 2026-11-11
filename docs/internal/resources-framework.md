@@ -175,10 +175,11 @@ not break; most are enforced in code and exercised by tests — pointers given w
 - **`headers.generation` changes only when desired state changes.** It starts at 1 on create and is
   bumped by the aggregate only when an apply produces a real headers/spec change (`Update`), once
   per apply even when both change; an unchanged apply is `Untouched` and does not bump it.
-- **Status is written only through `StatusUpdated`, by the lifecycle primitives.** Header and spec updates never
-  write status ([`Pending` is derived](#lifecycle-state-machine)). Each `StatusUpdated` bumps
-  `headers.statusGeneration`, as do `DeletionRequested` and `Deleted`, since they change the derived
-  phase. Every status write is conditional on the `statusGeneration` its writer read.
+- **Status is written only through `StatusUpdated`, by the lifecycle primitives.** Header and spec
+  updates never write status ([`Pending` is derived](#lifecycle-state-machine)). Each
+  `StatusUpdated` bumps `headers.statusGeneration`, as do `DeletionRequested` and `Deleted`, since
+  they change the derived phase. Every status write is conditional on the `statusGeneration` its
+  writer read.
 - **`status.observedGeneration <= headers.generation`** when present. A new resource has no
   observed generation. Reconciliation sets `observedGeneration` to the generation it starts on;
   `needs_reconciliation()` is true until that generation is also reconciled, so a `Failed` resource
@@ -716,9 +717,9 @@ URI before headers are converted into maps. `ResourcePersistenceServiceHelper` d
 the entries the write adds or changes, compared with the aggregate's stored state, so a schema
 change never blocks a write that leaves an entry alone, the deletion that removes it included.
 Registered label/annotation URIs and all condition URIs must resolve, apply to the resource
-schema, and validate through their dispatcher; registered short aliases are rejected as noncanonical durable
-state; unknown short label/annotation names remain free-form. The validator reports
-`ResourceDurableStateValidationError`, composed from existing domain errors such as
+schema, and validate through their dispatcher; registered short aliases are rejected as
+noncanonical durable state; unknown short label/annotation names remain free-form. The validator
+reports `ResourceDurableStateValidationError`, composed from existing domain errors such as
 `ParseResourceSchemaError`, `ResourceExtensionResolutionError`, and `ResourceExtensionValueError`.
 Persistence carries it as `ResourcePersistenceError::InvalidDurableState`; public use-case
 boundaries translate that into an internal error because user-authored paths should have been
@@ -1554,11 +1555,12 @@ status changes. The dispatcher + reconcile use case are generated together by th
 `declare_resource_service_layer!` macro and registered from the type's crate.
 
 The **second consumer**, `ConfigurationResourceLifecycleMessageConsumer` (configuration crate),
-reacts to a `StatusUpdated` that records the reconciliation of the current generation to
-**garbage-collect read-side projections** (drop superseded
-generations) — it does *not* reconcile. The projection entries of a resource being deleted are
-removed by its controller's `cleanup`. So the bridge
-**schedules reconciliation**, the configuration consumer **maintains projections**.
+reacts to the `StatusUpdated` that records the reconciliation of the current generation to
+**garbage-collect read-side projections** (drop superseded generations) — it does *not*
+reconcile. A later status update of the reconciled resource keeps its `reconciledAt` and does not
+trigger the cleanup again. The projection entries of a resource being deleted are removed by its
+controller's `cleanup`. So the bridge **schedules reconciliation**, the configuration consumer
+**maintains projections**.
 
 > There is **no periodic/background reconcile loop** today — reconciliation fires once per `Applied`
 > message (i.e. per generation-changing apply). A failed reconcile is not automatically retried; a
