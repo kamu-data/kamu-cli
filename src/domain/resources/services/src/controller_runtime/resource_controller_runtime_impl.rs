@@ -18,10 +18,11 @@ use tokio::task::JoinSet;
 use wakeup_listener::WakeupListenerConfig;
 
 use crate::controller_runtime::{
-    ResourceControllerDrainHoldBack,
     ResourceControllerDrainSessionImpl,
     ResourceControllerLoop,
     ResourceControllerRegistration,
+    ResourceControllerRuntimeMetrics,
+    ResourceControllerSupervisor,
 };
 use crate::domain::{
     RESOURCE_CONTROLLER_RUNTIME_AGENT_NAME,
@@ -45,6 +46,7 @@ pub struct ResourceControllerRuntimeImpl {
     wakeup_config: Arc<WakeupListenerConfig>,
     hints: Arc<dyn ResourceControllerHints>,
     time_source: Arc<dyn SystemTimeSource>,
+    metrics: Arc<ResourceControllerRuntimeMetrics>,
     /// One per controller, kept across calls: the agent's loop and the drain
     /// sessions build loops of their own, which must not drain the
     /// same controller at once
@@ -62,6 +64,7 @@ impl ResourceControllerRuntimeImpl {
         wakeup_config: Arc<WakeupListenerConfig>,
         hints: Arc<dyn ResourceControllerHints>,
         time_source: Arc<dyn SystemTimeSource>,
+        metrics: Arc<ResourceControllerRuntimeMetrics>,
     ) -> Self {
         Self {
             catalog,
@@ -69,6 +72,7 @@ impl ResourceControllerRuntimeImpl {
             wakeup_config,
             hints,
             time_source,
+            metrics,
             drain_locks: Mutex::new(HashMap::new()),
         }
     }
@@ -87,6 +91,7 @@ impl ResourceControllerRuntimeImpl {
                     self.config.clone(),
                     self.wakeup_config.clone(),
                     self.time_source.clone(),
+                    self.metrics.clone(),
                     drain_lock,
                 )
             })
@@ -121,37 +126,39 @@ impl BackgroundAgent for ResourceControllerRuntimeImpl {
             return std::future::pending().await;
         }
 
+        self.metrics.init(
+            loops
+                .iter()
+                .map(|controller_loop| &controller_loop.registration().meta().controller_name),
+        );
+
         let mut running = JoinSet::new();
         for controller_loop in loops {
-            // Created once per loop and kept, so that no hint is missed
+            // Created once per controller and kept, so that no hint is missed
             // between waits
             let meta = controller_loop.registration().meta();
-            let listener = self
-                .hints
-                .new_wakeup_listener(meta.schema, &meta.controller_name);
+            let listener = Arc::from(
+                self.hints
+                    .new_wakeup_listener(meta.schema, &meta.controller_name),
+            );
 
-            running.spawn(async move {
-                loop {
-                    let drained = controller_loop
-                        .drain(
-                            Some(listener.as_ref()),
-                            &mut ResourceControllerDrainHoldBack::default(),
-                        )
-                        .await?;
-                    tracing::debug!(
-                        processed = drained.processed(),
-                        "Resource controller drain finished"
-                    );
-                    controller_loop.wait(listener.as_ref(), &drained).await?;
-                }
-            });
+            running.spawn(
+                ResourceControllerSupervisor::new(
+                    controller_loop,
+                    listener,
+                    self.config.loop_restart_backoff,
+                    self.time_source.clone(),
+                    self.metrics.clone(),
+                )
+                .run(),
+            );
         }
 
-        // Loops only end by failing
+        // Supervisors never end
         match running.join_next().await {
-            Some(Ok(result)) => result,
+            Some(Ok(never)) => match never {},
             Some(Err(join_error)) => Err(join_error.int_err()),
-            None => Ok(()),
+            None => unreachable!("one supervisor per controller, and there are some"),
         }
     }
 }

@@ -28,6 +28,17 @@ pub(crate) enum ResourceProcessAttempt {
 }
 
 impl ResourceProcessAttempt {
+    /// How the call ended, without its details
+    pub fn kind(&self) -> ResourceProcessAttemptKind {
+        match self {
+            Self::Processed(ResourceProcessOutcome::Done(_)) => ResourceProcessAttemptKind::Done,
+            Self::Processed(ResourceProcessOutcome::RetryAt(_)) => {
+                ResourceProcessAttemptKind::RetryAt
+            }
+            Self::Failed(_) => ResourceProcessAttemptKind::Failed,
+        }
+    }
+
     /// The bookkeeping row recording this attempt. A failure keeps what the
     /// controller handled before and retries after a backoff that grows with
     /// each consecutive failure.
@@ -91,6 +102,18 @@ impl ResourceProcessAttempt {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// How one `process` call ended. Its strings are the `outcome` label of
+/// `resource_controller_processed_total`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, strum::IntoStaticStr, strum::EnumIter)]
+#[strum(serialize_all = "snake_case")]
+pub(crate) enum ResourceProcessAttemptKind {
+    Done,
+    RetryAt,
+    Failed,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[cfg(test)]
 mod tests {
     use std::time::Duration;
@@ -130,6 +153,16 @@ mod tests {
             attempts: 2,
             last_error: Some("boom".to_string()),
         }
+    }
+
+    #[test]
+    fn test_attempt_kind_label_values() {
+        use strum::IntoEnumIterator as _;
+
+        let labels: Vec<&'static str> =
+            ResourceProcessAttemptKind::iter().map(Into::into).collect();
+
+        assert_eq!(labels, ["done", "retry_at", "failed"]);
     }
 
     #[test]

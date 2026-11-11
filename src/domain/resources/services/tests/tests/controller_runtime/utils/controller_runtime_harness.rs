@@ -32,19 +32,21 @@ use kamu_resources::{
     ResourceVersion,
     TypeUri,
 };
-use kamu_resources_services::ResourceControllerRuntimeImpl;
 use kamu_resources_services::testing::{
     BaseResourceServiceHarness,
     BaseResourceServiceHarnessOpts,
 };
+use kamu_resources_services::{ResourceControllerRuntimeImpl, ResourceControllerRuntimeMetrics};
 use messaging_outbox::{OutboxMessageBridge, OutboxProvider};
 use retry_backoff::{RetryBackoff, RetryBackoffType};
 use time_source::FakeSystemTimeSource;
 
 use crate::tests::controller_runtime::utils::{
     TEST_CONTROLLER_NAME,
+    TEST_OTHER_SCHEMA,
     TestControllerBehavior,
     TestControllerScript,
+    TestOtherResourceController,
     TestOtherResourceControllerWithSameName,
     TestResourceController,
     TestResourceControllerLogic,
@@ -69,6 +71,9 @@ pub const MAX_PROCESS_CALLS_PER_DRAIN: usize = 10;
 /// First failure backoff of the harness; doubles per consecutive failure
 pub const FAILURE_BACKOFF: TimeDelta = TimeDelta::seconds(10);
 
+/// First loop restart backoff of the harness; doubles per consecutive failure
+pub const LOOP_RESTART_BACKOFF: TimeDelta = TimeDelta::seconds(30);
+
 /// Which controllers a simulated process registers
 #[derive(Debug, Clone, Copy)]
 pub enum TestControllers {
@@ -79,6 +84,8 @@ pub enum TestControllers {
     TwoForOneSchema,
     /// Two controllers of different schemas, with one name
     TwoWithOneName,
+    /// The main controller, and one of a schema no resource has
+    MainAndOther,
     /// The main controller, for a type also reconciled by its lifecycle
     /// dispatcher
     MainWithLifecycleDispatcher,
@@ -99,6 +106,10 @@ impl TestControllers {
             Self::TwoForOneSchema => {
                 b.add::<TestResourceController>();
                 b.add::<TestResourceSecondController>();
+            }
+            Self::MainAndOther => {
+                b.add::<TestResourceController>();
+                b.add::<TestOtherResourceController>();
             }
             Self::TwoWithOneName => {
                 b.add::<TestResourceController>();
@@ -176,7 +187,11 @@ impl ControllerRuntimeHarness {
                 min_delay: FAILURE_BACKOFF.to_std().unwrap(),
                 max_delay: Some(Duration::from_mins(1)),
             },
-            ..Default::default()
+            loop_restart_backoff: RetryBackoff {
+                backoff_type: RetryBackoffType::Exponential,
+                min_delay: LOOP_RESTART_BACKOFF.to_std().unwrap(),
+                max_delay: Some(Duration::from_mins(5)),
+            },
         });
         b.add_value(script.clone());
         b.add::<TestResourceControllerLogic>();
@@ -282,6 +297,14 @@ impl ControllerRuntimeHarness {
             .hint(&TypeUri::new_unchecked(TestResource::SCHEMA_STR));
     }
 
+    /// Hints the runtime that resources of the schema no resource has changed
+    pub fn hint_other_schema(&self) {
+        self.catalog()
+            .get_one::<dyn ResourceControllerHints>()
+            .unwrap()
+            .hint(&TypeUri::new_unchecked(TEST_OTHER_SCHEMA));
+    }
+
     /// Starts the runtime's background agent; it stops when the returned
     /// handle is dropped
     pub fn start_agent(&self) -> RunningControllerRuntime {
@@ -374,14 +397,51 @@ impl ControllerRuntimeHarness {
             .map(ToString::to_string)
     }
 
-    /// The controller's bookkeeping row of the resource
+    /// The main controller's bookkeeping row of the resource
     pub async fn state(&self, id: ResourceID) -> Option<ResourceControllerState> {
+        self.state_of(TEST_CONTROLLER_NAME, id).await
+    }
+
+    /// The named controller's bookkeeping row of the resource
+    pub async fn state_of(
+        &self,
+        controller_name: &'static str,
+        id: ResourceID,
+    ) -> Option<ResourceControllerState> {
         self.catalog()
             .get_one::<dyn ResourceControllerStateRepository>()
             .unwrap()
-            .get_state(&ResourceControllerName::new(TEST_CONTROLLER_NAME), &id)
+            .get_state(&ResourceControllerName::new(controller_name), &id)
             .await
             .unwrap()
+    }
+
+    /// `resource_controller_processed_total` of the main controller
+    pub fn processed_metric(&self, outcome: &str) -> u64 {
+        self.metrics()
+            .processed_total
+            .with_label_values(&[TEST_CONTROLLER_NAME, outcome])
+            .get()
+    }
+
+    /// `resource_controller_loop_restarts_total` of the named controller
+    pub fn loop_restarts_metric(&self, controller_name: &str) -> u64 {
+        self.metrics()
+            .loop_restarts_total
+            .with_label_values(&[controller_name])
+            .get()
+    }
+
+    /// `resource_controller_failing_resources` of the main controller
+    pub fn failing_resources_metric(&self) -> i64 {
+        self.metrics()
+            .failing_resources
+            .with_label_values(&[TEST_CONTROLLER_NAME])
+            .get()
+    }
+
+    fn metrics(&self) -> Arc<ResourceControllerRuntimeMetrics> {
+        self.catalog().get_one().unwrap()
     }
 }
 
