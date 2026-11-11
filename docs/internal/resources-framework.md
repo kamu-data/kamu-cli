@@ -396,6 +396,9 @@ a search follow its visibility. Deleted resources are never returned.
 **Label filters apply only to scoped searches**, never to direct identity reads: the scoped calls
 carry their pairs per row inside `ResourceScope`, while the by-id/by-name reads take none at all.
 
+`ResourceControllerStateRepository` (`repo/`) stores the controller runtime's bookkeeping and finds
+the resources a controller must act on; see [Controller bookkeeping](#controller-bookkeeping).
+
 ### Dispatchers
 
 The generic code can't name a concrete `R` at the API boundary, so dynamic dispatch is keyed by
@@ -445,7 +448,8 @@ Resources are **event-sourced with a materialized snapshot per resource**. Stora
 [`migrations/postgres/20260815100000_resources.sql`](/migrations/postgres/20260815100000_resources.sql)
 and the later `*_resource_*` migrations (SQLite mirrors alongside).
 
-**Two tables:**
+**Two tables** hold the resources (the controller runtime's table is described under
+[Controller bookkeeping](#controller-bookkeeping)):
 
 - **`resources`** — one row per resource (the snapshot): `resource_id` (UUID, **PK**),
   `account_id`, `resource_schema`, `resource_name`, `labels`/`annotations`
@@ -528,6 +532,33 @@ through the API:
 segment. Supporting a new schema version therefore requires an explicit compatibility/migration
 story for that resource type: update manifests, projections, dispatcher registration, and any
 existing rows/events that should move to the new schema.
+
+### Controller bookkeeping
+
+- **`resource_controller_state`** has one row per controller and resource. It is keyed by
+  `(controller, resource_id)`, where `controller` is a `ResourceControllerName`, and has an FK to
+  `resources`. A row records the generation and status generation the controller finished with,
+  or, with `not_before` set, a retry or a failure, with `attempts` and `last_error`.
+- The controller runtime writes these rows. They are not event-sourced: an upsert replaces the
+  row. Purging a resource removes its rows first (`delete_states_for_resource`).
+- **Actionable resources.** `find_actionable_resource_ids` returns the resources a controller must
+  act on, and `find_next_deadline` returns the earliest `not_before` among them. The eligibility
+  predicates and suppression rules are the contract of
+  [`ResourceControllerStateRepository`](/src/domain/resources/domain/src/repo/resource_controller_state_repository.rs).
+- **Indexes.** The SQL backends run one sub-select per predicate, so each one can use its index:
+  - `idx_resources_not_reconciled` serves "not reconciled at the current generation". It is a
+    partial index on `(resource_schema, resource_id)`.
+  - `idx_resources_deletion_pending` serves "deletion requested, not completed", with the same
+    shape.
+  - The status predicate has no index: it compares against the bookkeeping row, so it scans the
+    schema's resources that are not deleted. It runs only for controllers registered to react to
+    status.
+- **The reconciled generation is read from `status`, never stored apart from it.** On Postgres,
+  the partial index condition is `COALESCE((status ->> 'reconciledGeneration')::BIGINT, 0) <
+  generation`, and a query must repeat it verbatim for the planner to use the index. SQLite cannot
+  use a partial index whose condition calls a function. It therefore defines `reconciled_generation`
+  as a `VIRTUAL` generated column over the status, which is computed on read and never written by
+  the application.
 
 ---
 

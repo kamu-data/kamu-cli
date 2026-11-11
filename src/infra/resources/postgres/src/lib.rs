@@ -11,9 +11,11 @@
 pub use kamu_resources as domain;
 
 mod postgres_raw_resource_event_store;
+mod postgres_resource_controller_state_repository;
 mod postgres_resource_label_projection_repository;
 mod postgres_resource_repository;
 
 pub use postgres_raw_resource_event_store::*;
+pub use postgres_resource_controller_state_repository::*;
 pub use postgres_resource_label_projection_repository::*;
 pub use postgres_resource_repository::*;

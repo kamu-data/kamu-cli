@@ -1,0 +1,25 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT MIN(s.not_before)\n            FROM resource_controller_state AS s\n            JOIN resources AS r ON r.resource_id = s.resource_id\n            WHERE s.controller = $1\n              AND s.not_before IS NOT NULL\n              AND r.resource_schema = $2\n              AND r.deleted_at IS NULL\n              AND (\n                  r.deletion_requested_at IS NULL\n                      AND COALESCE((r.status ->> 'reconciledGeneration')::BIGINT, 0) < r.generation\n                  OR r.deletion_requested_at IS NOT NULL\n                  OR $3 AND s.handled_status_generation IS DISTINCT FROM r.status_generation\n              )\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "min",
+        "type_info": "Timestamptz",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text",
+        "Bool"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "643d66f4c3d7fae16c47a04774d3c954b3f981f7a7275b7284e401533e4565bc"
+}

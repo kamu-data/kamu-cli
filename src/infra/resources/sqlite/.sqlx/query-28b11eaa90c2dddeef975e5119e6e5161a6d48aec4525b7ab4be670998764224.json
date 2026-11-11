@@ -1,0 +1,86 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            SELECT\n                controller_revision,\n                handled_generation,\n                handled_status_generation,\n                not_before as \"not_before: DateTime<Utc>\",\n                attempts,\n                last_error\n            FROM resource_controller_state\n            WHERE controller = $1 AND resource_id = $2\n            ",
+  "describe": {
+    "columns": [
+      {
+        "name": "controller_revision",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "resource_controller_state",
+            "name": "controller_revision"
+          }
+        }
+      },
+      {
+        "name": "handled_generation",
+        "ordinal": 1,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "resource_controller_state",
+            "name": "handled_generation"
+          }
+        }
+      },
+      {
+        "name": "handled_status_generation",
+        "ordinal": 2,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "resource_controller_state",
+            "name": "handled_status_generation"
+          }
+        }
+      },
+      {
+        "name": "not_before: DateTime<Utc>",
+        "ordinal": 3,
+        "type_info": "Null",
+        "origin": {
+          "Table": {
+            "table": "resource_controller_state",
+            "name": "not_before"
+          }
+        }
+      },
+      {
+        "name": "attempts",
+        "ordinal": 4,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "resource_controller_state",
+            "name": "attempts"
+          }
+        }
+      },
+      {
+        "name": "last_error",
+        "ordinal": 5,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "resource_controller_state",
+            "name": "last_error"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false,
+      true,
+      true,
+      true,
+      false,
+      true
+    ]
+  },
+  "hash": "28b11eaa90c2dddeef975e5119e6e5161a6d48aec4525b7ab4be670998764224"
+}
