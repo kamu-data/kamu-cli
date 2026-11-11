@@ -18,7 +18,9 @@ engine provides the signals differently — Postgres uses `LISTEN`/`NOTIFY` fire
 and multiplexed over **one shared connection** (`PostgresNotificationHub`), SQLite polls cheap
 `MAX(id)` queries for all channels in **one shared loop** (`SqlitePollingHub`), and in-memory
 stores signal a channel explicitly on write (`InMemoryWakeupHub`). On every backend each agent
-creates its own lightweight per-channel handle (`HubWakeupListener`) onto the backend's single hub.
+creates its own lightweight per-channel handle (`HubWakeupListener`) onto the backend's single hub. The
+**resource controller runtime** is the exception: it runs a loop per resource controller, woken by
+in-process hints and its own deadlines ([§3](#3-inventory)).
 
 **Where to start reading, by intent:**
 
@@ -60,7 +62,7 @@ would query the database every second even when idle, which is noisy for the dat
 telemetry.
 
 In scope: the `WakeupListener` abstraction, the hubs behind it, its three storage implementations, the Postgres triggers that feed
-it, and how the four agents use it. Out of scope: what the agents do once awake (outbox routing —
+it, and how the agents use it. Out of scope: what the agents do once awake (outbox routing —
 see [outbox.md](outbox.md), flow projections, task execution).
 
 ---
@@ -143,6 +145,10 @@ loop {
 - How a pass pages through due flows and retries a failed activation is in
   [flow-system.md](flow-system.md#main-loop).
 
+The resource controller runtime waits the same way, once per controller loop. Its deadline combines
+the bookkeeping storage and the controller's own extra deadline
+([resources-framework.md](resources-framework.md#controller-runtime)).
+
 ### Hubs and handles
 
 All three backends share one shape, with the plumbing in the generic `wakeup-listener` crate:
@@ -181,6 +187,9 @@ stale value means a loop stuck in processing.
   their handles with that agent's name constant (`OUTBOX_AGENT_NAME`, `TASK_AGENT_NAME`,
   `FLOW_AGENT_NAME`, `FLOW_SYSTEM_EVENT_AGENT_NAME`), which the agent's `agent_name()` also returns.
   A new agent gets its own source and name; two agents sharing a source would share one gauge.
+  The one exception is the resource controller runtime: it is one agent with a loop per
+  controller, and each loop's handle is labelled with its controller's name, so one stuck
+  controller shows on its own.
 - **Required wiring**: each hub takes `Arc<WakeupListenerMetrics>` and exposes it through
   `WakeupHub::metrics()`, so an app that forgets to register the metrics fails at startup instead of
   silently losing the heartbeat. The app registers them once in `app.rs`; test catalogs add them
@@ -200,6 +209,12 @@ Agent-specific metrics and recommended alerts are in [metrics.md](metrics.md).
 | Flow system events (`FlowSystemEventAgentImpl`) | `flow_system_events_ready` | `flow_events` → `fe_notify`, `flow_trigger_events` → `fte_notify`, `flow_configuration_events` → `fce_notify` (statement-level, `AFTER INSERT`) | `SELECT MAX(event_id) FROM flow_system_events` | `InMemoryFlowSystemEventBridge::save_events` |
 | Task queue (`TaskAgentImpl`) | `tasks_queued` | `tasks` → `tasks_insert_notify` (statement-level, `AFTER INSERT`), `tasks_requeue_notify` (row-level, `AFTER UPDATE OF task_status WHEN NEW = 'queued'`) | latest `event_id` among `TaskEventCreated` / `TaskEventRequeued` in `task_events` | `InMemoryTaskEventStore::save_events` when a task becomes `Queued` |
 | Flow activation (`FlowAgentImpl`) | `flow_activation_scheduled` | `flows` → `flows_activation_notify` (row-level, `AFTER UPDATE OF scheduled_for_activation_at WHEN` set to a new non-NULL value) | latest `event_id` among `FlowEventScheduledForActivation` and `FlowEventTaskFinished` with a `next_attempt_at` in `flow_events` | `InMemoryFlowEventStore::save_events` when an event sets an activation time |
+| Resource controllers (`ResourceControllerRuntimeImpl`, one handle per controller) | — | — | — | `ResourceControllerHints::hint`, in-process on every backend (see below) |
+
+The resource controller runtime is the one agent whose wakeups do not come from storage: its hub,
+`ResourceControllerHintHub`, is registered on every backend, with one channel per schema, and is
+signaled by code in the same process. Storage stays authoritative: a hint only shortens the wait,
+and the fallback timeout covers a missed one.
 
 Each agent obtains its handle through a domain-level trait exposing `new_wakeup_listener()`:
 `OutboxMessageBridge`, `FlowSystemEventBridge`, `TaskQueueWakeupSource`, `FlowActivationWakeupSource`.

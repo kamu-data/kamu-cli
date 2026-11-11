@@ -31,7 +31,7 @@ use kamu_resources::{
     reconciliation_error_type_ref,
 };
 use messaging_outbox::{MockOutbox, Outbox, OutboxProvider, register_message_dispatcher};
-use time_source::{SystemTimeSource, SystemTimeSourceStub};
+use time_source::{FakeSystemTimeSource, SystemTimeSource, SystemTimeSourceStub};
 use wakeup_listener::WakeupListenerMetrics;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -53,6 +53,9 @@ pub struct BaseResourceServiceHarnessOpts {
     /// transaction leaves no resource, event or outbox message behind. Needs
     /// `OutboxProvider::Dispatching`, whose messages wait in the outbox
     pub transactional: bool,
+    /// Time stands still until `FakeSystemTimeSource::advance`, and sleeps on
+    /// it end only then. Otherwise `SystemTimeSourceStub`, whose sleeps are real.
+    pub fake_time: bool,
 }
 
 impl Default for BaseResourceServiceHarnessOpts {
@@ -62,6 +65,7 @@ impl Default for BaseResourceServiceHarnessOpts {
                 force_immediate: true,
             },
             transactional: false,
+            fake_time: false,
         }
     }
 }
@@ -90,8 +94,13 @@ impl BaseResourceServiceHarness {
     ) -> Self {
         let mut b = CatalogBuilder::new();
 
-        b.add_value(SystemTimeSourceStub::new_set(Utc::now()))
-            .bind::<dyn SystemTimeSource, SystemTimeSourceStub>();
+        if opts.fake_time {
+            b.add_value(FakeSystemTimeSource::new(Utc::now()))
+                .bind::<dyn SystemTimeSource, FakeSystemTimeSource>();
+        } else {
+            b.add_value(SystemTimeSourceStub::new_set(Utc::now()))
+                .bind::<dyn SystemTimeSource, SystemTimeSourceStub>();
+        }
 
         let needs_bridge = matches!(opts.outbox_provider, OutboxProvider::Dispatching);
         opts.outbox_provider.embed_into_catalog(&mut b);

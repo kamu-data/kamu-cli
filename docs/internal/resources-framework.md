@@ -541,6 +541,8 @@ existing rows/events that should move to the new schema.
   or, with `not_before` set, a retry or a failure, with `attempts` and `last_error`.
 - Rows are not event-sourced: an upsert replaces the row. The FK means a resource's rows must be
   removed (`delete_states_for_resource`) before the resource itself.
+- The [controller runtime](#controller-runtime) writes a row after every `process` call and
+  reads them to plan its drains and its deadlines.
 - **Actionable resources.** `find_actionable_resource_ids` returns the resources a controller must
   act on. `find_next_deadline` returns the earliest `not_before` among the rows whose resource a
   predicate selects, including rows that still suppress it, so the caller knows when to look
@@ -843,6 +845,99 @@ status rules, which apply to patches.
 **Condition ownership.** Each type documents which writer owns which of its conditions. For
 `VariableSet`, `SecretSet` and `Storage` the framework writes their only condition,
 `ReconciliationError`, and nothing patches conditions.
+
+### Controller runtime
+
+A **`ResourceController`** answers one question for one resource: what is the next step? Its
+`process(id)` does that step through the [lifecycle primitives](#lifecycle-primitives), in short
+transactions it opens itself, and returns an outcome. It is idempotent and level-triggered: it
+reads the current state, so a second call, or a call after a crash, is safe. A multi-step
+reconciliation is a series of `process` calls, each persisting its progress (in a condition, for
+example).
+
+One background agent, **`ResourceControllerRuntimeImpl`**, decides when to ask. It runs a loop per
+registered controller
+([`controller_runtime/`](/src/domain/resources/services/src/controller_runtime/)):
+
+```text
+drain: plan a pass → process its resources, a few at a time → record each outcome → plan again
+         … until a pass finds nothing
+wait:  a hint for the schema | the effective deadline | the fallback timeout
+```
+
+The existing types do not run on it yet: they still go through the lifecycle dispatcher
+([How reconciliation is scheduled](#how-reconciliation-is-scheduled)).
+
+**Registration.** A controller is a component bound as `dyn ResourceController` with a
+`ResourceControllerMeta { schema, controller_name, controller_revision, reacts_to_status }`. Each
+schema has one controller, and each controller a name of its own; the runtime refuses to start
+otherwise. The name keys the controller's bookkeeping, so it must not change once released. The
+application registers the runtime itself (`app.rs`), and with no controller registered its agent
+waits forever, since a returning agent stops the server.
+
+**Which resources a pass processes** (`ResourceControllerPassPlanner`):
+
+| Source | Selected when | Left out while |
+| --- | --- | --- |
+| Eligibility predicates ([Controller bookkeeping](#controller-bookkeeping)) | not reconciled, deletion pending, or a status change for a controller reacting to status | finished at the current version and revision, or waiting for a retry or a failure backoff |
+| `list_extra_actionable` | the controller says so, e.g. a task whose claim expired | waiting for a retry or a failure backoff |
+
+An extra resource ignores `Done` on purpose: being listed is the signal that it needs attention
+although nothing about it changed. A backoff still applies, so a failing extra resource is not
+retried at once.
+
+**What an outcome records** (`ResourceProcessAttempt::next_state`), in a transaction of its own
+after `process` returned:
+
+| Outcome | `not_before` | `attempts` | `last_error` | Handled version |
+| --- | --- | --- | --- | --- |
+| `Done(version)` | none | 0 | none | `version`, with the current revision |
+| `RetryAt(t)` | `t` | 0 | none | kept |
+| An error or a panic | now + failure backoff | +1 | the error | kept |
+
+`Done` must carry the version after the controller's own writes; an older one makes the runtime
+ask once more. A `RetryAt` already due means "the next step is due now", so steps due at once run
+back to back within one drain. Each `process` call runs in a task of its own: a panic is the
+failure of that one resource, backed off like an error. A crash between `process` and the record
+only loses the record, and the resource is asked again.
+
+**Why a drain ends.** Every outcome makes its resource drop out of the next pass, unless its next
+step is due at once. Two cases escape the bookkeeping, and the drain holds them back until it ends
+(`ResourceControllerDrainHoldBack`): an extra resource the controller finished with and still
+lists, which breaks its contract, and a resource asked about `MAX_PROCESS_CALLS_PER_DRAIN` (10)
+times, whose controller never settles. The eligibility query asks for as many more rows as are
+held back, so they cannot fill a batch and hide the resources still waiting.
+
+**The effective deadline** (`ResourceControllerWait`) is the earliest of:
+
+- the earliest `not_before` among the resources the predicates select (`find_next_deadline`);
+- `next_extra_deadline`, when it lies in the future: an extra deadline already passed belongs to
+  resources the drain just processed or left out;
+- the earliest `not_before` of the extra resources the last pass left out for their backoff.
+
+The last one is why an extra resource that keeps failing, and whose own due time passed long ago,
+wakes the loop only when its backoff ends. A deadline already passed after a drain means a resource
+became due after the last pass looked, and the loop drains again at once; when the drain held
+resources back, it waits the failure backoff's minimal delay instead, so they do not spin it. The
+sleep uses `SystemTimeSource`, so tests drive it with `FakeSystemTimeSource`.
+
+**`run_until_idle()`** drains every controller once and does not wait for deadlines: a resource
+waiting for time stays for a later run. Its drains and the agent's never overlap for one
+controller.
+
+**Failures of the runtime itself**, such as a storage error while planning or recording, end the
+agent.
+
+**Limits.**
+
+- Extra resources beyond one batch wait for the fallback timeout when the first batch of them is
+  all backing off: the runtime does not page through the controller's extra set.
+- The status predicate has no index (see [Controller bookkeeping](#controller-bookkeeping)).
+- Several node instances each run the runtime. The compare-and-set of every primitive keeps that
+  safe, but the work is duplicated.
+
+**Tuning** — batch size, `process` concurrency and both backoffs — comes from
+`backgroundAgents` ([wakeup-listeners.md](wakeup-listeners.md#7-configuration)).
 
 ---
 
