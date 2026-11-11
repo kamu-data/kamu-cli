@@ -36,8 +36,10 @@ use crate::domain::ResourceControllerStateRepository;
 ///
 /// - the earliest `not_before` of a resource the eligibility predicates select, from the
 ///   bookkeeping storage (a retry, or the end of a backoff);
-/// - the controller's `next_extra_deadline`, when it lies in the future. One already passed belongs
-///   to extra resources the drain just saw: processed, or left out for their backoff;
+/// - the controller's `next_extra_deadline` after the last listing of extra resources. One due by
+///   then belongs to extra resources the drain saw: processed, or left out for their backoff. One
+///   due after it, even if already passed by the time the wait starts, was not considered and makes
+///   the loop drain again at once;
 /// - the earliest `not_before` among extra resources the last pass left out. This is what keeps an
 ///   extra resource that keeps failing, and whose own due time passed long ago, from waking the
 ///   loop again and again during its backoff.
@@ -79,7 +81,7 @@ impl<'a> ResourceControllerWait<'a> {
         drained: &ResourceControllerDrainReport,
     ) -> Result<(), InternalError> {
         let now = self.time_source.now();
-        let deadline = self.effective_deadline(now, drained).await?;
+        let deadline = self.effective_deadline(drained).await?;
 
         let wait_for_hint = listener.wait_wake(
             self.wakeup_config.max_listening_timeout,
@@ -120,7 +122,6 @@ impl<'a> ResourceControllerWait<'a> {
     /// The earliest moment a resource becomes due and is no longer suppressed
     pub async fn effective_deadline(
         &self,
-        now: DateTime<Utc>,
         drained: &ResourceControllerDrainReport,
     ) -> Result<Option<DateTime<Utc>>, InternalError> {
         let query = self.registration.actionable_query();
@@ -135,9 +136,8 @@ impl<'a> ResourceControllerWait<'a> {
         let extra = self
             .registration
             .controller()
-            .next_extra_deadline()
-            .await?
-            .filter(|extra_deadline| *extra_deadline > now);
+            .next_extra_deadline(drained.extras_listed_at())
+            .await?;
 
         Ok([stored, extra, drained.earliest_deferred_extra()]
             .into_iter()

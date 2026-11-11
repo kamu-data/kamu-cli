@@ -58,17 +58,47 @@ impl<'a> ResourceControllerPassPlanner<'a> {
         }
     }
 
-    /// Plans a pass at `now`, leaving out what the drain holds back
+    /// Plans a pass at `now`, leaving out what the drain holds back.
+    ///
+    /// The controller lists its extra resources without knowing which ones
+    /// the runtime leaves out, so a listing of `batch_size` may consist of
+    /// resources backing off or held back only, and hide the ones behind
+    /// them. The listing is therefore repeated with a larger limit, until it
+    /// yields a full batch or ends.
     pub async fn plan(
         &self,
         now: DateTime<Utc>,
         hold_back: &ResourceControllerDrainHoldBack,
     ) -> Result<ResourceControllerPass, InternalError> {
+        let mut extras_limit = self.batch_size;
+
+        loop {
+            let (pass, extras) = self
+                .plan_with_extras_limit(now, hold_back, extras_limit)
+                .await?;
+
+            if extras.taken >= self.batch_size || extras.listed < extras_limit {
+                return Ok(pass);
+            }
+
+            // Fewer taken than a batch from a full listing: the next listing
+            // goes as far past the skipped ones as a batch, which is always
+            // more than this one did
+            extras_limit = self.batch_size + (extras.listed - extras.taken);
+        }
+    }
+
+    async fn plan_with_extras_limit(
+        &self,
+        now: DateTime<Utc>,
+        hold_back: &ResourceControllerDrainHoldBack,
+        extras_limit: usize,
+    ) -> Result<(ResourceControllerPass, ExtrasSelection), InternalError> {
         // The controller opens its own transactions, so it is asked before ours
         let extras = self
             .registration
             .controller()
-            .list_extra_actionable(now, self.batch_size)
+            .list_extra_actionable(now, extras_limit)
             .await?;
 
         // Both sources are read in one transaction, so that the bookkeeping of
@@ -77,13 +107,20 @@ impl<'a> ResourceControllerPassPlanner<'a> {
             .transactional_with(
                 |repository: Arc<dyn ResourceControllerStateRepository>| async move {
                     let mut pass = ResourceControllerPass::default();
+                    let mut selection = ExtrasSelection {
+                        listed: extras.len(),
+                        taken: 0,
+                    };
                     // A resource can be both extra and eligible; it is processed once
                     let mut planned = HashSet::new();
 
                     for id in extras {
-                        if planned.insert(id) {
-                            self.plan_extra(repository.as_ref(), id, now, hold_back, &mut pass)
-                                .await?;
+                        if planned.insert(id)
+                            && self
+                                .plan_extra(repository.as_ref(), id, now, hold_back, &mut pass)
+                                .await?
+                        {
+                            selection.taken += 1;
                         }
                     }
 
@@ -102,13 +139,14 @@ impl<'a> ResourceControllerPassPlanner<'a> {
                         }
                     }
 
-                    Ok(pass)
+                    Ok((pass, selection))
                 },
             )
             .await
     }
 
-    /// Adds an extra resource to the pass, or defers it while it backs off
+    /// Adds an extra resource to the pass, or defers it while it backs off.
+    /// Returns whether it was added.
     async fn plan_extra(
         &self,
         repository: &dyn ResourceControllerStateRepository,
@@ -116,7 +154,7 @@ impl<'a> ResourceControllerPassPlanner<'a> {
         now: DateTime<Utc>,
         hold_back: &ResourceControllerDrainHoldBack,
         pass: &mut ResourceControllerPass,
-    ) -> Result<(), InternalError> {
+    ) -> Result<bool, InternalError> {
         let controller_name = &self.registration.meta().controller_name;
 
         if hold_back.is_finished_extra(&id) {
@@ -127,7 +165,7 @@ impl<'a> ResourceControllerPassPlanner<'a> {
             );
         }
         if hold_back.holds_back(&id) {
-            return Ok(());
+            return Ok(false);
         }
 
         // A row with `not_before` records a retry or a failure. Without it the
@@ -138,12 +176,26 @@ impl<'a> ResourceControllerPassPlanner<'a> {
             .and_then(|state| state.not_before);
 
         match not_before {
-            Some(not_before) if not_before > now => pass.defer_extra(not_before),
-            Some(_) | None => pass.add_candidate(ResourceControllerCandidate::extra(id)),
+            Some(not_before) if not_before > now => {
+                pass.defer_extra(not_before);
+                Ok(false)
+            }
+            Some(_) | None => {
+                pass.add_candidate(ResourceControllerCandidate::extra(id));
+                Ok(true)
+            }
         }
-
-        Ok(())
     }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// How one listing of extra resources turned out
+struct ExtrasSelection {
+    /// Resources the controller listed
+    listed: usize,
+    /// Of those, the ones the pass processes
+    taken: usize,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

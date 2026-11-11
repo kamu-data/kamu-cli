@@ -103,22 +103,26 @@ impl ResourceControllerLoop {
             &self.config.failure_backoff,
         );
 
-        let mut report = ResourceControllerDrainReport::default();
+        let mut processed = 0;
         let mut hold_back = ResourceControllerDrainHoldBack::default();
 
         loop {
-            let pass = planner.plan(self.time_source.now(), &hold_back).await?;
+            let planned_at = self.time_source.now();
+            let pass = planner.plan(planned_at, &hold_back).await?;
 
             // Only the last, empty pass tells what is left waiting: an earlier
             // pass may have deferred a resource that a later one processed
-            report.earliest_deferred_extra = pass.earliest_deferred_extra();
             if pass.is_empty() {
-                report.held_back = hold_back.len() > 0;
-                return Ok(report);
+                return Ok(ResourceControllerDrainReport {
+                    processed,
+                    extras_listed_at: planned_at,
+                    earliest_deferred_extra: pass.earliest_deferred_extra(),
+                    held_back: hold_back.len() > 0,
+                });
             }
 
             for (candidate, attempt) in executor.run(pass.into_candidates()).await {
-                report.processed += 1;
+                processed += 1;
                 hold_back.note_attempt(
                     &candidate,
                     &attempt,
@@ -159,9 +163,10 @@ impl ResourceControllerLoop {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// What a drain did, and what it left waiting
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub(crate) struct ResourceControllerDrainReport {
     processed: usize,
+    extras_listed_at: DateTime<Utc>,
     earliest_deferred_extra: Option<DateTime<Utc>>,
     held_back: bool,
 }
@@ -170,6 +175,12 @@ impl ResourceControllerDrainReport {
     /// `process` calls made
     pub fn processed(&self) -> usize {
         self.processed
+    }
+
+    /// The moment the last pass listed the extra resources. Those due by then
+    /// were processed or deferred; those due later were not considered yet.
+    pub fn extras_listed_at(&self) -> DateTime<Utc> {
+        self.extras_listed_at
     }
 
     /// The earliest moment an extra resource left out for its backoff becomes

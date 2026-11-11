@@ -884,7 +884,10 @@ waits forever, since a returning agent stops the server.
 
 An extra resource ignores `Done` on purpose: being listed is the signal that it needs attention
 although nothing about it changed. A backoff still applies, so a failing extra resource is not
-retried at once.
+retried at once. The controller lists its extra resources without knowing which ones the runtime
+leaves out, so when a listing of one batch holds fewer resources to process than that, the runtime
+asks again with the skipped ones added to the limit, until the batch is full or the listing ends.
+Extra resources backing off thus cannot hide the ones listed after them.
 
 **What an outcome records** (`ResourceProcessAttempt::next_state`), in a transaction of its own
 after `process` returned:
@@ -911,8 +914,10 @@ held back, so they cannot fill a batch and hide the resources still waiting.
 **The effective deadline** (`ResourceControllerWait`) is the earliest of:
 
 - the earliest `not_before` among the resources the predicates select (`find_next_deadline`);
-- `next_extra_deadline`, when it lies in the future: an extra deadline already passed belongs to
-  resources the drain just processed or left out;
+- `next_extra_deadline(after)`, the earliest extra deadline after the last pass listed the extra
+  resources. One due by then belongs to resources that pass processed or left out, and would hide
+  the later ones if the controller returned it. One due later was not considered, even if it
+  passed before the wait started, so the loop drains again at once;
 - the earliest `not_before` of the extra resources the last pass left out for their backoff.
 
 The last one is why an extra resource that keeps failing, and whose own due time passed long ago,
@@ -930,8 +935,6 @@ agent.
 
 **Limits.**
 
-- Extra resources beyond one batch wait for the fallback timeout when the first batch of them is
-  all backing off: the runtime does not page through the controller's extra set.
 - The status predicate has no index (see [Controller bookkeeping](#controller-bookkeeping)).
 - Several node instances each run the runtime. The compare-and-set of every primitive keeps that
   safe, but the work is duplicated.

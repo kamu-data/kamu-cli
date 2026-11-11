@@ -25,7 +25,7 @@ use kamu_resources::{
     ResourceVersion,
     TypeUri,
 };
-use time_source::SystemTimeSource;
+use time_source::{FakeSystemTimeSource, SystemTimeSource};
 use tokio::sync::Notify;
 
 use crate::tests::utils::{TEST_STAGE_CONDITION_URI, TestResource, test_stage_condition_key};
@@ -61,7 +61,7 @@ macro_rules! declare_test_resource_controller {
                 _now: DateTime<Utc>,
                 limit: usize,
             ) -> Result<Vec<ResourceID>, InternalError> {
-                Ok(self.logic.script.extras(limit))
+                Ok(self.logic.list_extra_actionable(limit))
             }
 
             async fn process(
@@ -71,8 +71,11 @@ macro_rules! declare_test_resource_controller {
                 self.logic.process(*id).await
             }
 
-            async fn next_extra_deadline(&self) -> Result<Option<DateTime<Utc>>, InternalError> {
-                Ok(self.logic.script.next_extra_deadline())
+            async fn next_extra_deadline(
+                &self,
+                after: DateTime<Utc>,
+            ) -> Result<Option<DateTime<Utc>>, InternalError> {
+                Ok(self.logic.script.next_extra_deadline(after))
             }
         }
     };
@@ -157,9 +160,18 @@ struct TestControllerScriptState {
     behavior_by_resource: HashMap<ResourceID, TestControllerBehavior>,
     calls: Vec<ResourceID>,
     extras: Vec<ResourceID>,
-    next_extra_deadline: Option<DateTime<Utc>>,
+    /// Moments resources join the extra set, such as claim expiries
+    extra_deadlines: Vec<DateTime<Utc>>,
     /// How often the runtime asked for the next extra deadline: once per wait
     extra_deadline_queries: usize,
+    after_next_listing: Option<TestListingTwist>,
+}
+
+/// What happens right after the controller answers a listing of its extra
+/// resources
+struct TestListingTwist {
+    advance_clock: TimeDelta,
+    extras: Vec<ResourceID>,
 }
 
 impl TestControllerScript {
@@ -170,8 +182,9 @@ impl TestControllerScript {
                 behavior_by_resource: HashMap::new(),
                 calls: Vec::new(),
                 extras: Vec::new(),
-                next_extra_deadline: None,
+                extra_deadlines: Vec::new(),
                 extra_deadline_queries: 0,
+                after_next_listing: None,
             })),
             called: Arc::new(Notify::new()),
         }
@@ -185,8 +198,18 @@ impl TestControllerScript {
         self.lock().extras = ids;
     }
 
-    pub fn set_next_extra_deadline(&self, deadline: Option<DateTime<Utc>>) {
-        self.lock().next_extra_deadline = deadline;
+    pub fn set_extra_deadlines(&self, deadlines: Vec<DateTime<Utc>>) {
+        self.lock().extra_deadlines = deadlines;
+    }
+
+    /// Right after answering the next listing of extra resources, the clock
+    /// moves on and the extra set becomes `extras`: as when a claim expires
+    /// while a drain finishes
+    pub fn after_next_listing(&self, advance_clock: TimeDelta, extras: Vec<ResourceID>) {
+        self.lock().after_next_listing = Some(TestListingTwist {
+            advance_clock,
+            extras,
+        });
     }
 
     /// How many times the runtime prepared a wait, each asking for the next
@@ -230,14 +253,29 @@ impl TestControllerScript {
         behavior
     }
 
-    fn extras(&self, limit: usize) -> Vec<ResourceID> {
-        self.lock().extras.iter().take(limit).copied().collect()
+    /// Answers a listing of extra resources, then applies the pending twist,
+    /// returning how far it moves the clock
+    fn list_extras(&self, limit: usize) -> (Vec<ResourceID>, Option<TimeDelta>) {
+        let mut state = self.lock();
+        let listed = state.extras.iter().take(limit).copied().collect();
+
+        let advance_clock = state.after_next_listing.take().map(|twist| {
+            state.extras = twist.extras;
+            twist.advance_clock
+        });
+
+        (listed, advance_clock)
     }
 
-    fn next_extra_deadline(&self) -> Option<DateTime<Utc>> {
+    fn next_extra_deadline(&self, after: DateTime<Utc>) -> Option<DateTime<Utc>> {
         let mut state = self.lock();
         state.extra_deadline_queries += 1;
-        state.next_extra_deadline
+        state
+            .extra_deadlines
+            .iter()
+            .copied()
+            .filter(|deadline| *deadline > after)
+            .min()
     }
 
     fn lock(&self) -> std::sync::MutexGuard<'_, TestControllerScriptState> {
@@ -258,6 +296,19 @@ pub struct TestResourceControllerLogic {
 }
 
 impl TestResourceControllerLogic {
+    fn list_extra_actionable(&self, limit: usize) -> Vec<ResourceID> {
+        let (listed, advance_clock) = self.script.list_extras(limit);
+
+        if let Some(delta) = advance_clock {
+            self.catalog
+                .get_one::<FakeSystemTimeSource>()
+                .unwrap()
+                .advance(delta);
+        }
+
+        listed
+    }
+
     async fn process(&self, id: ResourceID) -> Result<ResourceProcessOutcome, InternalError> {
         let now = self.time_source.now();
 
