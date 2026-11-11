@@ -18,18 +18,18 @@ use crate::domain::{
     ResourceAggregateLoader,
     ResourceCleanupError,
     ResourceCleanupFailure,
-    ResourceController,
     ResourceDeletionCompletion,
     ResourceID,
     ResourceLifecyclePrimitives,
     ResourceLoadError,
     ResourceTransitionSkip,
     ResourceTransitionSkipReason,
+    SimpleResourceReconciler,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// A cleanup the main controller ran, recorded once its own transaction has
+/// A cleanup the reconciler ran, recorded once its own transaction has
 /// ended
 #[derive(Debug, Clone)]
 pub struct ResourceCleanupAttempt {
@@ -40,7 +40,7 @@ pub struct ResourceCleanupAttempt {
 }
 
 /// Ends the transaction of a cleanup. A failed cleanup rolls it back, which
-/// discards whatever the controller wrote before failing; its failure is then
+/// discards whatever the reconciler wrote before failing; its failure is then
 /// recorded in a transaction of its own.
 pub enum ResourceCleanupTransactionError<R: EventSourcedResource> {
     CleanupFailed(ResourceCleanupAttempt),
@@ -61,7 +61,7 @@ where
 {
     resource_aggregate_loader: &'a dyn ResourceAggregateLoader<R>,
     lifecycle_primitives: &'a dyn ResourceLifecyclePrimitives<R>,
-    controller: &'a dyn ResourceController<R>,
+    reconciler: &'a dyn SimpleResourceReconciler<R>,
 }
 
 impl<'a, R> CompleteResourceDeletionUseCaseHelper<'a, R>
@@ -71,12 +71,12 @@ where
     pub fn new(
         resource_aggregate_loader: &'a dyn ResourceAggregateLoader<R>,
         lifecycle_primitives: &'a dyn ResourceLifecyclePrimitives<R>,
-        controller: &'a dyn ResourceController<R>,
+        reconciler: &'a dyn SimpleResourceReconciler<R>,
     ) -> Self {
         Self {
             resource_aggregate_loader,
             lifecycle_primitives,
-            controller,
+            reconciler,
         }
     }
 
@@ -99,7 +99,7 @@ where
         }
 
         let status_generation = resource.headers().status_generation;
-        match self.controller.cleanup(&resource).await {
+        match self.reconciler.cleanup(&resource).await {
             Ok(()) => Ok(Some(ResourceCleanupAttempt {
                 id,
                 status_generation,
@@ -302,8 +302,8 @@ macro_rules! declare_complete_resource_deletion_use_case {
                             std::sync::Arc<dyn kamu_resources::ResourceAggregateLoader<$resource>>,
                         lifecycle_primitives:
                             std::sync::Arc<dyn kamu_resources::ResourceLifecyclePrimitives<$resource>>,
-                        controller:
-                            std::sync::Arc<dyn kamu_resources::ResourceController<$resource>>
+                        reconciler:
+                            std::sync::Arc<dyn kamu_resources::SimpleResourceReconciler<$resource>>
                     )]
             async fn cleanup_in_transaction(
                 &self,
@@ -315,7 +315,7 @@ macro_rules! declare_complete_resource_deletion_use_case {
                 let helper = $crate::CompleteResourceDeletionUseCaseHelper::<$resource>::new(
                     resource_aggregate_loader.as_ref(),
                     lifecycle_primitives.as_ref(),
-                    controller.as_ref(),
+                    reconciler.as_ref(),
                 );
 
                 helper.cleanup(id).await
@@ -326,8 +326,8 @@ macro_rules! declare_complete_resource_deletion_use_case {
                             std::sync::Arc<dyn kamu_resources::ResourceAggregateLoader<$resource>>,
                         lifecycle_primitives:
                             std::sync::Arc<dyn kamu_resources::ResourceLifecyclePrimitives<$resource>>,
-                        controller:
-                            std::sync::Arc<dyn kamu_resources::ResourceController<$resource>>
+                        reconciler:
+                            std::sync::Arc<dyn kamu_resources::SimpleResourceReconciler<$resource>>
                     )]
             async fn record_in_transaction(
                 &self,
@@ -336,7 +336,7 @@ macro_rules! declare_complete_resource_deletion_use_case {
                 let helper = $crate::CompleteResourceDeletionUseCaseHelper::<$resource>::new(
                     resource_aggregate_loader.as_ref(),
                     lifecycle_primitives.as_ref(),
-                    controller.as_ref(),
+                    reconciler.as_ref(),
                 );
 
                 helper.record_outcomes(&attempts).await

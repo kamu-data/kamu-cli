@@ -20,8 +20,8 @@ use crate::{
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Runs the cleanup of the main controller for resources whose deletion was
-/// requested, each in a transaction of its own, then completes their deletion.
+/// Runs the reconciler's cleanup of each resource whose deletion was
+/// requested, in a transaction of its own, then completes their deletion.
 /// A failed cleanup, a database error included, is recorded in the status and
 /// leaves that deletion in progress; it is not an error of the use case.
 /// Resources that do not wait for a cleanup are skipped.

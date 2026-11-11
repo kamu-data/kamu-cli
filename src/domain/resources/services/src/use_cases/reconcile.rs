@@ -10,12 +10,12 @@
 use crate::domain::{
     EventSourcedResource,
     ReconcileResourceUseCaseError,
-    ResourceController,
     ResourceExpectedVersion,
     ResourceID,
     ResourceLifecyclePrimitives,
     ResourceLifecycleTransitionError,
     ResourceStaleExpectationError,
+    SimpleResourceReconciler,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -25,7 +25,7 @@ where
     R: EventSourcedResource,
 {
     lifecycle_primitives: &'a dyn ResourceLifecyclePrimitives<R>,
-    controller: &'a dyn ResourceController<R>,
+    reconciler: &'a dyn SimpleResourceReconciler<R>,
 }
 
 impl<'a, R> ReconcileResourceUseCaseHelper<'a, R>
@@ -34,11 +34,11 @@ where
 {
     pub fn new(
         lifecycle_primitives: &'a dyn ResourceLifecyclePrimitives<R>,
-        controller: &'a dyn ResourceController<R>,
+        reconciler: &'a dyn SimpleResourceReconciler<R>,
     ) -> Self {
         Self {
             lifecycle_primitives,
-            controller,
+            reconciler,
         }
     }
 
@@ -72,7 +72,7 @@ where
 
         // Phase 2 runs in a separate transaction after the started state was
         // committed, so the resource may have changed in between.
-        let recorded = match self.controller.reconcile(&started).await {
+        let recorded = match self.reconciler.reconcile(&started).await {
             Ok(()) => {
                 self.lifecycle_primitives
                     .complete_reconciliation(&id, expected)
@@ -135,8 +135,8 @@ macro_rules! declare_reconcile_resource_use_case {
             #[::database_common_macros::transactional_method2(
                         lifecycle_primitives:
                             std::sync::Arc<dyn kamu_resources::ResourceLifecyclePrimitives<$resource>>,
-                        controller:
-                            std::sync::Arc<dyn kamu_resources::ResourceController<$resource>>
+                        reconciler:
+                            std::sync::Arc<dyn kamu_resources::SimpleResourceReconciler<$resource>>
                     )]
             async fn start_reconciliation_phase(
                 &self,
@@ -145,7 +145,7 @@ macro_rules! declare_reconcile_resource_use_case {
             {
                 let helper = $crate::ReconcileResourceUseCaseHelper::<$resource>::new(
                     lifecycle_primitives.as_ref(),
-                    controller.as_ref(),
+                    reconciler.as_ref(),
                 );
 
                 helper.start_reconciliation_phase(id).await
@@ -154,8 +154,8 @@ macro_rules! declare_reconcile_resource_use_case {
             #[::database_common_macros::transactional_method2(
                         lifecycle_primitives:
                             std::sync::Arc<dyn kamu_resources::ResourceLifecyclePrimitives<$resource>>,
-                        controller:
-                            std::sync::Arc<dyn kamu_resources::ResourceController<$resource>>
+                        reconciler:
+                            std::sync::Arc<dyn kamu_resources::SimpleResourceReconciler<$resource>>
                     )]
             async fn finish_reconciliation_phase(
                 &self,
@@ -165,7 +165,7 @@ macro_rules! declare_reconcile_resource_use_case {
                 // outcome in a new transaction.
                 let helper = $crate::ReconcileResourceUseCaseHelper::<$resource>::new(
                     lifecycle_primitives.as_ref(),
-                    controller.as_ref(),
+                    reconciler.as_ref(),
                 );
 
                 helper.finish_reconciliation_phase(resource).await

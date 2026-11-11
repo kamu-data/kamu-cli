@@ -35,7 +35,7 @@ use messaging_outbox::{MockOutbox, OutboxProvider};
 
 use crate::tests::utils::{
     TestResource,
-    TestResourceController,
+    TestResourceReconciler,
     TestResourceSpec,
     make_fresh_aggregate,
     register_test_resource_resource_service_layer,
@@ -296,7 +296,7 @@ impl ApplyResourcePlanExecutorHarness {
 
         let mut b = CatalogBuilder::new_chained(base.catalog());
         register_test_resource_resource_service_layer(&mut b);
-        b.add::<TestResourceController>();
+        b.add::<TestResourceReconciler>();
 
         let catalog = b.build();
 
