@@ -339,7 +339,7 @@ where
 
         let old_status = resource.status().clone();
         let mut new_status = old_status.clone();
-        if patch.apply_to(&mut new_status.conditions).is_empty() {
+        if !patch.apply_to(&mut new_status.conditions) {
             return Ok(resource);
         }
         R::validate_status_change(&old_status, &new_status)?;
@@ -397,14 +397,19 @@ where
         old: &ResourceConditions,
         new: &ResourceConditions,
     ) -> Result<BTreeMap<TypeUri, ResourceLifecycleMessageConditionChange>, InternalError> {
-        let keys = old.entries.keys().chain(new.entries.keys());
+        let set = new
+            .entries
+            .iter()
+            .filter(|(key, value)| old.entries.get(*key) != Some(*value))
+            .map(|(key, value)| (key, Some(value)));
+        let removed = old
+            .entries
+            .keys()
+            .filter(|key| !new.entries.contains_key(*key))
+            .map(|key| (key, None));
 
         let mut changes = BTreeMap::new();
-        for key in keys {
-            let new_value = new.entries.get(key);
-            if old.entries.get(key) == new_value {
-                continue;
-            }
+        for (key, new_value) in set.chain(removed) {
             let TypeRef::Uri(uri) = key else {
                 return Err(InternalError::new(format!(
                     "Stored condition '{key}' is not keyed by its schema URI"
