@@ -115,6 +115,37 @@ async fn test_panicking_loop_restarts_and_a_completed_drain_resets_its_backoff()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
+async fn test_loop_failing_in_its_wait_backs_off_more_each_time() {
+    let harness = ControllerRuntimeHarness::new(
+        TestControllers::MainAndOther,
+        TestControllerBehavior::FinishAtCurrentVersion,
+    )
+    .await;
+    // Each restart drains, then fails in the wait
+    harness
+        .script()
+        .fail_next_extra_deadline_queries(OTHER_TEST_CONTROLLER_NAME, 3);
+    let _agent = harness.start_agent();
+
+    harness.let_agent_settle().await;
+    assert_eq!(harness.loop_restarts_metric(OTHER_TEST_CONTROLLER_NAME), 1);
+
+    harness.advance_time(LOOP_RESTART_BACKOFF);
+    harness.let_agent_settle().await;
+    assert_eq!(harness.loop_restarts_metric(OTHER_TEST_CONTROLLER_NAME), 2);
+
+    harness.advance_time(LOOP_RESTART_BACKOFF * 2 - TimeDelta::seconds(1));
+    harness.let_agent_settle().await;
+    assert_eq!(harness.loop_restarts_metric(OTHER_TEST_CONTROLLER_NAME), 2);
+
+    harness.advance_time(TimeDelta::seconds(1));
+    harness.let_agent_settle().await;
+    assert_eq!(harness.loop_restarts_metric(OTHER_TEST_CONTROLLER_NAME), 3);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
 async fn test_metrics_count_outcomes_and_failing_resources() {
     let harness = ControllerRuntimeHarness::new(
         TestControllers::Main,

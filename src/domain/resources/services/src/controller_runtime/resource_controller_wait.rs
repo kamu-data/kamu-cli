@@ -44,6 +44,9 @@ use crate::domain::ResourceControllerStateRepository;
 ///   extra resource that keeps failing, and whose own due time passed long ago, from waking the
 ///   loop again and again during its backoff.
 ///
+/// After a drain that held resources back, the loop pauses for a fixed
+/// delay instead, which no hint ends.
+///
 /// The deadline is re-read after every drain, so it needs no timers: a
 /// resource scheduled earlier than the awaited moment comes with a hint, and
 /// one postponed is found not due when the loop wakes.
@@ -52,8 +55,7 @@ pub(crate) struct ResourceControllerWait<'a> {
     catalog: &'a dill::Catalog,
     wakeup_config: &'a WakeupListenerConfig,
     time_source: &'a dyn SystemTimeSource,
-    /// How long to wait for a deadline already passed while the drain held
-    /// resources back
+    /// How long to pause after a drain that held resources back
     held_back_delay: Duration,
 }
 
@@ -80,6 +82,21 @@ impl<'a> ResourceControllerWait<'a> {
         listener: &dyn WakeupListener,
         drained: &ResourceControllerDrainReport,
     ) -> Result<(), InternalError> {
+        // The drain held back resources whose controller never settles, which
+        // are due again at once by definition. Pausing keeps them from
+        // spinning the loop, and no hint ends the pause: such a controller
+        // writes status on every call, which hints its own loop. A hint that
+        // arrives meanwhile is kept for the next wait.
+        if drained.held_back() {
+            let pause = chrono::Duration::from_std(self.held_back_delay).int_err()?;
+            self.time_source.sleep(pause).await;
+            tracing::debug!(
+                ?pause,
+                "Resource controller paused for the resources it held back"
+            );
+            return Ok(());
+        }
+
         let now = self.time_source.now();
         let deadline = self.effective_deadline(drained).await?;
 
@@ -94,17 +111,14 @@ impl<'a> ResourceControllerWait<'a> {
             return Ok(());
         };
 
-        let sleep_for = match (deadline - now).to_std() {
-            // In the future: sleep until then
-            Ok(until_deadline) if !until_deadline.is_zero() => until_deadline,
-            // Passed. With nothing held back, a resource became due after the
-            // last pass looked: drain again at once. Otherwise the drain held
-            // back resources whose controller never settles, which are due
-            // again at once by definition: pausing keeps them from spinning
-            // the loop.
-            Ok(_) | Err(_) if !drained.held_back() => return Ok(()),
-            Ok(_) | Err(_) => self.held_back_delay,
+        // Passed: a resource became due after the last pass looked, so the
+        // loop drains again at once
+        let Ok(sleep_for) = (deadline - now).to_std() else {
+            return Ok(());
         };
+        if sleep_for.is_zero() {
+            return Ok(());
+        }
         let sleep_for = chrono::Duration::from_std(sleep_for).int_err()?;
 
         tokio::select! {

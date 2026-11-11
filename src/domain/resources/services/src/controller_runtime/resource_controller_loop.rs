@@ -125,7 +125,7 @@ impl ResourceControllerLoop {
                     processed,
                     extras_listed_at: planned_at,
                     earliest_deferred_extra: pass.earliest_deferred_extra(),
-                    held_back: hold_back.len() > 0,
+                    held_back: pass.held_back(),
                 });
             }
 

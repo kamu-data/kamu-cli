@@ -138,7 +138,12 @@ impl<'a> ResourceControllerPassPlanner<'a> {
                         )
                         .await?;
                     for id in eligible {
-                        if planned.insert(id) && !hold_back.holds_back_eligible(&id) {
+                        if !planned.insert(id) {
+                            continue;
+                        }
+                        if hold_back.holds_back_eligible(&id) {
+                            pass.note_held_back();
+                        } else {
                             pass.add_candidate(ResourceControllerCandidate::eligible(id));
                         }
                     }
@@ -169,6 +174,7 @@ impl<'a> ResourceControllerPassPlanner<'a> {
             );
         }
         if hold_back.holds_back_extra(&id) {
+            pass.note_held_back();
             return Ok(false);
         }
 
