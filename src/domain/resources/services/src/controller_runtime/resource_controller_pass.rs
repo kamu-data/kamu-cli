@@ -25,6 +25,9 @@ use crate::controller_runtime::ResourceControllerCandidate;
 pub(crate) struct ResourceControllerPass {
     candidates: Vec<ResourceControllerCandidate>,
     earliest_deferred_extra: Option<DateTime<Utc>>,
+    /// Whether the drain's hold-back left out a resource this pass would
+    /// otherwise have processed
+    held_back: bool,
 }
 
 impl ResourceControllerPass {
@@ -38,6 +41,15 @@ impl ResourceControllerPass {
             self.earliest_deferred_extra
                 .map_or(not_before, |earliest| earliest.min(not_before)),
         );
+    }
+
+    /// Records a resource left out because the drain holds it back
+    pub fn note_held_back(&mut self) {
+        self.held_back = true;
+    }
+
+    pub fn held_back(&self) -> bool {
+        self.held_back
     }
 
     pub fn is_empty(&self) -> bool {

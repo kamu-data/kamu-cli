@@ -75,7 +75,7 @@ macro_rules! declare_test_resource_controller {
                 &self,
                 after: DateTime<Utc>,
             ) -> Result<Option<DateTime<Utc>>, InternalError> {
-                Ok(self.logic.script.next_extra_deadline(after))
+                self.logic.next_extra_deadline($controller_name, after)
             }
         }
     };
@@ -187,6 +187,8 @@ struct TestControllerScriptState {
     failing_listings: HashMap<&'static str, (TestListingFailure, usize)>,
     /// By controller name: listings asked for, failed ones included
     listings: HashMap<&'static str, usize>,
+    /// By controller name: how many of the next extra deadline queries fail
+    failing_extra_deadline_queries: HashMap<&'static str, usize>,
 }
 
 /// What happens right after the controller answers a listing of its extra
@@ -209,6 +211,7 @@ impl TestControllerScript {
                 after_next_listing: None,
                 failing_listings: HashMap::new(),
                 listings: HashMap::new(),
+                failing_extra_deadline_queries: HashMap::new(),
             })),
             called: Arc::new(Notify::new()),
         }
@@ -246,6 +249,14 @@ impl TestControllerScript {
         self.lock()
             .failing_listings
             .insert(controller_name, (failure, count));
+    }
+
+    /// The next `count` extra deadline queries of the named controller fail,
+    /// each in a wait of its loop
+    pub fn fail_next_extra_deadline_queries(&self, controller_name: &'static str, count: usize) {
+        self.lock()
+            .failing_extra_deadline_queries
+            .insert(controller_name, count);
     }
 
     /// How many times the runtime asked the named controller for its extra
@@ -326,15 +337,29 @@ impl TestControllerScript {
         Ok((listed, advance_clock))
     }
 
-    fn next_extra_deadline(&self, after: DateTime<Utc>) -> Option<DateTime<Utc>> {
+    fn next_extra_deadline(
+        &self,
+        controller_name: &'static str,
+        after: DateTime<Utc>,
+    ) -> Result<Option<DateTime<Utc>>, InternalError> {
         let mut state = self.lock();
         state.extra_deadline_queries += 1;
-        state
+
+        if let Some(remaining) = state
+            .failing_extra_deadline_queries
+            .get_mut(controller_name)
+            && *remaining > 0
+        {
+            *remaining -= 1;
+            return Err(InternalError::new("scripted extra deadline failure"));
+        }
+
+        Ok(state
             .extra_deadlines
             .iter()
             .copied()
             .filter(|deadline| *deadline > after)
-            .min()
+            .min())
     }
 
     fn lock(&self) -> std::sync::MutexGuard<'_, TestControllerScriptState> {
@@ -376,6 +401,14 @@ impl TestResourceControllerLogic {
         }
 
         Ok(listed)
+    }
+
+    fn next_extra_deadline(
+        &self,
+        controller_name: &'static str,
+        after: DateTime<Utc>,
+    ) -> Result<Option<DateTime<Utc>>, InternalError> {
+        self.script.next_extra_deadline(controller_name, after)
     }
 
     async fn process(&self, id: ResourceID) -> Result<ResourceProcessOutcome, InternalError> {

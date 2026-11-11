@@ -14,6 +14,8 @@ use pretty_assertions::assert_eq;
 use crate::tests::controller_runtime::utils::{
     ControllerRuntimeHarness,
     FAILURE_BACKOFF,
+    MAX_PROCESS_CALLS_PER_DRAIN,
+    TEST_CONTROLLER_NAME,
     TestControllerBehavior,
     TestControllers,
 };
@@ -191,6 +193,71 @@ fn make_failing_extra_due_long_ago(harness: &ControllerRuntimeHarness, id: Resou
     script.set_extras(vec![id]);
     script.set_extra_deadlines(vec![harness.time_source().now() - TimeDelta::hours(1)]);
     script.set_behavior_of(id, TestControllerBehavior::Fail);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_hints_do_not_cut_short_the_pause_for_held_back_resources() {
+    let harness = ControllerRuntimeHarness::new(
+        TestControllers::Main,
+        TestControllerBehavior::RetryAfter(TimeDelta::zero()),
+    )
+    .await;
+    let id = harness.apply("res-a").await;
+    let _agent = harness.start_agent();
+
+    harness
+        .script()
+        .wait_for_total_calls(MAX_PROCESS_CALLS_PER_DRAIN)
+        .await;
+    harness.let_agent_settle().await;
+    assert_eq!(harness.script().calls_of(&id), MAX_PROCESS_CALLS_PER_DRAIN);
+
+    // As the status writes of a controller that never settles would
+    harness.hint();
+    harness.let_agent_settle().await;
+    assert_eq!(harness.script().calls_of(&id), MAX_PROCESS_CALLS_PER_DRAIN);
+
+    harness.advance_time(FAILURE_BACKOFF);
+    harness
+        .script()
+        .wait_for_total_calls(2 * MAX_PROCESS_CALLS_PER_DRAIN)
+        .await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_finished_extra_resource_that_leaves_the_set_does_not_pause_the_agent() {
+    let harness = ControllerRuntimeHarness::new(
+        TestControllers::Main,
+        TestControllerBehavior::FinishAtCurrentVersion,
+    )
+    .await;
+    let id = harness.apply("res-a").await;
+    harness.run_outbox_and_controllers_until_idle().await;
+    let calls_before = harness.script().total_calls();
+
+    // Finished as an extra resource, it leaves the set, as the contract asks
+    harness.script().set_extras(vec![id]);
+    harness
+        .script()
+        .after_next_listing(TimeDelta::zero(), Vec::new());
+    let _agent = harness.start_agent();
+
+    harness
+        .script()
+        .wait_for_total_calls(calls_before + 1)
+        .await;
+    harness.let_agent_settle().await;
+    let listings = harness.script().listings_of(TEST_CONTROLLER_NAME);
+
+    // Nothing was held back, so the agent waits for a hint, not for a pause
+    // to end
+    harness.advance_time(FAILURE_BACKOFF);
+    harness.let_agent_settle().await;
+    assert_eq!(harness.script().listings_of(TEST_CONTROLLER_NAME), listings);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
