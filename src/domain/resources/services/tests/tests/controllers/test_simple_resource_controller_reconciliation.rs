@@ -31,7 +31,7 @@ use kamu_resources_services::testing::{
 };
 use messaging_outbox::{MockOutbox, OutboxProvider};
 
-use super::resource_use_case_base_harness::{
+use crate::tests::use_cases::{
     ResourceUseCaseBaseHarness,
     ResourceUseCaseBaseHarnessOpts,
     SanitizerKind,
@@ -122,8 +122,8 @@ async fn test_reconcile_failure_transitions_resource_to_failed() {
     let account_handle = odf::ResourceOwnerHandle::new_test("test-owner");
     let id = harness.apply_and_get_id(&account_handle, "res-a").await;
 
-    // Reconciler errors are outcomes, not use-case failures — execute returns
-    // Ok(())
+    // Reconciler errors are outcomes, not failures of the controller —
+    // reconcile returns Ok(())
     harness.simple_controller().reconcile(&id).await.unwrap();
     harness.flush_outbox().await;
 
@@ -162,7 +162,7 @@ async fn test_reconcile_invokes_reconciler_exactly_once() {
 #[test_log::test(tokio::test)]
 async fn test_already_reconciled_is_no_op_and_reconciler_is_not_called() {
     // Generation does not change on a no-op: needs_reconciliation() is false
-    // because observed_generation == headers.generation. execute() returns
+    // because observed_generation == headers.generation. reconcile() returns
     // Ok(()) immediately without invoking the reconciler.
     let counter = Arc::new(AtomicU32::new(0));
     let harness = ReconcileTestHarness::dispatching(TestResourceReconcilerProvider::Counting(
@@ -172,17 +172,17 @@ async fn test_already_reconciled_is_no_op_and_reconciler_is_not_called() {
     let account_handle = odf::ResourceOwnerHandle::new_test("test-owner");
     let id = harness.apply_and_get_id(&account_handle, "res-a").await;
 
-    // First execute: Pending → reconciler called once → Ready
+    // First reconcile: Pending → reconciler called once → Ready
     harness.simple_controller().reconcile(&id).await.unwrap();
     harness.flush_outbox().await;
 
     assert_eq!(
         counter.load(Ordering::SeqCst),
         1,
-        "reconciler must be called on first execute"
+        "reconciler must be called on first reconcile"
     );
 
-    // Second execute: already Ready — no-op, no outbox message posted
+    // Second reconcile: already Ready — no-op, no outbox message posted
     harness.simple_controller().reconcile(&id).await.unwrap();
     harness.flush_outbox().await;
 
@@ -342,6 +342,41 @@ async fn test_finish_phase_after_concurrent_status_update_returns_status_conflic
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
+async fn test_reconciler_write_rolls_back_when_outcome_is_not_recorded() {
+    // The reconciler's own write commits only together with the outcome:
+    // here it updates the status, so recording the outcome fails and the
+    // transaction discards both
+    let harness =
+        ReconcileTestHarness::transactional(TestResourceReconcilerProvider::InterferingReconcile);
+
+    let account_handle = odf::ResourceOwnerHandle::new_test("test-owner");
+    let id = harness.apply_and_get_id(&account_handle, "res-a").await;
+
+    let result = harness.simple_controller().reconcile(&id).await;
+
+    assert_matches!(
+        result,
+        Err(SimpleResourceReconciliationError::StatusConflict(
+            ResourceStatusConflictError {
+                expected: 2,
+                actual: 3,
+            }
+        )),
+        "expected StatusConflict, got: {result:?}"
+    );
+    // The status is as the start of the reconciliation left it: the
+    // reconciler's write is gone with the outcome
+    let snapshot = harness.get_snapshot_by_id(&id).await.unwrap();
+    assert_eq!(snapshot.headers.status_generation, 2);
+    assert_eq!(
+        snapshot.basic_status().unwrap().phase,
+        ResourcePhase::Reconciling
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
 async fn test_overlapping_reconciliations_of_one_generation_record_one_outcome() {
     let harness = ReconcileTestHarness::dispatching(TestResourceReconcilerProvider::Stub);
 
@@ -467,10 +502,19 @@ struct ReconcileTestHarness {
 
 impl ReconcileTestHarness {
     fn dispatching(reconciler_provider: TestResourceReconcilerProvider) -> Self {
+        Self::new(reconciler_provider, false)
+    }
+
+    /// Writes roll back with the transaction they ran in
+    fn transactional(reconciler_provider: TestResourceReconcilerProvider) -> Self {
+        Self::new(reconciler_provider, true)
+    }
+
+    fn new(reconciler_provider: TestResourceReconcilerProvider, transactional: bool) -> Self {
         let base = ResourceUseCaseBaseHarness::new_with_opts(ResourceUseCaseBaseHarnessOpts {
             base_opts: BaseResourceServiceHarnessOpts {
                 outbox_provider: OutboxProvider::Dispatching,
-                ..Default::default()
+                transactional,
             },
             reconciler_provider,
             sanitizer: SanitizerKind::None,

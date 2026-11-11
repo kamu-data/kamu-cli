@@ -140,29 +140,37 @@ impl SimpleResourceReconciler<TestResource> for TestResourceInterferingCleanupRe
             return Ok(());
         }
 
-        let loader = self
-            .catalog
-            .get_one::<dyn ResourceAggregateLoader<TestResource>>()
-            .unwrap();
-        let persistence = self
-            .catalog
-            .get_one::<dyn ResourcePersistenceService<TestResource>>()
-            .unwrap();
-
-        let mut other = loader.load(resource.id()).await.unwrap();
-        let mut new_status = other.status().clone();
-        new_status.observed_at = Some(chrono::Utc::now());
-        let status_generation = other.headers().status_generation;
-        other
-            .try_update_status(chrono::Utc::now(), status_generation, new_status)
-            .unwrap();
-        persistence.save(&mut other).await.unwrap();
+        update_status_as_another_writer(&self.catalog, resource).await;
 
         if self.interference.then_fails {
             return Err(ResourceCleanupError::Internal(
                 "simulated cleanup failure".int_err(),
             ));
         }
+        Ok(())
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// TestResourceInterferingReconciler
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Writes to the status of the resource it reconciles, as another writer
+/// would, so the outcome recorded after it fails with a status conflict.
+#[dill::component(pub)]
+#[dill::interface(dyn SimpleResourceReconciler<TestResource>)]
+pub struct TestResourceInterferingReconciler {
+    catalog: dill::Catalog,
+}
+
+#[async_trait::async_trait]
+impl SimpleResourceReconciler<TestResource> for TestResourceInterferingReconciler {
+    async fn reconcile(&self, resource: &TestResource) -> Result<(), TestResourceReconcileError> {
+        update_status_as_another_writer(&self.catalog, resource).await;
+        Ok(())
+    }
+
+    async fn cleanup(&self, _resource: &TestResource) -> Result<(), ResourceCleanupError> {
         Ok(())
     }
 }
@@ -202,6 +210,28 @@ impl SimpleResourceReconciler<TestResource> for TestResourceFailingCleanupOnceRe
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Saves a status update of `resource`, through the services of `catalog`, as
+/// a writer other than the one running would
+async fn update_status_as_another_writer(catalog: &dill::Catalog, resource: &TestResource) {
+    let loader = catalog
+        .get_one::<dyn ResourceAggregateLoader<TestResource>>()
+        .unwrap();
+    let persistence = catalog
+        .get_one::<dyn ResourcePersistenceService<TestResource>>()
+        .unwrap();
+
+    let mut current = loader.load(resource.id()).await.unwrap();
+    let mut new_status = current.status().clone();
+    new_status.observed_at = Some(chrono::Utc::now());
+    let status_generation = current.headers().status_generation;
+    current
+        .try_update_status(chrono::Utc::now(), status_generation, new_status)
+        .unwrap();
+    persistence.save(&mut current).await.unwrap();
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[derive(Default)]
 pub enum TestResourceReconcilerProvider {
     #[default]
@@ -213,6 +243,7 @@ pub enum TestResourceReconcilerProvider {
         then_fails: bool,
     },
     FailingCleanupOnce,
+    InterferingReconcile,
 }
 
 impl TestResourceReconcilerProvider {
@@ -245,6 +276,9 @@ impl TestResourceReconcilerProvider {
             TestResourceReconcilerProvider::FailingCleanupOnce => {
                 b.add_value(TestCleanupFailureOnce::default());
                 b.add::<TestResourceFailingCleanupOnceReconciler>();
+            }
+            TestResourceReconcilerProvider::InterferingReconcile => {
+                b.add::<TestResourceInterferingReconciler>();
             }
         }
     }

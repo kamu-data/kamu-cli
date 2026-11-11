@@ -28,7 +28,7 @@ use kamu_resources_services::{
 };
 use messaging_outbox::{MockOutbox, OutboxProvider};
 
-use super::resource_use_case_base_harness::{
+use crate::tests::use_cases::{
     ResourceUseCaseBaseHarness,
     ResourceUseCaseBaseHarnessOpts,
     SanitizerKind,
