@@ -566,7 +566,7 @@ async fn test_status_updated_message_carries_values_of_carried_conditions_only()
     pretty_assertions::assert_eq!(
         harness.raw_messages_since(mark).await[0]["StatusUpdated"]["changed_conditions"],
         serde_json::json!({
-            TEST_PAYLOAD_CONDITION_URI: { "Set": { "value": null } },
+            TEST_PAYLOAD_CONDITION_URI: "SetEmpty",
             TEST_STAGE_CONDITION_URI: { "Set": { "value": "running" } },
         })
     );

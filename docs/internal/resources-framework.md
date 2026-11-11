@@ -746,7 +746,7 @@ persists its event and posts the matching lifecycle message:
   `StatusUpdated` message in the same transaction; a write that leaves the status as it was records
   and posts nothing. The message names the resource by ID, schema and headers, carries the status
   fields other than the conditions, and lists every changed condition: `Set` with the new value when
-  the condition's registration marks it as carried, `Set` without a value otherwise, or `Removed`.
+  the condition's registration marks it as carried, `SetEmpty` otherwise, or `Removed`.
   It leaves out the spec and the conditions, so a large condition never travels with it, and
   consumers that need a transition read it from the message, which reaches them even when the
   resource is gone by then. `ReconciliationError` is carried.

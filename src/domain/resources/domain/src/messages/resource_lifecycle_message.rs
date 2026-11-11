@@ -217,11 +217,13 @@ pub struct ResourceLifecycleMessageResourceRef {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ResourceLifecycleMessageConditionChange {
-    /// The new value travels only for a condition whose schema is registered
-    /// as carried
+    /// Set a condition whose schema is registered as carried; the value may be
+    /// JSON `null`
     Set {
-        value: Option<serde_json::Value>,
+        value: serde_json::Value,
     },
+    /// Set a condition whose value does not travel with the message
+    SetEmpty,
     Removed,
 }
 
