@@ -244,7 +244,7 @@
       "additionalProperties": false,
       "properties": {
         "failureBackoff": {
-          "$ref": "#/$defs/RetryBackoffConfig",
+          "$ref": "#/$defs/ResourceControllerFailureBackoffConfig",
           "default": {
             "backoffType": "Exponential",
             "maxDelay": "5m",
@@ -253,7 +253,7 @@
           "description": "Delay before a resource whose processing failed is processed again,\ngrowing with consecutive failures"
         },
         "loopRestartBackoff": {
-          "$ref": "#/$defs/RetryBackoffConfig",
+          "$ref": "#/$defs/ResourceControllerLoopRestartBackoffConfig",
           "default": {
             "backoffType": "Exponential",
             "maxDelay": "1m",
@@ -970,7 +970,7 @@
       },
       "type": "object"
     },
-    "RetryBackoffConfig": {
+    "ResourceControllerFailureBackoffConfig": {
       "additionalProperties": false,
       "description": "Delay before a retry: a function of the attempt number, from `minDelay`\nup to `maxDelay`",
       "properties": {
@@ -981,6 +981,25 @@
         "maxDelay": {
           "$ref": "#/$defs/DurationString",
           "default": "5m"
+        },
+        "minDelay": {
+          "$ref": "#/$defs/DurationString",
+          "default": "1s"
+        }
+      },
+      "type": "object"
+    },
+    "ResourceControllerLoopRestartBackoffConfig": {
+      "additionalProperties": false,
+      "description": "Delay before a retry: a function of the attempt number, from `minDelay`\nup to `maxDelay`",
+      "properties": {
+        "backoffType": {
+          "$ref": "#/$defs/RetryPolicyConfigBackoffType",
+          "default": "Exponential"
+        },
+        "maxDelay": {
+          "$ref": "#/$defs/DurationString",
+          "default": "1m"
         },
         "minDelay": {
           "$ref": "#/$defs/DurationString",

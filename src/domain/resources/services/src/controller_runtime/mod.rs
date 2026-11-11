@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 mod resource_controller_candidate;
+mod resource_controller_drain_hold_back;
 mod resource_controller_loop;
 mod resource_controller_outcome_recorder;
 mod resource_controller_pass;
@@ -18,6 +19,7 @@ mod resource_process_attempt;
 mod resource_process_executor;
 
 pub(crate) use resource_controller_candidate::*;
+pub(crate) use resource_controller_drain_hold_back::*;
 pub(crate) use resource_controller_loop::*;
 pub(crate) use resource_controller_outcome_recorder::*;
 pub(crate) use resource_controller_pass::*;

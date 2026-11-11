@@ -550,7 +550,7 @@ the next flow activation moment regardless of it.
 <tbody>
 <tr>
 <td><code>failureBackoff</code></td>
-<td><a href="#retrybackoffconfig"><code>RetryBackoffConfig</code></a></td>
+<td><a href="#resourcecontrollerfailurebackoffconfig"><code>ResourceControllerFailureBackoffConfig</code></a></td>
 <td><pre><code class="language-json">{
   &quot;backoffType&quot;: &quot;Exponential&quot;,
   &quot;maxDelay&quot;: &quot;5m&quot;,
@@ -565,7 +565,7 @@ growing with consecutive failures
 </tr>
 <tr>
 <td><code>loopRestartBackoff</code></td>
-<td><a href="#retrybackoffconfig"><code>RetryBackoffConfig</code></a></td>
+<td><a href="#resourcecontrollerlooprestartbackoffconfig"><code>ResourceControllerLoopRestartBackoffConfig</code></a></td>
 <td><pre><code class="language-json">{
   &quot;backoffType&quot;: &quot;Exponential&quot;,
   &quot;maxDelay&quot;: &quot;1m&quot;,
@@ -1535,7 +1535,7 @@ Base type: `string`
 </tbody>
 </table>
 
-## `RetryBackoffConfig`
+## `ResourceControllerFailureBackoffConfig`
 
 Delay before a retry: a function of the attempt number, from `minDelay`
 up to `maxDelay`
@@ -1553,6 +1553,35 @@ up to `maxDelay`
 <td><code>maxDelay</code></td>
 <td><a href="#durationstring"><code>DurationString</code></a></td>
 <td><code class="language-json">&quot;5m&quot;</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>minDelay</code></td>
+<td><a href="#durationstring"><code>DurationString</code></a></td>
+<td><code class="language-json">&quot;1s&quot;</code></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+
+## `ResourceControllerLoopRestartBackoffConfig`
+
+Delay before a retry: a function of the attempt number, from `minDelay`
+up to `maxDelay`
+
+<table>
+<thead><tr><th>Field</th><th>Type</th><th>Default</th><th>Description</th></tr></thead>
+<tbody>
+<tr>
+<td><code>backoffType</code></td>
+<td><a href="#retrypolicyconfigbackofftype"><code>RetryPolicyConfigBackoffType</code></a></td>
+<td><code class="language-json">&quot;Exponential&quot;</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>maxDelay</code></td>
+<td><a href="#durationstring"><code>DurationString</code></a></td>
+<td><code class="language-json">&quot;1m&quot;</code></td>
 <td></td>
 </tr>
 <tr>
