@@ -10,6 +10,8 @@
 use async_utils::BackgroundAgent;
 use internal_error::InternalError;
 
+use crate::ResourceControllerDrainSession;
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub const RESOURCE_CONTROLLER_RUNTIME_AGENT_NAME: &str =
@@ -19,12 +21,10 @@ pub const RESOURCE_CONTROLLER_RUNTIME_AGENT_NAME: &str =
 
 /// The background agent driving every registered `ResourceController`, with a
 /// loop of its own per controller
-#[async_trait::async_trait]
 pub trait ResourceControllerRuntime: BackgroundAgent {
-    /// Processes every resource that needs attention now, controller by
-    /// controller, until none is left. Does not wait for deadlines: a resource
-    /// waiting for time stays for a later run.
-    async fn run_until_idle(&self) -> Result<(), InternalError>;
+    /// Drains on demand, for a caller that does not run the agent, such as a
+    /// CLI command processing what it changed before it exits
+    fn new_drain_session(&self) -> Result<Box<dyn ResourceControllerDrainSession>, InternalError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

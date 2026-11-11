@@ -213,7 +213,8 @@ Agent-specific metrics and recommended alerts are in [metrics.md](metrics.md).
 
 The resource controller runtime is the one agent whose wakeups do not come from storage: its hub,
 `ResourceControllerHintHub`, is registered on every backend, with one channel per schema, and is
-signaled by code in the same process. Storage stays authoritative: a hint only shortens the wait,
+signaled by the resource lifecycle message consumer, which runs in the same process, on every
+`Applied`, `DeletionRequested` and `StatusUpdated`. Storage stays authoritative: a hint only shortens the wait,
 and the fallback timeout covers a missed one.
 
 Each agent obtains its handle through a domain-level trait exposing `new_wakeup_listener()`:

@@ -7,6 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::sync::Mutex;
+
 use chrono::Utc;
 use dill::CatalogBuilder;
 use event_sourcing::ConcurrentModificationError;
@@ -14,6 +16,8 @@ use internal_error::InternalError;
 use kamu_resources::{
     MESSAGE_PRODUCER_KAMU_RESOURCE_SERVICE,
     MockSimpleResourceController,
+    ResourceControllerHints,
+    ResourceControllerName,
     ResourceHeaders,
     ResourceHeadersExt,
     ResourceID,
@@ -31,6 +35,8 @@ use kamu_resources::{
 };
 use messaging_outbox::{MessageConsumerT, OutboxProvider, register_message_dispatcher};
 use odf::metadata::resources::TypeUri;
+use pretty_assertions::assert_eq;
+use wakeup_listener::WakeupListener;
 
 use crate::tests::utils::{TestResource, TestResourceResourceLifecycleDispatcher, make_id};
 
@@ -56,6 +62,11 @@ async fn test_applied_message_triggers_reconciliation() {
         ))
         .await
         .unwrap();
+
+    assert_eq!(
+        harness.hinted_schemas(),
+        vec![TestResource::schema().clone()]
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -124,6 +135,11 @@ async fn test_deletion_requested_message_completes_deletions_in_one_batch() {
         ))
         .await
         .unwrap();
+
+    assert_eq!(
+        harness.hinted_schemas(),
+        vec![TestResource::schema().clone()]
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -169,12 +185,14 @@ async fn test_deleted_message_is_no_op_for_controller() {
         ))
         .await
         .unwrap();
+
+    assert_eq!(harness.hinted_schemas(), vec![]);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_status_updated_message_is_no_op_for_controller() {
+async fn test_status_updated_message_only_hints() {
     let id = make_id();
 
     let harness = ResourceLifecycleConsumerHarness::new(
@@ -185,35 +203,35 @@ async fn test_status_updated_message_is_no_op_for_controller() {
         .consume_message(&ResourceLifecycleConsumerHarness::make_status_updated(id))
         .await
         .unwrap();
+
+    assert_eq!(
+        harness.hinted_schemas(),
+        vec![TestResource::schema().clone()]
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_applied_message_with_unregistered_schema_returns_error() {
-    // Applied message for an unknown schema: dispatcher lookup fails because no
-    // lifecycle dispatcher is registered for "UnknownSchema".
+async fn test_applied_message_of_a_type_without_lifecycle_dispatcher_only_hints() {
+    // A type without a lifecycle dispatcher is left to its resource controller
     let id = make_id();
+    let schema = TypeUri::new_unchecked("ControllerDrivenSchema");
 
     let harness = ResourceLifecycleConsumerHarness::new(
         ResourceLifecycleConsumerHarness::expect_no_reconcile(),
     );
 
-    let result = harness
+    harness
         .consume_message(&ResourceLifecycleMessage::applied(
             Utc::now(),
             ResourceLifecycleMessageOutcome::Created,
-            ResourceLifecycleConsumerHarness::make_snapshot_with_schema(
-                id,
-                &TypeUri::new_unchecked("UnknownSchema"),
-            ),
+            ResourceLifecycleConsumerHarness::make_snapshot_with_schema(id, &schema),
         ))
-        .await;
+        .await
+        .unwrap();
 
-    assert!(
-        result.is_err(),
-        "consumer must return an error for an unregistered resource schema"
-    );
+    assert_eq!(harness.hinted_schemas(), vec![schema]);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -313,6 +331,8 @@ impl ResourceLifecycleConsumerHarness {
         b.add_value(controller)
             .bind::<dyn SimpleResourceController<TestResource>, MockSimpleResourceController<TestResource>>();
 
+        b.add_value(RecordingHints::default())
+            .bind::<dyn ResourceControllerHints, RecordingHints>();
         b.add::<TestResourceResourceLifecycleDispatcher>();
         b.add::<kamu_resources_services::ResourceLifecycleMessageConsumer>();
 
@@ -323,6 +343,17 @@ impl ResourceLifecycleConsumerHarness {
 
         let catalog = b.build();
         Self { catalog }
+    }
+
+    /// The schemas the consumer hinted, in order
+    fn hinted_schemas(&self) -> Vec<TypeUri> {
+        self.catalog
+            .get_one::<RecordingHints>()
+            .unwrap()
+            .schemas
+            .lock()
+            .unwrap()
+            .clone()
     }
 
     async fn consume_message(
@@ -373,4 +404,26 @@ impl ResourceLifecycleConsumerHarness {
         }
     }
 }
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Records the schemas hinted to the controller runtime
+#[derive(Default)]
+struct RecordingHints {
+    schemas: Mutex<Vec<TypeUri>>,
+}
+
+impl ResourceControllerHints for RecordingHints {
+    fn hint(&self, schema: &TypeUri) {
+        self.schemas.lock().unwrap().push(schema.clone());
+    }
+
+    fn new_wakeup_listener(
+        &self,
+        _schema: &'static str,
+        _controller_name: &ResourceControllerName,
+    ) -> Box<dyn WakeupListener> {
+        unreachable!("the consumer never listens")
+    }
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

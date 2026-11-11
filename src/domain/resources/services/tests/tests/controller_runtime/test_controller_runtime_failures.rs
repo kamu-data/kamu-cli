@@ -136,7 +136,7 @@ async fn test_never_settling_resources_are_held_back_without_hiding_others() {
         .set_behavior_of(healthy, TestControllerBehavior::FinishAtCurrentVersion);
 
     // The drain ends, and reaches the healthy resource
-    harness.run_until_idle().await;
+    harness.run_outbox_and_controllers_until_idle().await;
     for id in &never_settling {
         assert_eq!(
             harness.script().calls_of(id),
@@ -147,7 +147,7 @@ async fn test_never_settling_resources_are_held_back_without_hiding_others() {
     assert_eq!(harness.script().calls_of(&healthy), 1);
 
     // Held back for one drain only
-    harness.run_until_idle().await;
+    harness.run_outbox_and_controllers_until_idle().await;
     assert_eq!(
         harness.script().calls_of(&never_settling[0]),
         2 * MAX_PROCESS_CALLS_PER_DRAIN

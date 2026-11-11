@@ -290,7 +290,9 @@ run_while_has_tasks(): loop { held = has_held_back_messages(); drain; if !held b
 Waking is described in [wakeup-listeners.md](wakeup-listeners.md) (channel `outbox_messages_ready`).
 The same drain is callable as `run_while_has_tasks()`. With a database configured, the CLI calls it
 after every command that `command_needs_outbox_processing` selects, whether the command succeeded or
-failed: a failed command may still have committed work in transactions of its own. The HTTP E2E
+failed: a failed command may still have committed work in transactions of its own. The CLI
+alternates it with drains of the resource controllers until one processes nothing
+([resources-framework.md](resources-framework.md#controller-runtime)). The HTTP E2E
 middleware calls it after every successful mutating request (a REST `POST` or a GraphQL
 `mutation`), so E2E tests observe
 consumers' effects synchronously. A `run_lock` keeps these entrances from overlapping with the main loop.
@@ -518,4 +520,4 @@ boundaries, failure isolation, self-managed consumers, batching and concurrency 
 | Testing helpers | `messaging-outbox` (`testing`) | `src/utils/messaging-outbox/src/services/testing` | `test_outbox_provider.rs`, `mock_outbox_impl.rs` |
 | Schema | — | `migrations/{postgres,sqlite}` | `*_outbox_messages_consumptions.sql`, `*_outbox_message_version.sql`, `*_outbox_listen_notify.sql`, `*_outbox_wipe*.sql` |
 | App wiring | `kamu-cli` | `src/app/cli/src` | `app.rs` (outbox components, dispatchers), `services/config/models.rs` (`BackgroundAgentsConfig`) |
-| Flushing | `kamu-cli`, `kamu-adapter-http` | `src/app/cli/src`, `src/adapter/http/src/e2e` | `app.rs` (`run_while_has_tasks` after commands), `e2e_middleware.rs` |
+| Flushing | `kamu-cli`, `kamu-adapter-http` | `src/app/cli/src`, `src/adapter/http/src/e2e` | `outbox.rs` (`run_while_has_tasks` after commands), `e2e_middleware.rs` |

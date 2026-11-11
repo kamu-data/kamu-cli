@@ -29,7 +29,6 @@ use kamu_resources_services::{
 use messaging_outbox::{MockOutbox, OutboxProvider};
 
 use crate::tests::utils::{
-    SanitizerKind,
     ServiceLayerTestHarness,
     ServiceLayerTestHarnessOpts,
     TestResource,
@@ -353,7 +352,7 @@ impl CompleteDeletionTestHarness {
                 ..Default::default()
             },
             reconciler_provider,
-            sanitizer: SanitizerKind::None,
+            ..Default::default()
         });
 
         Self {
