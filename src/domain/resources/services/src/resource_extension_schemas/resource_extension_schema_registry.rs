@@ -76,10 +76,9 @@ pub struct ResourceExtensionApplication {
 #[derive(Clone)]
 pub struct ResourceExtensionSchemaRegistry {
     by_uri: BTreeMap<TypeUri, Arc<ResourceExtensionSchemaRegistration>>,
-    exact_type_names: BTreeMap<ScopedNameKey, Arc<ResourceExtensionSchemaRegistration>>,
-    versioned_context_names: BTreeMap<ScopedNameKey, Arc<ResourceExtensionSchemaRegistration>>,
-    context_names: BTreeMap<ScopedNameKey, Arc<ResourceExtensionSchemaRegistration>>,
-    any_resource_names: BTreeMap<AnyNameKey, Arc<ResourceExtensionSchemaRegistration>>,
+    /// Every scope each short name is declared in, so a lookup by name builds
+    /// no key
+    by_name: BTreeMap<TypeName, Vec<ShortNameDeclaration>>,
 }
 
 #[dill::component(pub)]
@@ -92,10 +91,7 @@ impl ResourceExtensionSchemaRegistry {
     pub fn try_new(catalog: &Catalog) -> Result<Self, InternalError> {
         let mut registry = Self {
             by_uri: BTreeMap::new(),
-            exact_type_names: BTreeMap::new(),
-            versioned_context_names: BTreeMap::new(),
-            context_names: BTreeMap::new(),
-            any_resource_names: BTreeMap::new(),
+            by_name: BTreeMap::new(),
         };
 
         for builder in catalog.builders_for_with_meta::<dyn ResourceExtensionSchemaDispatcher, _>(
@@ -246,68 +242,24 @@ impl ResourceExtensionSchemaRegistry {
                 .chain(application.aliases.iter());
 
             for name in names {
-                match &application.scope {
-                    ResourceExtensionScope::AnyResource => {
-                        insert_alias(
-                            &mut self.any_resource_names,
-                            AnyNameKey {
-                                kind: registration.kind,
-                                name: name.clone(),
-                            },
-                            registration,
-                        )?;
+                let declarations = self.by_name.entry(name.clone()).or_default();
+                if let Some(existing) = declarations.iter().find(|declaration| {
+                    declaration.registration.kind == registration.kind
+                        && declaration.scope == application.scope
+                }) {
+                    if existing.registration.schema_id != registration.schema_id {
+                        return Err(InternalError::new(format!(
+                            "Resource extension short-name conflict between '{}' and '{}'",
+                            existing.registration.schema_id, registration.schema_id
+                        )));
                     }
-                    ResourceExtensionScope::ResourceContext {
-                        authority,
-                        context,
-                        version: Some(version),
-                    } => {
-                        insert_alias(
-                            &mut self.versioned_context_names,
-                            ScopedNameKey {
-                                kind: registration.kind,
-                                authority: authority.clone(),
-                                context: context.clone(),
-                                version: Some(version.clone()),
-                                schema: None,
-                                name: name.clone(),
-                            },
-                            registration,
-                        )?;
-                    }
-                    ResourceExtensionScope::ResourceContext {
-                        authority,
-                        context,
-                        version: None,
-                    } => {
-                        insert_alias(
-                            &mut self.context_names,
-                            ScopedNameKey {
-                                kind: registration.kind,
-                                authority: authority.clone(),
-                                context: context.clone(),
-                                version: None,
-                                schema: None,
-                                name: name.clone(),
-                            },
-                            registration,
-                        )?;
-                    }
-                    ResourceExtensionScope::ResourceType { schema } => {
-                        insert_alias(
-                            &mut self.exact_type_names,
-                            ScopedNameKey {
-                                kind: registration.kind,
-                                authority: String::new(),
-                                context: String::new(),
-                                version: None,
-                                schema: Some(schema.as_str().to_string()),
-                                name: name.clone(),
-                            },
-                            registration,
-                        )?;
-                    }
+                    continue;
                 }
+
+                declarations.push(ShortNameDeclaration {
+                    scope: application.scope.clone(),
+                    registration: Arc::clone(registration),
+                });
             }
         }
 
@@ -353,83 +305,55 @@ impl ResourceExtensionSchemaRegistry {
         name: &TypeName,
         resource_schema: &ResourceSchemaId,
     ) -> Option<Arc<ResourceExtensionSchemaRegistration>> {
-        self.exact_type_names
-            .get(&ScopedNameKey {
-                kind,
-                authority: String::new(),
-                context: String::new(),
-                version: None,
-                schema: Some(resource_schema.as_str().to_string()),
-                name: name.clone(),
+        self.by_name
+            .get(name)?
+            .iter()
+            .filter(|declaration| declaration.registration.kind == kind)
+            .filter_map(|declaration| {
+                ShortNamePrecedence::of(&declaration.scope, resource_schema)
+                    .map(|precedence| (precedence, &declaration.registration))
             })
-            .or_else(|| {
-                self.versioned_context_names.get(&ScopedNameKey {
-                    kind,
-                    authority: resource_schema.base().to_string(),
-                    context: resource_schema.context().to_string(),
-                    version: Some(resource_schema.version().to_string()),
-                    schema: None,
-                    name: name.clone(),
-                })
-            })
-            .or_else(|| {
-                self.context_names.get(&ScopedNameKey {
-                    kind,
-                    authority: resource_schema.base().to_string(),
-                    context: resource_schema.context().to_string(),
-                    version: None,
-                    schema: None,
-                    name: name.clone(),
-                })
-            })
-            .or_else(|| {
-                self.any_resource_names.get(&AnyNameKey {
-                    kind,
-                    name: name.clone(),
-                })
-            })
-            .cloned()
-            .filter(|registration| registration_applies_to(registration, resource_schema))
+            .min_by_key(|(precedence, _)| *precedence)
+            .map(|(_, registration)| Arc::clone(registration))
     }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
-struct AnyNameKey {
-    kind: ResourceExtensionKind,
-    name: TypeName,
+#[derive(Clone)]
+struct ShortNameDeclaration {
+    scope: ResourceExtensionScope,
+    registration: Arc<ResourceExtensionSchemaRegistration>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
-struct ScopedNameKey {
-    kind: ResourceExtensionKind,
-    authority: String,
-    context: String,
-    version: Option<String>,
-    schema: Option<String>,
-    name: TypeName,
+/// Which declaration of a short name wins for a resource type: the narrowest
+/// scope that applies to it
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+enum ShortNamePrecedence {
+    ResourceType,
+    VersionedContext,
+    Context,
+    AnyResource,
 }
 
-fn insert_alias<TKey>(
-    aliases: &mut BTreeMap<TKey, Arc<ResourceExtensionSchemaRegistration>>,
-    key: TKey,
-    registration: &Arc<ResourceExtensionSchemaRegistration>,
-) -> Result<(), InternalError>
-where
-    TKey: Ord,
-{
-    if let Some(existing) = aliases.insert(key, Arc::clone(registration))
-        && existing.schema_id != registration.schema_id
-    {
-        return Err(InternalError::new(format!(
-            "Resource extension short-name conflict between '{}' and '{}'",
-            existing.schema_id, registration.schema_id
-        )));
+impl ShortNamePrecedence {
+    fn of(scope: &ResourceExtensionScope, resource_schema: &ResourceSchemaId) -> Option<Self> {
+        if !scope_applies_to(scope, resource_schema) {
+            return None;
+        }
+
+        Some(match scope {
+            ResourceExtensionScope::ResourceType { .. } => Self::ResourceType,
+            ResourceExtensionScope::ResourceContext {
+                version: Some(_), ..
+            } => Self::VersionedContext,
+            ResourceExtensionScope::ResourceContext { version: None, .. } => Self::Context,
+            ResourceExtensionScope::AnyResource => Self::AnyResource,
+        })
     }
-
-    Ok(())
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 fn parse_scope_meta(
     meta: &ResourceExtensionScopeMeta,
