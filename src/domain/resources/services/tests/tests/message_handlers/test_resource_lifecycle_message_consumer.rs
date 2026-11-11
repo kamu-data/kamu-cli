@@ -12,13 +12,8 @@ use dill::CatalogBuilder;
 use event_sourcing::ConcurrentModificationError;
 use internal_error::InternalError;
 use kamu_resources::{
-    CompleteResourceDeletionUseCase,
-    CompleteResourceDeletionUseCaseError,
     MESSAGE_PRODUCER_KAMU_RESOURCE_SERVICE,
-    MockCompleteResourceDeletionUseCase,
-    MockReconcileResourceUseCase,
-    ReconcileResourceUseCase,
-    ReconcileResourceUseCaseError,
+    MockSimpleResourceController,
     ResourceHeaders,
     ResourceHeadersExt,
     ResourceID,
@@ -29,6 +24,9 @@ use kamu_resources::{
     ResourceSchemaProvider,
     ResourceSnapshot,
     ResourceStatusConflictError,
+    SimpleResourceController,
+    SimpleResourceDeletionError,
+    SimpleResourceReconciliationError,
     new_pending_resource_status,
 };
 use messaging_outbox::{MessageConsumerT, OutboxProvider, register_message_dispatcher};
@@ -43,11 +41,11 @@ use crate::tests::utils::{TestResource, TestResourceResourceLifecycleDispatcher,
 #[test_log::test(tokio::test)]
 async fn test_applied_message_triggers_reconciliation() {
     // Applied message → ResourceLifecycleMessageConsumer → handle_applied →
-    // ReconcileResourceUseCase::execute.  Verified via mock expectations.
+    // SimpleResourceController::reconcile.  Verified via mock expectations.
     let id = make_id();
 
     let harness = ResourceLifecycleConsumerHarness::new(
-        ResourceLifecycleConsumerHarness::expect_execute_once(id),
+        ResourceLifecycleConsumerHarness::expect_reconcile_once(id),
     );
 
     harness
@@ -69,7 +67,7 @@ async fn test_applied_message_skips_reconciliation_status_conflict() {
     let id = make_id();
 
     let harness = ResourceLifecycleConsumerHarness::new(
-        ResourceLifecycleConsumerHarness::expect_execute_once_with_status_conflict(id),
+        ResourceLifecycleConsumerHarness::expect_reconcile_once_with_status_conflict(id),
     );
 
     harness
@@ -91,7 +89,7 @@ async fn test_applied_message_skips_reconciliation_concurrent_modification() {
     let id = make_id();
 
     let harness = ResourceLifecycleConsumerHarness::new(
-        ResourceLifecycleConsumerHarness::expect_execute_once_with_concurrent_modification(id),
+        ResourceLifecycleConsumerHarness::expect_reconcile_once_with_concurrent_modification(id),
     );
 
     harness
@@ -112,7 +110,7 @@ async fn test_deletion_requested_message_completes_deletions_in_one_batch() {
     let id_b = make_id();
 
     let harness = ResourceLifecycleConsumerHarness::new_with_deletion(
-        ResourceLifecycleConsumerHarness::expect_no_execute(),
+        ResourceLifecycleConsumerHarness::expect_no_reconcile(),
         ResourceLifecycleConsumerHarness::expect_complete_deletion(&[id_a, id_b], || Ok(())),
     );
 
@@ -135,13 +133,11 @@ async fn test_deletion_requested_message_skips_concurrent_modification() {
     let id = make_id();
 
     let harness = ResourceLifecycleConsumerHarness::new_with_deletion(
-        ResourceLifecycleConsumerHarness::expect_no_execute(),
+        ResourceLifecycleConsumerHarness::expect_no_reconcile(),
         ResourceLifecycleConsumerHarness::expect_complete_deletion(&[id], || {
-            Err(
-                CompleteResourceDeletionUseCaseError::ConcurrentModification(
-                    ConcurrentModificationError {},
-                ),
-            )
+            Err(SimpleResourceDeletionError::ConcurrentModification(
+                ConcurrentModificationError {},
+            ))
         }),
     );
 
@@ -163,7 +159,7 @@ async fn test_deleted_message_is_no_op_for_controller() {
     let id = make_id();
 
     let harness = ResourceLifecycleConsumerHarness::new(
-        ResourceLifecycleConsumerHarness::expect_no_execute(),
+        ResourceLifecycleConsumerHarness::expect_no_reconcile(),
     );
 
     harness
@@ -182,7 +178,7 @@ async fn test_status_updated_message_is_no_op_for_controller() {
     let id = make_id();
 
     let harness = ResourceLifecycleConsumerHarness::new(
-        ResourceLifecycleConsumerHarness::expect_no_execute(),
+        ResourceLifecycleConsumerHarness::expect_no_reconcile(),
     );
 
     harness
@@ -200,7 +196,7 @@ async fn test_applied_message_with_unregistered_schema_returns_error() {
     let id = make_id();
 
     let harness = ResourceLifecycleConsumerHarness::new(
-        ResourceLifecycleConsumerHarness::expect_no_execute(),
+        ResourceLifecycleConsumerHarness::expect_no_reconcile(),
     );
 
     let result = harness
@@ -228,82 +224,85 @@ struct ResourceLifecycleConsumerHarness {
     catalog: dill::Catalog,
 }
 
+/// An expectation set on the mocked controller
+type ControllerExpectation = Box<dyn FnOnce(&mut MockSimpleResourceController<TestResource>)>;
+
 impl ResourceLifecycleConsumerHarness {
-    fn expect_execute_once(id: ResourceID) -> MockReconcileResourceUseCase<TestResource> {
-        let mut mock = MockReconcileResourceUseCase::<TestResource>::new();
-        mock.expect_execute()
-            .once()
-            .withf(move |id_| *id_ == id)
-            .returning(|_| Ok(()));
-        mock
+    fn expect_reconcile_once(id: ResourceID) -> ControllerExpectation {
+        Box::new(move |mock| {
+            mock.expect_reconcile()
+                .once()
+                .withf(move |id_| *id_ == id)
+                .returning(|_| Ok(()));
+        })
     }
 
-    fn expect_execute_once_with_status_conflict(
-        id: ResourceID,
-    ) -> MockReconcileResourceUseCase<TestResource> {
-        let mut mock = MockReconcileResourceUseCase::<TestResource>::new();
-        mock.expect_execute()
-            .once()
-            .withf(move |id_| *id_ == id)
-            .returning(|_| {
-                Err(ReconcileResourceUseCaseError::StatusConflict(
-                    ResourceStatusConflictError {
-                        expected: 2,
-                        actual: 3,
-                    },
-                ))
-            });
-        mock
+    fn expect_reconcile_once_with_status_conflict(id: ResourceID) -> ControllerExpectation {
+        Box::new(move |mock| {
+            mock.expect_reconcile()
+                .once()
+                .withf(move |id_| *id_ == id)
+                .returning(|_| {
+                    Err(SimpleResourceReconciliationError::StatusConflict(
+                        ResourceStatusConflictError {
+                            expected: 2,
+                            actual: 3,
+                        },
+                    ))
+                });
+        })
     }
 
-    fn expect_execute_once_with_concurrent_modification(
-        id: ResourceID,
-    ) -> MockReconcileResourceUseCase<TestResource> {
-        let mut mock = MockReconcileResourceUseCase::<TestResource>::new();
-        mock.expect_execute()
-            .once()
-            .withf(move |id_| *id_ == id)
-            .returning(|_| {
-                Err(ReconcileResourceUseCaseError::ConcurrentModification(
-                    ConcurrentModificationError {},
-                ))
-            });
-        mock
+    fn expect_reconcile_once_with_concurrent_modification(id: ResourceID) -> ControllerExpectation {
+        Box::new(move |mock| {
+            mock.expect_reconcile()
+                .once()
+                .withf(move |id_| *id_ == id)
+                .returning(|_| {
+                    Err(SimpleResourceReconciliationError::ConcurrentModification(
+                        ConcurrentModificationError {},
+                    ))
+                });
+        })
     }
 
-    fn expect_no_execute() -> MockReconcileResourceUseCase<TestResource> {
-        let mut mock = MockReconcileResourceUseCase::<TestResource>::new();
-        mock.expect_execute().never();
-        mock
+    fn expect_no_reconcile() -> ControllerExpectation {
+        Box::new(|mock| {
+            mock.expect_reconcile().never();
+        })
     }
 
     fn expect_complete_deletion(
         ids: &[ResourceID],
-        outcome: fn() -> Result<(), CompleteResourceDeletionUseCaseError<TestResource>>,
-    ) -> MockCompleteResourceDeletionUseCase<TestResource> {
+        outcome: fn() -> Result<(), SimpleResourceDeletionError<TestResource>>,
+    ) -> ControllerExpectation {
         let ids = ids.to_vec();
-        let mut mock = MockCompleteResourceDeletionUseCase::<TestResource>::new();
-        mock.expect_execute()
-            .once()
-            .withf(move |ids_| *ids_ == ids[..])
-            .returning(move |_| outcome());
-        mock
+        Box::new(move |mock| {
+            mock.expect_complete_deletions()
+                .once()
+                .withf(move |ids_| *ids_ == ids[..])
+                .returning(move |_| outcome());
+        })
     }
 
-    fn expect_no_complete_deletion() -> MockCompleteResourceDeletionUseCase<TestResource> {
-        let mut mock = MockCompleteResourceDeletionUseCase::<TestResource>::new();
-        mock.expect_execute().never();
-        mock
+    fn expect_no_complete_deletion() -> ControllerExpectation {
+        Box::new(|mock| {
+            mock.expect_complete_deletions().never();
+        })
     }
 
-    fn new(mock_reconcile_uc: MockReconcileResourceUseCase<TestResource>) -> Self {
-        Self::new_with_deletion(mock_reconcile_uc, Self::expect_no_complete_deletion())
+    fn new(reconcile: ControllerExpectation) -> Self {
+        Self::new_with_deletion(reconcile, Self::expect_no_complete_deletion())
     }
 
     fn new_with_deletion(
-        mock_reconcile_uc: MockReconcileResourceUseCase<TestResource>,
-        mock_complete_deletion_uc: MockCompleteResourceDeletionUseCase<TestResource>,
+        reconcile: ControllerExpectation,
+        complete_deletion: ControllerExpectation,
     ) -> Self {
+        let mut controller = MockSimpleResourceController::<TestResource>::new();
+        reconcile(&mut controller);
+        complete_deletion(&mut controller);
+
         let mut b = CatalogBuilder::new();
 
         OutboxProvider::Immediate {
@@ -311,10 +310,8 @@ impl ResourceLifecycleConsumerHarness {
         }
         .embed_into_catalog(&mut b);
 
-        b.add_value(mock_reconcile_uc)
-            .bind::<dyn ReconcileResourceUseCase<TestResource>, MockReconcileResourceUseCase<TestResource>>();
-        b.add_value(mock_complete_deletion_uc)
-            .bind::<dyn CompleteResourceDeletionUseCase<TestResource>, MockCompleteResourceDeletionUseCase<TestResource>>();
+        b.add_value(controller)
+            .bind::<dyn SimpleResourceController<TestResource>, MockSimpleResourceController<TestResource>>();
 
         b.add::<TestResourceResourceLifecycleDispatcher>();
         b.add::<kamu_resources_services::ResourceLifecycleMessageConsumer>();
