@@ -155,6 +155,7 @@ odf = { workspace = true, default-features = false, features = [
     "s3",
 ] }
 random-strings = { workspace = true }
+retry-backoff = { workspace = true }
 server-console = { workspace = true }
 time-source = { workspace = true }
 wakeup-listener = { workspace = true }
