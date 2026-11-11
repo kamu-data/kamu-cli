@@ -7,7 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::collections::HashSet;
 use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
@@ -15,14 +14,13 @@ use internal_error::InternalError;
 use time_source::SystemTimeSource;
 
 use crate::controller_runtime::{
-    ResourceControllerCandidateOrigin,
+    ResourceControllerDrainHoldBack,
     ResourceControllerOutcomeRecorder,
     ResourceControllerPassPlanner,
     ResourceControllerRegistration,
-    ResourceProcessAttempt,
     ResourceProcessExecutor,
 };
-use crate::domain::{ResourceControllerRuntimeConfig, ResourceProcessOutcome};
+use crate::domain::ResourceControllerRuntimeConfig;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -39,13 +37,14 @@ use crate::domain::{ResourceControllerRuntimeConfig, ResourceProcessOutcome};
 ///
 /// Why the drain ends: every outcome makes its resource drop out of the next
 /// pass, unless its next step is due at once:
-/// - `Done` suppresses an eligible resource until it changes. An extra one ignores `Done`, so it is
-///   excluded for the rest of the drain instead.
+/// - `Done` suppresses an eligible resource until it changes. An extra one ignores `Done`, so the
+///   drain holds it back instead.
 /// - `RetryAt` in the future and a failure both set `not_before`, which suppresses either kind
 ///   until then.
 /// - `RetryAt` already passed is the controller saying "the next step is due now": the resource is
 ///   processed again in the next pass, which is how a multi-step reconciliation runs its steps back
-///   to back.
+///   to back. A controller that never stops doing so is held back after a few calls
+///   (`ResourceControllerDrainHoldBack`).
 pub(crate) struct ResourceControllerLoop {
     registration: ResourceControllerRegistration,
     catalog: dill::Catalog,
@@ -91,12 +90,10 @@ impl ResourceControllerLoop {
         );
 
         let mut report = ResourceControllerDrainReport::default();
-        let mut finished_extras = HashSet::new();
+        let mut hold_back = ResourceControllerDrainHoldBack::default();
 
         loop {
-            let pass = planner
-                .plan(self.time_source.now(), &finished_extras)
-                .await?;
+            let pass = planner.plan(self.time_source.now(), &hold_back).await?;
 
             // Only the last, empty pass tells what is left waiting: an earlier
             // pass may have deferred a resource that a later one processed
@@ -107,15 +104,11 @@ impl ResourceControllerLoop {
 
             for (candidate, attempt) in executor.run(pass.into_candidates()).await {
                 report.processed += 1;
-
-                if candidate.origin() == ResourceControllerCandidateOrigin::Extra
-                    && matches!(
-                        attempt,
-                        ResourceProcessAttempt::Processed(ResourceProcessOutcome::Done(_))
-                    )
-                {
-                    finished_extras.insert(candidate.id());
-                }
+                hold_back.note_attempt(
+                    &candidate,
+                    &attempt,
+                    self.registration.meta().controller_name.as_str(),
+                );
 
                 // A failure to record fails the drain: the loop is then
                 // restarted, and the resource processed again

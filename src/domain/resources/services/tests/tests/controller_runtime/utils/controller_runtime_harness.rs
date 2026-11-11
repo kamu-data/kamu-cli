@@ -57,6 +57,9 @@ use crate::tests::utils::{
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Calls after which one drain holds a resource back, as the runtime defines it
+pub const MAX_PROCESS_CALLS_PER_DRAIN: usize = 10;
+
 /// First failure backoff of the harness; doubles per consecutive failure
 pub const FAILURE_BACKOFF: TimeDelta = TimeDelta::seconds(10);
 

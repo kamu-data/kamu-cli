@@ -802,19 +802,22 @@ pub struct BackgroundAgentsConcurrencyConfig {
 pub struct BackgroundAgentsResourceControllersConfig {
     /// Delay before a resource whose processing failed is processed again,
     /// growing with consecutive failures
-    #[config(default = RetryBackoffConfig::exponential("1s", "5m"))]
-    pub failure_backoff: RetryBackoffConfig,
+    #[config(default)]
+    pub failure_backoff: ResourceControllerFailureBackoffConfig,
 
     /// Delay before a failed resource controller loop is restarted, growing
     /// with consecutive failures
-    #[config(default = RetryBackoffConfig::exponential("1s", "1m"))]
-    pub loop_restart_backoff: RetryBackoffConfig,
+    #[config(default)]
+    pub loop_restart_backoff: ResourceControllerLoopRestartBackoffConfig,
 }
+
+// The two backoffs are separate types only for their defaults: a partial
+// override keeps the defaults of the fields it leaves out
 
 /// Delay before a retry: a function of the attempt number, from `minDelay`
 /// up to `maxDelay`
 #[derive(setty::Config, setty::Default)]
-pub struct RetryBackoffConfig {
+pub struct ResourceControllerFailureBackoffConfig {
     #[config(default = RetryPolicyConfigBackoffType::Exponential)]
     pub backoff_type: RetryPolicyConfigBackoffType,
 
@@ -825,15 +828,31 @@ pub struct RetryBackoffConfig {
     pub max_delay: DurationString,
 }
 
-impl RetryBackoffConfig {
-    fn exponential(min_delay: &str, max_delay: &str) -> Self {
-        Self {
-            backoff_type: RetryPolicyConfigBackoffType::Exponential,
-            min_delay: min_delay.parse().unwrap(),
-            max_delay: max_delay.parse().unwrap(),
+impl ResourceControllerFailureBackoffConfig {
+    pub fn into_system(&self) -> retry_backoff::RetryBackoff {
+        retry_backoff::RetryBackoff {
+            backoff_type: self.backoff_type.into(),
+            min_delay: self.min_delay.into(),
+            max_delay: Some(self.max_delay.into()),
         }
     }
+}
 
+/// Delay before a retry: a function of the attempt number, from `minDelay`
+/// up to `maxDelay`
+#[derive(setty::Config, setty::Default)]
+pub struct ResourceControllerLoopRestartBackoffConfig {
+    #[config(default = RetryPolicyConfigBackoffType::Exponential)]
+    pub backoff_type: RetryPolicyConfigBackoffType,
+
+    #[config(default_str = "1s")]
+    pub min_delay: DurationString,
+
+    #[config(default_str = "1m")]
+    pub max_delay: DurationString,
+}
+
+impl ResourceControllerLoopRestartBackoffConfig {
     pub fn into_system(&self) -> retry_backoff::RetryBackoff {
         retry_backoff::RetryBackoff {
             backoff_type: self.backoff_type.into(),
