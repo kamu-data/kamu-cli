@@ -49,13 +49,13 @@ pub enum SanitizerKind {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct ResourceUseCaseBaseHarnessOpts {
+pub struct ServiceLayerTestHarnessOpts {
     pub base_opts: BaseResourceServiceHarnessOpts,
     pub reconciler_provider: TestResourceReconcilerProvider,
     pub sanitizer: SanitizerKind,
 }
 
-impl Default for ResourceUseCaseBaseHarnessOpts {
+impl Default for ServiceLayerTestHarnessOpts {
     fn default() -> Self {
         Self {
             base_opts: BaseResourceServiceHarnessOpts {
@@ -73,18 +73,18 @@ impl Default for ResourceUseCaseBaseHarnessOpts {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[oop::extend(BaseResourceServiceHarness, base)]
-pub struct ResourceUseCaseBaseHarness {
+pub struct ServiceLayerTestHarness {
     base: BaseResourceServiceHarness,
     catalog: dill::Catalog,
 }
 
-impl ResourceUseCaseBaseHarness {
+impl ServiceLayerTestHarness {
     pub fn new() -> Self {
-        Self::new_with_opts(ResourceUseCaseBaseHarnessOpts::default())
+        Self::new_with_opts(ServiceLayerTestHarnessOpts::default())
     }
 
     pub fn new_with_mock_outbox(mock_outbox: MockOutbox) -> Self {
-        Self::new_with_opts(ResourceUseCaseBaseHarnessOpts {
+        Self::new_with_opts(ServiceLayerTestHarnessOpts {
             base_opts: BaseResourceServiceHarnessOpts {
                 outbox_provider: OutboxProvider::Mock(mock_outbox),
                 ..Default::default()
@@ -97,7 +97,7 @@ impl ResourceUseCaseBaseHarness {
         mock_outbox: MockOutbox,
         reconciler_provider: TestResourceReconcilerProvider,
     ) -> Self {
-        Self::new_with_opts(ResourceUseCaseBaseHarnessOpts {
+        Self::new_with_opts(ServiceLayerTestHarnessOpts {
             base_opts: BaseResourceServiceHarnessOpts {
                 outbox_provider: OutboxProvider::Mock(mock_outbox),
                 ..Default::default()
@@ -107,7 +107,7 @@ impl ResourceUseCaseBaseHarness {
         })
     }
 
-    pub fn new_with_opts(opts: ResourceUseCaseBaseHarnessOpts) -> Self {
+    pub fn new_with_opts(opts: ServiceLayerTestHarnessOpts) -> Self {
         let base = BaseResourceServiceHarness::new_with_opts(opts.base_opts);
 
         let mut b = CatalogBuilder::new_chained(base.catalog());

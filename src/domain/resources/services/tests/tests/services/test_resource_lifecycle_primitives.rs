@@ -55,8 +55,9 @@ use kamu_resources_services::testing::{
 };
 use messaging_outbox::{OutboxMessageBoundary, OutboxMessageBridge, OutboxProvider};
 
-use crate::tests::use_cases::{ResourceUseCaseBaseHarness, ResourceUseCaseBaseHarnessOpts};
 use crate::tests::utils::{
+    ServiceLayerTestHarness,
+    ServiceLayerTestHarnessOpts,
     TEST_OTHER_TYPE_CONDITION_URI,
     TEST_PAYLOAD_CONDITION_URI,
     TEST_STAGE_CONDITION_URI,
@@ -842,15 +843,15 @@ fn transitioned_ids(transition: &ResourceBatchTransition<TestResource>) -> Vec<R
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[oop::extend(ResourceUseCaseBaseHarness, base)]
+#[oop::extend(ServiceLayerTestHarness, base)]
 struct LifecyclePrimitivesHarness {
-    base: ResourceUseCaseBaseHarness,
+    base: ServiceLayerTestHarness,
     account: odf::ResourceOwnerHandle,
 }
 
 impl LifecyclePrimitivesHarness {
     async fn new() -> Self {
-        let base = ResourceUseCaseBaseHarness::new_with_opts(ResourceUseCaseBaseHarnessOpts {
+        let base = ServiceLayerTestHarness::new_with_opts(ServiceLayerTestHarnessOpts {
             base_opts: BaseResourceServiceHarnessOpts {
                 outbox_provider: OutboxProvider::Dispatching,
                 transactional: true,

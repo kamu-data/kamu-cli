@@ -24,19 +24,20 @@ use kamu_resources::{
     SimpleResourceReconciler,
     SimpleResourceReconciliationError,
 };
-use kamu_resources_services::SimpleResourceControllerAdapterHelper;
+use kamu_resources_services::SimpleResourceReconciliationHelper;
 use kamu_resources_services::testing::{
     BaseResourceServiceHarness,
     BaseResourceServiceHarnessOpts,
 };
 use messaging_outbox::{MockOutbox, OutboxProvider};
 
-use crate::tests::use_cases::{
-    ResourceUseCaseBaseHarness,
-    ResourceUseCaseBaseHarnessOpts,
+use crate::tests::utils::{
     SanitizerKind,
+    ServiceLayerTestHarness,
+    ServiceLayerTestHarnessOpts,
+    TestResource,
+    TestResourceReconcilerProvider,
 };
-use crate::tests::utils::{TestResource, TestResourceReconcilerProvider};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Tests: error cases
@@ -62,7 +63,7 @@ async fn test_reconcile_returns_error_for_non_applied_resource() {
 
 #[test_log::test(tokio::test)]
 async fn test_start_phase_transitions_resource_to_reconciling() {
-    // start_reconciliation_phase commits the Reconciling transition before
+    // The start phase commits the Reconciling transition before
     // the actual reconciliation work happens, giving a stable hand-off point.
     let harness = ReconcileTestHarness::dispatching(TestResourceReconcilerProvider::Stub);
 
@@ -71,10 +72,9 @@ async fn test_start_phase_transitions_resource_to_reconciling() {
 
     let helper = harness.make_reconcile_helper();
 
-    let resource = helper
+    let resource = harness
         .start_reconciliation_phase(id)
         .await
-        .unwrap()
         .expect("resource should need reconciliation after apply");
 
     let snapshot = harness.get_snapshot_by_id(&id).await.unwrap();
@@ -218,7 +218,7 @@ async fn test_reconcile_success_posts_status_updates_to_ready() {
         ResourcePhase::Ready,
     );
 
-    let harness = ResourceUseCaseBaseHarness::new_with_mock_outbox_and_reconciler(
+    let harness = ServiceLayerTestHarness::new_with_mock_outbox_and_reconciler(
         mock_outbox,
         TestResourceReconcilerProvider::Stub,
     );
@@ -245,7 +245,7 @@ async fn test_reconcile_failure_posts_status_updates_to_failed() {
         ResourcePhase::Failed,
     );
 
-    let harness = ResourceUseCaseBaseHarness::new_with_mock_outbox_and_reconciler(
+    let harness = ServiceLayerTestHarness::new_with_mock_outbox_and_reconciler(
         mock_outbox,
         TestResourceReconcilerProvider::Failing,
     );
@@ -273,10 +273,9 @@ async fn test_finish_phase_discards_outcome_of_superseded_generation() {
 
     let helper = harness.make_reconcile_helper();
 
-    let started = helper
+    let started = harness
         .start_reconciliation_phase(id)
         .await
-        .unwrap()
         .expect("resource should need reconciliation");
 
     let update_params = ApplyResourceParams {
@@ -313,10 +312,9 @@ async fn test_finish_phase_after_concurrent_status_update_returns_status_conflic
 
     let helper = harness.make_reconcile_helper();
 
-    let started = helper
+    let started = harness
         .start_reconciliation_phase(id)
         .await
-        .unwrap()
         .expect("resource should need reconciliation");
 
     harness.update_status_concurrently(&id).await;
@@ -385,16 +383,14 @@ async fn test_overlapping_reconciliations_of_one_generation_record_one_outcome()
 
     let helper = harness.make_reconcile_helper();
 
-    let first = helper
+    let first = harness
         .start_reconciliation_phase(id)
         .await
-        .unwrap()
         .expect("resource should need reconciliation");
     // Already `Reconciling`, so the second start writes no status
-    let second = helper
+    let second = harness
         .start_reconciliation_phase(id)
         .await
-        .unwrap()
         .expect("resource should still need reconciliation");
 
     helper.finish_reconciliation_phase(first).await.unwrap();
@@ -469,10 +465,9 @@ async fn test_finish_phase_discards_outcome_of_resource_being_deleted() {
 
     let helper = harness.make_reconcile_helper();
 
-    let started = helper
+    let started = harness
         .start_reconciliation_phase(id)
         .await
-        .unwrap()
         .expect("resource should need reconciliation");
 
     harness
@@ -491,9 +486,9 @@ async fn test_finish_phase_discards_outcome_of_resource_being_deleted() {
 // Local harness
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[oop::extend(ResourceUseCaseBaseHarness, base)]
+#[oop::extend(ServiceLayerTestHarness, base)]
 struct ReconcileTestHarness {
-    base: ResourceUseCaseBaseHarness,
+    base: ServiceLayerTestHarness,
     loader: Arc<dyn ResourceAggregateLoader<TestResource>>,
     persistence: Arc<dyn ResourcePersistenceService<TestResource>>,
     lifecycle_primitives: Arc<dyn ResourceLifecyclePrimitives<TestResource>>,
@@ -511,7 +506,7 @@ impl ReconcileTestHarness {
     }
 
     fn new(reconciler_provider: TestResourceReconcilerProvider, transactional: bool) -> Self {
-        let base = ResourceUseCaseBaseHarness::new_with_opts(ResourceUseCaseBaseHarnessOpts {
+        let base = ServiceLayerTestHarness::new_with_opts(ServiceLayerTestHarnessOpts {
             base_opts: BaseResourceServiceHarnessOpts {
                 outbox_provider: OutboxProvider::Dispatching,
                 transactional,
@@ -547,9 +542,17 @@ impl ReconcileTestHarness {
         self.persistence.save(&mut resource).await.unwrap();
     }
 
-    fn make_reconcile_helper(&self) -> SimpleResourceControllerAdapterHelper<'_, TestResource> {
-        SimpleResourceControllerAdapterHelper::new(
-            self.loader.as_ref(),
+    /// The first phase of a reconciliation, without the transaction of the
+    /// controller
+    async fn start_reconciliation_phase(&self, id: ResourceID) -> Option<TestResource> {
+        self.lifecycle_primitives
+            .begin_reconciliation(&id, None)
+            .await
+            .unwrap()
+    }
+
+    fn make_reconcile_helper(&self) -> SimpleResourceReconciliationHelper<'_, TestResource> {
+        SimpleResourceReconciliationHelper::new(
             self.lifecycle_primitives.as_ref(),
             self.reconciler.as_ref(),
         )
