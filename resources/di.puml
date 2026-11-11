@@ -143,7 +143,6 @@ interface "ResetPlanner" <<i>>
 interface "ResourceAccountResolver" <<i>>
 interface "ResourceAggregateLoader" <<i>>
 interface "ResourceContextStore" <<i>>
-interface "ResourceController" <<i>>
 interface "ResourceCrudDispatcher" <<i>>
 interface "ResourceExtensionSchemaDispatcher" <<i>>
 interface "ResourceFacade" <<i>>
@@ -178,6 +177,7 @@ interface "SetWatermarkExecutor" <<i>>
 interface "SetWatermarkPlanner" <<i>>
 interface "SetWatermarkUseCase" <<i>>
 interface "SignEip712UseCase" <<i>>
+interface "SimpleResourceReconciler" <<i>>
 interface "SmartTransferProtocolClient" <<i>>
 interface "StorageEventStore" <<i>>
 interface "SyncFromJob" <<i>>
@@ -416,9 +416,9 @@ class "SearchIndexerConfig" <<singleton>>
 class "SearchServiceRemoteImpl"
 class "SecretSetApplyResourceUseCaseImpl"
 class "SecretSetCompleteResourceDeletionUseCaseImpl"
-class "SecretSetControllerImpl"
 class "SecretSetEventStoreBridge"
 class "SecretSetReconcileResourceUseCaseImpl"
+class "SecretSetReconcilerImpl"
 class "SecretSetRequestResourcesDeletionUseCaseImpl"
 class "SecretSetResourceAggregateLoaderImpl"
 class "SecretSetResourceCrudDispatcher"
@@ -486,9 +486,9 @@ class "SqliteWebhookSubscriptionEventStore"
 class "SqliteWebhookWatermarkRepository"
 class "StorageApplyResourceUseCaseImpl"
 class "StorageCompleteResourceDeletionUseCaseImpl"
-class "StorageControllerImpl"
 class "StorageEventStoreBridge"
 class "StorageReconcileResourceUseCaseImpl"
+class "StorageReconcilerImpl"
 class "StorageRequestResourcesDeletionUseCaseImpl"
 class "StorageResourceAggregateLoaderImpl"
 class "StorageResourceCrudDispatcher"
@@ -514,9 +514,9 @@ class "UpdateCollectionEntriesUseCaseImpl"
 class "UpdateVersionedFileUseCaseImpl"
 class "VariableSetApplyResourceUseCaseImpl"
 class "VariableSetCompleteResourceDeletionUseCaseImpl"
-class "VariableSetControllerImpl"
 class "VariableSetEventStoreBridge"
 class "VariableSetReconcileResourceUseCaseImpl"
+class "VariableSetReconcilerImpl"
 class "VariableSetRequestResourcesDeletionUseCaseImpl"
 class "VariableSetResourceAggregateLoaderImpl"
 class "VariableSetResourceCrudDispatcher"
@@ -928,13 +928,6 @@ class "WsSmartTransferProtocolClient"
 "ResourceTypeLookupServiceImpl"  --> "ResourceFacadeFactory"
 "WorkspaceService"  --> "bool"
 "WorkspaceService"  --> "WorkspaceLayout"
-"ResourceController" <|-- "SecretSetControllerImpl"
-"SecretSetControllerImpl"  --> "SecretSetProjectionRepository"
-"SecretSetControllerImpl"  --> "SystemTimeSource"
-"SecretSetControllerImpl"  --> "SecretsEncryptionConfig"
-"ResourceController" <|-- "VariableSetControllerImpl"
-"VariableSetControllerImpl"  --> "VariableSetProjectionRepository"
-"VariableSetControllerImpl"  --> "SystemTimeSource"
 "DatasetEnvVarMutationAdapter" <|-- "DatasetEnvVarMutationAdapterImpl"
 "DatasetEnvVarMutationAdapterImpl"  --> "AccountService"
 "DatasetEnvVarMutationAdapterImpl"  --> "DatasetEntryRepository"
@@ -956,6 +949,13 @@ class "WsSmartTransferProtocolClient"
 "MessageConsumerT" <|-- "ConfigurationDatasetLifecycleMessageConsumer"
 "MessageConsumer" <|-- "ConfigurationResourceLifecycleMessageConsumer"
 "MessageConsumerT" <|-- "ConfigurationResourceLifecycleMessageConsumer"
+"SimpleResourceReconciler" <|-- "SecretSetReconcilerImpl"
+"SecretSetReconcilerImpl"  --> "SecretSetProjectionRepository"
+"SecretSetReconcilerImpl"  --> "SystemTimeSource"
+"SecretSetReconcilerImpl"  --> "SecretsEncryptionConfig"
+"SimpleResourceReconciler" <|-- "VariableSetReconcilerImpl"
+"VariableSetReconcilerImpl"  --> "VariableSetProjectionRepository"
+"VariableSetReconcilerImpl"  --> "SystemTimeSource"
 "ResourceCrudDispatcher" <|-- "SecretSetResourceCrudDispatcher"
 "SecretSetResourceCrudDispatcher"  --> "GenericResourceQueryService"
 "SecretSetResourceCrudDispatcher"  --> "ApplyResourceUseCase"
@@ -1300,7 +1300,7 @@ class "WsSmartTransferProtocolClient"
 "SignEip712UseCaseImpl"  --> "DidSecretEncryptionConfig"
 "SignEip712UseCaseImpl"  --> "Principal"
 "SignEip712UseCaseImpl"  --> "IdentityConfig"
-"ResourceController" <|-- "StorageControllerImpl"
+"SimpleResourceReconciler" <|-- "StorageReconcilerImpl"
 "ResourceCrudDispatcher" <|-- "StorageResourceCrudDispatcher"
 "StorageResourceCrudDispatcher"  --> "GenericResourceQueryService"
 "StorageResourceCrudDispatcher"  --> "ApplyResourceUseCase"

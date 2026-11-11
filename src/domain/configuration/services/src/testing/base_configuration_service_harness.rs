@@ -31,7 +31,6 @@ use kamu_resources::{
     DeclarativeResource,
     RequestResourcesDeletionUseCase,
     ResourceAggregateLoader,
-    ResourceController,
     ResourceHeaders,
     ResourceHeadersExt,
     ResourceHeadersInput,
@@ -41,6 +40,7 @@ use kamu_resources::{
     ResourceRepository,
     ResourceSchemaProvider,
     ResourceSnapshot,
+    SimpleResourceReconciler,
     TypeUri,
 };
 use kamu_resources_services::testing::BaseResourceServiceHarness;
@@ -92,11 +92,13 @@ impl BaseConfigurationServiceHarness {
         self.catalog.get_one().unwrap()
     }
 
-    pub fn variable_set_controller(&self) -> Arc<dyn ResourceController<VariableSetResource>> {
+    pub fn variable_set_reconciler(
+        &self,
+    ) -> Arc<dyn SimpleResourceReconciler<VariableSetResource>> {
         self.catalog.get_one().unwrap()
     }
 
-    pub fn secret_set_controller(&self) -> Arc<dyn ResourceController<SecretSetResource>> {
+    pub fn secret_set_reconciler(&self) -> Arc<dyn SimpleResourceReconciler<SecretSetResource>> {
         self.catalog.get_one().unwrap()
     }
 
@@ -352,21 +354,21 @@ impl BaseConfigurationServiceHarness {
         use_case.execute(account_id.clone(), ids).await.unwrap();
     }
 
-    /// Runs the `VariableSet` controller's cleanup directly, outside the
+    /// Runs the `VariableSet` reconciler's cleanup directly, outside the
     /// deletion flow.
     pub async fn cleanup_variable_set(&self, id: &ResourceID) {
         let resource = self.load_variable_set(id).await;
-        self.variable_set_controller()
+        self.variable_set_reconciler()
             .cleanup(&resource)
             .await
             .unwrap();
     }
 
-    /// Runs the `SecretSet` controller's cleanup directly, outside the
+    /// Runs the `SecretSet` reconciler's cleanup directly, outside the
     /// deletion flow.
     pub async fn cleanup_secret_set(&self, id: &ResourceID) {
         let resource = self.load_secret_set(id).await;
-        self.secret_set_controller()
+        self.secret_set_reconciler()
             .cleanup(&resource)
             .await
             .unwrap();
