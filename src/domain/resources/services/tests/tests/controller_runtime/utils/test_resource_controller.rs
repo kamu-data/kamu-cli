@@ -9,6 +9,7 @@
 
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
+use std::time::Duration;
 
 use chrono::{DateTime, TimeDelta, Utc};
 use database_common::DatabaseTransactionRunner;
@@ -25,6 +26,7 @@ use kamu_resources::{
     TypeUri,
 };
 use time_source::SystemTimeSource;
+use tokio::sync::Notify;
 
 use crate::tests::utils::{TEST_STAGE_CONDITION_URI, TestResource, test_stage_condition_key};
 
@@ -146,6 +148,8 @@ pub enum TestControllerBehavior {
 #[derive(Clone)]
 pub struct TestControllerScript {
     state: Arc<Mutex<TestControllerScriptState>>,
+    /// Signaled on every `process` call
+    called: Arc<Notify>,
 }
 
 struct TestControllerScriptState {
@@ -154,6 +158,8 @@ struct TestControllerScriptState {
     calls: Vec<ResourceID>,
     extras: Vec<ResourceID>,
     next_extra_deadline: Option<DateTime<Utc>>,
+    /// How often the runtime asked for the next extra deadline: once per wait
+    extra_deadline_queries: usize,
 }
 
 impl TestControllerScript {
@@ -165,7 +171,9 @@ impl TestControllerScript {
                 calls: Vec::new(),
                 extras: Vec::new(),
                 next_extra_deadline: None,
+                extra_deadline_queries: 0,
             })),
+            called: Arc::new(Notify::new()),
         }
     }
 
@@ -177,6 +185,29 @@ impl TestControllerScript {
         self.lock().extras = ids;
     }
 
+    pub fn set_next_extra_deadline(&self, deadline: Option<DateTime<Utc>>) {
+        self.lock().next_extra_deadline = deadline;
+    }
+
+    /// How many times the runtime prepared a wait, each asking for the next
+    /// extra deadline
+    pub fn extra_deadline_queries(&self) -> usize {
+        self.lock().extra_deadline_queries
+    }
+
+    /// Waits until the controller was asked `total` times in all. Shorter than
+    /// the runtime's fallback timeout, so a call it would make on that timeout
+    /// does not count.
+    pub async fn wait_for_total_calls(&self, total: usize) {
+        tokio::time::timeout(Duration::from_secs(1), async {
+            while self.total_calls() < total {
+                self.called.notified().await;
+            }
+        })
+        .await
+        .unwrap_or_else(|_| panic!("expected {total} process calls, got {}", self.total_calls()));
+    }
+
     pub fn calls_of(&self, id: &ResourceID) -> usize {
         self.lock().calls.iter().filter(|call| *call == id).count()
     }
@@ -186,13 +217,17 @@ impl TestControllerScript {
     }
 
     fn record_call(&self, id: ResourceID) -> TestControllerBehavior {
-        let mut state = self.lock();
-        state.calls.push(id);
-        state
-            .behavior_by_resource
-            .get(&id)
-            .copied()
-            .unwrap_or(state.default_behavior)
+        let behavior = {
+            let mut state = self.lock();
+            state.calls.push(id);
+            state
+                .behavior_by_resource
+                .get(&id)
+                .copied()
+                .unwrap_or(state.default_behavior)
+        };
+        self.called.notify_one();
+        behavior
     }
 
     fn extras(&self, limit: usize) -> Vec<ResourceID> {
@@ -200,7 +235,9 @@ impl TestControllerScript {
     }
 
     fn next_extra_deadline(&self) -> Option<DateTime<Utc>> {
-        self.lock().next_extra_deadline
+        let mut state = self.lock();
+        state.extra_deadline_queries += 1;
+        state.next_extra_deadline
     }
 
     fn lock(&self) -> std::sync::MutexGuard<'_, TestControllerScriptState> {

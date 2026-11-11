@@ -34,7 +34,7 @@ use kamu_resources_services::testing::{
 };
 use messaging_outbox::OutboxProvider;
 use retry_backoff::{RetryBackoff, RetryBackoffType};
-use time_source::SystemTimeSourceStub;
+use time_source::FakeSystemTimeSource;
 
 use crate::tests::controller_runtime::utils::{
     TEST_CONTROLLER_NAME,
@@ -123,6 +123,7 @@ impl ControllerRuntimeHarness {
                 // dispatch never runs: only the runtime drives the resources
                 outbox_provider: OutboxProvider::Dispatching,
                 transactional: true,
+                fake_time: true,
             },
             ..Default::default()
         });
@@ -190,9 +191,28 @@ impl ControllerRuntimeHarness {
         self.script.total_calls() - before
     }
 
+    /// Moves the fake clock, waking the runtime if it sleeps until a moment
+    /// that passed
     pub fn advance_time(&self, delta: TimeDelta) {
-        let time_source = self.catalog().get_one::<SystemTimeSourceStub>().unwrap();
-        time_source.set(self.time_source().now() + delta);
+        self.catalog()
+            .get_one::<FakeSystemTimeSource>()
+            .unwrap()
+            .advance(delta);
+    }
+
+    /// Starts the runtime's background agent; it stops when the returned
+    /// handle is dropped
+    pub fn start_agent(&self) -> RunningControllerRuntime {
+        let runtime = self.runtime();
+        RunningControllerRuntime {
+            task: tokio::spawn(async move { runtime.run().await }),
+        }
+    }
+
+    /// Lets the agent finish what it was doing and reach its wait. Real time:
+    /// the agent's tasks run on the test's runtime meanwhile.
+    pub async fn let_agent_settle(&self) {
+        tokio::time::sleep(Duration::from_millis(100)).await;
     }
 
     pub async fn apply(&self, name: &str) -> ResourceID {
@@ -280,6 +300,19 @@ impl ControllerRuntimeHarness {
             .get_state(&ResourceControllerName::new(TEST_CONTROLLER_NAME), &id)
             .await
             .unwrap()
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// The runtime's agent running in the background of a test
+pub struct RunningControllerRuntime {
+    task: tokio::task::JoinHandle<Result<(), InternalError>>,
+}
+
+impl Drop for RunningControllerRuntime {
+    fn drop(&mut self) {
+        self.task.abort();
     }
 }
 
