@@ -12,37 +12,28 @@ use internal_error::{ErrorIntoInternal, InternalError};
 
 use crate::{
     EventSourcedResource,
-    ResourceID,
     ResourceLifecycleTransitionError,
     ResourceLoadError,
     ResourcePersistenceError,
+    ResourceStaleExpectationError,
+    ResourceStatusConflictError,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Runs the reconciler's cleanup of each resource whose deletion was
-/// requested, in a transaction of its own, then completes their deletion.
-/// A failed cleanup, a database error included, is recorded in the status and
-/// leaves that deletion in progress; it is not an error of the use case.
-/// Resources that do not wait for a cleanup are skipped.
-#[cfg_attr(feature = "testing", mockall::automock)]
-#[async_trait::async_trait]
-pub trait CompleteResourceDeletionUseCase<R: EventSourcedResource>: Send + Sync {
-    async fn execute(
-        &self,
-        ids: &[ResourceID],
-    ) -> Result<(), CompleteResourceDeletionUseCaseError<R>>;
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
+/// Why recording a reconciliation failed. A failed `reconcile` is an outcome,
+/// recorded in the status, not this error
 #[derive(thiserror::Error, Debug)]
-pub enum CompleteResourceDeletionUseCaseError<R: EventSourcedResource> {
+pub enum SimpleResourceReconciliationError<R: EventSourcedResource> {
     #[error(transparent)]
     LoadFailed(#[from] ResourceLoadError<R::ResourceState>),
 
     #[error(transparent)]
     ConcurrentModification(ConcurrentModificationError),
+
+    /// Another writer updated the status after reconciliation started.
+    #[error(transparent)]
+    StatusConflict(ResourceStatusConflictError),
 
     #[error(transparent)]
     Internal(#[from] InternalError),
@@ -53,16 +44,15 @@ pub enum CompleteResourceDeletionUseCaseError<R: EventSourcedResource> {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl<R> From<ResourcePersistenceError> for CompleteResourceDeletionUseCaseError<R>
+impl<R> From<ResourcePersistenceError> for SimpleResourceReconciliationError<R>
 where
     R: EventSourcedResource,
 {
     fn from(err: ResourcePersistenceError) -> Self {
         match err {
-            ResourcePersistenceError::Duplicate(err) => Self::Internal(
-                err.int_err()
-                    .with_context("Unexpected duplicate resource state while completing deletion"),
-            ),
+            ResourcePersistenceError::Duplicate(err) => Self::Internal(err.int_err().with_context(
+                "Unexpected duplicate resource state while reconciling existing resource",
+            )),
             ResourcePersistenceError::ConcurrentModification(err) => {
                 Self::ConcurrentModification(err)
             }
@@ -74,9 +64,10 @@ where
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Recording cleanup outcomes skips resources whose expectations no longer
-/// hold, so a stale expectation reaches it only as an internal error
-impl<R> From<ResourceLifecycleTransitionError<R>> for CompleteResourceDeletionUseCaseError<R>
+/// The reconciliation discards its outcome on a deletion request or a newer
+/// generation before converting, so those expectations reach it only as
+/// internal errors
+impl<R> From<ResourceLifecycleTransitionError<R>> for SimpleResourceReconciliationError<R>
 where
     R: EventSourcedResource,
 {
@@ -84,7 +75,13 @@ where
         use ResourceLifecycleTransitionError as E;
 
         match err {
-            E::Stale(stale) => Self::Internal(stale.int_err()),
+            E::Stale(ResourceStaleExpectationError::StatusGenerationChanged(conflict)) => {
+                Self::StatusConflict(conflict)
+            }
+            E::Stale(
+                stale @ (ResourceStaleExpectationError::DeletionRequested(_)
+                | ResourceStaleExpectationError::GenerationChanged(_)),
+            ) => Self::Internal(stale.int_err()),
             E::LoadFailed(err) => Self::LoadFailed(err),
             E::ConcurrentModification(err) => Self::ConcurrentModification(err),
             E::Lifecycle(err) => Self::Lifecycle(err),

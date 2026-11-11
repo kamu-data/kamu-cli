@@ -12,35 +12,22 @@ use internal_error::{ErrorIntoInternal, InternalError};
 
 use crate::{
     EventSourcedResource,
-    ResourceID,
     ResourceLifecycleTransitionError,
     ResourceLoadError,
     ResourcePersistenceError,
-    ResourceStaleExpectationError,
-    ResourceStatusConflictError,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[cfg_attr(feature = "testing", mockall::automock)]
-#[async_trait::async_trait]
-pub trait ReconcileResourceUseCase<R: EventSourcedResource>: Send + Sync {
-    async fn execute(&self, id: &ResourceID) -> Result<(), ReconcileResourceUseCaseError<R>>;
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
+/// Why completing deletions failed. A failed cleanup is an outcome, recorded
+/// in the status, not this error
 #[derive(thiserror::Error, Debug)]
-pub enum ReconcileResourceUseCaseError<R: EventSourcedResource> {
+pub enum SimpleResourceDeletionError<R: EventSourcedResource> {
     #[error(transparent)]
     LoadFailed(#[from] ResourceLoadError<R::ResourceState>),
 
     #[error(transparent)]
     ConcurrentModification(ConcurrentModificationError),
-
-    /// Another writer updated the status after reconciliation started.
-    #[error(transparent)]
-    StatusConflict(ResourceStatusConflictError),
 
     #[error(transparent)]
     Internal(#[from] InternalError),
@@ -51,15 +38,16 @@ pub enum ReconcileResourceUseCaseError<R: EventSourcedResource> {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl<R> From<ResourcePersistenceError> for ReconcileResourceUseCaseError<R>
+impl<R> From<ResourcePersistenceError> for SimpleResourceDeletionError<R>
 where
     R: EventSourcedResource,
 {
     fn from(err: ResourcePersistenceError) -> Self {
         match err {
-            ResourcePersistenceError::Duplicate(err) => Self::Internal(err.int_err().with_context(
-                "Unexpected duplicate resource state while reconciling existing resource",
-            )),
+            ResourcePersistenceError::Duplicate(err) => Self::Internal(
+                err.int_err()
+                    .with_context("Unexpected duplicate resource state while completing deletion"),
+            ),
             ResourcePersistenceError::ConcurrentModification(err) => {
                 Self::ConcurrentModification(err)
             }
@@ -71,10 +59,9 @@ where
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// The reconciliation discards its outcome on a deletion request or a newer
-/// generation before converting, so those expectations reach it only as
-/// internal errors
-impl<R> From<ResourceLifecycleTransitionError<R>> for ReconcileResourceUseCaseError<R>
+/// Recording cleanup outcomes skips resources whose expectations no longer
+/// hold, so a stale expectation reaches it only as an internal error
+impl<R> From<ResourceLifecycleTransitionError<R>> for SimpleResourceDeletionError<R>
 where
     R: EventSourcedResource,
 {
@@ -82,13 +69,7 @@ where
         use ResourceLifecycleTransitionError as E;
 
         match err {
-            E::Stale(ResourceStaleExpectationError::StatusGenerationChanged(conflict)) => {
-                Self::StatusConflict(conflict)
-            }
-            E::Stale(
-                stale @ (ResourceStaleExpectationError::DeletionRequested(_)
-                | ResourceStaleExpectationError::GenerationChanged(_)),
-            ) => Self::Internal(stale.int_err()),
+            E::Stale(stale) => Self::Internal(stale.int_err()),
             E::LoadFailed(err) => Self::LoadFailed(err),
             E::ConcurrentModification(err) => Self::ConcurrentModification(err),
             E::Lifecycle(err) => Self::Lifecycle(err),

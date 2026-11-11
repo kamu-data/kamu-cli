@@ -405,10 +405,11 @@ schema plus presentation metadata as `dill` metadata for registry lookup
 
 ### Use-case traits
 
-Generic, `R`-parameterized contracts in `use_cases/`: `ApplyResourceUseCase<R>` (two-phase, below),
-`ReconcileResourceUseCase<R>`, `RequestResourcesDeletionUseCase<R>`,
-`CompleteResourceDeletionUseCase<R>`, plus the non-generic
-`RequestAccountResourcesDeletionUseCase`.
+Generic, `R`-parameterized contracts in `use_cases/`: `ApplyResourceUseCase<R>` (two-phase, below)
+and `RequestResourcesDeletionUseCase<R>`, plus the non-generic
+`RequestAccountResourcesDeletionUseCase`. Reconciliation and the completion of deletions are not use
+cases: the type's `SimpleResourceController<R>` runs them
+([§9](#9-services-kamu-resources-services)).
 
 Reads are deliberately absent from this list. Typed per-type read use cases would each run their own
 paginated query, which cannot paginate correctly across types — page 2 of a merged result is not
@@ -612,6 +613,12 @@ This crate turns the domain traits into running code. Module layout: `services/`
 - **`SimpleResourceReconciler<R>`** — the per-type one-shot callbacks (implemented in the type's
   crate): `reconcile` drives the resource toward its spec, and `cleanup` removes what it built
   before the deletion completes ([(c) Deletion](#c-deletion)).
+- **`SimpleResourceController<R>`** — `reconcile(id)` and `complete_deletions(ids)`: runs the
+  type's `SimpleResourceReconciler<R>` and records its outcomes through the lifecycle primitives,
+  owning the transactions of both ([(b) Reconciliation](#b-reconciliation),
+  [(c) Deletion](#c-deletion)). Implemented by the `SimpleResourceControllerAdapter` that
+  `declare_simple_resource_controller_adapter!` generates per type; the lifecycle dispatcher calls
+  it.
 
 **Two-phase apply.** `ApplyResourceUseCase<R>` separates *planning* (validate, diff, decide
 create/update/untouched, without writing) from *application* (persist + publish)
@@ -755,8 +762,9 @@ persists its event and posts the matching lifecycle message:
 
 - **They join the caller's transaction.** A primitive is resolved from the transaction catalog and
   never opens a transaction, so a caller can commit a transition together with writes of its own.
-  A rolled-back transaction leaves neither the event nor the message behind. The use cases of
-  [§13](#13-data-flow-walkthroughs) call them inside the transactions they run in.
+  A rolled-back transaction leaves neither the event nor the message behind. The use cases and the
+  simple controller of [§13](#13-data-flow-walkthroughs) call them inside the transactions they
+  own.
 - **Stale expectations are typed errors.** A reconciliation outcome expects the generation and
   status generation it started from (`ResourceExpectedVersion`). The checks run in the order an
   outcome is discarded: a deletion request, a newer generation, then another status writer, and
@@ -1400,25 +1408,26 @@ lines rather than two whole-object dumps — the property that motivated this de
 
 ```mermaid
 sequenceDiagram
-    participant UC as ReconcileResourceUseCase<R>
+    participant A as SimpleResourceController<R>
     participant Ctl as SimpleResourceReconciler<R>
     participant P as LifecyclePrimitives<R>
 
-    UC->>P: begin_reconciliation(id) → StatusUpdated if the generation is not yet reconciled and not already Reconciling (status gen. N)
-    UC->>Ctl: reconcile(resource)  %% e.g. SecretSet builds encrypted projection
+    A->>P: begin_reconciliation(id) → StatusUpdated if the generation is not yet reconciled and not already Reconciling (status gen. N)
+    A->>Ctl: reconcile(resource)  %% e.g. SecretSet builds encrypted projection
     alt success
-        UC->>P: complete_reconciliation(id, generation, N) → StatusUpdated (Ready)
+        A->>P: complete_reconciliation(id, generation, N) → StatusUpdated (Ready)
     else failure
-        UC->>P: fail_reconciliation(id, generation, N, error) → StatusUpdated (Failed or Degraded)
+        A->>P: fail_reconciliation(id, generation, N, error) → StatusUpdated (Failed or Degraded)
     end
     alt Stale: deletion requested or generation moved
-        UC->>UC: discard the outcome
+        A->>A: discard the outcome
     end
 ```
 
-Reconciliation runs as **two separately-committed phases**
-([`use_cases/reconcile.rs`](/src/domain/resources/services/src/use_cases/reconcile.rs)), each writing
-the status at most once through a [lifecycle primitive](#lifecycle-primitives):
+Reconciliation runs as **two separately-committed phases**, each writing the status at most once
+through a [lifecycle primitive](#lifecycle-primitives). The type's simple controller owns both
+transactions
+([`controllers/simple_resource_controller_adapter.rs`](/src/domain/resources/services/src/controllers/simple_resource_controller_adapter.rs)):
 
 - **Phase 1** commits the `Reconciling` status, a stable hand-off point, which brings
   `statusGeneration` to some N. A resource already `Reconciling` keeps its status, and N is its
@@ -1433,10 +1442,11 @@ the status at most once through a [lifecycle primitive](#lifecycle-primitives):
 - **A resource whose deletion was requested before or between the phases** is not reconciled, or
   its outcome is discarded: a resource being deleted never needs reconciliation.
 - **Another status writer between the phases** makes phase 2 fail with
-  `ReconcileResourceUseCaseError::StatusConflict`, which the lifecycle dispatcher logs and skips.
+  `SimpleResourceReconciliationError::StatusConflict`, which the lifecycle dispatcher logs and
+  skips.
 - **Any other write racing a phase's save** is detected by the repository and surfaces as
-  `ReconcileResourceUseCaseError::ConcurrentModification`, which the dispatcher logs and skips too:
-  the other writer is an apply, which posts its own `Applied` message, a delete, or another
+  `SimpleResourceReconciliationError::ConcurrentModification`, which the dispatcher logs and skips
+  too: the other writer is an apply, which posts its own `Applied` message, a delete, or another
   reconciliation.
 - **A resource left in `Reconciling`** (phase 2 never completed) is picked up by a later reconcile.
 
@@ -1447,26 +1457,26 @@ sequenceDiagram
     participant RQ as RequestResourcesDeletionUseCase<R>
     participant P as LifecyclePrimitives<R>
     participant OB as Outbox
-    participant CD as CompleteResourceDeletionUseCase<R>
+    participant A as SimpleResourceController<R>
     participant Ctl as SimpleResourceReconciler<R>
 
     RQ->>P: request_deletion(ids) → DeletionRequested (Deleting)
     P->>OB: produce ResourceLifecycleMessage::DeletionRequested (one per batch)
-    OB->>CD: execute(ids), through the lifecycle dispatcher
+    OB->>A: complete_deletions(ids), through the lifecycle dispatcher
     loop each resource that needs cleanup, in a transaction of its own
-        CD->>Ctl: cleanup(resource)  %% e.g. VariableSet drops its projection entries
-        Note over CD,Ctl: a failed cleanup rolls its transaction back
+        A->>Ctl: cleanup(resource)  %% e.g. VariableSet drops its projection entries
+        Note over A,Ctl: a failed cleanup rolls its transaction back
     end
     rect rgba(100, 150, 255, 0.15)
-        CD->>P: record_cleanup_failure(failed) → StatusUpdated (cleanup-failed)
-        CD->>P: complete_deletion(cleaned up) → Deleted (tombstone name)
+        A->>P: record_cleanup_failure(failed) → StatusUpdated (cleanup-failed)
+        A->>P: complete_deletion(cleaned up) → Deleted (tombstone name)
         P->>OB: produce ResourceLifecycleMessage::Deleted (completed deletions)
     end
 ```
 
 Deletion runs in two steps, as the ODF resource framework defines them
 ([`use_cases/request_deletion.rs`](/src/domain/resources/services/src/use_cases/request_deletion.rs),
-[`use_cases/complete_deletion.rs`](/src/domain/resources/services/src/use_cases/complete_deletion.rs)):
+[`controllers/simple_resource_controller_adapter.rs`](/src/domain/resources/services/src/controllers/simple_resource_controller_adapter.rs)):
 
 - **Requesting deletion** moves the resource to `Deleting` and frees its name
   ([§6](#6-persistence-model)). Its headers and spec can no longer change, and it is no longer
@@ -1481,8 +1491,8 @@ Deletion runs in two steps, as the ODF resource framework defines them
   `Deleted` message covers the batch. A
   concurrent modification of any resource in it rolls that transaction back; the outcomes are then
   recorded one by one, and a conflict there is logged and skipped: the other writer completes the
-  deletion or requests it again. The orchestration lives in `CompleteResourceDeletionPhases`, which
-  each generated use case implements with its two transactional phases.
+  deletion or requests it again. The orchestration lives in `SimpleResourceDeletionPhases`, which
+  each type's adapter implements with its two transactional phases.
 - **A failed cleanup is an outcome, not an error.** The resource stays `Deleting` with a
   `ReconciliationError` condition, code `cleanup-failed`, unless another writer updated its status since
   the cleanup started; that status then stands. Nothing retries it automatically; deleting the
@@ -1505,7 +1515,7 @@ The apply use case and the lifecycle primitives that the other use cases call pu
 flowchart LR
     APPLY["apply.rs"] -->|Applied| MSG[["ResourceLifecycleMessage"]]
     DEL["request_deletion.rs"] -->|DeletionRequested| MSG
-    COMP["complete_deletion.rs"] -->|Deleted| MSG
+    COMP["simple controller"] -->|Deleted| MSG
     PRIM["lifecycle primitives:<br/>every status write"] -->|StatusUpdated| MSG
 
     MSG --> OB[("Outbox")]
@@ -1521,7 +1531,7 @@ flowchart LR
 ```
 
 - **Resource lifecycle** — `Applied` (from `use_cases/apply.rs`), `DeletionRequested`
-  (`use_cases/request_deletion.rs`), `Deleted` (`use_cases/complete_deletion.rs`), and
+  (`use_cases/request_deletion.rs`), `Deleted` (the simple controller), and
   `StatusUpdated` for every status write of a [lifecycle primitive](#lifecycle-primitives): a
   reconciliation started, succeeded or failed, a cleanup failed, or a condition patch. Consumed by
   the **event bridge** (routes to the per-type `ResourceLifecycleEventDispatcher` — this is what
@@ -1546,12 +1556,13 @@ above). `apply` produces `Applied`; the generic **event bridge**
 `ResourceLifecycleMessageConsumer` (`MESSAGE_CONSUMER_KAMU_RESOURCE_LIFECYCLE_EVENT_BRIDGE`,
 [`resource_lifecycle_message_consumer.rs`](/src/domain/resources/services/src/message_handlers/resource_lifecycle_message_consumer.rs))
 consumes it, looks up the per-type `ResourceLifecycleEventDispatcher` by descriptor, and its
-`handle_applied` calls `ReconcileResourceUseCase::execute(id)` (which loads the aggregate, marks
-reconciliation started, runs the type's `SimpleResourceReconciler<R>`, records the outcome in the
-status, and posts `StatusUpdated` for each status write). `handle_deletion_requested` calls
-`CompleteResourceDeletionUseCase::execute(ids)` with the whole batch ([(c) Deletion](#c-deletion)).
+`handle_applied` calls `SimpleResourceController::reconcile(id)`, which marks reconciliation
+started, runs the type's `SimpleResourceReconciler<R>`, records the outcome in the status, and posts
+`StatusUpdated` for each status write. `handle_deletion_requested` calls
+`SimpleResourceController::complete_deletions(ids)` with the whole batch
+([(c) Deletion](#c-deletion)).
 `handle_deleted` is a no-op, and `StatusUpdated` reaches no dispatcher: no controller reacts to
-status changes. The dispatcher + reconcile use case are generated together by the
+status changes. The dispatcher and the simple controller are generated together by the
 `declare_resource_service_layer!` macro and registered from the type's crate.
 
 The **second consumer**, `ConfigurationResourceLifecycleMessageConsumer` (configuration crate),

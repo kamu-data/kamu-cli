@@ -58,13 +58,8 @@ macro_rules! declare_resource_service_layer {
                 resource = $resource
             );
 
-            $crate::declare_complete_resource_deletion_use_case!(
-                use_case = [<$name CompleteResourceDeletionUseCaseImpl>],
-                resource = $resource
-            );
-
-            $crate::declare_reconcile_resource_use_case!(
-                use_case = [<$name ReconcileResourceUseCaseImpl>],
+            $crate::declare_simple_resource_controller_adapter!(
+                adapter = [<$name SimpleResourceControllerAdapter>],
                 resource = $resource
             );
 
@@ -77,7 +72,6 @@ macro_rules! declare_resource_service_layer {
                 catalog_builder: &mut dill::CatalogBuilder,
             ) {
                 catalog_builder.add::<[<$name ApplyResourceUseCaseImpl>]>();
-                catalog_builder.add::<[<$name CompleteResourceDeletionUseCaseImpl>]>();
                 catalog_builder.add::<[<$name RequestResourcesDeletionUseCaseImpl>]>();
                 catalog_builder.add::<[<$name EventStoreBridge>]>();
                 catalog_builder.add::<[<$name ResourceAggregateLoaderImpl>]>();
@@ -85,7 +79,7 @@ macro_rules! declare_resource_service_layer {
                 catalog_builder.add::<[<$name ResourceLifecyclePrimitivesImpl>]>();
                 catalog_builder.add::<[<$name ResourcePersistenceServiceImpl>]>();
                 catalog_builder.add::<[<$name TypedResourceQueryServiceImpl>]>();
-                catalog_builder.add::<[<$name ReconcileResourceUseCaseImpl>]>();
+                catalog_builder.add::<[<$name SimpleResourceControllerAdapter>]>();
             }
         }
     };
