@@ -30,7 +30,6 @@ use kamu_resources::{
     ResourceConditionUpdateError,
     ResourceConditionsPatch,
     ResourceDeletionCompletion,
-    ResourceExpectedVersion,
     ResourceExtensionKind,
     ResourceExtensionResolutionError,
     ResourceExtensionValueError,
@@ -46,6 +45,7 @@ use kamu_resources::{
     ResourceStaleExpectationError,
     ResourceTransitionSkip,
     ResourceTransitionSkipReason,
+    ResourceVersion,
     TypeRef,
     TypeUri,
 };
@@ -736,7 +736,7 @@ impl Transition {
         self,
         primitives: &dyn ResourceLifecyclePrimitives<TestResource>,
         id: ResourceID,
-        version: ResourceExpectedVersion,
+        version: ResourceVersion,
     ) {
         match self {
             Self::BeginReconciliation => {
@@ -992,12 +992,9 @@ impl LifecyclePrimitivesHarness {
         self.load(id).await.status().conditions.entries.clone()
     }
 
-    async fn version(&self, id: &ResourceID) -> ResourceExpectedVersion {
+    async fn version(&self, id: &ResourceID) -> ResourceVersion {
         let resource = self.load(id).await;
-        ResourceExpectedVersion {
-            generation: resource.headers().generation,
-            status_generation: resource.headers().status_generation,
-        }
+        ResourceVersion::from(resource.headers())
     }
 
     async fn phase(&self, id: &ResourceID) -> ResourcePhase {

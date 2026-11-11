@@ -28,6 +28,7 @@ mod resource_schema_id;
 mod resource_selector;
 mod resource_type_selector;
 mod resource_type_uri;
+mod resource_version;
 mod resource_warning;
 mod rfc_spec_newtype;
 
@@ -52,4 +53,5 @@ pub use resource_schema_id::*;
 pub use resource_selector::*;
 pub use resource_type_selector::*;
 pub use resource_type_uri::*;
+pub use resource_version::*;
 pub use resource_warning::*;
