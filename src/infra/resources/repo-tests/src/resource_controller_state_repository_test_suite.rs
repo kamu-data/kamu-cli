@@ -32,9 +32,8 @@ static CONTROLLED_KIND: LazyLock<TypeUri> =
     LazyLock::new(|| TypeUri::new_unchecked("ControlledKind"));
 static OTHER_KIND: LazyLock<TypeUri> = LazyLock::new(|| TypeUri::new_unchecked("OtherKind"));
 
-const CONTROLLER: ResourceControllerName = ResourceControllerName::new_static("test-controller");
-const OTHER_CONTROLLER: ResourceControllerName =
-    ResourceControllerName::new_static("other-controller");
+const CONTROLLER: ResourceControllerName = ResourceControllerName::new("test-controller");
+const OTHER_CONTROLLER: ResourceControllerName = ResourceControllerName::new("other-controller");
 
 const REVISION: u32 = 1;
 
@@ -177,6 +176,27 @@ pub async fn test_not_before_suppresses_until_due(catalog: &Catalog) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+pub async fn test_retry_under_status_predicate(catalog: &Catalog) {
+    let ctx = ControllerStateTestContext::new(catalog);
+    let mut resource = ctx.create_resource("a").await;
+    ctx.reconcile(&mut resource).await;
+    let not_before = ctx.now + TimeDelta::minutes(5);
+    let after_not_before = not_before + TimeDelta::seconds(1);
+
+    ctx.upsert(&ctx.retry_state(&CONTROLLER, &resource, not_before))
+        .await;
+
+    assert_eq!(ctx.actionable_reacting_at(ctx.now).await, []);
+    assert_eq!(
+        ctx.actionable_reacting_at(after_not_before).await,
+        [resource.id]
+    );
+    // Without the status predicate nothing selects a reconciled resource
+    assert_eq!(ctx.actionable_at(after_not_before, REVISION).await, []);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 pub async fn test_other_controllers_and_schemas_ignored(catalog: &Catalog) {
     let ctx = ControllerStateTestContext::new(catalog);
     let resource = ctx.create_resource("a").await;
@@ -245,6 +265,22 @@ pub async fn test_next_deadline(catalog: &Catalog) {
         .await;
     assert_eq!(ctx.next_deadline(false).await, Some(past));
     assert_eq!(ctx.next_deadline(true).await, Some(earliest));
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_next_deadline_ignores_deleted_resources(catalog: &Catalog) {
+    let ctx = ControllerStateTestContext::new(catalog);
+    let mut resource = ctx.create_resource("a").await;
+    ctx.request_deletion(&mut resource).await;
+    let not_before = ctx.now + TimeDelta::minutes(5);
+
+    ctx.upsert(&ctx.retry_state(&CONTROLLER, &resource, not_before))
+        .await;
+    assert_eq!(ctx.next_deadline(true).await, Some(not_before));
+
+    ctx.complete_deletion(&mut resource).await;
+    assert_eq!(ctx.next_deadline(true).await, None);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -439,6 +475,11 @@ impl ControllerStateTestContext {
 
     async fn actionable_at(&self, now: DateTime<Utc>, controller_revision: u32) -> Vec<ResourceID> {
         self.find_actionable(self.query(controller_revision, false), now, 100)
+            .await
+    }
+
+    async fn actionable_reacting_at(&self, now: DateTime<Utc>) -> Vec<ResourceID> {
+        self.find_actionable(self.query(REVISION, true), now, 100)
             .await
     }
 

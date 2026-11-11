@@ -83,6 +83,14 @@ database_transactional_test!(
 
 database_transactional_test!(
     storage = inmem_with_transaction,
+    fixture = controller_state_repo_suite::test_retry_under_status_predicate,
+    harness = InMemoryResourceControllerStateRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = inmem_with_transaction,
     fixture = controller_state_repo_suite::test_other_controllers_and_schemas_ignored,
     harness = InMemoryResourceControllerStateRepositoryHarness
 );
@@ -100,6 +108,14 @@ database_transactional_test!(
 database_transactional_test!(
     storage = inmem_with_transaction,
     fixture = controller_state_repo_suite::test_next_deadline,
+    harness = InMemoryResourceControllerStateRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = inmem_with_transaction,
+    fixture = controller_state_repo_suite::test_next_deadline_ignores_deleted_resources,
     harness = InMemoryResourceControllerStateRepositoryHarness
 );
 
