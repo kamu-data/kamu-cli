@@ -539,10 +539,12 @@ existing rows/events that should move to the new schema.
   `(controller, resource_id)`, where `controller` is a `ResourceControllerName`, and has an FK to
   `resources`. A row records the generation and status generation the controller finished with,
   or, with `not_before` set, a retry or a failure, with `attempts` and `last_error`.
-- The controller runtime writes these rows. They are not event-sourced: an upsert replaces the
-  row. Purging a resource removes its rows first (`delete_states_for_resource`).
+- Rows are not event-sourced: an upsert replaces the row. The FK means a resource's rows must be
+  removed (`delete_states_for_resource`) before the resource itself.
 - **Actionable resources.** `find_actionable_resource_ids` returns the resources a controller must
-  act on, and `find_next_deadline` returns the earliest `not_before` among them. The eligibility
+  act on. `find_next_deadline` returns the earliest `not_before` among the rows whose resource a
+  predicate selects, including rows that still suppress it, so the caller knows when to look
+  again. The eligibility
   predicates and suppression rules are the contract of
   [`ResourceControllerStateRepository`](/src/domain/resources/domain/src/repo/resource_controller_state_repository.rs).
 - **Indexes.** The SQL backends run one sub-select per predicate, so each one can use its index:
