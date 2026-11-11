@@ -87,6 +87,7 @@ make clippy
     - [Legacy dataset association — the `legacy-config-target-dataset` label](#legacy-dataset-association--the-legacy-config-target-dataset-label)
     - [Secret handling invariant](#secret-handling-invariant)
     - [Recipe: how to add a new resource type](#recipe-how-to-add-a-new-resource-type)
+    - [Recipe: driving a type with a resource controller](#recipe-driving-a-type-with-a-resource-controller)
   - [15. Tests](#15-tests)
     - [Testing policy — what belongs where](#testing-policy--what-belongs-where)
   - [16. File/crate reference map](#16-filecrate-reference-map)
@@ -143,6 +144,8 @@ long-term goal. This page documents what exists now.
 | **generation / observedGeneration / reconciledGeneration** | `generation` bumps on each spec/headers change; `observedGeneration` is the last one a reconciliation started on, `reconciledGeneration` the last one reconciled successfully. Reconciliation is needed while `reconciledGeneration` is absent or lower than `generation`. |
 | **statusGeneration** | Header counting status updates: 1 for a new resource, +1 per `StatusUpdated`, `DeletionRequested` and `Deleted` event (the last two move the derived phase). A status writer passes the value it read as a precondition and fails with a status conflict if it is stale (compare-and-swap). |
 | **Reconciliation** | Driving actual state toward the spec (e.g. `SecretSet` materializes its encrypted read-side projection). |
+| **Resource controller** | A level-triggered component (`ResourceController`) that, asked about one resource, does its next step and returns `Done` or `RetryAt`. The controller runtime decides when to ask, from the controller's bookkeeping. See [Controller runtime](#controller-runtime). |
+| **Controller name / revision** | `ResourceControllerMeta::controller_name` keys a controller's bookkeeping rows, so it is persisted and must not change. `controller_revision` is bumped when the controller's logic changes: every resource it had finished with that a predicate still selects is processed once more. |
 | **Ref** | Identifies exactly one resource *instance* (`ResourceRef`), by UID or by exact name **plus type** — a name alone is not unique across types — optionally account-scoped. A batch is `Vec<ResourceRef>`. |
 | **Selector** | Matches zero or many resource *instances* (`ResourceSelector`), by SQL `LIKE` name pattern and/or UID. Several selectors act as a logical OR. |
 | **SpecViewOpts** | Options controlling how sensitive spec fields render, `{ revealed: bool }` today. `revealed: false` (default) returns stored ciphertext as-is; `revealed: true` decrypts. A struct, not an enum, so future spec-view options can be added without growing every call site's argument list. No "redacted" mode today. |
@@ -928,8 +931,10 @@ held back, so they cannot fill a batch and hide the resources still waiting.
 
 The last one is why an extra resource that keeps failing, and whose own due time passed long ago,
 wakes the loop only when its backoff ends. A deadline already passed after a drain means a resource
-became due after the last pass looked, and the loop drains again at once; when the drain held
-resources back, it waits the failure backoff's minimal delay instead, so they do not spin it. The
+became due after the last pass looked, and the loop drains again at once. A drain that left out
+resources it holds back pauses for the failure backoff's minimal delay instead, so they do not
+spin the loop. No hint ends that pause: a controller that never settles writes status on every
+call, which hints its own loop. The
 sleep uses `SystemTimeSource`, so tests drive it with `FakeSystemTimeSource`.
 
 **Hints.** The lifecycle message consumer hints the schema's loop on every `Applied`,
@@ -949,8 +954,9 @@ drains and the agent's never overlap for one controller.
 
 **Failures of the runtime itself**, such as a storage error while planning or recording, a failed
 call to the controller outside `process`, or a panic, end that controller's loop only
-(`ResourceControllerSupervisor`). The loop is restarted after `loopRestartBackoff`, doubling with
-each consecutive failure up to `maxLoopRestartBackoff`; a completed drain resets the count. The
+(`ResourceControllerSupervisor`). The loop is restarted after the `loopRestartBackoff` delay, which
+grows with each consecutive failure up to its `maxDelay` (doubling, with the default exponential
+type); a drain and the wait after it, both completed, reset the count. The
 other controllers' loops keep running, and the hint listener is kept, so no hint is lost while
 the loop is down. A drain session has no supervisor: its failure is the caller's error.
 
@@ -2078,6 +2084,23 @@ path** — a complete type still needs its DI registration, presentation metadat
 columns), facade contract coverage, CLI golden-output test, `cynic`/schema updates if the remote
 client depends on type-specific shapes, and any type-specific spec-view/sanitizer logic (+ tests).
 
+### Recipe: driving a type with a resource controller
+
+Instead of steps 2 and 4's simple reconciler and lifecycle dispatcher:
+
+1. **Implement `ResourceController`**: `process(id)` does the next step through the
+   [lifecycle primitives](#lifecycle-primitives) in transactions of its own and returns `Done`
+   with the version after its own writes, or `RetryAt`. Add `list_extra_actionable` and
+   `next_extra_deadline` only if something besides the resource makes it actionable (a claim that
+   expires, for example).
+2. **Register it** as `#[interface(dyn ResourceController)]` with
+   `#[meta(ResourceControllerMeta { schema, controller_name, controller_revision, reacts_to_status })]`,
+   and register the type's service layer with
+   `register_<type>_resource_service_layer_without_lifecycle_dispatcher`. The runtime refuses a
+   type that has both.
+3. **Test it** on `ControllerRuntimeHarness` (see [§15](#15-tests)): drain until idle, or run the
+   agent on the fake clock.
+
 ---
 
 ## 15. Tests
@@ -2091,6 +2114,15 @@ apply planner/executor, the simple controller's reconciliation and deletion, CRU
 persistence, the event-store bridge, and the message consumers. A `TestResource` mock and
 `BaseResourceServiceHarness` (`services/src/testing/`) provide a type-agnostic harness;
 configuration tests cover the real reconcilers (incl. the `SecretSet` spec sanitizer, encrypted projection, and `reveal_spec`).
+
+**Controller runtime** —
+[`services/tests/tests/controller_runtime`](/src/domain/resources/services/tests/tests/controller_runtime/).
+`ControllerRuntimeHarness` drives a scripted `TestResourceController` over in-memory storage on
+`FakeSystemTimeSource`, and `restart()` replaces the runtime and the controllers while keeping the
+storage. Tests either drain as the CLI does (outbox and drain session in turn, until idle) or run
+the agent and move the clock, asserting call counts rather than timing. The eligibility queries
+and `count_failing_resources` have a storage-agnostic suite in `kamu-resources-repo-tests`, wired
+to all three storages.
 
 **Facade contract tests** —
 [`src/domain/resources/facade-tests`](/src/domain/resources/facade-tests). The key idea: a
@@ -2149,7 +2181,7 @@ Otherwise the behavior is already guaranteed for both implementations by the con
 | --- | --- | --- | --- |
 | Domain model | `kamu-resources` | `src/domain/resources/domain/src` | `core/`, `state/`, `values/`, `manifests/`, `repo/`, `dispatchers/`, `messages/`, `use_cases/`, `views/` |
 | Domain schemas | `kamu-resources` | `src/domain/resources/schemas` | Informational JSON schemas for framework-owned resource extensions: built-in labels and annotations. ODF-defined extensions, such as the `ReconciliationError` condition, have none here. |
-| Services | `kamu-resources-services` | `src/domain/resources/services/src` | `use_cases/{apply,request_deletion}.rs`, `controllers/`, `crud_dispatchers/resource_dispatcher_factory.rs`, `resource_extension_schemas/`, `message_handlers/`, `event_stores/`, `dependencies.rs` |
+| Services | `kamu-resources-services` | `src/domain/resources/services/src` | `use_cases/{apply,request_deletion}.rs`, `controllers/`, `controller_runtime/`, `crud_dispatchers/resource_dispatcher_factory.rs`, `resource_extension_schemas/`, `message_handlers/`, `event_stores/`, `dependencies.rs` |
 | Facade | `kamu-resources-facade` | `src/domain/resources/facade/src/facade` | `resource_facade.rs`, `local/` |
 | Remote facade | `kamu-adapter-resources-facade-graphql` | `src/adapter/resources-facade-graphql/src` | `remote_graphql_resource_facade_impl.rs`, `cynic_api/`, `outcome_mapper/` |
 | GraphQL | (adapter) | `src/adapter/graphql/src` | `queries/resources/`, `mutations/resources_mut/` |
@@ -2188,6 +2220,15 @@ Otherwise the behavior is already guaranteed for both implementations by the con
   metadata, or same-tier short-name conflicts. Full URI keys are exact and strict; short names are
   human-authored aliases resolved through case-insensitive `TypeName` precedence tiers. Unknown short
   names stay free-form with warnings, while unknown full URIs reject.
+- **A controller's name is persisted.** It keys the controller's bookkeeping rows, so renaming it
+  orphans them and the controller starts over on every resource. Bump `controller_revision`
+  instead to have finished resources reconsidered.
+- **`Done` must carry the version after the controller's own writes.** A version read before them
+  is older than the resource, so the runtime asks once more
+  ([Controller runtime](#controller-runtime)).
+- **An extra resource must leave the controller's extra set**, or the controller must return
+  `RetryAt` for it: `Done` does not suppress an extra resource, and the runtime only holds it back
+  until the drain ends.
 - **Manifests are strict** — `#[serde(deny_unknown_fields)]` means a manifest cannot carry
   `status`, timestamps, or `generation`. Those are server-owned
   ([§5a](#5a-resource-anatomy--input-vs-auto-generated)).
