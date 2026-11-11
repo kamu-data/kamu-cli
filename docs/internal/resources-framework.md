@@ -947,8 +947,16 @@ processing posts messages of its own. A session keeps what its drains held back 
 that alternation ends too, even with a controller that never settles a resource. A session's
 drains and the agent's never overlap for one controller.
 
-**Failures of the runtime itself**, such as a storage error while planning or recording, end the
-agent.
+**Failures of the runtime itself**, such as a storage error while planning or recording, a failed
+call to the controller outside `process`, or a panic, end that controller's loop only
+(`ResourceControllerSupervisor`). The loop is restarted after `loopRestartBackoff`, doubling with
+each consecutive failure up to `maxLoopRestartBackoff`; a completed drain resets the count. The
+other controllers' loops keep running, and the hint listener is kept, so no hint is lost while
+the loop is down. A drain session has no supervisor: its failure is the caller's error.
+
+**Metrics.** Processed outcomes, loop restarts and resources whose last processing failed, by
+controller ([metrics.md](metrics.md#resource-controller-runtime)). The failing count comes from the
+bookkeeping (`count_failing_resources`) after every drain.
 
 **Limits.**
 

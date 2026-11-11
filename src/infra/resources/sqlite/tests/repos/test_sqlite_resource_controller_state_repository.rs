@@ -123,6 +123,14 @@ database_transactional_test!(
 
 database_transactional_test!(
     storage = sqlite,
+    fixture = controller_state_repo_suite::test_count_failing_resources,
+    harness = SqliteResourceControllerStateRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = sqlite,
     fixture = controller_state_repo_suite::test_delete_states_for_resource,
     harness = SqliteResourceControllerStateRepositoryHarness
 );

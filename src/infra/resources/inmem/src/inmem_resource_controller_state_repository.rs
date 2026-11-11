@@ -211,6 +211,26 @@ impl ResourceControllerStateRepository for InMemoryResourceControllerStateReposi
             .filter_map(|matching| matching.state.and_then(|state| state.not_before))
             .min())
     }
+
+    async fn count_failing_resources(
+        &self,
+        controller: &ResourceControllerName,
+    ) -> Result<usize, InternalError> {
+        // Locks in the order of `matching_resources`
+        Ok(self.resource_state.read(self.transaction_id, |resources| {
+            self.store.states.read(self.transaction_id, |states| {
+                resources
+                    .snapshots()
+                    .filter(|snapshot| snapshot.headers.deleted_at.is_none())
+                    .filter(|snapshot| {
+                        states
+                            .get(&(controller.clone(), snapshot.id))
+                            .is_some_and(|state| state.attempts > 0)
+                    })
+                    .count()
+            })
+        }))
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

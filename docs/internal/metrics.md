@@ -62,7 +62,9 @@ Recorded by the shared `HubWakeupListener` on every backend, so any wakeup-drive
 without code of its own ([wakeup-listeners.md](wakeup-listeners.md#monitoring)). `agent` is the
 name of the agent the wakeup source serves, the same as its `agent_name()`:
 `dev.kamu.utils.messaging.OutboxAgent`, `dev.kamu.domain.flow-system.FlowSystemEventAgent`,
-`dev.kamu.domain.flow-system.FlowAgent`, `dev.kamu.domain.task-system.TaskAgent`.
+`dev.kamu.domain.flow-system.FlowAgent`, `dev.kamu.domain.task-system.TaskAgent`. The resource
+controller runtime runs a loop per controller and labels each with the controller's name
+([wakeup-listeners.md](wakeup-listeners.md#monitoring)).
 
 ### Task agent
 
@@ -120,6 +122,18 @@ See [outbox.md §8](outbox.md#8-configuration--metrics) for how they are compute
 | `outbox_messages_processed_total` | counter | `producer`, `consumer` | Messages consumed |
 | `outbox_messages_pending_total` | gauge | `producer`, `consumer` | Best-effort backlog (latest message ID − consumed message ID) |
 | `outbox_failed_consumers_total` | gauge | `producer`, `consumer` | `1` while the consumer is failed; it stays failed until restart |
+
+### Resource controller runtime
+
+| Metric | Type | Labels | Meaning |
+| --- | --- | --- | --- |
+| `resource_controller_processed_total` | counter | `controller`, `outcome` | `process` calls; `outcome` is `done`, `retry_at` or `failed` (an error or a panic) |
+| `resource_controller_loop_restarts_total` | counter | `controller` | Times the controller's loop failed outside `process` (storage, a panic) and was restarted after a backoff |
+| `resource_controller_failing_resources` | gauge | `controller` | Resources, not deleted, whose last processing by the controller failed, as of its last drain. Each is retried after a growing backoff |
+
+`controller` is the controller's registered name (`ResourceControllerMeta::controller_name`);
+label sets are pre-created at startup for every registered controller. The loops are described
+in [resources-framework.md](resources-framework.md#controller-runtime).
 
 ### S3
 
@@ -227,6 +241,8 @@ Thresholds are starting points; tune them to the deployment (longest normal inge
 | Scheduler lagging | `histogram_quantile(0.95, rate(flow_agent_activation_delay_seconds_bucket[10m])) > 60`, `for: 15m` | Slow database, exhausted connection pool, or a burst of due flows |
 | Task slot saturated | `histogram_quantile(0.95, rate(task_agent_task_queue_wait_seconds_bucket[30m])) > 900`, `for: 30m` | More work than one task slot handles — a capacity signal |
 | Outbox backlog growing | `outbox_messages_pending_total > 1000`, `for: 15m` | Consumers fall behind producers. Units are global message IDs, not messages of this producer: tune per deployment |
+| Resource controller failing | `resource_controller_failing_resources > 0`, `for: 15m` | Resources the controller keeps failing on stay unreconciled; their `last_error` is in the controller's bookkeeping. `for` rides over failures a retry fixes |
+| Resource controller loop restarting | `increase(resource_controller_loop_restarts_total[15m]) > 0` | The runtime's own work fails for that controller, usually storage; it restarts with a growing delay, so its resources wait |
 
 ### Dashboards only
 
@@ -290,6 +306,7 @@ for durations, `_timestamp_seconds` for Unix times. The gauges `outbox_messages_
 | `FlowCompletionMetrics` | `src/domain/flow-system/services/src/flow/flow_completion_metrics.rs` (recorded in `flow_agent_impl.rs`, `flow_abort_helper.rs`) |
 | `FlowSystemEventAgentMetrics` | `src/domain/flow-system/services/src/flow_system_events/flow_system_event_agent_metrics.rs` |
 | `OutboxAgentMetrics` | `src/utils/messaging-outbox/src/agent/outbox_agent_metrics.rs` |
+| `ResourceControllerRuntimeMetrics` | `src/domain/resources/services/src/controller_runtime/resource_controller_runtime_metrics.rs` (recorded in `resource_controller_loop.rs`, `resource_controller_supervisor.rs`) |
 | `S3Metrics` | `src/utils/s3-utils/src/s3_metrics.rs` |
 | Registry, `--metrics` dump | `src/app/cli/src/app.rs` |
 | Endpoint routing | `src/app/cli/src/explore/api_server.rs`, `web_ui_server.rs` |

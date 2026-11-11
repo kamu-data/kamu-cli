@@ -402,6 +402,7 @@ class "ResourceContextTestService"
 class "ResourceControllerHintHub" <<singleton>>
 class "ResourceControllerRuntimeConfig" <<singleton>>
 class "ResourceControllerRuntimeImpl" <<singleton>>
+class "ResourceControllerRuntimeMetrics" <<singleton>>
 class "ResourceDispatcherFactory"
 class "ResourceExtensionSchemaRegistry" <<singleton>>
 class "ResourceExtensionSchemaResolver"
@@ -1264,7 +1265,9 @@ class "WsSmartTransferProtocolClient"
 "ResourceControllerRuntimeImpl"  --> "ResourceControllerHints"
 "ResourceControllerRuntimeImpl"  --> "SystemTimeSource"
 "ResourceControllerRuntimeImpl"  --> "ResourceControllerRuntimeConfig"
+"ResourceControllerRuntimeImpl"  --> "ResourceControllerRuntimeMetrics"
 "ResourceControllerRuntimeImpl"  --> "WakeupListenerConfig"
+"MetricsProvider" <|-- "ResourceControllerRuntimeMetrics"
 "ResourceDispatcherFactory"  --> "Catalog"
 "MessageConsumer" <|-- "AccountLifecycleMessageConsumer"
 "MessageConsumerT" <|-- "AccountLifecycleMessageConsumer"

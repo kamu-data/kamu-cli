@@ -10,6 +10,7 @@
 use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
+use database_common::DatabaseTransactionRunner;
 use internal_error::InternalError;
 use time_source::SystemTimeSource;
 use wakeup_listener::{WakeupListener, WakeupListenerConfig};
@@ -19,10 +20,11 @@ use crate::controller_runtime::{
     ResourceControllerOutcomeRecorder,
     ResourceControllerPassPlanner,
     ResourceControllerRegistration,
+    ResourceControllerRuntimeMetrics,
     ResourceControllerWait,
     ResourceProcessExecutor,
 };
-use crate::domain::ResourceControllerRuntimeConfig;
+use crate::domain::{ResourceControllerRuntimeConfig, ResourceControllerStateRepository};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -53,6 +55,7 @@ pub(crate) struct ResourceControllerLoop {
     config: Arc<ResourceControllerRuntimeConfig>,
     wakeup_config: Arc<WakeupListenerConfig>,
     time_source: Arc<dyn SystemTimeSource>,
+    metrics: Arc<ResourceControllerRuntimeMetrics>,
     /// Shared by every loop of this controller, so that the agent's loop and
     /// a drain session never drain at once and double-process a resource
     drain_lock: Arc<tokio::sync::Mutex<()>>,
@@ -65,6 +68,7 @@ impl ResourceControllerLoop {
         config: Arc<ResourceControllerRuntimeConfig>,
         wakeup_config: Arc<WakeupListenerConfig>,
         time_source: Arc<dyn SystemTimeSource>,
+        metrics: Arc<ResourceControllerRuntimeMetrics>,
         drain_lock: Arc<tokio::sync::Mutex<()>>,
     ) -> Self {
         Self {
@@ -73,6 +77,7 @@ impl ResourceControllerLoop {
             config,
             wakeup_config,
             time_source,
+            metrics,
             drain_lock,
         }
     }
@@ -115,6 +120,7 @@ impl ResourceControllerLoop {
             // Only the last, empty pass tells what is left waiting: an earlier
             // pass may have deferred a resource that a later one processed
             if pass.is_empty() {
+                self.update_failing_resources().await?;
                 return Ok(ResourceControllerDrainReport {
                     processed,
                     extras_listed_at: planned_at,
@@ -123,18 +129,26 @@ impl ResourceControllerLoop {
                 });
             }
 
-            for (candidate, attempt) in executor.run(pass.into_candidates()).await {
+            let attempts = executor.run(pass.into_candidates()).await;
+
+            // Every call of the batch ran, so each is counted before recording,
+            // which may fail the drain halfway
+            for (candidate, attempt) in &attempts {
                 processed += 1;
+                self.metrics
+                    .on_processed(&self.registration.meta().controller_name, attempt.kind());
                 hold_back.note_attempt(
-                    &candidate,
-                    &attempt,
+                    candidate,
+                    attempt,
                     self.registration.meta().controller_name.as_str(),
                 );
+            }
 
+            for (candidate, attempt) in &attempts {
                 // A failure to record fails the drain: the loop is then
                 // restarted, and the resource processed again
                 recorder
-                    .record(candidate.id(), &attempt, self.time_source.now())
+                    .record(candidate.id(), attempt, self.time_source.now())
                     .await?;
             }
 
@@ -142,6 +156,21 @@ impl ResourceControllerLoop {
                 listener.heartbeat();
             }
         }
+    }
+
+    /// Sets the gauge of failing resources from the bookkeeping storage
+    async fn update_failing_resources(&self) -> Result<(), InternalError> {
+        let controller_name = &self.registration.meta().controller_name;
+        let count = DatabaseTransactionRunner::new(self.catalog.clone())
+            .transactional_with(
+                |repository: Arc<dyn ResourceControllerStateRepository>| async move {
+                    repository.count_failing_resources(controller_name).await
+                },
+            )
+            .await?;
+
+        self.metrics.set_failing_resources(controller_name, count);
+        Ok(())
     }
 
     /// Waits until the next drain is due: see `ResourceControllerWait`
