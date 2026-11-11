@@ -17,6 +17,7 @@ use crate::{
     ResourceID,
     ResourceLifecycleTransitionError,
     ResourceStatusConflictError,
+    ResourceVersion,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -51,7 +52,7 @@ pub trait ResourceLifecyclePrimitives<R: EventSourcedResource>: Send + Sync {
     async fn complete_reconciliation(
         &self,
         id: &ResourceID,
-        expected: ResourceExpectedVersion,
+        expected: ResourceVersion,
     ) -> Result<R, ResourceLifecycleTransitionError<R>>;
 
     /// Moves the resource to `Failed` or `Degraded` with the error as its
@@ -59,7 +60,7 @@ pub trait ResourceLifecyclePrimitives<R: EventSourcedResource>: Send + Sync {
     async fn fail_reconciliation(
         &self,
         id: &ResourceID,
-        expected: ResourceExpectedVersion,
+        expected: ResourceVersion,
         error: &R::ReconcileError,
     ) -> Result<R, ResourceLifecycleTransitionError<R>>;
 
@@ -95,15 +96,6 @@ pub trait ResourceLifecyclePrimitives<R: EventSourcedResource>: Send + Sync {
         expected_status_generation: u64,
         patch: &ResourceConditionsPatch,
     ) -> Result<R, ResourceConditionUpdateError<R>>;
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-/// The generation and status generation a transition is based on
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct ResourceExpectedVersion {
-    pub generation: u64,
-    pub status_generation: u64,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
