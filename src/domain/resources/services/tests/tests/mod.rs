@@ -9,6 +9,7 @@
 
 pub mod utils;
 
+mod controllers;
 mod crud_dispatchers;
 mod event_stores;
 mod message_handlers;
