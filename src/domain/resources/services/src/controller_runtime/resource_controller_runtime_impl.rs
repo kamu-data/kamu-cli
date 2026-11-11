@@ -12,7 +12,7 @@ use std::sync::{Arc, Mutex};
 
 use async_utils::BackgroundAgent;
 use dill::{CatalogWeakRef, Singleton, component, interface, scope};
-use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
+use internal_error::{ErrorIntoInternal, InternalError};
 use time_source::SystemTimeSource;
 use tokio::task::JoinSet;
 use wakeup_listener::WakeupListenerConfig;
@@ -20,6 +20,7 @@ use wakeup_listener::WakeupListenerConfig;
 use crate::controller_runtime::{ResourceControllerLoop, ResourceControllerRegistration};
 use crate::domain::{
     RESOURCE_CONTROLLER_RUNTIME_AGENT_NAME,
+    ResourceControllerHints,
     ResourceControllerName,
     ResourceControllerRuntime,
     ResourceControllerRuntimeConfig,
@@ -36,6 +37,7 @@ pub struct ResourceControllerRuntimeImpl {
     catalog: CatalogWeakRef,
     config: Arc<ResourceControllerRuntimeConfig>,
     wakeup_config: Arc<WakeupListenerConfig>,
+    hints: Arc<dyn ResourceControllerHints>,
     time_source: Arc<dyn SystemTimeSource>,
     /// One per controller, kept across calls: the agent's loop and
     /// `run_until_idle` build loops of their own, which must not drain the
@@ -52,12 +54,14 @@ impl ResourceControllerRuntimeImpl {
         catalog: CatalogWeakRef,
         config: Arc<ResourceControllerRuntimeConfig>,
         wakeup_config: Arc<WakeupListenerConfig>,
+        hints: Arc<dyn ResourceControllerHints>,
         time_source: Arc<dyn SystemTimeSource>,
     ) -> Self {
         Self {
             catalog,
             config,
             wakeup_config,
+            hints,
             time_source,
             drain_locks: Mutex::new(HashMap::new()),
         }
@@ -75,6 +79,7 @@ impl ResourceControllerRuntimeImpl {
                     registration,
                     catalog.clone(),
                     self.config.clone(),
+                    self.wakeup_config.clone(),
                     self.time_source.clone(),
                     drain_lock,
                 )
@@ -110,20 +115,23 @@ impl BackgroundAgent for ResourceControllerRuntimeImpl {
             return std::future::pending().await;
         }
 
-        let fallback_interval =
-            chrono::Duration::from_std(self.wakeup_config.max_listening_timeout).int_err()?;
         let mut running = JoinSet::new();
         for controller_loop in loops {
-            let time_source = self.time_source.clone();
+            // Created once per loop and kept, so that no hint is missed
+            // between waits
+            let meta = controller_loop.registration().meta();
+            let listener = self
+                .hints
+                .new_wakeup_listener(meta.schema, &meta.controller_name);
+
             running.spawn(async move {
                 loop {
-                    let report = controller_loop.drain().await?;
+                    let drained = controller_loop.drain(Some(listener.as_ref())).await?;
                     tracing::debug!(
-                        processed = report.processed(),
-                        earliest_deferred_extra = ?report.earliest_deferred_extra(),
+                        processed = drained.processed(),
                         "Resource controller drain finished"
                     );
-                    time_source.sleep(fallback_interval).await;
+                    controller_loop.wait(listener.as_ref(), &drained).await?;
                 }
             });
         }
@@ -143,7 +151,7 @@ impl BackgroundAgent for ResourceControllerRuntimeImpl {
 impl ResourceControllerRuntime for ResourceControllerRuntimeImpl {
     async fn run_until_idle(&self) -> Result<(), InternalError> {
         for controller_loop in self.build_loops()? {
-            controller_loop.drain().await?;
+            controller_loop.drain(None).await?;
         }
         Ok(())
     }

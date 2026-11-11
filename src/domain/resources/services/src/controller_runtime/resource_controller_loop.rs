@@ -12,12 +12,14 @@ use std::sync::Arc;
 use chrono::{DateTime, Utc};
 use internal_error::InternalError;
 use time_source::SystemTimeSource;
+use wakeup_listener::{WakeupListener, WakeupListenerConfig};
 
 use crate::controller_runtime::{
     ResourceControllerDrainHoldBack,
     ResourceControllerOutcomeRecorder,
     ResourceControllerPassPlanner,
     ResourceControllerRegistration,
+    ResourceControllerWait,
     ResourceProcessExecutor,
 };
 use crate::domain::ResourceControllerRuntimeConfig;
@@ -49,6 +51,7 @@ pub(crate) struct ResourceControllerLoop {
     registration: ResourceControllerRegistration,
     catalog: dill::Catalog,
     config: Arc<ResourceControllerRuntimeConfig>,
+    wakeup_config: Arc<WakeupListenerConfig>,
     time_source: Arc<dyn SystemTimeSource>,
     /// Shared by every loop of this controller, so that the agent's loop and
     /// `run_until_idle` never drain at once and double-process a resource
@@ -60,6 +63,7 @@ impl ResourceControllerLoop {
         registration: ResourceControllerRegistration,
         catalog: dill::Catalog,
         config: Arc<ResourceControllerRuntimeConfig>,
+        wakeup_config: Arc<WakeupListenerConfig>,
         time_source: Arc<dyn SystemTimeSource>,
         drain_lock: Arc<tokio::sync::Mutex<()>>,
     ) -> Self {
@@ -67,13 +71,23 @@ impl ResourceControllerLoop {
             registration,
             catalog,
             config,
+            wakeup_config,
             time_source,
             drain_lock,
         }
     }
 
-    /// Processes pass after pass until no resource needs attention now
-    pub async fn drain(&self) -> Result<ResourceControllerDrainReport, InternalError> {
+    pub fn registration(&self) -> &ResourceControllerRegistration {
+        &self.registration
+    }
+
+    /// Processes pass after pass until no resource needs attention now. The
+    /// listener, when the agent's loop drains, gets a heartbeat per pass, so a
+    /// long drain still proves the loop alive.
+    pub async fn drain(
+        &self,
+        listener: Option<&dyn WakeupListener>,
+    ) -> Result<ResourceControllerDrainReport, InternalError> {
         let _guard = self.drain_lock.lock().await;
 
         let planner = ResourceControllerPassPlanner::new(
@@ -99,6 +113,7 @@ impl ResourceControllerLoop {
             // pass may have deferred a resource that a later one processed
             report.earliest_deferred_extra = pass.earliest_deferred_extra();
             if pass.is_empty() {
+                report.held_back = hold_back.len() > 0;
                 return Ok(report);
             }
 
@@ -116,7 +131,28 @@ impl ResourceControllerLoop {
                     .record(candidate.id(), &attempt, self.time_source.now())
                     .await?;
             }
+
+            if let Some(listener) = listener {
+                listener.heartbeat();
+            }
         }
+    }
+
+    /// Waits until the next drain is due: see `ResourceControllerWait`
+    pub async fn wait(
+        &self,
+        listener: &dyn WakeupListener,
+        drained: &ResourceControllerDrainReport,
+    ) -> Result<(), InternalError> {
+        ResourceControllerWait::new(
+            &self.registration,
+            &self.catalog,
+            &self.wakeup_config,
+            self.time_source.as_ref(),
+            self.config.failure_backoff.min_delay,
+        )
+        .wait(listener, drained)
+        .await
     }
 }
 
@@ -127,6 +163,7 @@ impl ResourceControllerLoop {
 pub(crate) struct ResourceControllerDrainReport {
     processed: usize,
     earliest_deferred_extra: Option<DateTime<Utc>>,
+    held_back: bool,
 }
 
 impl ResourceControllerDrainReport {
@@ -140,6 +177,11 @@ impl ResourceControllerDrainReport {
     /// the extra set.
     pub fn earliest_deferred_extra(&self) -> Option<DateTime<Utc>> {
         self.earliest_deferred_extra
+    }
+
+    /// Whether the drain held back resources that are still due
+    pub fn held_back(&self) -> bool {
+        self.held_back
     }
 }
 

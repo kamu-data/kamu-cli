@@ -19,7 +19,7 @@ impl ResourceControllerName {
         Self(name)
     }
 
-    pub fn as_str(&self) -> &str {
+    pub fn as_str(&self) -> &'static str {
         self.0
     }
 }
