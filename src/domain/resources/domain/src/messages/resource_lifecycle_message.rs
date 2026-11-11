@@ -160,11 +160,13 @@ pub struct ResourceLifecycleMessageStatusUpdated {
 }
 
 impl ResourceLifecycleMessageStatusUpdated {
-    /// Whether the update recorded the reconciliation of the resource's
-    /// current generation
-    pub fn reconciled_current_generation(&self) -> bool {
+    /// Whether this update recorded the reconciliation of the resource's
+    /// current generation. A later update of a reconciled resource, such as a
+    /// condition patch, keeps the earlier `reconciledAt` and does not count
+    pub fn records_reconciliation_of_current_generation(&self) -> bool {
         self.status.phase == ResourcePhase::Ready
             && self.status.reconciled_generation == Some(self.resource.headers.generation)
+            && self.status.reconciled_at == Some(self.event_time)
     }
 }
 
