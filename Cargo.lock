@@ -9420,6 +9420,7 @@ dependencies = [
  "tracing",
  "url",
  "uuid",
+ "wakeup-listener",
 ]
 
 [[package]]

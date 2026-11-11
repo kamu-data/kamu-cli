@@ -13,6 +13,7 @@ use crate::*;
 
 pub fn register_dependencies(catalog_builder: &mut dill::CatalogBuilder) {
     catalog_builder.add::<ResourceDispatcherFactory>();
+    catalog_builder.add::<ResourceControllerHintHub>();
     catalog_builder.add::<GenericResourceQueryServiceImpl>();
     catalog_builder.add::<RequestAccountResourcesDeletionUseCaseImpl>();
     catalog_builder.add::<ResourceExtensionSchemaRegistry>();
