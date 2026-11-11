@@ -712,16 +712,17 @@ strict (unknown / wrong-kind / inapplicable URIs reject), while unresolved short
 as free-form extension keys with warnings. For registered labels and annotations the resolver also
 validates the JSON value through the schema dispatcher and rewrites the key to the canonical schema
 URI before headers are converted into maps. `ResourcePersistenceServiceHelper` delegates to
-`ResourceDurableStateValidator` before create/save repository/event-store writes: registered
-label/annotation URIs and all condition URIs must resolve, apply to the resource schema, and
-validate through their dispatcher; registered short aliases are rejected as noncanonical durable
+`ResourceDurableStateValidator` before create/save repository/event-store writes. It checks only
+the entries the write adds or changes, compared with the aggregate's stored state, so a schema
+change never blocks a write that leaves an entry alone, the deletion that removes it included.
+Registered label/annotation URIs and all condition URIs must resolve, apply to the resource
+schema, and validate through their dispatcher; registered short aliases are rejected as noncanonical durable
 state; unknown short label/annotation names remain free-form. The validator reports
 `ResourceDurableStateValidationError`, composed from existing domain errors such as
 `ParseResourceSchemaError`, `ResourceExtensionResolutionError`, and `ResourceExtensionValueError`.
 Persistence carries it as `ResourcePersistenceError::InvalidDurableState`; public use-case
 boundaries translate that into an internal error because user-authored paths should have been
-rejected earlier. A resource whose deletion was requested is not validated, so its deletion can
-complete even when its stored extension state no longer validates. Label indexing and filtering are implemented — see
+rejected earlier. Label indexing and filtering are implemented — see
 [§10](#10-facade-kamu-resources-facade) for the resolved-filter tree and the AND-only evaluation
 boundary.
 
