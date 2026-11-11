@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 mod test_postgres_raw_resource_event_store;
+mod test_postgres_resource_controller_state_repository;
 mod test_postgres_resource_label_projection_repository;
 mod test_postgres_resource_repository;
 mod test_postgres_resource_repository_concurrent_updates;
