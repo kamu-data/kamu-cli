@@ -111,15 +111,19 @@ impl<'a> ResourceControllerPassPlanner<'a> {
                         listed: extras.len(),
                         taken: 0,
                     };
-                    // A resource can be both extra and eligible; it is processed once
+                    // A resource can be both extra and eligible; it is processed
+                    // once. One the extras leave out stays open to the
+                    // eligibility predicates, which apply suppressions of their own
+                    let mut listed = HashSet::new();
                     let mut planned = HashSet::new();
 
                     for id in extras {
-                        if planned.insert(id)
+                        if listed.insert(id)
                             && self
                                 .plan_extra(repository.as_ref(), id, now, hold_back, &mut pass)
                                 .await?
                         {
+                            planned.insert(id);
                             selection.taken += 1;
                         }
                     }
@@ -134,7 +138,7 @@ impl<'a> ResourceControllerPassPlanner<'a> {
                         )
                         .await?;
                     for id in eligible {
-                        if planned.insert(id) && !hold_back.holds_back(&id) {
+                        if planned.insert(id) && !hold_back.holds_back_eligible(&id) {
                             pass.add_candidate(ResourceControllerCandidate::eligible(id));
                         }
                     }
@@ -164,7 +168,7 @@ impl<'a> ResourceControllerPassPlanner<'a> {
                 "Extra resource still listed after its controller finished with it in this drain"
             );
         }
-        if hold_back.holds_back(&id) {
+        if hold_back.holds_back_extra(&id) {
             return Ok(false);
         }
 

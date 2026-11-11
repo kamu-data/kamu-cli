@@ -68,14 +68,26 @@ macro_rules! declare_resource_service_layer {
                 resource = $resource
             );
 
+            /// The service layer of a type reconciled by the one-shot
+            /// lifecycle dispatch, on each lifecycle message
             pub fn [<register_ $name:snake _resource_service_layer>](
+                catalog_builder: &mut dill::CatalogBuilder,
+            ) {
+                [<register_ $name:snake _resource_service_layer_without_lifecycle_dispatcher>](
+                    catalog_builder,
+                );
+                catalog_builder.add::<[<$name ResourceLifecycleDispatcher>]>();
+            }
+
+            /// The service layer of a type that a `ResourceController` drives
+            /// alone: lifecycle messages only hint the controller runtime
+            pub fn [<register_ $name:snake _resource_service_layer_without_lifecycle_dispatcher>](
                 catalog_builder: &mut dill::CatalogBuilder,
             ) {
                 catalog_builder.add::<[<$name ApplyResourceUseCaseImpl>]>();
                 catalog_builder.add::<[<$name RequestResourcesDeletionUseCaseImpl>]>();
                 catalog_builder.add::<[<$name EventStoreBridge>]>();
                 catalog_builder.add::<[<$name ResourceAggregateLoaderImpl>]>();
-                catalog_builder.add::<[<$name ResourceLifecycleDispatcher>]>();
                 catalog_builder.add::<[<$name ResourceLifecyclePrimitivesImpl>]>();
                 catalog_builder.add::<[<$name ResourcePersistenceServiceImpl>]>();
                 catalog_builder.add::<[<$name TypedResourceQueryServiceImpl>]>();

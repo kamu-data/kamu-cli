@@ -17,9 +17,15 @@ use time_source::SystemTimeSource;
 use tokio::task::JoinSet;
 use wakeup_listener::WakeupListenerConfig;
 
-use crate::controller_runtime::{ResourceControllerLoop, ResourceControllerRegistration};
+use crate::controller_runtime::{
+    ResourceControllerDrainHoldBack,
+    ResourceControllerDrainSessionImpl,
+    ResourceControllerLoop,
+    ResourceControllerRegistration,
+};
 use crate::domain::{
     RESOURCE_CONTROLLER_RUNTIME_AGENT_NAME,
+    ResourceControllerDrainSession,
     ResourceControllerHints,
     ResourceControllerName,
     ResourceControllerRuntime,
@@ -30,17 +36,17 @@ use crate::domain::{
 
 /// One background agent for every registered `ResourceController`.
 ///
-/// The controllers are collected from the catalog each time the agent starts
-/// or `run_until_idle` is called, so the agent holds no controller, and no
-/// strong reference to the catalog that owns it.
+/// The controllers are collected from the catalog each time the agent or a
+/// drain session starts, so the agent holds no controller, and no strong
+/// reference to the catalog that owns it.
 pub struct ResourceControllerRuntimeImpl {
     catalog: CatalogWeakRef,
     config: Arc<ResourceControllerRuntimeConfig>,
     wakeup_config: Arc<WakeupListenerConfig>,
     hints: Arc<dyn ResourceControllerHints>,
     time_source: Arc<dyn SystemTimeSource>,
-    /// One per controller, kept across calls: the agent's loop and
-    /// `run_until_idle` build loops of their own, which must not drain the
+    /// One per controller, kept across calls: the agent's loop and the drain
+    /// sessions build loops of their own, which must not drain the
     /// same controller at once
     drain_locks: Mutex<HashMap<ResourceControllerName, Arc<tokio::sync::Mutex<()>>>>,
 }
@@ -126,7 +132,12 @@ impl BackgroundAgent for ResourceControllerRuntimeImpl {
 
             running.spawn(async move {
                 loop {
-                    let drained = controller_loop.drain(Some(listener.as_ref())).await?;
+                    let drained = controller_loop
+                        .drain(
+                            Some(listener.as_ref()),
+                            &mut ResourceControllerDrainHoldBack::default(),
+                        )
+                        .await?;
                     tracing::debug!(
                         processed = drained.processed(),
                         "Resource controller drain finished"
@@ -147,13 +158,11 @@ impl BackgroundAgent for ResourceControllerRuntimeImpl {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[async_trait::async_trait]
 impl ResourceControllerRuntime for ResourceControllerRuntimeImpl {
-    async fn run_until_idle(&self) -> Result<(), InternalError> {
-        for controller_loop in self.build_loops()? {
-            controller_loop.drain(None).await?;
-        }
-        Ok(())
+    fn new_drain_session(&self) -> Result<Box<dyn ResourceControllerDrainSession>, InternalError> {
+        Ok(Box::new(ResourceControllerDrainSessionImpl::new(
+            self.build_loops()?,
+        )))
     }
 }
 

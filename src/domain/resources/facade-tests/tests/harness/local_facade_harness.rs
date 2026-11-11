@@ -175,10 +175,11 @@ impl LocalFacadeHarness {
         // Outbox
         let needs_bridge = matches!(outbox_provider, OutboxProvider::Dispatching);
         outbox_provider.embed_into_catalog(&mut b);
+        // The controller hint hub needs it with any outbox
+        b.add::<WakeupListenerMetrics>();
         if needs_bridge {
             b.add::<kamu_messaging_outbox_inmem::InMemoryOutboxMessageBridge>();
             b.add::<kamu_wakeup_listener_inmem::InMemoryWakeupHub>();
-            b.add::<WakeupListenerMetrics>();
         }
 
         // Accounts

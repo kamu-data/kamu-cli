@@ -62,7 +62,7 @@ async fn test_failing_extra_resource_neither_spins_nor_wakes_the_agent_during_it
     .await;
     // Reconciled, so only the extra set makes it actionable
     let id = harness.apply("res-a").await;
-    harness.run_until_idle().await;
+    harness.run_outbox_and_controllers_until_idle().await;
     assert_eq!(harness.phase(id).await, ResourcePhase::Ready);
     let calls_before = harness.script().total_calls();
 
@@ -103,7 +103,7 @@ async fn test_future_extra_deadline_wakes_the_agent() {
     )
     .await;
     let id = harness.apply("res-a").await;
-    harness.run_until_idle().await;
+    harness.run_outbox_and_controllers_until_idle().await;
     let calls_before = harness.script().total_calls();
 
     harness
@@ -133,7 +133,7 @@ async fn test_extra_deadline_passing_between_the_drain_and_the_wait_wakes_the_ag
     )
     .await;
     let id = harness.apply("res-a").await;
-    harness.run_until_idle().await;
+    harness.run_outbox_and_controllers_until_idle().await;
     let calls_before = harness.script().total_calls();
 
     let _agent = harness.start_agent();
@@ -164,7 +164,7 @@ async fn test_overdue_extra_backing_off_does_not_hide_a_later_extra_deadline() {
     .await;
     let backing_off = harness.apply("res-a").await;
     let expiring = harness.apply("res-b").await;
-    harness.run_until_idle().await;
+    harness.run_outbox_and_controllers_until_idle().await;
 
     // The first claim expired an hour ago and keeps failing, so it backs off
     // longer than the second claim takes to expire

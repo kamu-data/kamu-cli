@@ -17,6 +17,9 @@ use dill::CatalogBuilder;
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu_resources::{
     ApplyResourceParams,
+    MESSAGE_CONSUMER_KAMU_RESOURCE_LIFECYCLE_EVENT_BRIDGE,
+    MESSAGE_PRODUCER_KAMU_RESOURCE_SERVICE,
+    ResourceControllerDrainSession,
     ResourceControllerHints,
     ResourceControllerName,
     ResourceControllerRuntime,
@@ -34,7 +37,7 @@ use kamu_resources_services::testing::{
     BaseResourceServiceHarness,
     BaseResourceServiceHarnessOpts,
 };
-use messaging_outbox::OutboxProvider;
+use messaging_outbox::{OutboxMessageBridge, OutboxProvider};
 use retry_backoff::{RetryBackoff, RetryBackoffType};
 use time_source::FakeSystemTimeSource;
 
@@ -53,6 +56,7 @@ use crate::tests::utils::{
     ServiceLayerTestHarness,
     ServiceLayerTestHarnessOpts,
     TestResource,
+    TestResourceResourceLifecycleDispatcher,
     TestResourceSpec,
     test_stage_condition_key,
 };
@@ -75,6 +79,9 @@ pub enum TestControllers {
     TwoForOneSchema,
     /// Two controllers of different schemas, with one name
     TwoWithOneName,
+    /// The main controller, for a type also reconciled by its lifecycle
+    /// dispatcher
+    MainWithLifecycleDispatcher,
 }
 
 impl TestControllers {
@@ -96,6 +103,10 @@ impl TestControllers {
             Self::TwoWithOneName => {
                 b.add::<TestResourceController>();
                 b.add::<TestOtherResourceControllerWithSameName>();
+            }
+            Self::MainWithLifecycleDispatcher => {
+                b.add::<TestResourceController>();
+                b.add::<TestResourceResourceLifecycleDispatcher>();
             }
         }
     }
@@ -121,14 +132,17 @@ impl ControllerRuntimeHarness {
     pub async fn new(controllers: TestControllers, behavior: TestControllerBehavior) -> Self {
         let base = ServiceLayerTestHarness::new_with_opts(ServiceLayerTestHarnessOpts {
             base_opts: BaseResourceServiceHarnessOpts {
-                // Messages wait in the outbox, so the one-shot lifecycle
-                // dispatch never runs: only the runtime drives the resources
                 outbox_provider: OutboxProvider::Dispatching,
                 transactional: true,
                 fake_time: true,
             },
+            // Only the runtime drives the resources
+            lifecycle_dispatcher: false,
             ..Default::default()
         });
+        // As at startup: consumers start from the latest message, so they
+        // must be registered before the first one
+        base.outbox_agent().run_initialization().await.unwrap();
         let account = base.ensure_test_account("test-owner").await;
         let script = TestControllerScript::new(behavior);
         let process_catalog = Self::start_process(&base, &script, controllers);
@@ -178,19 +192,77 @@ impl ControllerRuntimeHarness {
         self.process_catalog.get_one().unwrap()
     }
 
-    pub async fn run_until_idle(&self) {
-        self.try_run_until_idle().await.unwrap();
+    pub async fn run_outbox_and_controllers_until_idle(&self) {
+        self.try_run_outbox_and_controllers_until_idle()
+            .await
+            .unwrap();
     }
 
-    pub async fn try_run_until_idle(&self) -> Result<(), InternalError> {
-        self.runtime().run_until_idle().await
+    /// Delivers the outbox messages and drains the controllers in turn, as a
+    /// CLI command does before it exits
+    pub async fn try_run_outbox_and_controllers_until_idle(&self) -> Result<(), InternalError> {
+        let outbox_agent = self.outbox_agent();
+        let mut drains = self.runtime().new_drain_session()?;
+
+        loop {
+            outbox_agent.run_while_has_tasks().await?;
+
+            if drains.drain_due_resources().await? == 0 {
+                return Ok(());
+            }
+        }
+    }
+
+    pub fn new_drain_session(&self) -> Box<dyn ResourceControllerDrainSession> {
+        self.runtime().new_drain_session().unwrap()
+    }
+
+    /// Delivers the outbox messages, then drains once in the session, and
+    /// returns the `process` calls made
+    pub async fn deliver_and_drain(
+        &self,
+        session: &mut Box<dyn ResourceControllerDrainSession>,
+    ) -> usize {
+        self.deliver_messages().await;
+        session.drain_due_resources().await.unwrap()
+    }
+
+    /// Whether the resource lifecycle consumer has messages left to deliver
+    pub async fn has_undelivered_lifecycle_messages(&self) -> bool {
+        let bridge = self.catalog().get_one::<dyn OutboxMessageBridge>().unwrap();
+
+        let (_, latest) = bridge
+            .get_latest_message_boundaries_by_producer(self.catalog())
+            .await
+            .unwrap()
+            .into_iter()
+            .find(|(producer, _)| producer == MESSAGE_PRODUCER_KAMU_RESOURCE_SERVICE)
+            .unwrap();
+        let consumed = bridge
+            .list_consumption_boundaries(self.catalog())
+            .await
+            .unwrap()
+            .into_iter()
+            .find(|boundary| {
+                boundary.producer_name == MESSAGE_PRODUCER_KAMU_RESOURCE_SERVICE
+                    && boundary.consumer_name
+                        == MESSAGE_CONSUMER_KAMU_RESOURCE_LIFECYCLE_EVENT_BRIDGE
+            })
+            .unwrap();
+
+        consumed.last_consumed_message_id < latest.message_id
     }
 
     /// Runs until idle and returns how many `process` calls it made
     pub async fn process_calls_until_idle(&self) -> usize {
         let before = self.script.total_calls();
-        self.run_until_idle().await;
+        self.run_outbox_and_controllers_until_idle().await;
         self.script.total_calls() - before
+    }
+
+    /// Delivers the outbox messages, without draining the controllers
+    pub async fn deliver_messages(&self) {
+        self.outbox_agent().run_while_has_tasks().await.unwrap();
     }
 
     /// Moves the fake clock, waking the runtime if it sleeps until a moment
