@@ -842,6 +842,22 @@ CREATE TABLE public.outbox_messages (
 
 
 --
+-- Name: resource_controller_state; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.resource_controller_state (
+    controller character varying(200) NOT NULL,
+    resource_id uuid NOT NULL,
+    controller_revision integer NOT NULL,
+    handled_generation bigint,
+    handled_status_generation bigint,
+    not_before timestamp with time zone,
+    attempts integer NOT NULL,
+    last_error text
+);
+
+
+--
 -- Name: resource_event_id_seq; Type: SEQUENCE; Schema: public; Owner: -
 --
 
@@ -1193,6 +1209,14 @@ ALTER TABLE ONLY public.outbox_message_consumptions
 
 ALTER TABLE ONLY public.outbox_messages
     ADD CONSTRAINT outbox_messages_pkey PRIMARY KEY (message_id);
+
+
+--
+-- Name: resource_controller_state resource_controller_state_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.resource_controller_state
+    ADD CONSTRAINT resource_controller_state_pkey PRIMARY KEY (controller, resource_id);
 
 
 --
@@ -1705,6 +1729,20 @@ CREATE INDEX idx_outbox_messages_producer_name ON public.outbox_messages USING b
 
 
 --
+-- Name: idx_resource_controller_state_not_before; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_resource_controller_state_not_before ON public.resource_controller_state USING btree (controller, not_before) WHERE (not_before IS NOT NULL);
+
+
+--
+-- Name: idx_resource_controller_state_resource_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_resource_controller_state_resource_id ON public.resource_controller_state USING btree (resource_id);
+
+
+--
 -- Name: idx_resource_events_resource_id_event_id; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -1737,6 +1775,20 @@ CREATE UNIQUE INDEX idx_resources_account_schema_name_ci ON public.resources USI
 --
 
 CREATE INDEX idx_resources_account_schema_updated_at ON public.resources USING btree (account_id, resource_schema, updated_at DESC);
+
+
+--
+-- Name: idx_resources_deletion_pending; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_resources_deletion_pending ON public.resources USING btree (resource_schema, resource_id) WHERE ((deletion_requested_at IS NOT NULL) AND (deleted_at IS NULL));
+
+
+--
+-- Name: idx_resources_not_reconciled; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_resources_not_reconciled ON public.resources USING btree (resource_schema, resource_id) WHERE ((deletion_requested_at IS NULL) AND (COALESCE(((status ->> 'reconciledGeneration'::text))::bigint, (0)::bigint) < generation));
 
 
 --
@@ -1928,6 +1980,14 @@ ALTER TABLE ONLY public.config_secret_set_entries
 
 ALTER TABLE ONLY public.config_variable_set_entries
     ADD CONSTRAINT fk_config_variable_set_entries_resource_id FOREIGN KEY (resource_id) REFERENCES public.resources(resource_id) ON DELETE CASCADE;
+
+
+--
+-- Name: resource_controller_state fk_resource_controller_state_resource_id; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.resource_controller_state
+    ADD CONSTRAINT fk_resource_controller_state_resource_id FOREIGN KEY (resource_id) REFERENCES public.resources(resource_id);
 
 
 --

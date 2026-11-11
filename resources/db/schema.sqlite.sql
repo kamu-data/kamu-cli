@@ -182,6 +182,13 @@ CREATE INDEX idx_oauth_device_codes_device_code_expires_at
 
 CREATE INDEX idx_outbox_messages_producer_name ON outbox_messages(producer_name);
 
+CREATE INDEX idx_resource_controller_state_not_before
+    ON resource_controller_state (controller, not_before)
+    WHERE not_before IS NOT NULL;
+
+CREATE INDEX idx_resource_controller_state_resource_id
+    ON resource_controller_state (resource_id);
+
 CREATE INDEX idx_resource_events_resource_id_event_id
     ON resource_events (resource_id, event_id);
 
@@ -197,6 +204,14 @@ CREATE UNIQUE INDEX idx_resources_account_schema_name_ci
 
 CREATE INDEX idx_resources_account_schema_updated_at
     ON resources (account_id, resource_schema, updated_at DESC);
+
+CREATE INDEX idx_resources_deletion_pending
+    ON resources (resource_schema, resource_id)
+    WHERE deletion_requested_at IS NOT NULL AND deleted_at IS NULL;
+
+CREATE INDEX idx_resources_not_reconciled
+    ON resources (resource_schema, resource_id)
+    WHERE deletion_requested_at IS NULL AND reconciled_generation < generation;
 
 CREATE INDEX idx_resources_summary_projection
     ON resources (
@@ -537,6 +552,22 @@ CREATE TABLE outbox_messages(
     occurred_on timestamptz NOT NULL
 , 'version' INT);
 
+CREATE TABLE resource_controller_state (
+    controller                VARCHAR(200) NOT NULL,
+    resource_id               CHAR(36) NOT NULL,
+    controller_revision       INTEGER NOT NULL,
+    handled_generation        BIGINT NULL,
+    handled_status_generation BIGINT NULL,
+    not_before                TIMESTAMPTZ NULL,
+    attempts                  INTEGER NOT NULL,
+    last_error                TEXT NULL,
+
+    PRIMARY KEY (controller, resource_id),
+
+    CONSTRAINT fk_resource_controller_state_resource_id
+        FOREIGN KEY (resource_id) REFERENCES resources(resource_id)
+);
+
 CREATE TABLE resource_events (
     event_id               INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
     resource_id            CHAR(36) NOT NULL,
@@ -578,7 +609,8 @@ CREATE TABLE resources (
     updated_at             TIMESTAMPTZ NOT NULL,
     deleted_at             TIMESTAMPTZ NULL,
     last_event_id          BIGINT NULL
-, status_generation BIGINT NOT NULL DEFAULT 1, deletion_requested_at TIMESTAMPTZ NULL);
+, status_generation BIGINT NOT NULL DEFAULT 1, deletion_requested_at TIMESTAMPTZ NULL, reconciled_generation INTEGER
+    GENERATED ALWAYS AS (COALESCE(json_extract(status, '$.reconciledGeneration'), 0)) VIRTUAL);
 
 CREATE TABLE sqlite_sequence(name,seq);
 
