@@ -32,7 +32,6 @@ use kamu_resources_services::testing::{
 use messaging_outbox::{MockOutbox, OutboxProvider};
 
 use crate::tests::utils::{
-    SanitizerKind,
     ServiceLayerTestHarness,
     ServiceLayerTestHarnessOpts,
     TestResource,
@@ -513,7 +512,7 @@ impl ReconcileTestHarness {
                 fake_time: false,
             },
             reconciler_provider,
-            sanitizer: SanitizerKind::None,
+            ..Default::default()
         });
 
         let catalog = base.catalog();

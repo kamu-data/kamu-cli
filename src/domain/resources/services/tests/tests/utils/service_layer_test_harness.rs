@@ -35,6 +35,7 @@ use crate::tests::utils::{
     register_test_condition_schema_dispatchers,
     register_test_resource_crud_dispatcher,
     register_test_resource_resource_service_layer,
+    register_test_resource_resource_service_layer_without_lifecycle_dispatcher,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -53,6 +54,9 @@ pub struct ServiceLayerTestHarnessOpts {
     pub base_opts: BaseResourceServiceHarnessOpts,
     pub reconciler_provider: TestResourceReconcilerProvider,
     pub sanitizer: SanitizerKind,
+    /// Whether the test type is reconciled by the one-shot lifecycle dispatch.
+    /// Without it, only a `ResourceController` drives the type.
+    pub lifecycle_dispatcher: bool,
 }
 
 impl Default for ServiceLayerTestHarnessOpts {
@@ -66,6 +70,7 @@ impl Default for ServiceLayerTestHarnessOpts {
             },
             reconciler_provider: TestResourceReconcilerProvider::default(),
             sanitizer: SanitizerKind::None,
+            lifecycle_dispatcher: true,
         }
     }
 }
@@ -103,7 +108,7 @@ impl ServiceLayerTestHarness {
                 ..Default::default()
             },
             reconciler_provider,
-            sanitizer: SanitizerKind::None,
+            ..Default::default()
         })
     }
 
@@ -111,7 +116,11 @@ impl ServiceLayerTestHarness {
         let base = BaseResourceServiceHarness::new_with_opts(opts.base_opts);
 
         let mut b = CatalogBuilder::new_chained(base.catalog());
-        register_test_resource_resource_service_layer(&mut b);
+        if opts.lifecycle_dispatcher {
+            register_test_resource_resource_service_layer(&mut b);
+        } else {
+            register_test_resource_resource_service_layer_without_lifecycle_dispatcher(&mut b);
+        }
         register_test_resource_crud_dispatcher(&mut b);
         register_test_condition_schema_dispatchers(&mut b);
         opts.reconciler_provider.embed_into_catalog(&mut b);
