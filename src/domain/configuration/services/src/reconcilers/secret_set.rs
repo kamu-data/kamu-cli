@@ -26,8 +26,8 @@ use kamu_resources::{
     DeclarativeResource,
     ManagedResource,
     ResourceCleanupError,
-    ResourceController,
     ResourceID,
+    SimpleResourceReconciler,
 };
 use odf::AccountID;
 use time_source::SystemTimeSource;
@@ -38,8 +38,8 @@ use crate::PreviousConfigurationEntry;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[dill::component]
-#[dill::interface(dyn ResourceController<SecretSetResource>)]
-pub struct SecretSetControllerImpl {
+#[dill::interface(dyn SimpleResourceReconciler<SecretSetResource>)]
+pub struct SecretSetReconcilerImpl {
     secret_set_projection_repository: Arc<dyn SecretSetProjectionRepository>,
     time_source: Arc<dyn SystemTimeSource>,
     secrets_encryption_config: Arc<SecretsEncryptionConfig>,
@@ -48,7 +48,7 @@ pub struct SecretSetControllerImpl {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-impl ResourceController<SecretSetResource> for SecretSetControllerImpl {
+impl SimpleResourceReconciler<SecretSetResource> for SecretSetReconcilerImpl {
     async fn reconcile(
         &self,
         resource: &SecretSetResource,
@@ -98,7 +98,7 @@ impl ResourceController<SecretSetResource> for SecretSetControllerImpl {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl SecretSetControllerImpl {
+impl SecretSetReconcilerImpl {
     async fn load_previous_entries_by_key(
         &self,
         resource_id: &ResourceID,

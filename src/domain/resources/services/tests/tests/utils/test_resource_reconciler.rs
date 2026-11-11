@@ -16,22 +16,22 @@ use kamu_resources::{
     ManagedResource,
     ResourceAggregateLoader,
     ResourceCleanupError,
-    ResourceController,
     ResourcePersistenceService,
+    SimpleResourceReconciler,
 };
 
 use crate::tests::utils::{TestResource, TestResourceReconcileError};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// TestResourceController
+// TestResourceReconciler
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[dill::component(pub)]
-#[dill::interface(dyn ResourceController<TestResource>)]
-pub struct TestResourceController;
+#[dill::interface(dyn SimpleResourceReconciler<TestResource>)]
+pub struct TestResourceReconciler;
 
 #[async_trait::async_trait]
-impl ResourceController<TestResource> for TestResourceController {
+impl SimpleResourceReconciler<TestResource> for TestResourceReconciler {
     async fn reconcile(&self, _resource: &TestResource) -> Result<(), TestResourceReconcileError> {
         Ok(())
     }
@@ -42,15 +42,15 @@ impl ResourceController<TestResource> for TestResourceController {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// TestResourceFailingController
+// TestResourceFailingReconciler
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[dill::component(pub)]
-#[dill::interface(dyn ResourceController<TestResource>)]
-pub struct TestResourceFailingController;
+#[dill::interface(dyn SimpleResourceReconciler<TestResource>)]
+pub struct TestResourceFailingReconciler;
 
 #[async_trait::async_trait]
-impl ResourceController<TestResource> for TestResourceFailingController {
+impl SimpleResourceReconciler<TestResource> for TestResourceFailingReconciler {
     async fn reconcile(&self, _resource: &TestResource) -> Result<(), TestResourceReconcileError> {
         Err(TestResourceReconcileError::Internal(
             "simulated reconcile failure".int_err(),
@@ -65,17 +65,17 @@ impl ResourceController<TestResource> for TestResourceFailingController {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// TestResourceCountingController
+// TestResourceCountingReconciler
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 // Not a #[dill::component] — always registered via add_value() so that the
 // Arc<AtomicU32> owned by the test is shared across all catalog resolutions.
-pub struct TestResourceCountingController {
+pub struct TestResourceCountingReconciler {
     pub call_count: Arc<AtomicU32>,
 }
 
 #[async_trait::async_trait]
-impl ResourceController<TestResource> for TestResourceCountingController {
+impl SimpleResourceReconciler<TestResource> for TestResourceCountingReconciler {
     async fn reconcile(&self, _resource: &TestResource) -> Result<(), TestResourceReconcileError> {
         self.call_count.fetch_add(1, Ordering::SeqCst);
         Ok(())
@@ -87,16 +87,16 @@ impl ResourceController<TestResource> for TestResourceCountingController {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// TestResourceSelectiveCleanupController
+// TestResourceSelectiveCleanupReconciler
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// Fails the cleanup of the resource named `failing_name` only.
-pub struct TestResourceSelectiveCleanupController {
+pub struct TestResourceSelectiveCleanupReconciler {
     pub failing_name: &'static str,
 }
 
 #[async_trait::async_trait]
-impl ResourceController<TestResource> for TestResourceSelectiveCleanupController {
+impl SimpleResourceReconciler<TestResource> for TestResourceSelectiveCleanupReconciler {
     async fn reconcile(&self, _resource: &TestResource) -> Result<(), TestResourceReconcileError> {
         Ok(())
     }
@@ -112,14 +112,14 @@ impl ResourceController<TestResource> for TestResourceSelectiveCleanupController
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// TestResourceInterferingCleanupController
+// TestResourceInterferingCleanupReconciler
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// During its first cleanup, plays another writer that updates the status of
 /// the resource being cleaned up, then fails that cleanup if asked to.
 #[dill::component(pub)]
-#[dill::interface(dyn ResourceController<TestResource>)]
-pub struct TestResourceInterferingCleanupController {
+#[dill::interface(dyn SimpleResourceReconciler<TestResource>)]
+pub struct TestResourceInterferingCleanupReconciler {
     catalog: dill::Catalog,
     interference: Arc<TestCleanupInterference>,
 }
@@ -130,7 +130,7 @@ pub struct TestCleanupInterference {
 }
 
 #[async_trait::async_trait]
-impl ResourceController<TestResource> for TestResourceInterferingCleanupController {
+impl SimpleResourceReconciler<TestResource> for TestResourceInterferingCleanupReconciler {
     async fn reconcile(&self, _resource: &TestResource) -> Result<(), TestResourceReconcileError> {
         Ok(())
     }
@@ -168,13 +168,13 @@ impl ResourceController<TestResource> for TestResourceInterferingCleanupControll
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// TestResourceFailingCleanupOnceController
+// TestResourceFailingCleanupOnceReconciler
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// Fails its first cleanup and succeeds on every later one.
 #[dill::component(pub)]
-#[dill::interface(dyn ResourceController<TestResource>)]
-pub struct TestResourceFailingCleanupOnceController {
+#[dill::interface(dyn SimpleResourceReconciler<TestResource>)]
+pub struct TestResourceFailingCleanupOnceReconciler {
     failure: Arc<TestCleanupFailureOnce>,
 }
 
@@ -184,7 +184,7 @@ pub struct TestCleanupFailureOnce {
 }
 
 #[async_trait::async_trait]
-impl ResourceController<TestResource> for TestResourceFailingCleanupOnceController {
+impl SimpleResourceReconciler<TestResource> for TestResourceFailingCleanupOnceReconciler {
     async fn reconcile(&self, _resource: &TestResource) -> Result<(), TestResourceReconcileError> {
         Ok(())
     }
@@ -203,7 +203,7 @@ impl ResourceController<TestResource> for TestResourceFailingCleanupOnceControll
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Default)]
-pub enum TestResourceControllerProvider {
+pub enum TestResourceReconcilerProvider {
     #[default]
     Stub,
     Failing,
@@ -215,35 +215,36 @@ pub enum TestResourceControllerProvider {
     FailingCleanupOnce,
 }
 
-impl TestResourceControllerProvider {
+impl TestResourceReconcilerProvider {
     pub fn embed_into_catalog(self, b: &mut dill::CatalogBuilder) {
         match self {
-            TestResourceControllerProvider::Stub => {
-                b.add::<TestResourceController>();
+            TestResourceReconcilerProvider::Stub => {
+                b.add::<TestResourceReconciler>();
             }
-            TestResourceControllerProvider::Failing => {
-                b.add::<TestResourceFailingController>();
+            TestResourceReconcilerProvider::Failing => {
+                b.add::<TestResourceFailingReconciler>();
             }
-            TestResourceControllerProvider::Counting(counter) => {
-                b.add_value(TestResourceCountingController {
+            TestResourceReconcilerProvider::Counting(counter) => {
+                b.add_value(TestResourceCountingReconciler {
                     call_count: counter,
                 })
-                .bind::<dyn ResourceController<TestResource>, TestResourceCountingController>();
+                .bind::<dyn SimpleResourceReconciler<TestResource>, TestResourceCountingReconciler>(
+                );
             }
-            TestResourceControllerProvider::FailingCleanupOf(failing_name) => {
-                b.add_value(TestResourceSelectiveCleanupController { failing_name })
-                    .bind::<dyn ResourceController<TestResource>, TestResourceSelectiveCleanupController>();
+            TestResourceReconcilerProvider::FailingCleanupOf(failing_name) => {
+                b.add_value(TestResourceSelectiveCleanupReconciler { failing_name })
+                    .bind::<dyn SimpleResourceReconciler<TestResource>, TestResourceSelectiveCleanupReconciler>();
             }
-            TestResourceControllerProvider::InterferingCleanup { then_fails } => {
+            TestResourceReconcilerProvider::InterferingCleanup { then_fails } => {
                 b.add_value(TestCleanupInterference {
                     done: AtomicBool::new(false),
                     then_fails,
                 });
-                b.add::<TestResourceInterferingCleanupController>();
+                b.add::<TestResourceInterferingCleanupReconciler>();
             }
-            TestResourceControllerProvider::FailingCleanupOnce => {
+            TestResourceReconcilerProvider::FailingCleanupOnce => {
                 b.add_value(TestCleanupFailureOnce::default());
-                b.add::<TestResourceFailingCleanupOnceController>();
+                b.add::<TestResourceFailingCleanupOnceReconciler>();
             }
         }
     }

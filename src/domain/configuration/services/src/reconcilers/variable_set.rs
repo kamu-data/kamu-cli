@@ -21,8 +21,8 @@ use kamu_resources::{
     DeclarativeResource,
     ManagedResource,
     ResourceCleanupError,
-    ResourceController,
     ResourceID,
+    SimpleResourceReconciler,
 };
 use time_source::SystemTimeSource;
 use uuid::Uuid;
@@ -32,8 +32,8 @@ use crate::PreviousConfigurationEntry;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[dill::component]
-#[dill::interface(dyn ResourceController<VariableSetResource>)]
-pub struct VariableSetControllerImpl {
+#[dill::interface(dyn SimpleResourceReconciler<VariableSetResource>)]
+pub struct VariableSetReconcilerImpl {
     variable_set_projection_repository: Arc<dyn VariableSetProjectionRepository>,
     time_source: Arc<dyn SystemTimeSource>,
 }
@@ -41,7 +41,7 @@ pub struct VariableSetControllerImpl {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-impl ResourceController<VariableSetResource> for VariableSetControllerImpl {
+impl SimpleResourceReconciler<VariableSetResource> for VariableSetReconcilerImpl {
     async fn reconcile(
         &self,
         resource: &VariableSetResource,
@@ -103,7 +103,7 @@ impl ResourceController<VariableSetResource> for VariableSetControllerImpl {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl VariableSetControllerImpl {
+impl VariableSetReconcilerImpl {
     async fn load_previous_entries_by_key(
         &self,
         resource_id: &ResourceID,
