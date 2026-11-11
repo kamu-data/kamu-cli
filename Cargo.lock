@@ -8487,6 +8487,7 @@ dependencies = [
  "read_input",
  "regex",
  "reqwest",
+ "retry-backoff",
  "rust-embed",
  "rustls",
  "secrecy",
@@ -9397,6 +9398,7 @@ name = "kamu-resources"
 version = "0.272.1"
 dependencies = [
  "async-trait",
+ "async-utils",
  "chrono",
  "database-common",
  "dill",
@@ -9407,6 +9409,7 @@ dependencies = [
  "mockall",
  "opendatafabric",
  "pretty_assertions",
+ "retry-backoff",
  "serde",
  "serde_json",
  "serde_with",
@@ -9562,6 +9565,7 @@ name = "kamu-resources-services"
 version = "0.272.1"
 dependencies = [
  "async-trait",
+ "async-utils",
  "chrono",
  "database-common",
  "database-common-macros",
@@ -9583,6 +9587,7 @@ dependencies = [
  "opendatafabric",
  "paste",
  "pretty_assertions",
+ "retry-backoff",
  "serde",
  "serde_json",
  "test-log",

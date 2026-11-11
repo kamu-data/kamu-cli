@@ -142,6 +142,7 @@ interface "ResetPlanner" <<i>>
 interface "ResourceAccountResolver" <<i>>
 interface "ResourceAggregateLoader" <<i>>
 interface "ResourceContextStore" <<i>>
+interface "ResourceControllerRuntime" <<i>>
 interface "ResourceControllerStateRepository" <<i>>
 interface "ResourceCrudDispatcher" <<i>>
 interface "ResourceExtensionSchemaDispatcher" <<i>>
@@ -394,6 +395,8 @@ class "ResourceContextRegistryService"
 class "ResourceContextReporter"
 class "ResourceContextResolver"
 class "ResourceContextTestService"
+class "ResourceControllerRuntimeConfig" <<singleton>>
+class "ResourceControllerRuntimeImpl" <<singleton>>
 class "ResourceDispatcherFactory"
 class "ResourceExtensionSchemaRegistry" <<singleton>>
 class "ResourceExtensionSchemaResolver"
@@ -1241,6 +1244,12 @@ class "WsSmartTransferProtocolClient"
 "ResourceAccountResolverImpl"  --> "AccountService"
 "ResourceAccountResolverImpl"  --> "RebacService"
 "ResourceAccountResolverImpl"  --> "CurrentAccountSubject"
+"BackgroundAgent" <|-- "ResourceControllerRuntimeImpl"
+"ResourceControllerRuntime" <|-- "ResourceControllerRuntimeImpl"
+"ResourceControllerRuntimeImpl"  --> "CatalogWeakRef"
+"ResourceControllerRuntimeImpl"  --> "SystemTimeSource"
+"ResourceControllerRuntimeImpl"  --> "ResourceControllerRuntimeConfig"
+"ResourceControllerRuntimeImpl"  --> "WakeupListenerConfig"
 "ResourceDispatcherFactory"  --> "Catalog"
 "MessageConsumer" <|-- "AccountLifecycleMessageConsumer"
 "MessageConsumerT" <|-- "AccountLifecycleMessageConsumer"
