@@ -17,6 +17,7 @@ use dill::CatalogBuilder;
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu_resources::{
     ApplyResourceParams,
+    ResourceControllerHints,
     ResourceControllerName,
     ResourceControllerRuntime,
     ResourceControllerRuntimeConfig,
@@ -26,6 +27,7 @@ use kamu_resources::{
     ResourceLifecyclePrimitives,
     ResourcePhase,
     ResourceVersion,
+    TypeUri,
 };
 use kamu_resources_services::ResourceControllerRuntimeImpl;
 use kamu_resources_services::testing::{
@@ -198,6 +200,14 @@ impl ControllerRuntimeHarness {
             .get_one::<FakeSystemTimeSource>()
             .unwrap()
             .advance(delta);
+    }
+
+    /// Hints the runtime that resources of the test type changed
+    pub fn hint(&self) {
+        self.catalog()
+            .get_one::<dyn ResourceControllerHints>()
+            .unwrap()
+            .hint(&TypeUri::new_unchecked(TestResource::SCHEMA_STR));
     }
 
     /// Starts the runtime's background agent; it stops when the returned
