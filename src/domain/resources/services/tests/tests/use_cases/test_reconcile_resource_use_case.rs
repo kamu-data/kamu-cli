@@ -15,7 +15,6 @@ use kamu_resources::{
     ApplyResourceParams,
     DeclarativeResource,
     ManagedResource,
-    ReconcileResourceUseCaseError,
     ResourceAggregateLoader,
     ResourceID,
     ResourceLifecyclePrimitives,
@@ -23,8 +22,9 @@ use kamu_resources::{
     ResourcePhase,
     ResourceStatusConflictError,
     SimpleResourceReconciler,
+    SimpleResourceReconciliationError,
 };
-use kamu_resources_services::ReconcileResourceUseCaseHelper;
+use kamu_resources_services::SimpleResourceControllerAdapterHelper;
 use kamu_resources_services::testing::{
     BaseResourceServiceHarness,
     BaseResourceServiceHarnessOpts,
@@ -47,11 +47,11 @@ async fn test_reconcile_returns_error_for_non_applied_resource() {
     let harness = ReconcileTestHarness::dispatching(TestResourceReconcilerProvider::Stub);
 
     let id = harness.allocate_resource_id().await;
-    let result = harness.reconcile_test_uc().execute(&id).await;
+    let result = harness.simple_controller().reconcile(&id).await;
 
     assert_matches!(
         result,
-        Err(ReconcileResourceUseCaseError::LoadFailed(_)),
+        Err(SimpleResourceReconciliationError::LoadFailed(_)),
         "expected LoadFailed for a non-applied resource, got: {result:?}"
     );
 }
@@ -96,7 +96,7 @@ async fn test_reconcile_success_transitions_resource_to_ready() {
     let account_handle = odf::ResourceOwnerHandle::new_test("test-owner");
     let id = harness.apply_and_get_id(&account_handle, "res-a").await;
 
-    harness.reconcile_test_uc().execute(&id).await.unwrap();
+    harness.simple_controller().reconcile(&id).await.unwrap();
     harness.flush_outbox().await;
 
     let snapshot = harness.get_snapshot_by_id(&id).await.unwrap();
@@ -124,7 +124,7 @@ async fn test_reconcile_failure_transitions_resource_to_failed() {
 
     // Reconciler errors are outcomes, not use-case failures — execute returns
     // Ok(())
-    harness.reconcile_test_uc().execute(&id).await.unwrap();
+    harness.simple_controller().reconcile(&id).await.unwrap();
     harness.flush_outbox().await;
 
     let snapshot = harness.get_snapshot_by_id(&id).await.unwrap();
@@ -151,7 +151,7 @@ async fn test_reconcile_invokes_reconciler_exactly_once() {
     let account_handle = odf::ResourceOwnerHandle::new_test("test-owner");
     let id = harness.apply_and_get_id(&account_handle, "res-a").await;
 
-    harness.reconcile_test_uc().execute(&id).await.unwrap();
+    harness.simple_controller().reconcile(&id).await.unwrap();
     harness.flush_outbox().await;
 
     assert_eq!(counter.load(Ordering::SeqCst), 1);
@@ -173,7 +173,7 @@ async fn test_already_reconciled_is_no_op_and_reconciler_is_not_called() {
     let id = harness.apply_and_get_id(&account_handle, "res-a").await;
 
     // First execute: Pending → reconciler called once → Ready
-    harness.reconcile_test_uc().execute(&id).await.unwrap();
+    harness.simple_controller().reconcile(&id).await.unwrap();
     harness.flush_outbox().await;
 
     assert_eq!(
@@ -183,7 +183,7 @@ async fn test_already_reconciled_is_no_op_and_reconciler_is_not_called() {
     );
 
     // Second execute: already Ready — no-op, no outbox message posted
-    harness.reconcile_test_uc().execute(&id).await.unwrap();
+    harness.simple_controller().reconcile(&id).await.unwrap();
     harness.flush_outbox().await;
 
     assert_eq!(
@@ -226,7 +226,7 @@ async fn test_reconcile_success_posts_status_updates_to_ready() {
     let account_handle = odf::ResourceOwnerHandle::new_test("test-owner");
     let id = harness.apply_and_get_id(&account_handle, "res-a").await;
 
-    harness.reconcile_test_uc().execute(&id).await.unwrap();
+    harness.simple_controller().reconcile(&id).await.unwrap();
     // MockOutbox verifies expected call counts on drop
 }
 
@@ -253,7 +253,7 @@ async fn test_reconcile_failure_posts_status_updates_to_failed() {
     let account_handle = odf::ResourceOwnerHandle::new_test("test-owner");
     let id = harness.apply_and_get_id(&account_handle, "res-a").await;
 
-    harness.reconcile_test_uc().execute(&id).await.unwrap();
+    harness.simple_controller().reconcile(&id).await.unwrap();
     // MockOutbox verifies expected call counts on drop
 }
 
@@ -325,7 +325,7 @@ async fn test_finish_phase_after_concurrent_status_update_returns_status_conflic
 
     assert_matches!(
         result,
-        Err(ReconcileResourceUseCaseError::StatusConflict(
+        Err(SimpleResourceReconciliationError::StatusConflict(
             ResourceStatusConflictError {
                 expected: 2,
                 actual: 3,
@@ -367,7 +367,7 @@ async fn test_overlapping_reconciliations_of_one_generation_record_one_outcome()
 
     assert_matches!(
         result,
-        Err(ReconcileResourceUseCaseError::StatusConflict(
+        Err(SimpleResourceReconciliationError::StatusConflict(
             ResourceStatusConflictError {
                 expected: 2,
                 actual: 3,
@@ -390,7 +390,7 @@ async fn test_reconcile_counts_status_updates() {
     let id = harness.apply_and_get_id(&account_handle, "res-a").await;
     assert_eq!(harness.load(&id).await.headers().status_generation, 1);
 
-    harness.reconcile_test_uc().execute(&id).await.unwrap();
+    harness.simple_controller().reconcile(&id).await.unwrap();
 
     let resource = harness.load(&id).await;
     assert_eq!(resource.headers().generation, 1);
@@ -416,7 +416,7 @@ async fn test_reconcile_of_resource_being_deleted_is_no_op() {
         .request_resources_deletion(account_handle.did, vec![id])
         .await;
 
-    harness.reconcile_test_uc().execute(&id).await.unwrap();
+    harness.simple_controller().reconcile(&id).await.unwrap();
 
     let resource = harness.load(&id).await;
     assert_eq!(resource.status().phase, ResourcePhase::Deleting);
@@ -503,8 +503,9 @@ impl ReconcileTestHarness {
         self.persistence.save(&mut resource).await.unwrap();
     }
 
-    fn make_reconcile_helper(&self) -> ReconcileResourceUseCaseHelper<'_, TestResource> {
-        ReconcileResourceUseCaseHelper::new(
+    fn make_reconcile_helper(&self) -> SimpleResourceControllerAdapterHelper<'_, TestResource> {
+        SimpleResourceControllerAdapterHelper::new(
+            self.loader.as_ref(),
             self.lifecycle_primitives.as_ref(),
             self.reconciler.as_ref(),
         )

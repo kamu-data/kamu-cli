@@ -14,12 +14,11 @@ use kamu_resources::{
     ApplyResourceApplicationDecision,
     ApplyResourceParams,
     ApplyResourceUseCase,
-    CompleteResourceDeletionUseCase,
-    ReconcileResourceUseCase,
     RequestAccountResourcesDeletionUseCase,
     RequestResourcesDeletionUseCase,
     ResourceID,
     ResourceSpecSanitizer,
+    SimpleResourceController,
 };
 use kamu_resources_services::testing::{
     BaseResourceServiceHarness,
@@ -156,13 +155,7 @@ impl ResourceUseCaseBaseHarness {
         self.catalog.get_one().unwrap()
     }
 
-    pub fn complete_deletion_test_uc(
-        &self,
-    ) -> Arc<dyn CompleteResourceDeletionUseCase<TestResource>> {
-        self.catalog.get_one().unwrap()
-    }
-
-    pub fn reconcile_test_uc(&self) -> Arc<dyn ReconcileResourceUseCase<TestResource>> {
+    pub fn simple_controller(&self) -> Arc<dyn SimpleResourceController<TestResource>> {
         self.catalog.get_one().unwrap()
     }
 
@@ -196,7 +189,10 @@ impl ResourceUseCaseBaseHarness {
     }
 
     pub async fn complete_deletion(&self, ids: &[ResourceID]) {
-        self.complete_deletion_test_uc().execute(ids).await.unwrap();
+        self.simple_controller()
+            .complete_deletions(ids)
+            .await
+            .unwrap();
     }
 
     pub async fn apply_and_assert_snapshot(
