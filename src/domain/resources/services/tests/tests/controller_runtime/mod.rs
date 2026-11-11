@@ -12,5 +12,6 @@ pub mod utils;
 mod test_controller_runtime_agent;
 mod test_controller_runtime_eligibility;
 mod test_controller_runtime_failures;
+mod test_controller_runtime_outbox;
 mod test_controller_runtime_registration;
 mod test_controller_runtime_restarts;

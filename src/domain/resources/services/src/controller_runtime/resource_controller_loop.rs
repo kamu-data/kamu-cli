@@ -54,7 +54,7 @@ pub(crate) struct ResourceControllerLoop {
     wakeup_config: Arc<WakeupListenerConfig>,
     time_source: Arc<dyn SystemTimeSource>,
     /// Shared by every loop of this controller, so that the agent's loop and
-    /// `run_until_idle` never drain at once and double-process a resource
+    /// a drain session never drain at once and double-process a resource
     drain_lock: Arc<tokio::sync::Mutex<()>>,
 }
 
@@ -84,9 +84,12 @@ impl ResourceControllerLoop {
     /// Processes pass after pass until no resource needs attention now. The
     /// listener, when the agent's loop drains, gets a heartbeat per pass, so a
     /// long drain still proves the loop alive.
+    ///
+    /// The hold-back is the caller's, so that several drains can share one.
     pub async fn drain(
         &self,
         listener: Option<&dyn WakeupListener>,
+        hold_back: &mut ResourceControllerDrainHoldBack,
     ) -> Result<ResourceControllerDrainReport, InternalError> {
         let _guard = self.drain_lock.lock().await;
 
@@ -104,11 +107,10 @@ impl ResourceControllerLoop {
         );
 
         let mut processed = 0;
-        let mut hold_back = ResourceControllerDrainHoldBack::default();
 
         loop {
             let planned_at = self.time_source.now();
-            let pass = planner.plan(planned_at, &hold_back).await?;
+            let pass = planner.plan(planned_at, hold_back).await?;
 
             // Only the last, empty pass tells what is left waiting: an earlier
             // pass may have deferred a resource that a later one processed

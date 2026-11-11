@@ -28,13 +28,16 @@ pub(crate) const MAX_PROCESS_CALLS_PER_DRAIN: usize = 10;
 /// but two cases escape it and would keep the drain going forever:
 ///
 /// - an extra resource the controller finished with: `Done` does not suppress an extra resource,
-///   and the controller may keep listing it;
+///   and the controller may keep listing it. It is held back only as an extra resource: once it
+///   changes, the eligibility predicates select it again, and it is processed;
 /// - a resource the controller never settles: one that keeps returning a `RetryAt` already due, or
 ///   `Done` with a version older than its own writes. It is held back once it reaches
 ///   `MAX_PROCESS_CALLS_PER_DRAIN`.
 ///
-/// Holding back lasts for this drain only: the next one asks again, so a
-/// misbehaving controller is slowed down, never starved of its resources.
+/// Holding back lasts as long as the caller keeps the value: the agent's loop
+/// starts each drain with a new one, so a misbehaving controller is slowed
+/// down, never starved of its resources; a drain session keeps one across its
+/// drains, so that they end.
 #[derive(Debug, Default)]
 pub(crate) struct ResourceControllerDrainHoldBack {
     finished_extras: HashSet<ResourceID>,
@@ -73,8 +76,17 @@ impl ResourceControllerDrainHoldBack {
         }
     }
 
-    pub fn holds_back(&self, id: &ResourceID) -> bool {
+    /// Whether the resource, listed as an extra one, is not asked about
+    pub fn holds_back_extra(&self, id: &ResourceID) -> bool {
         self.finished_extras.contains(id) || self.over_limit.contains(id)
+    }
+
+    /// Whether the resource, selected by the eligibility predicates, is not
+    /// asked about. A finished extra resource is not held back here: the
+    /// predicates suppress one finished at its current version, so selecting
+    /// it means it changed since.
+    pub fn holds_back_eligible(&self, id: &ResourceID) -> bool {
+        self.over_limit.contains(id)
     }
 
     /// An extra resource the controller finished with and still lists, which

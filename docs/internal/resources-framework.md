@@ -866,11 +866,15 @@ wait:  a hint for the schema | the effective deadline | the fallback timeout
 ```
 
 The existing types do not run on it yet: they still go through the lifecycle dispatcher
-([How reconciliation is scheduled](#how-reconciliation-is-scheduled)).
+([How reconciliation is scheduled](#how-reconciliation-is-scheduled)). A type driven by a controller
+registers its service layer without one
+(`register_<type>_resource_service_layer_without_lifecycle_dispatcher`), so that the controller
+alone reconciles it.
 
 **Registration.** A controller is a component bound as `dyn ResourceController` with a
 `ResourceControllerMeta { schema, controller_name, controller_revision, reacts_to_status }`. Each
-schema has one controller, and each controller a name of its own; the runtime refuses to start
+schema has one controller, each controller a name of its own, and a type with a controller no
+lifecycle dispatcher, which would reconcile it a second time; the runtime refuses to start
 otherwise. The name keys the controller's bookkeeping, so it must not change once released. The
 application registers the runtime itself (`app.rs`), and with no controller registered its agent
 waits forever, since a returning agent stops the server.
@@ -908,7 +912,9 @@ only loses the record, and the resource is asked again.
 step is due at once. Two cases escape the bookkeeping, and the drain holds them back until it ends
 (`ResourceControllerDrainHoldBack`): an extra resource the controller finished with and still
 lists, which breaks its contract, and a resource asked about `MAX_PROCESS_CALLS_PER_DRAIN` (10)
-times, whose controller never settles. The eligibility query asks for as many more rows as are
+times, whose controller never settles. The first is held back only as an extra resource: once it
+changes, the eligibility predicates select it again, so a drain session, which keeps its hold-back
+across drains, still processes a change that the outbox delivered in between. The eligibility query asks for as many more rows as are
 held back, so they cannot fill a batch and hide the resources still waiting.
 
 **The effective deadline** (`ResourceControllerWait`) is the earliest of:
@@ -926,9 +932,20 @@ became due after the last pass looked, and the loop drains again at once; when t
 resources back, it waits the failure backoff's minimal delay instead, so they do not spin it. The
 sleep uses `SystemTimeSource`, so tests drive it with `FakeSystemTimeSource`.
 
-**`run_until_idle()`** drains every controller once and does not wait for deadlines: a resource
-waiting for time stays for a later run. Its drains and the agent's never overlap for one
-controller.
+**Hints.** The lifecycle message consumer hints the schema's loop on every `Applied`,
+`DeletionRequested` and `StatusUpdated`, through `ResourceControllerHints`. The hint carries no
+data: the loop re-reads storage, so a missed hint costs only latency, up to the fallback timeout.
+The hub is in-process on every backend
+([wakeup-listeners.md](wakeup-listeners.md#3-inventory)).
+
+**Draining on demand.** A caller that does not run the agent opens a drain session
+(`new_drain_session()`), whose `drain_due_resources()` drains every controller once and does not
+wait for deadlines: a resource waiting for time stays for a later drain. The CLI, after a command,
+alternates it with the outbox until a drain processes nothing
+([`outbox.rs`](/src/app/cli/src/outbox.rs)): a message may make a resource actionable, and
+processing posts messages of its own. A session keeps what its drains held back until it ends, so
+that alternation ends too, even with a controller that never settles a resource. A session's
+drains and the agent's never overlap for one controller.
 
 **Failures of the runtime itself**, such as a storage error while planning or recording, end the
 agent.
@@ -1654,6 +1671,7 @@ flowchart LR
     MSG --> OB[("Outbox")]
 
     OB --> BRIDGE["ResourceLifecycleMessageConsumer<br/>(MESSAGE_CONSUMER_..._RESOURCE_LIFECYCLE_EVENT_BRIDGE)<br/>→ ResourceLifecycleEventDispatcher (per-type)"]
+    BRIDGE -.->|hint per schema| RT["ResourceControllerRuntime"]
     OB --> CFG["configuration crate:<br/>ConfigurationResourceLifecycleMessageConsumer"]
 
     ACC[["AccountLifecycleMessage::Deleted"]] --> OB2[("Outbox")]
@@ -1667,8 +1685,9 @@ flowchart LR
   (`use_cases/request_deletion.rs`), `Deleted` (the simple controller), and
   `StatusUpdated` for every status write of a [lifecycle primitive](#lifecycle-primitives): a
   reconciliation started, succeeded or failed, a cleanup failed, or a condition patch. Consumed by
-  the **event bridge** (routes to the per-type `ResourceLifecycleEventDispatcher` — this is what
-  schedules reconciliation and completes deletions) and by the configuration crate's
+  the **event bridge** (hints the [controller runtime](#controller-runtime) and routes to the
+  per-type `ResourceLifecycleEventDispatcher` — this is what schedules reconciliation and completes
+  deletions) and by the configuration crate's
   projection-maintenance consumer. See
   [How reconciliation is scheduled](#how-reconciliation-is-scheduled) for the split of duties.
 - **Account cascade** — when an account is deleted, `AccountLifecycleMessage::Deleted` is consumed by
@@ -1688,15 +1707,17 @@ Reconciliation is **not** synchronous within `apply` — it is driven by the out
 above). `apply` produces `Applied`; the generic **event bridge**
 `ResourceLifecycleMessageConsumer` (`MESSAGE_CONSUMER_KAMU_RESOURCE_LIFECYCLE_EVENT_BRIDGE`,
 [`resource_lifecycle_message_consumer.rs`](/src/domain/resources/services/src/message_handlers/resource_lifecycle_message_consumer.rs))
-consumes it, looks up the per-type `ResourceLifecycleEventDispatcher` by descriptor, and its
+consumes it, hints the [controller runtime](#controller-runtime), looks up the per-type
+`ResourceLifecycleEventDispatcher` by descriptor, and its
 `handle_applied` calls `SimpleResourceController::reconcile(id)`, which marks reconciliation
 started, runs the type's `SimpleResourceReconciler<R>`, records the outcome in the status, and posts
 `StatusUpdated` for each status write. `handle_deletion_requested` calls
 `SimpleResourceController::complete_deletions(ids)` with the whole batch
 ([(c) Deletion](#c-deletion)).
-`handle_deleted` is a no-op, and `StatusUpdated` reaches no dispatcher: no controller reacts to
-status changes. The dispatcher and the simple controller are generated together by the
-`declare_resource_service_layer!` macro and registered from the type's crate.
+`handle_deleted` is a no-op, and `StatusUpdated` reaches no dispatcher, only the runtime's hints.
+The dispatcher and the simple controller are generated together by the
+`declare_resource_service_layer!` macro and registered from the type's crate. A type registered
+without the dispatcher is left to its `ResourceController`.
 
 The **second consumer**, `ConfigurationResourceLifecycleMessageConsumer` (configuration crate),
 reacts to the `StatusUpdated` that records the reconciliation of the current generation to
@@ -1706,9 +1727,11 @@ trigger the cleanup again. The projection entries of a resource being deleted ar
 reconciler's `cleanup`. So the bridge **schedules reconciliation**, the configuration consumer
 **maintains projections**.
 
-> There is **no periodic/background reconcile loop** today — reconciliation fires once per `Applied`
-> message (i.e. per generation-changing apply). A failed reconcile is not automatically retried; a
-> subsequent re-apply that bumps the generation produces a new `Applied` and re-triggers the chain.
+> A type on the lifecycle dispatcher has **no periodic/background reconcile loop** — reconciliation
+> fires once per `Applied` message (i.e. per generation-changing apply). A failed reconcile is not
+> automatically retried; a subsequent re-apply that bumps the generation produces a new `Applied`
+> and re-triggers the chain. The [controller runtime](#controller-runtime) is that loop for the
+> types it drives.
 
 ### Lifecycle state machine
 
@@ -1751,8 +1774,8 @@ stateDiagram-v2
 - **`Failed` and `Degraded` are the unhealthy phases**, set by `mark_failed_or_degraded` with a
   `ReconciliationError` condition carrying the code and message: `Failed` when no generation was ever
   reconciled, `Degraded` when an earlier one was and is presumably still in effect.
-- **Neither is terminal, nor retried automatically.** There is no background reconcile worker or
-  scheduler yet. Recovery is driven by the user re-applying a changed manifest: the generation bumps
+- **Neither is terminal, nor retried automatically.** The types on the lifecycle dispatcher have no
+  background reconcile worker or scheduler. Recovery is driven by the user re-applying a changed manifest: the generation bumps
   and an `Applied` message reconciles it again.
 - An unchanged re-apply (`Untouched`) does not bump `generation` and so does not re-trigger
   reconciliation.

@@ -9,6 +9,7 @@
 
 mod resource_controller_candidate;
 mod resource_controller_drain_hold_back;
+mod resource_controller_drain_session_impl;
 mod resource_controller_hint_hub;
 mod resource_controller_loop;
 mod resource_controller_outcome_recorder;
@@ -22,6 +23,7 @@ mod resource_process_executor;
 
 pub(crate) use resource_controller_candidate::*;
 pub(crate) use resource_controller_drain_hold_back::*;
+pub(crate) use resource_controller_drain_session_impl::*;
 pub use resource_controller_hint_hub::*;
 pub(crate) use resource_controller_loop::*;
 pub(crate) use resource_controller_outcome_recorder::*;

@@ -14,6 +14,7 @@ use kamu_configuration_inmem::{
 use kamu_core::TenancyConfig;
 use kamu_resources::{MESSAGE_PRODUCER_KAMU_RESOURCE_SERVICE, ResourceLifecycleMessage};
 use messaging_outbox::{OutboxProvider, register_message_dispatcher};
+use wakeup_listener::WakeupListenerMetrics;
 
 use crate::utils::BaseGQLDatasetHarness;
 
@@ -41,6 +42,8 @@ impl BaseGQLResourceHarness {
             .add::<InMemorySecretSetProjectionRepository>();
 
         kamu_resources_services::register_dependencies(&mut b);
+        // For the controller hint hub
+        b.add::<WakeupListenerMetrics>();
         kamu_configuration_services::register_dependencies(&mut b);
 
         register_message_dispatcher::<ResourceLifecycleMessage>(

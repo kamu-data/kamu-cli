@@ -17,6 +17,8 @@ use crate::domain::{
     ActionableResourcesQuery,
     ResourceController,
     ResourceControllerMeta,
+    ResourceDispatcherMeta,
+    ResourceLifecycleEventDispatcher,
     TypeUri,
 };
 
@@ -31,7 +33,9 @@ pub(crate) struct ResourceControllerRegistration {
 
 impl ResourceControllerRegistration {
     /// Every controller registered in the catalog. Two controllers of one
-    /// schema, or two with one name, are a wiring error.
+    /// schema, two with one name, or a controller of a schema that also has a
+    /// lifecycle dispatcher, are a wiring error: the last would reconcile the
+    /// type twice.
     pub fn collect_all(catalog: &dill::Catalog) -> Result<Vec<Self>, InternalError> {
         let mut registrations = Vec::new();
         let mut schemas = HashSet::new();
@@ -61,12 +65,28 @@ impl ResourceControllerRegistration {
                     meta.controller_name.as_str()
                 )));
             }
+            if Self::has_lifecycle_dispatcher(catalog, meta.schema) {
+                return Err(InternalError::new(format!(
+                    "Resource controller registered for schema='{}', which also has a lifecycle \
+                     dispatcher: register the type's service layer without it",
+                    meta.schema
+                )));
+            }
 
             let controller = builder.get(catalog).int_err()?;
             registrations.push(Self::new(meta, controller)?);
         }
 
         Ok(registrations)
+    }
+
+    fn has_lifecycle_dispatcher(catalog: &dill::Catalog, schema: &str) -> bool {
+        catalog
+            .builders_for_with_meta::<dyn ResourceLifecycleEventDispatcher, _>(
+                |meta: &ResourceDispatcherMeta| meta.schema == schema,
+            )
+            .next()
+            .is_some()
     }
 
     fn new(

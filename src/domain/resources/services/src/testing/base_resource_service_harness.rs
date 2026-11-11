@@ -105,10 +105,11 @@ impl BaseResourceServiceHarness {
         let needs_bridge = matches!(opts.outbox_provider, OutboxProvider::Dispatching);
         opts.outbox_provider.embed_into_catalog(&mut b);
 
+        // The controller hint hub needs it with any outbox
+        b.add::<WakeupListenerMetrics>();
         if needs_bridge {
             b.add::<kamu_messaging_outbox_inmem::InMemoryOutboxMessageBridge>();
             b.add::<kamu_wakeup_listener_inmem::InMemoryWakeupHub>();
-            b.add::<WakeupListenerMetrics>();
         }
 
         kamu_resources_inmem::register_dependencies(&mut b);
