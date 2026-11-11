@@ -8,6 +8,8 @@
 // by the Apache License, Version 2.0.
 
 use chrono::{DateTime, Duration, Utc};
+use retry_backoff::RetryBackoff;
+pub use retry_backoff::RetryBackoffType;
 use serde::{Deserialize, Serialize};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -17,14 +19,6 @@ pub struct RetryPolicy {
     pub max_attempts: u32,
     pub min_delay_seconds: u32,
     pub backoff_type: RetryBackoffType,
-}
-
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub enum RetryBackoffType {
-    Fixed,
-    Linear,
-    Exponential,
-    ExponentialWithJitter,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -52,26 +46,15 @@ impl RetryPolicy {
             return None;
         }
 
-        // Compute delay, depending on the backoff type; it saturates at u32::MAX
-        // seconds
-        let exponential_delay = || {
-            self.min_delay_seconds
-                .saturating_mul(2u32.saturating_pow(run_attempt - 1))
-        };
-        let delay_seconds = match self.backoff_type {
-            RetryBackoffType::Fixed => self.min_delay_seconds,
-            RetryBackoffType::Linear => self.min_delay_seconds.saturating_mul(run_attempt),
-            RetryBackoffType::Exponential => exponential_delay(),
-            RetryBackoffType::ExponentialWithJitter => {
-                // Jitter lies in [0, min_delay_seconds), which is empty when the delay is 0
-                let jitter = rand::random::<u32>()
-                    .checked_rem(self.min_delay_seconds)
-                    .unwrap_or(0);
-                exponential_delay().saturating_add(jitter)
-            }
-        };
+        // The delay saturates at u32::MAX seconds
+        let delay = RetryBackoff {
+            backoff_type: self.backoff_type,
+            min_delay: std::time::Duration::from_secs(u64::from(self.min_delay_seconds)),
+            max_delay: Some(std::time::Duration::from_secs(u64::from(u32::MAX))),
+        }
+        .delay(run_attempt);
 
-        Some(last_attempt_at + Duration::seconds(i64::from(delay_seconds)))
+        Some(last_attempt_at + Duration::from_std(delay).unwrap())
     }
 }
 
