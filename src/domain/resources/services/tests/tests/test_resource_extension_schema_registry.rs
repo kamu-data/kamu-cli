@@ -238,6 +238,29 @@ fn test_condition_registration_exposes_condition_meta() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test]
+fn test_condition_meta_is_looked_up_by_uri_alone() {
+    let harness = ExtensionRegistryHarness::built_ins();
+
+    assert_eq!(
+        harness.condition_meta(RESOURCE_CONDITION_RECONCILIATION_ERROR_SCHEMA_URI),
+        Some(ResourceConditionSchemaMeta {
+            max_serialized_size: 16 * 1024,
+            carried: true,
+        })
+    );
+    assert_eq!(
+        harness.condition_meta(RESOURCE_LABEL_ENVIRONMENT_SCHEMA_URI),
+        None
+    );
+    assert_eq!(
+        harness.condition_meta("https://kamu.dev/schemas/resource/v1alpha1/conditions/Unknown"),
+        None
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test]
 #[should_panic(expected = "declares no condition metadata")]
 fn test_condition_without_condition_meta_fails_registry_construction() {
     ExtensionRegistryHarness::with_test_dispatchers(|b| {
@@ -310,6 +333,12 @@ impl ExtensionRegistryHarness {
             .resolve(kind, &self.uri_ref(uri), &self.default_schema)
             .unwrap()
             .unwrap()
+    }
+
+    fn condition_meta(&self, uri: &str) -> Option<ResourceConditionSchemaMeta> {
+        self.registry
+            .condition_meta(&TypeUri::new_unchecked(uri))
+            .copied()
     }
 
     fn assert_resolves_to_uri(

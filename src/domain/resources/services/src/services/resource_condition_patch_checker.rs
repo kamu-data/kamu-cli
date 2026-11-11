@@ -15,7 +15,6 @@ use crate::domain::{
     ResourceConditionsPatch,
     ResourceExtensionKind,
     ResourceSchemaId,
-    TypeRef,
     TypeUri,
 };
 
@@ -65,16 +64,11 @@ impl<'a> ResourceConditionPatchChecker<'a> {
         value: &serde_json::Value,
         resource_schema: &ResourceSchemaId,
     ) -> Result<(), ResourceConditionPatchError> {
-        let registration = self
-            .extension_schema_registry
-            .resolve(
-                ResourceExtensionKind::Condition,
-                &TypeRef::Uri(key.clone()),
-                resource_schema,
-            )?
-            .unwrap_or_else(|| {
-                unreachable!("URI extension resolution must return a registration or an error")
-            });
+        let registration = self.extension_schema_registry.resolve_uri(
+            ResourceExtensionKind::Condition,
+            key,
+            resource_schema,
+        )?;
 
         registration
             .dispatcher()

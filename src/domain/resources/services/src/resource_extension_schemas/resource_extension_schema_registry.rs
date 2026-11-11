@@ -137,9 +137,20 @@ impl ResourceExtensionSchemaRegistry {
     ) -> Result<Option<Arc<ResourceExtensionSchemaRegistration>>, ResourceExtensionResolutionError>
     {
         match key {
-            TypeRef::Uri(uri) => self.resolve_uri(kind, uri, resource_schema).map(Some),
+            TypeRef::Uri(uri) => self
+                .resolve_uri(kind, uri, resource_schema)
+                .map(|registration| Some(Arc::clone(registration))),
             TypeRef::Name(name) => Ok(self.resolve_name(kind, name, resource_schema)),
         }
+    }
+
+    /// The metadata of the condition registered under `uri`, or `None` when no
+    /// condition is. A map lookup only: unlike [`Self::resolve`], it does not
+    /// check that the condition applies to a resource type
+    pub fn condition_meta(&self, uri: &TypeUri) -> Option<&ResourceConditionSchemaMeta> {
+        self.by_uri
+            .get(uri)
+            .and_then(|registration| registration.condition.as_ref())
     }
 
     fn parse_registration(
@@ -303,12 +314,14 @@ impl ResourceExtensionSchemaRegistry {
         Ok(())
     }
 
-    fn resolve_uri(
+    /// Resolves a canonical key, which must be registered with `kind` and
+    /// apply to `resource_schema`
+    pub fn resolve_uri(
         &self,
         kind: ResourceExtensionKind,
         uri: &TypeUri,
         resource_schema: &ResourceSchemaId,
-    ) -> Result<Arc<ResourceExtensionSchemaRegistration>, ResourceExtensionResolutionError> {
+    ) -> Result<&Arc<ResourceExtensionSchemaRegistration>, ResourceExtensionResolutionError> {
         let Some(registration) = self.by_uri.get(uri) else {
             return Err(ResourceExtensionResolutionError::UnknownUri {
                 kind,
@@ -331,7 +344,7 @@ impl ResourceExtensionSchemaRegistry {
             });
         }
 
-        Ok(registration.clone())
+        Ok(registration)
     }
 
     fn resolve_name(
