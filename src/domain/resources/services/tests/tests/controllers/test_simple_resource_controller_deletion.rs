@@ -28,12 +28,13 @@ use kamu_resources_services::{
 };
 use messaging_outbox::{MockOutbox, OutboxProvider};
 
-use crate::tests::use_cases::{
-    ResourceUseCaseBaseHarness,
-    ResourceUseCaseBaseHarnessOpts,
+use crate::tests::utils::{
     SanitizerKind,
+    ServiceLayerTestHarness,
+    ServiceLayerTestHarnessOpts,
+    TestResource,
+    TestResourceReconcilerProvider,
 };
-use crate::tests::utils::{TestResource, TestResourceReconcilerProvider};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -64,7 +65,7 @@ async fn test_completed_deletion_posts_deleted_message() {
     BaseResourceServiceHarness::expect_deletion_requested_message(&mut mock_outbox, 1);
     BaseResourceServiceHarness::expect_deleted_message(&mut mock_outbox, 1);
 
-    let harness = ResourceUseCaseBaseHarness::new_with_mock_outbox(mock_outbox);
+    let harness = ServiceLayerTestHarness::new_with_mock_outbox(mock_outbox);
     let account_handle = odf::ResourceOwnerHandle::new_test("test-owner");
     let id = harness.apply_and_get_id(&account_handle, "res-a").await;
     harness
@@ -175,7 +176,7 @@ async fn test_repeated_id_in_one_call_completes_deletion_once() {
     BaseResourceServiceHarness::expect_deletion_requested_message(&mut mock_outbox, 1);
     BaseResourceServiceHarness::expect_deleted_message(&mut mock_outbox, 1);
 
-    let harness = ResourceUseCaseBaseHarness::new_with_mock_outbox(mock_outbox);
+    let harness = ServiceLayerTestHarness::new_with_mock_outbox(mock_outbox);
     let account_handle = odf::ResourceOwnerHandle::new_test("test-owner");
     let id = harness.apply_and_get_id(&account_handle, "res-a").await;
     harness
@@ -216,7 +217,7 @@ async fn test_batch_posts_one_deleted_message() {
     BaseResourceServiceHarness::expect_deletion_requested_message(&mut mock_outbox, 2);
     BaseResourceServiceHarness::expect_deleted_message(&mut mock_outbox, 2);
 
-    let harness = ResourceUseCaseBaseHarness::new_with_mock_outbox(mock_outbox);
+    let harness = ServiceLayerTestHarness::new_with_mock_outbox(mock_outbox);
     let account_handle = odf::ResourceOwnerHandle::new_test("test-owner");
     let id_a = harness.apply_and_get_id(&account_handle, "res-a").await;
     let id_b = harness.apply_and_get_id(&account_handle, "res-b").await;
@@ -337,16 +338,16 @@ async fn test_concurrent_modification_of_one_outcome_holds_back_only_its_resourc
 // Local harness
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[oop::extend(ResourceUseCaseBaseHarness, base)]
+#[oop::extend(ServiceLayerTestHarness, base)]
 struct CompleteDeletionTestHarness {
-    base: ResourceUseCaseBaseHarness,
+    base: ServiceLayerTestHarness,
     loader: Arc<dyn ResourceAggregateLoader<TestResource>>,
 }
 
 impl CompleteDeletionTestHarness {
     /// Messages wait in the outbox, so each step runs only when a test calls it.
     fn dispatching(reconciler_provider: TestResourceReconcilerProvider) -> Self {
-        let base = ResourceUseCaseBaseHarness::new_with_opts(ResourceUseCaseBaseHarnessOpts {
+        let base = ServiceLayerTestHarness::new_with_opts(ServiceLayerTestHarnessOpts {
             base_opts: BaseResourceServiceHarnessOpts {
                 outbox_provider: OutboxProvider::Dispatching,
                 ..Default::default()

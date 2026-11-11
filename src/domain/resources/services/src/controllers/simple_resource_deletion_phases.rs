@@ -66,7 +66,7 @@ pub trait SimpleResourceDeletionPhases<R: EventSourcedResource>: Sync {
     /// Runs each cleanup in a transaction of its own, so that a failing one,
     /// even a database error, holds back only its resource. Then records the
     /// outcomes as one batch, so that one `Deleted` message covers them.
-    async fn complete_deletions(
+    async fn run_deletion_phases(
         &self,
         ids: &[ResourceID],
     ) -> Result<(), SimpleResourceDeletionError<R>> {
