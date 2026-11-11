@@ -77,8 +77,11 @@ impl InMemoryResourceControllerStateRepository {
     /// The resources of the queried schema that match a predicate, each with
     /// the controller's row, if any
     fn matching_resources(&self, query: &ActionableResourcesQuery) -> Vec<MatchingResource> {
-        self.store.states.read(self.transaction_id, |states| {
-            self.resource_state.read(self.transaction_id, |resources| {
+        // A commit holds every participant's lock, taken in registration order,
+        // and `register_dependencies` registers the resource state first. Locking
+        // in another order deadlocks against a concurrent commit
+        self.resource_state.read(self.transaction_id, |resources| {
+            self.store.states.read(self.transaction_id, |states| {
                 resources
                     .snapshots()
                     .filter(|snapshot| snapshot.schema == query.schema)
