@@ -132,7 +132,7 @@ impl<'a> ResourceProcessExecutor<'a> {
 
 /// The text of a panic payload: `panic!` with a literal yields `&str`, with a
 /// format string `String`
-fn panic_message(payload: &(dyn Any + Send)) -> String {
+pub(crate) fn panic_message(payload: &(dyn Any + Send)) -> String {
     if let Some(message) = payload.downcast_ref::<&str>() {
         (*message).to_string()
     } else if let Some(message) = payload.downcast_ref::<String>() {

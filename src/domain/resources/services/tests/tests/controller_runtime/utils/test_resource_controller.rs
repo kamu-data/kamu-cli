@@ -61,7 +61,7 @@ macro_rules! declare_test_resource_controller {
                 _now: DateTime<Utc>,
                 limit: usize,
             ) -> Result<Vec<ResourceID>, InternalError> {
-                Ok(self.logic.list_extra_actionable(limit))
+                self.logic.list_extra_actionable($controller_name, limit)
             }
 
             async fn process(
@@ -82,6 +82,8 @@ macro_rules! declare_test_resource_controller {
 }
 
 pub const TEST_CONTROLLER_NAME: &str = "dev.kamu.test.TestResourceController";
+
+pub const OTHER_TEST_CONTROLLER_NAME: &str = "dev.kamu.test.OtherResourceController";
 
 /// A schema no resource of these tests has
 pub const TEST_OTHER_SCHEMA: &str = "https://test.kamu.dev/schemas/test/v1/OtherResource";
@@ -119,6 +121,14 @@ declare_test_resource_controller!(
 );
 
 declare_test_resource_controller!(
+    TestOtherResourceController,
+    schema = TEST_OTHER_SCHEMA,
+    controller_name = OTHER_TEST_CONTROLLER_NAME,
+    revision = 1,
+    reacts_to_status = false
+);
+
+declare_test_resource_controller!(
     TestOtherResourceControllerWithSameName,
     schema = TEST_OTHER_SCHEMA,
     controller_name = TEST_CONTROLLER_NAME,
@@ -146,6 +156,14 @@ pub enum TestControllerBehavior {
     Panic,
 }
 
+/// How a listing of extra resources fails: a failure of the runtime's own
+/// work, outside `process`
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TestListingFailure {
+    Error,
+    Panic,
+}
+
 /// What the tests script and observe, shared by every controller instance of
 /// a harness, across restarts
 #[derive(Clone)]
@@ -165,6 +183,10 @@ struct TestControllerScriptState {
     /// How often the runtime asked for the next extra deadline: once per wait
     extra_deadline_queries: usize,
     after_next_listing: Option<TestListingTwist>,
+    /// By controller name: how the next listings fail, and how many do
+    failing_listings: HashMap<&'static str, (TestListingFailure, usize)>,
+    /// By controller name: listings asked for, failed ones included
+    listings: HashMap<&'static str, usize>,
 }
 
 /// What happens right after the controller answers a listing of its extra
@@ -185,6 +207,8 @@ impl TestControllerScript {
                 extra_deadlines: Vec::new(),
                 extra_deadline_queries: 0,
                 after_next_listing: None,
+                failing_listings: HashMap::new(),
+                listings: HashMap::new(),
             })),
             called: Arc::new(Notify::new()),
         }
@@ -210,6 +234,28 @@ impl TestControllerScript {
             advance_clock,
             extras,
         });
+    }
+
+    /// The next `count` listings of the named controller fail
+    pub fn fail_next_listings(
+        &self,
+        controller_name: &'static str,
+        failure: TestListingFailure,
+        count: usize,
+    ) {
+        self.lock()
+            .failing_listings
+            .insert(controller_name, (failure, count));
+    }
+
+    /// How many times the runtime asked the named controller for its extra
+    /// resources, failed listings included: at least once per drain pass
+    pub fn listings_of(&self, controller_name: &str) -> usize {
+        self.lock()
+            .listings
+            .get(controller_name)
+            .copied()
+            .unwrap_or(0)
     }
 
     /// How many times the runtime prepared a wait, each asking for the next
@@ -255,8 +301,21 @@ impl TestControllerScript {
 
     /// Answers a listing of extra resources, then applies the pending twist,
     /// returning how far it moves the clock
-    fn list_extras(&self, limit: usize) -> (Vec<ResourceID>, Option<TimeDelta>) {
+    fn list_extras(
+        &self,
+        controller_name: &'static str,
+        limit: usize,
+    ) -> Result<(Vec<ResourceID>, Option<TimeDelta>), TestListingFailure> {
         let mut state = self.lock();
+        *state.listings.entry(controller_name).or_default() += 1;
+
+        if let Some((failure, remaining)) = state.failing_listings.get_mut(controller_name)
+            && *remaining > 0
+        {
+            *remaining -= 1;
+            return Err(*failure);
+        }
+
         let listed = state.extras.iter().take(limit).copied().collect();
 
         let advance_clock = state.after_next_listing.take().map(|twist| {
@@ -264,7 +323,7 @@ impl TestControllerScript {
             twist.advance_clock
         });
 
-        (listed, advance_clock)
+        Ok((listed, advance_clock))
     }
 
     fn next_extra_deadline(&self, after: DateTime<Utc>) -> Option<DateTime<Utc>> {
@@ -296,8 +355,18 @@ pub struct TestResourceControllerLogic {
 }
 
 impl TestResourceControllerLogic {
-    fn list_extra_actionable(&self, limit: usize) -> Vec<ResourceID> {
-        let (listed, advance_clock) = self.script.list_extras(limit);
+    fn list_extra_actionable(
+        &self,
+        controller_name: &'static str,
+        limit: usize,
+    ) -> Result<Vec<ResourceID>, InternalError> {
+        let (listed, advance_clock) = match self.script.list_extras(controller_name, limit) {
+            Ok(listing) => listing,
+            Err(TestListingFailure::Error) => {
+                return Err(InternalError::new("scripted listing failure"));
+            }
+            Err(TestListingFailure::Panic) => panic!("scripted listing panic"),
+        };
 
         if let Some(delta) = advance_clock {
             self.catalog
@@ -306,7 +375,7 @@ impl TestResourceControllerLogic {
                 .advance(delta);
         }
 
-        listed
+        Ok(listed)
     }
 
     async fn process(&self, id: ResourceID) -> Result<ResourceProcessOutcome, InternalError> {

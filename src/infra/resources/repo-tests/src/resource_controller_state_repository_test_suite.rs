@@ -285,6 +285,40 @@ pub async fn test_next_deadline_ignores_deleted_resources(catalog: &Catalog) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+pub async fn test_count_failing_resources(catalog: &Catalog) {
+    let ctx = ControllerStateTestContext::new(catalog);
+    let failing = ctx.create_resource("failing").await;
+    let recovered = ctx.create_resource("recovered").await;
+    let mut deleted = ctx.create_resource("deleted").await;
+    let retrying = ctx.create_resource("retrying").await;
+
+    assert_eq!(ctx.count_failing(&CONTROLLER).await, 0);
+
+    let retry_at = ctx.now + TimeDelta::minutes(5);
+    for resource in [&failing, &recovered, &deleted, &retrying] {
+        ctx.upsert(&ctx.retry_state(&CONTROLLER, resource, retry_at))
+            .await;
+    }
+    ctx.upsert(&ctx.retry_state(&OTHER_CONTROLLER, &failing, retry_at))
+        .await;
+    assert_eq!(ctx.count_failing(&CONTROLLER).await, 4);
+
+    // A success resets the failures, a planned retry is not one
+    ctx.upsert(&ctx.done_state(&CONTROLLER, &recovered, REVISION))
+        .await;
+    let mut planned_retry = ctx.retry_state(&CONTROLLER, &retrying, retry_at);
+    planned_retry.attempts = 0;
+    planned_retry.last_error = None;
+    ctx.upsert(&planned_retry).await;
+    assert_eq!(ctx.count_failing(&CONTROLLER).await, 2);
+
+    ctx.complete_deletion(&mut deleted).await;
+    assert_eq!(ctx.count_failing(&CONTROLLER).await, 1);
+    assert_eq!(ctx.count_failing(&OTHER_CONTROLLER).await, 1);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 pub async fn test_delete_states_for_resource(catalog: &Catalog) {
     let ctx = ControllerStateTestContext::new(catalog);
     let removed = ctx.create_resource("removed").await;
@@ -497,6 +531,13 @@ impl ControllerStateTestContext {
             .unwrap();
         resource_ids.sort();
         resource_ids
+    }
+
+    async fn count_failing(&self, controller: &ResourceControllerName) -> usize {
+        self.states
+            .count_failing_resources(controller)
+            .await
+            .unwrap()
     }
 
     async fn next_deadline(&self, reacts_to_status: bool) -> Option<DateTime<Utc>> {

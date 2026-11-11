@@ -272,6 +272,31 @@ impl ResourceControllerStateRepository for PostgresResourceControllerStateReposi
 
         Ok(next_deadline)
     }
+
+    async fn count_failing_resources(
+        &self,
+        controller: &ResourceControllerName,
+    ) -> Result<usize, InternalError> {
+        let mut tr = self.transaction.lock().await;
+        let connection_mut = tr.connection_mut().await?;
+
+        let count = sqlx::query_scalar!(
+            r#"
+            SELECT COUNT(*) AS "count!"
+            FROM resource_controller_state AS s
+            JOIN resources AS r ON r.resource_id = s.resource_id
+            WHERE s.controller = $1
+              AND s.attempts > 0
+              AND r.deleted_at IS NULL
+            "#,
+            controller.as_str(),
+        )
+        .fetch_one(connection_mut)
+        .await
+        .int_err()?;
+
+        Ok(usize::try_from(count).unwrap())
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

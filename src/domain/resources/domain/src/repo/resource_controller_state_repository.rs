@@ -65,6 +65,13 @@ pub trait ResourceControllerStateRepository: Send + Sync {
         &self,
         query: &ActionableResourcesQuery,
     ) -> Result<Option<DateTime<Utc>>, InternalError>;
+
+    /// How many resources that are not deleted have a row of the controller
+    /// recording a failure since its last success (`attempts > 0`).
+    async fn count_failing_resources(
+        &self,
+        controller: &ResourceControllerName,
+    ) -> Result<usize, InternalError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
