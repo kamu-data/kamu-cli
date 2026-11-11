@@ -223,7 +223,8 @@ flowchart TD
     subgraph domain["Domain + services"]
       REG["ResourceDispatcherFactory<br/>lookup by schema metadata"]
       DISP["ResourceCrudDispatcher&lt;R&gt;<br/>per-type"]
-      UC["Use cases&lt;R&gt;<br/>apply / reconcile / get / list / delete"]
+      UC["Use cases&lt;R&gt;<br/>apply / request deletion"]
+      CTL["SimpleResourceController&lt;R&gt;<br/>reconcile / complete deletions"]
     end
 
     STORE[("Event store + ResourceRepository<br/>(snapshots)")]
@@ -237,6 +238,7 @@ flowchart TD
     LOCAL --> REG --> DISP --> UC
     UC --> STORE
     UC --> OUTBOX
+    OUTBOX --> CTL --> STORE
 ```
 
 Note the loop: the **remote** facade implementation calls back into the GraphQL adapter of a remote
@@ -598,7 +600,7 @@ Note names are normalized to lowercase on write, so case-only differences are no
 ## 9. Services (`kamu-resources-services`)
 
 This crate turns the domain traits into running code. Module layout: `services/`, `use_cases/`,
-`crud_dispatchers/`, `message_handlers/`, `event_stores/`, `resources/`, `testing/`.
+`controllers/`, `crud_dispatchers/`, `message_handlers/`, `event_stores/`, `resources/`, `testing/`.
 
 **Supporting services:**
 
@@ -1891,7 +1893,7 @@ pub fn register_variable_set_resource_crud_dispatcher(catalog_builder: &mut dill
    canonical should be the schema `TypeName`; include at least the singular and plural lowercase
    forms and a short code as aliases). No `status.rs` is needed — status is inherited automatically
    via the shared `ResourceStatus`/`ResourceStatusExt`, written through the generic
-   `StatusUpdated` event by the reconcile use case.
+   `StatusUpdated` event by the type's simple controller.
 2. **Implement a `SimpleResourceReconciler<R>`** in `configuration/services/src/reconcilers/`
    (no-op projection is fine if there's nothing to do; transform the spec here if needed — see
    `SecretSet`).
@@ -1899,7 +1901,8 @@ pub fn register_variable_set_resource_crud_dispatcher(catalog_builder: &mut dill
    `declare_resource_presentation_dispatcher!` (and a spec-view dispatcher if the type has sensitive
    fields) and add a `register_<type>_resource_crud_dispatcher(builder)` function.
 4. **Wire it into DI** — generate the per-type service layer (event-store bridge, loader,
-   persistence, typed query, all use cases, and the lifecycle controller dispatcher) with the
+   persistence, typed query, all use cases, the simple controller adapter, and the lifecycle
+   controller dispatcher) with the
    `declare_resource_service_layer!` umbrella macro, then call its
    `register_<type>_resource_service_layer(builder)` plus your CRUD/presentation/spec-view
    `register_*` from the crate's `dependencies.rs`, and `add` the `SimpleResourceReconciler<R>`
@@ -1922,10 +1925,10 @@ Three tiers, all exercising the real `VariableSet` / `SecretSet` types:
 **Service-level (unit/integration)** —
 [`src/domain/resources/services/tests`](/src/domain/resources/services/tests) and
 [`src/domain/configuration/services/tests`](/src/domain/configuration/services/tests). Cover the
-apply planner/executor, reconcile transitions, CRUD dispatch, persistence, the event-store bridge,
-and the message consumers. A `TestResource` mock and `BaseResourceServiceHarness`
-(`services/src/testing/`) provide a type-agnostic harness; configuration tests cover the real
-controllers (incl. the `SecretSet` spec sanitizer, encrypted projection, and `reveal_spec`).
+apply planner/executor, the simple controller's reconciliation and deletion, CRUD dispatch,
+persistence, the event-store bridge, and the message consumers. A `TestResource` mock and
+`BaseResourceServiceHarness` (`services/src/testing/`) provide a type-agnostic harness;
+configuration tests cover the real reconcilers (incl. the `SecretSet` spec sanitizer, encrypted projection, and `reveal_spec`).
 
 **Facade contract tests** —
 [`src/domain/resources/facade-tests`](/src/domain/resources/facade-tests). The key idea: a
@@ -1984,7 +1987,7 @@ Otherwise the behavior is already guaranteed for both implementations by the con
 | --- | --- | --- | --- |
 | Domain model | `kamu-resources` | `src/domain/resources/domain/src` | `core/`, `state/`, `values/`, `manifests/`, `repo/`, `dispatchers/`, `messages/`, `use_cases/`, `views/` |
 | Domain schemas | `kamu-resources` | `src/domain/resources/schemas` | Informational JSON schemas for framework-owned resource extensions: built-in labels and annotations. ODF-defined extensions, such as the `ReconciliationError` condition, have none here. |
-| Services | `kamu-resources-services` | `src/domain/resources/services/src` | `use_cases/{apply,reconcile,request_deletion,complete_deletion}.rs`, `crud_dispatchers/resource_dispatcher_factory.rs`, `resource_extension_schemas/`, `message_handlers/`, `event_stores/`, `dependencies.rs` |
+| Services | `kamu-resources-services` | `src/domain/resources/services/src` | `use_cases/{apply,request_deletion}.rs`, `controllers/`, `crud_dispatchers/resource_dispatcher_factory.rs`, `resource_extension_schemas/`, `message_handlers/`, `event_stores/`, `dependencies.rs` |
 | Facade | `kamu-resources-facade` | `src/domain/resources/facade/src/facade` | `resource_facade.rs`, `local/` |
 | Remote facade | `kamu-adapter-resources-facade-graphql` | `src/adapter/resources-facade-graphql/src` | `remote_graphql_resource_facade_impl.rs`, `cynic_api/`, `outcome_mapper/` |
 | GraphQL | (adapter) | `src/adapter/graphql/src` | `queries/resources/`, `mutations/resources_mut/` |

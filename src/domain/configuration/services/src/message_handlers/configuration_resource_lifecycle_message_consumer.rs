@@ -96,7 +96,7 @@ impl MessageConsumerT<ResourceLifecycleMessage> for ConfigurationResourceLifecyc
                 }
             }
             // Only a reconciled generation supersedes projection entries, and
-            // deletion cleanup belongs to the controllers
+            // deletion cleanup belongs to the reconcilers
             ResourceLifecycleMessage::Applied(_)
             | ResourceLifecycleMessage::DeletionRequested(_)
             | ResourceLifecycleMessage::Deleted(_)
