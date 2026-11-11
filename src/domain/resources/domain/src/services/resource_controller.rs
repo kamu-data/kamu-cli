@@ -29,6 +29,9 @@ pub trait ResourceController: Send + Sync {
     /// whose claim expired. `process` must take such a resource out of this
     /// set or return `RetryAt`; one that returns `Done` and stays in the set is
     /// asked about at most once per drain.
+    ///
+    /// The runtime may ask again within one pass with a larger `limit`, when
+    /// the resources listed first are backing off.
     async fn list_extra_actionable(
         &self,
         _now: DateTime<Utc>,
@@ -44,9 +47,14 @@ pub trait ResourceController: Send + Sync {
     /// An error is retried with a backoff that grows with each failure.
     async fn process(&self, id: &ResourceID) -> Result<ResourceProcessOutcome, InternalError>;
 
-    /// The nearest moment a resource joins the extra set without any message,
-    /// such as the earliest claim expiry
-    async fn next_extra_deadline(&self) -> Result<Option<DateTime<Utc>>, InternalError> {
+    /// The nearest moment after `after` that a resource joins the extra set
+    /// without any message, such as the earliest claim expiring after it.
+    /// Moments up to `after` were covered by a listing already, so returning
+    /// one of them would hide the later ones.
+    async fn next_extra_deadline(
+        &self,
+        _after: DateTime<Utc>,
+    ) -> Result<Option<DateTime<Utc>>, InternalError> {
         Ok(None)
     }
 }
