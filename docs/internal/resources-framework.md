@@ -609,9 +609,9 @@ This crate turns the domain traits into running code. Module layout: `services/`
 - **`GenericResourceQueryService`** (impl `GenericResourceQueryServiceImpl`) — descriptor-agnostic
   queries (allocate UID, find by name, search identities) delegating to `ResourceRepository`.
 - **`TypedResourceQueryService<R>`** — type-safe queries for a single type.
-- **`ResourceController<R>`** — the per-type main controller (implemented in the type's crate):
-  `reconcile` drives the resource toward its spec, and `cleanup` removes what it built before the
-  deletion completes ([(c) Deletion](#c-deletion)).
+- **`SimpleResourceReconciler<R>`** — the per-type one-shot callbacks (implemented in the type's
+  crate): `reconcile` drives the resource toward its spec, and `cleanup` removes what it built
+  before the deletion completes ([(c) Deletion](#c-deletion)).
 
 **Two-phase apply.** `ApplyResourceUseCase<R>` separates *planning* (validate, diff, decide
 create/update/untouched, without writing) from *application* (persist + publish)
@@ -1401,7 +1401,7 @@ lines rather than two whole-object dumps — the property that motivated this de
 ```mermaid
 sequenceDiagram
     participant UC as ReconcileResourceUseCase<R>
-    participant Ctl as ResourceController<R>
+    participant Ctl as SimpleResourceReconciler<R>
     participant P as LifecyclePrimitives<R>
 
     UC->>P: begin_reconciliation(id) → StatusUpdated if the generation is not yet reconciled and not already Reconciling (status gen. N)
@@ -1423,8 +1423,8 @@ the status at most once through a [lifecycle primitive](#lifecycle-primitives):
 - **Phase 1** commits the `Reconciling` status, a stable hand-off point, which brings
   `statusGeneration` to some N. A resource already `Reconciling` keeps its status, and N is its
   current `statusGeneration`.
-- **Phase 2** runs the `ResourceController<R>` on that resource, then commits the outcome (`Ready`,
-  `Failed` or `Degraded`) in a separate transaction, conditional on the generation and
+- **Phase 2** runs the `SimpleResourceReconciler<R>` on that resource, then commits the outcome
+  (`Ready`, `Failed` or `Degraded`) in a separate transaction, conditional on the generation and
   `statusGeneration` still being the ones phase 1 left.
 - **A changed generation between the phases** (any apply between them) discards the outcome without
   saving or posting anything: it was computed for a superseded generation, and the newer `Applied`
@@ -1448,7 +1448,7 @@ sequenceDiagram
     participant P as LifecyclePrimitives<R>
     participant OB as Outbox
     participant CD as CompleteResourceDeletionUseCase<R>
-    participant Ctl as ResourceController<R>
+    participant Ctl as SimpleResourceReconciler<R>
 
     RQ->>P: request_deletion(ids) → DeletionRequested (Deleting)
     P->>OB: produce ResourceLifecycleMessage::DeletionRequested (one per batch)
@@ -1472,11 +1472,11 @@ Deletion runs in two steps, as the ODF resource framework defines them
   ([§6](#6-persistence-model)). Its headers and spec can no longer change, and it is no longer
   reconciled. Requesting the deletion of a resource already being deleted, by its id, posts the
   message again, which retries its cleanup.
-- **Completing the deletion** runs the main controller's `cleanup`, then appends `Deleted`, which
+- **Completing the deletion** runs the reconciler's `cleanup`, then appends `Deleted`, which
   renames the resource to its tombstone. Resources that do not wait for cleanup are skipped, so a
   message delivered twice completes a deletion once.
 - **Each cleanup runs in a transaction of its own**, so a failing one, a database error included,
-  holds back only its resource and discards whatever the controller wrote before failing. The
+  holds back only its resource and discards whatever the reconciler wrote before failing. The
   outcomes are then recorded in one transaction, failures first and completions last, so one
   `Deleted` message covers the batch. A
   concurrent modification of any resource in it rolls that transaction back; the outcomes are then
@@ -1547,8 +1547,8 @@ above). `apply` produces `Applied`; the generic **event bridge**
 [`resource_lifecycle_message_consumer.rs`](/src/domain/resources/services/src/message_handlers/resource_lifecycle_message_consumer.rs))
 consumes it, looks up the per-type `ResourceLifecycleEventDispatcher` by descriptor, and its
 `handle_applied` calls `ReconcileResourceUseCase::execute(id)` (which loads the aggregate, marks
-reconciliation started, runs the type's `ResourceController<R>`, records the outcome in the status, and
-posts `StatusUpdated` for each status write). `handle_deletion_requested` calls
+reconciliation started, runs the type's `SimpleResourceReconciler<R>`, records the outcome in the
+status, and posts `StatusUpdated` for each status write). `handle_deletion_requested` calls
 `CompleteResourceDeletionUseCase::execute(ids)` with the whole batch ([(c) Deletion](#c-deletion)).
 `handle_deleted` is a no-op, and `StatusUpdated` reaches no dispatcher: no controller reacts to
 status changes. The dispatcher + reconcile use case are generated together by the
@@ -1559,7 +1559,7 @@ reacts to the `StatusUpdated` that records the reconciliation of the current gen
 **garbage-collect read-side projections** (drop superseded generations) — it does *not*
 reconcile. A later status update of the reconciled resource keeps its `reconciledAt` and does not
 trigger the cleanup again. The projection entries of a resource being deleted are removed by its
-controller's `cleanup`. So the bridge **schedules reconciliation**, the configuration consumer
+reconciler's `cleanup`. So the bridge **schedules reconciliation**, the configuration consumer
 **maintains projections**.
 
 > There is **no periodic/background reconcile loop** today — reconciliation fires once per `Applied`
@@ -1568,7 +1568,7 @@ controller's `cleanup`. So the bridge **schedules reconciliation**, the configur
 
 ### Lifecycle state machine
 
-Below is the machine as implemented for `VariableSet` / `SecretSet`. The controller's transitions
+Below is the machine as implemented for `VariableSet` / `SecretSet`. The status transitions
 come from `ResourceStatusExt` in
 [`state/resource_status.rs`](/src/domain/resources/domain/src/state/resource_status.rs)
 (`mark_reconciling` → `Reconciling`, `mark_ready` → `Ready`, `mark_failed_or_degraded` → `Failed`
@@ -1601,7 +1601,7 @@ stateDiagram-v2
 **Notes on current behavior:**
 
 - **`Pending` is not written, it is derived.** A spec or header change bumps `generation` and leaves
-  the status as the controller wrote it, so the conditions of the previous reconciliation stay
+  the status as it was last written, so the conditions of the previous reconciliation stay
   visible while the phase shows `Pending` and then `Reconciling`. The outcome of that
   reconciliation replaces them: success clears `ReconciliationError`, a failure sets it again.
 - **`Failed` and `Degraded` are the unhealthy phases**, set by `mark_failed_or_degraded` with a
@@ -1775,7 +1775,7 @@ on the way through; that still bumps the generation only once. The `aes256gcm` f
 the auto-managed sets (those are deleted, not stripped), and a normally-authored set is always
 already `jwe`.
 
-*Projection GC is inherited, not repeated.* Deleting runs the controller's `cleanup`, which drops
+*Projection GC is inherited, not repeated.* Deleting runs the reconciler's `cleanup`, which drops
 the read-side entries ([(c) Deletion](#c-deletion)).
 
 The bindings system had an equivalent consumer before the label replaced it, but it was strictly
@@ -1788,7 +1788,7 @@ orphaned binding rows.
 > read-side projection, logs, GraphQL responses, CLI output, diffs, or outbox payloads. `SecretSet`
 > input is converted to an encrypted canonical representation **before the first durable write.**
 
-Encryption happens in **two places — not (primarily) in the controller**, which is the easy wrong
+Encryption happens in **two places — not (primarily) in the reconciler**, which is the easy wrong
 assumption:
 
 1. **Spec sanitizer — the pre-persistence boundary** ([`sanitizers/secret_set.rs`](/src/domain/configuration/services/src/sanitizers/secret_set.rs)).
@@ -1818,8 +1818,8 @@ assumption:
    `ResourceSpecSanitizer::sanitize_new_spec` returns `SanitizeSpecOutcome<R>` so sanitizers can
    report key-dependent business rejections without adding resource-specific `LifecycleError`
    variants; technical failures still return `InternalError`.
-2. **Controller — encrypted read-side projection** ([`controllers/secret_set.rs`](/src/domain/configuration/services/src/controllers/secret_set.rs)).
-   `SecretSetControllerImpl` re-encrypts into a *separate* projection (`SecretSetEntry` rows in
+2. **Reconciler — encrypted read-side projection** ([`reconcilers/secret_set.rs`](/src/domain/configuration/services/src/reconcilers/secret_set.rs)).
+   `SecretSetReconcilerImpl` re-encrypts into a *separate* projection (`SecretSetEntry` rows in
    `SecretSetProjectionRepository`) that downstream consumers read; ciphertext-only, and it does not
    rewrite the resource `spec`.
 
@@ -1881,8 +1881,9 @@ pub fn register_variable_set_resource_crud_dispatcher(catalog_builder: &mut dill
    forms and a short code as aliases). No `status.rs` is needed — status is inherited automatically
    via the shared `ResourceStatus`/`ResourceStatusExt`, written through the generic
    `StatusUpdated` event by the reconcile use case.
-2. **Implement a `ResourceController<R>`** in `configuration/services/src/controllers/` (no-op projection is
-   fine if there's nothing to do; transform the spec here if needed — see `SecretSet`).
+2. **Implement a `SimpleResourceReconciler<R>`** in `configuration/services/src/reconcilers/`
+   (no-op projection is fine if there's nothing to do; transform the spec here if needed — see
+   `SecretSet`).
 3. **Declare dispatchers** with `declare_resource_crud_dispatcher!` /
    `declare_resource_presentation_dispatcher!` (and a spec-view dispatcher if the type has sensitive
    fields) and add a `register_<type>_resource_crud_dispatcher(builder)` function.
@@ -1890,7 +1891,8 @@ pub fn register_variable_set_resource_crud_dispatcher(catalog_builder: &mut dill
    persistence, typed query, all use cases, and the lifecycle controller dispatcher) with the
    `declare_resource_service_layer!` umbrella macro, then call its
    `register_<type>_resource_service_layer(builder)` plus your CRUD/presentation/spec-view
-   `register_*` from the crate's `dependencies.rs`, and `add` the `ResourceController<R>` impl.
+   `register_*` from the crate's `dependencies.rs`, and `add` the `SimpleResourceReconciler<R>`
+   impl.
 5. **Test all three tiers** (see [§15](#15-tests)): a controller/service unit test, a facade contract
    case, and an E2E lifecycle test (apply → list → get → update → delete) plus a golden-view test.
 
@@ -1977,7 +1979,7 @@ Otherwise the behavior is already guaranteed for both implementations by the con
 | GraphQL | (adapter) | `src/adapter/graphql/src` | `queries/resources/`, `mutations/resources_mut/` |
 | CLI commands | (app/cli) | `src/app/cli/src/commands` | `apply_command.rs`, `list_resources_command.rs`, `get_resource_command.rs`, `delete_resources_command.rs`, `context_*_command.rs` |
 | CLI services | (app/cli) | `src/app/cli/src/services/resources` | `resource_facade_factory.rs`, `resource_manifest_{discovery,execution}_service.rs`, `resource_type_lookup_service.rs`, `resource_selection_*_service.rs`, `resource_summary_service.rs`, `impl/` |
-| Concrete types | `kamu-configuration` / `-services` | `src/domain/configuration/{domain,services}/src` | `resources/{variable_set,secret_set}/`, `controllers/`, `resource_crud_dispatchers/`, `dependencies.rs` |
+| Concrete types | `kamu-configuration` / `-services` | `src/domain/configuration/{domain,services}/src` | `resources/{variable_set,secret_set}/`, `reconcilers/`, `resource_crud_dispatchers/`, `dependencies.rs` |
 | Concrete type (WIP) | `kamu-storage` / `-services` | `src/domain/storage/{domain,services}/src` | `Storage` type (`st`/`storage`) — registered in the CLI catalog but incomplete; same machinery as above |
 | Tests | several | see [§15](#15-tests) | `resources/services/tests`, `resources/facade-tests`, `e2e/app/cli/repo-tests/src/commands/resources` |
 

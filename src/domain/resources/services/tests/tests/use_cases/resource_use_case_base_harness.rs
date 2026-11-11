@@ -29,7 +29,7 @@ use messaging_outbox::{MockOutbox, OutboxAgent, OutboxProvider};
 
 use crate::tests::utils::{
     TestResource,
-    TestResourceControllerProvider,
+    TestResourceReconcilerProvider,
     TestResourceSpec,
     TestResourceSpecClearingSanitizer,
     TestResourceSpecSanitizer,
@@ -52,7 +52,7 @@ pub enum SanitizerKind {
 
 pub struct ResourceUseCaseBaseHarnessOpts {
     pub base_opts: BaseResourceServiceHarnessOpts,
-    pub controller_provider: TestResourceControllerProvider,
+    pub reconciler_provider: TestResourceReconcilerProvider,
     pub sanitizer: SanitizerKind,
 }
 
@@ -65,7 +65,7 @@ impl Default for ResourceUseCaseBaseHarnessOpts {
                 },
                 ..Default::default()
             },
-            controller_provider: TestResourceControllerProvider::default(),
+            reconciler_provider: TestResourceReconcilerProvider::default(),
             sanitizer: SanitizerKind::None,
         }
     }
@@ -94,16 +94,16 @@ impl ResourceUseCaseBaseHarness {
         })
     }
 
-    pub fn new_with_mock_outbox_and_controller(
+    pub fn new_with_mock_outbox_and_reconciler(
         mock_outbox: MockOutbox,
-        controller_provider: TestResourceControllerProvider,
+        reconciler_provider: TestResourceReconcilerProvider,
     ) -> Self {
         Self::new_with_opts(ResourceUseCaseBaseHarnessOpts {
             base_opts: BaseResourceServiceHarnessOpts {
                 outbox_provider: OutboxProvider::Mock(mock_outbox),
                 ..Default::default()
             },
-            controller_provider,
+            reconciler_provider,
             sanitizer: SanitizerKind::None,
         })
     }
@@ -115,7 +115,7 @@ impl ResourceUseCaseBaseHarness {
         register_test_resource_resource_service_layer(&mut b);
         register_test_resource_crud_dispatcher(&mut b);
         register_test_condition_schema_dispatchers(&mut b);
-        opts.controller_provider.embed_into_catalog(&mut b);
+        opts.reconciler_provider.embed_into_catalog(&mut b);
 
         match opts.sanitizer {
             SanitizerKind::None => {}

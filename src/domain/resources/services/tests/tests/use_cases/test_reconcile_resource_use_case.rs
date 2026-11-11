@@ -17,12 +17,12 @@ use kamu_resources::{
     ManagedResource,
     ReconcileResourceUseCaseError,
     ResourceAggregateLoader,
-    ResourceController,
     ResourceID,
     ResourceLifecyclePrimitives,
     ResourcePersistenceService,
     ResourcePhase,
     ResourceStatusConflictError,
+    SimpleResourceReconciler,
 };
 use kamu_resources_services::ReconcileResourceUseCaseHelper;
 use kamu_resources_services::testing::{
@@ -36,7 +36,7 @@ use super::resource_use_case_base_harness::{
     ResourceUseCaseBaseHarnessOpts,
     SanitizerKind,
 };
-use crate::tests::utils::{TestResource, TestResourceControllerProvider};
+use crate::tests::utils::{TestResource, TestResourceReconcilerProvider};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Tests: error cases
@@ -44,7 +44,7 @@ use crate::tests::utils::{TestResource, TestResourceControllerProvider};
 
 #[test_log::test(tokio::test)]
 async fn test_reconcile_returns_error_for_non_applied_resource() {
-    let harness = ReconcileTestHarness::dispatching(TestResourceControllerProvider::Stub);
+    let harness = ReconcileTestHarness::dispatching(TestResourceReconcilerProvider::Stub);
 
     let id = harness.allocate_resource_id().await;
     let result = harness.reconcile_test_uc().execute(&id).await;
@@ -63,8 +63,8 @@ async fn test_reconcile_returns_error_for_non_applied_resource() {
 #[test_log::test(tokio::test)]
 async fn test_start_phase_transitions_resource_to_reconciling() {
     // start_reconciliation_phase commits the Reconciling transition before
-    // the actual controller work happens, giving a stable hand-off point.
-    let harness = ReconcileTestHarness::dispatching(TestResourceControllerProvider::Stub);
+    // the actual reconciliation work happens, giving a stable hand-off point.
+    let harness = ReconcileTestHarness::dispatching(TestResourceReconcilerProvider::Stub);
 
     let account_handle = odf::ResourceOwnerHandle::new_test("test-owner");
     let id = harness.apply_and_get_id(&account_handle, "res-a").await;
@@ -91,7 +91,7 @@ async fn test_start_phase_transitions_resource_to_reconciling() {
 
 #[test_log::test(tokio::test)]
 async fn test_reconcile_success_transitions_resource_to_ready() {
-    let harness = ReconcileTestHarness::dispatching(TestResourceControllerProvider::Stub);
+    let harness = ReconcileTestHarness::dispatching(TestResourceReconcilerProvider::Stub);
 
     let account_handle = odf::ResourceOwnerHandle::new_test("test-owner");
     let id = harness.apply_and_get_id(&account_handle, "res-a").await;
@@ -117,12 +117,12 @@ async fn test_reconcile_success_transitions_resource_to_ready() {
 
 #[test_log::test(tokio::test)]
 async fn test_reconcile_failure_transitions_resource_to_failed() {
-    let harness = ReconcileTestHarness::dispatching(TestResourceControllerProvider::Failing);
+    let harness = ReconcileTestHarness::dispatching(TestResourceReconcilerProvider::Failing);
 
     let account_handle = odf::ResourceOwnerHandle::new_test("test-owner");
     let id = harness.apply_and_get_id(&account_handle, "res-a").await;
 
-    // Controller errors are outcomes, not use-case failures — execute returns
+    // Reconciler errors are outcomes, not use-case failures — execute returns
     // Ok(())
     harness.reconcile_test_uc().execute(&id).await.unwrap();
     harness.flush_outbox().await;
@@ -138,13 +138,13 @@ async fn test_reconcile_failure_transitions_resource_to_failed() {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Tests: controller invocation count
+// Tests: reconciler invocation count
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_reconcile_invokes_controller_exactly_once() {
+async fn test_reconcile_invokes_reconciler_exactly_once() {
     let counter = Arc::new(AtomicU32::new(0));
-    let harness = ReconcileTestHarness::dispatching(TestResourceControllerProvider::Counting(
+    let harness = ReconcileTestHarness::dispatching(TestResourceReconcilerProvider::Counting(
         counter.clone(),
     ));
 
@@ -160,26 +160,26 @@ async fn test_reconcile_invokes_controller_exactly_once() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_already_reconciled_is_no_op_and_controller_is_not_called() {
+async fn test_already_reconciled_is_no_op_and_reconciler_is_not_called() {
     // Generation does not change on a no-op: needs_reconciliation() is false
     // because observed_generation == headers.generation. execute() returns
-    // Ok(()) immediately without invoking the controller.
+    // Ok(()) immediately without invoking the reconciler.
     let counter = Arc::new(AtomicU32::new(0));
-    let harness = ReconcileTestHarness::dispatching(TestResourceControllerProvider::Counting(
+    let harness = ReconcileTestHarness::dispatching(TestResourceReconcilerProvider::Counting(
         counter.clone(),
     ));
 
     let account_handle = odf::ResourceOwnerHandle::new_test("test-owner");
     let id = harness.apply_and_get_id(&account_handle, "res-a").await;
 
-    // First execute: Pending → controller called once → Ready
+    // First execute: Pending → reconciler called once → Ready
     harness.reconcile_test_uc().execute(&id).await.unwrap();
     harness.flush_outbox().await;
 
     assert_eq!(
         counter.load(Ordering::SeqCst),
         1,
-        "controller must be called on first execute"
+        "reconciler must be called on first execute"
     );
 
     // Second execute: already Ready — no-op, no outbox message posted
@@ -189,7 +189,7 @@ async fn test_already_reconciled_is_no_op_and_controller_is_not_called() {
     assert_eq!(
         counter.load(Ordering::SeqCst),
         1,
-        "controller must NOT be called again when resource is already reconciled"
+        "reconciler must NOT be called again when resource is already reconciled"
     );
 
     // State must be unchanged after the no-op
@@ -218,9 +218,9 @@ async fn test_reconcile_success_posts_status_updates_to_ready() {
         ResourcePhase::Ready,
     );
 
-    let harness = ResourceUseCaseBaseHarness::new_with_mock_outbox_and_controller(
+    let harness = ResourceUseCaseBaseHarness::new_with_mock_outbox_and_reconciler(
         mock_outbox,
-        TestResourceControllerProvider::Stub,
+        TestResourceReconcilerProvider::Stub,
     );
 
     let account_handle = odf::ResourceOwnerHandle::new_test("test-owner");
@@ -245,9 +245,9 @@ async fn test_reconcile_failure_posts_status_updates_to_failed() {
         ResourcePhase::Failed,
     );
 
-    let harness = ResourceUseCaseBaseHarness::new_with_mock_outbox_and_controller(
+    let harness = ResourceUseCaseBaseHarness::new_with_mock_outbox_and_reconciler(
         mock_outbox,
-        TestResourceControllerProvider::Failing,
+        TestResourceReconcilerProvider::Failing,
     );
 
     let account_handle = odf::ResourceOwnerHandle::new_test("test-owner");
@@ -266,7 +266,7 @@ async fn test_finish_phase_discards_outcome_of_superseded_generation() {
     // A concurrent apply between the two reconcile phases bumps the generation.
     // The outcome computed for the old generation is dropped, and the
     // `Applied` message of the new generation reconciles it again.
-    let harness = ReconcileTestHarness::dispatching(TestResourceControllerProvider::Stub);
+    let harness = ReconcileTestHarness::dispatching(TestResourceReconcilerProvider::Stub);
 
     let account_handle = odf::ResourceOwnerHandle::new_test("test-owner");
     let id = harness.apply_and_get_id(&account_handle, "res-a").await;
@@ -306,7 +306,7 @@ async fn test_finish_phase_discards_outcome_of_superseded_generation() {
 
 #[test_log::test(tokio::test)]
 async fn test_finish_phase_after_concurrent_status_update_returns_status_conflict() {
-    let harness = ReconcileTestHarness::dispatching(TestResourceControllerProvider::Stub);
+    let harness = ReconcileTestHarness::dispatching(TestResourceReconcilerProvider::Stub);
 
     let account_handle = odf::ResourceOwnerHandle::new_test("test-owner");
     let id = harness.apply_and_get_id(&account_handle, "res-a").await;
@@ -343,7 +343,7 @@ async fn test_finish_phase_after_concurrent_status_update_returns_status_conflic
 
 #[test_log::test(tokio::test)]
 async fn test_overlapping_reconciliations_of_one_generation_record_one_outcome() {
-    let harness = ReconcileTestHarness::dispatching(TestResourceControllerProvider::Stub);
+    let harness = ReconcileTestHarness::dispatching(TestResourceReconcilerProvider::Stub);
 
     let account_handle = odf::ResourceOwnerHandle::new_test("test-owner");
     let id = harness.apply_and_get_id(&account_handle, "res-a").await;
@@ -384,7 +384,7 @@ async fn test_overlapping_reconciliations_of_one_generation_record_one_outcome()
 
 #[test_log::test(tokio::test)]
 async fn test_reconcile_counts_status_updates() {
-    let harness = ReconcileTestHarness::dispatching(TestResourceControllerProvider::Stub);
+    let harness = ReconcileTestHarness::dispatching(TestResourceReconcilerProvider::Stub);
 
     let account_handle = odf::ResourceOwnerHandle::new_test("test-owner");
     let id = harness.apply_and_get_id(&account_handle, "res-a").await;
@@ -407,7 +407,7 @@ async fn test_reconcile_counts_status_updates() {
 
 #[test_log::test(tokio::test)]
 async fn test_reconcile_of_resource_being_deleted_is_no_op() {
-    let harness = ReconcileTestHarness::dispatching(TestResourceControllerProvider::Stub);
+    let harness = ReconcileTestHarness::dispatching(TestResourceReconcilerProvider::Stub);
 
     let account_handle = odf::ResourceOwnerHandle::new_test("test-owner");
     let id = harness.apply_and_get_id(&account_handle, "res-a").await;
@@ -427,7 +427,7 @@ async fn test_reconcile_of_resource_being_deleted_is_no_op() {
 
 #[test_log::test(tokio::test)]
 async fn test_finish_phase_discards_outcome_of_resource_being_deleted() {
-    let harness = ReconcileTestHarness::dispatching(TestResourceControllerProvider::Stub);
+    let harness = ReconcileTestHarness::dispatching(TestResourceReconcilerProvider::Stub);
 
     let account_handle = odf::ResourceOwnerHandle::new_test("test-owner");
     let id = harness.apply_and_get_id(&account_handle, "res-a").await;
@@ -462,17 +462,17 @@ struct ReconcileTestHarness {
     loader: Arc<dyn ResourceAggregateLoader<TestResource>>,
     persistence: Arc<dyn ResourcePersistenceService<TestResource>>,
     lifecycle_primitives: Arc<dyn ResourceLifecyclePrimitives<TestResource>>,
-    controller: Arc<dyn ResourceController<TestResource>>,
+    reconciler: Arc<dyn SimpleResourceReconciler<TestResource>>,
 }
 
 impl ReconcileTestHarness {
-    fn dispatching(controller_provider: TestResourceControllerProvider) -> Self {
+    fn dispatching(reconciler_provider: TestResourceReconcilerProvider) -> Self {
         let base = ResourceUseCaseBaseHarness::new_with_opts(ResourceUseCaseBaseHarnessOpts {
             base_opts: BaseResourceServiceHarnessOpts {
                 outbox_provider: OutboxProvider::Dispatching,
                 ..Default::default()
             },
-            controller_provider,
+            reconciler_provider,
             sanitizer: SanitizerKind::None,
         });
 
@@ -482,7 +482,7 @@ impl ReconcileTestHarness {
             loader: catalog.get_one().unwrap(),
             persistence: catalog.get_one().unwrap(),
             lifecycle_primitives: catalog.get_one().unwrap(),
-            controller: catalog.get_one().unwrap(),
+            reconciler: catalog.get_one().unwrap(),
             base,
         }
     }
@@ -506,7 +506,7 @@ impl ReconcileTestHarness {
     fn make_reconcile_helper(&self) -> ReconcileResourceUseCaseHelper<'_, TestResource> {
         ReconcileResourceUseCaseHelper::new(
             self.lifecycle_primitives.as_ref(),
-            self.controller.as_ref(),
+            self.reconciler.as_ref(),
         )
     }
 }
