@@ -16,6 +16,7 @@ use internal_error::InternalError;
 
 use crate::controller_runtime::{
     ResourceControllerCandidate,
+    ResourceControllerDrainHoldBack,
     ResourceControllerPass,
     ResourceControllerRegistration,
 };
@@ -30,7 +31,10 @@ use crate::domain::{ResourceControllerStateRepository, ResourceID};
 /// | Source | Selected when | Left out while |
 /// | --- | --- | --- |
 /// | Eligibility predicates (storage) | not reconciled, deletion pending, or status changed for a controller reacting to status | finished at the current version and revision, or waiting for a retry or failure backoff |
-/// | `list_extra_actionable` (controller) | the controller says so, e.g. an expired claim | waiting for a retry or failure backoff, or finished with earlier in this drain |
+/// | `list_extra_actionable` (controller) | the controller says so, e.g. an expired claim | waiting for a retry or failure backoff |
+///
+/// Either kind is also left out while the drain holds it back
+/// (`ResourceControllerDrainHoldBack`).
 ///
 /// An extra resource ignores `Done` on purpose: being listed is the signal
 /// that it needs attention although nothing about the resource changed. A
@@ -54,14 +58,11 @@ impl<'a> ResourceControllerPassPlanner<'a> {
         }
     }
 
-    /// Plans a pass at `now`. `finished_extras` are the extra resources the
-    /// controller returned `Done` for earlier in this drain: listing them
-    /// again breaks the controller's contract, and processing them again would
-    /// never let the drain end.
+    /// Plans a pass at `now`, leaving out what the drain holds back
     pub async fn plan(
         &self,
         now: DateTime<Utc>,
-        finished_extras: &HashSet<ResourceID>,
+        hold_back: &ResourceControllerDrainHoldBack,
     ) -> Result<ResourceControllerPass, InternalError> {
         // The controller opens its own transactions, so it is asked before ours
         let extras = self
@@ -81,26 +82,22 @@ impl<'a> ResourceControllerPassPlanner<'a> {
 
                     for id in extras {
                         if planned.insert(id) {
-                            self.plan_extra(
-                                repository.as_ref(),
-                                id,
-                                now,
-                                finished_extras,
-                                &mut pass,
-                            )
-                            .await?;
+                            self.plan_extra(repository.as_ref(), id, now, hold_back, &mut pass)
+                                .await?;
                         }
                     }
 
+                    // Held back resources may still be eligible: asking for as
+                    // many more rows keeps them from filling the batch
                     let eligible = repository
                         .find_actionable_resource_ids(
                             self.registration.actionable_query(),
                             now,
-                            self.batch_size,
+                            self.batch_size + hold_back.len(),
                         )
                         .await?;
                     for id in eligible {
-                        if planned.insert(id) {
+                        if planned.insert(id) && !hold_back.holds_back(&id) {
                             pass.add_candidate(ResourceControllerCandidate::eligible(id));
                         }
                     }
@@ -117,17 +114,19 @@ impl<'a> ResourceControllerPassPlanner<'a> {
         repository: &dyn ResourceControllerStateRepository,
         id: ResourceID,
         now: DateTime<Utc>,
-        finished_extras: &HashSet<ResourceID>,
+        hold_back: &ResourceControllerDrainHoldBack,
         pass: &mut ResourceControllerPass,
     ) -> Result<(), InternalError> {
         let controller_name = &self.registration.meta().controller_name;
 
-        if finished_extras.contains(&id) {
+        if hold_back.is_finished_extra(&id) {
             tracing::warn!(
                 controller = controller_name.as_str(),
                 resource_id = %id,
                 "Extra resource still listed after its controller finished with it in this drain"
             );
+        }
+        if hold_back.holds_back(&id) {
             return Ok(());
         }
 
