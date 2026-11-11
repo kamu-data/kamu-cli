@@ -417,8 +417,12 @@ where
                         .extension_schema_registry
                         .condition_meta(uri)
                         .is_some_and(|condition| condition.carried);
-                    ResourceLifecycleMessageConditionChange::Set {
-                        value: carried.then(|| value.clone()),
+                    if carried {
+                        ResourceLifecycleMessageConditionChange::Set {
+                            value: value.clone(),
+                        }
+                    } else {
+                        ResourceLifecycleMessageConditionChange::SetEmpty
                     }
                 }
                 None => ResourceLifecycleMessageConditionChange::Removed,
