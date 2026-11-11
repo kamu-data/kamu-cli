@@ -7,12 +7,18 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+mod actionable_resources_query;
+mod resource_controller_state;
+mod resource_controller_state_repository;
 mod resource_label_projection_repository;
 mod resource_raw_event;
 mod resource_raw_event_query;
 mod resource_raw_event_store;
 mod resource_repository;
 
+pub use actionable_resources_query::*;
+pub use resource_controller_state::*;
+pub use resource_controller_state_repository::*;
 pub use resource_label_projection_repository::*;
 pub use resource_raw_event::*;
 pub use resource_raw_event_query::*;

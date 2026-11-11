@@ -22,6 +22,9 @@ pub fn register_dependencies(b: &mut CatalogBuilder) {
 
     b.add::<InMemoryResourceLabelProjectionState>();
     b.add::<InMemoryResourceLabelProjectionRepository>();
+
+    b.add::<InMemoryResourceControllerStateStore>();
+    b.add::<InMemoryResourceControllerStateRepository>();
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
