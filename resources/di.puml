@@ -142,6 +142,7 @@ interface "ResetPlanner" <<i>>
 interface "ResourceAccountResolver" <<i>>
 interface "ResourceAggregateLoader" <<i>>
 interface "ResourceContextStore" <<i>>
+interface "ResourceControllerStateRepository" <<i>>
 interface "ResourceCrudDispatcher" <<i>>
 interface "ResourceExtensionSchemaDispatcher" <<i>>
 interface "ResourceFacade" <<i>>
@@ -467,6 +468,7 @@ class "SqliteOutboxMessageBridge" <<agnostic>>
 class "SqlitePlugin"
 class "SqlitePollingHub" <<singleton>>
 class "SqliteRebacRepository"
+class "SqliteResourceControllerStateRepository"
 class "SqliteResourceLabelProjectionRepository"
 class "SqliteResourceRawEventStore"
 class "SqliteResourceRepository"
@@ -1255,6 +1257,8 @@ class "WsSmartTransferProtocolClient"
 "RequestAccountResourcesDeletionUseCase" <|-- "RequestAccountResourcesDeletionUseCaseImpl"
 "RequestAccountResourcesDeletionUseCaseImpl"  --> "GenericResourceQueryService"
 "RequestAccountResourcesDeletionUseCaseImpl"  --> "ResourceDispatcherFactory"
+"ResourceControllerStateRepository" <|-- "SqliteResourceControllerStateRepository"
+"SqliteResourceControllerStateRepository"  --> "TransactionRefT"
 "ResourceLabelProjectionRepository" <|-- "SqliteResourceLabelProjectionRepository"
 "SqliteResourceLabelProjectionRepository"  --> "TransactionRefT"
 "ResourceRawEventStore" <|-- "SqliteResourceRawEventStore"
