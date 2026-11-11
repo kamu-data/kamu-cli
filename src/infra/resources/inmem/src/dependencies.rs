@@ -23,6 +23,7 @@ pub fn register_dependencies(b: &mut CatalogBuilder) {
     b.add::<InMemoryResourceLabelProjectionState>();
     b.add::<InMemoryResourceLabelProjectionRepository>();
 
+    // After the resource state: its queries lock both in this order, as a commit does
     b.add::<InMemoryResourceControllerStateStore>();
     b.add::<InMemoryResourceControllerStateRepository>();
 }
