@@ -140,7 +140,11 @@ impl SimpleResourceReconciler<TestResource> for TestResourceInterferingCleanupRe
             return Ok(());
         }
 
-        update_status_as_another_writer(&self.catalog, resource).await;
+        AnotherStatusWriter {
+            catalog: &self.catalog,
+        }
+        .update_status(resource)
+        .await;
 
         if self.interference.then_fails {
             return Err(ResourceCleanupError::Internal(
@@ -166,7 +170,11 @@ pub struct TestResourceInterferingReconciler {
 #[async_trait::async_trait]
 impl SimpleResourceReconciler<TestResource> for TestResourceInterferingReconciler {
     async fn reconcile(&self, resource: &TestResource) -> Result<(), TestResourceReconcileError> {
-        update_status_as_another_writer(&self.catalog, resource).await;
+        AnotherStatusWriter {
+            catalog: &self.catalog,
+        }
+        .update_status(resource)
+        .await;
         Ok(())
     }
 
@@ -210,24 +218,32 @@ impl SimpleResourceReconciler<TestResource> for TestResourceFailingCleanupOnceRe
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Saves a status update of `resource`, through the services of `catalog`, as
-/// a writer other than the one running would
-async fn update_status_as_another_writer(catalog: &dill::Catalog, resource: &TestResource) {
-    let loader = catalog
-        .get_one::<dyn ResourceAggregateLoader<TestResource>>()
-        .unwrap();
-    let persistence = catalog
-        .get_one::<dyn ResourcePersistenceService<TestResource>>()
-        .unwrap();
+/// Plays a writer other than the one running: saves a status update of a
+/// resource through the services of its catalog
+struct AnotherStatusWriter<'a> {
+    catalog: &'a dill::Catalog,
+}
 
-    let mut current = loader.load(resource.id()).await.unwrap();
-    let mut new_status = current.status().clone();
-    new_status.observed_at = Some(chrono::Utc::now());
-    let status_generation = current.headers().status_generation;
-    current
-        .try_update_status(chrono::Utc::now(), status_generation, new_status)
-        .unwrap();
-    persistence.save(&mut current).await.unwrap();
+impl AnotherStatusWriter<'_> {
+    async fn update_status(&self, resource: &TestResource) {
+        let loader = self
+            .catalog
+            .get_one::<dyn ResourceAggregateLoader<TestResource>>()
+            .unwrap();
+        let persistence = self
+            .catalog
+            .get_one::<dyn ResourcePersistenceService<TestResource>>()
+            .unwrap();
+
+        let mut current = loader.load(resource.id()).await.unwrap();
+        let mut new_status = current.status().clone();
+        new_status.observed_at = Some(chrono::Utc::now());
+        let status_generation = current.headers().status_generation;
+        current
+            .try_update_status(chrono::Utc::now(), status_generation, new_status)
+            .unwrap();
+        persistence.save(&mut current).await.unwrap();
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

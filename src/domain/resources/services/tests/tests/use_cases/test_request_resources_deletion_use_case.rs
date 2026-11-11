@@ -17,8 +17,7 @@ use kamu_resources::{
 use kamu_resources_services::testing::BaseResourceServiceHarness;
 use messaging_outbox::MockOutbox;
 
-use crate::tests::use_cases::resource_use_case_base_harness::ResourceUseCaseBaseHarness;
-use crate::tests::utils::make_id;
+use crate::tests::utils::{ServiceLayerTestHarness, make_id};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Tests
@@ -26,7 +25,7 @@ use crate::tests::utils::make_id;
 
 #[test_log::test(tokio::test)]
 async fn test_request_deletion_of_single_resource_completes() {
-    let harness = ResourceUseCaseBaseHarness::new();
+    let harness = ServiceLayerTestHarness::new();
     let account_handle = odf::ResourceOwnerHandle::new_test("test-owner");
 
     let (id, snapshot) = harness
@@ -45,7 +44,7 @@ async fn test_request_deletion_of_single_resource_completes() {
 
 #[test_log::test(tokio::test)]
 async fn test_request_deletion_of_multiple_resources_in_one_call() {
-    let harness = ResourceUseCaseBaseHarness::new();
+    let harness = ServiceLayerTestHarness::new();
     let account_handle = odf::ResourceOwnerHandle::new_test("test-owner");
 
     let (id_a, snapshot_a) = harness
@@ -78,7 +77,7 @@ async fn test_request_deletion_of_multiple_resources_in_one_call() {
 
 #[test_log::test(tokio::test)]
 async fn test_request_deletion_of_nonexistent_id_is_idempotent() {
-    let harness = ResourceUseCaseBaseHarness::new();
+    let harness = ServiceLayerTestHarness::new();
     let account_handle = odf::ResourceOwnerHandle::new_test("test-owner");
 
     let random_id = make_id();
@@ -93,7 +92,7 @@ async fn test_request_deletion_of_nonexistent_id_is_idempotent() {
 
 #[test_log::test(tokio::test)]
 async fn test_request_deletion_of_resource_owned_by_other_account_fails() {
-    let harness = ResourceUseCaseBaseHarness::new();
+    let harness = ServiceLayerTestHarness::new();
     let account_handle_a = odf::ResourceOwnerHandle::new_test("test-owner-a");
     let account_handle_b = odf::ResourceOwnerHandle::new_test("test-owner-b");
 
@@ -129,7 +128,7 @@ async fn test_request_deletion_emits_deletion_requested_lifecycle_message() {
     BaseResourceServiceHarness::expect_applied_messages(&mut mock_outbox, 1, None);
     BaseResourceServiceHarness::expect_deletion_requested_message(&mut mock_outbox, 1);
 
-    let harness = ResourceUseCaseBaseHarness::new_with_mock_outbox(mock_outbox);
+    let harness = ServiceLayerTestHarness::new_with_mock_outbox(mock_outbox);
     let account_handle = odf::ResourceOwnerHandle::new_test("test-owner");
 
     let id = harness.apply_and_get_id(&account_handle, "res-a").await;
@@ -150,7 +149,7 @@ async fn test_request_deletion_of_multiple_emits_single_message_with_all_resourc
     BaseResourceServiceHarness::expect_applied_messages(&mut mock_outbox, 3, None);
     BaseResourceServiceHarness::expect_deletion_requested_message(&mut mock_outbox, 3);
 
-    let harness = ResourceUseCaseBaseHarness::new_with_mock_outbox(mock_outbox);
+    let harness = ServiceLayerTestHarness::new_with_mock_outbox(mock_outbox);
     let account_handle = odf::ResourceOwnerHandle::new_test("test-owner");
 
     let id_a = harness.apply_and_get_id(&account_handle, "res-a").await;
@@ -174,7 +173,7 @@ async fn test_repeated_deletion_request_posts_message_again() {
     BaseResourceServiceHarness::expect_deletion_requested_message(&mut mock_outbox, 1);
     BaseResourceServiceHarness::expect_deletion_requested_message(&mut mock_outbox, 1);
 
-    let harness = ResourceUseCaseBaseHarness::new_with_mock_outbox(mock_outbox);
+    let harness = ServiceLayerTestHarness::new_with_mock_outbox(mock_outbox);
     let account_handle = odf::ResourceOwnerHandle::new_test("test-owner");
 
     let id = harness.apply_and_get_id(&account_handle, "res-a").await;
@@ -195,7 +194,7 @@ async fn test_request_deletion_no_op_emits_no_message() {
     let mut mock_outbox = MockOutbox::new();
     mock_outbox.expect_post_message_as_json().times(0);
 
-    let harness = ResourceUseCaseBaseHarness::new_with_mock_outbox(mock_outbox);
+    let harness = ServiceLayerTestHarness::new_with_mock_outbox(mock_outbox);
     let account_handle = odf::ResourceOwnerHandle::new_test("test-owner");
 
     harness
@@ -240,7 +239,7 @@ async fn test_deletion_requested_message_carries_correct_snapshot_data() {
         })
         .returning(|_, _, _| Ok(()));
 
-    let harness = ResourceUseCaseBaseHarness::new_with_mock_outbox(mock_outbox);
+    let harness = ServiceLayerTestHarness::new_with_mock_outbox(mock_outbox);
     let account_handle = odf::ResourceOwnerHandle::new_test("test-owner");
 
     let id = harness.apply_and_get_id(&account_handle, "res-a").await;
