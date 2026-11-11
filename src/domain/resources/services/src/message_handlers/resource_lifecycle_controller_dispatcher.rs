@@ -24,10 +24,7 @@ macro_rules! declare_resource_lifecycle_controller_dispatcher {
             selector_aliases: <$resource>::SELECTOR_ALIAS_STRS,
         })]
         pub struct $dispatcher {
-            reconcile_resource_use_case:
-                std::sync::Arc<dyn kamu_resources::ReconcileResourceUseCase<$resource>>,
-            complete_resource_deletion_use_case:
-                std::sync::Arc<dyn kamu_resources::CompleteResourceDeletionUseCase<$resource>>,
+            controller: std::sync::Arc<dyn kamu_resources::SimpleResourceController<$resource>>,
         }
 
         #[async_trait::async_trait]
@@ -39,9 +36,9 @@ macro_rules! declare_resource_lifecycle_controller_dispatcher {
                 &self,
                 resource: &kamu_resources::ResourceSnapshot,
             ) -> Result<(), internal_error::InternalError> {
-                use kamu_resources::ReconcileResourceUseCaseError as E;
+                use kamu_resources::SimpleResourceReconciliationError as E;
 
-                match self.reconcile_resource_use_case.execute(&resource.id).await {
+                match self.controller.reconcile(&resource.id).await {
                     Ok(()) => Ok(()),
                     // Another reconciliation of the same resource records its
                     // own outcome
@@ -73,11 +70,11 @@ macro_rules! declare_resource_lifecycle_controller_dispatcher {
                 &self,
                 resources: &[kamu_resources::ResourceSnapshot],
             ) -> Result<(), internal_error::InternalError> {
-                use kamu_resources::CompleteResourceDeletionUseCaseError as E;
+                use kamu_resources::SimpleResourceDeletionError as E;
 
                 let ids = resources.iter().map(|resource| resource.id).collect::<Vec<_>>();
 
-                match self.complete_resource_deletion_use_case.execute(&ids).await {
+                match self.controller.complete_deletions(&ids).await {
                     Ok(()) => Ok(()),
                     Err(E::ConcurrentModification(err)) => {
                         tracing::info!(

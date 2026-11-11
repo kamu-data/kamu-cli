@@ -294,7 +294,7 @@ async fn test_apply_update_resets_status_to_pending() {
 
     // Create + reconcile → gen=1, observed_gen=1, phase=Ready
     let id = harness.apply_and_get_id(&account_handle, "res-a").await;
-    harness.reconcile_test_uc().execute(&id).await.unwrap();
+    harness.simple_controller().reconcile(&id).await.unwrap();
     harness.flush_outbox().await;
 
     let snapshot = harness.get_snapshot_by_id(&id).await.unwrap();

@@ -11,20 +11,20 @@ use std::sync::{Arc, Mutex};
 
 use event_sourcing::ConcurrentModificationError;
 use kamu_resources::{
-    CompleteResourceDeletionUseCaseError,
     DeclarativeResource,
     ResourceAggregateLoader,
     ResourceID,
     ResourcePhase,
+    SimpleResourceDeletionError,
 };
 use kamu_resources_services::testing::{
     BaseResourceServiceHarness,
     BaseResourceServiceHarnessOpts,
 };
 use kamu_resources_services::{
-    CompleteResourceDeletionPhases,
     ResourceCleanupAttempt,
     ResourceCleanupTransactionError,
+    SimpleResourceDeletionPhases,
 };
 use messaging_outbox::{MockOutbox, OutboxProvider};
 
@@ -400,7 +400,7 @@ impl OutcomeRecorder {
     async fn record_in_batch(
         &self,
         ids: &[ResourceID],
-    ) -> Result<(), CompleteResourceDeletionUseCaseError<TestResource>> {
+    ) -> Result<(), SimpleResourceDeletionError<TestResource>> {
         let attempts = ids
             .iter()
             .map(|&id| ResourceCleanupAttempt {
@@ -419,7 +419,7 @@ impl OutcomeRecorder {
 }
 
 #[async_trait::async_trait]
-impl CompleteResourceDeletionPhases<TestResource> for OutcomeRecorder {
+impl SimpleResourceDeletionPhases<TestResource> for OutcomeRecorder {
     async fn run_cleanup(
         &self,
         _id: ResourceID,
@@ -430,7 +430,7 @@ impl CompleteResourceDeletionPhases<TestResource> for OutcomeRecorder {
     async fn record_outcomes(
         &self,
         attempts: Vec<ResourceCleanupAttempt>,
-    ) -> Result<(), CompleteResourceDeletionUseCaseError<TestResource>> {
+    ) -> Result<(), SimpleResourceDeletionError<TestResource>> {
         let ids = attempts
             .iter()
             .map(|attempt| attempt.id)
@@ -439,11 +439,9 @@ impl CompleteResourceDeletionPhases<TestResource> for OutcomeRecorder {
         self.recorded.lock().unwrap().push(ids);
 
         if conflicts {
-            Err(
-                CompleteResourceDeletionUseCaseError::ConcurrentModification(
-                    ConcurrentModificationError {},
-                ),
-            )
+            Err(SimpleResourceDeletionError::ConcurrentModification(
+                ConcurrentModificationError {},
+            ))
         } else {
             Ok(())
         }
