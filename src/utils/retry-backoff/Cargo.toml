@@ -1,0 +1,28 @@
+[package]
+name = "retry-backoff"
+description = "Retry delays that grow with each attempt: fixed, linear or exponential"
+version = { workspace = true }
+homepage = { workspace = true }
+repository = { workspace = true }
+authors = { workspace = true }
+readme = { workspace = true }
+license-file = { workspace = true }
+keywords = { workspace = true }
+include = { workspace = true }
+edition = { workspace = true }
+publish = { workspace = true }
+
+
+[lints]
+workspace = true
+
+
+[lib]
+doctest = false
+
+
+[dependencies]
+rand = { version = "0.10", default-features = false }
+serde = { version = "1", default-features = false, features = [
+    "derive",
+] }
