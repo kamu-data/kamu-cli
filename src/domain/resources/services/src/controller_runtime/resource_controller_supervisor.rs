@@ -33,8 +33,8 @@ use crate::controller_runtime::{
 /// bookkeeping storage, recording an outcome, or a call to the controller
 /// outside `process`. It may also panic. Either way the supervisor logs it,
 /// counts it, and starts the loop again after a backoff that grows with each
-/// consecutive failure; a drain that completes resets the count. Other
-/// controllers' loops are not affected.
+/// consecutive failure; a drain and the wait after it, both completed, reset
+/// the count. Other controllers' loops are not affected.
 pub(crate) struct ResourceControllerSupervisor {
     controller_loop: Arc<ResourceControllerLoop>,
     listener: Arc<dyn WakeupListener>,
@@ -134,13 +134,16 @@ impl ResourceControllerSupervisor {
                     &mut ResourceControllerDrainHoldBack::default(),
                 )
                 .await?;
-            consecutive_failures.store(0, Ordering::Relaxed);
             tracing::debug!(
                 processed = drained.processed(),
                 "Resource controller drain finished"
             );
 
             controller_loop.wait(listener.as_ref(), &drained).await?;
+
+            // Only a whole cycle counts as healthy: a loop that drains and
+            // then fails to wait every time must still back off
+            consecutive_failures.store(0, Ordering::Relaxed);
         }
     }
 }
