@@ -9,10 +9,10 @@
 
 use crate::domain::{
     EventSourcedResource,
-    ResourceExpectedVersion,
     ResourceLifecyclePrimitives,
     ResourceLifecycleTransitionError,
     ResourceStaleExpectationError,
+    ResourceVersion,
     SimpleResourceReconciler,
     SimpleResourceReconciliationError,
 };
@@ -52,10 +52,7 @@ where
         started: R,
     ) -> Result<(), SimpleResourceReconciliationError<R>> {
         let id = *started.id();
-        let expected = ResourceExpectedVersion {
-            generation: started.headers().generation,
-            status_generation: started.headers().status_generation,
-        };
+        let expected = ResourceVersion::from(started.headers());
 
         // Phase 2 runs in a separate transaction after the started state was
         // committed, so the resource may have changed in between.

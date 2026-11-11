@@ -801,7 +801,7 @@ persists its event and posts the matching lifecycle message:
   simple controller of [§13](#13-data-flow-walkthroughs) call them inside the transactions they
   own.
 - **Stale expectations are typed errors.** A reconciliation outcome expects the generation and
-  status generation it started from (`ResourceExpectedVersion`). The checks run in the order an
+  status generation it started from (`ResourceVersion`). The checks run in the order an
   outcome is discarded: a deletion request, a newer generation, then another status writer, and
   fail with `ResourceLifecycleTransitionError::Stale` carrying the matching
   `ResourceStaleExpectationError`. A caller can tell "someone else changed it" from a failure.

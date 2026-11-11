@@ -28,7 +28,6 @@ use crate::domain::{
     ResourceConditionsPatch,
     ResourceDeletionCompletion,
     ResourceDeletionInProgressError,
-    ResourceExpectedVersion,
     ResourceGenerationConflictError,
     ResourceID,
     ResourceLifecycleMessage,
@@ -44,6 +43,7 @@ use crate::domain::{
     ResourceStatusConflictError,
     ResourceTransitionSkip,
     ResourceTransitionSkipReason,
+    ResourceVersion,
     StatusConflictOf,
     TypeRef,
     TypeUri,
@@ -118,7 +118,7 @@ where
     pub async fn complete_reconciliation(
         &self,
         id: &ResourceID,
-        expected: ResourceExpectedVersion,
+        expected: ResourceVersion,
     ) -> TransitionResult<R, R> {
         let mut resource = self.load_reconcilable(id, expected).await?;
         let old_status = resource.status().clone();
@@ -139,7 +139,7 @@ where
     pub async fn fail_reconciliation(
         &self,
         id: &ResourceID,
-        expected: ResourceExpectedVersion,
+        expected: ResourceVersion,
         error: &R::ReconcileError,
     ) -> TransitionResult<R, R> {
         let mut resource = self.load_reconcilable(id, expected).await?;
@@ -445,7 +445,7 @@ where
     async fn load_reconcilable(
         &self,
         id: &ResourceID,
-        expected: ResourceExpectedVersion,
+        expected: ResourceVersion,
     ) -> TransitionResult<R, R> {
         let resource = self.load(id).await?;
 
@@ -611,7 +611,7 @@ macro_rules! declare_resource_lifecycle_primitives {
             async fn complete_reconciliation(
                 &self,
                 id: &kamu_resources::ResourceID,
-                expected: kamu_resources::ResourceExpectedVersion,
+                expected: kamu_resources::ResourceVersion,
             ) -> Result<$resource, kamu_resources::ResourceLifecycleTransitionError<$resource>>
             {
                 self.helper().complete_reconciliation(id, expected).await
@@ -620,7 +620,7 @@ macro_rules! declare_resource_lifecycle_primitives {
             async fn fail_reconciliation(
                 &self,
                 id: &kamu_resources::ResourceID,
-                expected: kamu_resources::ResourceExpectedVersion,
+                expected: kamu_resources::ResourceVersion,
                 error: &<$resource as kamu_resources::ManagedResource>::ReconcileError,
             ) -> Result<$resource, kamu_resources::ResourceLifecycleTransitionError<$resource>>
             {
