@@ -29,7 +29,6 @@ use crate::domain::{
     ResourceDeletionCompletion,
     ResourceDeletionInProgressError,
     ResourceExpectedVersion,
-    ResourceExtensionKind,
     ResourceGenerationConflictError,
     ResourceID,
     ResourceLifecycleMessage,
@@ -334,8 +333,9 @@ where
             ));
         }
 
+        let resource_schema = ResourceSchemaId::parse(R::schema().as_str()).int_err()?;
         ResourceConditionPatchChecker::new(self.extension_schema_registry)
-            .check(patch, &self.resource_schema()?)?;
+            .check(patch, &resource_schema)?;
 
         let old_status = resource.status().clone();
         let mut new_status = old_status.clone();
@@ -389,13 +389,14 @@ where
     }
 
     /// How each condition that differs between `old` and `new` ended up, with
-    /// the value where its registration marks it as carried
+    /// the value where its registration marks it as carried. The conditions
+    /// were checked when they were written, so a condition is looked up by its
+    /// URI alone; one no longer registered is not carried
     fn condition_changes(
         &self,
         old: &ResourceConditions,
         new: &ResourceConditions,
     ) -> Result<BTreeMap<TypeUri, ResourceLifecycleMessageConditionChange>, InternalError> {
-        let resource_schema = self.resource_schema()?;
         let keys = old.entries.keys().chain(new.entries.keys());
 
         let mut changes = BTreeMap::new();
@@ -411,31 +412,21 @@ where
             };
 
             let change = match new_value {
-                Some(value) => ResourceLifecycleMessageConditionChange::Set {
-                    value: self
-                        .is_carried(key, &resource_schema)
-                        .then(|| value.clone()),
-                },
+                Some(value) => {
+                    let carried = self
+                        .extension_schema_registry
+                        .condition_meta(uri)
+                        .is_some_and(|condition| condition.carried);
+                    ResourceLifecycleMessageConditionChange::Set {
+                        value: carried.then(|| value.clone()),
+                    }
+                }
                 None => ResourceLifecycleMessageConditionChange::Removed,
             };
             changes.insert(uri.clone(), change);
         }
 
         Ok(changes)
-    }
-
-    /// A condition whose schema is no longer registered is not carried
-    fn is_carried(&self, key: &TypeRef, resource_schema: &ResourceSchemaId) -> bool {
-        self.extension_schema_registry
-            .resolve(ResourceExtensionKind::Condition, key, resource_schema)
-            .ok()
-            .flatten()
-            .and_then(|registration| registration.condition().map(|condition| condition.carried))
-            .unwrap_or(false)
-    }
-
-    fn resource_schema(&self) -> Result<ResourceSchemaId, InternalError> {
-        ResourceSchemaId::parse(R::schema().as_str()).int_err()
     }
 
     /// Loads a resource whose reconciliation outcome is about to be recorded,

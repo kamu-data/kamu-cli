@@ -61,16 +61,11 @@ impl<'a> ResourceDurableStateValidator<'a> {
     ) -> Result<(), ResourceDurableStateValidationError> {
         for (key, value) in entries {
             match key {
-                TypeRef::Uri(_) => {
+                TypeRef::Uri(uri) => {
                     let registration = self
                         .extension_schema_registry
-                        .resolve(kind, key, resource_schema)
-                        .map_err(ResourceDurableStateValidationError::ExtensionResolution)?
-                        .unwrap_or_else(|| {
-                            unreachable!(
-                                "URI extension resolution must return a registration or an error"
-                            )
-                        });
+                        .resolve_uri(kind, uri, resource_schema)
+                        .map_err(ResourceDurableStateValidationError::ExtensionResolution)?;
 
                     registration
                         .dispatcher()
@@ -110,7 +105,7 @@ impl<'a> ResourceDurableStateValidator<'a> {
         resource_schema: &ResourceSchemaId,
     ) -> Result<(), ResourceDurableStateValidationError> {
         for (key, value) in entries {
-            let TypeRef::Uri(_) = key else {
+            let TypeRef::Uri(uri) = key else {
                 return Err(
                     ResourceDurableStateValidationError::NonCanonicalExtensionKey {
                         kind: ResourceExtensionKind::Condition,
@@ -121,11 +116,8 @@ impl<'a> ResourceDurableStateValidator<'a> {
 
             let registration = self
                 .extension_schema_registry
-                .resolve(ResourceExtensionKind::Condition, key, resource_schema)
-                .map_err(ResourceDurableStateValidationError::ExtensionResolution)?
-                .unwrap_or_else(|| {
-                    unreachable!("URI extension resolution must return a registration or an error")
-                });
+                .resolve_uri(ResourceExtensionKind::Condition, uri, resource_schema)
+                .map_err(ResourceDurableStateValidationError::ExtensionResolution)?;
 
             registration
                 .dispatcher()
