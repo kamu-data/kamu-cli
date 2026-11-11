@@ -38,6 +38,8 @@ async fn test_done_suppresses_until_the_generation_changes() {
     assert_eq!(harness.process_calls_until_idle().await, 0);
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[test_log::test(tokio::test)]
 async fn test_done_suppresses_until_the_status_changes() {
     let harness = ControllerRuntimeHarness::new(
@@ -55,6 +57,8 @@ async fn test_done_suppresses_until_the_status_changes() {
     assert_eq!(harness.process_calls_until_idle().await, 1);
     assert_eq!(harness.process_calls_until_idle().await, 0);
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
 async fn test_status_change_of_reconciled_resource_wakes_only_a_status_reacting_controller() {
@@ -87,6 +91,8 @@ async fn test_status_change_of_reconciled_resource_wakes_only_a_status_reacting_
         );
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
 async fn test_revision_bump_reconsiders_finished_resources_a_predicate_selects() {
@@ -121,6 +127,8 @@ async fn test_revision_bump_reconsiders_finished_resources_a_predicate_selects()
     assert_eq!(harness.process_calls_until_idle().await, 0);
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[test_log::test(tokio::test)]
 async fn test_steps_due_at_once_run_back_to_back_in_one_drain() {
     let harness = ControllerRuntimeHarness::new(
@@ -136,6 +144,8 @@ async fn test_steps_due_at_once_run_back_to_back_in_one_drain() {
     assert_eq!(harness.phase(id).await, ResourcePhase::Ready);
     assert_eq!(harness.process_calls_until_idle().await, 0);
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
 async fn test_retry_at_waits_until_due() {
@@ -155,6 +165,8 @@ async fn test_retry_at_waits_until_due() {
     assert_eq!(harness.script().calls_of(&id), 2);
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[test_log::test(tokio::test)]
 async fn test_drain_goes_through_more_resources_than_one_batch() {
     let harness = ControllerRuntimeHarness::new(
@@ -170,6 +182,8 @@ async fn test_drain_goes_through_more_resources_than_one_batch() {
     assert_eq!(harness.process_calls_until_idle().await, 7);
     assert_eq!(harness.process_calls_until_idle().await, 0);
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
 async fn test_extra_resource_lifts_done_but_not_backoff() {
@@ -195,6 +209,39 @@ async fn test_extra_resource_lifts_done_but_not_backoff() {
 
     harness.advance_time(FAILURE_BACKOFF);
     assert_eq!(harness.process_calls_until_idle().await, 1);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_backing_off_extra_resources_do_not_hide_the_ones_listed_after_them() {
+    let harness = ControllerRuntimeHarness::new(
+        TestControllers::Main,
+        TestControllerBehavior::FinishAtCurrentVersion,
+    )
+    .await;
+    // The harness batch holds 3: as many failing extra resources as that,
+    // listed first, then a healthy one
+    let mut ids = Vec::new();
+    for i in 0..4 {
+        ids.push(harness.apply(&format!("res-{i}")).await);
+    }
+    harness.run_until_idle().await;
+
+    let (failing, healthy) = (&ids[..3], ids[3]);
+    for id in failing {
+        harness
+            .script()
+            .set_behavior_of(*id, TestControllerBehavior::Fail);
+    }
+    harness.script().set_extras(ids.clone());
+
+    harness.run_until_idle().await;
+    assert_eq!(harness.script().calls_of(&healthy), 2);
+
+    // Reached again while the failing ones back off
+    harness.run_until_idle().await;
+    assert_eq!(harness.script().calls_of(&healthy), 3);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

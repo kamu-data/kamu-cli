@@ -49,6 +49,8 @@ async fn test_agent_wakes_for_a_retry_at_its_time() {
     assert_eq!(harness.phase(id).await, ResourcePhase::Ready);
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[test_log::test(tokio::test)]
 async fn test_failing_extra_resource_neither_spins_nor_wakes_the_agent_during_its_backoff() {
     let harness = ControllerRuntimeHarness::new(
@@ -91,6 +93,8 @@ async fn test_failing_extra_resource_neither_spins_nor_wakes_the_agent_during_it
     assert_eq!(harness.state(id).await.unwrap().attempts, 2);
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[test_log::test(tokio::test)]
 async fn test_future_extra_deadline_wakes_the_agent() {
     let harness = ControllerRuntimeHarness::new(
@@ -104,7 +108,7 @@ async fn test_future_extra_deadline_wakes_the_agent() {
 
     harness
         .script()
-        .set_next_extra_deadline(Some(harness.time_source().now() + TimeDelta::minutes(1)));
+        .set_extra_deadlines(vec![harness.time_source().now() + TimeDelta::minutes(1)]);
     let _agent = harness.start_agent();
     harness.let_agent_settle().await;
     assert_eq!(harness.script().total_calls(), calls_before);
@@ -121,10 +125,71 @@ async fn test_future_extra_deadline_wakes_the_agent() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[test_log::test(tokio::test)]
+async fn test_extra_deadline_passing_between_the_drain_and_the_wait_wakes_the_agent() {
+    let harness = ControllerRuntimeHarness::new(
+        TestControllers::Main,
+        TestControllerBehavior::FinishAtCurrentVersion,
+    )
+    .await;
+    let id = harness.apply("res-a").await;
+    harness.run_until_idle().await;
+    let calls_before = harness.script().total_calls();
+
+    let _agent = harness.start_agent();
+    harness.let_agent_settle().await;
+
+    // A claim expiring a minute from now does so after the next drain listed
+    // the extra resources, but before that drain's wait starts
+    harness
+        .script()
+        .set_extra_deadlines(vec![harness.time_source().now() + TimeDelta::minutes(1)]);
+    harness
+        .script()
+        .after_next_listing(TimeDelta::minutes(1), vec![id]);
+    harness.hint();
+
+    harness
+        .script()
+        .wait_for_total_calls(calls_before + 1)
+        .await;
+}
+
+#[test_log::test(tokio::test)]
+async fn test_overdue_extra_backing_off_does_not_hide_a_later_extra_deadline() {
+    let harness = ControllerRuntimeHarness::new(
+        TestControllers::Main,
+        TestControllerBehavior::FinishAtCurrentVersion,
+    )
+    .await;
+    let backing_off = harness.apply("res-a").await;
+    let expiring = harness.apply("res-b").await;
+    harness.run_until_idle().await;
+
+    // The first claim expired an hour ago and keeps failing, so it backs off
+    // longer than the second claim takes to expire
+    make_failing_extra_due_long_ago(&harness, backing_off);
+    let now = harness.time_source().now();
+    harness
+        .script()
+        .set_extra_deadlines(vec![now - TimeDelta::hours(1), now + TimeDelta::seconds(1)]);
+    let _agent = harness.start_agent();
+    harness.script().wait_for_total_calls(3).await;
+    harness.let_agent_settle().await;
+
+    harness.script().set_extras(vec![backing_off, expiring]);
+    harness.advance_time(TimeDelta::seconds(1));
+
+    harness.script().wait_for_total_calls(4).await;
+    assert_eq!(harness.script().calls_of(&expiring), 2);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 fn make_failing_extra_due_long_ago(harness: &ControllerRuntimeHarness, id: ResourceID) {
     let script = harness.script();
     script.set_extras(vec![id]);
-    script.set_next_extra_deadline(Some(harness.time_source().now() - TimeDelta::hours(1)));
+    script.set_extra_deadlines(vec![harness.time_source().now() - TimeDelta::hours(1)]);
     script.set_behavior_of(id, TestControllerBehavior::Fail);
 }
 
