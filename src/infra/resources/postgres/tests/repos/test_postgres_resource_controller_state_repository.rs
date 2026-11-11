@@ -86,6 +86,14 @@ database_transactional_test!(
 
 database_transactional_test!(
     storage = postgres,
+    fixture = controller_state_repo_suite::test_retry_under_status_predicate,
+    harness = PostgresResourceControllerStateRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = postgres,
     fixture = controller_state_repo_suite::test_other_controllers_and_schemas_ignored,
     harness = PostgresResourceControllerStateRepositoryHarness
 );
@@ -103,6 +111,14 @@ database_transactional_test!(
 database_transactional_test!(
     storage = postgres,
     fixture = controller_state_repo_suite::test_next_deadline,
+    harness = PostgresResourceControllerStateRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = postgres,
+    fixture = controller_state_repo_suite::test_next_deadline_ignores_deleted_resources,
     harness = PostgresResourceControllerStateRepositoryHarness
 );
 
