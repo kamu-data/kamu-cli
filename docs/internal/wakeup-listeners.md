@@ -338,8 +338,19 @@ backgroundAgents:
     outboxMessages: 20      # OutboxAgentConfig::batch_size
     flowSystemEvents: 20    # FlowSystemEventAgentConfig::batch_size
     flowActivations: 20     # FlowAgentActivationConfig::batch_size
+    resourceControllers: 20 # ResourceControllerRuntimeConfig::batch_size
   concurrency:
     outboxConsumers: 1      # OutboxAgentConfig::consumer_concurrency
+    resourceControllers: 1  # ResourceControllerRuntimeConfig::process_concurrency
+  resourceControllers:
+    failureBackoff:         # ResourceControllerRuntimeConfig::failure_backoff
+      backoffType: Exponential
+      minDelay: 1s
+      maxDelay: 5m
+    loopRestartBackoff:     # ResourceControllerRuntimeConfig::loop_restart_backoff
+      backoffType: Exponential
+      minDelay: 1s
+      maxDelay: 1m
 ```
 
 - `minDebounceInterval` — how long a handle absorbs a burst after the first signal, and the SQLite
@@ -356,6 +367,12 @@ backgroundAgents:
   concurrency, not batching).
 - `batching.outboxMessages` and `concurrency.outboxConsumers` — see
   [outbox.md](outbox.md#8-configuration--metrics).
+- `batching.resourceControllers`, `concurrency.resourceControllers` and `resourceControllers` —
+  the resource controller runtime, for each controller: resources selected per drain pass,
+  `process` calls at once, and the retry delays of a failing resource and of a failing controller
+  loop, by consecutive failures (`backoffType` is one of `Fixed`, `Linear`, `Exponential`,
+  `ExponentialWithJitter`). See
+  [resources-framework.md](resources-framework.md#controller-bookkeeping).
 - Internal constants: Postgres reconnect retry `1s` (`postgres_notification_hub.rs`), SQLite poll
   floor `10ms` (`sqlite_polling_hub.rs`).
 

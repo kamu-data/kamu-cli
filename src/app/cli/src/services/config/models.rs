@@ -52,7 +52,8 @@ pub struct CLIConfig {
     #[config(default)]
     pub identity: kamu_signing::entities::IdentityConfig,
 
-    /// Background agents configuration (outbox, flow system events, tasks)
+    /// Background agents configuration (outbox, flow system events, tasks,
+    /// resource controllers)
     #[config(default)]
     pub background_agents: BackgroundAgentsConfig,
 
@@ -754,6 +755,10 @@ pub struct BackgroundAgentsConfig {
     /// Concurrency limits of agents processing records in parallel
     #[config(default)]
     pub concurrency: BackgroundAgentsConcurrencyConfig,
+
+    /// Retry delays of the resource controller runtime
+    #[config(default)]
+    pub resource_controllers: BackgroundAgentsResourceControllersConfig,
 }
 
 #[derive(setty::Config, setty::Default)]
@@ -771,6 +776,11 @@ pub struct BackgroundAgentsBatchingConfig {
     /// 0 is treated as 1
     #[config(default = 20)]
     pub flow_activations: usize,
+
+    /// Resources a resource controller selects at once before processing
+    /// them. 0 is treated as 1
+    #[config(default = 20)]
+    pub resource_controllers: usize,
 }
 
 #[derive(setty::Config, setty::Default)]
@@ -780,6 +790,57 @@ pub struct BackgroundAgentsConcurrencyConfig {
     /// as 1
     #[config(default = 1)]
     pub outbox_consumers: usize,
+
+    /// Resources each resource controller processes at once, each in
+    /// transactions of its own: e.g. 4 with Postgres, 1 with `SQLite`. 0 is
+    /// treated as 1
+    #[config(default = 1)]
+    pub resource_controllers: usize,
+}
+
+#[derive(setty::Config, setty::Default)]
+pub struct BackgroundAgentsResourceControllersConfig {
+    /// Delay before a resource whose processing failed is processed again,
+    /// growing with consecutive failures
+    #[config(default = RetryBackoffConfig::exponential("1s", "5m"))]
+    pub failure_backoff: RetryBackoffConfig,
+
+    /// Delay before a failed resource controller loop is restarted, growing
+    /// with consecutive failures
+    #[config(default = RetryBackoffConfig::exponential("1s", "1m"))]
+    pub loop_restart_backoff: RetryBackoffConfig,
+}
+
+/// Delay before a retry: a function of the attempt number, from `minDelay`
+/// up to `maxDelay`
+#[derive(setty::Config, setty::Default)]
+pub struct RetryBackoffConfig {
+    #[config(default = RetryPolicyConfigBackoffType::Exponential)]
+    pub backoff_type: RetryPolicyConfigBackoffType,
+
+    #[config(default_str = "1s")]
+    pub min_delay: DurationString,
+
+    #[config(default_str = "5m")]
+    pub max_delay: DurationString,
+}
+
+impl RetryBackoffConfig {
+    fn exponential(min_delay: &str, max_delay: &str) -> Self {
+        Self {
+            backoff_type: RetryPolicyConfigBackoffType::Exponential,
+            min_delay: min_delay.parse().unwrap(),
+            max_delay: max_delay.parse().unwrap(),
+        }
+    }
+
+    pub fn into_system(&self) -> retry_backoff::RetryBackoff {
+        retry_backoff::RetryBackoff {
+            backoff_type: self.backoff_type.into(),
+            min_delay: self.min_delay.into(),
+            max_delay: Some(self.max_delay.into()),
+        }
+    }
 }
 
 impl BackgroundAgentsConfig {
@@ -803,6 +864,19 @@ impl BackgroundAgentsConfig {
         kamu_flow_system::FlowSystemEventAgentConfig {
             batch_size: NonZeroUsize::new(self.batching.flow_system_events)
                 .unwrap_or(NonZeroUsize::MIN),
+        }
+    }
+
+    pub fn resource_controller_runtime_config(
+        &self,
+    ) -> kamu_resources::ResourceControllerRuntimeConfig {
+        kamu_resources::ResourceControllerRuntimeConfig {
+            batch_size: NonZeroUsize::new(self.batching.resource_controllers)
+                .unwrap_or(NonZeroUsize::MIN),
+            process_concurrency: NonZeroUsize::new(self.concurrency.resource_controllers)
+                .unwrap_or(NonZeroUsize::MIN),
+            failure_backoff: self.resource_controllers.failure_backoff.into_system(),
+            loop_restart_backoff: self.resource_controllers.loop_restart_backoff.into_system(),
         }
     }
 
@@ -876,7 +950,7 @@ pub enum RetryPolicyConfigBackoffType {
     ExponentialWithJitter,
 }
 
-impl From<RetryPolicyConfigBackoffType> for kamu_flow_system::RetryBackoffType {
+impl From<RetryPolicyConfigBackoffType> for retry_backoff::RetryBackoffType {
     fn from(value: RetryPolicyConfigBackoffType) -> Self {
         match value {
             RetryPolicyConfigBackoffType::Fixed => Self::Fixed,
