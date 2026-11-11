@@ -13,18 +13,22 @@ use internal_error::ErrorIntoInternal;
 use crate::domain::{
     CreateResourceError,
     DeclarativeResource,
+    DeclarativeResourceState,
     EventSourcedResource,
     InvariantViolationOf,
     ResourceLabelProjectionRepository,
     ResourcePersistenceError,
     ResourceRepository,
     ResourceSchemaProvider,
-    ResourceSnapshot,
     ResourceSnapshotUpdate,
     UpdateResourceError,
     string_label_entries,
 };
-use crate::{ResourceDurableStateValidator, ResourceExtensionSchemaRegistry};
+use crate::{
+    ResourceDurableStateValidator,
+    ResourceExtensionSchemaRegistry,
+    ResourceExtensionState,
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -59,8 +63,8 @@ where
     }
 
     pub async fn create(&self, resource: &mut R) -> Result<(), ResourcePersistenceError> {
+        self.validate(resource)?;
         let snapshot = resource.make_resource_snapshot()?;
-        self.validate_snapshot(&snapshot)?;
 
         match self.resource_repository.create_resource(&snapshot).await {
             Ok(()) => {}
@@ -87,8 +91,7 @@ where
 
     pub async fn save(&self, resource: &mut R) -> Result<(), ResourcePersistenceError> {
         let expected_last_event_id = resource.aggregate().last_stored_event_id();
-        let snapshot = resource.make_resource_snapshot()?;
-        self.validate_snapshot(&snapshot)?;
+        self.validate(resource)?;
 
         match resource.aggregate_mut().save(self.event_store).await {
             Ok(()) => {}
@@ -105,7 +108,7 @@ where
 
     pub async fn save_many(&self, resources: &mut [R]) -> Result<(), ResourcePersistenceError> {
         for resource in resources.iter() {
-            self.validate_snapshot(&resource.make_resource_snapshot()?)?;
+            self.validate(resource)?;
         }
 
         let expected_last_event_ids = resources
@@ -127,17 +130,24 @@ where
             .await
     }
 
-    fn validate_snapshot(
-        &self,
-        snapshot: &ResourceSnapshot,
-    ) -> Result<(), ResourcePersistenceError> {
-        // State that no longer validates must not block the deletion that removes it
-        if snapshot.headers.deletion_requested_at.is_some() {
-            return Ok(());
-        }
+    fn validate(&self, resource: &R) -> Result<(), ResourcePersistenceError> {
+        let stored = resource
+            .aggregate()
+            .stored_state()
+            .map(|stored| ResourceExtensionState {
+                headers: stored.headers(),
+                status: stored.status(),
+            });
 
         ResourceDurableStateValidator::new(self.extension_schema_registry)
-            .validate_snapshot(snapshot)
+            .validate_changes(
+                R::schema(),
+                ResourceExtensionState {
+                    headers: resource.headers(),
+                    status: resource.status(),
+                },
+                stored,
+            )
             .map_err(ResourcePersistenceError::InvalidDurableState)
     }
 
