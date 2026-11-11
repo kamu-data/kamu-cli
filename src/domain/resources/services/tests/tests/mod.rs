@@ -9,6 +9,7 @@
 
 pub mod utils;
 
+mod controller_runtime;
 mod controllers;
 mod crud_dispatchers;
 mod event_stores;
