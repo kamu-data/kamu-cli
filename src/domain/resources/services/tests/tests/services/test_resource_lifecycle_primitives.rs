@@ -855,6 +855,7 @@ impl LifecyclePrimitivesHarness {
             base_opts: BaseResourceServiceHarnessOpts {
                 outbox_provider: OutboxProvider::Dispatching,
                 transactional: true,
+                fake_time: false,
             },
             ..Default::default()
         });

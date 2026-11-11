@@ -510,6 +510,7 @@ impl ReconcileTestHarness {
             base_opts: BaseResourceServiceHarnessOpts {
                 outbox_provider: OutboxProvider::Dispatching,
                 transactional,
+                fake_time: false,
             },
             reconciler_provider,
             sanitizer: SanitizerKind::None,
