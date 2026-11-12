@@ -880,7 +880,8 @@ controller registers its service layer with
 schema has one controller and each controller a name of its own; the runtime refuses to start
 otherwise. The name keys the controller's bookkeeping, so it must not change once released. The
 application registers the runtime itself (`app.rs`), and with no controller registered its agent
-waits forever, since a returning agent stops the server.
+waits for the shutdown: returning earlier counts as an unexpected completion, which the host
+restarts ([background-agents.md](background-agents.md#3-supervision)).
 
 **Which resources a pass processes** (`ResourceControllerPassPlanner`):
 
@@ -960,6 +961,10 @@ grows with each consecutive failure up to its `maxDelay` (doubling, with the def
 type); a drain and the wait after it, both completed, reset the count. The
 other controllers' loops keep running, and the hint listener is kept, so no hint is lost while
 the loop is down. A drain session has no supervisor: its failure is the caller's error.
+
+**Shutdown.** Each loop stops in its wait once the shutdown token is cancelled: a drain in
+progress finishes first, and a loop that fails after the shutdown began is not restarted. The
+agent returns once every loop has stopped ([background-agents.md](background-agents.md#4-shutdown)).
 
 **Metrics.** Processed outcomes, loop restarts and resources whose last processing failed, by
 controller ([metrics.md](metrics.md#resource-controller-runtime)). The failing count comes from the

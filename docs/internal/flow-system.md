@@ -169,7 +169,8 @@ flowchart TD
 | `kamu-adapter-flow-webhook` | `src/adapter/flow-webhook` |
 
 Two background agents run in the API server: `FlowAgentImpl` (activations and task progress) and
-`FlowSystemEventAgentImpl` (projections). Storage backends are chosen in
+`FlowSystemEventAgentImpl` (projections), each restarted by its host after a failure and stopped
+between passes on a shutdown ([background-agents.md](background-agents.md)). Storage backends are chosen in
 `src/app/cli/src/database.rs`; agent configuration comes from `flowSystem` and
 `backgroundAgents` in the CLI config (`src/app/cli/src/services/config/models.rs`).
 

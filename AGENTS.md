@@ -167,6 +167,7 @@ change invalidates what it says.
 |---|---|
 | Posting messages, new message types or consumers, consumption modes, the outbox agent, delivery ordering | [`docs/internal/outbox.md`](docs/internal/outbox.md) |
 | How background agents wake up, Postgres `LISTEN`/`NOTIFY`, SQLite polling, deadline-driven waits | [`docs/internal/wakeup-listeners.md`](docs/internal/wakeup-listeners.md) |
+| Writing a background agent, its restarts and graceful shutdown, `BackgroundAgentHost` | [`docs/internal/background-agents.md`](docs/internal/background-agents.md) |
 | Exported Prometheus metrics, recommended alerts, adding metrics | [`docs/internal/metrics.md`](docs/internal/metrics.md) |
 | Task scheduling and execution, the task agent, planners and runners, new task types | [`docs/internal/task-system.md`](docs/internal/task-system.md) |
 | Flows, triggers, configurations, scheduling, sensors, flow process state, new flow types | [`docs/internal/flow-system.md`](docs/internal/flow-system.md) |
