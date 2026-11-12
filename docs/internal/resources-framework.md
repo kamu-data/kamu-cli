@@ -13,7 +13,7 @@ Kubernetes-inspired subsystem for *declarative* management of arbitrary "resourc
 authors a **manifest** (`$schema` + `headers` + `spec`); the framework stores it as an event-sourced
 aggregate, fills in server-owned headers (id, timestamps, `generation`) and an **initial**
 server-owned `status`, then **asynchronously reconciles** it toward the desired state (the status
-progresses `Pending → Reconciling → Ready`, or `Failed`/`Degraded`). Every type (today: `VariableSet`, `SecretSet`)
+progresses `Pending → Reconciling → Ready`, or `Failed`/`Degraded`). Every type (today: `VariableSet`, `SecretSet`, `Storage`)
 implements a small set of traits and registers a **dispatcher** keyed by its canonical schema URL.
 All callers — the CLI and the GraphQL API — go through a single seam, the **`ResourceFacade`** trait,
 which has an in-process (`Local`) implementation and a `RemoteGraphql` implementation that talks to
@@ -100,7 +100,7 @@ make clippy
 The framework provides a uniform way to **declaratively manage** typed resources:
 
 - **CRUD + reconcile** — `apply` (create/update), `get`, `list`, `delete` (selectors support `%`
-  name patterns), plus a `reconcile` step (outbox-driven, asynchronous — see
+  name patterns), plus a `reconcile` step (run by the controller runtime, asynchronously — see
   [How reconciliation is scheduled](#how-reconciliation-is-scheduled)) that drives a resource toward
   its desired state.
 - **ODF resource model** — every resource carries user-authored `headers` + `spec`. The server
@@ -227,7 +227,7 @@ flowchart TD
       REG["ResourceDispatcherFactory<br/>lookup by schema metadata"]
       DISP["ResourceCrudDispatcher&lt;R&gt;<br/>per-type"]
       UC["Use cases&lt;R&gt;<br/>apply / request deletion"]
-      CTL["SimpleResourceController&lt;R&gt;<br/>reconcile / complete deletions"]
+      CTL["Resource controllers on the runtime<br/>reconcile / complete deletions"]
     end
 
     STORE[("Event store + ResourceRepository<br/>(snapshots)")]
@@ -406,7 +406,7 @@ the resources a controller must act on; see [Controller bookkeeping](#controller
 
 The generic code can't name a concrete `R` at the API boundary, so dynamic dispatch is keyed by
 descriptor. `ResourceCrudDispatcher` is the main one (also `ResourcePresentationDispatcher`,
-`ResourceLifecycleEventDispatcher`, and a spec-view dispatcher that reveals/decrypts sensitive
+and a spec-view dispatcher that reveals/decrypts sensitive
 spec fields on request). Each carries
 schema plus presentation metadata as `dill` metadata for registry lookup
 (see [§9](#9-services-kamu-resources-services)).
@@ -416,8 +416,8 @@ schema plus presentation metadata as `dill` metadata for registry lookup
 Generic, `R`-parameterized contracts in `use_cases/`: `ApplyResourceUseCase<R>` (two-phase, below)
 and `RequestResourcesDeletionUseCase<R>`, plus the non-generic
 `RequestAccountResourcesDeletionUseCase`. Reconciliation and the completion of deletions are not use
-cases: the type's `SimpleResourceController<R>` runs them
-([§9](#9-services-kamu-resources-services)).
+cases: the type's resource controller runs them on the
+[controller runtime](#controller-runtime).
 
 Reads are deliberately absent from this list. Typed per-type read use cases would each run their own
 paginated query, which cannot paginate correctly across types — page 2 of a merged result is not
@@ -601,7 +601,7 @@ Resolution + permission checks live in `ResourceAccountResolverImpl`
   `ResourceLookupProblem::SchemaMismatch` at the facade boundary.
 - **Account-deletion cascade.** When an account is deleted, `RequestAccountResourcesDeletionUseCase`
   requests deletion of that account's resources (see [§13](#13-data-flow-walkthroughs)). Resources
-  already being deleted are included again, which retries their cleanup; deleted ones are skipped,
+  already being deleted are included again, which posts their message again; deleted ones are skipped,
   so the cascade is idempotent with respect to prior deletions.
 
 ---
@@ -651,15 +651,15 @@ This crate turns the domain traits into running code. Module layout: `services/`
 - **`GenericResourceQueryService`** (impl `GenericResourceQueryServiceImpl`) — descriptor-agnostic
   queries (allocate UID, find by name, search identities) delegating to `ResourceRepository`.
 - **`TypedResourceQueryService<R>`** — type-safe queries for a single type.
-- **`SimpleResourceReconciler<R>`** — the per-type one-shot callbacks (implemented in the type's
-  crate): `reconcile` drives the resource toward its spec, and `cleanup` removes what it built
-  before the deletion completes ([(c) Deletion](#c-deletion)).
-- **`SimpleResourceController<R>`** — `reconcile(id)` and `complete_deletions(ids)`: runs the
-  type's `SimpleResourceReconciler<R>` and records its outcomes through the lifecycle primitives,
-  owning the transactions of both ([(b) Reconciliation](#b-reconciliation),
-  [(c) Deletion](#c-deletion)). Implemented by the `SimpleResourceControllerAdapter` that
-  `declare_simple_resource_controller_adapter!` generates per type; the lifecycle dispatcher calls
-  it.
+- **`SimpleResourceReconciler<R>`** — the per-type callbacks of a type whose reconciliation and
+  cleanup each fit in one step (implemented in the type's crate): `reconcile` drives the resource
+  toward its spec, and `cleanup` removes what it built before the deletion completes
+  ([(c) Deletion](#c-deletion)).
+- **`SimpleResourceControllerAdapter`** — generated per type by
+  `declare_simple_resource_controller_adapter!`: the type's main lifecycle controller on the
+  [controller runtime](#controller-runtime). Its `process` runs the reconciler and records the
+  outcome through the lifecycle primitives, owning the transactions of both
+  ([(b) Reconciliation](#b-reconciliation), [(c) Deletion](#c-deletion)).
 
 **Two-phase apply.** `ApplyResourceUseCase<R>` separates *planning* (validate, diff, decide
 create/update/untouched, without writing) from *application* (persist + publish)
@@ -869,16 +869,15 @@ drain: plan a pass → process its resources, a few at a time → record each ou
 wait:  a hint for the schema | the effective deadline | the fallback timeout
 ```
 
-The existing types do not run on it yet: they still go through the lifecycle dispatcher
-([How reconciliation is scheduled](#how-reconciliation-is-scheduled)). A type driven by a controller
-registers its service layer without one
-(`register_<type>_resource_service_layer_without_lifecycle_dispatcher`), so that the controller
-alone reconciles it.
+Every resource type runs on it: `VariableSet`, `SecretSet` and `Storage` through the
+`SimpleResourceControllerAdapter` that their service layer registers
+([How reconciliation is scheduled](#how-reconciliation-is-scheduled)). A type that brings its own
+controller registers its service layer with
+`register_<type>_resource_service_layer_without_controller` instead.
 
 **Registration.** A controller is a component bound as `dyn ResourceController` with a
 `ResourceControllerMeta { schema, controller_name, controller_revision, reacts_to_status }`. Each
-schema has one controller, each controller a name of its own, and a type with a controller no
-lifecycle dispatcher, which would reconcile it a second time; the runtime refuses to start
+schema has one controller and each controller a name of its own; the runtime refuses to start
 otherwise. The name keys the controller's bookkeeping, so it must not change once released. The
 application registers the runtime itself (`app.rs`), and with no controller registered its agent
 waits forever, since a returning agent stops the server.
@@ -1013,8 +1012,8 @@ pub trait ResourceFacade: Send + Sync {
     async fn apply_manifests(&self, request: ApplyManifestBatchRequest)
         -> Result<ApplyManifestBatchResponse<ApplyManifestApplicationDecision>, BatchResourceError>;
 
-    // Each success carries the id and the phase: `Deleting`, or `Deleted` when the
-    // controllers cleaned up within the request
+    // Each success carries the id and the phase when the response was made:
+    // `Deleting`, or `Deleted` once the controllers cleaned up
     async fn delete(&self, resource_refs: Vec<ResourceRef>)
         -> Result<BatchResourceResponse<ResourceDeletion, ResourceLookupProblem>, ...>;
 }
@@ -1023,8 +1022,9 @@ pub trait ResourceFacade: Send + Sync {
 **Resources being deleted are hidden unless asked for.** With `ResourceVisibility::IncludeDeleting`
 a ref by name may match several resources: each is a success at the same `request_index`, the live
 resource first. A ref by id finds a resource being deleted either way. `delete` takes no visibility:
-a name finds the live resource only, and a resource being deleted is deleted again by its id, which
-retries its cleanup.
+a name finds the live resource only, and a resource being deleted is deleted again by its id. That
+posts its message again; a failed cleanup is retried by the controller runtime either way, once its
+backoff ends ([(c) Deletion](#c-deletion)).
 
 **The two families are deliberately asymmetric about which form is the
 primitive.** Ref-keyed reads and deletes (`get`, `get_handles`,
@@ -1191,8 +1191,8 @@ query takes `[ResourceRefInput!]!` — there are no single-ref variants, matchin
 **Mutations (`ResourcesMut`):** `apply_manifest(manifest, format, dry_run?)`,
 `apply_manifests(manifests, dry_run?)`, `delete(resourceRefs)`. `dry_run` routes to
 `plan_apply_manifest`, otherwise `apply_manifest`. `delete` requests deletion, and each
-`ResourceDeleteSuccess` reports the `phase` the resource reached: `DELETING`, or `DELETED` when its
-controllers cleaned up within the request.
+`ResourceDeleteSuccess` reports the `phase` the resource had when the response was made:
+`DELETING`, or `DELETED` once its controllers cleaned up.
 
 **Per-item lookup problems.** The ref-keyed queries and `delete` report per-entry failures through
 the `ResourceLookupProblem` union: `ResourceIDNotFoundProblem`, `ResourceNameNotFoundProblem`,
@@ -1353,7 +1353,7 @@ themselves are agnostic. Selector grammar is specified below, after the semantic
 | Default secret visibility | n/a | **`Encrypted`** (ciphertext); `--revealed` to decrypt | secrets not expanded in list columns | n/a |
 | Relevant flags | `--dry-run`, `--recursive`, `--stdin`, `--continue-on-error` | `--ignore-not-found`, `--spec`, `--revealed`, `--max-results`/`--unbounded`, `--label`/`-l` | `--max-results`/`--unbounded`, `-w`, `-o`, `--label`/`-l` | `--force`, `--ignore-not-found`, `--dry-run`, `--label`/`-l` |
 | Label filtering | n/a | `-l` narrows the selector expansion | `-l` narrows the listing (incl. `list %`) | `-l` narrows what `--all`/patterns resolve to |
-| Resources being deleted | a manifest taking the name of one creates a new resource and warns | hidden; `--include-deleting` shows them, and a name may then match several | hidden; `--include-deleting` lists them, as does a list of ids alone | names select live resources only; an id selects a resource being deleted, retrying its cleanup |
+| Resources being deleted | a manifest taking the name of one creates a new resource and warns | hidden; `--include-deleting` shows them, and a name may then match several | hidden; `--include-deleting` lists them, as does a list of ids alone | names select live resources only; an id selects a resource being deleted again |
 | Flag semantics | default: whole batch is one transaction, a rejection/failure rolls back every manifest including earlier successes; `--continue-on-error`: apply each manifest independently so earlier successes survive a later failure; `--dry-run`: plan only, no writes | `--ignore-not-found`: skip missing selectors instead of erroring | — | `--force`: skip confirmation prompt; `--ignore-not-found`: exit OK if absent; `--dry-run`: preview resolved deletions |
 | Local vs remote | identical behavior; chosen by context (`--context` to override) | identical | identical | identical |
 
@@ -1574,7 +1574,7 @@ lines rather than two whole-object dumps — the property that motivated this de
 
 ```mermaid
 sequenceDiagram
-    participant A as SimpleResourceController<R>
+    participant A as SimpleResourceControllerAdapter (process)
     participant Ctl as SimpleResourceReconciler<R>
     participant P as LifecyclePrimitives<R>
 
@@ -1590,8 +1590,9 @@ sequenceDiagram
     end
 ```
 
-Reconciliation runs as **two separately-committed phases**, each writing the status at most once
-through a [lifecycle primitive](#lifecycle-primitives). The type's simple controller owns both
+Reconciliation is one `process` call of the type's controller on the
+[controller runtime](#controller-runtime), in **two separately-committed phases**, each writing the
+status at most once through a [lifecycle primitive](#lifecycle-primitives). The adapter owns both
 transactions
 ([`controllers/simple_resource_controller_adapter.rs`](/src/domain/resources/services/src/controllers/simple_resource_controller_adapter.rs)):
 
@@ -1602,19 +1603,21 @@ transactions
   (`Ready`, `Failed` or `Degraded`) in a separate transaction, conditional on the generation and
   `statusGeneration` still being the ones phase 1 left.
 - **A changed generation between the phases** (any apply between them) discards the outcome without
-  saving or posting anything: it was computed for a superseded generation, and the newer `Applied`
-  message reconciles again. A `StatusUpdated` recording its reconciliation would also make the
+  saving or posting anything: it was computed for a superseded generation, and the next pass of the
+  drain reconciles the new one. A `StatusUpdated` recording its reconciliation would also make the
   configuration consumer drop projection entries the new generation still needs.
 - **A resource whose deletion was requested before or between the phases** is not reconciled, or
   its outcome is discarded: a resource being deleted never needs reconciliation.
 - **Another status writer between the phases** makes phase 2 fail with
-  `SimpleResourceReconciliationError::StatusConflict`, which the lifecycle dispatcher logs and
-  skips.
-- **Any other write racing a phase's save** is detected by the repository and surfaces as
-  `SimpleResourceReconciliationError::ConcurrentModification`, which the dispatcher logs and skips
-  too: the other writer is an apply, which posts its own `Applied` message, a delete, or another
-  reconciliation.
-- **A resource left in `Reconciling`** (phase 2 never completed) is picked up by a later reconcile.
+  `SimpleResourceReconciliationError::StatusConflict`, and **any other write racing a phase's save**
+  surfaces as `ConcurrentModification`. Either way `process` returns `RetryAt(now)`, so the next
+  pass of the drain reads the current state and does the next step.
+- **A failed reconciliation** is recorded as `Failed` or `Degraded`. A failure the reconciler's
+  error marks transient (`ResourceReconcileError::is_transient`) is then returned as an error, so
+  the runtime retries it with a backoff that grows with each attempt and keeps the error in its
+  bookkeeping. Any other failure returns `Done`: it waits for a new spec.
+- **A resource left in `Reconciling`** (phase 2 never completed, say after a crash) still matches
+  the "not reconciled" predicate, so the first drain after a restart reconciles it.
 
 ### (c) Deletion
 
@@ -1623,20 +1626,25 @@ sequenceDiagram
     participant RQ as RequestResourcesDeletionUseCase<R>
     participant P as LifecyclePrimitives<R>
     participant OB as Outbox
-    participant A as SimpleResourceController<R>
+    participant RT as Controller runtime
+    participant A as SimpleResourceControllerAdapter (process)
     participant Ctl as SimpleResourceReconciler<R>
 
     RQ->>P: request_deletion(ids) → DeletionRequested (Deleting)
     P->>OB: produce ResourceLifecycleMessage::DeletionRequested (one per batch)
-    OB->>A: complete_deletions(ids), through the lifecycle dispatcher
-    loop each resource that needs cleanup, in a transaction of its own
+    OB-->>RT: hint the schema
+    RT->>A: process(id), for each resource being deleted
+    rect rgba(100, 150, 255, 0.15)
         A->>Ctl: cleanup(resource)  %% e.g. VariableSet drops its projection entries
         Note over A,Ctl: a failed cleanup rolls its transaction back
     end
     rect rgba(100, 150, 255, 0.15)
-        A->>P: record_cleanup_failure(failed) → StatusUpdated (cleanup-failed)
-        A->>P: complete_deletion(cleaned up) → Deleted (tombstone name)
-        P->>OB: produce ResourceLifecycleMessage::Deleted (completed deletions)
+        alt cleaned up
+            A->>P: complete_deletion(id) → Deleted (tombstone name)
+            P->>OB: produce ResourceLifecycleMessage::Deleted
+        else cleanup failed
+            A->>P: record_cleanup_failure(id) → StatusUpdated (cleanup-failed)
+        end
     end
 ```
 
@@ -1647,25 +1655,22 @@ Deletion runs in two steps, as the ODF resource framework defines them
 - **Requesting deletion** moves the resource to `Deleting` and frees its name
   ([§6](#6-persistence-model)). Its headers and spec can no longer change, and it is no longer
   reconciled. Requesting the deletion of a resource already being deleted, by its id, posts the
-  message again, which retries its cleanup.
-- **Completing the deletion** runs the reconciler's `cleanup`, then appends `Deleted`, which
-  renames the resource to its tombstone. Resources that do not wait for cleanup are skipped, so a
-  message delivered twice completes a deletion once.
-- **Each cleanup runs in a transaction of its own**, so a failing one, a database error included,
-  holds back only its resource and discards whatever the reconciler wrote before failing. The
-  outcomes are then recorded in one transaction, failures first and completions last, so one
-  `Deleted` message covers the batch. A
-  concurrent modification of any resource in it rolls that transaction back; the outcomes are then
-  recorded one by one, and a conflict there is logged and skipped: the other writer completes the
-  deletion or requests it again. The orchestration lives in `SimpleResourceDeletionPhases`, which
-  each type's adapter implements with its two transactional phases.
-- **A failed cleanup is an outcome, not an error.** The resource stays `Deleting` with a
-  `ReconciliationError` condition, code `cleanup-failed`, unless another writer updated its status since
-  the cleanup started; that status then stands. Nothing retries it automatically; deleting the
-  resource again by its id does. Since the failure never reaches the outbox consumer, it cannot
-  stall the processing of other resource messages.
-- **The phase a delete reports** is the one at the time of the response: `Deleted` only if the
-  controllers cleaned up within the request. A local workspace processes a command's messages once
+  message again.
+- **Completing the deletion** is one `process` call per resource: it runs the reconciler's
+  `cleanup`, then appends `Deleted`, which renames the resource to its tombstone and posts a
+  `Deleted` message of its own. A resource that no longer waits for cleanup is skipped, so
+  processing it twice completes its deletion once.
+- **The cleanup runs in a transaction of its own**, so a failure, a database error included,
+  discards whatever the reconciler wrote before failing; the outcome is recorded in the next one.
+  A concurrent modification while recording it makes `process` return `RetryAt(now)`: the next
+  pass reads the current state.
+- **A failed cleanup is retried.** The resource stays `Deleting` with a `ReconciliationError`
+  condition, code `cleanup-failed`, unless another writer updated its status since the cleanup
+  started; that status then stands. `process` then returns the error, so the runtime retries the
+  cleanup with its growing backoff. A resource left `Deleting` by a crash matches the "deletion
+  pending" predicate, so the first drain after a restart completes it.
+- **The phase a delete reports** is the one at the time of the response: `Deleting` unless the
+  controller runtime completed the deletion before it. A local workspace processes a command's messages once
   its transaction has committed, so `kamu delete` there reports afterwards, through a
   `PostCommandActions` step: a resource still found by its id is `Deleting`, one gone is `Deleted`.
   A resource still `Deleting` there gets a hint to retry by id. The command runs in one
@@ -1681,12 +1686,12 @@ The apply use case and the lifecycle primitives that the other use cases call pu
 flowchart LR
     APPLY["apply.rs"] -->|Applied| MSG[["ResourceLifecycleMessage"]]
     DEL["request_deletion.rs"] -->|DeletionRequested| MSG
-    COMP["simple controller"] -->|Deleted| MSG
+    COMP["resource controllers"] -->|Deleted| MSG
     PRIM["lifecycle primitives:<br/>every status write"] -->|StatusUpdated| MSG
 
     MSG --> OB[("Outbox")]
 
-    OB --> BRIDGE["ResourceLifecycleMessageConsumer<br/>(MESSAGE_CONSUMER_..._RESOURCE_LIFECYCLE_EVENT_BRIDGE)<br/>→ ResourceLifecycleEventDispatcher (per-type)"]
+    OB --> BRIDGE["ResourceLifecycleMessageConsumer<br/>(MESSAGE_CONSUMER_..._RESOURCE_LIFECYCLE_EVENT_BRIDGE)"]
     BRIDGE -.->|hint per schema| RT["ResourceControllerRuntime"]
     OB --> CFG["configuration crate:<br/>ConfigurationResourceLifecycleMessageConsumer"]
 
@@ -1698,12 +1703,11 @@ flowchart LR
 ```
 
 - **Resource lifecycle** — `Applied` (from `use_cases/apply.rs`), `DeletionRequested`
-  (`use_cases/request_deletion.rs`), `Deleted` (the simple controller), and
+  (`use_cases/request_deletion.rs`), `Deleted` (a controller completing a deletion), and
   `StatusUpdated` for every status write of a [lifecycle primitive](#lifecycle-primitives): a
   reconciliation started, succeeded or failed, a cleanup failed, or a condition patch. Consumed by
-  the **event bridge** (hints the [controller runtime](#controller-runtime) and routes to the
-  per-type `ResourceLifecycleEventDispatcher` — this is what schedules reconciliation and completes
-  deletions) and by the configuration crate's
+  the **event bridge**, which hints the [controller runtime](#controller-runtime), and by the
+  configuration crate's
   projection-maintenance consumer. See
   [How reconciliation is scheduled](#how-reconciliation-is-scheduled) for the split of duties.
 - **Account cascade** — when an account is deleted, `AccountLifecycleMessage::Deleted` is consumed by
@@ -1719,39 +1723,37 @@ flowchart LR
 
 ### How reconciliation is scheduled
 
-Reconciliation is **not** synchronous within `apply` — it is driven by the outbox (see the diagram
-above). `apply` produces `Applied`; the generic **event bridge**
-`ResourceLifecycleMessageConsumer` (`MESSAGE_CONSUMER_KAMU_RESOURCE_LIFECYCLE_EVENT_BRIDGE`,
+Reconciliation is **not** synchronous within `apply`: the
+[controller runtime](#controller-runtime) runs it. `apply` produces `Applied`; the generic **event
+bridge** `ResourceLifecycleMessageConsumer`
+(`MESSAGE_CONSUMER_KAMU_RESOURCE_LIFECYCLE_EVENT_BRIDGE`,
 [`resource_lifecycle_message_consumer.rs`](/src/domain/resources/services/src/message_handlers/resource_lifecycle_message_consumer.rs))
-consumes it, hints the [controller runtime](#controller-runtime), looks up the per-type
-`ResourceLifecycleEventDispatcher` by descriptor, and its
-`handle_applied` calls `SimpleResourceController::reconcile(id)`, which marks reconciliation
-started, runs the type's `SimpleResourceReconciler<R>`, records the outcome in the status, and posts
-`StatusUpdated` for each status write. `handle_deletion_requested` calls
-`SimpleResourceController::complete_deletions(ids)` with the whole batch
-([(c) Deletion](#c-deletion)).
-`handle_deleted` is a no-op, and `StatusUpdated` reaches no dispatcher, only the runtime's hints.
-The dispatcher and the simple controller are generated together by the
-`declare_resource_service_layer!` macro and registered from the type's crate. A type registered
-without the dispatcher is left to its `ResourceController`.
+consumes it and hints the runtime for the resource's schema, as it does for `DeletionRequested` and
+`StatusUpdated`. The hint only wakes the loop of that schema's controller: the runtime finds the
+work in storage, through the eligibility predicates
+([Controller bookkeeping](#controller-bookkeeping)), and calls the controller's `process` for each
+resource due. For `VariableSet`, `SecretSet` and `Storage` that controller is the type's
+`SimpleResourceControllerAdapter`, generated and registered with the rest of the service layer by
+`declare_resource_service_layer!`
+([(b) Reconciliation](#b-reconciliation), [(c) Deletion](#c-deletion)).
 
 The **second consumer**, `ConfigurationResourceLifecycleMessageConsumer` (configuration crate),
 reacts to the `StatusUpdated` that records the reconciliation of the current generation to
 **garbage-collect read-side projections** (drop superseded generations) — it does *not*
 reconcile. A later status update of the reconciled resource keeps its `reconciledAt` and does not
 trigger the cleanup again. The projection entries of a resource being deleted are removed by its
-reconciler's `cleanup`. So the bridge **schedules reconciliation**, the configuration consumer
-**maintains projections**.
+reconciler's `cleanup`. So the runtime **reconciles**, the configuration consumer **maintains
+projections**.
 
-> A type on the lifecycle dispatcher has **no periodic/background reconcile loop** — reconciliation
-> fires once per `Applied` message (i.e. per generation-changing apply). A failed reconcile is not
-> automatically retried; a subsequent re-apply that bumps the generation produces a new `Applied`
-> and re-triggers the chain. The [controller runtime](#controller-runtime) is that loop for the
-> types it drives.
+> Storage, not the messages, decides what is reconciled. A resource left `Reconciling` or
+> `Deleting` by a crash, or one whose message was consumed while its controller failed, is found by
+> the first drain after a restart. A transient reconcile failure and a failed cleanup are retried
+> with a backoff; a failing controller holds back only its own resources, since the event bridge
+> never runs controller work.
 
 ### Lifecycle state machine
 
-Below is the machine as implemented for `VariableSet` / `SecretSet`. The status transitions
+Below is the machine as implemented for `VariableSet`, `SecretSet` and `Storage`. The status transitions
 come from `ResourceStatusExt` in
 [`state/resource_status.rs`](/src/domain/resources/domain/src/state/resource_status.rs)
 (`mark_reconciling` → `Reconciling`, `mark_ready` → `Ready`, `mark_failed_or_degraded` → `Failed`
@@ -1776,7 +1778,7 @@ stateDiagram-v2
     Degraded --> Deleting: delete
     Pending --> Deleting: delete
     Reconciling --> Deleting: delete<br/>(outcome discarded)
-    Deleting --> Deleting: cleanup failed<br/>(retried by another delete)
+    Deleting --> Deleting: cleanup failed<br/>(retried with a backoff)
     Deleting --> Deleted: controller cleaned up
     Deleted --> [*]
 ```
@@ -1790,9 +1792,9 @@ stateDiagram-v2
 - **`Failed` and `Degraded` are the unhealthy phases**, set by `mark_failed_or_degraded` with a
   `ReconciliationError` condition carrying the code and message: `Failed` when no generation was ever
   reconciled, `Degraded` when an earlier one was and is presumably still in effect.
-- **Neither is terminal, nor retried automatically.** The types on the lifecycle dispatcher have no
-  background reconcile worker or scheduler. Recovery is driven by the user re-applying a changed manifest: the generation bumps
-  and an `Applied` message reconciles it again.
+- **Neither is terminal.** A failure the reconciler marks transient is retried by the controller
+  runtime with a growing backoff. Any other failure waits for the user to re-apply a changed
+  manifest: the generation bumps and the runtime reconciles it again.
 - An unchanged re-apply (`Untouched`) does not bump `generation` and so does not re-trigger
   reconciliation.
 - **Deletion phases take precedence** over every other phase, and are final: a resource being
@@ -2063,7 +2065,7 @@ pub fn register_variable_set_resource_crud_dispatcher(catalog_builder: &mut dill
    canonical should be the schema `TypeName`; include at least the singular and plural lowercase
    forms and a short code as aliases). No `status.rs` is needed — status is inherited automatically
    via the shared `ResourceStatus`/`ResourceStatusExt`, written through the generic
-   `StatusUpdated` event by the type's simple controller.
+   `StatusUpdated` event by the type's controller.
 2. **Implement a `SimpleResourceReconciler<R>`** in `configuration/services/src/reconcilers/`
    (no-op projection is fine if there's nothing to do; transform the spec here if needed — see
    `SecretSet`).
@@ -2071,9 +2073,10 @@ pub fn register_variable_set_resource_crud_dispatcher(catalog_builder: &mut dill
    `declare_resource_presentation_dispatcher!` (and a spec-view dispatcher if the type has sensitive
    fields) and add a `register_<type>_resource_crud_dispatcher(builder)` function.
 4. **Wire it into DI** — generate the per-type service layer (event-store bridge, loader,
-   persistence, typed query, all use cases, the simple controller adapter, and the lifecycle
-   controller dispatcher) with the
-   `declare_resource_service_layer!` umbrella macro, then call its
+   persistence, typed query, all use cases, and the simple controller adapter, the type's
+   controller on the [controller runtime](#controller-runtime)) with the
+   `declare_resource_service_layer!` umbrella macro, giving it a `controller_name` that is stored in
+   the controller bookkeeping and must not change once released, then call its
    `register_<type>_resource_service_layer(builder)` plus your CRUD/presentation/spec-view
    `register_*` from the crate's `dependencies.rs`, and `add` the `SimpleResourceReconciler<R>`
    impl.
@@ -2088,7 +2091,7 @@ client depends on type-specific shapes, and any type-specific spec-view/sanitize
 
 ### Recipe: driving a type with a resource controller
 
-Instead of steps 2 and 4's simple reconciler and lifecycle dispatcher:
+Instead of step 2's simple reconciler, and the simple controller adapter of step 4:
 
 1. **Implement `ResourceController`**: `process(id)` does the next step through the
    [lifecycle primitives](#lifecycle-primitives) in transactions of its own and returns `Done`
@@ -2098,8 +2101,8 @@ Instead of steps 2 and 4's simple reconciler and lifecycle dispatcher:
 2. **Register it** as `#[interface(dyn ResourceController)]` with
    `#[meta(ResourceControllerMeta { schema, controller_name, controller_revision, reacts_to_status })]`,
    and register the type's service layer with
-   `register_<type>_resource_service_layer_without_lifecycle_dispatcher`. The runtime refuses a
-   type that has both.
+   `register_<type>_resource_service_layer_without_controller`, which leaves the adapter out. The
+   runtime refuses two controllers for one schema.
 3. **Test it** on `ControllerRuntimeHarness` (see [§15](#15-tests)): drain until idle, or run the
    agent on the fake clock.
 
@@ -2107,13 +2110,17 @@ Instead of steps 2 and 4's simple reconciler and lifecycle dispatcher:
 
 ## 15. Tests
 
-Three tiers, all exercising the real `VariableSet` / `SecretSet` types:
+Three tiers, all exercising the real `VariableSet` / `SecretSet` types. Writes only record desired
+state, so a test that reads reconciled state or a completed deletion first lets the controllers
+work: the harnesses' `settle` runs the `BackgroundWorkFinalizer`, as the CLI does after a command.
 
 **Service-level (unit/integration)** —
 [`src/domain/resources/services/tests`](/src/domain/resources/services/tests) and
 [`src/domain/configuration/services/tests`](/src/domain/configuration/services/tests). Cover the
-apply planner/executor, the simple controller's reconciliation and deletion, CRUD dispatch,
-persistence, the event-store bridge, and the message consumers. A `TestResource` mock and
+apply planner/executor, the simple controller adapter's reconciliation, deletion and retries, CRUD
+dispatch, persistence, the event-store bridge, and the message consumers. Configuration tests also
+leave real resources `Reconciling` or `Deleting` without the runtime, as a crash would, and check
+that the first drain completes them, and that a failing `SecretSet` holds back no `VariableSet`. A `TestResource` mock and
 `BaseResourceServiceHarness` (`services/src/testing/`) provide a type-agnostic harness;
 configuration tests cover the real reconcilers (incl. the `SecretSet` spec sanitizer, encrypted projection, and `reveal_spec`).
 

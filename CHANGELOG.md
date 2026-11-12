@@ -83,6 +83,14 @@ Recommendation: for ease of reading, use the following format:
   records it added
 - GraphQL: a transform flow that found nothing to do reports `FlowDescriptionUpdateResultUpToDate`,
   as ingest flows do, instead of no result
+- Resources (`VariableSet`, `SecretSet`, `Storage`) are reconciled by a background controller
+  that keeps trying, instead of once per change:
+  - a resource left `Reconciling` or `Deleting` by a crash is completed after a restart instead of
+    staying stuck
+  - a transient reconciliation failure is retried with a growing backoff instead of leaving the
+    resource `Failed` until the next apply, and a failed cleanup during deletion is retried the
+    same way
+  - a resource that keeps failing no longer delays the processing of other resources
 ### Fixed
 - A polling source with an unsupported URL scheme (such as `s3://`) or fetch kind, an invalid
   header, an MQTT port out of range, a files glob ordered by event time or matching a file name that
