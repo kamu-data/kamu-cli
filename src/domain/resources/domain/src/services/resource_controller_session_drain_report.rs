@@ -14,15 +14,18 @@
 pub struct ResourceControllerSessionDrainReport {
     /// `process` calls the drain made
     pub processed: usize,
-    /// Whether the drain waited for another drain of a controller, such as
-    /// the agent's, whose work may have posted messages not delivered yet
-    pub waited_for_another_drain: bool,
+    /// `process` calls other drains of the controllers, such as the agent's,
+    /// made since the session's previous drain or its start. Their messages
+    /// may not be delivered yet.
+    pub processed_by_other_drains: usize,
 }
 
 impl ResourceControllerSessionDrainReport {
-    /// Whether neither this drain nor one it waited for did any work
+    /// Whether no drain of the controllers did any work since the session's
+    /// previous drain. Drains with nothing to do keep it idle, so that
+    /// sessions running at once do not keep each other going.
     pub fn is_idle(&self) -> bool {
-        self.processed == 0 && !self.waited_for_another_drain
+        self.processed == 0 && self.processed_by_other_drains == 0
     }
 }
 

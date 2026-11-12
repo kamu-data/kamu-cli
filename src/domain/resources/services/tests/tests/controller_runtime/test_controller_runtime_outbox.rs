@@ -58,3 +58,26 @@ async fn test_steps_due_at_once_run_in_one_drain_and_their_messages_are_delivere
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test(flavor = "multi_thread", worker_threads = 4))]
+async fn test_concurrent_finalizations_all_end() {
+    let harness = ControllerRuntimeHarness::new(
+        TestControllers::Main,
+        TestControllerBehavior::Stepwise {
+            step_wait: TimeDelta::zero(),
+        },
+    )
+    .await;
+    let id_a = harness.apply("res-a").await;
+    let id_b = harness.apply("res-b").await;
+
+    harness
+        .run_outbox_and_controllers_until_idle_concurrently(8)
+        .await;
+
+    assert_eq!(harness.phase(id_a).await, ResourcePhase::Ready);
+    assert_eq!(harness.phase(id_b).await, ResourcePhase::Ready);
+    assert!(!harness.has_undelivered_lifecycle_messages().await);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

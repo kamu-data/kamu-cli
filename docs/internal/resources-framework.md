@@ -976,8 +976,12 @@ it with the outbox until a drain is idle
 ([`BackgroundWorkFinalizer`](/src/domain/resources/services/src/controller_runtime/background_work_finalizer.rs)): a message may
 make a resource actionable, and processing posts messages of its own. A session keeps what its drains held back until it ends, so
 that alternation ends too, even with a controller that never settles a resource. A session's
-drains and the agent's never overlap for one controller: a session's drain that waited for the
-agent's is not idle, since the messages the agent's drain posted may still be undelivered.
+drains and the agent's never overlap for one controller (`ResourceControllerDrainGate`), which
+also counts every drain's `process` calls. A session's drain is idle only when no drain of the
+controllers, its own or another, such as the agent's, processed a resource since the session's
+previous drain: the other drain's messages may still be undelivered. Drains with nothing to do
+leave the count alone, so sessions running at once, one per concurrent request, cannot keep each
+other going.
 
 **Failures of the runtime itself**, such as a storage error while planning or recording, a failed
 call to the controller outside `process`, or a panic, end that controller's loop only

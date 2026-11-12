@@ -16,6 +16,7 @@ use time_source::SystemTimeSource;
 use wakeup_listener::{WakeupListener, WakeupListenerConfig};
 
 use crate::controller_runtime::{
+    ResourceControllerDrainGate,
     ResourceControllerDrainHoldBack,
     ResourceControllerOutcomeRecorder,
     ResourceControllerPassPlanner,
@@ -56,9 +57,8 @@ pub(crate) struct ResourceControllerLoop {
     wakeup_config: Arc<WakeupListenerConfig>,
     time_source: Arc<dyn SystemTimeSource>,
     metrics: Arc<ResourceControllerRuntimeMetrics>,
-    /// Shared by every loop of this controller, so that the agent's loop and
-    /// a drain session never drain at once and double-process a resource
-    drain_lock: Arc<tokio::sync::Mutex<()>>,
+    /// Shared by every loop of this controller
+    drain_gate: Arc<ResourceControllerDrainGate>,
 }
 
 impl ResourceControllerLoop {
@@ -69,7 +69,7 @@ impl ResourceControllerLoop {
         wakeup_config: Arc<WakeupListenerConfig>,
         time_source: Arc<dyn SystemTimeSource>,
         metrics: Arc<ResourceControllerRuntimeMetrics>,
-        drain_lock: Arc<tokio::sync::Mutex<()>>,
+        drain_gate: Arc<ResourceControllerDrainGate>,
     ) -> Self {
         Self {
             registration,
@@ -78,12 +78,17 @@ impl ResourceControllerLoop {
             wakeup_config,
             time_source,
             metrics,
-            drain_lock,
+            drain_gate,
         }
     }
 
     pub fn registration(&self) -> &ResourceControllerRegistration {
         &self.registration
+    }
+
+    /// `process` calls every loop of this controller made so far
+    pub fn processed_by_all_drains(&self) -> usize {
+        self.drain_gate.processed()
     }
 
     /// Processes pass after pass until no resource needs attention now. The
@@ -96,10 +101,7 @@ impl ResourceControllerLoop {
         listener: Option<&dyn WakeupListener>,
         hold_back: &mut ResourceControllerDrainHoldBack,
     ) -> Result<ResourceControllerDrainReport, InternalError> {
-        let (_guard, waited_for_another_drain) = match self.drain_lock.try_lock() {
-            Ok(guard) => (guard, false),
-            Err(_) => (self.drain_lock.lock().await, true),
-        };
+        let _turn = self.drain_gate.enter().await;
 
         let planner = ResourceControllerPassPlanner::new(
             &self.registration,
@@ -126,7 +128,6 @@ impl ResourceControllerLoop {
                 self.update_failing_resources().await?;
                 return Ok(ResourceControllerDrainReport {
                     processed,
-                    waited_for_another_drain,
                     extras_listed_at: planned_at,
                     earliest_deferred_extra: pass.earliest_deferred_extra(),
                     held_back: pass.held_back(),
@@ -139,6 +140,7 @@ impl ResourceControllerLoop {
             // which may fail the drain halfway
             for (candidate, attempt) in &attempts {
                 processed += 1;
+                self.drain_gate.count_processed();
                 self.metrics
                     .on_processed(&self.registration.meta().controller_name, attempt.kind());
                 hold_back.note_attempt(
@@ -201,7 +203,6 @@ impl ResourceControllerLoop {
 #[derive(Debug)]
 pub(crate) struct ResourceControllerDrainReport {
     processed: usize,
-    waited_for_another_drain: bool,
     extras_listed_at: DateTime<Utc>,
     earliest_deferred_extra: Option<DateTime<Utc>>,
     held_back: bool,
@@ -211,12 +212,6 @@ impl ResourceControllerDrainReport {
     /// `process` calls made
     pub fn processed(&self) -> usize {
         self.processed
-    }
-
-    /// Whether the drain started only after another drain of the controller
-    /// ended
-    pub fn waited_for_another_drain(&self) -> bool {
-        self.waited_for_another_drain
     }
 
     /// The moment the last pass listed the extra resources. Those due by then
