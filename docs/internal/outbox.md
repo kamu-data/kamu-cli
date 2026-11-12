@@ -293,9 +293,9 @@ after every command that `command_needs_outbox_processing` selects, whether the 
 failed: a failed command may still have committed work in transactions of its own. The CLI
 alternates it with drains of the resource controllers until one processes nothing
 ([resources-framework.md](resources-framework.md#controller-runtime)). The HTTP E2E
-middleware calls it after every successful mutating request (a REST `POST` or a GraphQL
-`mutation`), so E2E tests observe
-consumers' effects synchronously. A `run_lock` keeps these entrances from overlapping with the main loop.
+middleware does the same after every successful mutating request (a REST `POST` or a GraphQL
+`mutation`), through the `E2EMutationFinalizer` the CLI gives it (`BackgroundWorkFinalizer`), so E2E tests observe consumers'
+and controllers' effects synchronously. A `run_lock` keeps these entrances from overlapping with the main loop.
 
 `run_while_has_tasks()` does not stop at the first empty iteration. Committed messages can be held
 back while an older transaction runs ([§6](#reading-below-the-oldest-running-transaction)), anywhere
@@ -520,4 +520,4 @@ boundaries, failure isolation, self-managed consumers, batching and concurrency 
 | Testing helpers | `messaging-outbox` (`testing`) | `src/utils/messaging-outbox/src/services/testing` | `test_outbox_provider.rs`, `mock_outbox_impl.rs` |
 | Schema | — | `migrations/{postgres,sqlite}` | `*_outbox_messages_consumptions.sql`, `*_outbox_message_version.sql`, `*_outbox_listen_notify.sql`, `*_outbox_wipe*.sql` |
 | App wiring | `kamu-cli` | `src/app/cli/src` | `app.rs` (outbox components, dispatchers), `services/config/models.rs` (`BackgroundAgentsConfig`) |
-| Flushing | `kamu-cli`, `kamu-adapter-http` | `src/app/cli/src`, `src/adapter/http/src/e2e` | `outbox.rs` (`run_while_has_tasks` after commands), `e2e_middleware.rs` |
+| Flushing | `kamu-cli`, `kamu-adapter-http` | `src/app/cli/src`, `src/adapter/http/src/e2e` | `background_work_finalizer.rs` (after commands and e2e requests), `e2e_middleware.rs` |
