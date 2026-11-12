@@ -543,7 +543,8 @@ existing rows/events that should move to the new schema.
   `resources`. A row records the generation and status generation the controller finished with,
   or, with `not_before` set, a retry or a failure, with `attempts` and `last_error`.
 - Rows are not event-sourced: an upsert replaces the row. The FK means a resource's rows must be
-  removed (`delete_states_for_resource`) before the resource itself.
+  removed (`delete_states_for_resource`) before the resource itself. Nothing removes a deleted
+  resource, which stays as its tombstone, so its rows stay too; every query leaves them out.
 - The [controller runtime](#controller-runtime) writes a row after every `process` call and
   reads them to plan its drains and its deadlines.
 - **Actionable resources.** `find_actionable_resource_ids` returns the resources a controller must
@@ -946,9 +947,10 @@ The hub is in-process on every backend
 **Draining on demand.** A caller that does not run the agent opens a drain session
 (`new_drain_session()`), whose `drain_due_resources()` drains every controller once and does not
 wait for deadlines: a resource waiting for time stays for a later drain. The CLI, after a command,
-alternates it with the outbox until a drain processes nothing
-([`outbox.rs`](/src/app/cli/src/outbox.rs)): a message may make a resource actionable, and
-processing posts messages of its own. A session keeps what its drains held back until it ends, so
+and the e2e API server, after a mutating request, alternate it with the outbox until a drain
+processes nothing
+([`BackgroundWorkFinalizer`](/src/app/cli/src/background_work_finalizer.rs)): a message may
+make a resource actionable, and processing posts messages of its own. A session keeps what its drains held back until it ends, so
 that alternation ends too, even with a controller that never settles a resource. A session's
 drains and the agent's never overlap for one controller.
 
@@ -2147,9 +2149,10 @@ context and a registered remote context. The `get_view.rs` helper parses `get -o
 queryable `ResourceView` (`ident()`, `variable()`, `has_secret()`, `id()`, …) so assertions are
 targeted rather than brittle; a golden-view test pins the whole-document shape once per type.
 
-**CLI E2E tests cannot observe `Deleting`.** The e2e server drains the outbox after every mutating
-request ([`e2e_middleware.rs`](/src/adapter/http/src/e2e/e2e_middleware.rs)), and the local CLI
-drains it before it reports, so a deletion has completed by the time a command returns. The window
+**CLI E2E tests cannot observe `Deleting`.** The e2e server drains the outbox and the resource
+controllers after every mutating request
+([`e2e_middleware.rs`](/src/adapter/http/src/e2e/e2e_middleware.rs)), as the local CLI does before
+it reports, so a deletion has completed by the time a command returns. The window
 in between is covered by the facade contract tests, which hold messages back with
 `OutboxProvider::Dispatching`. Slowing cleanup down or sleeping in an e2e scenario was rejected:
 such tests depend on timing.
