@@ -344,6 +344,32 @@ pub async fn test_delete_states_for_resource(catalog: &Catalog) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+pub async fn test_upsert_state_with_nul_in_error(catalog: &Catalog) {
+    let ctx = ControllerStateTestContext::new(catalog);
+    let resource = ctx.create_resource("a").await;
+
+    let mut state = ctx.retry_state(&CONTROLLER, &resource, ctx.now + TimeDelta::minutes(5));
+    state.last_error = Some("before\0after".to_string());
+    ctx.upsert(&state).await;
+
+    let stored = ctx.get_state(&CONTROLLER, &resource).await.unwrap();
+    let last_error = stored.last_error.unwrap();
+    assert!(last_error.starts_with("before"), "{last_error}");
+    assert!(last_error.ends_with("after"), "{last_error}");
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_upsert_state_of_unknown_resource_fails(catalog: &Catalog) {
+    let ctx = ControllerStateTestContext::new(catalog);
+    let unknown = ctx.unsaved_resource("unknown").await;
+
+    let state = ctx.done_state(&CONTROLLER, &unknown, REVISION);
+    assert!(ctx.states.upsert_state(&state).await.is_err());
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 struct ControllerStateTestContext {
     resources: Arc<dyn ResourceRepository>,
     states: Arc<dyn ResourceControllerStateRepository>,
@@ -368,9 +394,19 @@ impl ControllerStateTestContext {
         self.create_resource_of(&CONTROLLED_KIND, name).await
     }
 
-    async fn create_resource_of(&self, schema: &TypeUri, name: &str) -> ResourceSnapshot {
+    /// A resource with an ID of its own that the storage never saw
+    async fn unsaved_resource(&self, name: &str) -> ResourceSnapshot {
+        self.unsaved_resource_of(&CONTROLLED_KIND, name).await
+    }
+
+    async fn unsaved_resource_of(&self, schema: &TypeUri, name: &str) -> ResourceSnapshot {
         let mut snapshot = make_test_snapshot(&self.account, schema, name);
         snapshot.id = self.resources.new_resource_id().await.unwrap();
+        snapshot
+    }
+
+    async fn create_resource_of(&self, schema: &TypeUri, name: &str) -> ResourceSnapshot {
+        let mut snapshot = self.unsaved_resource_of(schema, name).await;
         // As apply creates resources: the first generation is 1
         snapshot.headers.generation = 1;
         snapshot.status = Some(new_pending_resource_status());

@@ -10,7 +10,7 @@
 use internal_error::InternalError;
 
 use crate::controller_runtime::{ResourceControllerDrainHoldBack, ResourceControllerLoop};
-use crate::domain::ResourceControllerDrainSession;
+use crate::domain::{ResourceControllerDrainSession, ResourceControllerSessionDrainReport};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -35,12 +35,19 @@ impl ResourceControllerDrainSessionImpl {
 
 #[async_trait::async_trait]
 impl ResourceControllerDrainSession for ResourceControllerDrainSessionImpl {
-    async fn drain_due_resources(&mut self) -> Result<usize, InternalError> {
-        let mut processed = 0;
+    async fn drain_due_resources(
+        &mut self,
+    ) -> Result<ResourceControllerSessionDrainReport, InternalError> {
+        let mut report = ResourceControllerSessionDrainReport {
+            processed: 0,
+            waited_for_another_drain: false,
+        };
         for (controller_loop, hold_back) in &mut self.loops {
-            processed += controller_loop.drain(None, hold_back).await?.processed();
+            let drained = controller_loop.drain(None, hold_back).await?;
+            report.processed += drained.processed();
+            report.waited_for_another_drain |= drained.waited_for_another_drain();
         }
-        Ok(processed)
+        Ok(report)
     }
 }
 

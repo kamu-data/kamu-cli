@@ -217,7 +217,10 @@ runs startup jobs:
    `TaskRequeued`.
 
 `run()` repeats step 2 before its loop, so a restart by the host after a failure in the middle of
-a task requeues that task too; at a server's first run it finds nothing left.
+a task requeues that task too; at a server's first run it finds nothing left. An internal error
+while planning or running a task, such as a plan type with no planner, finishes the task as a
+recoverable failure instead of failing the agent: a restart would requeue that task first, and no
+other task would ever run.
 
 Requeued tasks keep their ID and plan, so a crash costs a re-run, not a lost task. Runners must
 therefore tolerate being re-run after a partial first attempt. The dataset runners do, because

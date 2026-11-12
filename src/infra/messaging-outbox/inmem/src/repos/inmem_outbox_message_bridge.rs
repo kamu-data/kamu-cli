@@ -157,14 +157,15 @@ impl OutboxMessageBridge for InMemoryOutboxMessageBridge {
 
         let mut latest_message_id_by_producer = HashMap::new();
         for message in log.visible(transaction_id) {
-            latest_message_id_by_producer.insert(message.producer_name.clone(), message.message_id);
+            latest_message_id_by_producer
+                .insert(message.producer_name.as_str(), message.message_id);
         }
 
         Ok(latest_message_id_by_producer
             .into_iter()
             .map(|(producer_name, message_id)| {
                 (
-                    producer_name,
+                    producer_name.to_owned(),
                     OutboxMessageBoundary {
                         message_id,
                         tx_id: 0,

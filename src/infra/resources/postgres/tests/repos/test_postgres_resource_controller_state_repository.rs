@@ -130,6 +130,18 @@ database_transactional_test!(
     harness = PostgresResourceControllerStateRepositoryHarness
 );
 
+database_transactional_test!(
+    storage = postgres,
+    fixture = controller_state_repo_suite::test_upsert_state_with_nul_in_error,
+    harness = PostgresResourceControllerStateRepositoryHarness
+);
+
+database_transactional_test!(
+    storage = postgres,
+    fixture = controller_state_repo_suite::test_upsert_state_of_unknown_resource_fails,
+    harness = PostgresResourceControllerStateRepositoryHarness
+);
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 database_transactional_test!(
