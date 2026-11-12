@@ -31,7 +31,7 @@ testing = [
 ]
 
 [dependencies]
-async-utils = { workspace = true }
+background-agent-host = { workspace = true }
 database-common = { workspace = true }
 database-common-macros = { workspace = true }
 init-on-startup = { workspace = true }

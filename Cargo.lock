@@ -1777,7 +1777,6 @@ name = "async-utils"
 version = "0.272.1"
 dependencies = [
  "async-trait",
- "internal-error",
  "tokio",
 ]
 
@@ -2405,6 +2404,15 @@ dependencies = [
  "tower-layer",
  "tower-service",
  "tracing",
+]
+
+[[package]]
+name = "background-agent-host"
+version = "0.272.1"
+dependencies = [
+ "async-trait",
+ "internal-error",
+ "tokio-util",
 ]
 
 [[package]]
@@ -8652,8 +8660,8 @@ dependencies = [
  "async-graphql",
  "async-graphql-axum",
  "async-trait",
- "async-utils",
  "axum",
+ "background-agent-host",
  "cfg-if",
  "chrono",
  "chrono-humanize",
@@ -9358,7 +9366,7 @@ name = "kamu-flow-system"
 version = "0.272.1"
 dependencies = [
  "async-trait",
- "async-utils",
+ "background-agent-host",
  "chrono",
  "cron",
  "database-common",
@@ -9466,7 +9474,7 @@ version = "0.272.1"
 dependencies = [
  "async-stream",
  "async-trait",
- "async-utils",
+ "background-agent-host",
  "chrono",
  "common-macros",
  "cron",
@@ -9603,6 +9611,7 @@ version = "0.272.1"
 dependencies = [
  "async-stream",
  "async-trait",
+ "background-agent-host",
  "chrono",
  "database-common",
  "database-common-macros",
@@ -9684,7 +9693,7 @@ name = "kamu-resources"
 version = "0.272.1"
 dependencies = [
  "async-trait",
- "async-utils",
+ "background-agent-host",
  "chrono",
  "database-common",
  "dill",
@@ -9853,6 +9862,7 @@ version = "0.272.1"
 dependencies = [
  "async-trait",
  "async-utils",
+ "background-agent-host",
  "chrono",
  "database-common",
  "database-common-macros",
@@ -10164,7 +10174,7 @@ name = "kamu-task-system"
 version = "0.272.1"
 dependencies = [
  "async-trait",
- "async-utils",
+ "background-agent-host",
  "chrono",
  "database-common",
  "enum-variants",
@@ -10245,7 +10255,7 @@ name = "kamu-task-system-services"
 version = "0.272.1"
 dependencies = [
  "async-trait",
- "async-utils",
+ "background-agent-host",
  "chrono",
  "database-common",
  "database-common-macros",
@@ -11093,7 +11103,7 @@ name = "messaging-outbox"
 version = "0.272.1"
 dependencies = [
  "async-trait",
- "async-utils",
+ "background-agent-host",
  "chrono",
  "database-common",
  "database-common-macros",

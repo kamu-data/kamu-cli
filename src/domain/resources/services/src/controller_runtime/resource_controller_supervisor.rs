@@ -7,22 +7,22 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::convert::Infallible;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU32, Ordering};
 
+use async_utils::join_error_message;
+use background_agent_host::CancellationToken;
 use chrono::TimeDelta;
 use internal_error::InternalError;
 use retry_backoff::RetryBackoff;
 use time_source::SystemTimeSource;
-use tokio::task::{JoinError, JoinSet};
+use tokio::task::JoinSet;
 use wakeup_listener::WakeupListener;
 
 use crate::controller_runtime::{
     ResourceControllerDrainHoldBack,
     ResourceControllerLoop,
     ResourceControllerRuntimeMetrics,
-    panic_message,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -35,6 +35,8 @@ use crate::controller_runtime::{
 /// counts it, and starts the loop again after a backoff that grows with each
 /// consecutive failure; a drain and the wait after it, both completed, reset
 /// the count. Other controllers' loops are not affected.
+///
+/// On a shutdown the loop stops after its current drain, and is not restarted.
 pub(crate) struct ResourceControllerSupervisor {
     controller_loop: Arc<ResourceControllerLoop>,
     listener: Arc<dyn WakeupListener>,
@@ -62,7 +64,7 @@ impl ResourceControllerSupervisor {
         }
     }
 
-    pub async fn run(self) -> Infallible {
+    pub async fn run(self, shutdown: CancellationToken) {
         let consecutive_failures = Arc::new(AtomicU32::new(0));
         let controller_name = self
             .controller_loop
@@ -79,12 +81,15 @@ impl ResourceControllerSupervisor {
                 self.controller_loop.clone(),
                 self.listener.clone(),
                 consecutive_failures.clone(),
+                shutdown.clone(),
             ));
 
             let ended = running.join_next().await;
             // Read after the loop ended: a drain that completed reset it
             let failures = consecutive_failures.fetch_add(1, Ordering::Relaxed) + 1;
             let delay = self.restart_backoff.delay(failures);
+            // A loop that fails during a shutdown is not restarted
+            let stopping = shutdown.is_cancelled();
 
             match ended {
                 Some(Ok(Err(e))) => tracing::error!(
@@ -93,32 +98,31 @@ impl ResourceControllerSupervisor {
                     error_msg = %e,
                     consecutive_failures = failures,
                     ?delay,
-                    "Resource controller loop failed, restarting it after a delay"
+                    stopping,
+                    "Resource controller loop failed"
                 ),
-                Some(Ok(Ok(never))) => match never {},
+                Some(Ok(Ok(()))) => return,
                 Some(Err(join_error)) => tracing::error!(
                     controller = controller_name.as_str(),
-                    panic = %Self::panic_text(join_error),
+                    panic = %join_error_message(join_error),
                     consecutive_failures = failures,
                     ?delay,
-                    "Resource controller loop panicked, restarting it after a delay"
+                    stopping,
+                    "Resource controller loop panicked"
                 ),
                 None => unreachable!("the set holds the loop's task"),
             }
+            if stopping {
+                return;
+            }
             self.metrics.on_loop_restart(&controller_name);
 
-            self.time_source
-                .sleep(TimeDelta::from_std(delay).unwrap_or(TimeDelta::MAX))
-                .await;
-        }
-    }
-
-    /// The task is never aborted while awaited, so it panicked
-    fn panic_text(join_error: JoinError) -> String {
-        if join_error.is_panic() {
-            panic_message(join_error.into_panic().as_ref())
-        } else {
-            join_error.to_string()
+            let backoff = self
+                .time_source
+                .sleep(TimeDelta::from_std(delay).unwrap_or(TimeDelta::MAX));
+            if shutdown.run_until_cancelled(backoff).await.is_none() {
+                return;
+            }
         }
     }
 
@@ -126,7 +130,8 @@ impl ResourceControllerSupervisor {
         controller_loop: Arc<ResourceControllerLoop>,
         listener: Arc<dyn WakeupListener>,
         consecutive_failures: Arc<AtomicU32>,
-    ) -> Result<Infallible, InternalError> {
+        shutdown: CancellationToken,
+    ) -> Result<(), InternalError> {
         loop {
             let drained = controller_loop
                 .drain(
@@ -139,7 +144,14 @@ impl ResourceControllerSupervisor {
                 "Resource controller drain finished"
             );
 
-            controller_loop.wait(listener.as_ref(), &drained).await?;
+            // The wait only reads, so a shutdown may drop it
+            let Some(waited) = shutdown
+                .run_until_cancelled(controller_loop.wait(listener.as_ref(), &drained))
+                .await
+            else {
+                return Ok(());
+            };
+            waited?;
 
             // Only a whole cycle counts as healthy: a loop that drains and
             // then fails to wait every time must still back off

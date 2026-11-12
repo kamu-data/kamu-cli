@@ -12,7 +12,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-use async_utils::BackgroundAgent;
+use background_agent_host::{BackgroundAgent, CancellationToken};
 use database_common::NoOpDatabasePlugin;
 use dill::*;
 use internal_error::InternalError;
@@ -1234,7 +1234,7 @@ async fn test_catchup_records_heartbeat_after_every_batch() {
 
     let agent = harness.catalog.get_one::<OutboxAgentImpl>().unwrap();
     tokio::select! {
-        res = agent.run() => panic!("Outbox agent stopped: {res:?}"),
+        res = agent.run(CancellationToken::new()) => panic!("Outbox agent stopped: {res:?}"),
         () = async {
             while harness.probe.heartbeats_seen().len() < 3 {
                 tokio::task::yield_now().await;
@@ -1244,6 +1244,42 @@ async fn test_catchup_records_heartbeat_after_every_batch() {
 
     // The first is covered by the listener's creation, the rest only by batches
     assert_eq!(harness.probe.heartbeats_seen(), [true, true, true]);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_shutdown_lets_catch_up_finish() {
+    let harness = OutboxAgentHeartbeatHarness::new();
+    harness.outbox_agent.run_initialization().await.unwrap();
+    harness.post_j_messages(3).await;
+
+    // Requested before the start: the backlog is still relayed, then the
+    // agent returns instead of waiting
+    let shutdown = CancellationToken::new();
+    shutdown.cancel();
+    harness.run_agent_to_end(shutdown).await.unwrap();
+
+    assert_eq!(harness.probe.heartbeats_seen().len(), 3);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_shutdown_ends_wait_for_messages() {
+    let harness = OutboxAgentHeartbeatHarness::new();
+    harness.outbox_agent.run_initialization().await.unwrap();
+    harness.post_j_messages(1).await;
+
+    let shutdown = CancellationToken::new();
+    let (result, ()) = tokio::join!(harness.run_agent_to_end(shutdown.clone()), async {
+        harness.wait_for_heartbeats(1).await;
+        // Real time, for the agent to finish the pass and reach its wait
+        tokio::time::sleep(Duration::from_millis(50)).await;
+        shutdown.cancel();
+    });
+
+    result.unwrap();
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1618,6 +1654,35 @@ impl OutboxAgentHeartbeatHarness {
         Self {
             base_harness: BaseOutboxAgentHarness::from_catalog(catalog),
             probe,
+        }
+    }
+
+    async fn post_j_messages(&self, count: usize) {
+        for i in 1..=count {
+            self.outbox
+                .post_message(
+                    TEST_PRODUCER_J,
+                    TestMessageJ {
+                        body: format!("j-{i}"),
+                    },
+                )
+                .await
+                .unwrap();
+        }
+    }
+
+    /// Runs the agent until it returns; a run that outlives the test's bound
+    /// ignored its shutdown
+    async fn run_agent_to_end(&self, shutdown: CancellationToken) -> Result<(), InternalError> {
+        let agent = self.catalog.get_one::<OutboxAgentImpl>().unwrap();
+        tokio::time::timeout(Duration::from_secs(5), agent.run(shutdown))
+            .await
+            .expect("the agent ignored the shutdown")
+    }
+
+    async fn wait_for_heartbeats(&self, count: usize) {
+        while self.probe.heartbeats_seen().len() < count {
+            tokio::task::yield_now().await;
         }
     }
 }

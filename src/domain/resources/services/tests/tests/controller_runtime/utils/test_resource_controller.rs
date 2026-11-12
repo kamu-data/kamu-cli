@@ -143,6 +143,9 @@ declare_test_resource_controller!(
 pub enum TestControllerBehavior {
     /// Changes nothing and returns `Done` at the resource's current version
     FinishAtCurrentVersion,
+    /// Like `FinishAtCurrentVersion`, once the test calls
+    /// `TestControllerScript::release_processing`
+    FinishWhenReleased,
     /// Works in two steps, each persisted in the `TestStage` condition, with a
     /// `RetryAt` of `step_wait` in between:
     /// - reconciliation: begin and mark `prepared`, then complete;
@@ -171,6 +174,8 @@ pub struct TestControllerScript {
     state: Arc<Mutex<TestControllerScriptState>>,
     /// Signaled on every `process` call
     called: Arc<Notify>,
+    /// Lets one `FinishWhenReleased` call finish
+    released: Arc<Notify>,
 }
 
 struct TestControllerScriptState {
@@ -214,7 +219,13 @@ impl TestControllerScript {
                 failing_extra_deadline_queries: HashMap::new(),
             })),
             called: Arc::new(Notify::new()),
+            released: Arc::new(Notify::new()),
         }
+    }
+
+    /// Lets one `process` call of `FinishWhenReleased`, current or next, finish
+    pub fn release_processing(&self) {
+        self.released.notify_one();
     }
 
     pub fn set_behavior_of(&self, id: ResourceID, behavior: TestControllerBehavior) {
@@ -416,13 +427,11 @@ impl TestResourceControllerLogic {
 
         match self.script.record_call(id) {
             TestControllerBehavior::FinishAtCurrentVersion => {
-                self.in_transaction(|_, loader| async move {
-                    let resource = loader.load(&id).await.int_err()?;
-                    Ok(ResourceProcessOutcome::Done(ResourceVersion::from(
-                        resource.headers(),
-                    )))
-                })
-                .await
+                self.finish_at_current_version(id).await
+            }
+            TestControllerBehavior::FinishWhenReleased => {
+                self.script.released.notified().await;
+                self.finish_at_current_version(id).await
             }
             TestControllerBehavior::Stepwise { step_wait } => {
                 self.in_transaction(|primitives, loader| async move {
@@ -437,6 +446,19 @@ impl TestResourceControllerLogic {
             TestControllerBehavior::Fail => Err(InternalError::new("scripted failure")),
             TestControllerBehavior::Panic => panic!("scripted panic"),
         }
+    }
+
+    async fn finish_at_current_version(
+        &self,
+        id: ResourceID,
+    ) -> Result<ResourceProcessOutcome, InternalError> {
+        self.in_transaction(|_, loader| async move {
+            let resource = loader.load(&id).await.int_err()?;
+            Ok(ResourceProcessOutcome::Done(ResourceVersion::from(
+                resource.headers(),
+            )))
+        })
+        .await
     }
 
     /// One step of `TestControllerBehavior::Stepwise`

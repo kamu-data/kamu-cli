@@ -12,7 +12,7 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Duration;
 
-use async_utils::BackgroundAgent;
+use background_agent_host::{BackgroundAgent, CancellationToken};
 use database_common_macros::transactional_method;
 use dill::*;
 use init_on_startup::{InitOnStartup, InitOnStartupMeta};
@@ -123,7 +123,7 @@ impl OutboxAgentImpl {
         )
     }
 
-    async fn run_main_relay_loop(&self) -> Result<(), InternalError> {
+    async fn run_main_relay_loop(&self, shutdown: CancellationToken) -> Result<(), InternalError> {
         let wakeup_listener = self.outbox_message_bridge.new_wakeup_listener();
 
         // Initial catchup phase to process all existing messages
@@ -135,9 +135,16 @@ impl OutboxAgentImpl {
 
         loop {
             // Wait for push or timeout - let the store handle the backoff strategy
-            let hint = wakeup_listener
-                .wait_wake(listening_timeout, self.wakeup_config.min_debounce_interval)
-                .await?;
+            let Some(hint) = shutdown
+                .run_until_cancelled(
+                    wakeup_listener
+                        .wait_wake(listening_timeout, self.wakeup_config.min_debounce_interval),
+                )
+                .await
+            else {
+                return Ok(());
+            };
+            let hint = hint?;
             tracing::debug!(hint = ?hint, "Agent woke up with a hint");
 
             // Process tasks while they are available, to make sure we process all messages
@@ -413,8 +420,8 @@ impl BackgroundAgent for OutboxAgentImpl {
         OUTBOX_AGENT_NAME
     }
 
-    async fn run(&self) -> Result<(), InternalError> {
-        self.run_main_relay_loop().await
+    async fn run(&self, shutdown: CancellationToken) -> Result<(), InternalError> {
+        self.run_main_relay_loop(shutdown).await
     }
 }
 
