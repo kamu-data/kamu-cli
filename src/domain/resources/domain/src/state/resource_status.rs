@@ -29,7 +29,7 @@ pub fn new_pending_resource_status() -> ResourceStatus {
     new_pending_resource_status_with(empty_resource_conditions())
 }
 
-pub fn new_pending_resource_status_with(conditions: ResourceConditions) -> ResourceStatus {
+pub(crate) fn new_pending_resource_status_with(conditions: ResourceConditions) -> ResourceStatus {
     ResourceStatus {
         phase: ResourcePhase::Pending,
         observed_generation: None,

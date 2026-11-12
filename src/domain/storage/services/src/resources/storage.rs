@@ -13,7 +13,7 @@ use kamu_storage::{StorageResource, StorageStateModel};
 
 /// Persisted in the controller bookkeeping and used as a metric label: changing
 /// it orphans the bookkeeping of every resource of the type
-pub const STORAGE_CONTROLLER_NAME: &str = "dev.kamu.domain.storage.StorageController";
+const STORAGE_CONTROLLER_NAME: &str = "dev.kamu.domain.storage.StorageController";
 
 kamu_resources_services::declare_resource_service_layer!(
     domain = kamu_storage,

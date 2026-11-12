@@ -9,7 +9,13 @@
 
 use internal_error::InternalError;
 
-use crate::{ResourceHeaders, ResourceID, ResourceSnapshot, ResourceStatus};
+use crate::{
+    ResourceHeaders,
+    ResourceID,
+    ResourceSnapshot,
+    ResourceStatus,
+    ResourceStatusConflictError,
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -41,6 +47,19 @@ pub trait DeclarativeResource:
 
     fn status(&self) -> &ResourceStatus {
         self.as_ref().status()
+    }
+
+    /// The conflict of a writer that expects `expected_status_generation`
+    /// with the resource's current status generation, if they differ
+    fn status_conflict(
+        &self,
+        expected_status_generation: u64,
+    ) -> Option<ResourceStatusConflictError> {
+        let actual = self.headers().status_generation;
+        (actual != expected_status_generation).then_some(ResourceStatusConflictError {
+            expected: expected_status_generation,
+            actual,
+        })
     }
 }
 

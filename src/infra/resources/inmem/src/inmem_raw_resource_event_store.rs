@@ -19,6 +19,7 @@ use event_sourcing::{
     MultiEventStream,
     SaveEventsError,
     SaveEventsItem,
+    validate_multi_save_items,
 };
 use internal_error::InternalError;
 use kamu_resources::{
@@ -128,7 +129,7 @@ impl EventStore<ResourceRawEventProjection> for InMemoryRawResourceEventStore {
             return Ok(vec![]);
         }
 
-        event_sourcing::validate_multi_save_items(&items)?;
+        validate_multi_save_items(&items)?;
 
         self.state.save(self.transaction_id, items)
     }

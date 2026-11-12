@@ -22,7 +22,7 @@ use crate::domain::{
 
 /// Checks a condition patch against the conditions registered for a resource
 /// type, before any of it is applied
-pub struct ResourceConditionPatchChecker<'a> {
+pub(crate) struct ResourceConditionPatchChecker<'a> {
     extension_schema_registry: &'a ResourceExtensionSchemaRegistry,
 }
 

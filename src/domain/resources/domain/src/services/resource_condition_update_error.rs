@@ -17,6 +17,7 @@ use crate::{
     ResourceLoadError,
     ResourcePersistenceError,
     ResourceStatusConflictError,
+    StatusConflictOf,
     TypeUri,
 };
 
@@ -47,6 +48,16 @@ pub enum ResourceConditionUpdateError<R: EventSourcedResource> {
 
     #[error(transparent)]
     Internal(#[from] InternalError),
+}
+
+impl<R: EventSourcedResource> ResourceConditionUpdateError<R> {
+    /// A refused status update; a status conflict is reported as such
+    pub fn from_lifecycle_error(err: R::LifecycleError) -> Self {
+        match err.as_status_conflict() {
+            Some(conflict) => Self::StatusGenerationChanged(*conflict),
+            None => Self::Lifecycle(err),
+        }
+    }
 }
 
 impl<R: EventSourcedResource> From<ResourcePersistenceError> for ResourceConditionUpdateError<R> {

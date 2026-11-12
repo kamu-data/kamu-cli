@@ -24,7 +24,7 @@ use crate::domain::{
 
 /// The parts of a resource that carry extension entries
 #[derive(Debug, Clone, Copy)]
-pub struct ResourceExtensionState<'a> {
+pub(crate) struct ResourceExtensionState<'a> {
     pub headers: &'a ResourceHeaders,
     pub status: &'a ResourceStatus,
 }
@@ -46,7 +46,7 @@ impl<'a> ResourceDurableStateValidator<'a> {
     /// against `stored`, the state last saved. An entry equal to the stored
     /// one is not checked again, so a schema change never blocks a write that
     /// leaves the entry alone. Without a stored state every entry is checked
-    pub fn validate_changes(
+    pub(crate) fn validate_changes(
         &self,
         schema: &TypeUri,
         state: ResourceExtensionState<'_>,

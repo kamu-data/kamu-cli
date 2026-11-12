@@ -202,7 +202,7 @@ impl BackgroundAgent for FlowSystemEventAgentImpl {
         FLOW_SYSTEM_EVENT_AGENT_NAME
     }
 
-    async fn run(&self, shutdown: CancellationToken) -> Result<(), internal_error::InternalError> {
+    async fn run(&self, shutdown: CancellationToken) -> Result<(), InternalError> {
         let wakeup_listener = self.flow_system_event_bridge.new_wakeup_listener();
 
         // On startup, immediately sync all projectors to catch up with existing events
