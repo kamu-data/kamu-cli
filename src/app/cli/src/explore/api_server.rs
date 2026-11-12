@@ -194,7 +194,10 @@ impl APIServer {
         let is_e2e_testing = e2e_output_data_path.is_some();
 
         if is_e2e_testing {
-            router = router.layer(middleware::from_fn(
+            let finalizer: Arc<dyn kamu_adapter_http::e2e::E2EMutationFinalizer> =
+                Arc::new(crate::background_work_finalizer::BackgroundWorkFinalizer);
+            router = router.layer(middleware::from_fn_with_state(
+                finalizer,
                 kamu_adapter_http::e2e::e2e_middleware_fn,
             ));
         }
