@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use std::fs;
-use std::future::{Future, IntoFuture};
+use std::future::{Future, IntoFuture, pending};
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::path::PathBuf;
 use std::pin::Pin;
@@ -16,6 +16,7 @@ use std::sync::Arc;
 
 use axum::{Extension, middleware};
 use background_agent_host::{BackgroundAgentHost, BackgroundAgentHostConfig, CancellationToken};
+use container_runtime::signal::graceful_stop;
 use internal_error::*;
 use kamu::domain::{FileUploadLimitConfig, Protocols, ServerUrlConfig, TenancyConfig};
 use kamu_accounts_services::PasswordPolicyConfig;
@@ -25,6 +26,7 @@ use kamu_datasets::VersionedFilesConfig;
 use kamu_webhooks::WebhooksConfig;
 use observability::axum::{panic_handler, unknown_fallback_handler};
 use tokio::sync::Notify;
+use tokio::time::timeout;
 use tower_http::catch_panic::CatchPanicLayer;
 use url::Url;
 use utoipa_axum::router::OpenApiRouter;
@@ -287,7 +289,7 @@ impl APIServer {
             e2e_shutdown_notify,
             ..
         } = self;
-        let timeout = background_agent_host_config.shutdown_timeout;
+        let shutdown_timeout = background_agent_host_config.shutdown_timeout;
 
         let shutdown_requests =
             Self::cancel_on_shutdown_request(shutdown.clone(), e2e_shutdown_notify);
@@ -300,7 +302,7 @@ impl APIServer {
                     result
                 }
                 () = shutdown.cancelled() => {
-                    match tokio::time::timeout(timeout, &mut server_future).await {
+                    match timeout(shutdown_timeout, &mut server_future).await {
                         Ok(result) => result,
                         Err(_) => {
                             tracing::warn!(
@@ -332,15 +334,15 @@ impl APIServer {
     ) {
         // Without signals the other sources still work
         let signal = async {
-            if let Err(e) = container_runtime::signal::graceful_stop().await {
+            if let Err(e) = graceful_stop().await {
                 tracing::warn!(error = %e, "Failed to listen for shutdown signals");
-                std::future::pending::<()>().await;
+                pending::<()>().await;
             }
         };
         let e2e_shutdown = async {
             match e2e_shutdown_notify {
                 Some(notify) => notify.notified().await,
-                None => std::future::pending().await,
+                None => pending().await,
             }
         };
 

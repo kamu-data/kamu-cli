@@ -17,6 +17,7 @@ use crate::{
     ResourceLoadError,
     ResourcePersistenceError,
     ResourceStatusConflictError,
+    StatusConflictOf,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -40,6 +41,18 @@ pub enum ResourceLifecycleTransitionError<R: EventSourcedResource> {
 
     #[error(transparent)]
     Internal(#[from] InternalError),
+}
+
+impl<R: EventSourcedResource> ResourceLifecycleTransitionError<R> {
+    /// A refused transition; a status conflict is a stale expectation
+    pub fn from_lifecycle_error(err: R::LifecycleError) -> Self {
+        match err.as_status_conflict() {
+            Some(conflict) => {
+                ResourceStaleExpectationError::StatusGenerationChanged(*conflict).into()
+            }
+            None => Self::Lifecycle(err),
+        }
+    }
 }
 
 impl<R: EventSourcedResource> From<ResourcePersistenceError>

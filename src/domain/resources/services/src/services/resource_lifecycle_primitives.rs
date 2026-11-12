@@ -41,7 +41,6 @@ use crate::domain::{
     ResourceSchemaProvider,
     ResourceStaleExpectationError,
     ResourceStatus,
-    ResourceStatusConflictError,
     ResourceTransitionSkip,
     ResourceTransitionSkipReason,
     ResourceVersion,
@@ -106,7 +105,7 @@ where
         let now = self.time_source.now();
         resource
             .try_mark_reconciliation_started(now, expected_status_generation)
-            .map_err(lifecycle_error)?;
+            .map_err(ResourceLifecycleTransitionError::from_lifecycle_error)?;
         self.save_status_write(now, &mut resource, &old_status)
             .await?;
 
@@ -157,7 +156,7 @@ where
         let old_status = resource.status().clone();
         let now = self.time_source.now();
 
-        mark(&mut resource, now).map_err(lifecycle_error)?;
+        mark(&mut resource, now).map_err(ResourceLifecycleTransitionError::from_lifecycle_error)?;
         self.save_status_write(now, &mut resource, &old_status)
             .await?;
 
@@ -209,7 +208,7 @@ where
         let (transition, _) = self
             .transition_awaiting_cleanup(&ids, |resource, index| {
                 if let Some(expected) = completions[index].expected_status_generation
-                    && let Some(conflict) = status_conflict(resource, expected)
+                    && let Some(conflict) = resource.status_conflict(expected)
                 {
                     return Err(TransitionStep::Skip(
                         ResourceTransitionSkipReason::StatusConflict(conflict),
@@ -328,7 +327,7 @@ where
             .load(id)
             .await
             .map_err(ResourceLoadError)?;
-        if let Some(conflict) = status_conflict(&resource, expected_status_generation) {
+        if let Some(conflict) = resource.status_conflict(expected_status_generation) {
             return Err(ResourceConditionUpdateError::StatusGenerationChanged(
                 conflict,
             ));
@@ -348,7 +347,7 @@ where
         let now = self.time_source.now();
         resource
             .try_update_status(now, expected_status_generation, new_status)
-            .map_err(condition_update_lifecycle_error)?;
+            .map_err(ResourceConditionUpdateError::from_lifecycle_error)?;
         self.save_status_write(now, &mut resource, &old_status)
             .await?;
 
@@ -477,7 +476,9 @@ where
             .into());
         }
 
-        ensure_status_generation(&resource, expected.status_generation)?;
+        if let Some(conflict) = resource.status_conflict(expected.status_generation) {
+            return Err(ResourceStaleExpectationError::StatusGenerationChanged(conflict).into());
+        }
 
         Ok(resource)
     }
@@ -532,44 +533,6 @@ impl<R: EventSourcedResource> TransitionStep<R> {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-fn status_conflict<R: EventSourcedResource>(
-    resource: &R,
-    expected: u64,
-) -> Option<ResourceStatusConflictError> {
-    let actual = resource.headers().status_generation;
-    (actual != expected).then_some(ResourceStatusConflictError { expected, actual })
-}
-
-fn ensure_status_generation<R: EventSourcedResource>(
-    resource: &R,
-    expected: u64,
-) -> Result<(), ResourceStaleExpectationError> {
-    match status_conflict(resource, expected) {
-        Some(conflict) => Err(ResourceStaleExpectationError::StatusGenerationChanged(
-            conflict,
-        )),
-        None => Ok(()),
-    }
-}
-
-fn condition_update_lifecycle_error<R: EventSourcedResource>(
-    err: R::LifecycleError,
-) -> ResourceConditionUpdateError<R> {
-    match err.as_status_conflict() {
-        Some(conflict) => ResourceConditionUpdateError::StatusGenerationChanged(*conflict),
-        None => ResourceConditionUpdateError::Lifecycle(err),
-    }
-}
-
-fn lifecycle_error<R: EventSourcedResource>(
-    err: R::LifecycleError,
-) -> ResourceLifecycleTransitionError<R> {
-    match err.as_status_conflict() {
-        Some(conflict) => ResourceStaleExpectationError::StatusGenerationChanged(*conflict).into(),
-        None => ResourceLifecycleTransitionError::Lifecycle(err),
-    }
-}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
