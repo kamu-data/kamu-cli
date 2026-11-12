@@ -247,7 +247,7 @@ async fn test_finished_extra_resource_that_leaves_the_set_does_not_pause_the_age
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_session_drain_that_waited_for_the_agent_is_not_idle() {
+async fn test_session_drain_after_the_agent_processed_a_resource_is_not_idle() {
     let harness = ControllerRuntimeHarness::new(
         TestControllers::Main,
         TestControllerBehavior::FinishWhenReleased,
@@ -265,8 +265,11 @@ async fn test_session_drain_that_waited_for_the_agent_is_not_idle() {
     });
 
     assert_eq!(report.processed, 0);
-    assert!(report.waited_for_another_drain);
+    assert_eq!(report.processed_by_other_drains, 1);
     assert!(!report.is_idle());
+
+    // The next drain sees no work since this one
+    assert!(harness.drain(&mut session).await.is_idle());
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

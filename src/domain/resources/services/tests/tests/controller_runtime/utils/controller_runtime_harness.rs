@@ -38,7 +38,11 @@ use kamu_resources_services::testing::{
     BaseResourceServiceHarness,
     BaseResourceServiceHarnessOpts,
 };
-use kamu_resources_services::{ResourceControllerRuntimeImpl, ResourceControllerRuntimeMetrics};
+use kamu_resources_services::{
+    BackgroundWorkFinalizer,
+    ResourceControllerRuntimeImpl,
+    ResourceControllerRuntimeMetrics,
+};
 use messaging_outbox::{OutboxMessageBridge, OutboxProvider};
 use retry_backoff::{RetryBackoff, RetryBackoffType};
 use time_source::FakeSystemTimeSource;
@@ -220,16 +224,28 @@ impl ControllerRuntimeHarness {
     /// Delivers the outbox messages and drains the controllers in turn, as a
     /// CLI command does before it exits
     pub async fn try_run_outbox_and_controllers_until_idle(&self) -> Result<(), InternalError> {
-        let outbox_agent = self.outbox_agent();
-        let mut drains = self.runtime().new_drain_session()?;
+        BackgroundWorkFinalizer::for_dispatching_outbox()
+            .finalize(&self.process_catalog)
+            .await
+    }
 
-        loop {
-            outbox_agent.run_while_has_tasks().await?;
-
-            if drains.drain_due_resources().await?.is_idle() {
-                return Ok(());
-            }
+    /// Runs finalizations in tasks of their own, as concurrent requests to
+    /// the e2e API server do, and waits for all of them to end
+    pub async fn run_outbox_and_controllers_until_idle_concurrently(&self, count: usize) {
+        let mut finalizations = tokio::task::JoinSet::new();
+        for _ in 0..count {
+            let catalog = self.process_catalog.clone();
+            finalizations.spawn(async move {
+                BackgroundWorkFinalizer::for_dispatching_outbox()
+                    .finalize(&catalog)
+                    .await
+            });
         }
+        tokio::time::timeout(Duration::from_secs(10), finalizations.join_all())
+            .await
+            .expect("concurrent finalizations keep each other going")
+            .into_iter()
+            .for_each(|result| result.unwrap());
     }
 
     pub fn new_drain_session(&self) -> Box<dyn ResourceControllerDrainSession> {

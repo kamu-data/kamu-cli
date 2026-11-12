@@ -18,6 +18,7 @@ use tokio::task::JoinSet;
 use wakeup_listener::WakeupListenerConfig;
 
 use crate::controller_runtime::{
+    ResourceControllerDrainGate,
     ResourceControllerDrainSessionImpl,
     ResourceControllerLoop,
     ResourceControllerRegistration,
@@ -50,7 +51,7 @@ pub struct ResourceControllerRuntimeImpl {
     /// One per controller, kept across calls: the agent's loop and the drain
     /// sessions build loops of their own, which must not drain the
     /// same controller at once
-    drain_locks: Mutex<HashMap<ResourceControllerName, Arc<tokio::sync::Mutex<()>>>>,
+    drain_gates: Mutex<HashMap<ResourceControllerName, Arc<ResourceControllerDrainGate>>>,
 }
 
 #[component(pub)]
@@ -73,7 +74,7 @@ impl ResourceControllerRuntimeImpl {
             hints,
             time_source,
             metrics,
-            drain_locks: Mutex::new(HashMap::new()),
+            drain_gates: Mutex::new(HashMap::new()),
         }
     }
 
@@ -84,7 +85,7 @@ impl ResourceControllerRuntimeImpl {
         Ok(ResourceControllerRegistration::collect_all(&catalog)?
             .into_iter()
             .map(|registration| {
-                let drain_lock = self.drain_lock(&registration.meta().controller_name);
+                let drain_gate = self.drain_gate(&registration.meta().controller_name);
                 ResourceControllerLoop::new(
                     registration,
                     catalog.clone(),
@@ -92,14 +93,17 @@ impl ResourceControllerRuntimeImpl {
                     self.wakeup_config.clone(),
                     self.time_source.clone(),
                     self.metrics.clone(),
-                    drain_lock,
+                    drain_gate,
                 )
             })
             .collect())
     }
 
-    fn drain_lock(&self, controller_name: &ResourceControllerName) -> Arc<tokio::sync::Mutex<()>> {
-        self.drain_locks
+    fn drain_gate(
+        &self,
+        controller_name: &ResourceControllerName,
+    ) -> Arc<ResourceControllerDrainGate> {
+        self.drain_gates
             .lock()
             .unwrap()
             .entry(controller_name.clone())
