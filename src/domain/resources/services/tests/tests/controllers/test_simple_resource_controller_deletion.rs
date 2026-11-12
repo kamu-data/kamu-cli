@@ -193,6 +193,25 @@ async fn test_status_update_during_cleanup_does_not_hold_back_completion() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
+async fn test_deletion_completed_by_another_writer_during_cleanup_is_done() {
+    let harness =
+        CompleteDeletionTestHarness::new(TestResourceReconcilerProvider::CompletingCleanup);
+    let [id] = harness.apply_and_request_deletion(["res"]).await;
+
+    let outcome = harness.process(&id).await.unwrap();
+
+    // Done at the version the other writer left, with nothing written on top
+    let resource = harness.load(&id).await;
+    assert_eq!(resource.status().phase, ResourcePhase::Deleted);
+    assert_eq!(
+        outcome,
+        ResourceProcessOutcome::Done(ResourceVersion::from(resource.headers()))
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
 async fn test_failed_cleanup_after_concurrent_status_update_is_not_recorded() {
     // The other writer's status wins; the runtime retries the cleanup
     let harness =

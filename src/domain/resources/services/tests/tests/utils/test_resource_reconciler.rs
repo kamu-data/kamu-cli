@@ -16,6 +16,8 @@ use kamu_resources::{
     ManagedResource,
     ResourceAggregateLoader,
     ResourceCleanupError,
+    ResourceDeletionCompletion,
+    ResourceLifecyclePrimitives,
     ResourcePersistenceService,
     SimpleResourceReconciler,
 };
@@ -151,6 +153,36 @@ impl SimpleResourceReconciler<TestResource> for TestResourceInterferingCleanupRe
                 "simulated cleanup failure".int_err(),
             ));
         }
+        Ok(())
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// TestResourceCompletingCleanupReconciler
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// During its cleanup, plays another writer that completes the deletion of the
+/// resource being cleaned up
+#[dill::component(pub)]
+#[dill::interface(dyn SimpleResourceReconciler<TestResource>)]
+pub struct TestResourceCompletingCleanupReconciler {
+    lifecycle_primitives: Arc<dyn ResourceLifecyclePrimitives<TestResource>>,
+}
+
+#[async_trait::async_trait]
+impl SimpleResourceReconciler<TestResource> for TestResourceCompletingCleanupReconciler {
+    async fn reconcile(&self, _resource: &TestResource) -> Result<(), TestResourceReconcileError> {
+        Ok(())
+    }
+
+    async fn cleanup(&self, resource: &TestResource) -> Result<(), ResourceCleanupError> {
+        self.lifecycle_primitives
+            .complete_deletion(&[ResourceDeletionCompletion {
+                id: *resource.id(),
+                expected_status_generation: None,
+            }])
+            .await
+            .unwrap();
         Ok(())
     }
 }
@@ -314,6 +346,7 @@ pub enum TestResourceReconcilerProvider {
     InterferingCleanup {
         then_fails: bool,
     },
+    CompletingCleanup,
     FailingCleanupOnce,
     InterferingReconcile,
     Rejecting,
@@ -346,6 +379,9 @@ impl TestResourceReconcilerProvider {
                     then_fails,
                 });
                 b.add::<TestResourceInterferingCleanupReconciler>();
+            }
+            TestResourceReconcilerProvider::CompletingCleanup => {
+                b.add::<TestResourceCompletingCleanupReconciler>();
             }
             TestResourceReconcilerProvider::FailingCleanupOnce => {
                 b.add_value(TestCleanupFailureOnce::default());

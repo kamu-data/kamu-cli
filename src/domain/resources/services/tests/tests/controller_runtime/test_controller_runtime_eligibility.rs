@@ -14,6 +14,7 @@ use pretty_assertions::assert_eq;
 use crate::tests::controller_runtime::utils::{
     ControllerRuntimeHarness,
     FAILURE_BACKOFF,
+    TEST_CONTROLLER_NAME,
     TestControllerBehavior,
     TestControllers,
 };
@@ -238,6 +239,38 @@ async fn test_finished_extra_resource_that_changes_is_processed_again_in_one_ses
 
     assert_eq!(harness.deliver_and_drain(&mut session).await, 1);
     assert_eq!(harness.deliver_and_drain(&mut session).await, 0);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_pass_takes_at_most_a_batch_of_eligible_resources() {
+    // The harness's batch size is 3
+    let harness = ControllerRuntimeHarness::finishing().await;
+    let mut extras = Vec::new();
+    for i in 0..3 {
+        extras.push(harness.apply(&format!("extra-{i}")).await);
+    }
+    harness.run_outbox_and_controllers_until_idle().await;
+
+    // Three extra resources the session finished with: held back from the
+    // extra listing, so the eligibility query asks for three more rows
+    let mut session = harness.new_drain_session();
+    harness.script().set_extras(extras);
+    assert_eq!(harness.deliver_and_drain(&mut session).await, 3);
+    harness.script().set_extras(vec![]);
+
+    for i in 0..6 {
+        harness.apply(&format!("res-{i}")).await;
+    }
+    let listings_before = harness.script().listings_of(TEST_CONTROLLER_NAME);
+
+    assert_eq!(harness.deliver_and_drain(&mut session).await, 6);
+    // A pass per batch of three, then the empty one
+    assert_eq!(
+        harness.script().listings_of(TEST_CONTROLLER_NAME) - listings_before,
+        3
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

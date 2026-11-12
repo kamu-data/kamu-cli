@@ -216,6 +216,28 @@ async fn test_shutdown_waits_for_the_current_step() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
+async fn test_agent_failing_during_a_shutdown_is_not_restarted() {
+    let a = ScriptedAgent::new(AGENT_A, [ScriptedRun::FailWhenReleased]);
+    let harness = HostHarness::new([a.clone()]);
+    let mut host = harness.start();
+    a.wait_for_runs(1).await;
+
+    harness.request_shutdown();
+    harness.settle().await;
+    a.release();
+
+    host.wait_for_end().await.unwrap();
+    assert_eq!(a.runs(), 1);
+    assert!(harness.last_failed_now(AGENT_A));
+    assert_eq!(
+        harness.restarts(AGENT_A, BackgroundAgentRestartReason::Failed),
+        0
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
 async fn test_shutdown_aborts_agents_still_running_after_the_bound() {
     let a = ScriptedAgent::new(AGENT_A, [ScriptedRun::IgnoreShutdown]);
     let b = ScriptedAgent::new(AGENT_B, []);
@@ -409,6 +431,8 @@ enum ScriptedRun {
     /// Ignores the shutdown until `ScriptedAgent::release`, then returns: a
     /// step in progress
     ReturnWhenReleased,
+    /// Like `ReturnWhenReleased`, but fails
+    FailWhenReleased,
     /// Never returns
     IgnoreShutdown,
 }
@@ -516,6 +540,10 @@ impl BackgroundAgent for ScriptedAgent {
             ScriptedRun::ReturnWhenReleased => {
                 self.released.notified().await;
                 Ok(())
+            }
+            ScriptedRun::FailWhenReleased => {
+                self.released.notified().await;
+                Err(InternalError::new("scripted failure"))
             }
             ScriptedRun::IgnoreShutdown => {
                 let _guard = AbortGuard(self.aborted.clone());

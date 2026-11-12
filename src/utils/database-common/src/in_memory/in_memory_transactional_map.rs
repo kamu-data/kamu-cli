@@ -808,6 +808,56 @@ mod tests {
     }
 
     #[test]
+    fn test_update_after_upsert_is_applied_again_to_a_value_another_transaction_committed() {
+        let harness = MapHarness::with_committed(&[("a", 1)]);
+        let first = harness.begin();
+        let second = harness.begin();
+        harness.map.write(Some(first), |write| write.put("a", 10));
+        harness.map.write(Some(second), |write| {
+            write.upsert("a", 100, |value| value + 5);
+            assert!(write.update("a", |value| value * 2));
+        });
+
+        harness.commit(first);
+        harness.commit(second);
+
+        pretty_assertions::assert_eq!(harness.entries(None), [("a", 30)]);
+    }
+
+    #[test]
+    fn test_upsert_after_update_fails_the_commit_on_a_key_another_transaction_deleted() {
+        let harness = MapHarness::with_committed(&[("a", 1)]);
+        let first = harness.begin();
+        let second = harness.begin();
+        harness.map.write(Some(first), |write| write.delete("a"));
+        harness.map.write(Some(second), |write| {
+            assert!(write.update("a", |value| value + 5));
+            write.upsert("a", 100, |value| value * 2);
+        });
+        harness.commit(first);
+
+        // The key existed at the update, which a delete fails
+        assert_matches!(harness.check_commit(second), Err(_));
+    }
+
+    #[test]
+    fn test_upsert_after_update_is_applied_again_to_a_value_another_transaction_committed() {
+        let harness = MapHarness::with_committed(&[("a", 1)]);
+        let first = harness.begin();
+        let second = harness.begin();
+        harness.map.write(Some(first), |write| write.put("a", 10));
+        harness.map.write(Some(second), |write| {
+            assert!(write.update("a", |value| value + 5));
+            write.upsert("a", 100, |value| value * 2);
+        });
+
+        harness.commit(first);
+        harness.commit(second);
+
+        pretty_assertions::assert_eq!(harness.entries(None), [("a", 30)]);
+    }
+
+    #[test]
     fn test_upsert_updates_a_value_the_transaction_sees() {
         let harness = MapHarness::with_committed(&[("a", 1)]);
         let transaction = harness.begin();
