@@ -64,116 +64,21 @@ impl RetryPolicy {
 mod tests {
     use super::*;
 
+    // Delays per backoff type are tested on `RetryBackoff`
     #[test]
-    fn test_next_attempt_at_fixed_backoff() {
-        let policy = RetryPolicy::new(4, 10, RetryBackoffType::Fixed);
+    fn test_next_attempt_at_follows_the_backoff_up_to_max_attempts() {
+        let policy = RetryPolicy::new(2, 10, RetryBackoffType::Exponential);
         let last_attempt_at = Utc::now();
 
-        let next_attempt = policy.next_attempt_at(1, last_attempt_at);
-        assert_eq!(next_attempt, Some(last_attempt_at + Duration::seconds(10)));
-
-        let next_attempt = policy.next_attempt_at(2, last_attempt_at);
-        assert_eq!(next_attempt, Some(last_attempt_at + Duration::seconds(10)));
-
-        let next_attempt = policy.next_attempt_at(3, last_attempt_at);
-        assert_eq!(next_attempt, Some(last_attempt_at + Duration::seconds(10)));
-
-        let next_attempt = policy.next_attempt_at(4, last_attempt_at);
-        assert_eq!(next_attempt, Some(last_attempt_at + Duration::seconds(10)));
-
-        let next_attempt = policy.next_attempt_at(5, last_attempt_at);
-        assert_eq!(next_attempt, None); // Exceeds max_retry_attempts
-    }
-
-    #[test]
-    fn test_next_attempt_at_linear_backoff() {
-        let policy = RetryPolicy::new(4, 10, RetryBackoffType::Linear);
-        let last_attempt_at = Utc::now();
-
-        let next_attempt = policy.next_attempt_at(1, last_attempt_at);
-        assert_eq!(next_attempt, Some(last_attempt_at + Duration::seconds(10)));
-
-        let next_attempt = policy.next_attempt_at(2, last_attempt_at);
-        assert_eq!(next_attempt, Some(last_attempt_at + Duration::seconds(20)));
-
-        let next_attempt = policy.next_attempt_at(3, last_attempt_at);
-        assert_eq!(next_attempt, Some(last_attempt_at + Duration::seconds(30)));
-
-        let next_attempt = policy.next_attempt_at(4, last_attempt_at);
-        assert_eq!(next_attempt, Some(last_attempt_at + Duration::seconds(40)));
-
-        let next_attempt = policy.next_attempt_at(5, last_attempt_at);
-        assert_eq!(next_attempt, None); // Exceeds max_retry_attempts
-    }
-
-    #[test]
-    fn test_next_attempt_at_exponential_backoff() {
-        let policy = RetryPolicy::new(4, 10, RetryBackoffType::Exponential);
-        let last_attempt_at = Utc::now();
-
-        let next_attempt = policy.next_attempt_at(1, last_attempt_at);
-        assert_eq!(next_attempt, Some(last_attempt_at + Duration::seconds(10)));
-
-        let next_attempt = policy.next_attempt_at(2, last_attempt_at);
-        assert_eq!(next_attempt, Some(last_attempt_at + Duration::seconds(20)));
-
-        let next_attempt = policy.next_attempt_at(3, last_attempt_at);
-        assert_eq!(next_attempt, Some(last_attempt_at + Duration::seconds(40)));
-
-        let next_attempt = policy.next_attempt_at(4, last_attempt_at);
-        assert_eq!(next_attempt, Some(last_attempt_at + Duration::seconds(80)));
-
-        let next_attempt = policy.next_attempt_at(5, last_attempt_at);
-        assert_eq!(next_attempt, None); // Exceeds max_retry_attempts
-    }
-
-    #[test]
-    fn test_next_attempt_at_exponential_with_jitter_backoff() {
-        let policy = RetryPolicy::new(4, 10, RetryBackoffType::ExponentialWithJitter);
-        let last_attempt_at = Utc::now();
-
-        let next_attempt = policy.next_attempt_at(1, last_attempt_at);
-        assert!(next_attempt.is_some());
-        assert!(next_attempt.unwrap() >= last_attempt_at + Duration::seconds(10));
-        assert!(next_attempt.unwrap() <= last_attempt_at + Duration::seconds(20));
-
-        let next_attempt = policy.next_attempt_at(2, last_attempt_at);
-        assert!(next_attempt.is_some());
-        assert!(next_attempt.unwrap() >= last_attempt_at + Duration::seconds(20));
-        assert!(next_attempt.unwrap() <= last_attempt_at + Duration::seconds(30));
-
-        let next_attempt = policy.next_attempt_at(3, last_attempt_at);
-        assert!(next_attempt.is_some());
-        assert!(next_attempt.unwrap() >= last_attempt_at + Duration::seconds(40));
-        assert!(next_attempt.unwrap() <= last_attempt_at + Duration::seconds(50));
-
-        let next_attempt = policy.next_attempt_at(4, last_attempt_at);
-        assert!(next_attempt.is_some());
-        assert!(next_attempt.unwrap() >= last_attempt_at + Duration::seconds(80));
-        assert!(next_attempt.unwrap() <= last_attempt_at + Duration::seconds(90));
-
-        let next_attempt = policy.next_attempt_at(5, last_attempt_at);
-        assert_eq!(next_attempt, None); // Exceeds max_retry_attempts
-    }
-
-    #[test]
-    fn test_next_attempt_at_zero_min_delay() {
-        let last_attempt_at = Utc::now();
-
-        for backoff_type in [
-            RetryBackoffType::Fixed,
-            RetryBackoffType::Linear,
-            RetryBackoffType::Exponential,
-            RetryBackoffType::ExponentialWithJitter,
-        ] {
-            let policy = RetryPolicy::new(2, 0, backoff_type);
-
-            let next_attempt = policy.next_attempt_at(1, last_attempt_at);
-            assert_eq!(next_attempt, Some(last_attempt_at), "{backoff_type:?}");
-
-            let next_attempt = policy.next_attempt_at(2, last_attempt_at);
-            assert_eq!(next_attempt, Some(last_attempt_at), "{backoff_type:?}");
-        }
+        assert_eq!(
+            policy.next_attempt_at(1, last_attempt_at),
+            Some(last_attempt_at + Duration::seconds(10))
+        );
+        assert_eq!(
+            policy.next_attempt_at(2, last_attempt_at),
+            Some(last_attempt_at + Duration::seconds(20))
+        );
+        assert_eq!(policy.next_attempt_at(3, last_attempt_at), None);
     }
 
     #[test]

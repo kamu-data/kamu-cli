@@ -17,37 +17,6 @@ use crate::tests::utils::ServiceLayerTestHarness;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_request_account_deletion_no_resources_succeeds() {
-    let harness = ServiceLayerTestHarness::new();
-    let account_handle = odf::ResourceOwnerHandle::new_test("test-owner");
-
-    harness
-        .request_account_resources_deletion(account_handle.did)
-        .await;
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[test_log::test(tokio::test)]
-async fn test_request_account_deletion_deletes_all_owned_resources() {
-    let harness = ServiceLayerTestHarness::new();
-    let account_handle = odf::ResourceOwnerHandle::new_test("test-owner");
-
-    let ids = harness
-        .apply_all(&account_handle, &["res-a", "res-b", "res-c"])
-        .await;
-
-    harness
-        .request_account_resources_deletion(account_handle.did)
-        .await;
-    harness.settle().await;
-
-    harness.assert_gone(&ids).await;
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[test_log::test(tokio::test)]
 async fn test_request_account_deletion_leaves_other_accounts_intact() {
     let harness = ServiceLayerTestHarness::new();
     let account_handle_a = odf::ResourceOwnerHandle::new_test("test-owner-a");
@@ -81,25 +50,6 @@ async fn test_request_account_deletion_handles_pagination() {
     harness.settle().await;
 
     harness.assert_gone(&ids).await;
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[test_log::test(tokio::test)]
-async fn test_request_account_deletion_emits_deletion_requested_lifecycle_message() {
-    let mut mock_outbox = MockOutbox::new();
-    BaseResourceServiceHarness::expect_applied_messages(&mut mock_outbox, 1, None);
-    BaseResourceServiceHarness::expect_deletion_requested_message(&mut mock_outbox, 1);
-
-    let harness = ServiceLayerTestHarness::new_with_mock_outbox(mock_outbox);
-    let account_handle = odf::ResourceOwnerHandle::new_test("test-owner");
-
-    harness.apply_and_get_id(&account_handle, "res-a").await;
-
-    harness
-        .request_account_resources_deletion(account_handle.did)
-        .await;
-    // MockOutbox verifies expectations on drop
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

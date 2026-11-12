@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 use container_runtime::{Terminate, TerminateStatus};
 use headers::Header as _;
@@ -42,10 +42,6 @@ impl KamuApiServerProcess {
         Self { child, client }
     }
 
-    pub fn client(&mut self) -> &mut KamuApiServerClient {
-        &mut self.client
-    }
-
     /// Opens a smart transfer protocol push session to the dataset as
     /// `e2e-user` and sends nothing on it, so the server's side waits for the
     /// client
@@ -77,11 +73,9 @@ impl KamuApiServerProcess {
     }
 
     /// Sends SIGTERM and waits up to `timeout` for the process to exit, then
-    /// kills it. Returns how it ended and how long that took
-    pub async fn terminate(&mut self, timeout: Duration) -> (TerminateStatus, Duration) {
-        let started = Instant::now();
-        let status = self.child.terminate(timeout).await.unwrap();
-        (status, started.elapsed())
+    /// kills it. Returns how it ended
+    pub async fn terminate(&mut self, timeout: Duration) -> TerminateStatus {
+        self.child.terminate(timeout).await.unwrap()
     }
 }
 
