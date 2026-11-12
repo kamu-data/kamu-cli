@@ -41,6 +41,7 @@ use crate::{
 /// | Cleanup failed | `record_cleanup_failure` | an error, retried with backoff |
 /// | Needs reconciliation | `begin_reconciliation`, `reconcile`, `complete_reconciliation` | `Done` |
 /// | Reconcile failed | `fail_reconciliation` | `Done`, or an error when the failure is transient |
+/// | Deleted meanwhile | nothing | `Done` |
 /// | Changed meanwhile by another writer | nothing | `RetryAt(now)` |
 /// | Anything else | nothing | `Done` |
 ///
@@ -166,7 +167,10 @@ where
 
         match self.run_cleanup(id).await {
             Ok(SimpleResourceCleanupOutcome::CleanedUp) => {}
-            Ok(SimpleResourceCleanupOutcome::NotAwaitingCleanup) => return Ok(self.retry_now()),
+            // The deletion completed meanwhile
+            Ok(SimpleResourceCleanupOutcome::NotAwaitingCleanup) => {
+                return self.done_at_current_version(id).await;
+            }
             Err(Cleanup::CleanupFailed(failure)) => {
                 let error = failure.error.clone();
                 match self.record_cleanup_failure(failure).await {
@@ -186,11 +190,22 @@ where
             Ok(Some(deleted)) => Ok(ResourceProcessOutcome::Done(ResourceVersion::from(
                 deleted.headers(),
             ))),
-            // Skipped, because the deletion completed meanwhile, or another
-            // writer saved the resource first
-            Ok(None) | Err(E::ConcurrentModification(_)) => Ok(self.retry_now()),
+            // The deletion completed meanwhile
+            Ok(None) => self.done_at_current_version(id).await,
+            // Another writer saved the resource first
+            Err(E::ConcurrentModification(_)) => Ok(self.retry_now()),
             Err(err @ (E::LoadFailed(_) | E::Internal(_) | E::Lifecycle(_))) => Err(err.int_err()),
         }
+    }
+
+    async fn done_at_current_version(
+        &self,
+        id: ResourceID,
+    ) -> Result<ResourceProcessOutcome, InternalError> {
+        let resource = self.load(id).await?;
+        Ok(ResourceProcessOutcome::Done(ResourceVersion::from(
+            resource.headers(),
+        )))
     }
 
     fn retry_now(&self) -> ResourceProcessOutcome {

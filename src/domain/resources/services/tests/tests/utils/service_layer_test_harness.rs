@@ -26,7 +26,6 @@ use kamu_resources::{
     ResourceProcessOutcome,
     ResourceSpecSanitizer,
 };
-use kamu_resources_services::BackgroundWorkFinalizer;
 use kamu_resources_services::testing::{
     BaseResourceServiceHarness,
     BaseResourceServiceHarnessOpts,
@@ -202,9 +201,10 @@ impl ServiceLayerTestHarness {
             .unwrap();
     }
 
-    /// See [`BackgroundWorkFinalizer`]
+    /// See [`kamu_resources_services::BackgroundWorkFinalizer`]
     pub async fn settle(&self) {
-        BackgroundWorkFinalizer
+        self.base
+            .background_work_finalizer()
             .finalize(&self.catalog)
             .await
             .unwrap();
