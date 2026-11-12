@@ -24,7 +24,7 @@ pub fn join_error_message(join_error: JoinError) -> String {
 
 /// The text of a panic payload: `panic!` with a literal yields `&str`, with a
 /// format string `String`
-fn panic_message(payload: &(dyn Any + Send)) -> String {
+pub fn panic_message(payload: &(dyn Any + Send)) -> String {
     if let Some(message) = payload.downcast_ref::<&str>() {
         (*message).to_string()
     } else if let Some(message) = payload.downcast_ref::<String>() {

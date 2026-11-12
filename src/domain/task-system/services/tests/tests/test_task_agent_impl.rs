@@ -428,6 +428,42 @@ async fn test_task_without_planner_fails_instead_of_the_agent() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[test_log::test(tokio::test)]
+async fn test_panicking_task_fails_and_the_next_task_runs() {
+    let mut mock_outbox = MockOutbox::new();
+    TaskAgentHarness::add_outbox_task_expectations(&mut mock_outbox, TaskID::new(0));
+    TaskAgentHarness::add_outbox_task_expectations(&mut mock_outbox, TaskID::new(1));
+
+    let harness = TaskAgentHarness::new(
+        mock_outbox,
+        MockTaskDefinitionPlanner::new(),
+        MockTaskRunner::new(),
+    );
+    let panicking_task_id = harness
+        .schedule_task(LogicalPlan {
+            plan_type: PANICKING_PLAN_TYPE.to_owned(),
+            payload: serde_json::Value::Null,
+        })
+        .await;
+    let next_task_id = harness
+        .schedule_probe_task(LogicalPlanProbe::default())
+        .await;
+
+    harness.task_agent.run_single_task().await.unwrap();
+    harness.task_agent.run_single_task().await.unwrap();
+
+    assert_eq!(
+        harness.get_task(panicking_task_id).await.outcome(),
+        Some(&TaskOutcome::Failed(TaskError::empty_recoverable())),
+    );
+    assert_eq!(
+        harness.get_task(next_task_id).await.outcome(),
+        Some(&TaskOutcome::Success(TaskResult::empty())),
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 const LISTENING_TIMEOUT: Duration = Duration::from_mins(1);
 
 struct TaskAgentHarness {
@@ -500,6 +536,7 @@ impl TaskAgentHarness {
                 max_listening_timeout: LISTENING_TIMEOUT,
             })
             .add::<ProbeTaskPlanner>()
+            .add::<PanickingTaskPlanner>()
             .add::<ProbeTaskRunner>()
             .add_value(SecretsEncryptionConfig::sample());
 
@@ -632,6 +669,29 @@ impl TaskAgentHarness {
             )
             .times(1)
             .returning(|_, _, _| Ok(()));
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+const PANICKING_PLAN_TYPE: &str = "dev.kamu.tasks.test.panicking";
+
+/// Panics while planning, as a planner with a bug would
+#[dill::component]
+#[dill::interface(dyn TaskDefinitionPlanner)]
+#[dill::meta(TaskDefinitionPlannerMeta {
+    logic_plan_type: PANICKING_PLAN_TYPE,
+})]
+struct PanickingTaskPlanner {}
+
+#[async_trait::async_trait]
+impl TaskDefinitionPlanner for PanickingTaskPlanner {
+    async fn prepare_task_definition(
+        &self,
+        _task_id: TaskID,
+        _logical_plan: &LogicalPlan,
+    ) -> Result<TaskDefinition, PrepareTaskDefinitionError> {
+        panic!("planner bug");
     }
 }
 
