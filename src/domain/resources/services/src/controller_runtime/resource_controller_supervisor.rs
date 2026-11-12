@@ -10,13 +10,11 @@
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU32, Ordering};
 
-use async_utils::join_error_message;
-use background_agent_host::CancellationToken;
-use chrono::TimeDelta;
+use async_utils::IsolatedTask;
+use background_agent_host::{CancellationToken, wait_restart_delay};
 use internal_error::InternalError;
 use retry_backoff::RetryBackoff;
 use time_source::SystemTimeSource;
-use tokio::task::JoinSet;
 use wakeup_listener::WakeupListener;
 
 use crate::controller_runtime::{
@@ -74,17 +72,16 @@ impl ResourceControllerSupervisor {
             .clone();
 
         loop {
-            // A task of its own, so that a panic ends the loop, not the
-            // supervisor. The set aborts the task if the supervisor is dropped.
-            let mut running = JoinSet::new();
-            running.spawn(Self::run_loop(
+            // A panic ends the loop, not the supervisor; dropping the
+            // supervisor aborts the loop
+            let ended = IsolatedTask::spawn(Self::run_loop(
                 self.controller_loop.clone(),
                 self.listener.clone(),
                 consecutive_failures.clone(),
                 shutdown.clone(),
-            ));
-
-            let ended = running.join_next().await;
+            ))
+            .join()
+            .await;
             // Read after the loop ended: a drain that completed reset it
             let failures = consecutive_failures.fetch_add(1, Ordering::Relaxed) + 1;
             let delay = self.restart_backoff.delay(failures);
@@ -92,7 +89,7 @@ impl ResourceControllerSupervisor {
             let stopping = shutdown.is_cancelled();
 
             match ended {
-                Some(Ok(Err(e))) => tracing::error!(
+                Ok(Err(e)) => tracing::error!(
                     controller = controller_name.as_str(),
                     error = ?e,
                     error_msg = %e,
@@ -101,26 +98,22 @@ impl ResourceControllerSupervisor {
                     stopping,
                     "Resource controller loop failed"
                 ),
-                Some(Ok(Ok(()))) => return,
-                Some(Err(join_error)) => tracing::error!(
+                Ok(Ok(())) => return,
+                Err(panic) => tracing::error!(
                     controller = controller_name.as_str(),
-                    panic = %join_error_message(join_error),
+                    %panic,
                     consecutive_failures = failures,
                     ?delay,
                     stopping,
                     "Resource controller loop panicked"
                 ),
-                None => unreachable!("the set holds the loop's task"),
             }
             if stopping {
                 return;
             }
             self.metrics.on_loop_restart(&controller_name);
 
-            let backoff = self
-                .time_source
-                .sleep(TimeDelta::from_std(delay).unwrap_or(TimeDelta::MAX));
-            if shutdown.run_until_cancelled(backoff).await.is_none() {
+            if !wait_restart_delay(self.time_source.as_ref(), delay, &shutdown).await {
                 return;
             }
         }

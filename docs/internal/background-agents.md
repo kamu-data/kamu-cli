@@ -145,8 +145,10 @@ sequenceDiagram
    `dyn BackgroundAgent`. Resolve repositories per call through `CatalogWeakRef` (`kamu-dill-di`,
    "Singletons must not depend on repositories").
 2. In `run`, create the agent's wakeup listener once, before the loop
-   ([wakeup-listeners.md](wakeup-listeners.md)), then loop: one step, then a wait wrapped in
-   `shutdown.run_until_cancelled(...)`, returning `Ok` when it yields `None`.
+   ([wakeup-listeners.md](wakeup-listeners.md)), then loop: one step, then a wait that a shutdown
+   ends, returning `Ok` when it yields `None`. A plain wakeup wait is
+   `WakeupListener::wait_wake_until_shutdown`; a wait combined with a deadline goes inside
+   `shutdown.run_until_cancelled(...)`.
 3. Make each step safe to repeat after an abort or a crash: keep its state in storage and commit
    it in short transactions.
 4. Return `Err` for failures a restart may fix. Override `is_failure_fatal()` only when running on

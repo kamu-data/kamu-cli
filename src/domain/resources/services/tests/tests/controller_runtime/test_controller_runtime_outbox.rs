@@ -21,11 +21,7 @@ use crate::tests::controller_runtime::utils::{
 
 #[test_log::test(tokio::test)]
 async fn test_applied_message_wakes_the_agent() {
-    let harness = ControllerRuntimeHarness::new(
-        TestControllers::Main,
-        TestControllerBehavior::FinishAtCurrentVersion,
-    )
-    .await;
+    let harness = ControllerRuntimeHarness::finishing().await;
     let _agent = harness.start_agent();
     harness.let_agent_settle().await;
 

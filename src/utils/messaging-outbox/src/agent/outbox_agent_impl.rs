@@ -135,17 +135,17 @@ impl OutboxAgentImpl {
 
         loop {
             // Wait for push or timeout - let the store handle the backoff strategy
-            let Some(hint) = shutdown
-                .run_until_cancelled(
-                    wakeup_listener
-                        .wait_wake(listening_timeout, self.wakeup_config.min_debounce_interval),
+            let Some(hint) = wakeup_listener
+                .wait_wake_until_shutdown(
+                    listening_timeout,
+                    self.wakeup_config.min_debounce_interval,
+                    &shutdown,
                 )
-                .await
+                .await?
             else {
                 return Ok(());
             };
-            let hint = hint?;
-            tracing::debug!(hint = ?hint, "Agent woke up with a hint");
+            tracing::debug!(?hint, "Agent woke up with a hint");
 
             // Process tasks while they are available, to make sure we process all messages
             listening_timeout = self.catch_up(wakeup_listener.as_ref()).await?;

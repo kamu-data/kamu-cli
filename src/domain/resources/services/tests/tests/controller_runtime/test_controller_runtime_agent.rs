@@ -99,11 +99,7 @@ async fn test_failing_extra_resource_neither_spins_nor_wakes_the_agent_during_it
 
 #[test_log::test(tokio::test)]
 async fn test_future_extra_deadline_wakes_the_agent() {
-    let harness = ControllerRuntimeHarness::new(
-        TestControllers::Main,
-        TestControllerBehavior::FinishAtCurrentVersion,
-    )
-    .await;
+    let harness = ControllerRuntimeHarness::finishing().await;
     let id = harness.apply("res-a").await;
     harness.run_outbox_and_controllers_until_idle().await;
     let calls_before = harness.script().total_calls();
@@ -129,11 +125,7 @@ async fn test_future_extra_deadline_wakes_the_agent() {
 
 #[test_log::test(tokio::test)]
 async fn test_extra_deadline_passing_between_the_drain_and_the_wait_wakes_the_agent() {
-    let harness = ControllerRuntimeHarness::new(
-        TestControllers::Main,
-        TestControllerBehavior::FinishAtCurrentVersion,
-    )
-    .await;
+    let harness = ControllerRuntimeHarness::finishing().await;
     let id = harness.apply("res-a").await;
     harness.run_outbox_and_controllers_until_idle().await;
     let calls_before = harness.script().total_calls();
@@ -159,11 +151,7 @@ async fn test_extra_deadline_passing_between_the_drain_and_the_wait_wakes_the_ag
 
 #[test_log::test(tokio::test)]
 async fn test_overdue_extra_backing_off_does_not_hide_a_later_extra_deadline() {
-    let harness = ControllerRuntimeHarness::new(
-        TestControllers::Main,
-        TestControllerBehavior::FinishAtCurrentVersion,
-    )
-    .await;
+    let harness = ControllerRuntimeHarness::finishing().await;
     let backing_off = harness.apply("res-a").await;
     let expiring = harness.apply("res-b").await;
     harness.run_outbox_and_controllers_until_idle().await;
@@ -230,11 +218,7 @@ async fn test_hints_do_not_cut_short_the_pause_for_held_back_resources() {
 
 #[test_log::test(tokio::test)]
 async fn test_finished_extra_resource_that_leaves_the_set_does_not_pause_the_agent() {
-    let harness = ControllerRuntimeHarness::new(
-        TestControllers::Main,
-        TestControllerBehavior::FinishAtCurrentVersion,
-    )
-    .await;
+    let harness = ControllerRuntimeHarness::finishing().await;
     let id = harness.apply("res-a").await;
     harness.run_outbox_and_controllers_until_idle().await;
     let calls_before = harness.script().total_calls();
