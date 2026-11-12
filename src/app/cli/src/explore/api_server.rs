@@ -303,7 +303,9 @@ impl APIServer {
                     match tokio::time::timeout(timeout, &mut server_future).await {
                         Ok(result) => result,
                         Err(_) => {
-                            tracing::warn!("HTTP requests did not finish in time, dropping them");
+                            tracing::warn!(
+                                "HTTP grace period expired, remaining requests end with the process"
+                            );
                             Ok(())
                         }
                     }
