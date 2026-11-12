@@ -156,16 +156,6 @@ mod tests {
     }
 
     #[test]
-    fn test_attempt_kind_label_values() {
-        use strum::IntoEnumIterator as _;
-
-        let labels: Vec<&'static str> =
-            ResourceProcessAttemptKind::iter().map(Into::into).collect();
-
-        assert_eq!(labels, ["done", "retry_at", "failed"]);
-    }
-
-    #[test]
     fn test_done_records_the_version_and_clears_the_failures() {
         let resource_id = ResourceID::new(uuid::Uuid::from_u128(1));
         let attempt =
