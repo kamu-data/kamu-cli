@@ -82,7 +82,7 @@ impl ResourceControllerSupervisor {
             ))
             .join()
             .await;
-            // Read after the loop ended: a drain that completed reset it
+            // Read after the loop ended: a drain and wait that both completed reset it
             let failures = consecutive_failures.fetch_add(1, Ordering::Relaxed) + 1;
             let delay = self.restart_backoff.delay(failures);
             // A loop that fails during a shutdown is not restarted

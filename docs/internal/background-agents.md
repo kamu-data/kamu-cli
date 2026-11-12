@@ -60,9 +60,8 @@ read; `CancellationToken::run_until_cancelled` wraps them.
 | Task agent | taking a task, and running it | while waiting for a task; never between taking and running one |
 | Resource controller runtime | each controller loop's drain | after each loop's drain, in its wait; a loop that fails then is not restarted |
 
-The task agent requeues tasks left `Running` at the start of every `run` (`recover_running_tasks`),
-so a restart after a failure in the middle of a task re-runs it instead of leaving it claimed until
-the next process start ([task-system.md](task-system.md#startup-recovery)).
+For example, the task agent requeues tasks left `Running` on every run
+([task-system.md](task-system.md#startup-recovery)).
 
 ---
 
@@ -70,9 +69,12 @@ the next process start ([task-system.md](task-system.md#startup-recovery)).
 
 | Process | Agents |
 | --- | --- |
-| `kamu system api-server` | all of them, on `BackgroundAgentHost` (`src/app/cli/src/explore/api_server.rs`); nothing is drained after it stops, so a shutdown stays within its bound and the next start picks up what is left (`command_needs_outbox_processing`) |
+| `kamu system api-server` | all of them, on `BackgroundAgentHost` (`src/app/cli/src/explore/api_server.rs`) |
 | `kamu ui` | none: flows, tasks and resource controllers do not run there |
 | One-shot CLI commands | none: the outbox messages and resource controller work a command causes are drained before it exits (`BackgroundWorkFinalizer`, [resources-framework.md](resources-framework.md#controller-runtime)) |
+
+Nothing is drained after the API server stops (`command_needs_outbox_processing` excludes it), so
+a shutdown stays within its bound; the next start picks up what is left.
 
 Agents run in the background catalog, as `Principal::Node` ([identity.md](identity.md)).
 
@@ -91,7 +93,7 @@ the host.
 | Panic | error, with the panic text | restart, `reason="panicked"`; a fatal agent stops the host instead |
 
 The delay before a restart is `backgroundAgents.restartBackoff.delay(n)` for the `n`-th consecutive
-restart: by default 1s, doubling, up to 1m. A run that lasted at least `maxDelay` counts as
+restart ([defaults](wakeup-listeners.md#7-configuration)). A run that lasted at least `maxDelay` counts as
 healthy and resets `n` to 1. A shutdown cuts a restart delay short.
 
 **Metrics** ([metrics.md](metrics.md#background-agent-host)): whether each agent is running,
@@ -126,7 +128,7 @@ sequenceDiagram
     H-->>S: Ok, or the fatal error
 ```
 
-- Agents and in-flight requests share `backgroundAgents.shutdownTimeout` (10s by default). For
+- Agents and in-flight requests share `backgroundAgents.shutdownTimeout` ([default](wakeup-listeners.md#7-configuration)). For
   requests it bounds graceful draining: connections still open when it expires are cancelled as
   the process exits.
 - The host returns only once every supervisor and every agent's own task has ended. Tasks an

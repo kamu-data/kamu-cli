@@ -22,8 +22,6 @@ use crate::domain::{
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Runs the [`SimpleResourceReconciler`] cleanup of a resource whose deletion
-/// was requested, within the transaction of its caller
 /// What a cleanup that did not fail did
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SimpleResourceCleanupOutcome {
@@ -35,6 +33,8 @@ pub enum SimpleResourceCleanupOutcome {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Runs the [`SimpleResourceReconciler`] cleanup of a resource whose deletion
+/// was requested, within the transaction of its caller
 pub struct SimpleResourceCleanupHelper<'a, R>
 where
     R: EventSourcedResource,

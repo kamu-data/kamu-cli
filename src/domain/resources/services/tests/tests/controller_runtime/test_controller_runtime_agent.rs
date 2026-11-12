@@ -85,7 +85,7 @@ async fn test_failing_extra_resource_neither_spins_nor_wakes_the_agent_during_it
     assert_eq!(harness.script().total_calls(), calls_before + 1);
     assert_eq!(harness.script().extra_deadline_queries(), waits_before);
 
-    // Its backoff over, the second failure doubles it
+    // Its backoff over, it is processed and fails a second time
     harness.advance_time(TimeDelta::seconds(1));
     harness
         .script()

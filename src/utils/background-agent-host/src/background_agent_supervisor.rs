@@ -29,7 +29,8 @@ use crate::{
 ///
 /// A run that fails, panics or returns before a shutdown is logged, counted
 /// and restarted after a backoff growing with consecutive restarts; a run that
-/// lasted at least the backoff's maximum delay resets the count. A failure or
+/// lasted at least the backoff's `max_delay` (`min_delay` if uncapped) resets
+/// the count. A failure or
 /// panic of an agent whose failure is fatal cancels the shutdown token
 /// instead, so that the host stops every agent. Cancelling the abort token
 /// aborts a run in progress and returns once its task has ended.
@@ -192,7 +193,8 @@ impl BackgroundAgentSupervisor {
         Ok(())
     }
 
-    /// A run that lasted at least the longest backoff delay restarts the count
+    /// A run that lasted at least `max_delay`, or `min_delay` when uncapped,
+    /// restarts the count
     fn was_healthy_since(&self, started_at: DateTime<Utc>) -> bool {
         let healthy_after = self
             .restart_backoff

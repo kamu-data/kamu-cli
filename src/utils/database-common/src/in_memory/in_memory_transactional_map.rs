@@ -240,7 +240,7 @@ impl<K: Eq + Hash, V> InMemoryMapWrite<'_, K, V> {
     /// Whether another open transaction has deleted the key, as a unique index
     /// sees an entry that an uncommitted transaction removes. Always `false`
     /// for a key this transaction has changed itself, whose own change is what
-    /// it sees, and for a change made outside a tracked transaction
+    /// it sees, and when this write is not in a tracked transaction
     pub fn is_deleted_by_another_transaction(&self, key: &K) -> bool {
         let Some(transaction_id) = self.transaction_id else {
             return false;

@@ -31,7 +31,7 @@ use crate::domain::ResourceControllerStateRepository;
 /// | The effective deadline | the earliest moment a resource becomes due and is no longer suppressed |
 /// | The fallback timeout | `maxListeningTimeout`: a safety net for a missed hint |
 ///
-/// The effective deadline is the earliest of three moments, because no
+/// The effective deadline is the earliest of these moments, because no
 /// single store knows them all:
 ///
 /// - the earliest `not_before` of a resource the eligibility predicates select, from the

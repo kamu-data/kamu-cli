@@ -66,8 +66,7 @@ pub trait ResourceLifecyclePrimitives<R: EventSourcedResource>: Send + Sync {
 
     /// Requests the deletion of the resources and posts one
     /// `DeletionRequested` for all of them. Requesting it again for a resource
-    /// being deleted records nothing new, but the message still covers it, so
-    /// its cleanup is retried
+    /// being deleted records nothing new, but the message still covers it
     async fn request_deletion(
         &self,
         ids: &[ResourceID],
