@@ -759,6 +759,17 @@ pub struct BackgroundAgentsConfig {
     /// Retry delays of the resource controller runtime
     #[config(default)]
     pub resource_controllers: BackgroundAgentsResourceControllersConfig,
+
+    /// Delay before an agent that failed, panicked or returned early is
+    /// restarted, growing with consecutive restarts. A run that lasted at
+    /// least `maxDelay` resets the count
+    #[config(default)]
+    pub restart_backoff: RestartBackoffConfig,
+
+    /// How long background agents and in-flight API requests get to finish
+    /// on a shutdown, before they are aborted
+    #[config(default_str = "10s")]
+    pub shutdown_timeout: DurationString,
 }
 
 #[derive(setty::Config, setty::Default)]
@@ -808,7 +819,7 @@ pub struct BackgroundAgentsResourceControllersConfig {
     /// Delay before a failed resource controller loop is restarted, growing
     /// with consecutive failures
     #[config(default)]
-    pub loop_restart_backoff: ResourceControllerLoopRestartBackoffConfig,
+    pub loop_restart_backoff: RestartBackoffConfig,
 }
 
 // The two backoffs are separate types only for their defaults: a partial
@@ -841,7 +852,7 @@ impl ResourceControllerFailureBackoffConfig {
 /// Delay before a retry: a function of the attempt number, from `minDelay`
 /// up to `maxDelay`
 #[derive(setty::Config, setty::Default)]
-pub struct ResourceControllerLoopRestartBackoffConfig {
+pub struct RestartBackoffConfig {
     #[config(default = RetryPolicyConfigBackoffType::Exponential)]
     pub backoff_type: RetryPolicyConfigBackoffType,
 
@@ -852,7 +863,7 @@ pub struct ResourceControllerLoopRestartBackoffConfig {
     pub max_delay: DurationString,
 }
 
-impl ResourceControllerLoopRestartBackoffConfig {
+impl RestartBackoffConfig {
     pub fn into_system(&self) -> retry_backoff::RetryBackoff {
         retry_backoff::RetryBackoff {
             backoff_type: self.backoff_type.into(),
@@ -863,6 +874,13 @@ impl ResourceControllerLoopRestartBackoffConfig {
 }
 
 impl BackgroundAgentsConfig {
+    pub fn background_agent_host_config(&self) -> background_agent_host::BackgroundAgentHostConfig {
+        background_agent_host::BackgroundAgentHostConfig {
+            restart_backoff: self.restart_backoff.into_system(),
+            shutdown_timeout: self.shutdown_timeout.into(),
+        }
+    }
+
     pub fn wakeup_listener_config(&self) -> wakeup_listener::WakeupListenerConfig {
         wakeup_listener::WakeupListenerConfig {
             min_debounce_interval: self.min_debounce_interval.into(),
