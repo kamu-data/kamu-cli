@@ -21,8 +21,17 @@ Recommendation: for ease of reading, use the following format:
 - GraphQL: `setWatermark` can return `SetWatermarkCasFailed` with the expected and actual heads
   when the dataset's head moves concurrently, instead of an internal error
 - Data types now support a shorthand for optionality, e.g. `Float64?`
-- Prometheus metrics for each background agent: `background_agent_running`,
-  `background_agent_restarts_total` by reason, and `background_agent_last_failure_timestamp_seconds`
+- Prometheus metrics of `kamu system api-server`'s background work: per agent
+  `background_agent_running`, `background_agent_restarts_total` by reason and
+  `background_agent_last_failure_timestamp_seconds`; per resource controller
+  `resource_controller_processed_total`, `resource_controller_failing_resources` and
+  `resource_controller_loop_restarts_total`
+- Config: `backgroundAgents.resourceControllers.failureBackoff` (from 1s, doubling, up to 5m by
+  default) sets how long a resource whose reconciliation or cleanup failed waits before it is
+  retried, `backgroundAgents.resourceControllers.loopRestartBackoff` how long a failing controller
+  loop waits before it restarts, and `backgroundAgents.batching.resourceControllers` and
+  `backgroundAgents.concurrency.resourceControllers` how many resources a controller selects and
+  processes at once
 ### Changed
 - Upgrading clears the history of tasks and flow runs, including pending manual runs. Flow
   configurations and triggers are kept, and enabled flows are scheduled again when the node starts
