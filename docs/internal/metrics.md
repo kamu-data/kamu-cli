@@ -162,9 +162,9 @@ embedding kamu that pass it to `S3Context` do.
 
 ## 3. Design decisions
 
-- **Measure silent degradation, not exits.** When any background agent's `run()` returns, the API
-  server shuts down (`api_server.rs`), so an exited agent already shows as a restarted pod. What
-  goes unnoticed is an agent that keeps running but is hung, saturated, lagging, or failing the
+- **Measure silent degradation, not exits.** An agent that exits is restarted by its host, which
+  `background_agent_running` and `background_agent_restarts_total` already show. What goes
+  unnoticed is an agent that keeps running but is hung, saturated, lagging, or failing the
   same work in a loop. Every agent metric answers one such question.
 - **One metric per question, few metrics overall.** Deliberately left out:
   - *queued task count* — needs a new store query; queue wait and the running task gauge already

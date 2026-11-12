@@ -213,7 +213,7 @@ Agent-specific metrics and recommended alerts are in [metrics.md](metrics.md).
 
 | Agent | Postgres channel | Postgres triggers (table → trigger) | SQLite polling query | In-memory signal point |
 | --- | --- | --- | --- | --- |
-| Outbox (`OutboxAgentImpl`) | `outbox_messages_ready` | `outbox_messages` → `outbox_notify` (statement-level, `AFTER INSERT`) | `SELECT MAX(message_id) FROM outbox_messages` | `InMemoryOutboxMessageBridge` on push |
+| Outbox (`OutboxAgentImpl`) | `outbox_messages_ready` | `outbox_messages` → `outbox_notify` (statement-level, `AFTER INSERT`) | `SELECT MAX(message_id) FROM outbox_messages` | `InMemoryOutboxMessageBridge` on commit, or on push outside a transaction |
 | Flow system events (`FlowSystemEventAgentImpl`) | `flow_system_events_ready` | `flow_events` → `fe_notify`, `flow_trigger_events` → `fte_notify`, `flow_configuration_events` → `fce_notify` (statement-level, `AFTER INSERT`) | `SELECT MAX(event_id) FROM flow_system_events` | `InMemoryFlowSystemEventBridge::save_events` |
 | Task queue (`TaskAgentImpl`) | `tasks_queued` | `tasks` → `tasks_insert_notify` (statement-level, `AFTER INSERT`), `tasks_requeue_notify` (row-level, `AFTER UPDATE OF task_status WHEN NEW = 'queued'`) | latest `event_id` among `TaskEventCreated` / `TaskEventRequeued` in `task_events` | `InMemoryTaskEventStore::save_events` when a task becomes `Queued` |
 | Flow activation (`FlowAgentImpl`) | `flow_activation_scheduled` | `flows` → `flows_activation_notify` (row-level, `AFTER UPDATE OF scheduled_for_activation_at WHEN` set to a new non-NULL value) | latest `event_id` among `FlowEventScheduledForActivation` and `FlowEventTaskFinished` with a `next_attempt_at` in `flow_events` | `InMemoryFlowEventStore::save_events` when an event sets an activation time |
@@ -335,7 +335,7 @@ it with the channel's watermark (the maximum id seen, starting at 0). Advanced c
 ## 6. In-memory: explicit signals
 
 `InMemoryWakeupHub` (dill `Singleton`) routes signals by channel name. In-memory stores call
-`hub.signal(CHANNEL)` after a successful write: the outbox bridge on push, the flow system event
+`hub.signal(CHANNEL)` after a successful write: the outbox bridge on commit (or on push outside a transaction), the flow system event
 bridge on `save_events`, the task event store when a task becomes `Queued`, and the flow event
 store when a flow gets an activation time. The channel names
 match the Postgres ones.
@@ -433,12 +433,13 @@ backgroundAgents:
    already registered once per backend; test catalogs using the bridges must add the hub with
    `WakeupListenerMetrics` (and, for SQLite, a `WakeupListenerConfig`).
 5. **Agent loop**: inject `Arc<WakeupListenerConfig>`, create the handle once at the start of
-   `run` (the heartbeat metric comes with it), drain
-   everything pending, then
-   `wait_wake(max_listening_timeout, min_debounce_interval)` (§2); if it reads Postgres rows below
-   the oldest running transaction, wait `HELD_BACK_RECHECK_INTERVAL` instead while rows are held back
-   (§2). If the agent processes records in batches, call `wakeup_listener.heartbeat()` after each one (a long catch-up has no waits to
-   beat on), and add an entry under `backgroundAgents.batching`.
+   `run` (the heartbeat metric comes with it), drain everything pending, then
+   `wait_wake_until_shutdown(max_listening_timeout, min_debounce_interval, &shutdown)` (§2) and
+   return `Ok` when it yields `None` ([background-agents.md](background-agents.md)). If the agent
+   reads Postgres rows below the oldest running transaction, wait `HELD_BACK_RECHECK_INTERVAL`
+   instead while rows are held back (§2). If the agent processes records in batches, call
+   `wakeup_listener.heartbeat()` after each one (a long catch-up has no waits to beat on), check
+   the shutdown token between batches, and add an entry under `backgroundAgents.batching`.
 6. **Tests**: a storage test that committed changes of interest wake the listener and irrelevant ones
    don't (see `test_wakes_up_only_when_task_is_queued` for Postgres and SQLite).
 7. Update the inventory in §3.
