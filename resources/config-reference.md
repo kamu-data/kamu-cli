@@ -41,7 +41,13 @@
       &quot;maxDelay&quot;: &quot;1m&quot;,
       &quot;minDelay&quot;: &quot;1s&quot;
     }
-  }
+  },
+  &quot;restartBackoff&quot;: {
+    &quot;backoffType&quot;: &quot;Exponential&quot;,
+    &quot;maxDelay&quot;: &quot;1m&quot;,
+    &quot;minDelay&quot;: &quot;1s&quot;
+  },
+  &quot;shutdownTimeout&quot;: &quot;10s&quot;
 }</code></pre></td>
 <td>
 
@@ -540,6 +546,33 @@ the next flow activation moment regardless of it.
 }</code></pre></td>
 <td>Retry delays of the resource controller runtime</td>
 </tr>
+<tr>
+<td><code>restartBackoff</code></td>
+<td><a href="#restartbackoffconfig"><code>RestartBackoffConfig</code></a></td>
+<td><pre><code class="language-json">{
+  &quot;backoffType&quot;: &quot;Exponential&quot;,
+  &quot;maxDelay&quot;: &quot;1m&quot;,
+  &quot;minDelay&quot;: &quot;1s&quot;
+}</code></pre></td>
+<td>
+
+Delay before an agent that failed, panicked or returned early is
+restarted, growing with consecutive restarts. A run that lasted at
+least `maxDelay` resets the count
+
+</td>
+</tr>
+<tr>
+<td><code>shutdownTimeout</code></td>
+<td><a href="#durationstring"><code>DurationString</code></a></td>
+<td><code class="language-json">&quot;10s&quot;</code></td>
+<td>
+
+How long background agents and in-flight API requests get to finish
+on a shutdown, before they are aborted
+
+</td>
+</tr>
 </tbody>
 </table>
 
@@ -565,7 +598,7 @@ growing with consecutive failures
 </tr>
 <tr>
 <td><code>loopRestartBackoff</code></td>
-<td><a href="#resourcecontrollerlooprestartbackoffconfig"><code>ResourceControllerLoopRestartBackoffConfig</code></a></td>
+<td><a href="#restartbackoffconfig"><code>RestartBackoffConfig</code></a></td>
 <td><pre><code class="language-json">{
   &quot;backoffType&quot;: &quot;Exponential&quot;,
   &quot;maxDelay&quot;: &quot;1m&quot;,
@@ -1564,7 +1597,7 @@ up to `maxDelay`
 </tbody>
 </table>
 
-## `ResourceControllerLoopRestartBackoffConfig`
+## `RestartBackoffConfig`
 
 Delay before a retry: a function of the attempt number, from `minDelay`
 up to `maxDelay`

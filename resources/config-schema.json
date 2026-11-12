@@ -236,6 +236,20 @@
             }
           },
           "description": "Retry delays of the resource controller runtime"
+        },
+        "restartBackoff": {
+          "$ref": "#/$defs/RestartBackoffConfig",
+          "default": {
+            "backoffType": "Exponential",
+            "maxDelay": "1m",
+            "minDelay": "1s"
+          },
+          "description": "Delay before an agent that failed, panicked or returned early is\nrestarted, growing with consecutive restarts. A run that lasted at\nleast `maxDelay` resets the count"
+        },
+        "shutdownTimeout": {
+          "$ref": "#/$defs/DurationString",
+          "default": "10s",
+          "description": "How long background agents and in-flight API requests get to finish\non a shutdown, before they are aborted"
         }
       },
       "type": "object"
@@ -253,7 +267,7 @@
           "description": "Delay before a resource whose processing failed is processed again,\ngrowing with consecutive failures"
         },
         "loopRestartBackoff": {
-          "$ref": "#/$defs/ResourceControllerLoopRestartBackoffConfig",
+          "$ref": "#/$defs/RestartBackoffConfig",
           "default": {
             "backoffType": "Exponential",
             "maxDelay": "1m",
@@ -989,7 +1003,7 @@
       },
       "type": "object"
     },
-    "ResourceControllerLoopRestartBackoffConfig": {
+    "RestartBackoffConfig": {
       "additionalProperties": false,
       "description": "Delay before a retry: a function of the attempt number, from `minDelay`\nup to `maxDelay`",
       "properties": {
@@ -1350,7 +1364,13 @@
             "maxDelay": "1m",
             "minDelay": "1s"
           }
-        }
+        },
+        "restartBackoff": {
+          "backoffType": "Exponential",
+          "maxDelay": "1m",
+          "minDelay": "1s"
+        },
+        "shutdownTimeout": "10s"
       },
       "description": "Background agents configuration (outbox, flow system events, tasks,\nresource controllers)"
     },

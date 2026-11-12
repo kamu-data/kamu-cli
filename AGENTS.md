@@ -83,6 +83,9 @@ problem is cost.
 - Keep build, test and lint output available in full. Do not pipe it into `head` or `tail`;
   save long output to a file and read the relevant sections after checking the exit status.
 - `make lint` runs every lint CI runs, plus `lint-sqlx` and `lint-harness`.
+- Run only the tests whose outcome the change can alter, narrowed to the crates whose behaviour
+  changed. A change that only deletes tests or dead code needs `make clippy` alone; say so instead
+  of running tests. Leave nextest's build and test parallelism at its defaults.
 
 ### Migration review context
 

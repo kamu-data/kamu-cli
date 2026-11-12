@@ -218,6 +218,9 @@ class "AppendDatasetMetadataBatchUseCaseImpl"
 class "ApplyAccountDatasetRelationsUseCaseImpl"
 class "AuthConfig" <<singleton>>
 class "AuthenticationServiceImpl"
+class "BackgroundAgentHost"
+class "BackgroundAgentHostConfig" <<singleton>>
+class "BackgroundAgentHostMetrics" <<singleton>>
 class "BuildInfo" <<singleton>>
 class "CLIAccessTokenStore"
 class "CLIResourceContextStore"
@@ -531,6 +534,11 @@ class "WebhooksConfig" <<singleton>>
 class "WorkspaceLayout" <<singleton>>
 class "WorkspaceService"
 class "WsSmartTransferProtocolClient"
+"BackgroundAgentHost"  --> "BackgroundAgentHostConfig"
+"BackgroundAgentHost"  --> "BackgroundAgentHostMetrics"
+"BackgroundAgentHost" "*" --> "BackgroundAgent"
+"BackgroundAgentHost"  --> "SystemTimeSource"
+"MetricsProvider" <|-- "BackgroundAgentHostMetrics"
 "ContainerRuntime"  --> "ContainerRuntimeConfig"
 "DatabasePasswordProvider" <|-- "DatabaseNoPasswordProvider"
 "DatabaseTransactionRunner"  --> "Catalog"
