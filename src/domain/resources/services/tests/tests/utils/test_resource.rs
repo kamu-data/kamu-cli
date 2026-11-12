@@ -299,7 +299,8 @@ kamu_resources_services::declare_resource_service_layer!(
     name = TestResource,
     resource = crate::tests::utils::TestResource,
     state_model = crate::tests::utils::TestResourceStateModel,
-    controller_name = TEST_RESOURCE_SIMPLE_CONTROLLER_NAME
+    controller_name = TEST_RESOURCE_SIMPLE_CONTROLLER_NAME,
+    controller_revision = 1
 );
 
 kamu_resources_services::declare_resource_crud_dispatcher!(

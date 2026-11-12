@@ -93,6 +93,7 @@ impl Default for LocalFacadeHarnessOpts {
 
 pub struct LocalFacadeHarness {
     base_catalog: dill::Catalog,
+    dispatching_outbox: bool,
     alice_account_id: odf::AccountID,
     bob_account_id: odf::AccountID,
 }
@@ -141,6 +142,7 @@ impl LocalFacadeHarness {
             base_catalog,
             alice_account_id,
             bob_account_id,
+            dispatching_outbox: is_dispatching,
         }
     }
 
@@ -251,10 +253,12 @@ impl LocalFacadeHarness {
 
     /// See [`FacadeContractHarness::settle`]
     pub async fn settle(&self) {
-        BackgroundWorkFinalizer
-            .finalize(&self.base_catalog)
-            .await
-            .unwrap();
+        let finalizer = if self.dispatching_outbox {
+            BackgroundWorkFinalizer::for_dispatching_outbox()
+        } else {
+            BackgroundWorkFinalizer::for_immediate_outbox()
+        };
+        finalizer.finalize(&self.base_catalog).await.unwrap();
     }
 
     /// A facade acting as the admin account

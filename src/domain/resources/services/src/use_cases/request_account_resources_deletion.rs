@@ -46,7 +46,7 @@ impl RequestAccountResourcesDeletionUseCaseImpl {
             self.generic_resource_query_service
                 // Account teardown sweeps every resource, never a subset.
                 // Requesting the deletion of a resource being deleted again
-                // retries its cleanup.
+                // is harmless.
                 .list_snapshots(
                     account_id,
                     &ResourceScope::default(),

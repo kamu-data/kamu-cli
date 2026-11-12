@@ -14,14 +14,15 @@ macro_rules! declare_simple_resource_controller_adapter {
     (
         adapter = $adapter:ident,
         resource = $resource:ty,
-        controller_name = $controller_name:expr
+        controller_name = $controller_name:expr,
+        controller_revision = $controller_revision:expr
     ) => {
         #[dill::component]
         #[dill::interface(dyn kamu_resources::ResourceController)]
         #[dill::meta(kamu_resources::ResourceControllerMeta {
             schema: <$resource>::SCHEMA_STR,
             controller_name: kamu_resources::ResourceControllerName::new($controller_name),
-            controller_revision: 1,
+            controller_revision: $controller_revision,
             reacts_to_status: false,
         })]
         pub struct $adapter {

@@ -534,12 +534,12 @@ pub async fn test_name_of_resource_being_deleted_can_be_reused(h: &impl FacadeCo
 
 // RF-139
 contract_test!(
-    repeated_delete_of_resource_being_deleted_retries,
-    super::test_repeated_delete_of_resource_being_deleted_retries,
+    repeated_delete_of_resource_being_deleted_reports_deleting,
+    super::test_repeated_delete_of_resource_being_deleted_reports_deleting,
     messaging_outbox::OutboxProvider::Dispatching
 );
 
-pub async fn test_repeated_delete_of_resource_being_deleted_retries(
+pub async fn test_repeated_delete_of_resource_being_deleted_reports_deleting(
     h: &impl FacadeContractHarness,
 ) {
     let id = create_variable_set(h, TestAccount::Alice, "retry-del").await;
