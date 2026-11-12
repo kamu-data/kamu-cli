@@ -367,8 +367,8 @@ where
     }
 
     /// Announces the status write that moved the resource from `old_status`.
-    /// A write that left the status as it was recorded no event, so it posts
-    /// nothing
+    /// A write that left the status unchanged recorded no event, so nothing
+    /// is posted
     async fn post_status_updated(
         &self,
         now: DateTime<Utc>,

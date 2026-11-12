@@ -125,8 +125,8 @@ pub struct ResourceLifecycleMessageApplied {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Deletion of the resources was requested, or requested again to retry a
-/// failed cleanup. The resources are in the `Deleting` phase.
+/// Deletion of the resources was requested, possibly again for resources
+/// already being deleted. The resources are in the `Deleting` phase.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ResourceLifecycleMessageDeletionRequested {
     pub event_time: DateTime<Utc>,

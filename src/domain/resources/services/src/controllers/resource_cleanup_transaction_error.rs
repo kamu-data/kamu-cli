@@ -13,7 +13,7 @@ use crate::domain::{EventSourcedResource, ResourceCleanupFailure, SimpleResource
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Ends the transaction of a cleanup. A failed cleanup rolls it back, which
+/// The error that rolls back the transaction of a cleanup. A failed cleanup
 /// discards whatever the reconciler wrote before failing; its failure is then
 /// recorded in a transaction of its own.
 pub enum ResourceCleanupTransactionError<R: EventSourcedResource> {

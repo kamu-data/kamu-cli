@@ -249,9 +249,8 @@ async fn test_reconcile_invokes_reconciler_exactly_once() {
 
 #[test_log::test(tokio::test)]
 async fn test_already_reconciled_is_no_op_and_reconciler_is_not_called() {
-    // Generation does not change on a no-op: needs_reconciliation() is false
-    // because observed_generation == headers.generation. process() returns
-    // `Done` without invoking the reconciler.
+    // Already reconciled at the current generation, so needs_reconciliation()
+    // is false and process() returns `Done` without invoking the reconciler
     let counter = Arc::new(AtomicU32::new(0));
     let harness = ReconcileTestHarness::dispatching(TestResourceReconcilerProvider::Counting(
         counter.clone(),
@@ -269,7 +268,7 @@ async fn test_already_reconciled_is_no_op_and_reconciler_is_not_called() {
         "reconciler must be called on first reconcile"
     );
 
-    // Second process: already Ready — no-op, no outbox message posted
+    // Second process: already Ready, so the reconciler is not called
     harness.process(&id).await.unwrap();
 
     assert_eq!(

@@ -79,7 +79,7 @@ impl OutboxMessageLog {
     }
 
     /// The messages the transaction sees, ordered by ID: committed ones not
-    /// held back, then its own
+    /// held back, and its own
     pub(crate) fn visible(
         &self,
         transaction_id: Option<TransactionId>,
