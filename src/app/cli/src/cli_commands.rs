@@ -662,8 +662,10 @@ pub fn command_needs_outbox_processing(args: &cli::Cli) -> bool {
             | cli::SystemSubCommand::GenerateToken(_)
             | cli::SystemSubCommand::Gc(_) => false,
             cli::SystemSubCommand::ApiServer(a) => match &a.subcommand {
-                None | Some(cli::SystemApiServerSubCommand::GqlQuery(_)) => true,
-                Some(cli::SystemApiServerSubCommand::GqlSchema(_)) => false,
+                // The server's agents process the outbox while it runs; after a shutdown,
+                // what is left waits for the next start instead of outliving the shutdown bound
+                None | Some(cli::SystemApiServerSubCommand::GqlSchema(_)) => false,
+                Some(cli::SystemApiServerSubCommand::GqlQuery(_)) => true,
             },
             cli::SystemSubCommand::Compact(_)
             | cli::SystemSubCommand::Depgraph(_)
