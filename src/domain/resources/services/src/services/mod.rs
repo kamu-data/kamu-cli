@@ -20,7 +20,7 @@ mod typed_resource_query;
 pub use apply_resource_plan_executor::*;
 pub use apply_resource_planner::*;
 pub use generic_resource_query::*;
-pub use resource_condition_patch_checker::*;
+pub(crate) use resource_condition_patch_checker::*;
 pub use resource_durable_state_validator::*;
 pub use resource_lifecycle_primitives::*;
 pub use resource_persistence::*;

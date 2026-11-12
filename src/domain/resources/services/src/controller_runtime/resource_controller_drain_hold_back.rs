@@ -13,8 +13,9 @@ use crate::controller_runtime::{
     ResourceControllerCandidate,
     ResourceControllerCandidateOrigin,
     ResourceProcessAttempt,
+    ResourceProcessAttemptKind,
 };
-use crate::domain::{ResourceID, ResourceProcessOutcome};
+use crate::domain::ResourceID;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -55,12 +56,11 @@ impl ResourceControllerDrainHoldBack {
     ) {
         let id = candidate.id();
 
-        if candidate.origin() == ResourceControllerCandidateOrigin::Extra
-            && matches!(
-                attempt,
-                ResourceProcessAttempt::Processed(ResourceProcessOutcome::Done(_))
-            )
-        {
+        let finished = match attempt.kind() {
+            ResourceProcessAttemptKind::Done => true,
+            ResourceProcessAttemptKind::RetryAt | ResourceProcessAttemptKind::Failed => false,
+        };
+        if candidate.origin() == ResourceControllerCandidateOrigin::Extra && finished {
             self.finished_extras.insert(id);
         }
 
