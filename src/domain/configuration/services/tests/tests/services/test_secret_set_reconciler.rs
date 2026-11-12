@@ -147,9 +147,20 @@ async fn test_requested_deletion_of_secret_set_removes_its_projection_entries() 
         )
         .await;
 
+    // Until the controller runtime cleans up, the entries stay
     harness
-        .request_secret_sets_deletion(&account_handle.did, vec![id_deleted])
+        .request_secret_sets_deletion_unsettled(&account_handle.did, vec![id_deleted])
         .await;
+    assert_eq!(
+        harness.secret_set_phase(&id_deleted).await,
+        ResourcePhase::Deleting
+    );
+    assert_eq!(
+        harness.secret_set_projection_entry_count(&id_deleted).await,
+        1
+    );
+
+    harness.settle().await;
 
     assert_eq!(
         harness.secret_set_phase(&id_deleted).await,

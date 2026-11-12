@@ -40,6 +40,8 @@ async fn test_multi_step_reconciliation_resumes_after_restart() {
         harness.stage(id).await.as_deref(),
         Some(TEST_STAGE_PREPARED)
     );
+    // Draining returned while the step waits, with its messages delivered
+    assert!(!harness.has_undelivered_lifecycle_messages().await);
 
     harness.restart(TestControllers::Main);
 

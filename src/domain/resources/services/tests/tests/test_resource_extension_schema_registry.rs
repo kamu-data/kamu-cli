@@ -213,8 +213,12 @@ fn test_duplicate_alias_registration_fails_registry_construction() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test]
-fn test_condition_registration_exposes_condition_meta() {
+fn test_condition_meta_by_registration_and_by_uri() {
     let harness = ExtensionRegistryHarness::built_ins();
+    let reconciliation_error_meta = ResourceConditionSchemaMeta {
+        max_serialized_size: 16 * 1024,
+        carried: true,
+    };
 
     let reconciliation_error = harness.resolve_uri(
         ResourceExtensionKind::Condition,
@@ -224,29 +228,16 @@ fn test_condition_registration_exposes_condition_meta() {
         ResourceExtensionKind::Label,
         RESOURCE_LABEL_ENVIRONMENT_SCHEMA_URI,
     );
-
     assert_eq!(
         reconciliation_error.condition(),
-        Some(&ResourceConditionSchemaMeta {
-            max_serialized_size: 16 * 1024,
-            carried: true,
-        })
+        Some(&reconciliation_error_meta)
     );
     assert_eq!(environment.condition(), None);
-}
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[test]
-fn test_condition_meta_is_looked_up_by_uri_alone() {
-    let harness = ExtensionRegistryHarness::built_ins();
-
+    // By URI alone, without knowing the kind
     assert_eq!(
         harness.condition_meta(RESOURCE_CONDITION_RECONCILIATION_ERROR_SCHEMA_URI),
-        Some(ResourceConditionSchemaMeta {
-            max_serialized_size: 16 * 1024,
-            carried: true,
-        })
+        Some(reconciliation_error_meta)
     );
     assert_eq!(
         harness.condition_meta(RESOURCE_LABEL_ENVIRONMENT_SCHEMA_URI),

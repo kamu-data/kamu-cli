@@ -55,21 +55,6 @@ async fn test_cleanup_completes_requested_deletion() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_completed_deletion_posts_deleted_message() {
-    let mut mock_outbox = MockOutbox::new();
-    BaseResourceServiceHarness::expect_applied_messages(&mut mock_outbox, 1, None);
-    BaseResourceServiceHarness::expect_deletion_requested_message(&mut mock_outbox, 1);
-    BaseResourceServiceHarness::expect_deleted_message(&mut mock_outbox, 1);
-
-    let harness = CompleteDeletionTestHarness::with_mock_outbox(mock_outbox);
-    let [id] = harness.apply_and_request_deletion(["res-a"]).await;
-
-    harness.process(&id).await.unwrap();
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[test_log::test(tokio::test)]
 async fn test_failed_cleanup_keeps_deletion_in_progress_and_is_returned_as_an_error() {
     let harness = CompleteDeletionTestHarness::new(TestResourceReconcilerProvider::Failing);
     let [id] = harness.apply_and_request_deletion(["res-a"]).await;

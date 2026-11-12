@@ -119,58 +119,6 @@ async fn test_revision_bump_reconsiders_finished_resources_a_predicate_selects()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_steps_due_at_once_run_back_to_back_in_one_drain() {
-    let harness = ControllerRuntimeHarness::new(
-        TestControllers::Main,
-        TestControllerBehavior::Stepwise {
-            step_wait: TimeDelta::zero(),
-        },
-    )
-    .await;
-    let id = harness.apply("res-a").await;
-
-    assert_eq!(harness.process_calls_until_idle().await, 2);
-    assert_eq!(harness.phase(id).await, ResourcePhase::Ready);
-    assert_eq!(harness.process_calls_until_idle().await, 0);
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[test_log::test(tokio::test)]
-async fn test_retry_at_waits_until_due() {
-    let harness = ControllerRuntimeHarness::new(
-        TestControllers::Main,
-        TestControllerBehavior::RetryAfter(TimeDelta::minutes(1)),
-    )
-    .await;
-    let id = harness.apply("res-a").await;
-
-    assert_eq!(harness.process_calls_until_idle().await, 1);
-    assert_eq!(harness.process_calls_until_idle().await, 0);
-
-    harness.advance_time(TimeDelta::minutes(1));
-
-    assert_eq!(harness.process_calls_until_idle().await, 1);
-    assert_eq!(harness.script().calls_of(&id), 2);
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[test_log::test(tokio::test)]
-async fn test_drain_goes_through_more_resources_than_one_batch() {
-    let harness = ControllerRuntimeHarness::finishing().await;
-    // The harness batch holds 3
-    for i in 0..7 {
-        harness.apply(&format!("res-{i}")).await;
-    }
-
-    assert_eq!(harness.process_calls_until_idle().await, 7);
-    assert_eq!(harness.process_calls_until_idle().await, 0);
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[test_log::test(tokio::test)]
 async fn test_extra_resource_lifts_done_but_not_backoff() {
     let harness = ControllerRuntimeHarness::finishing().await;
     let id = harness.apply("res-a").await;

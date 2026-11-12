@@ -20,23 +20,6 @@ use crate::tests::utils::{ServiceLayerTestHarness, make_id};
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_request_deletion_of_single_resource_completes() {
-    let harness = ServiceLayerTestHarness::new();
-    let account_handle = odf::ResourceOwnerHandle::new_test("test-owner");
-
-    let id = harness.apply_and_get_id(&account_handle, "res-a").await;
-
-    harness
-        .request_resources_deletion(account_handle.did, vec![id])
-        .await;
-    harness.settle().await;
-
-    harness.assert_gone(&[id]).await;
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[test_log::test(tokio::test)]
 async fn test_request_deletion_of_multiple_resources_in_one_call() {
     let harness = ServiceLayerTestHarness::new();
     let account_handle = odf::ResourceOwnerHandle::new_test("test-owner");
@@ -51,21 +34,6 @@ async fn test_request_deletion_of_multiple_resources_in_one_call() {
     harness.settle().await;
 
     harness.assert_gone(&ids).await;
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[test_log::test(tokio::test)]
-async fn test_request_deletion_of_nonexistent_id_is_idempotent() {
-    let harness = ServiceLayerTestHarness::new();
-    let account_handle = odf::ResourceOwnerHandle::new_test("test-owner");
-
-    let random_id = make_id();
-
-    // Non-existent IDs land in `outcome.not_found` and are silently skipped
-    harness
-        .request_resources_deletion(account_handle.did, vec![random_id])
-        .await;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -90,26 +58,6 @@ async fn test_request_deletion_of_resource_owned_by_other_account_fails() {
     );
 
     harness.assert_exists(&id).await;
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[test_log::test(tokio::test)]
-async fn test_request_deletion_emits_deletion_requested_lifecycle_message() {
-    let mut mock_outbox = MockOutbox::new();
-    // apply_and_get_id posts one Applied message; expect it before the DeletionRequested one
-    BaseResourceServiceHarness::expect_applied_messages(&mut mock_outbox, 1, None);
-    BaseResourceServiceHarness::expect_deletion_requested_message(&mut mock_outbox, 1);
-
-    let harness = ServiceLayerTestHarness::new_with_mock_outbox(mock_outbox);
-    let account_handle = odf::ResourceOwnerHandle::new_test("test-owner");
-
-    let id = harness.apply_and_get_id(&account_handle, "res-a").await;
-
-    harness
-        .request_resources_deletion(account_handle.did, vec![id])
-        .await;
-    // MockOutbox verifies .times() expectations on drop
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

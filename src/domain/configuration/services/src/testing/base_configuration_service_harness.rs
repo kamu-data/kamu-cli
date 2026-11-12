@@ -351,10 +351,20 @@ impl BaseConfigurationServiceHarness {
         account_id: &odf::AccountID,
         ids: Vec<ResourceID>,
     ) {
+        self.request_secret_sets_deletion_unsettled(account_id, ids)
+            .await;
+        self.settle().await;
+    }
+
+    /// Requests the deletion, leaving its cleanup to the next `settle`
+    pub async fn request_secret_sets_deletion_unsettled(
+        &self,
+        account_id: &odf::AccountID,
+        ids: Vec<ResourceID>,
+    ) {
         let use_case: Arc<dyn RequestResourcesDeletionUseCase<SecretSetResource>> =
             self.catalog.get_one().unwrap();
         use_case.execute(account_id.clone(), ids).await.unwrap();
-        self.settle().await;
     }
 
     /// Runs the `VariableSet` reconciler's cleanup directly, outside the
