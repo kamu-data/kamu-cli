@@ -291,7 +291,7 @@ Waking is described in [wakeup-listeners.md](wakeup-listeners.md) (channel `outb
 The same drain is callable as `run_while_has_tasks()`. With a database configured, the CLI calls it
 after every command that `command_needs_outbox_processing` selects, whether the command succeeded or
 failed: a failed command may still have committed work in transactions of its own. The CLI
-alternates it with drains of the resource controllers until one processes nothing
+alternates it with drains of the resource controllers until one is idle
 ([resources-framework.md](resources-framework.md#controller-runtime)). The HTTP E2E
 middleware does the same after every successful mutating request (a REST `POST` or a GraphQL
 `mutation`), with the same `BackgroundWorkFinalizer`, so E2E tests observe consumers'

@@ -125,6 +125,18 @@ database_transactional_test!(
     harness = InMemoryResourceRepositoriesHarness
 );
 
+database_transactional_test!(
+    storage = inmem_with_transaction,
+    fixture = controller_state_repo_suite::test_upsert_state_with_nul_in_error,
+    harness = InMemoryResourceRepositoriesHarness
+);
+
+database_transactional_test!(
+    storage = inmem_with_transaction,
+    fixture = controller_state_repo_suite::test_upsert_state_of_unknown_resource_fails,
+    harness = InMemoryResourceRepositoriesHarness
+);
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 database_transactional_test!(

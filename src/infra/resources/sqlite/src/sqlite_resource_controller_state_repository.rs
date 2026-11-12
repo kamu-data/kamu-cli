@@ -285,6 +285,8 @@ impl ResourceControllerStateRepository for SqliteResourceControllerStateReposito
             FROM resource_controller_state AS s
             JOIN resources AS r ON r.resource_id = s.resource_id
             WHERE s.controller = $1
+              -- Implied by a failure; lets the partial index on not_before serve the query
+              AND s.not_before IS NOT NULL
               AND s.attempts > 0
               AND r.deleted_at IS NULL
             "#,

@@ -129,7 +129,8 @@ impl<'a> ResourceControllerPassPlanner<'a> {
                     }
 
                     // Held back resources may still be eligible: asking for as
-                    // many more rows keeps them from filling the batch
+                    // many more rows keeps them from filling the batch, and the
+                    // rows they leave over are not taken past it
                     let eligible = repository
                         .find_actionable_resource_ids(
                             self.registration.actionable_query(),
@@ -137,7 +138,11 @@ impl<'a> ResourceControllerPassPlanner<'a> {
                             self.batch_size + hold_back.len(),
                         )
                         .await?;
+                    let mut eligible_taken = 0;
                     for id in eligible {
+                        if eligible_taken == self.batch_size {
+                            break;
+                        }
                         if !planned.insert(id) {
                             continue;
                         }
@@ -145,6 +150,7 @@ impl<'a> ResourceControllerPassPlanner<'a> {
                             pass.note_held_back();
                         } else {
                             pass.add_candidate(ResourceControllerCandidate::eligible(id));
+                            eligible_taken += 1;
                         }
                     }
 
