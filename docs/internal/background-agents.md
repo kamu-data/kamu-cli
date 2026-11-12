@@ -41,12 +41,12 @@ their current step, then aborts the ones still running.
 
 | Part | Contract |
 | --- | --- |
-| `agent_name()` | A stable name: the `agent` label of the host's metrics and of `wakeup_listener_last_heartbeat_timestamp_seconds` |
+| `agent_name()` | A stable name: the `agent` label of the host's metrics and of `wakeup_listener_last_heartbeat_timestamp_seconds` (the resource controller runtime labels its heartbeats per controller instead) |
 | `run(&self, shutdown: CancellationToken)` | Runs until `shutdown` is cancelled, then returns `Ok`. The agent checks the token between steps and stops waiting for work when it is cancelled; it never cuts a step short itself |
 | Returning `Ok` before a shutdown | An unexpected completion: the host restarts the agent |
 | Returning `Err`, or panicking | A failure: the host restarts the agent, unless the failure is fatal |
 | `is_failure_fatal()` | `false` by default. `true` makes any failure of the agent stop the host and every other agent |
-| A new run | Starts from storage: whatever the previous run left behind (a claimed task, a half-done drain) is found again |
+| A new run | Starts from storage: whatever the previous run left behind (a claimed task, a half-done drain) is found again. State the singleton agent keeps in memory survives, such as the outbox's failed consumers |
 
 A **step** is the unit of work an agent never abandons on its own: a batch of a catch-up, a flow
 activation tick, a task, a controller drain. Waits around steps are always droppable, as they only
@@ -91,6 +91,8 @@ the host.
 | `Ok` before a shutdown | warning | restart, `reason="completed"` |
 | `Err` | error, with the error | restart, `reason="failed"`; a fatal agent stops the host instead |
 | Panic | error, with the panic text | restart, `reason="panicked"`; a fatal agent stops the host instead |
+| `Err` or panic after a shutdown | error, as above | the supervisor ends: no restart, and not fatal |
+| Aborted after `shutdownTimeout` | warning, "did not stop in time" | the supervisor ends |
 
 The delay before a restart is `backgroundAgents.restartBackoff.delay(n)` for the `n`-th consecutive
 restart ([defaults](wakeup-listeners.md#7-configuration)). A run that lasted at least `maxDelay` counts as

@@ -310,7 +310,7 @@ keeps the env-var backfill's keys, such as `key-1`, which predate the name gramm
 Note that `needs_reconciliation()` is derived from `generation` vs the status:
 
 ```rust
-pub trait ManagedResource: DeclarativeResource {
+pub trait ManagedResource: DeclarativeResource + ResourceStatusRules {
     type ReconcileError: ResourceReconcileError;
     type LifecycleError;
 
@@ -555,6 +555,8 @@ existing rows/events that should move to the new schema.
 - Rows are not event-sourced: an upsert replaces the row. The FK means a resource's rows must be
   removed (`delete_states_for_resource`) before the resource itself. Nothing removes a deleted
   resource, which stays as its tombstone, so its rows stay too; every query leaves them out.
+- Postgres stores `last_error` with NUL characters replaced by U+FFFD, since a TEXT column
+  rejects them and the failed write would fail every later drain.
 - **A change clears the rows.** Saving a new generation or a deletion request removes the
   resource's rows in the same transaction (`ResourcePersistenceServiceHelper`), so a retry or a
   failure backoff recorded for the earlier state does not delay the change. The resource is
@@ -574,13 +576,9 @@ existing rows/events that should move to the new schema.
     partial index on `(resource_schema, resource_id)`.
   - `idx_resources_deletion_pending` serves "deletion requested, not completed", with the same
     shape.
-  - The status-change predicate has no index of its own yet: no controller reacts to status, and
-    the predicate is switched off for the others. The first controller that sets
-    `reacts_to_status` adds an index on `(resource_schema, resource_id)` of resources not deleted;
-    without it, that predicate reads every resource on each drain.
-  - The status predicate has no index: it compares against the bookkeeping row, so it scans the
-    schema's resources that are not deleted. It runs only for controllers registered to react to
-    status.
+  - The status-change predicate has no index of its own: it compares against the bookkeeping row,
+    so it scans the schema's resources that are not deleted on each drain. It runs only for
+    controllers registered to react to status, and none is today.
 - **The reconciled generation is read from `status`, never stored apart from it.** On Postgres,
   the partial index condition is `COALESCE((status ->> 'reconciledGeneration')::BIGINT, 0) <
   generation`, and a query must repeat it verbatim for the planner to use the index. SQLite cannot
@@ -659,7 +657,8 @@ Note names are normalized to lowercase on write, so case-only differences are no
 ## 9. Services (`kamu-resources-services`)
 
 This crate turns the domain traits into running code. Module layout: `services/`, `use_cases/`,
-`controllers/`, `crud_dispatchers/`, `message_handlers/`, `event_stores/`, `resources/`, `testing/`.
+`controllers/`, `controller_runtime/`, `crud_dispatchers/`, `message_handlers/`, `event_stores/`,
+`resources/`, `resource_extension_schemas/`, `testing/`.
 
 **Supporting services:**
 
@@ -752,9 +751,9 @@ The factory is therefore `Transient` and injects the catalog **by value**, which
 resolution *started from*: a factory injected into a component built from a transaction-chained
 catalog carries that chained catalog, so the dispatchers it builds see the transaction.
 
-Outbox consumers pass the catalog explicitly: `ResourceLifecycleMessageConsumer` and
-`ConfigurationDatasetLifecycleMessageConsumer` receive the per-message transaction catalog as a
-*method argument*, and a component-held catalog would be the wrong one there. They call the static
+Outbox consumers pass the catalog explicitly: `ConfigurationDatasetLifecycleMessageConsumer`
+receives the per-message transaction catalog as a *method argument*, and a component-held catalog
+would be the wrong one there. It calls the static
 `*_in` methods of
 [`ResourceDispatcherFactory`](/src/domain/resources/services/src/crud_dispatchers/resource_dispatcher_factory.rs).
 
@@ -831,11 +830,12 @@ persists its event and posts the matching lifecycle message:
   outcome is discarded: a deletion request, a newer generation, then another status writer, and
   fail with `ResourceLifecycleTransitionError::Stale` carrying the matching
   `ResourceStaleExpectationError`. A caller can tell "someone else changed it" from a failure.
-- **Batch primitives skip instead of failing.** The deletion primitives return a
-  `ResourceBatchTransition`: the resources they transitioned, and the skipped ones with a reason
+- **Batch primitives skip instead of failing.** `complete_deletion` and `record_cleanup_failure`
+  return a `ResourceBatchTransition`: the resources they transitioned, and the skipped ones with a reason
   (`NotAwaitingCleanup`, `StatusConflict`).
 - **Completing a deletion may ignore the status.** `ResourceDeletionCompletion` takes an optional
-  expected status generation. The deletion use case passes none, so a status written during the
+  expected status generation. The simple controller (`SimpleResourceDeletionRecorder`) passes
+  none, so a status written during the
   cleanup does not hold the completion back.
 - **Generated per type** by `declare_resource_lifecycle_primitives!`, part of
   `declare_resource_service_layer!`.
@@ -943,7 +943,8 @@ lists, which breaks its contract, and a resource asked about `MAX_PROCESS_CALLS_
 times, whose controller never settles. The hold-back on such an extra resource applies only to
 the extra listing. If the resource changes, the eligibility predicates select it again, so a drain
 session, whose hold-back lasts across its drains, still processes a change the outbox delivered
-between them. The eligibility query asks for as many more rows as are held back, so they cannot fill a batch and hide the resources still waiting.
+between them. The eligibility query asks for as many more rows as are held back, so they cannot fill a batch
+and hide the resources still waiting; a pass still takes at most `batch_size` eligible resources.
 
 **The effective deadline** (`ResourceControllerWait`) is the earliest of:
 
@@ -1691,8 +1692,10 @@ Deletion runs in two steps, as the ODF resource framework defines them
   processing it twice completes its deletion once.
 - **The cleanup runs in a transaction of its own**, so a failure, a database error included,
   discards whatever the reconciler wrote before failing; the outcome is recorded in the next one.
-  A concurrent modification while recording it makes `process` return `RetryAt(now)`: the next
-  pass reads the current state.
+  A concurrent modification while completing the deletion makes `process` return `RetryAt(now)`:
+  the next pass reads the current state. One while recording a cleanup failure leaves the other
+  writer's status, and the cleanup error is still returned, so the cleanup is retried with a
+  backoff.
 - **A failed cleanup is retried.** The resource stays `Deleting` with a `ReconciliationError`
   condition, code `cleanup-failed`, unless another writer updated its status since the cleanup
   started; that status then stands. `process` then returns the error, so the runtime retries the
@@ -2149,8 +2152,9 @@ work: the harnesses' `settle` runs the `BackgroundWorkFinalizer`, as the CLI doe
 apply planner/executor, the simple controller adapter's reconciliation, deletion and retries, CRUD
 dispatch, persistence, the event-store bridge, and the message consumers. Configuration tests also
 leave real resources `Reconciling` or `Deleting` without the runtime, as a crash would, and check
-that the first drain completes them, and that a failing `SecretSet` holds back no `VariableSet`. A `TestResource` mock and
-`BaseResourceServiceHarness` (`services/src/testing/`) provide a type-agnostic harness;
+that the first drain completes them, and that a failing `SecretSet` holds back no `VariableSet`. A `TestResource` mock
+(`services/tests/tests/utils/`) and `BaseResourceServiceHarness` (`services/src/testing/`) provide
+a type-agnostic harness;
 configuration tests cover the real reconcilers (incl. the `SecretSet` spec sanitizer, encrypted projection, and `reveal_spec`).
 
 **Controller runtime** —
