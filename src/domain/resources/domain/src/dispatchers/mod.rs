@@ -11,7 +11,6 @@ mod resource_crud_dispatcher;
 mod resource_dispatcher;
 mod resource_extension_schema;
 mod resource_extension_schema_dispatcher;
-mod resource_lifecycle_event_dispatcher;
 mod resource_presentation_dispatcher;
 mod resource_spec_view_dispatcher;
 
@@ -19,6 +18,5 @@ pub use resource_crud_dispatcher::*;
 pub use resource_dispatcher::*;
 pub use resource_extension_schema::*;
 pub use resource_extension_schema_dispatcher::*;
-pub use resource_lifecycle_event_dispatcher::*;
 pub use resource_presentation_dispatcher::*;
 pub use resource_spec_view_dispatcher::*;

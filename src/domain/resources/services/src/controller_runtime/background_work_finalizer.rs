@@ -8,41 +8,41 @@
 // by the Apache License, Version 2.0.
 
 use internal_error::{InternalError, ResultIntoInternal};
-use kamu_adapter_http::e2e::E2EMutationFinalizer;
-use kamu_resources::ResourceControllerRuntime;
 use messaging_outbox::OutboxAgent;
+
+use crate::domain::ResourceControllerRuntime;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Completes the background work a command, or a mutating request of the e2e
-/// API server, left behind: delivers the Outbox messages, alternating with
-/// drains of the resource controllers, since a message may make a resource
-/// actionable, and processing it posts messages of its own. Ends once a drain
-/// processes nothing.
-pub(crate) struct BackgroundWorkFinalizer;
+/// Completes the background work a command, a mutating request of the e2e API
+/// server, or a test write left behind: delivers the Outbox messages,
+/// alternating with drains of the resource controllers, since a message may
+/// make a resource actionable, and processing it posts messages of its own.
+/// Ends once a drain processes nothing.
+///
+/// The controller runtime drives the controllers of the catalog it is
+/// registered in, so `catalog` is the one that has both. A catalog without an
+/// outbox agent has an immediate outbox, which delivered every message
+/// already.
+pub struct BackgroundWorkFinalizer;
 
 impl BackgroundWorkFinalizer {
     pub async fn finalize(&self, catalog: &dill::Catalog) -> Result<(), InternalError> {
-        let outbox_agent = catalog.get_one::<dyn OutboxAgent>().int_err()?;
+        let outbox_agent = catalog.get_one::<dyn OutboxAgent>().ok();
         let mut controller_drains = catalog
             .get_one::<dyn ResourceControllerRuntime>()
             .int_err()?
             .new_drain_session()?;
 
         loop {
-            outbox_agent.run_while_has_tasks().await?;
+            if let Some(outbox_agent) = &outbox_agent {
+                outbox_agent.run_while_has_tasks().await?;
+            }
 
             if controller_drains.drain_due_resources().await? == 0 {
                 return Ok(());
             }
         }
-    }
-}
-
-#[async_trait::async_trait]
-impl E2EMutationFinalizer for BackgroundWorkFinalizer {
-    async fn finalize(&self, base_catalog: &dill::Catalog) -> Result<(), InternalError> {
-        Self::finalize(self, base_catalog).await
     }
 }
 

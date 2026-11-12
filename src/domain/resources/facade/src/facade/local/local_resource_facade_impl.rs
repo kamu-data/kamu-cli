@@ -490,8 +490,8 @@ impl ResourceFacade for LocalResourceFacadeImpl {
                 })
                 .await?;
 
-            // Controllers may complete a deletion within the request, which
-            // removes the resource from the lookup by id
+            // The controller runtime may complete a deletion before the
+            // response, which removes the resource from the lookup by id
             let being_deleted = self
                 .generic_resource_query_service
                 .find_resource_handles_by_ids(&group.account.did, &ids_to_delete)

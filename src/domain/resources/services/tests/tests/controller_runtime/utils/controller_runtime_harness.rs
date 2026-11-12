@@ -58,7 +58,6 @@ use crate::tests::utils::{
     ServiceLayerTestHarness,
     ServiceLayerTestHarnessOpts,
     TestResource,
-    TestResourceResourceLifecycleDispatcher,
     TestResourceSpec,
     test_stage_condition_key,
 };
@@ -86,9 +85,6 @@ pub enum TestControllers {
     TwoWithOneName,
     /// The main controller, and one of a schema no resource has
     MainAndOther,
-    /// The main controller, for a type also reconciled by its lifecycle
-    /// dispatcher
-    MainWithLifecycleDispatcher,
 }
 
 impl TestControllers {
@@ -114,10 +110,6 @@ impl TestControllers {
             Self::TwoWithOneName => {
                 b.add::<TestResourceController>();
                 b.add::<TestOtherResourceControllerWithSameName>();
-            }
-            Self::MainWithLifecycleDispatcher => {
-                b.add::<TestResourceController>();
-                b.add::<TestResourceResourceLifecycleDispatcher>();
             }
         }
     }
@@ -146,9 +138,10 @@ impl ControllerRuntimeHarness {
                 outbox_provider: OutboxProvider::Dispatching,
                 transactional: true,
                 fake_time: true,
+                ..Default::default()
             },
-            // Only the runtime drives the resources
-            lifecycle_dispatcher: false,
+            // The scripted controllers drive the resources, on a runtime of its own
+            simple_controller: false,
             ..Default::default()
         });
         // As at startup: consumers start from the latest message, so they

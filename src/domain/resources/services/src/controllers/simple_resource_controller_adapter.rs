@@ -7,42 +7,107 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-/// Generates the `SimpleResourceController` of a resource type, which runs its
+/// Generates the main lifecycle controller of a resource type, which runs its
 /// `SimpleResourceReconciler` in transactions of its own
 #[macro_export]
 macro_rules! declare_simple_resource_controller_adapter {
     (
         adapter = $adapter:ident,
-        resource = $resource:ty
+        resource = $resource:ty,
+        controller_name = $controller_name:expr
     ) => {
         #[dill::component]
-        #[dill::interface(dyn kamu_resources::SimpleResourceController<$resource>)]
+        #[dill::interface(dyn kamu_resources::ResourceController)]
+        #[dill::meta(kamu_resources::ResourceControllerMeta {
+            schema: <$resource>::SCHEMA_STR,
+            controller_name: kamu_resources::ResourceControllerName::new($controller_name),
+            controller_revision: 1,
+            reacts_to_status: false,
+        })]
         pub struct $adapter {
             catalog: dill::Catalog,
+            time_source: std::sync::Arc<dyn time_source::SystemTimeSource>,
         }
 
         #[async_trait::async_trait]
-        impl kamu_resources::SimpleResourceController<$resource> for $adapter {
-            async fn reconcile(
+        impl kamu_resources::ResourceController for $adapter {
+            async fn process(
                 &self,
                 id: &kamu_resources::ResourceID,
-            ) -> Result<(), kamu_resources::SimpleResourceReconciliationError<$resource>> {
-                let Some(resource) = self.start_reconciliation_phase(*id).await? else {
-                    return Ok(());
-                };
+            ) -> Result<kamu_resources::ResourceProcessOutcome, internal_error::InternalError> {
+                $crate::SimpleResourceControllerSteps::<$resource>::process_resource(self, *id).await
+            }
+        }
 
-                self.finish_reconciliation_phase(resource).await
+        #[async_trait::async_trait]
+        impl $crate::SimpleResourceControllerSteps<$resource> for $adapter {
+            fn now(&self) -> chrono::DateTime<chrono::Utc> {
+                self.time_source.now()
             }
 
-            async fn complete_deletions(
+            async fn load(
                 &self,
-                ids: &[kamu_resources::ResourceID],
+                id: kamu_resources::ResourceID,
+            ) -> Result<$resource, internal_error::InternalError> {
+                self.load_in_transaction(id).await
+            }
+
+            async fn start_reconciliation(
+                &self,
+                id: kamu_resources::ResourceID,
+            ) -> Result<Option<$resource>, kamu_resources::ResourceLifecycleTransitionError<$resource>>
+            {
+                self.start_reconciliation_phase(id).await
+            }
+
+            async fn finish_reconciliation(
+                &self,
+                started: $resource,
+            ) -> Result<
+                $crate::SimpleResourceReconciliationOutcome<$resource>,
+                kamu_resources::SimpleResourceReconciliationError<$resource>,
+            > {
+                self.finish_reconciliation_phase(started).await
+            }
+
+            async fn run_cleanup(
+                &self,
+                id: kamu_resources::ResourceID,
+            ) -> Result<
+                $crate::SimpleResourceCleanupOutcome,
+                $crate::ResourceCleanupTransactionError<$resource>,
+            > {
+                self.cleanup_in_transaction(id).await
+            }
+
+            async fn complete_deletion(
+                &self,
+                id: kamu_resources::ResourceID,
+            ) -> Result<Option<$resource>, kamu_resources::SimpleResourceDeletionError<$resource>>
+            {
+                self.complete_deletion_in_transaction(id).await
+            }
+
+            async fn record_cleanup_failure(
+                &self,
+                failure: kamu_resources::ResourceCleanupFailure,
             ) -> Result<(), kamu_resources::SimpleResourceDeletionError<$resource>> {
-                $crate::SimpleResourceDeletionPhases::run_deletion_phases(self, ids).await
+                self.record_cleanup_failure_in_transaction(failure).await
             }
         }
 
         impl $adapter {
+            #[::database_common_macros::transactional_method1(
+                resource_aggregate_loader:
+                    std::sync::Arc<dyn kamu_resources::ResourceAggregateLoader<$resource>>
+            )]
+            async fn load_in_transaction(
+                &self,
+                id: kamu_resources::ResourceID,
+            ) -> Result<$resource, internal_error::InternalError> {
+                internal_error::ResultIntoInternal::int_err(resource_aggregate_loader.load(&id).await)
+            }
+
             /// Commits the started reconciliation before the reconciler runs,
             /// a stable hand-off point for the second phase
             #[::database_common_macros::transactional_method1(
@@ -52,9 +117,9 @@ macro_rules! declare_simple_resource_controller_adapter {
             async fn start_reconciliation_phase(
                 &self,
                 id: kamu_resources::ResourceID,
-            ) -> Result<Option<$resource>, kamu_resources::SimpleResourceReconciliationError<$resource>>
+            ) -> Result<Option<$resource>, kamu_resources::ResourceLifecycleTransitionError<$resource>>
             {
-                Ok(lifecycle_primitives.begin_reconciliation(&id, None).await?)
+                lifecycle_primitives.begin_reconciliation(&id, None).await
             }
 
             #[::database_common_macros::transactional_method2(
@@ -66,7 +131,10 @@ macro_rules! declare_simple_resource_controller_adapter {
             async fn finish_reconciliation_phase(
                 &self,
                 resource: $resource,
-            ) -> Result<(), kamu_resources::SimpleResourceReconciliationError<$resource>> {
+            ) -> Result<
+                $crate::SimpleResourceReconciliationOutcome<$resource>,
+                kamu_resources::SimpleResourceReconciliationError<$resource>,
+            > {
                 $crate::SimpleResourceReconciliationHelper::<$resource>::new(
                     lifecycle_primitives.as_ref(),
                     reconciler.as_ref(),
@@ -85,7 +153,7 @@ macro_rules! declare_simple_resource_controller_adapter {
                 &self,
                 id: kamu_resources::ResourceID,
             ) -> Result<
-                Option<$crate::ResourceCleanupAttempt>,
+                $crate::SimpleResourceCleanupOutcome,
                 $crate::ResourceCleanupTransactionError<$resource>,
             > {
                 $crate::SimpleResourceCleanupHelper::<$resource>::new(
@@ -100,32 +168,27 @@ macro_rules! declare_simple_resource_controller_adapter {
                 lifecycle_primitives:
                     std::sync::Arc<dyn kamu_resources::ResourceLifecyclePrimitives<$resource>>
             )]
-            async fn record_in_transaction(
-                &self,
-                attempts: Vec<$crate::ResourceCleanupAttempt>,
-            ) -> Result<(), kamu_resources::SimpleResourceDeletionError<$resource>> {
-                $crate::SimpleResourceDeletionRecorder::<$resource>::new(lifecycle_primitives.as_ref())
-                    .record_outcomes(&attempts)
-                    .await
-            }
-        }
-        #[async_trait::async_trait]
-        impl $crate::SimpleResourceDeletionPhases<$resource> for $adapter {
-            async fn run_cleanup(
+            async fn complete_deletion_in_transaction(
                 &self,
                 id: kamu_resources::ResourceID,
-            ) -> Result<
-                Option<$crate::ResourceCleanupAttempt>,
-                $crate::ResourceCleanupTransactionError<$resource>,
-            > {
-                self.cleanup_in_transaction(id).await
+            ) -> Result<Option<$resource>, kamu_resources::SimpleResourceDeletionError<$resource>>
+            {
+                $crate::SimpleResourceDeletionRecorder::<$resource>::new(lifecycle_primitives.as_ref())
+                    .complete_deletion(id)
+                    .await
             }
 
-            async fn record_outcomes(
+            #[::database_common_macros::transactional_method1(
+                lifecycle_primitives:
+                    std::sync::Arc<dyn kamu_resources::ResourceLifecyclePrimitives<$resource>>
+            )]
+            async fn record_cleanup_failure_in_transaction(
                 &self,
-                attempts: Vec<$crate::ResourceCleanupAttempt>,
+                failure: kamu_resources::ResourceCleanupFailure,
             ) -> Result<(), kamu_resources::SimpleResourceDeletionError<$resource>> {
-                self.record_in_transaction(attempts).await
+                $crate::SimpleResourceDeletionRecorder::<$resource>::new(lifecycle_primitives.as_ref())
+                    .record_cleanup_failure(failure)
+                    .await
             }
         }
     };

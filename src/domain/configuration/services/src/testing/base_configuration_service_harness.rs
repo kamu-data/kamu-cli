@@ -291,6 +291,7 @@ impl BaseConfigurationServiceHarness {
             })
             .await
             .unwrap();
+        self.settle().await;
 
         decision.expect_applied().id
     }
@@ -326,13 +327,13 @@ impl BaseConfigurationServiceHarness {
             })
             .await
             .unwrap();
+        self.settle().await;
 
         decision.expect_applied().id
     }
 
-    /// Requests deletion of `account_id`'s `VariableSet`s. The immediate
-    /// outbox delivers `DeletionRequested` right away, so the deletion is
-    /// completed, cleanup included, before this returns.
+    /// Requests deletion of `account_id`'s `VariableSet`s, and lets the
+    /// controller runtime complete it, cleanup included, before returning.
     pub async fn request_variable_sets_deletion(
         &self,
         account_id: &odf::AccountID,
@@ -341,6 +342,7 @@ impl BaseConfigurationServiceHarness {
         let use_case: Arc<dyn RequestResourcesDeletionUseCase<VariableSetResource>> =
             self.catalog.get_one().unwrap();
         use_case.execute(account_id.clone(), ids).await.unwrap();
+        self.settle().await;
     }
 
     /// [`Self::request_variable_sets_deletion`] for `SecretSet`s.
@@ -352,6 +354,7 @@ impl BaseConfigurationServiceHarness {
         let use_case: Arc<dyn RequestResourcesDeletionUseCase<SecretSetResource>> =
             self.catalog.get_one().unwrap();
         use_case.execute(account_id.clone(), ids).await.unwrap();
+        self.settle().await;
     }
 
     /// Runs the `VariableSet` reconciler's cleanup directly, outside the

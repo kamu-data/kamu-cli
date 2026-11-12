@@ -19,6 +19,7 @@ use kamu_resources::{
     GenericResourceQueryService,
     MESSAGE_PRODUCER_KAMU_RESOURCE_SERVICE,
     ReconciliationError,
+    ResourceControllerRuntimeConfig,
     ResourceHeadersInput,
     ResourceID,
     ResourceLifecycleMessage,
@@ -32,7 +33,9 @@ use kamu_resources::{
 };
 use messaging_outbox::{MockOutbox, Outbox, OutboxProvider, register_message_dispatcher};
 use time_source::{FakeSystemTimeSource, SystemTimeSource, SystemTimeSourceStub};
-use wakeup_listener::WakeupListenerMetrics;
+use wakeup_listener::{WakeupListenerConfig, WakeupListenerMetrics};
+
+use crate::{BackgroundWorkFinalizer, ResourceControllerRuntimeImpl};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -56,6 +59,13 @@ pub struct BaseResourceServiceHarnessOpts {
     /// Time stands still until `FakeSystemTimeSource::advance`, and sleeps on
     /// it end only then. Otherwise `SystemTimeSourceStub`, whose sleeps are real.
     pub fake_time: bool,
+    /// Registers the controller runtime, which `settle` drains. The runtime
+    /// drives the controllers of the catalog it is registered in, so a harness
+    /// that registers types in a chained catalog registers the runtime there
+    /// instead, with
+    /// [`BaseResourceServiceHarness::register_controller_runtime`], and
+    /// finalizes that catalog with [`BackgroundWorkFinalizer`]
+    pub controller_runtime: bool,
 }
 
 impl Default for BaseResourceServiceHarnessOpts {
@@ -66,6 +76,7 @@ impl Default for BaseResourceServiceHarnessOpts {
             },
             transactional: false,
             fake_time: false,
+            controller_runtime: true,
         }
     }
 }
@@ -112,6 +123,15 @@ impl BaseResourceServiceHarness {
             b.add::<kamu_wakeup_listener_inmem::InMemoryWakeupHub>();
         }
 
+        if !needs_bridge {
+            // The controller runtime needs it; the dispatching outbox brings
+            // its own
+            b.add_value(WakeupListenerConfig::local_default());
+        }
+        if opts.controller_runtime {
+            Self::register_controller_runtime(&mut b);
+        }
+
         kamu_resources_inmem::register_dependencies(&mut b);
         b.add::<InMemoryAccountRepository>();
 
@@ -148,6 +168,19 @@ impl BaseResourceServiceHarness {
             outbox,
             time_source,
         }
+    }
+
+    pub fn register_controller_runtime(b: &mut CatalogBuilder) {
+        b.add::<ResourceControllerRuntimeImpl>();
+        b.add_value(ResourceControllerRuntimeConfig::default());
+    }
+
+    /// See [`BackgroundWorkFinalizer`]
+    pub async fn settle(&self) {
+        BackgroundWorkFinalizer
+            .finalize(&self.catalog)
+            .await
+            .unwrap();
     }
 
     pub fn catalog(&self) -> &dill::Catalog {
@@ -304,9 +337,19 @@ impl BaseResourceServiceHarness {
     }
 
     pub fn expect_deleted_message(mock_outbox: &mut MockOutbox, expected_resource_count: usize) {
+        Self::expect_deleted_messages(mock_outbox, 1, expected_resource_count);
+    }
+
+    /// Expects `n` `Deleted` messages, each of `expected_resource_count`
+    /// resources
+    pub fn expect_deleted_messages(
+        mock_outbox: &mut MockOutbox,
+        n: usize,
+        expected_resource_count: usize,
+    ) {
         mock_outbox
             .expect_post_message_as_json()
-            .times(1)
+            .times(n)
             .withf(move |producer, message, _version| {
                 producer == MESSAGE_PRODUCER_KAMU_RESOURCE_SERVICE
                     && matches!(

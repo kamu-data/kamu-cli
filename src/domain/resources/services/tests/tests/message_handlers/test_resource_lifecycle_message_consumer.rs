@@ -11,11 +11,9 @@ use std::sync::Mutex;
 
 use chrono::Utc;
 use dill::CatalogBuilder;
-use event_sourcing::ConcurrentModificationError;
 use internal_error::InternalError;
 use kamu_resources::{
     MESSAGE_PRODUCER_KAMU_RESOURCE_SERVICE,
-    MockSimpleResourceController,
     ResourceControllerHints,
     ResourceControllerName,
     ResourceHeaders,
@@ -27,10 +25,6 @@ use kamu_resources::{
     ResourceLifecycleMessageResourceRef,
     ResourceSchemaProvider,
     ResourceSnapshot,
-    ResourceStatusConflictError,
-    SimpleResourceController,
-    SimpleResourceDeletionError,
-    SimpleResourceReconciliationError,
     new_pending_resource_status,
 };
 use messaging_outbox::{MessageConsumerT, OutboxProvider, register_message_dispatcher};
@@ -38,99 +32,41 @@ use odf::metadata::resources::TypeUri;
 use pretty_assertions::assert_eq;
 use wakeup_listener::WakeupListener;
 
-use crate::tests::utils::{TestResource, TestResourceResourceLifecycleDispatcher, make_id};
+use crate::tests::utils::{TestResource, make_id};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Tests
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_applied_message_triggers_reconciliation() {
-    // Applied message → ResourceLifecycleMessageConsumer → handle_applied →
-    // SimpleResourceController::reconcile.  Verified via mock expectations.
-    let id = make_id();
-
-    let harness = ResourceLifecycleConsumerHarness::new(
-        ResourceLifecycleConsumerHarness::expect_reconcile_once(id),
-    );
+async fn test_applied_message_hints_its_schema() {
+    let harness = ResourceLifecycleConsumerHarness::new();
+    let schema = TypeUri::new_unchecked("ControllerDrivenSchema");
 
     harness
         .consume_message(&ResourceLifecycleMessage::applied(
             Utc::now(),
             ResourceLifecycleMessageOutcome::Created,
-            ResourceLifecycleConsumerHarness::make_snapshot(id),
+            ResourceLifecycleConsumerHarness::make_snapshot_with_schema(make_id(), &schema),
         ))
         .await
         .unwrap();
 
-    assert_eq!(
-        harness.hinted_schemas(),
-        vec![TestResource::schema().clone()]
-    );
+    assert_eq!(harness.hinted_schemas(), vec![schema]);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_applied_message_skips_reconciliation_status_conflict() {
-    // A concurrent reconciliation of the same resource already recorded its
-    // outcome, so the conflict is not an error of the message.
-    let id = make_id();
-
-    let harness = ResourceLifecycleConsumerHarness::new(
-        ResourceLifecycleConsumerHarness::expect_reconcile_once_with_status_conflict(id),
-    );
-
-    harness
-        .consume_message(&ResourceLifecycleMessage::applied(
-            Utc::now(),
-            ResourceLifecycleMessageOutcome::Created,
-            ResourceLifecycleConsumerHarness::make_snapshot(id),
-        ))
-        .await
-        .unwrap();
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[test_log::test(tokio::test)]
-async fn test_applied_message_skips_reconciliation_concurrent_modification() {
-    // The writer the repository detected reconciles the resource itself or
-    // makes the reconciliation unnecessary
-    let id = make_id();
-
-    let harness = ResourceLifecycleConsumerHarness::new(
-        ResourceLifecycleConsumerHarness::expect_reconcile_once_with_concurrent_modification(id),
-    );
-
-    harness
-        .consume_message(&ResourceLifecycleMessage::applied(
-            Utc::now(),
-            ResourceLifecycleMessageOutcome::Created,
-            ResourceLifecycleConsumerHarness::make_snapshot(id),
-        ))
-        .await
-        .unwrap();
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[test_log::test(tokio::test)]
-async fn test_deletion_requested_message_completes_deletions_in_one_batch() {
-    let id_a = make_id();
-    let id_b = make_id();
-
-    let harness = ResourceLifecycleConsumerHarness::new_with_deletion(
-        ResourceLifecycleConsumerHarness::expect_no_reconcile(),
-        ResourceLifecycleConsumerHarness::expect_complete_deletion(&[id_a, id_b], || Ok(())),
-    );
+async fn test_deletion_requested_message_hints_once_per_batch() {
+    let harness = ResourceLifecycleConsumerHarness::new();
 
     harness
         .consume_message(&ResourceLifecycleMessage::deletion_requested(
             Utc::now(),
             vec![
-                ResourceLifecycleConsumerHarness::make_snapshot(id_a),
-                ResourceLifecycleConsumerHarness::make_snapshot(id_b),
+                ResourceLifecycleConsumerHarness::make_snapshot(make_id()),
+                ResourceLifecycleConsumerHarness::make_snapshot(make_id()),
             ],
         ))
         .await
@@ -145,62 +81,13 @@ async fn test_deletion_requested_message_completes_deletions_in_one_batch() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_deletion_requested_message_skips_concurrent_modification() {
-    let id = make_id();
-
-    let harness = ResourceLifecycleConsumerHarness::new_with_deletion(
-        ResourceLifecycleConsumerHarness::expect_no_reconcile(),
-        ResourceLifecycleConsumerHarness::expect_complete_deletion(&[id], || {
-            Err(SimpleResourceDeletionError::ConcurrentModification(
-                ConcurrentModificationError {},
-            ))
-        }),
-    );
+async fn test_status_updated_message_hints_its_schema() {
+    let harness = ResourceLifecycleConsumerHarness::new();
 
     harness
-        .consume_message(&ResourceLifecycleMessage::deletion_requested(
-            Utc::now(),
-            vec![ResourceLifecycleConsumerHarness::make_snapshot(id)],
+        .consume_message(&ResourceLifecycleConsumerHarness::make_status_updated(
+            make_id(),
         ))
-        .await
-        .unwrap();
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[test_log::test(tokio::test)]
-async fn test_deleted_message_is_no_op_for_controller() {
-    // Deleted message → handle_deleted, which is a no-op in the generated
-    // controller dispatcher: the controller already cleaned up.
-    let id = make_id();
-
-    let harness = ResourceLifecycleConsumerHarness::new(
-        ResourceLifecycleConsumerHarness::expect_no_reconcile(),
-    );
-
-    harness
-        .consume_message(&ResourceLifecycleMessage::deleted(
-            Utc::now(),
-            vec![ResourceLifecycleConsumerHarness::make_snapshot(id)],
-        ))
-        .await
-        .unwrap();
-
-    assert_eq!(harness.hinted_schemas(), vec![]);
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[test_log::test(tokio::test)]
-async fn test_status_updated_message_only_hints() {
-    let id = make_id();
-
-    let harness = ResourceLifecycleConsumerHarness::new(
-        ResourceLifecycleConsumerHarness::expect_no_reconcile(),
-    );
-
-    harness
-        .consume_message(&ResourceLifecycleConsumerHarness::make_status_updated(id))
         .await
         .unwrap();
 
@@ -213,25 +100,18 @@ async fn test_status_updated_message_only_hints() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_applied_message_of_a_type_without_lifecycle_dispatcher_only_hints() {
-    // A type without a lifecycle dispatcher is left to its resource controller
-    let id = make_id();
-    let schema = TypeUri::new_unchecked("ControllerDrivenSchema");
-
-    let harness = ResourceLifecycleConsumerHarness::new(
-        ResourceLifecycleConsumerHarness::expect_no_reconcile(),
-    );
+async fn test_deleted_message_hints_nothing() {
+    let harness = ResourceLifecycleConsumerHarness::new();
 
     harness
-        .consume_message(&ResourceLifecycleMessage::applied(
+        .consume_message(&ResourceLifecycleMessage::deleted(
             Utc::now(),
-            ResourceLifecycleMessageOutcome::Created,
-            ResourceLifecycleConsumerHarness::make_snapshot_with_schema(id, &schema),
+            vec![ResourceLifecycleConsumerHarness::make_snapshot(make_id())],
         ))
         .await
         .unwrap();
 
-    assert_eq!(harness.hinted_schemas(), vec![schema]);
+    assert_eq!(harness.hinted_schemas(), vec![]);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -242,85 +122,8 @@ struct ResourceLifecycleConsumerHarness {
     catalog: dill::Catalog,
 }
 
-/// An expectation set on the mocked controller
-type ControllerExpectation = Box<dyn FnOnce(&mut MockSimpleResourceController<TestResource>)>;
-
 impl ResourceLifecycleConsumerHarness {
-    fn expect_reconcile_once(id: ResourceID) -> ControllerExpectation {
-        Box::new(move |mock| {
-            mock.expect_reconcile()
-                .once()
-                .withf(move |id_| *id_ == id)
-                .returning(|_| Ok(()));
-        })
-    }
-
-    fn expect_reconcile_once_with_status_conflict(id: ResourceID) -> ControllerExpectation {
-        Box::new(move |mock| {
-            mock.expect_reconcile()
-                .once()
-                .withf(move |id_| *id_ == id)
-                .returning(|_| {
-                    Err(SimpleResourceReconciliationError::StatusConflict(
-                        ResourceStatusConflictError {
-                            expected: 2,
-                            actual: 3,
-                        },
-                    ))
-                });
-        })
-    }
-
-    fn expect_reconcile_once_with_concurrent_modification(id: ResourceID) -> ControllerExpectation {
-        Box::new(move |mock| {
-            mock.expect_reconcile()
-                .once()
-                .withf(move |id_| *id_ == id)
-                .returning(|_| {
-                    Err(SimpleResourceReconciliationError::ConcurrentModification(
-                        ConcurrentModificationError {},
-                    ))
-                });
-        })
-    }
-
-    fn expect_no_reconcile() -> ControllerExpectation {
-        Box::new(|mock| {
-            mock.expect_reconcile().never();
-        })
-    }
-
-    fn expect_complete_deletion(
-        ids: &[ResourceID],
-        outcome: fn() -> Result<(), SimpleResourceDeletionError<TestResource>>,
-    ) -> ControllerExpectation {
-        let ids = ids.to_vec();
-        Box::new(move |mock| {
-            mock.expect_complete_deletions()
-                .once()
-                .withf(move |ids_| *ids_ == ids[..])
-                .returning(move |_| outcome());
-        })
-    }
-
-    fn expect_no_complete_deletion() -> ControllerExpectation {
-        Box::new(|mock| {
-            mock.expect_complete_deletions().never();
-        })
-    }
-
-    fn new(reconcile: ControllerExpectation) -> Self {
-        Self::new_with_deletion(reconcile, Self::expect_no_complete_deletion())
-    }
-
-    fn new_with_deletion(
-        reconcile: ControllerExpectation,
-        complete_deletion: ControllerExpectation,
-    ) -> Self {
-        let mut controller = MockSimpleResourceController::<TestResource>::new();
-        reconcile(&mut controller);
-        complete_deletion(&mut controller);
-
+    fn new() -> Self {
         let mut b = CatalogBuilder::new();
 
         OutboxProvider::Immediate {
@@ -328,12 +131,8 @@ impl ResourceLifecycleConsumerHarness {
         }
         .embed_into_catalog(&mut b);
 
-        b.add_value(controller)
-            .bind::<dyn SimpleResourceController<TestResource>, MockSimpleResourceController<TestResource>>();
-
         b.add_value(RecordingHints::default())
             .bind::<dyn ResourceControllerHints, RecordingHints>();
-        b.add::<TestResourceResourceLifecycleDispatcher>();
         b.add::<kamu_resources_services::ResourceLifecycleMessageConsumer>();
 
         register_message_dispatcher::<ResourceLifecycleMessage>(

@@ -55,6 +55,7 @@ async fn test_request_account_deletion_deletes_all_owned_resources() {
     harness
         .request_account_resources_deletion(account_handle.did)
         .await;
+    harness.settle().await;
 
     for id in [&id_a, &id_b, &id_c] {
         let snapshot = harness.get_snapshot_by_id(id).await;
@@ -107,6 +108,7 @@ async fn test_request_account_deletion_handles_pagination() {
     harness
         .request_account_resources_deletion(account_handle.did)
         .await;
+    harness.settle().await;
 
     for id in &ids {
         let snapshot = harness.get_snapshot_by_id(id).await;
