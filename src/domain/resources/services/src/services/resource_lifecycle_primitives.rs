@@ -35,6 +35,7 @@ use crate::domain::{
     ResourceLifecycleMessageResourceRef,
     ResourceLifecycleTransitionError,
     ResourceLoadError,
+    ResourcePersistenceError,
     ResourcePersistenceService,
     ResourceSchemaId,
     ResourceSchemaProvider,
@@ -106,10 +107,7 @@ where
         resource
             .try_mark_reconciliation_started(now, expected_status_generation)
             .map_err(lifecycle_error)?;
-        self.resource_persistence_service
-            .save(&mut resource)
-            .await?;
-        self.post_status_updated(now, &resource, &old_status)
+        self.save_status_write(now, &mut resource, &old_status)
             .await?;
 
         Ok(Some(resource))
@@ -120,20 +118,14 @@ where
         id: &ResourceID,
         expected: ResourceVersion,
     ) -> TransitionResult<R, R> {
-        let mut resource = self.load_reconcilable(id, expected).await?;
-        let old_status = resource.status().clone();
-        let now = self.time_source.now();
-
-        resource
-            .try_mark_reconciliation_succeeded(now, expected.generation, expected.status_generation)
-            .map_err(lifecycle_error)?;
-        self.resource_persistence_service
-            .save(&mut resource)
-            .await?;
-        self.post_status_updated(now, &resource, &old_status)
-            .await?;
-
-        Ok(resource)
+        self.record_reconciliation_outcome(id, expected, |resource, now| {
+            resource.try_mark_reconciliation_succeeded(
+                now,
+                expected.generation,
+                expected.status_generation,
+            )
+        })
+        .await
     }
 
     pub async fn fail_reconciliation(
@@ -142,22 +134,31 @@ where
         expected: ResourceVersion,
         error: &R::ReconcileError,
     ) -> TransitionResult<R, R> {
-        let mut resource = self.load_reconcilable(id, expected).await?;
-        let old_status = resource.status().clone();
-        let now = self.time_source.now();
-
-        resource
-            .try_mark_reconciliation_failed(
+        self.record_reconciliation_outcome(id, expected, |resource, now| {
+            resource.try_mark_reconciliation_failed(
                 now,
                 expected.generation,
                 expected.status_generation,
                 error,
             )
-            .map_err(lifecycle_error)?;
-        self.resource_persistence_service
-            .save(&mut resource)
-            .await?;
-        self.post_status_updated(now, &resource, &old_status)
+        })
+        .await
+    }
+
+    /// Records the outcome `mark` writes, on a resource whose reconciliation
+    /// still matches `expected`
+    async fn record_reconciliation_outcome(
+        &self,
+        id: &ResourceID,
+        expected: ResourceVersion,
+        mark: impl FnOnce(&mut R, DateTime<Utc>) -> Result<(), R::LifecycleError>,
+    ) -> TransitionResult<R, R> {
+        let mut resource = self.load_reconcilable(id, expected).await?;
+        let old_status = resource.status().clone();
+        let now = self.time_source.now();
+
+        mark(&mut resource, now).map_err(lifecycle_error)?;
+        self.save_status_write(now, &mut resource, &old_status)
             .await?;
 
         Ok(resource)
@@ -348,13 +349,22 @@ where
         resource
             .try_update_status(now, expected_status_generation, new_status)
             .map_err(condition_update_lifecycle_error)?;
-        self.resource_persistence_service
-            .save(&mut resource)
-            .await?;
-        self.post_status_updated(now, &resource, &old_status)
+        self.save_status_write(now, &mut resource, &old_status)
             .await?;
 
         Ok(resource)
+    }
+
+    /// Saves a status write of `resource` and announces it
+    async fn save_status_write(
+        &self,
+        now: DateTime<Utc>,
+        resource: &mut R,
+        old_status: &ResourceStatus,
+    ) -> Result<(), ResourcePersistenceError> {
+        self.resource_persistence_service.save(resource).await?;
+        self.post_status_updated(now, resource, old_status).await?;
+        Ok(())
     }
 
     /// Announces the status write that moved the resource from `old_status`.

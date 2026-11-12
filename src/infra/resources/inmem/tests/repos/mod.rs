@@ -7,6 +7,9 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+mod in_memory_resource_repositories_harness;
+use in_memory_resource_repositories_harness::*;
+
 mod test_inmem_raw_resource_event_store;
 mod test_inmem_resource_controller_state_repository;
 mod test_inmem_resource_label_projection_repository;

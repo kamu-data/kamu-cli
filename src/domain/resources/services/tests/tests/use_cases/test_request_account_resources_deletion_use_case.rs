@@ -7,11 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_resources::{
-    MESSAGE_PRODUCER_KAMU_RESOURCE_SERVICE,
-    ResourceID,
-    ResourceLifecycleMessage,
-};
 use kamu_resources_services::testing::BaseResourceServiceHarness;
 use messaging_outbox::MockOutbox;
 
@@ -38,29 +33,16 @@ async fn test_request_account_deletion_deletes_all_owned_resources() {
     let harness = ServiceLayerTestHarness::new();
     let account_handle = odf::ResourceOwnerHandle::new_test("test-owner");
 
-    let (id_a, snapshot_a) = harness
-        .apply_and_assert_snapshot(&account_handle, "res-a")
+    let ids = harness
+        .apply_all(&account_handle, &["res-a", "res-b", "res-c"])
         .await;
-    let (id_b, snapshot_b) = harness
-        .apply_and_assert_snapshot(&account_handle, "res-b")
-        .await;
-    let (id_c, snapshot_c) = harness
-        .apply_and_assert_snapshot(&account_handle, "res-c")
-        .await;
-
-    pretty_assertions::assert_eq!(snapshot_a.spec, serde_json::json!({ "value": "res-a" }));
-    pretty_assertions::assert_eq!(snapshot_b.spec, serde_json::json!({ "value": "res-b" }));
-    pretty_assertions::assert_eq!(snapshot_c.spec, serde_json::json!({ "value": "res-c" }));
 
     harness
         .request_account_resources_deletion(account_handle.did)
         .await;
     harness.settle().await;
 
-    for id in [&id_a, &id_b, &id_c] {
-        let snapshot = harness.get_snapshot_by_id(id).await;
-        assert!(snapshot.is_none(), "expected snapshot for {id} to be gone");
-    }
+    harness.assert_gone(&ids).await;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -73,20 +55,13 @@ async fn test_request_account_deletion_leaves_other_accounts_intact() {
 
     harness.apply_and_get_id(&account_handle_a, "res-a").await;
 
-    let (id_b, snapshot_b) = harness
-        .apply_and_assert_snapshot(&account_handle_b, "res-b")
-        .await;
-    pretty_assertions::assert_eq!(snapshot_b.spec, serde_json::json!({ "value": "res-b" }));
+    let id_b = harness.apply_and_get_id(&account_handle_b, "res-b").await;
 
     harness
         .request_account_resources_deletion(account_handle_a.did)
         .await;
 
-    let snapshot = harness.get_snapshot_by_id(&id_b).await;
-    assert!(
-        snapshot.is_some(),
-        "account B's resource should still exist"
-    );
+    harness.assert_exists(&id_b).await;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -97,23 +72,15 @@ async fn test_request_account_deletion_handles_pagination() {
     let harness = ServiceLayerTestHarness::new();
     let account_handle = odf::ResourceOwnerHandle::new_test("test-owner");
 
-    let mut ids = Vec::new();
-    for i in 0..=100 {
-        let id = harness
-            .apply_and_get_id(&account_handle, &format!("res-{i:03}"))
-            .await;
-        ids.push(id);
-    }
+    let names = (0..=100).map(|i| format!("res-{i:03}")).collect::<Vec<_>>();
+    let ids = harness.apply_all(&account_handle, &names).await;
 
     harness
         .request_account_resources_deletion(account_handle.did)
         .await;
     harness.settle().await;
 
-    for id in &ids {
-        let snapshot = harness.get_snapshot_by_id(id).await;
-        assert!(snapshot.is_none(), "expected snapshot for {id} to be gone");
-    }
+    harness.assert_gone(&ids).await;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -146,9 +113,9 @@ async fn test_request_account_deletion_multiple_resources_emits_single_message()
     let harness = ServiceLayerTestHarness::new_with_mock_outbox(mock_outbox);
     let account_handle = odf::ResourceOwnerHandle::new_test("test-owner");
 
-    harness.apply_and_get_id(&account_handle, "res-a").await;
-    harness.apply_and_get_id(&account_handle, "res-b").await;
-    harness.apply_and_get_id(&account_handle, "res-c").await;
+    harness
+        .apply_all(&account_handle, &["res-a", "res-b", "res-c"])
+        .await;
 
     harness
         .request_account_resources_deletion(account_handle.did)
@@ -179,36 +146,16 @@ async fn test_request_account_deletion_message_carries_correct_snapshot_data() {
 
     BaseResourceServiceHarness::expect_applied_messages(&mut mock_outbox, 1, None);
 
-    let uid_cell = std::sync::Arc::new(std::sync::Mutex::new(None::<ResourceID>));
-    let uid_cell_clone = uid_cell.clone();
-
-    mock_outbox
-        .expect_post_message_as_json()
-        .times(1)
-        .withf(move |producer, message, _version| {
-            let expected_id = uid_cell_clone.lock().unwrap();
-            let Some(expected_id) = *expected_id else {
-                return false;
-            };
-            if producer != MESSAGE_PRODUCER_KAMU_RESOURCE_SERVICE {
-                return false;
-            }
-            let ResourceLifecycleMessage::DeletionRequested(m) =
-                serde_json::from_value(message.clone()).unwrap()
-            else {
-                return false;
-            };
-            m.resources.len() == 1
-                && m.resources[0].id == expected_id
-                && m.resources[0].spec == serde_json::json!({ "value": "res-a" })
-        })
-        .returning(|_, _, _| Ok(()));
+    BaseResourceServiceHarness::expect_deletion_requested_message_of(
+        &mut mock_outbox,
+        "res-a",
+        serde_json::json!({ "value": "res-a" }),
+    );
 
     let harness = ServiceLayerTestHarness::new_with_mock_outbox(mock_outbox);
     let account_handle = odf::ResourceOwnerHandle::new_test("test-owner");
 
-    let id = harness.apply_and_get_id(&account_handle, "res-a").await;
-    *uid_cell.lock().unwrap() = Some(id);
+    harness.apply_and_get_id(&account_handle, "res-a").await;
 
     harness
         .request_account_resources_deletion(account_handle.did)

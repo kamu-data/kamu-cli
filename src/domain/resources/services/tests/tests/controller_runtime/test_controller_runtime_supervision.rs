@@ -147,11 +147,7 @@ async fn test_loop_failing_in_its_wait_backs_off_more_each_time() {
 
 #[test_log::test(tokio::test)]
 async fn test_metrics_count_outcomes_and_failing_resources() {
-    let harness = ControllerRuntimeHarness::new(
-        TestControllers::Main,
-        TestControllerBehavior::FinishAtCurrentVersion,
-    )
-    .await;
+    let harness = ControllerRuntimeHarness::finishing().await;
     let _done = harness.apply("res-done").await;
     let failing = harness.apply("res-failing").await;
     let retrying = harness.apply("res-retrying").await;

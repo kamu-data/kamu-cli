@@ -22,6 +22,7 @@ proc-macro = true
 
 
 [dependencies]
+proc-macro2 = "1"
 quote = "1"
 syn = { version = "3", default-features = false, features = [
     "full",

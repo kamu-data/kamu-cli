@@ -80,11 +80,7 @@ async fn test_failure_backs_off_and_success_resets_it() {
 
 #[test_log::test(tokio::test)]
 async fn test_panic_fails_only_its_resource() {
-    let harness = ControllerRuntimeHarness::new(
-        TestControllers::Main,
-        TestControllerBehavior::FinishAtCurrentVersion,
-    )
-    .await;
+    let harness = ControllerRuntimeHarness::finishing().await;
     let panicking = harness.apply("res-panicking").await;
     let healthy = harness.apply("res-healthy").await;
     harness

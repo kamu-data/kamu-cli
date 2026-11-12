@@ -71,11 +71,7 @@ async fn test_shutdown_lets_the_current_drain_finish() {
 
 #[test_log::test(tokio::test)]
 async fn test_shutdown_ends_a_loop_restart_backoff() {
-    let harness = ControllerRuntimeHarness::new(
-        TestControllers::Main,
-        TestControllerBehavior::FinishAtCurrentVersion,
-    )
-    .await;
+    let harness = ControllerRuntimeHarness::finishing().await;
     harness
         .script()
         .fail_next_listings(TEST_CONTROLLER_NAME, TestListingFailure::Error, 1);

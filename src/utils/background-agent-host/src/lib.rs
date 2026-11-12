@@ -13,6 +13,7 @@ mod background_agent_host_config;
 mod background_agent_host_metrics;
 mod background_agent_restart_reason;
 mod background_agent_supervisor;
+mod restart_delay;
 
 pub use background_agent::*;
 pub use background_agent_host::*;
@@ -20,3 +21,4 @@ pub use background_agent_host_config::*;
 pub use background_agent_host_metrics::*;
 pub use background_agent_restart_reason::*;
 pub(crate) use background_agent_supervisor::*;
+pub use restart_delay::*;

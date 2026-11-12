@@ -251,6 +251,58 @@ impl ServiceLayerTestHarness {
         (id, snapshot)
     }
 
+    /// Applies a new spec `value` to the existing resource `id`
+    pub async fn update_spec(
+        &self,
+        account_handle: &odf::ResourceOwnerHandle,
+        id: ResourceID,
+        name: &str,
+        value: &str,
+    ) {
+        let params = ApplyResourceParams {
+            id: Some(id),
+            headers: BaseResourceServiceHarness::make_headers_input(account_handle.clone(), name),
+            spec: TestResourceSpec {
+                value: value.to_string(),
+            },
+        };
+
+        self.apply_test_uc()
+            .apply(params)
+            .await
+            .unwrap()
+            .expect_applied();
+    }
+
+    /// Applies one resource per name, in order
+    pub async fn apply_all(
+        &self,
+        account_handle: &odf::ResourceOwnerHandle,
+        names: &[impl AsRef<str>],
+    ) -> Vec<ResourceID> {
+        let mut ids = Vec::with_capacity(names.len());
+        for name in names {
+            ids.push(self.apply_and_get_id(account_handle, name.as_ref()).await);
+        }
+        ids
+    }
+
+    pub async fn assert_gone(&self, ids: &[ResourceID]) {
+        for id in ids {
+            assert!(
+                self.get_snapshot_by_id(id).await.is_none(),
+                "expected snapshot for {id} to be gone"
+            );
+        }
+    }
+
+    pub async fn assert_exists(&self, id: &ResourceID) {
+        assert!(
+            self.get_snapshot_by_id(id).await.is_some(),
+            "expected snapshot for {id} to exist"
+        );
+    }
+
     pub async fn apply_and_get_id(
         &self,
         account_handle: &odf::ResourceOwnerHandle,

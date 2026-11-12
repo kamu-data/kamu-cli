@@ -52,15 +52,14 @@ Use `database_common_macros::database_transactional_test`.
 
 - `storage = inmem` emits a plain tokio test.
 - `storage = inmem_with_transaction` emits that test plus `<fixture>_in_transaction`, which runs the
-  fixture inside one transaction of `InMemoryTransactionManager`; the harness must provide
-  `new_transactional()`, which registers that manager. Use it for in-memory repositories built on
-  `InMemoryTransactionalMap`.
+  fixture inside one transaction of `InMemoryTransactionManager`, which the macro adds to the
+  harness catalog. Use it for in-memory repositories built on `InMemoryTransactionalMap`.
 - `storage = postgres` and `storage = sqlite` emit an `sqlx::test`, receive a pool, run migrations, and wrap the fixture in a transaction runner.
 
 A fixture that needs several transactions, such as a race between two writers, is wired with
 `database_concurrent_transactions_test!` instead. It takes the same arguments, with `storage` one
 of `inmem`, `postgres` and `sqlite`, and passes the harness catalog with its transaction manager,
-outside any transaction; `inmem` builds the harness with `new_transactional()`. The fixture opens
+outside any transaction; for `inmem` the macro adds `InMemoryTransactionManager`. The fixture opens
 transactions through `database_common::testing` (`race_transactions`, `in_committed_transaction`,
 `in_rolled_back_transaction`), which the repo-tests crate gets through `database-common`'s
 `testing` feature. Wire fixtures whose transactions run one after another, such as a rollback, to

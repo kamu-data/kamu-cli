@@ -13,7 +13,6 @@ use std::sync::atomic::{AtomicU32, Ordering};
 
 use chrono::TimeDelta;
 use kamu_resources::{
-    ApplyResourceParams,
     DeclarativeResource,
     ManagedResource,
     ResourceAggregateLoader,
@@ -72,12 +71,7 @@ async fn test_start_phase_transitions_resource_to_reconciling() {
     let account_handle = odf::ResourceOwnerHandle::new_test("test-owner");
     let id = harness.apply_and_get_id(&account_handle, "res-a").await;
 
-    let helper = harness.make_reconcile_helper();
-
-    let resource = harness
-        .start_reconciliation_phase(id)
-        .await
-        .expect("resource should need reconciliation after apply");
+    let resource = harness.start_reconciliation_phase(id).await;
 
     let snapshot = harness.get_snapshot_by_id(&id).await.unwrap();
     let status = snapshot.basic_status().unwrap();
@@ -85,7 +79,7 @@ async fn test_start_phase_transitions_resource_to_reconciling() {
     assert_eq!(status.phase, ResourcePhase::Reconciling);
 
     // Finish phase so the event store is left in a consistent state
-    helper.finish_reconciliation_phase(resource).await.unwrap();
+    harness.finish_reconciliation_phase(resource).await.unwrap();
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -363,28 +357,13 @@ async fn test_finish_phase_discards_outcome_of_superseded_generation() {
     let account_handle = odf::ResourceOwnerHandle::new_test("test-owner");
     let id = harness.apply_and_get_id(&account_handle, "res-a").await;
 
-    let helper = harness.make_reconcile_helper();
+    let started = harness.start_reconciliation_phase(id).await;
 
-    let started = harness
-        .start_reconciliation_phase(id)
-        .await
-        .expect("resource should need reconciliation");
-
-    let update_params = ApplyResourceParams {
-        id: Some(id),
-        headers: BaseResourceServiceHarness::make_headers_input(account_handle, "res-a"),
-        spec: crate::tests::utils::TestResourceSpec {
-            value: "updated-concurrently".to_string(),
-        },
-    };
     harness
-        .apply_test_uc()
-        .apply(update_params)
-        .await
-        .unwrap()
-        .expect_applied();
+        .update_spec(&account_handle, id, "res-a", "updated-concurrently")
+        .await;
 
-    let outcome = helper.finish_reconciliation_phase(started).await.unwrap();
+    let outcome = harness.finish_reconciliation_phase(started).await.unwrap();
 
     assert_matches!(outcome, SimpleResourceReconciliationOutcome::Superseded);
     let snapshot = harness.get_snapshot_by_id(&id).await.unwrap();
@@ -403,16 +382,11 @@ async fn test_finish_phase_after_concurrent_status_update_returns_status_conflic
     let account_handle = odf::ResourceOwnerHandle::new_test("test-owner");
     let id = harness.apply_and_get_id(&account_handle, "res-a").await;
 
-    let helper = harness.make_reconcile_helper();
-
-    let started = harness
-        .start_reconciliation_phase(id)
-        .await
-        .expect("resource should need reconciliation");
+    let started = harness.start_reconciliation_phase(id).await;
 
     harness.update_status_concurrently(&id).await;
 
-    let result = helper.finish_reconciliation_phase(started).await;
+    let result = harness.finish_reconciliation_phase(started).await;
 
     assert_matches!(
         result,
@@ -469,20 +443,12 @@ async fn test_overlapping_reconciliations_of_one_generation_record_one_outcome()
     let account_handle = odf::ResourceOwnerHandle::new_test("test-owner");
     let id = harness.apply_and_get_id(&account_handle, "res-a").await;
 
-    let helper = harness.make_reconcile_helper();
-
-    let first = harness
-        .start_reconciliation_phase(id)
-        .await
-        .expect("resource should need reconciliation");
+    let first = harness.start_reconciliation_phase(id).await;
     // Already `Reconciling`, so the second start writes no status
-    let second = harness
-        .start_reconciliation_phase(id)
-        .await
-        .expect("resource should still need reconciliation");
+    let second = harness.start_reconciliation_phase(id).await;
 
-    helper.finish_reconciliation_phase(first).await.unwrap();
-    let result = helper.finish_reconciliation_phase(second).await;
+    harness.finish_reconciliation_phase(first).await.unwrap();
+    let result = harness.finish_reconciliation_phase(second).await;
 
     assert_matches!(
         result,
@@ -554,18 +520,13 @@ async fn test_finish_phase_discards_outcome_of_resource_being_deleted() {
     let account_handle = odf::ResourceOwnerHandle::new_test("test-owner");
     let id = harness.apply_and_get_id(&account_handle, "res-a").await;
 
-    let helper = harness.make_reconcile_helper();
-
-    let started = harness
-        .start_reconciliation_phase(id)
-        .await
-        .expect("resource should need reconciliation");
+    let started = harness.start_reconciliation_phase(id).await;
 
     harness
         .request_resources_deletion(account_handle.did, vec![id])
         .await;
 
-    let outcome = helper.finish_reconciliation_phase(started).await.unwrap();
+    let outcome = harness.finish_reconciliation_phase(started).await.unwrap();
 
     assert_matches!(outcome, SimpleResourceReconciliationOutcome::Superseded);
     let resource = harness.load(&id).await;
@@ -645,20 +606,31 @@ impl ReconcileTestHarness {
         self.persistence.save(&mut resource).await.unwrap();
     }
 
-    /// The first phase of a reconciliation, without the transaction of the
-    /// controller
-    async fn start_reconciliation_phase(&self, id: ResourceID) -> Option<TestResource> {
+    /// The first phase of a reconciliation of a resource that needs one,
+    /// without the transaction of the controller
+    async fn start_reconciliation_phase(&self, id: ResourceID) -> TestResource {
         self.lifecycle_primitives
             .begin_reconciliation(&id, None)
             .await
             .unwrap()
+            .expect("resource should need reconciliation")
     }
 
-    fn make_reconcile_helper(&self) -> SimpleResourceReconciliationHelper<'_, TestResource> {
+    /// The second phase of the reconciliation `started`, without the
+    /// transaction of the controller
+    async fn finish_reconciliation_phase(
+        &self,
+        started: TestResource,
+    ) -> Result<
+        SimpleResourceReconciliationOutcome<TestResource>,
+        SimpleResourceReconciliationError<TestResource>,
+    > {
         SimpleResourceReconciliationHelper::new(
             self.lifecycle_primitives.as_ref(),
             self.reconciler.as_ref(),
         )
+        .finish_reconciliation_phase(started)
+        .await
     }
 }
 

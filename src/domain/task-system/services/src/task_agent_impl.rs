@@ -203,17 +203,17 @@ impl TaskAgentImpl {
             }
 
             // Signals are only hints, so the queue is re-checked on any wakeup
-            let Some(hint) = shutdown
-                .run_until_cancelled(wakeup_listener.wait_wake(
+            let Some(hint) = wakeup_listener
+                .wait_wake_until_shutdown(
                     self.wakeup_config.max_listening_timeout,
                     self.wakeup_config.min_debounce_interval,
-                ))
-                .await
+                    shutdown,
+                )
+                .await?
             else {
                 return Ok(None);
             };
-            let hint = hint?;
-            tracing::debug!(hint = ?hint, "Agent woke up with a hint");
+            tracing::debug!(?hint, "Agent woke up with a hint");
         }
     }
 

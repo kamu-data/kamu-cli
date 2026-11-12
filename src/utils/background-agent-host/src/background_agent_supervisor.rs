@@ -9,18 +9,18 @@
 
 use std::sync::Arc;
 
-use async_utils::join_error_message;
-use chrono::{DateTime, TimeDelta, Utc};
+use async_utils::IsolatedTask;
+use chrono::{DateTime, Utc};
 use internal_error::InternalError;
 use retry_backoff::RetryBackoff;
 use time_source::SystemTimeSource;
-use tokio::task::JoinSet;
 
 use crate::{
     BackgroundAgent,
     BackgroundAgentHostMetrics,
     BackgroundAgentRestartReason,
     CancellationToken,
+    wait_restart_delay,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -137,10 +137,7 @@ impl BackgroundAgentSupervisor {
                 "Restarting background agent after a delay"
             );
 
-            let backoff = self
-                .time_source
-                .sleep(TimeDelta::from_std(delay).unwrap_or(TimeDelta::MAX));
-            if shutdown.run_until_cancelled(backoff).await.is_none() {
+            if !wait_restart_delay(self.time_source.as_ref(), delay, &shutdown).await {
                 return Ok(());
             }
         }
@@ -155,25 +152,22 @@ impl BackgroundAgentSupervisor {
         abort: &CancellationToken,
     ) -> AgentRunEnd {
         let agent = self.agent.clone();
-        let mut running = JoinSet::new();
-        running.spawn(async move { agent.run(shutdown).await });
+        let mut running = IsolatedTask::spawn(async move { agent.run(shutdown).await });
 
         let ended = tokio::select! {
             biased;
 
-            ended = running.join_next() => ended,
+            ended = running.join() => ended,
             () = abort.cancelled() => {
-                running.abort_all();
-                running.join_next().await;
+                running.abort().await;
                 return AgentRunEnd::Aborted;
             }
         };
 
         match ended {
-            Some(Ok(Ok(()))) => AgentRunEnd::Returned,
-            Some(Ok(Err(e))) => AgentRunEnd::Failed(e),
-            Some(Err(join_error)) => AgentRunEnd::Panicked(join_error_message(join_error)),
-            None => unreachable!("the set holds the agent's task"),
+            Ok(Ok(())) => AgentRunEnd::Returned,
+            Ok(Err(e)) => AgentRunEnd::Failed(e),
+            Err(message) => AgentRunEnd::Panicked(message),
         }
     }
 

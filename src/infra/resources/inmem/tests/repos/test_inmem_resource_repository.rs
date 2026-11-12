@@ -7,19 +7,17 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use database_common::InMemoryTransactionManager;
 use database_common_macros::{database_concurrent_transactions_test, database_transactional_test};
-use dill::{Catalog, CatalogBuilder};
-use kamu_accounts_inmem::InMemoryAccountRepository;
-use kamu_resources_inmem::register_dependencies;
 use kamu_resources_repo_tests::resource_repository_test_suite as resource_repo_suite;
+
+use super::InMemoryResourceRepositoriesHarness;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 database_transactional_test!(
     storage = inmem_with_transaction,
     fixture = resource_repo_suite::test_no_resources_initially,
-    harness = InMemoryResourceRepositoryHarness
+    harness = InMemoryResourceRepositoriesHarness
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -27,7 +25,7 @@ database_transactional_test!(
 database_transactional_test!(
     storage = inmem_with_transaction,
     fixture = resource_repo_suite::test_create_and_find_resource,
-    harness = InMemoryResourceRepositoryHarness
+    harness = InMemoryResourceRepositoriesHarness
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -36,7 +34,7 @@ database_transactional_test!(
     storage = inmem_with_transaction,
     fixture =
         resource_repo_suite::test_create_find_update_resource_with_populated_labels_annotations,
-    harness = InMemoryResourceRepositoryHarness
+    harness = InMemoryResourceRepositoriesHarness
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -44,7 +42,7 @@ database_transactional_test!(
 database_transactional_test!(
     storage = inmem_with_transaction,
     fixture = resource_repo_suite::test_find_resource_snapshots_by_ids,
-    harness = InMemoryResourceRepositoryHarness
+    harness = InMemoryResourceRepositoriesHarness
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -52,7 +50,7 @@ database_transactional_test!(
 database_transactional_test!(
     storage = inmem_with_transaction,
     fixture = resource_repo_suite::test_find_resource_handles_by_ids,
-    harness = InMemoryResourceRepositoryHarness
+    harness = InMemoryResourceRepositoriesHarness
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -60,7 +58,7 @@ database_transactional_test!(
 database_transactional_test!(
     storage = inmem_with_transaction,
     fixture = resource_repo_suite::test_find_resource_snapshots_by_schema_and_ids,
-    harness = InMemoryResourceRepositoryHarness
+    harness = InMemoryResourceRepositoriesHarness
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -68,7 +66,7 @@ database_transactional_test!(
 database_transactional_test!(
     storage = inmem_with_transaction,
     fixture = resource_repo_suite::test_search_resource_handles,
-    harness = InMemoryResourceRepositoryHarness
+    harness = InMemoryResourceRepositoriesHarness
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -76,7 +74,7 @@ database_transactional_test!(
 database_transactional_test!(
     storage = inmem_with_transaction,
     fixture = resource_repo_suite::test_search_resource_handles_exact_ids,
-    harness = InMemoryResourceRepositoryHarness
+    harness = InMemoryResourceRepositoriesHarness
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -84,7 +82,7 @@ database_transactional_test!(
 database_transactional_test!(
     storage = inmem_with_transaction,
     fixture = resource_repo_suite::test_search_resource_handles_any_type,
-    harness = InMemoryResourceRepositoryHarness
+    harness = InMemoryResourceRepositoriesHarness
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -92,7 +90,7 @@ database_transactional_test!(
 database_transactional_test!(
     storage = inmem_with_transaction,
     fixture = resource_repo_suite::test_search_resource_handles_per_row_account,
-    harness = InMemoryResourceRepositoryHarness
+    harness = InMemoryResourceRepositoriesHarness
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -100,7 +98,7 @@ database_transactional_test!(
 database_transactional_test!(
     storage = inmem_with_transaction,
     fixture = resource_repo_suite::test_search_resource_handles_per_row_labels,
-    harness = InMemoryResourceRepositoryHarness
+    harness = InMemoryResourceRepositoriesHarness
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -108,7 +106,7 @@ database_transactional_test!(
 database_transactional_test!(
     storage = inmem_with_transaction,
     fixture = resource_repo_suite::test_search_resource_handles_any_type_labels,
-    harness = InMemoryResourceRepositoryHarness
+    harness = InMemoryResourceRepositoriesHarness
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -116,7 +114,7 @@ database_transactional_test!(
 database_transactional_test!(
     storage = inmem_with_transaction,
     fixture = resource_repo_suite::test_search_resource_handles_pattern_special_characters,
-    harness = InMemoryResourceRepositoryHarness
+    harness = InMemoryResourceRepositoriesHarness
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -124,7 +122,7 @@ database_transactional_test!(
 database_transactional_test!(
     storage = inmem_with_transaction,
     fixture = resource_repo_suite::test_count_search_resource_handles,
-    harness = InMemoryResourceRepositoryHarness
+    harness = InMemoryResourceRepositoriesHarness
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -132,7 +130,7 @@ database_transactional_test!(
 database_transactional_test!(
     storage = inmem_with_transaction,
     fixture = resource_repo_suite::test_count_search_resource_handles_exact_ids,
-    harness = InMemoryResourceRepositoryHarness
+    harness = InMemoryResourceRepositoriesHarness
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -140,7 +138,7 @@ database_transactional_test!(
 database_transactional_test!(
     storage = inmem_with_transaction,
     fixture = resource_repo_suite::test_list_resource_snapshots_label_filtering,
-    harness = InMemoryResourceRepositoryHarness
+    harness = InMemoryResourceRepositoriesHarness
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -148,7 +146,7 @@ database_transactional_test!(
 database_transactional_test!(
     storage = inmem_with_transaction,
     fixture = resource_repo_suite::test_search_resource_handles_label_filtering,
-    harness = InMemoryResourceRepositoryHarness
+    harness = InMemoryResourceRepositoriesHarness
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -156,7 +154,7 @@ database_transactional_test!(
 database_transactional_test!(
     storage = inmem_with_transaction,
     fixture = resource_repo_suite::test_create_resource_duplicate_fails,
-    harness = InMemoryResourceRepositoryHarness
+    harness = InMemoryResourceRepositoriesHarness
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -164,7 +162,7 @@ database_transactional_test!(
 database_transactional_test!(
     storage = inmem_with_transaction,
     fixture = resource_repo_suite::test_create_resource_duplicate_ignore_case_fails,
-    harness = InMemoryResourceRepositoryHarness
+    harness = InMemoryResourceRepositoriesHarness
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -172,7 +170,7 @@ database_transactional_test!(
 database_transactional_test!(
     storage = inmem_with_transaction,
     fixture = resource_repo_suite::test_update_resource,
-    harness = InMemoryResourceRepositoryHarness
+    harness = InMemoryResourceRepositoriesHarness
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -180,7 +178,7 @@ database_transactional_test!(
 database_transactional_test!(
     storage = inmem_with_transaction,
     fixture = resource_repo_suite::test_status_generation_round_trips,
-    harness = InMemoryResourceRepositoryHarness
+    harness = InMemoryResourceRepositoriesHarness
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -188,7 +186,7 @@ database_transactional_test!(
 database_transactional_test!(
     storage = inmem_with_transaction,
     fixture = resource_repo_suite::test_update_resource_wrong_event_id_fails,
-    harness = InMemoryResourceRepositoryHarness
+    harness = InMemoryResourceRepositoriesHarness
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -196,7 +194,7 @@ database_transactional_test!(
 database_transactional_test!(
     storage = inmem_with_transaction,
     fixture = resource_repo_suite::test_update_resource_optimistic_locking,
-    harness = InMemoryResourceRepositoryHarness
+    harness = InMemoryResourceRepositoriesHarness
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -204,7 +202,7 @@ database_transactional_test!(
 database_transactional_test!(
     storage = inmem_with_transaction,
     fixture = resource_repo_suite::test_update_resources,
-    harness = InMemoryResourceRepositoryHarness
+    harness = InMemoryResourceRepositoriesHarness
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -212,7 +210,7 @@ database_transactional_test!(
 database_transactional_test!(
     storage = inmem_with_transaction,
     fixture = resource_repo_suite::test_update_resources_wrong_event_id_fails,
-    harness = InMemoryResourceRepositoryHarness
+    harness = InMemoryResourceRepositoriesHarness
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -220,7 +218,7 @@ database_transactional_test!(
 database_transactional_test!(
     storage = inmem_with_transaction,
     fixture = resource_repo_suite::test_list_resource_snapshots_by_scope,
-    harness = InMemoryResourceRepositoryHarness
+    harness = InMemoryResourceRepositoriesHarness
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -228,7 +226,7 @@ database_transactional_test!(
 database_transactional_test!(
     storage = inmem_with_transaction,
     fixture = resource_repo_suite::test_list_resource_snapshots_with_queries,
-    harness = InMemoryResourceRepositoryHarness
+    harness = InMemoryResourceRepositoriesHarness
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -236,7 +234,7 @@ database_transactional_test!(
 database_transactional_test!(
     storage = inmem_with_transaction,
     fixture = resource_repo_suite::test_list_all_resource_snapshots,
-    harness = InMemoryResourceRepositoryHarness
+    harness = InMemoryResourceRepositoriesHarness
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -244,7 +242,7 @@ database_transactional_test!(
 database_transactional_test!(
     storage = inmem_with_transaction,
     fixture = resource_repo_suite::test_summarize_resources,
-    harness = InMemoryResourceRepositoryHarness
+    harness = InMemoryResourceRepositoriesHarness
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -252,7 +250,7 @@ database_transactional_test!(
 database_transactional_test!(
     storage = inmem_with_transaction,
     fixture = resource_repo_suite::test_find_deleted_resource_not_returned,
-    harness = InMemoryResourceRepositoryHarness
+    harness = InMemoryResourceRepositoriesHarness
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -260,7 +258,7 @@ database_transactional_test!(
 database_transactional_test!(
     storage = inmem_with_transaction,
     fixture = resource_repo_suite::test_resource_being_deleted_round_trips,
-    harness = InMemoryResourceRepositoryHarness
+    harness = InMemoryResourceRepositoriesHarness
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -268,7 +266,7 @@ database_transactional_test!(
 database_transactional_test!(
     storage = inmem_with_transaction,
     fixture = resource_repo_suite::test_resource_being_deleted_is_hidden_unless_included,
-    harness = InMemoryResourceRepositoryHarness
+    harness = InMemoryResourceRepositoriesHarness
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -276,7 +274,7 @@ database_transactional_test!(
 database_transactional_test!(
     storage = inmem_with_transaction,
     fixture = resource_repo_suite::test_name_of_resource_being_deleted_can_be_taken,
-    harness = InMemoryResourceRepositoryHarness
+    harness = InMemoryResourceRepositoriesHarness
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -284,7 +282,7 @@ database_transactional_test!(
 database_transactional_test!(
     storage = inmem_with_transaction,
     fixture = resource_repo_suite::test_summarize_resources_counts_deleting,
-    harness = InMemoryResourceRepositoryHarness
+    harness = InMemoryResourceRepositoriesHarness
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -292,7 +290,7 @@ database_transactional_test!(
 database_transactional_test!(
     storage = inmem_with_transaction,
     fixture = resource_repo_suite::test_resource_name_case_insensitive,
-    harness = InMemoryResourceRepositoryHarness
+    harness = InMemoryResourceRepositoriesHarness
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -300,7 +298,7 @@ database_transactional_test!(
 database_transactional_test!(
     storage = inmem_with_transaction,
     fixture = resource_repo_suite::test_account_rename_reflected_immediately_in_headers,
-    harness = InMemoryResourceRepositoryHarness
+    harness = InMemoryResourceRepositoriesHarness
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -308,7 +306,7 @@ database_transactional_test!(
 database_transactional_test!(
     storage = inmem_with_transaction,
     fixture = resource_repo_suite::test_deleted_account_falls_back_to_sentinel_name,
-    harness = InMemoryResourceRepositoryHarness
+    harness = InMemoryResourceRepositoriesHarness
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -316,7 +314,7 @@ database_transactional_test!(
 database_transactional_test!(
     storage = inmem_with_transaction,
     fixture = resource_repo_suite::test_search_resource_handles_partially_vacuous_scope,
-    harness = InMemoryResourceRepositoryHarness
+    harness = InMemoryResourceRepositoriesHarness
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -324,7 +322,7 @@ database_transactional_test!(
 database_concurrent_transactions_test!(
     storage = inmem,
     fixture = resource_repo_suite::test_rolled_back_create_leaves_no_resource,
-    harness = InMemoryResourceRepositoryHarness
+    harness = InMemoryResourceRepositoriesHarness
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -332,7 +330,7 @@ database_concurrent_transactions_test!(
 database_concurrent_transactions_test!(
     storage = inmem,
     fixture = resource_repo_suite::test_create_same_name_in_concurrent_transactions,
-    harness = InMemoryResourceRepositoryHarness
+    harness = InMemoryResourceRepositoriesHarness
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -340,7 +338,7 @@ database_concurrent_transactions_test!(
 database_concurrent_transactions_test!(
     storage = inmem,
     fixture = resource_repo_suite::test_create_name_freed_by_concurrent_deletion_request,
-    harness = InMemoryResourceRepositoryHarness
+    harness = InMemoryResourceRepositoriesHarness
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -349,37 +347,8 @@ database_concurrent_transactions_test!(
     storage = inmem,
     fixture =
         resource_repo_suite::test_create_name_twice_while_concurrent_deletion_request_frees_it,
-    harness = InMemoryResourceRepositoryHarness
+    harness = InMemoryResourceRepositoriesHarness
 );
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-struct InMemoryResourceRepositoryHarness {
-    catalog: Catalog,
-}
-
-impl InMemoryResourceRepositoryHarness {
-    pub fn new() -> Self {
-        Self {
-            catalog: Self::catalog_builder().build(),
-        }
-    }
-
-    pub fn new_transactional() -> Self {
-        let mut catalog_builder = Self::catalog_builder();
-        catalog_builder.add::<InMemoryTransactionManager>();
-        Self {
-            catalog: catalog_builder.build(),
-        }
-    }
-
-    fn catalog_builder() -> CatalogBuilder {
-        let mut catalog_builder = CatalogBuilder::new();
-        register_dependencies(&mut catalog_builder);
-        catalog_builder.add::<InMemoryAccountRepository>();
-        catalog_builder
-    }
-}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -387,7 +356,7 @@ database_transactional_test!(
     storage = inmem_with_transaction,
     fixture =
         resource_repo_suite::test_find_resource_ids_by_schema_and_label_returns_nothing_initially,
-    harness = InMemoryResourceRepositoryHarness
+    harness = InMemoryResourceRepositoriesHarness
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -395,7 +364,7 @@ database_transactional_test!(
 database_transactional_test!(
     storage = inmem_with_transaction,
     fixture = resource_repo_suite::test_find_resource_ids_by_schema_and_label_orders_by_created_at,
-    harness = InMemoryResourceRepositoryHarness
+    harness = InMemoryResourceRepositoriesHarness
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -403,7 +372,7 @@ database_transactional_test!(
 database_transactional_test!(
     storage = inmem_with_transaction,
     fixture = resource_repo_suite::test_find_resource_ids_by_schema_and_label_discriminates_schema_and_value,
-    harness = InMemoryResourceRepositoryHarness
+    harness = InMemoryResourceRepositoriesHarness
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -411,7 +380,7 @@ database_transactional_test!(
 database_transactional_test!(
     storage = inmem_with_transaction,
     fixture = resource_repo_suite::test_find_resource_ids_by_schema_and_label_excludes_deleted,
-    harness = InMemoryResourceRepositoryHarness
+    harness = InMemoryResourceRepositoriesHarness
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -420,7 +389,7 @@ database_transactional_test!(
     storage = inmem_with_transaction,
     fixture =
         resource_repo_suite::test_find_resource_ids_by_schema_and_label_excludes_other_accounts,
-    harness = InMemoryResourceRepositoryHarness
+    harness = InMemoryResourceRepositoriesHarness
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -429,7 +398,7 @@ database_transactional_test!(
     storage = inmem_with_transaction,
     fixture =
         resource_repo_suite::test_find_resource_ids_by_schema_and_label_any_account_spans_accounts,
-    harness = InMemoryResourceRepositoryHarness
+    harness = InMemoryResourceRepositoriesHarness
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -438,7 +407,7 @@ database_transactional_test!(
     storage = inmem_with_transaction,
     fixture =
         resource_repo_suite::test_find_resource_ids_by_schema_and_label_any_account_discriminates,
-    harness = InMemoryResourceRepositoryHarness
+    harness = InMemoryResourceRepositoriesHarness
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

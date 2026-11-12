@@ -173,6 +173,40 @@ impl InMemoryResourceRepository {
                 )
             })
     }
+
+    /// Resources of `schema` carrying the label, oldest first, of one account
+    /// or of any. Resources whose deletion was requested are left out.
+    fn ids_by_schema_and_label(
+        &self,
+        account_id: Option<&odf::AccountID>,
+        schema: &TypeUri,
+        label_key: &str,
+        label_value: &str,
+    ) -> Vec<ResourceID> {
+        let mut matched = self.state.read(self.transaction_id, |state| {
+            state
+                .snapshots()
+                .filter(|snapshot| {
+                    account_id.is_none_or(|account_id| snapshot.headers.account.did == *account_id)
+                })
+                .filter(|snapshot| snapshot.schema == *schema)
+                .filter(|snapshot| snapshot.headers.deletion_requested_at.is_none())
+                .filter(|snapshot| {
+                    // Reads labels off the snapshot rather than a projection, the
+                    // same way `snapshot_matches_label_pairs` does, so the two
+                    // cannot disagree about what is indexed.
+                    string_label_entries(&snapshot.headers.labels)
+                        .iter()
+                        .any(|(key, value)| key == label_key && value == label_value)
+                })
+                .map(|snapshot| (snapshot.headers.created_at, snapshot.headers.id))
+                .collect::<Vec<_>>()
+        });
+
+        matched.sort();
+
+        matched.into_iter().map(|(_, id)| id).collect()
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -461,27 +495,7 @@ impl ResourceRepository for InMemoryResourceRepository {
         label_key: &str,
         label_value: &str,
     ) -> Result<Vec<ResourceID>, InternalError> {
-        let mut matched = self.state.read(self.transaction_id, |state| {
-            state
-                .snapshots()
-                .filter(|snapshot| snapshot.headers.account.did == *account_id)
-                .filter(|snapshot| snapshot.schema == *schema)
-                .filter(|snapshot| snapshot.headers.deletion_requested_at.is_none())
-                .filter(|snapshot| {
-                    // Reads labels off the snapshot rather than a projection, the
-                    // same way `snapshot_matches_label_pairs` does, so the two
-                    // cannot disagree about what is indexed.
-                    string_label_entries(&snapshot.headers.labels)
-                        .iter()
-                        .any(|(key, value)| key == label_key && value == label_value)
-                })
-                .map(|snapshot| (snapshot.headers.created_at, snapshot.headers.id))
-                .collect::<Vec<_>>()
-        });
-
-        matched.sort();
-
-        Ok(matched.into_iter().map(|(_, id)| id).collect())
+        Ok(self.ids_by_schema_and_label(Some(account_id), schema, label_key, label_value))
     }
 
     async fn find_resource_ids_by_schema_and_label_any_account(
@@ -490,26 +504,7 @@ impl ResourceRepository for InMemoryResourceRepository {
         label_key: &str,
         label_value: &str,
     ) -> Result<Vec<ResourceID>, InternalError> {
-        let mut matched = self.state.read(self.transaction_id, |state| {
-            state
-                .snapshots()
-                .filter(|snapshot| snapshot.schema == *schema)
-                .filter(|snapshot| snapshot.headers.deletion_requested_at.is_none())
-                .filter(|snapshot| {
-                    // Reads labels off the snapshot rather than a projection, the
-                    // same way `snapshot_matches_label_pairs` does, so the two
-                    // cannot disagree about what is indexed.
-                    string_label_entries(&snapshot.headers.labels)
-                        .iter()
-                        .any(|(key, value)| key == label_key && value == label_value)
-                })
-                .map(|snapshot| (snapshot.headers.created_at, snapshot.headers.id))
-                .collect::<Vec<_>>()
-        });
-
-        matched.sort();
-
-        Ok(matched.into_iter().map(|(_, id)| id).collect())
+        Ok(self.ids_by_schema_and_label(None, schema, label_key, label_value))
     }
 
     async fn find_resource_snapshots_by_schema_and_ids(

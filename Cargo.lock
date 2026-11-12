@@ -4015,6 +4015,7 @@ dependencies = [
 name = "database-common-macros"
 version = "0.272.1"
 dependencies = [
+ "proc-macro2",
  "quote",
  "syn 3.0.9",
 ]
@@ -16402,6 +16403,7 @@ dependencies = [
  "observability",
  "prometheus",
  "tokio",
+ "tokio-util",
 ]
 
 [[package]]
