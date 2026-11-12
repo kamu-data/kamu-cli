@@ -129,7 +129,7 @@ impl OutboxAgentImpl {
         // Initial catchup phase to process all existing messages
         // before starting the main loop
         let mut listening_timeout = self
-            .catch_up(wakeup_listener.as_ref())
+            .catch_up(wakeup_listener.as_ref(), &shutdown)
             .instrument(tracing::debug_span!("OutboxAgent::initial_catchup_phase"))
             .await?;
 
@@ -148,27 +148,32 @@ impl OutboxAgentImpl {
             tracing::debug!(?hint, "Agent woke up with a hint");
 
             // Process tasks while they are available, to make sure we process all messages
-            listening_timeout = self.catch_up(wakeup_listener.as_ref()).await?;
+            listening_timeout = self.catch_up(wakeup_listener.as_ref(), &shutdown).await?;
         }
     }
 
-    /// Processes the queue to its end and returns how long to wait for the next
-    /// wakeup. Held back messages are checked before processing: a commit that
-    /// releases them after the check is either seen by the processing, or
-    /// happens while the check still holds
+    /// Processes the queue to its end, or until `shutdown`, and returns how
+    /// long to wait for the next wakeup. Held back messages are checked before
+    /// processing: a commit that releases them after the check is either seen
+    /// by the processing, or happens while the check still holds
     async fn catch_up(
         &self,
         wakeup_listener: &dyn WakeupListener,
+        shutdown: &CancellationToken,
     ) -> Result<Duration, InternalError> {
         let listening_timeout = self.listening_timeout().await;
-        self.run_until_end_of_queue(Some(wakeup_listener)).await?;
+        self.run_until_end_of_queue(Some(wakeup_listener), Some(shutdown))
+            .await?;
         Ok(listening_timeout)
     }
 
-    /// Given the agent's listener, keeps its heartbeat going between batches
+    /// Given the agent's listener, keeps its heartbeat going between batches.
+    /// Given a shutdown token, stops between batches once it is cancelled, so
+    /// that messages arriving during a shutdown do not keep it going
     async fn run_until_end_of_queue(
         &self,
         wakeup_listener: Option<&dyn WakeupListener>,
+        shutdown: Option<&CancellationToken>,
     ) -> Result<(), InternalError> {
         loop {
             let processed_consumer_tasks_count = self
@@ -180,7 +185,9 @@ impl OutboxAgentImpl {
                 wakeup_listener.heartbeat();
             }
 
-            if processed_consumer_tasks_count == 0 {
+            if processed_consumer_tasks_count == 0
+                || shutdown.is_some_and(CancellationToken::is_cancelled)
+            {
                 break;
             }
         }
@@ -436,7 +443,7 @@ impl OutboxAgent for OutboxAgentImpl {
             // would miss a release landing in between and leave its messages
             let has_held_back_messages = self.has_held_back_messages().await?;
 
-            self.run_until_end_of_queue(None).await?;
+            self.run_until_end_of_queue(None, None).await?;
 
             if !has_held_back_messages {
                 return Ok(());

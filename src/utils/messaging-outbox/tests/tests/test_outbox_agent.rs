@@ -1249,18 +1249,18 @@ async fn test_catchup_records_heartbeat_after_every_batch() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_shutdown_lets_catch_up_finish() {
+async fn test_shutdown_stops_catch_up_between_batches() {
     let harness = OutboxAgentHeartbeatHarness::new();
     harness.outbox_agent.run_initialization().await.unwrap();
     harness.post_j_messages(3).await;
 
-    // Requested before the start: the backlog is still relayed, then the
-    // agent returns instead of waiting
+    // Requested before the start: the batch in progress, of one message, is
+    // finished, then the agent returns with the rest left for the next run
     let shutdown = CancellationToken::new();
     shutdown.cancel();
     harness.run_agent_to_end(shutdown).await.unwrap();
 
-    assert_eq!(harness.probe.heartbeats_seen().len(), 3);
+    assert_eq!(harness.probe.heartbeats_seen().len(), 1);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

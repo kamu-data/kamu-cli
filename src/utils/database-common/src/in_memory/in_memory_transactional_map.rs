@@ -134,11 +134,9 @@ where
     }
 
     fn rollback(&self, transaction_id: TransactionId) {
-        self.state
-            .lock()
-            .unwrap()
-            .working_sets
-            .remove(&transaction_id);
+        let mut state = self.state.lock().unwrap();
+        state.working_sets.remove(&transaction_id);
+        state.forget_unwatched_deletes();
     }
 }
 
@@ -162,6 +160,7 @@ impl<K: Eq + Hash, V> InMemoryPreparedCommit for PreparedMapCommit<'_, K, V> {
                 ChangedValue::Delete => self.state.commit_delete(key),
             }
         }
+        self.state.forget_unwatched_deletes();
     }
 }
 
@@ -369,7 +368,8 @@ impl<K: Eq + Hash, V> InMemoryMapWrite<'_, K, V> {
 struct MapState<K, V> {
     committed: HashMap<K, Versioned<V>>,
     /// The version of each committed delete, so a key deleted and created
-    /// again does not look unchanged
+    /// again does not look unchanged. Kept only while an open transaction has
+    /// changed the key: a later change takes no delete as its base
     deleted_versions: HashMap<K, u64>,
     next_version: u64,
     working_sets: HashMap<TransactionId, WorkingSet<K, V>>,
@@ -400,8 +400,29 @@ impl<K: Eq + Hash, V> MapState<K, V> {
     fn commit_delete(&mut self, key: K) {
         if self.committed.remove(&key).is_some() {
             let version = self.take_next_version();
-            self.deleted_versions.insert(key, version);
+            if self.is_changed_in_open_transaction(&key) {
+                self.deleted_versions.insert(key, version);
+            } else {
+                self.deleted_versions.remove(&key);
+            }
         }
+    }
+
+    fn is_changed_in_open_transaction(&self, key: &K) -> bool {
+        self.working_sets
+            .values()
+            .any(|working_set| working_set.changes.contains_key(key))
+    }
+
+    /// Drops the deletes no open transaction can still conflict with, once
+    /// one ended
+    fn forget_unwatched_deletes(&mut self) {
+        let working_sets = &self.working_sets;
+        self.deleted_versions.retain(|key, _| {
+            working_sets
+                .values()
+                .any(|working_set| working_set.changes.contains_key(key))
+        });
     }
 
     fn take_next_version(&mut self) -> u64 {
@@ -658,6 +679,21 @@ mod tests {
         harness.map.write(None, |write| write.delete("a"));
 
         assert_matches!(harness.check_commit(first), Err(_));
+    }
+
+    #[test]
+    fn test_deletes_are_forgotten_once_no_open_transaction_changed_their_keys() {
+        let harness = MapHarness::with_committed(&[("a", 1), ("b", 2)]);
+        harness.map.write(None, |write| write.delete("a"));
+        assert_eq!(harness.remembered_deletes(), 0);
+
+        let open = harness.begin();
+        harness.map.write(Some(open), |write| write.put("b", 20));
+        harness.map.write(None, |write| write.delete("b"));
+        assert_eq!(harness.remembered_deletes(), 1);
+
+        harness.map.rollback(open);
+        assert_eq!(harness.remembered_deletes(), 0);
     }
 
     #[test]
@@ -920,6 +956,10 @@ mod tests {
             transaction: TransactionId,
         ) -> Result<(), InMemoryWriteConflictError> {
             self.map.prepare_commit(transaction).map(|_| ())
+        }
+
+        fn remembered_deletes(&self) -> usize {
+            self.map.state.lock().unwrap().deleted_versions.len()
         }
 
         fn get(&self, transaction: Option<TransactionId>, key: &'static str) -> Option<i32> {

@@ -16,6 +16,8 @@ use crate::domain::{
     DeclarativeResourceState,
     EventSourcedResource,
     InvariantViolationOf,
+    ResourceControllerStateRepository,
+    ResourceID,
     ResourceLabelProjectionRepository,
     ResourcePersistenceError,
     ResourceRepository,
@@ -38,6 +40,7 @@ where
 {
     resource_repository: &'a dyn ResourceRepository,
     label_projection_repository: &'a dyn ResourceLabelProjectionRepository,
+    controller_state_repository: &'a dyn ResourceControllerStateRepository,
     event_store: &'a R::Store,
     extension_schema_registry: &'a ResourceExtensionSchemaRegistry,
 }
@@ -51,12 +54,14 @@ where
     pub fn new(
         resource_repository: &'a dyn ResourceRepository,
         label_projection_repository: &'a dyn ResourceLabelProjectionRepository,
+        controller_state_repository: &'a dyn ResourceControllerStateRepository,
         event_store: &'a R::Store,
         extension_schema_registry: &'a ResourceExtensionSchemaRegistry,
     ) -> Self {
         Self {
             resource_repository,
             label_projection_repository,
+            controller_state_repository,
             event_store,
             extension_schema_registry,
         }
@@ -92,6 +97,7 @@ where
     pub async fn save(&self, resource: &mut R) -> Result<(), ResourcePersistenceError> {
         let expected_last_event_id = resource.aggregate().last_stored_event_id();
         self.validate(resource)?;
+        let outdates_controller_outcomes = Self::outdates_controller_outcomes(resource);
 
         match resource.aggregate_mut().save(self.event_store).await {
             Ok(()) => {}
@@ -103,13 +109,23 @@ where
             }
         }
 
-        self.sync_snapshot(resource, expected_last_event_id).await
+        self.sync_snapshot(resource, expected_last_event_id).await?;
+
+        if outdates_controller_outcomes {
+            self.forget_controller_outcomes(resource.id()).await?;
+        }
+        Ok(())
     }
 
     pub async fn save_many(&self, resources: &mut [R]) -> Result<(), ResourcePersistenceError> {
         for resource in resources.iter() {
             self.validate(resource)?;
         }
+        let outdated_controller_outcomes = resources
+            .iter()
+            .filter(|resource| Self::outdates_controller_outcomes(resource))
+            .map(|resource| *resource.id())
+            .collect::<Vec<_>>();
 
         let expected_last_event_ids = resources
             .iter()
@@ -127,7 +143,38 @@ where
         }
 
         self.sync_snapshots(resources, expected_last_event_ids)
+            .await?;
+
+        for id in &outdated_controller_outcomes {
+            self.forget_controller_outcomes(id).await?;
+        }
+        Ok(())
+    }
+
+    /// Whether the save turns what controllers recorded about the resource
+    /// into an answer to an earlier question: a new generation, or a deletion
+    /// request. Checked before the save, which makes the new state the stored
+    /// one.
+    fn outdates_controller_outcomes(resource: &R) -> bool {
+        resource.aggregate().stored_state().is_some_and(|stored| {
+            let (before, after) = (stored.headers(), resource.headers());
+            before.generation != after.generation
+                || (before.deletion_requested_at.is_none() && after.deletion_requested_at.is_some())
+        })
+    }
+
+    /// Clears the bookkeeping of the controller runtime for the resource, so
+    /// that a retry or failure backoff recorded for an earlier generation does
+    /// not delay the change: the runtime processes it at once and backs off
+    /// from scratch if it fails again
+    async fn forget_controller_outcomes(
+        &self,
+        id: &ResourceID,
+    ) -> Result<(), ResourcePersistenceError> {
+        self.controller_state_repository
+            .delete_states_for_resource(id)
             .await
+            .map_err(ResourcePersistenceError::Internal)
     }
 
     fn validate(&self, resource: &R) -> Result<(), ResourcePersistenceError> {
@@ -225,6 +272,8 @@ macro_rules! declare_resource_persistence_service {
             resource_repository: std::sync::Arc<dyn kamu_resources::ResourceRepository>,
             label_projection_repository:
                 std::sync::Arc<dyn kamu_resources::ResourceLabelProjectionRepository>,
+            controller_state_repository:
+                std::sync::Arc<dyn kamu_resources::ResourceControllerStateRepository>,
             event_store: std::sync::Arc<dyn $store>,
             extension_schema_registry: std::sync::Arc<$crate::ResourceExtensionSchemaRegistry>,
         }
@@ -238,6 +287,7 @@ macro_rules! declare_resource_persistence_service {
                 let helper = $crate::ResourcePersistenceServiceHelper::<$resource>::new(
                     self.resource_repository.as_ref(),
                     self.label_projection_repository.as_ref(),
+                    self.controller_state_repository.as_ref(),
                     self.event_store.as_ref(),
                     self.extension_schema_registry.as_ref(),
                 );
@@ -252,6 +302,7 @@ macro_rules! declare_resource_persistence_service {
                 let helper = $crate::ResourcePersistenceServiceHelper::<$resource>::new(
                     self.resource_repository.as_ref(),
                     self.label_projection_repository.as_ref(),
+                    self.controller_state_repository.as_ref(),
                     self.event_store.as_ref(),
                     self.extension_schema_registry.as_ref(),
                 );
@@ -266,6 +317,7 @@ macro_rules! declare_resource_persistence_service {
                 let helper = $crate::ResourcePersistenceServiceHelper::<$resource>::new(
                     self.resource_repository.as_ref(),
                     self.label_projection_repository.as_ref(),
+                    self.controller_state_repository.as_ref(),
                     self.event_store.as_ref(),
                     self.extension_schema_registry.as_ref(),
                 );

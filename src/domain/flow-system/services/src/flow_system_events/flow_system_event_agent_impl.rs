@@ -45,9 +45,15 @@ pub struct FlowSystemEventAgentImpl {
 
 impl FlowSystemEventAgentImpl {
     /// Applies all pending events to every projector. Given the agent's
-    /// listener, keeps its heartbeat going between batches
+    /// listener, keeps its heartbeat going between batches. Given a shutdown
+    /// token, stops between batches once it is cancelled, so that events
+    /// arriving during a shutdown do not keep it going
     #[tracing::instrument(level = "debug", skip_all)]
-    async fn apply_pending_events(&self, wakeup_listener: Option<&dyn WakeupListener>) {
+    async fn apply_pending_events(
+        &self,
+        wakeup_listener: Option<&dyn WakeupListener>,
+        shutdown: Option<&CancellationToken>,
+    ) {
         let catalog = self.catalog.upgrade();
 
         // For each projector, apply all existing unprocessed events
@@ -69,6 +75,9 @@ impl FlowSystemEventAgentImpl {
                 let result = self.apply_batch_to_projector(&builder).await;
                 if let Some(wakeup_listener) = wakeup_listener {
                     wakeup_listener.heartbeat();
+                }
+                if shutdown.is_some_and(CancellationToken::is_cancelled) {
+                    return;
                 }
 
                 match result {
@@ -109,9 +118,14 @@ impl FlowSystemEventAgentImpl {
     /// Held back events are checked before applying: a commit that releases
     /// them after the check is either seen by the applying, or happens while
     /// the check still holds
-    async fn catch_up(&self, wakeup_listener: &dyn WakeupListener) -> Duration {
+    async fn catch_up(
+        &self,
+        wakeup_listener: &dyn WakeupListener,
+        shutdown: &CancellationToken,
+    ) -> Duration {
         let listening_timeout = self.listening_timeout().await;
-        self.apply_pending_events(Some(wakeup_listener)).await;
+        self.apply_pending_events(Some(wakeup_listener), Some(shutdown))
+            .await;
         listening_timeout
     }
 
@@ -207,7 +221,7 @@ impl BackgroundAgent for FlowSystemEventAgentImpl {
 
         // On startup, immediately sync all projectors to catch up with existing events
         let mut listening_timeout = self
-            .catch_up(wakeup_listener.as_ref())
+            .catch_up(wakeup_listener.as_ref(), &shutdown)
             .instrument(tracing::info_span!(
                 "FlowSystemEventAgent::initial_catchup_phase"
             ))
@@ -228,7 +242,7 @@ impl BackgroundAgent for FlowSystemEventAgentImpl {
             };
             tracing::debug!(?hint, "Agent woke up with a hint");
 
-            listening_timeout = self.catch_up(wakeup_listener.as_ref()).await;
+            listening_timeout = self.catch_up(wakeup_listener.as_ref(), &shutdown).await;
         }
     }
 }
@@ -238,7 +252,7 @@ impl BackgroundAgent for FlowSystemEventAgentImpl {
 #[async_trait::async_trait]
 impl FlowSystemEventAgent for FlowSystemEventAgentImpl {
     async fn catchup_remaining_events(&self) -> Result<(), InternalError> {
-        self.apply_pending_events(None).await;
+        self.apply_pending_events(None, None).await;
         Ok(())
     }
 }

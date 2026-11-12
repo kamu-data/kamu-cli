@@ -859,6 +859,30 @@ impl FlowHarness {
         Ok(())
     }
 
+    /// Runs the flow system event agent with a shutdown requested before its
+    /// start, until it returns. A run outliving the test's bound ignored the
+    /// shutdown
+    pub async fn run_flow_system_event_agent_shut_down_at_start(&self) {
+        let shutdown = CancellationToken::new();
+        shutdown.cancel();
+        tokio::time::timeout(
+            std::time::Duration::from_secs(5),
+            self.flow_system_event_agent.run(shutdown),
+        )
+        .await
+        .expect("the flow system event agent ignored the shutdown")
+        .unwrap();
+    }
+
+    /// Batches the heartbeat probe projector applied, each with whether the
+    /// agent's heartbeat was recent
+    pub fn probe_heartbeats_seen(&self) -> Vec<bool> {
+        self.catalog
+            .get_one::<HeartbeatProbeFlowSystemEventProjector>()
+            .unwrap()
+            .heartbeats_seen()
+    }
+
     /// Runs the flow agent and the flow system event agent, requests a
     /// shutdown after `delay` of real time, and returns how each run ended.
     /// A run outliving the test's bound ignored the shutdown

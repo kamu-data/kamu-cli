@@ -79,6 +79,38 @@ async fn test_failure_backs_off_and_success_resets_it() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
+async fn test_spec_change_during_backoff_is_processed_at_once() {
+    let harness =
+        ControllerRuntimeHarness::new(TestControllers::Main, TestControllerBehavior::Fail).await;
+    let id = harness.apply("res-a").await;
+    assert_eq!(harness.process_calls_until_idle().await, 1);
+    assert_eq!(harness.process_calls_until_idle().await, 0);
+
+    harness.update_spec(id, "v2").await;
+
+    assert_eq!(harness.process_calls_until_idle().await, 1);
+    // The new generation backs off from scratch
+    assert_eq!(harness.state(id).await.unwrap().attempts, 1);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_deletion_request_during_backoff_is_processed_at_once() {
+    let harness =
+        ControllerRuntimeHarness::new(TestControllers::Main, TestControllerBehavior::Fail).await;
+    let id = harness.apply("res-a").await;
+    assert_eq!(harness.process_calls_until_idle().await, 1);
+    assert_eq!(harness.process_calls_until_idle().await, 0);
+
+    harness.request_deletion(id).await;
+
+    assert_eq!(harness.process_calls_until_idle().await, 1);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
 async fn test_panic_fails_only_its_resource() {
     let harness = ControllerRuntimeHarness::finishing().await;
     let panicking = harness.apply("res-panicking").await;

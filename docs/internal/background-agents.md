@@ -48,14 +48,14 @@ their current step, then aborts the ones still running.
 | `is_failure_fatal()` | `false` by default. `true` makes any failure of the agent stop the host and every other agent |
 | A new run | Starts from storage: whatever the previous run left behind (a claimed task, a half-done drain) is found again |
 
-A **step** is the unit of work an agent never abandons on its own: a catch-up pass, a flow
+A **step** is the unit of work an agent never abandons on its own: a batch of a catch-up, a flow
 activation tick, a task, a controller drain. Waits around steps are always droppable, as they only
 read; `CancellationToken::run_until_cancelled` wraps them.
 
 | Agent | Steps | Stops |
 | --- | --- | --- |
-| Outbox agent | the initial catch-up, then a catch-up per wakeup | while waiting for messages |
-| Flow system event agent | the initial catch-up, then a catch-up per wakeup | while waiting for events |
+| Outbox agent | each batch of a catch-up: the initial one, then one per wakeup | between batches, and while waiting for messages |
+| Flow system event agent | each projector batch of a catch-up: the initial one, then one per wakeup | between batches, and while waiting for events |
 | Flow agent | activating the due flows | while waiting for the next activation moment |
 | Task agent | taking a task, and running it | while waiting for a task; never between taking and running one |
 | Resource controller runtime | each controller loop's drain | after each loop's drain, in its wait; a loop that fails then is not restarted |
@@ -105,7 +105,9 @@ restarts by reason, and the time of its last failure.
 
 `api-server` cancels one token on Ctrl+C, on SIGTERM, on the e2e `/e2e/shutdown` route, when its
 HTTP server ends unexpectedly, or when an agent fails fatally. The same token stops the HTTP server
-from accepting requests and every agent.
+from accepting requests and every agent. Once the stop has begun, another Ctrl+C or SIGTERM exits
+the process at once with status 1, for a stop that hangs, such as an agent blocked in code an abort
+cannot interrupt.
 
 ```mermaid
 sequenceDiagram

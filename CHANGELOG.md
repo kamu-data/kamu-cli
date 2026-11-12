@@ -108,8 +108,8 @@ Recommendation: for ease of reading, use the following format:
   configured by `backgroundAgents.restartBackoff` (from 1s, doubling, up to 1m by default)
 - `kamu system api-server` shuts down gracefully on Ctrl+C or SIGTERM: it stops accepting requests,
   and in-flight requests and background agents get `backgroundAgents.shutdownTimeout` (10s by
-  default) to finish their current step before they are stopped. Before, the process was killed at
-  once
+  default) to finish their current step before they are stopped; a second Ctrl+C or SIGTERM exits
+  at once. Before, the process was killed at once
 ### Fixed
 - A polling source with an unsupported URL scheme (such as `s3://`) or fetch kind, an invalid
   header, an MQTT port out of range, a files glob ordered by event time or matching a file name that
