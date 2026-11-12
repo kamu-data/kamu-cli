@@ -175,8 +175,8 @@ pub struct BatchResourceProblem<E> {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ResourceDeletion {
     pub id: ResourceID,
-    /// `Deleting` while the controllers clean up, `Deleted` once they finished
-    /// within the request.
+    /// The phase when the response was made: `Deleting` while the controllers
+    /// clean up, `Deleted` once they finished.
     pub phase: ResourcePhase,
 }
 

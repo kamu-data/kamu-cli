@@ -9,24 +9,33 @@
 
 use std::sync::Arc;
 
+use chrono::TimeDelta;
 use dill::CatalogBuilder;
+use internal_error::InternalError;
 use kamu_resources::{
     ApplyResourceApplicationDecision,
     ApplyResourceParams,
     ApplyResourceUseCase,
     RequestAccountResourcesDeletionUseCase,
     RequestResourcesDeletionUseCase,
+    ResourceController,
+    ResourceControllerName,
+    ResourceControllerState,
+    ResourceControllerStateRepository,
     ResourceID,
+    ResourceProcessOutcome,
     ResourceSpecSanitizer,
-    SimpleResourceController,
 };
+use kamu_resources_services::BackgroundWorkFinalizer;
 use kamu_resources_services::testing::{
     BaseResourceServiceHarness,
     BaseResourceServiceHarnessOpts,
 };
 use messaging_outbox::{MockOutbox, OutboxAgent, OutboxProvider};
+use time_source::FakeSystemTimeSource;
 
 use crate::tests::utils::{
+    TEST_RESOURCE_SIMPLE_CONTROLLER_NAME,
     TestResource,
     TestResourceReconcilerProvider,
     TestResourceSpec,
@@ -35,7 +44,7 @@ use crate::tests::utils::{
     register_test_condition_schema_dispatchers,
     register_test_resource_crud_dispatcher,
     register_test_resource_resource_service_layer,
-    register_test_resource_resource_service_layer_without_lifecycle_dispatcher,
+    register_test_resource_resource_service_layer_without_controller,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -54,9 +63,10 @@ pub struct ServiceLayerTestHarnessOpts {
     pub base_opts: BaseResourceServiceHarnessOpts,
     pub reconciler_provider: TestResourceReconcilerProvider,
     pub sanitizer: SanitizerKind,
-    /// Whether the test type is reconciled by the one-shot lifecycle dispatch.
-    /// Without it, only a `ResourceController` drives the type.
-    pub lifecycle_dispatcher: bool,
+    /// Whether the controller runtime drives the test type through its simple
+    /// controller adapter, which `settle` drains. Without it, the test brings
+    /// its own controller and runtime.
+    pub simple_controller: bool,
 }
 
 impl Default for ServiceLayerTestHarnessOpts {
@@ -70,7 +80,7 @@ impl Default for ServiceLayerTestHarnessOpts {
             },
             reconciler_provider: TestResourceReconcilerProvider::default(),
             sanitizer: SanitizerKind::None,
-            lifecycle_dispatcher: true,
+            simple_controller: true,
         }
     }
 }
@@ -113,13 +123,19 @@ impl ServiceLayerTestHarness {
     }
 
     pub fn new_with_opts(opts: ServiceLayerTestHarnessOpts) -> Self {
-        let base = BaseResourceServiceHarness::new_with_opts(opts.base_opts);
+        // The runtime drives the controllers of its own catalog, so it is
+        // registered here, next to the adapter
+        let base = BaseResourceServiceHarness::new_with_opts(BaseResourceServiceHarnessOpts {
+            controller_runtime: false,
+            ..opts.base_opts
+        });
 
         let mut b = CatalogBuilder::new_chained(base.catalog());
-        if opts.lifecycle_dispatcher {
+        if opts.simple_controller {
             register_test_resource_resource_service_layer(&mut b);
+            BaseResourceServiceHarness::register_controller_runtime(&mut b);
         } else {
-            register_test_resource_resource_service_layer_without_lifecycle_dispatcher(&mut b);
+            register_test_resource_resource_service_layer_without_controller(&mut b);
         }
         register_test_resource_crud_dispatcher(&mut b);
         register_test_condition_schema_dispatchers(&mut b);
@@ -164,19 +180,8 @@ impl ServiceLayerTestHarness {
         self.catalog.get_one().unwrap()
     }
 
-    pub fn simple_controller(&self) -> Arc<dyn SimpleResourceController<TestResource>> {
-        self.catalog.get_one().unwrap()
-    }
-
     pub fn outbox_agent(&self) -> Arc<dyn OutboxAgent> {
         self.catalog.get_one().unwrap()
-    }
-
-    pub async fn flush_outbox(&self) {
-        self.outbox_agent()
-            .run_single_iteration_only()
-            .await
-            .unwrap();
     }
 
     pub async fn request_resources_deletion(
@@ -197,11 +202,43 @@ impl ServiceLayerTestHarness {
             .unwrap();
     }
 
-    pub async fn complete_deletion(&self, ids: &[ResourceID]) {
-        self.simple_controller()
-            .complete_deletions(ids)
+    /// See [`BackgroundWorkFinalizer`]
+    pub async fn settle(&self) {
+        BackgroundWorkFinalizer
+            .finalize(&self.catalog)
             .await
             .unwrap();
+    }
+
+    /// One `process` call of the type's simple controller adapter
+    pub async fn process(&self, id: &ResourceID) -> Result<ResourceProcessOutcome, InternalError> {
+        self.catalog()
+            .get_one::<dyn ResourceController>()
+            .unwrap()
+            .process(id)
+            .await
+    }
+
+    /// The runtime's bookkeeping of the adapter for the resource
+    pub async fn controller_state(&self, id: &ResourceID) -> ResourceControllerState {
+        self.catalog()
+            .get_one::<dyn ResourceControllerStateRepository>()
+            .unwrap()
+            .get_state(
+                &ResourceControllerName::new(TEST_RESOURCE_SIMPLE_CONTROLLER_NAME),
+                id,
+            )
+            .await
+            .unwrap()
+            .expect("the runtime keeps bookkeeping of every resource it processed")
+    }
+
+    /// Needs `fake_time`
+    pub fn advance_time(&self, delta: TimeDelta) {
+        self.catalog()
+            .get_one::<FakeSystemTimeSource>()
+            .unwrap()
+            .advance(delta);
     }
 
     pub async fn apply_and_assert_snapshot(

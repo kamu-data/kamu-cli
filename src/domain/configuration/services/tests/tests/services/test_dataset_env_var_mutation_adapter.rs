@@ -41,7 +41,6 @@ async fn test_lazy_creation_of_variable_resource_on_first_upsert() {
 
     // No resources exist yet — first upsert creates them lazily
     let result = harness
-        .mutation_adapter()
         .upsert_env_var(
             &dataset_id,
             "FOO",
@@ -80,7 +79,6 @@ async fn test_lazy_creation_of_variable_resource_on_first_upsert() {
 
     // Second upsert for the same key → Updated status, still one resource
     let result2 = harness
-        .mutation_adapter()
         .upsert_env_var(
             &dataset_id,
             "FOO",
@@ -119,7 +117,6 @@ async fn test_lazy_creation_of_secret_resource_on_first_upsert() {
     harness.seed_dataset_entry(&dataset_id, &account_id).await;
 
     let result = harness
-        .mutation_adapter()
         .upsert_env_var(
             &dataset_id,
             "MY_SECRET",
@@ -172,14 +169,12 @@ async fn test_delete_last_variable_removes_resource() {
 
     // Upsert two vars
     let r_a = harness
-        .mutation_adapter()
         .upsert_env_var(&dataset_id, "A", &DatasetEnvVarValue::Regular("va".into()))
         .await
         .unwrap();
     DatasetEnvVarServiceHarness::assert_upsert_created(&r_a);
 
     let r_b = harness
-        .mutation_adapter()
         .upsert_env_var(&dataset_id, "B", &DatasetEnvVarValue::Regular("vb".into()))
         .await
         .unwrap();
@@ -195,11 +190,7 @@ async fn test_delete_last_variable_removes_resource() {
     );
 
     // Delete A — the resource stays and B is still visible
-    harness
-        .mutation_adapter()
-        .delete_env_var(&dataset_id, "A")
-        .await
-        .unwrap();
+    harness.delete_env_var(&dataset_id, "A").await.unwrap();
 
     assert_eq!(
         harness
@@ -218,11 +209,7 @@ async fn test_delete_last_variable_removes_resource() {
     assert!(env_after_a.contains_key("B"));
 
     // Delete B — last entry, the resource itself must be removed
-    harness
-        .mutation_adapter()
-        .delete_env_var(&dataset_id, "B")
-        .await
-        .unwrap();
+    harness.delete_env_var(&dataset_id, "B").await.unwrap();
 
     assert_eq!(
         harness
@@ -262,7 +249,6 @@ async fn test_delete_last_secret_removes_resource() {
 
     // Upsert two secrets
     let r_a = harness
-        .mutation_adapter()
         .upsert_env_var(
             &dataset_id,
             "SEC_A",
@@ -273,7 +259,6 @@ async fn test_delete_last_secret_removes_resource() {
     DatasetEnvVarServiceHarness::assert_upsert_created(&r_a);
 
     let r_b = harness
-        .mutation_adapter()
         .upsert_env_var(
             &dataset_id,
             "SEC_B",
@@ -292,11 +277,7 @@ async fn test_delete_last_secret_removes_resource() {
     );
 
     // Delete SEC_A — the labelled resource must still exist
-    harness
-        .mutation_adapter()
-        .delete_env_var(&dataset_id, "SEC_A")
-        .await
-        .unwrap();
+    harness.delete_env_var(&dataset_id, "SEC_A").await.unwrap();
 
     assert_eq!(
         harness
@@ -315,11 +296,7 @@ async fn test_delete_last_secret_removes_resource() {
     assert!(env_after_a.contains_key("SEC_B"));
 
     // Delete SEC_B — last secret; the resource must be removed
-    harness
-        .mutation_adapter()
-        .delete_env_var(&dataset_id, "SEC_B")
-        .await
-        .unwrap();
+    harness.delete_env_var(&dataset_id, "SEC_B").await.unwrap();
 
     assert_eq!(
         harness
@@ -358,7 +335,6 @@ async fn test_upsert_converts_variable_to_secret() {
 
     // Start as a regular variable
     let r1 = harness
-        .mutation_adapter()
         .upsert_env_var(
             &dataset_id,
             "FOO",
@@ -384,7 +360,6 @@ async fn test_upsert_converts_variable_to_secret() {
 
     // Re-upsert the same key as a secret — must convert
     let r2 = harness
-        .mutation_adapter()
         .upsert_env_var(
             &dataset_id,
             "FOO",
@@ -435,7 +410,6 @@ async fn test_upsert_converts_secret_to_variable() {
 
     // Start as a secret
     let r1 = harness
-        .mutation_adapter()
         .upsert_env_var(
             &dataset_id,
             "BAR",
@@ -461,7 +435,6 @@ async fn test_upsert_converts_secret_to_variable() {
 
     // Re-upsert the same key as a regular variable — must convert
     let r2 = harness
-        .mutation_adapter()
         .upsert_env_var(
             &dataset_id,
             "BAR",
@@ -511,7 +484,6 @@ async fn test_delete_nonexistent_key_returns_not_found() {
     harness.seed_dataset_entry(&dataset_id, &account_id).await;
 
     let err = harness
-        .mutation_adapter()
         .delete_env_var(&dataset_id, "NONEXISTENT")
         .await
         .unwrap_err();
@@ -536,7 +508,6 @@ async fn test_managed_resources_are_stamped_with_the_target_dataset_label() {
         .await;
 
     harness
-        .mutation_adapter()
         .upsert_env_var(
             &dataset_id,
             "FOO",
@@ -545,7 +516,6 @@ async fn test_managed_resources_are_stamped_with_the_target_dataset_label() {
         .await
         .unwrap();
     harness
-        .mutation_adapter()
         .upsert_env_var(
             &dataset_id,
             "SEC",
@@ -593,7 +563,6 @@ async fn test_target_dataset_label_survives_an_update() {
 
     for value in ["first", "second"] {
         harness
-            .mutation_adapter()
             .upsert_env_var(
                 &dataset_id,
                 "FOO",
@@ -654,7 +623,6 @@ async fn test_legacy_key_does_not_block_writes() {
     pretty_assertions::assert_eq!(edited.status, UpsertDatasetEnvVarStatus::Updated);
 
     harness
-        .mutation_adapter()
         .delete_env_var(&dataset_id, "API_URL")
         .await
         .unwrap();
@@ -708,7 +676,6 @@ async fn test_legacy_secret_key_does_not_block_writes() {
     pretty_assertions::assert_eq!(edited.status, UpsertDatasetEnvVarStatus::Updated);
 
     harness
-        .mutation_adapter()
         .delete_env_var(&dataset_id, "API_TOKEN")
         .await
         .unwrap();

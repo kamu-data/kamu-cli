@@ -856,6 +856,7 @@ impl LifecyclePrimitivesHarness {
                 outbox_provider: OutboxProvider::Dispatching,
                 transactional: true,
                 fake_time: false,
+                ..Default::default()
             },
             ..Default::default()
         });

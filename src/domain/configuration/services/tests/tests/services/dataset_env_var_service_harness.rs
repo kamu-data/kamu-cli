@@ -33,6 +33,7 @@ use kamu_datasets::{
     DatasetEnvVarSpecResolver,
     DatasetEnvVarUpsertResult,
     DatasetEnvVarValue,
+    DeleteDatasetEnvVarError,
     GetDatasetEnvVarError,
     UpsertDatasetEnvVarError,
     UpsertDatasetEnvVarStatus,
@@ -217,14 +218,58 @@ impl DatasetEnvVarServiceHarness {
         persistence_service.create(&mut resource).await.unwrap();
     }
 
+    /// Upserts through the mutation adapter, then lets the controller runtime
+    /// reconcile the change
+    pub async fn upsert_env_var(
+        &self,
+        dataset_id: &odf::DatasetID,
+        key: &str,
+        value: &DatasetEnvVarValue,
+    ) -> Result<DatasetEnvVarUpsertResult, UpsertDatasetEnvVarError> {
+        let result = self
+            .mutation_adapter()
+            .upsert_env_var(dataset_id, key, value)
+            .await;
+        self.settle().await;
+        result
+    }
+
+    /// [`Self::upsert_env_var`] for a create
+    pub async fn create_env_var(
+        &self,
+        dataset_id: &odf::DatasetID,
+        key: &str,
+        value: &DatasetEnvVarValue,
+    ) -> Result<DatasetEnvVar, CreateDatasetEnvVarError> {
+        let result = self
+            .mutation_adapter()
+            .create_env_var(dataset_id, key, value)
+            .await;
+        self.settle().await;
+        result
+    }
+
+    /// [`Self::upsert_env_var`] for a delete
+    pub async fn delete_env_var(
+        &self,
+        dataset_id: &odf::DatasetID,
+        key: &str,
+    ) -> Result<(), DeleteDatasetEnvVarError> {
+        let result = self
+            .mutation_adapter()
+            .delete_env_var(dataset_id, key)
+            .await;
+        self.settle().await;
+        result
+    }
+
     pub async fn upsert_variable(
         &self,
         dataset_id: &odf::DatasetID,
         key: &str,
         value: &str,
     ) -> Result<DatasetEnvVarUpsertResult, UpsertDatasetEnvVarError> {
-        self.mutation_adapter()
-            .upsert_env_var(dataset_id, key, &DatasetEnvVarValue::Regular(value.into()))
+        self.upsert_env_var(dataset_id, key, &DatasetEnvVarValue::Regular(value.into()))
             .await
     }
 
@@ -234,13 +279,12 @@ impl DatasetEnvVarServiceHarness {
         key: &str,
         value: &str,
     ) -> Result<DatasetEnvVarUpsertResult, UpsertDatasetEnvVarError> {
-        self.mutation_adapter()
-            .upsert_env_var(
-                dataset_id,
-                key,
-                &DatasetEnvVarValue::Secret(SecretString::from(value.to_string())),
-            )
-            .await
+        self.upsert_env_var(
+            dataset_id,
+            key,
+            &DatasetEnvVarValue::Secret(SecretString::from(value.to_string())),
+        )
+        .await
     }
 
     pub async fn create_variable(
@@ -249,8 +293,7 @@ impl DatasetEnvVarServiceHarness {
         key: &str,
         value: &str,
     ) -> Result<DatasetEnvVar, CreateDatasetEnvVarError> {
-        self.mutation_adapter()
-            .create_env_var(dataset_id, key, &DatasetEnvVarValue::Regular(value.into()))
+        self.create_env_var(dataset_id, key, &DatasetEnvVarValue::Regular(value.into()))
             .await
     }
 

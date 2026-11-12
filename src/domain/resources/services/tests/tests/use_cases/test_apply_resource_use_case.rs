@@ -61,11 +61,12 @@ async fn test_apply_end_to_end_create_and_retrieve() {
     let result = decision.expect_applied();
     assert_eq!(result.outcome, ApplyResourceOutcome::Created);
 
+    // The controller runtime reconciles the resource after the apply
+    harness.settle().await;
+
     let snapshot = harness.get_snapshot_by_id(&result.id).await.unwrap();
     pretty_assertions::assert_eq!(snapshot.spec, serde_json::json!({ "value": "res-a" }));
 
-    // Default harness uses Immediate outbox — auto-reconcile runs synchronously
-    // after apply, so the resource must already be Ready at this point.
     let status = snapshot.basic_status().unwrap();
     assert_eq!(status.phase, ResourcePhase::Ready);
     assert_eq!(status.observed_generation, Some(1));
@@ -295,8 +296,7 @@ async fn test_apply_update_resets_status_to_pending() {
 
     // Create + reconcile → gen=1, observed_gen=1, phase=Ready
     let id = harness.apply_and_get_id(&account_handle, "res-a").await;
-    harness.simple_controller().reconcile(&id).await.unwrap();
-    harness.flush_outbox().await;
+    harness.settle().await;
 
     let snapshot = harness.get_snapshot_by_id(&id).await.unwrap();
     let status = snapshot.basic_status().unwrap();

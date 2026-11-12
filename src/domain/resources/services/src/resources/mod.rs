@@ -15,7 +15,8 @@ macro_rules! declare_resource_service_layer {
         domain = $domain:path,
         name = $name:ident,
         resource = $resource:ty,
-        state_model = $state_model:ty
+        state_model = $state_model:ty,
+        controller_name = $controller_name:expr
     ) => {
         $crate::paste::paste! {
             $crate::declare_resource_event_store_bridge!(
@@ -60,28 +61,24 @@ macro_rules! declare_resource_service_layer {
 
             $crate::declare_simple_resource_controller_adapter!(
                 adapter = [<$name SimpleResourceControllerAdapter>],
-                resource = $resource
+                resource = $resource,
+                controller_name = $controller_name
             );
 
-            $crate::declare_resource_lifecycle_controller_dispatcher!(
-                dispatcher = [<$name ResourceLifecycleDispatcher>],
-                resource = $resource
-            );
-
-            /// The service layer of a type reconciled by the one-shot
-            /// lifecycle dispatch, on each lifecycle message
+            /// The service layer of a type whose `SimpleResourceReconciler`
+            /// the controller runtime drives, through the generated adapter
             pub fn [<register_ $name:snake _resource_service_layer>](
                 catalog_builder: &mut dill::CatalogBuilder,
             ) {
-                [<register_ $name:snake _resource_service_layer_without_lifecycle_dispatcher>](
+                [<register_ $name:snake _resource_service_layer_without_controller>](
                     catalog_builder,
                 );
-                catalog_builder.add::<[<$name ResourceLifecycleDispatcher>]>();
+                catalog_builder.add::<[<$name SimpleResourceControllerAdapter>]>();
             }
 
-            /// The service layer of a type that a `ResourceController` drives
-            /// alone: lifecycle messages only hint the controller runtime
-            pub fn [<register_ $name:snake _resource_service_layer_without_lifecycle_dispatcher>](
+            /// The service layer of a type that brings its own
+            /// `ResourceController` instead of a `SimpleResourceReconciler`
+            pub fn [<register_ $name:snake _resource_service_layer_without_controller>](
                 catalog_builder: &mut dill::CatalogBuilder,
             ) {
                 catalog_builder.add::<[<$name ApplyResourceUseCaseImpl>]>();
@@ -91,7 +88,6 @@ macro_rules! declare_resource_service_layer {
                 catalog_builder.add::<[<$name ResourceLifecyclePrimitivesImpl>]>();
                 catalog_builder.add::<[<$name ResourcePersistenceServiceImpl>]>();
                 catalog_builder.add::<[<$name TypedResourceQueryServiceImpl>]>();
-                catalog_builder.add::<[<$name SimpleResourceControllerAdapter>]>();
             }
         }
     };

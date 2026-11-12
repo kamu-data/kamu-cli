@@ -21,6 +21,23 @@ use crate::domain::{
 
 /// Runs a [`SimpleResourceReconciler`] on a resource whose reconciliation
 /// started and records the outcome, within the transaction of its caller
+/// What the second phase of a reconciliation recorded
+#[derive(Debug)]
+pub enum SimpleResourceReconciliationOutcome<R: EventSourcedResource> {
+    /// The resource as `complete_reconciliation` left it
+    Reconciled(R),
+    /// The resource as `fail_reconciliation` left it, with the error it recorded
+    Failed {
+        recorded: R,
+        error: R::ReconcileError,
+    },
+    /// Nothing was recorded: the deletion of the resource was requested, or
+    /// its generation changed, after the reconciliation started
+    Superseded,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 pub struct SimpleResourceReconciliationHelper<'a, R>
 where
     R: EventSourcedResource,
@@ -50,36 +67,36 @@ where
     pub async fn finish_reconciliation_phase(
         &self,
         started: R,
-    ) -> Result<(), SimpleResourceReconciliationError<R>> {
+    ) -> Result<SimpleResourceReconciliationOutcome<R>, SimpleResourceReconciliationError<R>> {
         let id = *started.id();
         let expected = ResourceVersion::from(started.headers());
 
         // Phase 2 runs in a separate transaction after the started state was
         // committed, so the resource may have changed in between.
         let recorded = match self.reconciler.reconcile(&started).await {
-            Ok(()) => {
-                self.lifecycle_primitives
-                    .complete_reconciliation(&id, expected)
-                    .await
-            }
-            Err(err) => {
-                self.lifecycle_primitives
-                    .fail_reconciliation(&id, expected, &err)
-                    .await
-            }
+            Ok(()) => self
+                .lifecycle_primitives
+                .complete_reconciliation(&id, expected)
+                .await
+                .map(SimpleResourceReconciliationOutcome::Reconciled),
+            Err(error) => self
+                .lifecycle_primitives
+                .fail_reconciliation(&id, expected, &error)
+                .await
+                .map(|recorded| SimpleResourceReconciliationOutcome::Failed { recorded, error }),
         };
 
         use ResourceLifecycleTransitionError as E;
         use ResourceStaleExpectationError as Stale;
 
         match recorded {
-            Ok(_) => Ok(()),
+            Ok(outcome) => Ok(outcome),
             Err(E::Stale(Stale::DeletionRequested(_))) => {
                 tracing::info!(
                     resource_id = %id,
                     "Discarding reconciliation outcome of a resource being deleted"
                 );
-                Ok(())
+                Ok(SimpleResourceReconciliationOutcome::Superseded)
             }
             Err(E::Stale(Stale::GenerationChanged(conflict))) => {
                 tracing::info!(
@@ -88,7 +105,7 @@ where
                     current_generation = conflict.actual,
                     "Discarding reconciliation outcome of a superseded generation"
                 );
-                Ok(())
+                Ok(SimpleResourceReconciliationOutcome::Superseded)
             }
             Err(
                 err @ (E::Stale(Stale::StatusGenerationChanged(_))
