@@ -367,6 +367,11 @@ backgroundAgents:
       backoffType: Exponential
       minDelay: 1s
       maxDelay: 1m
+  restartBackoff:           # BackgroundAgentHostConfig::restart_backoff
+    backoffType: Exponential
+    minDelay: 1s
+    maxDelay: 1m
+  shutdownTimeout: 10s      # BackgroundAgentHostConfig::shutdown_timeout
 ```
 
 - `minDebounceInterval` — how long a handle absorbs a burst after the first signal, and the SQLite
@@ -389,6 +394,9 @@ backgroundAgents:
   loop, by consecutive failures (`backoffType` is one of `Fixed`, `Linear`, `Exponential`,
   `ExponentialWithJitter`). See
   [resources-framework.md](resources-framework.md#controller-bookkeeping).
+- `restartBackoff` and `shutdownTimeout` — the agent host: the delay before an agent that failed is
+  restarted, and how long agents and in-flight API requests get on a shutdown. See
+  [background-agents.md](background-agents.md).
 - Internal constants: Postgres reconnect retry `1s` (`postgres_notification_hub.rs`), SQLite poll
   floor `10ms` (`sqlite_polling_hub.rs`).
 

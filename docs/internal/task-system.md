@@ -198,14 +198,16 @@ Planners and runners register through dill metadata, and the agent picks the fir
 
 ## 5. The task agent
 
-`TaskAgentImpl` (`services/src/task_agent_impl.rs`) is a singleton `BackgroundAgent`, started by
-the API server together with the other background agents (`src/app/cli/src/explore/api_server.rs`).
+`TaskAgentImpl` (`services/src/task_agent_impl.rs`) is a singleton `BackgroundAgent`, run by the
+API server's `BackgroundAgentHost` together with the other background agents
+([background-agents.md](background-agents.md)).
 It runs **one task at a time, in-process**. There is no concurrency limit to configure because
 there is no concurrency.
 
 ### Startup recovery
 
-`InitOnStartup` job `JOB_KAMU_TASKS_AGENT_RECOVERY` runs before the loop:
+`InitOnStartup` job `JOB_KAMU_TASKS_AGENT_RECOVERY` runs before the loop, for every command that
+runs startup jobs:
 
 1. Pre-registers the `task_agent_task_duration_seconds` label sets for every plan type that has a
    planner.
@@ -214,6 +216,9 @@ there is no concurrency.
    and a `TaskProgressMessage::Finished` is posted; every other one is requeued with
    `TaskRequeued`.
 
+`run()` repeats step 2 before its loop, so a restart by the host after a failure in the middle of
+a task requeues that task too; at a server's first run it finds nothing left.
+
 Requeued tasks keep their ID and plan, so a crash costs a re-run, not a lost task. Runners must
 therefore tolerate being re-run after a partial first attempt. The dataset runners do, because
 `HEAD` moves in a single short transaction at the very end
@@ -221,8 +226,9 @@ therefore tolerate being re-run after a partial first attempt. The dataset runne
 
 ### One iteration
 
-`run()` creates one wakeup listener for the agent's whole life and calls `run_task_iteration` in a
-loop; any error ends the loop. One iteration:
+`run()` creates one wakeup listener for the agent's whole life, then takes and runs one task at a
+time. Any error ends the run, and the host restarts it. A shutdown ends the wait for a task; a task
+taken is always run. One iteration:
 
 ```mermaid
 sequenceDiagram

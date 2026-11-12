@@ -14,6 +14,9 @@ Recommendation: for ease of reading, use the following format:
 -->
 
 ## [Unreleased]
+### Added
+- Prometheus metrics for each background agent: `background_agent_running`,
+  `background_agent_restarts_total` by reason, and `background_agent_last_failure_timestamp_seconds`
 ### Changed
 - Resources (`VariableSet`, `SecretSet`, `Storage`) are reconciled by a background controller
   that keeps trying, instead of once per change:
@@ -23,6 +26,14 @@ Recommendation: for ease of reading, use the following format:
     resource `Failed` until the next apply, and a failed cleanup during deletion is retried the
     same way
   - a resource that keeps failing no longer delays the processing of other resources
+- `kamu system api-server` keeps running when a background agent fails, panics or stops: the
+  agent is logged and restarted after a delay that grows with each consecutive failure, while the
+  API and the other agents keep working. Before, the whole server shut down. The delay is
+  configured by `backgroundAgents.restartBackoff` (from 1s, doubling, up to 1m by default)
+- `kamu system api-server` shuts down gracefully on Ctrl+C or SIGTERM: it stops accepting requests,
+  and in-flight requests and background agents get `backgroundAgents.shutdownTimeout` (10s by
+  default) to finish their current step before they are stopped. Before, the process was killed at
+  once
 
 ## [0.273.0] - 2026-11-23
 ### Added
