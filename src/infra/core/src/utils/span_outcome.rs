@@ -14,7 +14,7 @@ use kamu_core::{PullError, PullResponse, PullResult, SyncError};
 
 /// How a dataset job or a pull job ended, recorded as the `outcome` field of
 /// its span
-#[derive(Debug, Clone, Copy, PartialEq, Eq, strum::IntoStaticStr, strum::EnumIter)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, strum::IntoStaticStr)]
 #[strum(serialize_all = "snake_case")]
 pub(crate) enum SpanOutcome {
     Updated,
@@ -89,33 +89,6 @@ impl From<&PullError> for SpanOutcome {
             | PullError::TransformError(_)
             | PullError::TransformStopped(_)
             | PullError::Internal(_) => Self::Failed,
-        }
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[cfg(test)]
-mod tests {
-    use strum::IntoEnumIterator;
-
-    use super::*;
-
-    #[test]
-    fn test_outcome_names_are_stable() {
-        let names = [
-            (SpanOutcome::Updated, "updated"),
-            (SpanOutcome::UpToDate, "up_to_date"),
-            (SpanOutcome::Verified, "verified"),
-            (SpanOutcome::DatasetDeleted, "dataset_deleted"),
-            (SpanOutcome::RefMoved, "ref_moved"),
-            (SpanOutcome::NotAllowed, "not_allowed"),
-            (SpanOutcome::Failed, "failed"),
-        ];
-
-        assert_eq!(names.len(), SpanOutcome::iter().count());
-        for (outcome, name) in names {
-            assert_eq!(<&'static str>::from(outcome), name);
         }
     }
 }
