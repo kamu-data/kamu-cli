@@ -22,7 +22,41 @@ doctest = false
 
 
 [dependencies]
+async-utils = { workspace = true }
 internal-error = { workspace = true }
+observability = { workspace = true, features = [
+    "prometheus",
+] }
+retry-backoff = { workspace = true }
+time-source = { workspace = true }
 
 async-trait = { version = "0.1", default-features = false }
+chrono = { version = "0.4", default-features = false, features = [
+    "clock",
+] }
+dill = { version = "0.17", default-features = false }
+prometheus = { version = "0.14", default-features = false }
+strum = { version = "0.28", features = [
+    "derive",
+] }
+tokio = { version = "1", default-features = false, features = [
+    "macros",
+    "rt",
+] }
 tokio-util = { version = "0.7", default-features = false }
+tracing = { version = "0.1", default-features = false }
+
+
+[dev-dependencies]
+pretty_assertions = { version = "1", default-features = false, features = [
+    "std",
+    "unstable",
+] }
+test-log = { version = "0.2", features = [
+    "trace",
+] }
+tokio = { version = "1", default-features = false, features = [
+    "macros",
+    "rt",
+    "sync",
+] }
