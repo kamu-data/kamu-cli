@@ -300,7 +300,8 @@ impl ControllerRuntimeHarness {
             .hint(&TypeUri::new_unchecked(TestResource::SCHEMA_STR));
     }
 
-    /// Hints the runtime that resources of the schema no resource has changed
+    /// Hints the runtime that resources of `TEST_OTHER_SCHEMA`, a schema no
+    /// resource has, changed
     pub fn hint_other_schema(&self) {
         self.catalog()
             .get_one::<dyn ResourceControllerHints>()

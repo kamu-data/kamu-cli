@@ -139,8 +139,7 @@ async fn test_request_deletion_of_multiple_emits_single_message_with_all_resourc
 
 #[test_log::test(tokio::test)]
 async fn test_repeated_deletion_request_posts_message_again() {
-    // Requesting the deletion again re-drives the cleanup of a resource whose
-    // earlier cleanup failed
+    // Requesting the deletion of a resource being deleted posts the message again
     let mut mock_outbox = MockOutbox::new();
     BaseResourceServiceHarness::expect_applied_messages(&mut mock_outbox, 1, None);
     BaseResourceServiceHarness::expect_deletion_requested_message(&mut mock_outbox, 1);

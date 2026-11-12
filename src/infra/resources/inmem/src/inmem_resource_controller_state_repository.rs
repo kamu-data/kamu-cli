@@ -78,8 +78,8 @@ impl InMemoryResourceControllerStateRepository {
     /// the controller's row, if any
     fn matching_resources(&self, query: &ActionableResourcesQuery) -> Vec<MatchingResource> {
         // A commit holds every participant's lock, taken in registration order,
-        // and `register_dependencies` registers the resource state first. Locking
-        // in another order deadlocks against a concurrent commit
+        // and `register_dependencies` registers the resource state before the controller state
+        // store. Locking in another order deadlocks against a concurrent commit
         self.resource_state.read(self.transaction_id, |resources| {
             self.store.states.read(self.transaction_id, |states| {
                 resources

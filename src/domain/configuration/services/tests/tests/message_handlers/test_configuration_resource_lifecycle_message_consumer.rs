@@ -195,7 +195,8 @@ async fn test_status_update_not_recording_reconciliation_of_current_generation_k
     harness.seed_variable_entries(&id, 1).await;
     harness.seed_variable_entries(&id, 2).await;
 
-    // The last one is a later update of generation 2, reconciled before
+    // None records the reconciliation of generation 2 at the message's time;
+    // the last is a later update that keeps an earlier `reconciledAt`
     let now = Utc::now();
     for status in [
         reconciling_status(2),

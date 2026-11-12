@@ -1307,7 +1307,8 @@ impl DatasetEnvVarsHarness {
     /// A harness where reconciliation never runs, so the projections stay
     /// empty.
     ///
-    /// This holds open the window every client briefly reads in. The default
+    /// This keeps open the gap between a write and its reconciliation, which
+    /// every client briefly reads in. The default
     /// [`Self::new`] reconciles within each request, which production never
     /// does, so only this variant can catch a read-after-write regression.
     async fn new_unreconciled() -> Self {

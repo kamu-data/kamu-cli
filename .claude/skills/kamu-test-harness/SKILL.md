@@ -110,8 +110,8 @@ with a library's own behaviour is noise: it fails on a library upgrade, never on
 | That a derive covers every variant | `EnumIter::iter().count()` compared with a hand-written list |
 | A library's documented formatting or defaults | `serde` field naming, `InternalError` display, `prometheus` text format |
 
-When such strings are data (persisted values, metric labels), check them once while changing
-them, as part of review; `kamu-renaming-a-concept` covers later renames.
+When such strings are data (persisted values, metric labels), how to keep them is in
+[`kamu-rust-style`](../kamu-rust-style/SKILL.md#enum--string-mappings-come-from-strum).
 
 ---
 

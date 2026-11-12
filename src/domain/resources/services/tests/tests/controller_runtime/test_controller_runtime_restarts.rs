@@ -79,7 +79,6 @@ async fn test_delayed_deletion_finalizes_after_restart() {
     harness.advance_time(STEP_WAIT);
 
     assert_eq!(harness.process_calls_until_idle().await, 1);
-    // A deleted resource is no longer found
     assert!(!harness.exists(id).await);
     assert_eq!(harness.process_calls_until_idle().await, 0);
 }

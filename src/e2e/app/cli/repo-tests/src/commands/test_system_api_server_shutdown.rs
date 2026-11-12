@@ -15,8 +15,7 @@ use kamu_cli_puppet::KamuCliPuppet;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// A multi-tenant workspace, for the `e2e-user` account, with a shutdown
-/// timeout short enough to wait for in a test
+/// A config with a shutdown timeout short enough to wait for in a test
 pub const KAMU_CONFIG_WITH_SHORT_SHUTDOWN_TIMEOUT: &str = indoc::indoc!(
     r#"
     kind: CLIConfig
@@ -34,7 +33,8 @@ pub const KAMU_CONFIG_WITH_SHORT_SHUTDOWN_TIMEOUT: &str = indoc::indoc!(
     "#
 );
 
-/// The shutdown timeout above, plus time for the process to start exiting
+/// The `shutdownTimeout` of [`KAMU_CONFIG_WITH_SHORT_SHUTDOWN_TIMEOUT`], plus
+/// time for the process to start exiting
 const EXIT_BOUND: Duration = Duration::from_secs(5);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -65,8 +65,8 @@ pub async fn test_api_server_exits_on_sigterm_during_a_transfer(kamu: KamuCliPup
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// The server exited on its own within the bound; a server it had to kill
-/// ignored the signal or outlived its shutdown timeout
+/// Asserts the server exited successfully on its own within the bound; a kill
+/// means it ignored the signal or outlived its shutdown timeout
 fn assert_exited_successfully(status: &TerminateStatus) {
     match status {
         TerminateStatus::Exited(exit_status) => {

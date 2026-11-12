@@ -19,8 +19,6 @@ use crate::domain::{
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Runs a [`SimpleResourceReconciler`] on a resource whose reconciliation
-/// started and records the outcome, within the transaction of its caller
 /// What the second phase of a reconciliation recorded
 #[derive(Debug)]
 pub enum SimpleResourceReconciliationOutcome<R: EventSourcedResource> {
@@ -38,6 +36,8 @@ pub enum SimpleResourceReconciliationOutcome<R: EventSourcedResource> {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Runs a [`SimpleResourceReconciler`] on a resource whose reconciliation
+/// started and records the outcome, within the transaction of its caller
 pub struct SimpleResourceReconciliationHelper<'a, R>
 where
     R: EventSourcedResource,

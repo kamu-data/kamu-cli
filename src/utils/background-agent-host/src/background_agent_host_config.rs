@@ -16,7 +16,8 @@ use retry_backoff::{RetryBackoff, RetryBackoffType};
 #[derive(Debug, Clone)]
 pub struct BackgroundAgentHostConfig {
     /// Delay before an agent is restarted, by consecutive restarts. A run
-    /// that lasted at least the maximum delay resets the count
+    /// that lasted at least `max_delay` (`min_delay` if uncapped) resets the
+    /// count
     pub restart_backoff: RetryBackoff,
 
     /// How long agents get to finish their current step on a shutdown,

@@ -136,16 +136,16 @@ long-term goal. This page documents what exists now.
 | **Descriptor** | Schema (`TypeUri`) + selector name/aliases identifying a type for routing/presentation; domain type `ResourceTypeDescriptor`, carried in `dill` as `ResourceDispatcherMeta`. |
 | **Manifest** | The user-authored wire document (`$schema`/`headers`/`spec`) in YAML or JSON. |
 | **Spec** | The desired-state portion authored by the user; stored as `serde_json::Value`. |
-| **Status** | Server-owned observed state (`ResourceStatus`: `phase`, optional `observedGeneration`/`observedAt`/`reconciledGeneration`/`reconciledAt`, and `conditions`), written only by the lifecycle primitives ([§9](#lifecycle-primitives)). `conditions` is a `TypeRef → JSON` map. `generation` lives in **headers**, not status. On a `Resource` (domain/GraphQL), `status` is always present — a resource with no reconciliation yet gets a synthesized `Pending` status with no conditions. The `Option` lives only in the persisted `ResourceSnapshot` row (`None` before the first write completes). |
+| **Status** | Server-owned observed state (`ResourceStatus`), written only by the lifecycle primitives ([§9](#lifecycle-primitives)); see [Status fields](#status-fields). `generation` lives in **headers**, not status. |
 | **Snapshot** | The persisted materialized form of a resource (`ResourceSnapshot`). |
 | **Phase** | Lifecycle stage: `Pending`, `Reconciling`, `Ready`, `Degraded`, `Failed`, `Deleting`, `Deleted` (ODF `ResourcePhase`). `Pending`, `Deleting` and `Deleted` are derived from the headers, deletion first: `Deleted` once `deletedAt` is set, `Deleting` once `deletionRequestedAt` is set, otherwise `Pending` whenever `observedGeneration` is absent or lower than `generation`. See [§13 state machine](#lifecycle-state-machine). |
 | **Two-phase deletion** | Deleting a resource requests its deletion (`Deleting`); its main controller cleans up, then the deletion completes (`Deleted`). A resource being deleted gives up its name at once. See [(c) Deletion](#c-deletion). |
-| **Condition** | A status signal keyed by a registered condition schema URI. Writers set and remove conditions one by one through [condition patches](#condition-patches). The built-in ODF `ReconciliationError` (`code`, `message`) is present while the latest reconciliation or cleanup has failed, and only the framework writes it. |
+| **Condition** | A status signal keyed by a registered condition schema URI, set and removed one by one through [condition patches](#condition-patches). See [Status fields](#status-fields) for the built-in one. |
 | **generation / observedGeneration / reconciledGeneration** | `generation` bumps on each spec/headers change; `observedGeneration` is the last one a reconciliation started on, `reconciledGeneration` the last one reconciled successfully. Reconciliation is needed while `reconciledGeneration` is absent or lower than `generation`. |
 | **statusGeneration** | Header counting status updates: 1 for a new resource, +1 per `StatusUpdated`, `DeletionRequested` and `Deleted` event (the last two move the derived phase). A status writer passes the value it read as a precondition and fails with a status conflict if it is stale (compare-and-swap). |
 | **Reconciliation** | Driving actual state toward the spec (e.g. `SecretSet` materializes its encrypted read-side projection). |
-| **Resource controller** | A level-triggered component (`ResourceController`) that, asked about one resource, does its next step and returns `Done` or `RetryAt`. The controller runtime decides when to ask, from the controller's bookkeeping. See [Controller runtime](#controller-runtime). |
-| **Controller name / revision** | `ResourceControllerMeta::controller_name` keys a controller's bookkeeping rows, so it is persisted and must not change. `controller_revision` is bumped when the controller's logic changes: every resource it had finished with that a predicate still selects is processed once more. |
+| **Resource controller** | A level-triggered component (`ResourceController`) that, asked about one resource, does its next step and returns `Done` or `RetryAt`; the runtime decides when to ask. See [Controller runtime](#controller-runtime). |
+| **Controller name / revision** | `ResourceControllerMeta::controller_name` keys a controller's bookkeeping rows (persisted, see [gotchas](#17-extension-points--gotchas)). `controller_revision` is bumped when the controller's logic changes. |
 | **Ref** | Identifies exactly one resource *instance* (`ResourceRef`), by UID or by exact name **plus type** — a name alone is not unique across types — optionally account-scoped. A batch is `Vec<ResourceRef>`. |
 | **Selector** | Matches zero or many resource *instances* (`ResourceSelector`), by SQL `LIKE` name pattern and/or UID. Several selectors act as a logical OR. |
 | **SpecViewOpts** | Options controlling how sensitive spec fields render, `{ revealed: bool }` today. `revealed: false` (default) returns stored ciphertext as-is; `revealed: true` decrypts. A struct, not an enum, so future spec-view options can be added without growing every call site's argument list. No "redacted" mode today. |
@@ -153,6 +153,16 @@ long-term goal. This page documents what exists now.
 | **Facade** | The single API seam (`ResourceFacade`); local or remote-GraphQL impl. |
 | **TypeRef** | A label/annotation *key*: a short `TypeName` (e.g. registered `environment`, or free-form `env`) or a full schema URI, per ODF RFC-018 (`odf::metadata::resource::TypeRef` = `Uri \| Name`). `Ord`, so a `BTreeMap` key; serializes as a plain string. |
 | **Labels / Annotations** | `headers.{labels,annotations}`: `BTreeMap<TypeRef, serde_json::Value>` (arbitrary JSON keyed by `TypeRef`, not flat `String → String`). Manifest input starts as ordered `Vec<(TypeRef, Value)>` so duplicate keys can be rejected before map construction; registered extension keys are canonicalized to schema URI and typed-value validated during facade apply preparation. Per RFC-018, labels are meant to be indexed/queryable and annotations not: **string-valued** labels are indexed via `resource_labels_projection` and selectable with `--label`/`-l`; non-string values are stored but not indexed, so they can never be matched by an equality filter. Annotations are never indexed. |
+
+#### Status fields
+
+- `ResourceStatus` holds `phase`, the optional `observedGeneration`, `observedAt`,
+  `reconciledGeneration` and `reconciledAt`, and `conditions`, a `TypeRef → JSON` map.
+- On a `Resource` (domain and GraphQL), `status` is always present: a resource with no
+  reconciliation yet gets a synthesized `Pending` status with no conditions. Only the persisted
+  `ResourceSnapshot` row holds an `Option` (`None` before the first write completes).
+- The built-in ODF `ReconciliationError` condition (`code`, `message`) is present while the latest
+  reconciliation or cleanup has failed; only the framework writes it.
 
 ---
 
@@ -878,7 +888,7 @@ controller registers its service layer with
 **Registration.** A controller is a component bound as `dyn ResourceController` with a
 `ResourceControllerMeta { schema, controller_name, controller_revision, reacts_to_status }`. Each
 schema has one controller and each controller a name of its own; the runtime refuses to start
-otherwise. The name keys the controller's bookkeeping, so it must not change once released. The
+otherwise. The name is persisted ([gotchas](#17-extension-points--gotchas)). The
 application registers the runtime itself (`app.rs`), and with no controller registered its agent
 waits for the shutdown: returning earlier counts as an unexpected completion, which the host
 restarts ([background-agents.md](background-agents.md#3-supervision)).
@@ -893,8 +903,9 @@ restarts ([background-agents.md](background-agents.md#3-supervision)).
 An extra resource ignores `Done` on purpose: being listed is the signal that it needs attention
 although nothing about it changed. A backoff still applies, so a failing extra resource is not
 retried at once. The controller lists its extra resources without knowing which ones the runtime
-leaves out, so when a listing of one batch holds fewer resources to process than that, the runtime
-asks again with the skipped ones added to the limit, until the batch is full or the listing ends.
+leaves out. If, after removing the backed-off ones, a listing yields fewer than a batch, the
+runtime lists again with the limit raised by the number skipped, until the batch is full or the
+listing ends.
 Extra resources backing off thus cannot hide the ones listed after them.
 
 **What an outcome records** (`ResourceProcessAttempt::next_state`), in a transaction of its own
@@ -906,8 +917,8 @@ after `process` returned:
 | `RetryAt(t)` | `t` | 0 | none | kept |
 | An error or a panic | now + failure backoff | +1 | the error | kept |
 
-`Done` must carry the version after the controller's own writes; an older one makes the runtime
-ask once more. A `RetryAt` already due means "the next step is due now", so steps due at once run
+`Done` must carry the version after the controller's own writes: a version read before them is
+older than the resource, so the runtime asks once more. A `RetryAt` already due means "the next step is due now", so steps due at once run
 back to back within one drain. Each `process` call runs in a task of its own: a panic is the
 failure of that one resource, backed off like an error. A crash between `process` and the record
 only loses the record, and the resource is asked again.
@@ -916,18 +927,17 @@ only loses the record, and the resource is asked again.
 step is due at once. Two cases escape the bookkeeping, and the drain holds them back until it ends
 (`ResourceControllerDrainHoldBack`): an extra resource the controller finished with and still
 lists, which breaks its contract, and a resource asked about `MAX_PROCESS_CALLS_PER_DRAIN` (10)
-times, whose controller never settles. The first is held back only as an extra resource: once it
-changes, the eligibility predicates select it again, so a drain session, which keeps its hold-back
-across drains, still processes a change that the outbox delivered in between. The eligibility query asks for as many more rows as are
-held back, so they cannot fill a batch and hide the resources still waiting.
+times, whose controller never settles. The hold-back on such an extra resource applies only to
+the extra listing. If the resource changes, the eligibility predicates select it again, so a drain
+session, whose hold-back lasts across its drains, still processes a change the outbox delivered
+between them. The eligibility query asks for as many more rows as are held back, so they cannot fill a batch and hide the resources still waiting.
 
 **The effective deadline** (`ResourceControllerWait`) is the earliest of:
 
 - the earliest `not_before` among the resources the predicates select (`find_next_deadline`);
-- `next_extra_deadline(after)`, the earliest extra deadline after the last pass listed the extra
-  resources. One due by then belongs to resources that pass processed or left out, and would hide
-  the later ones if the controller returned it. One due later was not considered, even if it
-  passed before the wait started, so the loop drains again at once;
+- `next_extra_deadline(after)`: the earliest extra deadline later than the last pass's listing.
+  Earlier ones belong to resources that pass already handled or left out, so they are excluded. A
+  later one that is already due when the wait starts makes the loop drain again at once;
 - the earliest `not_before` of the extra resources the last pass left out for their backoff.
 
 The last one is why an extra resource that keeps failing, and whose own due time passed long ago,
@@ -1733,8 +1743,8 @@ Reconciliation is **not** synchronous within `apply`: the
 bridge** `ResourceLifecycleMessageConsumer`
 (`MESSAGE_CONSUMER_KAMU_RESOURCE_LIFECYCLE_EVENT_BRIDGE`,
 [`resource_lifecycle_message_consumer.rs`](/src/domain/resources/services/src/message_handlers/resource_lifecycle_message_consumer.rs))
-consumes it and hints the runtime for the resource's schema, as it does for `DeletionRequested` and
-`StatusUpdated`. The hint only wakes the loop of that schema's controller: the runtime finds the
+consumes it and hints the runtime for the resource's schema
+([Hints](#controller-runtime)). The hint only wakes the loop of that schema's controller: the runtime finds the
 work in storage, through the eligibility predicates
 ([Controller bookkeeping](#controller-bookkeeping)), and calls the controller's `process` for each
 resource due. For `VariableSet`, `SecretSet` and `Storage` that controller is the type's
@@ -2080,8 +2090,8 @@ pub fn register_variable_set_resource_crud_dispatcher(catalog_builder: &mut dill
 4. **Wire it into DI** — generate the per-type service layer (event-store bridge, loader,
    persistence, typed query, all use cases, and the simple controller adapter, the type's
    controller on the [controller runtime](#controller-runtime)) with the
-   `declare_resource_service_layer!` umbrella macro, giving it a `controller_name` that is stored in
-   the controller bookkeeping and must not change once released, then call its
+   `declare_resource_service_layer!` umbrella macro, giving it a `controller_name` (persisted, see
+   [gotchas](#17-extension-points--gotchas)), then call its
    `register_<type>_resource_service_layer(builder)` plus your CRUD/presentation/spec-view
    `register_*` from the crate's `dependencies.rs`, and `add` the `SimpleResourceReconciler<R>`
    impl.
@@ -2100,7 +2110,7 @@ Instead of step 2's simple reconciler, and the simple controller adapter of step
 
 1. **Implement `ResourceController`**: `process(id)` does the next step through the
    [lifecycle primitives](#lifecycle-primitives) in transactions of its own and returns `Done`
-   with the version after its own writes, or `RetryAt`. Add `list_extra_actionable` and
+   ([which version](#controller-runtime)) or `RetryAt`. Add `list_extra_actionable` and
    `next_extra_deadline` only if something besides the resource makes it actionable (a claim that
    expires, for example).
 2. **Register it** as `#[interface(dyn ResourceController)]` with
@@ -2238,8 +2248,7 @@ Otherwise the behavior is already guaranteed for both implementations by the con
 - **A controller's name is persisted.** It keys the controller's bookkeeping rows, so renaming it
   orphans them and the controller starts over on every resource. Bump `controller_revision`
   instead to have finished resources reconsidered.
-- **`Done` must carry the version after the controller's own writes.** A version read before them
-  is older than the resource, so the runtime asks once more
+- **`Done` must carry the version after the controller's own writes**
   ([Controller runtime](#controller-runtime)).
 - **An extra resource must leave the controller's extra set**, or the controller must return
   `RetryAt` for it: `Done` does not suppress an extra resource, and the runtime only holds it back
