@@ -217,6 +217,62 @@ impl SimpleResourceReconciler<TestResource> for TestResourceFailingCleanupOnceRe
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// TestResourceRejectingReconciler
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Fails every reconciliation with an error that is not transient
+#[dill::component(pub)]
+#[dill::interface(dyn SimpleResourceReconciler<TestResource>)]
+pub struct TestResourceRejectingReconciler;
+
+#[async_trait::async_trait]
+impl SimpleResourceReconciler<TestResource> for TestResourceRejectingReconciler {
+    async fn reconcile(&self, _resource: &TestResource) -> Result<(), TestResourceReconcileError> {
+        Err(TestResourceReconcileError::Rejected(
+            "simulated invalid spec".to_string(),
+        ))
+    }
+
+    async fn cleanup(&self, _resource: &TestResource) -> Result<(), ResourceCleanupError> {
+        Ok(())
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// TestResourceFailingReconcileOnceReconciler
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Fails its first reconciliation with a transient error and succeeds on
+/// every later one
+#[dill::component(pub)]
+#[dill::interface(dyn SimpleResourceReconciler<TestResource>)]
+pub struct TestResourceFailingReconcileOnceReconciler {
+    failure: Arc<TestReconcileFailureOnce>,
+}
+
+#[derive(Default)]
+pub struct TestReconcileFailureOnce {
+    done: AtomicBool,
+}
+
+#[async_trait::async_trait]
+impl SimpleResourceReconciler<TestResource> for TestResourceFailingReconcileOnceReconciler {
+    async fn reconcile(&self, _resource: &TestResource) -> Result<(), TestResourceReconcileError> {
+        if self.failure.done.swap(true, Ordering::SeqCst) {
+            return Ok(());
+        }
+
+        Err(TestResourceReconcileError::Internal(
+            "simulated transient reconcile failure".int_err(),
+        ))
+    }
+
+    async fn cleanup(&self, _resource: &TestResource) -> Result<(), ResourceCleanupError> {
+        Ok(())
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// Plays a writer other than the one running: saves a status update of a
 /// resource through the services of its catalog
@@ -260,6 +316,8 @@ pub enum TestResourceReconcilerProvider {
     },
     FailingCleanupOnce,
     InterferingReconcile,
+    Rejecting,
+    FailingReconcileOnce,
 }
 
 impl TestResourceReconcilerProvider {
@@ -295,6 +353,13 @@ impl TestResourceReconcilerProvider {
             }
             TestResourceReconcilerProvider::InterferingReconcile => {
                 b.add::<TestResourceInterferingReconciler>();
+            }
+            TestResourceReconcilerProvider::Rejecting => {
+                b.add::<TestResourceRejectingReconciler>();
+            }
+            TestResourceReconcilerProvider::FailingReconcileOnce => {
+                b.add_value(TestReconcileFailureOnce::default());
+                b.add::<TestResourceFailingReconcileOnceReconciler>();
             }
         }
     }

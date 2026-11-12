@@ -118,13 +118,20 @@ pub enum TestResourceReconcileError {
 
     #[error(transparent)]
     Internal(#[from] internal_error::InternalError),
+
+    /// Fails every reconciliation of the spec, so retrying does not help
+    #[error("Spec rejected: {0}")]
+    Rejected(String),
 }
+
+pub const TEST_RECONCILIATION_ERROR_CODE_REJECTED: &str = "test-rejected";
 
 impl ResourceReconcileError for TestResourceReconcileError {
     fn code(&self) -> &'static str {
         match self {
             Self::ConcurrentModification(_) => RECONCILIATION_ERROR_CODE_CONCURRENT_MODIFICATION,
             Self::Internal(_) => RECONCILIATION_ERROR_CODE_INTERNAL_ERROR,
+            Self::Rejected(_) => TEST_RECONCILIATION_ERROR_CODE_REJECTED,
         }
     }
 
@@ -134,11 +141,15 @@ impl ResourceReconcileError for TestResourceReconcileError {
                 "Resource was modified concurrently during reconciliation.".to_owned()
             }
             Self::Internal(e) => format!("Internal error: {e}"),
+            Self::Rejected(reason) => format!("Spec rejected: {reason}"),
         }
     }
 
     fn is_transient(&self) -> bool {
-        true
+        match self {
+            Self::ConcurrentModification(_) | Self::Internal(_) => true,
+            Self::Rejected(_) => false,
+        }
     }
 }
 
@@ -281,11 +292,14 @@ impl ResourceSpecSanitizer<TestResource> for TestResourceSpecClearingSanitizer {
 // Service layer
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+pub const TEST_RESOURCE_SIMPLE_CONTROLLER_NAME: &str = "test-resource-simple-controller";
+
 kamu_resources_services::declare_resource_service_layer!(
     domain = crate::tests::utils,
     name = TestResource,
     resource = crate::tests::utils::TestResource,
-    state_model = crate::tests::utils::TestResourceStateModel
+    state_model = crate::tests::utils::TestResourceStateModel,
+    controller_name = TEST_RESOURCE_SIMPLE_CONTROLLER_NAME
 );
 
 kamu_resources_services::declare_resource_crud_dispatcher!(

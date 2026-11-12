@@ -7,37 +7,22 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::sync::Arc;
-
 use axum::body::{Body, Bytes};
-use axum::extract::{Request, State};
+use axum::extract::Request;
 use axum::middleware::Next;
 use axum::response::Response;
 use http::Method;
 use http_common::ApiError;
-use internal_error::InternalError;
+use kamu_resources_services::BackgroundWorkFinalizer;
 use serde::Deserialize;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Completes the background work a mutating request left behind, such as
-/// delivering its Outbox messages, so that an e2e test sees its full effect
-/// once the response arrives. The application provides it, as it knows which
-/// background work there is.
-#[async_trait::async_trait]
-pub trait E2EMutationFinalizer: Send + Sync {
-    async fn finalize(&self, base_catalog: &dill::Catalog) -> Result<(), InternalError>;
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-/// Middleware that finalizes the background work of mutable requests before
-/// responding
-pub async fn e2e_middleware_fn(
-    State(finalizer): State<Arc<dyn E2EMutationFinalizer>>,
-    request: Request,
-    next: Next,
-) -> Result<Response, ApiError> {
+/// Middleware that completes the background work of mutable requests before
+/// responding, such as delivering their Outbox messages and letting the
+/// resource controllers process their changes, so that an e2e test sees the
+/// full effect of a request once its response arrives
+pub async fn e2e_middleware_fn(request: Request, next: Next) -> Result<Response, ApiError> {
     let base_catalog = request
         .extensions()
         .get::<dill::Catalog>()
@@ -48,7 +33,7 @@ pub async fn e2e_middleware_fn(
     let response = next.run(request).await;
 
     if is_mutable_request && response.status().is_success() {
-        finalizer.finalize(&base_catalog).await?;
+        BackgroundWorkFinalizer.finalize(&base_catalog).await?;
     }
 
     Ok(response)

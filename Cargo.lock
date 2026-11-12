@@ -8273,6 +8273,7 @@ dependencies = [
  "kamu-datasets-inmem",
  "kamu-datasets-services",
  "kamu-ingest-datafusion",
+ "kamu-resources-services",
  "kamu-signing",
  "messaging-outbox",
  "mockall",

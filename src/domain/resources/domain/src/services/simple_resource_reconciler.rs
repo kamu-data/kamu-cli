@@ -11,9 +11,10 @@ use crate::{ManagedResource, ResourceCleanupError};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// The one-shot callbacks of a resource type whose reconciliation and cleanup
-/// each fit in a single step. The framework runs them and records their
-/// outcomes.
+/// The callbacks of a resource type whose reconciliation and cleanup each fit
+/// in a single step. The type's simple controller adapter runs them on the
+/// controller runtime and records their outcomes; a transient reconcile error
+/// and a failed cleanup are retried with a backoff.
 #[async_trait::async_trait]
 pub trait SimpleResourceReconciler<R: ManagedResource>: Send + Sync {
     /// Brings the entities the reconciler manages in line with the current

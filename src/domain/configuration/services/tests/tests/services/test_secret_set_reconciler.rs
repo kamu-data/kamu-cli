@@ -52,6 +52,7 @@ async fn test_reconcile_secret_set_decrypts_and_reprojects_values() {
         })
         .await
         .unwrap();
+    harness.settle().await;
 
     let applied_id = match decision {
         ApplyResourceApplicationDecision::Applied(result) => result.id,
@@ -60,8 +61,6 @@ async fn test_reconcile_secret_set_decrypts_and_reprojects_values() {
         }
     };
 
-    // Reconciliation fires synchronously via OutboxImmediateImpl — projection
-    // entries should already be populated
     let entries = harness
         .secret_set_projection_repo()
         .get_latest_entries(&applied_id)

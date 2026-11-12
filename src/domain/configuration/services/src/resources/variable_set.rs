@@ -11,11 +11,17 @@ use kamu_configuration::{VariableSetResource, VariableSetStateModel};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Persisted in the controller bookkeeping and used as a metric label: changing
+/// it orphans the bookkeeping of every resource of the type
+pub const VARIABLE_SET_CONTROLLER_NAME: &str =
+    "dev.kamu.domain.configuration.VariableSetController";
+
 kamu_resources_services::declare_resource_service_layer!(
     domain = kamu_configuration,
     name = VariableSet,
     resource = VariableSetResource,
-    state_model = VariableSetStateModel
+    state_model = VariableSetStateModel,
+    controller_name = VARIABLE_SET_CONTROLLER_NAME
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

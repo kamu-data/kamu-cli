@@ -8,10 +8,10 @@
 // by the Apache License, Version 2.0.
 
 use internal_error::InternalError;
+use kamu_resources_services::BackgroundWorkFinalizer;
 use messaging_outbox::register_message_dispatcher;
 use tracing::Instrument;
 
-use crate::background_work_finalizer::BackgroundWorkFinalizer;
 use crate::error::CLIError;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

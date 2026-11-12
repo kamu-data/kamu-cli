@@ -60,27 +60,3 @@ async fn test_two_controllers_with_one_name_are_rejected() {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[test_log::test(tokio::test)]
-async fn test_controller_of_a_type_with_lifecycle_dispatcher_is_rejected() {
-    let harness = ControllerRuntimeHarness::new(
-        TestControllers::MainWithLifecycleDispatcher,
-        TestControllerBehavior::FinishAtCurrentVersion,
-    )
-    .await;
-
-    let error = harness
-        .try_run_outbox_and_controllers_until_idle()
-        .await
-        .unwrap_err();
-
-    assert!(
-        error
-            .reason()
-            .contains("which also has a lifecycle dispatcher"),
-        "{}",
-        error.reason()
-    );
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

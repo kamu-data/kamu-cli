@@ -9,20 +9,32 @@
 
 use std::sync::Arc;
 
+use crate::ResourceCleanupTransactionError;
 use crate::domain::{
     EventSourcedResource,
     ResourceAggregateLoader,
+    ResourceCleanupFailure,
     ResourceID,
     ResourceLoadError,
     SimpleResourceDeletionError,
     SimpleResourceReconciler,
 };
-use crate::{ResourceCleanupAttempt, ResourceCleanupTransactionError};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// Runs the [`SimpleResourceReconciler`] cleanup of a resource whose deletion
 /// was requested, within the transaction of its caller
+/// What a cleanup that did not fail did
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SimpleResourceCleanupOutcome {
+    CleanedUp,
+    /// The resource does not wait for a cleanup, such as one whose deletion
+    /// completed meanwhile
+    NotAwaitingCleanup,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 pub struct SimpleResourceCleanupHelper<'a, R>
 where
     R: EventSourcedResource,
@@ -46,12 +58,11 @@ where
     }
 
     /// Runs the cleanup of one resource. A failed cleanup is returned as an
-    /// error, so that the transaction of the caller rolls back. Returns `None`
-    /// when the resource does not wait for a cleanup.
+    /// error, so that the transaction of the caller rolls back.
     pub async fn cleanup(
         &self,
         id: ResourceID,
-    ) -> Result<Option<ResourceCleanupAttempt>, ResourceCleanupTransactionError<R>> {
+    ) -> Result<SimpleResourceCleanupOutcome, ResourceCleanupTransactionError<R>> {
         let resource = self
             .resource_aggregate_loader
             .load(&id)
@@ -60,16 +71,12 @@ where
             .map_err(SimpleResourceDeletionError::LoadFailed)
             .map_err(ResourceCleanupTransactionError::Deletion)?;
         if !resource.needs_cleanup() {
-            return Ok(None);
+            return Ok(SimpleResourceCleanupOutcome::NotAwaitingCleanup);
         }
 
         let status_generation = resource.headers().status_generation;
         match self.reconciler.cleanup(&resource).await {
-            Ok(()) => Ok(Some(ResourceCleanupAttempt {
-                id,
-                status_generation,
-                failure: None,
-            })),
+            Ok(()) => Ok(SimpleResourceCleanupOutcome::CleanedUp),
             Err(err) => {
                 tracing::warn!(
                     resource_id = %id,
@@ -77,10 +84,10 @@ where
                     "Cleanup of a resource being deleted failed"
                 );
                 Err(ResourceCleanupTransactionError::CleanupFailed(
-                    ResourceCleanupAttempt {
+                    ResourceCleanupFailure {
                         id,
-                        status_generation,
-                        failure: Some(Arc::new(err)),
+                        expected_status_generation: status_generation,
+                        error: Arc::new(err),
                     },
                 ))
             }

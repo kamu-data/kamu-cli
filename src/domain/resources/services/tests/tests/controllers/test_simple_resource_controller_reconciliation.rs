@@ -11,6 +11,7 @@ use std::assert_matches;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU32, Ordering};
 
+use chrono::TimeDelta;
 use kamu_resources::{
     ApplyResourceParams,
     DeclarativeResource,
@@ -20,20 +21,26 @@ use kamu_resources::{
     ResourceLifecyclePrimitives,
     ResourcePersistenceService,
     ResourcePhase,
+    ResourceProcessOutcome,
     ResourceStatusConflictError,
+    ResourceVersion,
     SimpleResourceReconciler,
     SimpleResourceReconciliationError,
 };
-use kamu_resources_services::SimpleResourceReconciliationHelper;
 use kamu_resources_services::testing::{
     BaseResourceServiceHarness,
     BaseResourceServiceHarnessOpts,
+};
+use kamu_resources_services::{
+    SimpleResourceReconciliationHelper,
+    SimpleResourceReconciliationOutcome,
 };
 use messaging_outbox::{MockOutbox, OutboxProvider};
 
 use crate::tests::utils::{
     ServiceLayerTestHarness,
     ServiceLayerTestHarnessOpts,
+    TEST_RECONCILIATION_ERROR_CODE_REJECTED,
     TestResource,
     TestResourceReconcilerProvider,
 };
@@ -43,17 +50,13 @@ use crate::tests::utils::{
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_reconcile_returns_error_for_non_applied_resource() {
+async fn test_process_returns_error_for_non_applied_resource() {
     let harness = ReconcileTestHarness::dispatching(TestResourceReconcilerProvider::Stub);
 
     let id = harness.allocate_resource_id().await;
-    let result = harness.simple_controller().reconcile(&id).await;
+    let result = harness.process(&id).await;
 
-    assert_matches!(
-        result,
-        Err(SimpleResourceReconciliationError::LoadFailed(_)),
-        "expected LoadFailed for a non-applied resource, got: {result:?}"
-    );
+    assert_matches!(result, Err(_), "expected a load failure, got: {result:?}");
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -83,7 +86,6 @@ async fn test_start_phase_transitions_resource_to_reconciling() {
 
     // Finish phase so the event store is left in a consistent state
     helper.finish_reconciliation_phase(resource).await.unwrap();
-    harness.flush_outbox().await;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -95,12 +97,17 @@ async fn test_reconcile_success_transitions_resource_to_ready() {
     let account_handle = odf::ResourceOwnerHandle::new_test("test-owner");
     let id = harness.apply_and_get_id(&account_handle, "res-a").await;
 
-    harness.simple_controller().reconcile(&id).await.unwrap();
-    harness.flush_outbox().await;
+    let outcome = harness.process(&id).await.unwrap();
 
     let snapshot = harness.get_snapshot_by_id(&id).await.unwrap();
     let status = snapshot.basic_status().unwrap();
 
+    // The version after the outcome was recorded, so the runtime leaves the
+    // resource alone until it changes
+    assert_eq!(
+        outcome,
+        ResourceProcessOutcome::Done(ResourceVersion::from(&snapshot.headers))
+    );
     assert_eq!(status.phase, ResourcePhase::Ready);
     assert_eq!(snapshot.headers.generation, 1);
     assert_eq!(status.observed_generation, Some(1));
@@ -115,25 +122,114 @@ async fn test_reconcile_success_transitions_resource_to_ready() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_reconcile_failure_transitions_resource_to_failed() {
+async fn test_non_transient_failure_transitions_resource_to_failed_and_is_done() {
+    let harness = ReconcileTestHarness::dispatching(TestResourceReconcilerProvider::Rejecting);
+
+    let account_handle = odf::ResourceOwnerHandle::new_test("test-owner");
+    let id = harness.apply_and_get_id(&account_handle, "res-a").await;
+
+    // Retrying does not help, so the runtime waits for the resource to change
+    let outcome = harness.process(&id).await.unwrap();
+
+    let snapshot = harness.get_snapshot_by_id(&id).await.unwrap();
+    let status = snapshot.basic_status().unwrap();
+
+    assert_eq!(
+        outcome,
+        ResourceProcessOutcome::Done(ResourceVersion::from(&snapshot.headers))
+    );
+    assert_eq!(status.phase, ResourcePhase::Failed);
+    assert_eq!(snapshot.headers.generation, 1);
+    assert_eq!(status.observed_generation, Some(1));
+
+    BaseResourceServiceHarness::assert_reconciliation_error(
+        &status,
+        Some(TEST_RECONCILIATION_ERROR_CODE_REJECTED),
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_transient_failure_is_recorded_and_returned_as_an_error() {
     let harness = ReconcileTestHarness::dispatching(TestResourceReconcilerProvider::Failing);
 
     let account_handle = odf::ResourceOwnerHandle::new_test("test-owner");
     let id = harness.apply_and_get_id(&account_handle, "res-a").await;
 
-    // Reconciler errors are outcomes, not failures of the controller —
-    // reconcile returns Ok(())
-    harness.simple_controller().reconcile(&id).await.unwrap();
-    harness.flush_outbox().await;
+    // An error, so that the runtime retries with a backoff
+    let result = harness.process(&id).await;
+    assert_matches!(result, Err(_), "expected an error, got: {result:?}");
 
     let snapshot = harness.get_snapshot_by_id(&id).await.unwrap();
     let status = snapshot.basic_status().unwrap();
 
     assert_eq!(status.phase, ResourcePhase::Failed);
-    assert_eq!(snapshot.headers.generation, 1);
     assert_eq!(status.observed_generation, Some(1));
-
     BaseResourceServiceHarness::assert_reconciliation_error(&status, Some("internal-error"));
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_transient_failure_is_retried_after_backoff_and_then_succeeds() {
+    let harness =
+        ReconcileTestHarness::with_fake_time(TestResourceReconcilerProvider::FailingReconcileOnce);
+
+    let account_handle = odf::ResourceOwnerHandle::new_test("test-owner");
+    let id = harness.apply_and_get_id(&account_handle, "res-a").await;
+
+    harness.settle().await;
+
+    assert_eq!(
+        harness.load(&id).await.status().phase,
+        ResourcePhase::Failed
+    );
+    let state = harness.controller_state(&id).await;
+    assert_eq!(state.attempts, 1);
+    assert!(state.last_error.is_some(), "the error is kept: {state:?}");
+    assert!(state.not_before.is_some(), "backing off: {state:?}");
+
+    // Not due during the backoff
+    harness.settle().await;
+    assert_eq!(
+        harness.load(&id).await.status().phase,
+        ResourcePhase::Failed
+    );
+
+    harness.advance_time(TimeDelta::minutes(1));
+    harness.settle().await;
+
+    let resource = harness.load(&id).await;
+    assert_eq!(resource.status().phase, ResourcePhase::Ready);
+    BaseResourceServiceHarness::assert_reconciliation_error(resource.status(), None);
+    let state = harness.controller_state(&id).await;
+    assert_eq!(state.attempts, 0);
+    assert_eq!(state.last_error, None);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_non_transient_failure_is_not_retried() {
+    let harness = ReconcileTestHarness::with_fake_time(TestResourceReconcilerProvider::Rejecting);
+
+    let account_handle = odf::ResourceOwnerHandle::new_test("test-owner");
+    let id = harness.apply_and_get_id(&account_handle, "res-a").await;
+
+    harness.settle().await;
+    harness.advance_time(TimeDelta::hours(1));
+    harness.settle().await;
+
+    let resource = harness.load(&id).await;
+    assert_eq!(resource.status().phase, ResourcePhase::Failed);
+    let state = harness.controller_state(&id).await;
+    assert_eq!(state.attempts, 0);
+    assert_eq!(state.handled_generation, Some(1));
+    assert_eq!(
+        state.handled_status_generation,
+        Some(resource.headers().status_generation)
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -150,8 +246,7 @@ async fn test_reconcile_invokes_reconciler_exactly_once() {
     let account_handle = odf::ResourceOwnerHandle::new_test("test-owner");
     let id = harness.apply_and_get_id(&account_handle, "res-a").await;
 
-    harness.simple_controller().reconcile(&id).await.unwrap();
-    harness.flush_outbox().await;
+    harness.process(&id).await.unwrap();
 
     assert_eq!(counter.load(Ordering::SeqCst), 1);
 }
@@ -161,8 +256,8 @@ async fn test_reconcile_invokes_reconciler_exactly_once() {
 #[test_log::test(tokio::test)]
 async fn test_already_reconciled_is_no_op_and_reconciler_is_not_called() {
     // Generation does not change on a no-op: needs_reconciliation() is false
-    // because observed_generation == headers.generation. reconcile() returns
-    // Ok(()) immediately without invoking the reconciler.
+    // because observed_generation == headers.generation. process() returns
+    // `Done` without invoking the reconciler.
     let counter = Arc::new(AtomicU32::new(0));
     let harness = ReconcileTestHarness::dispatching(TestResourceReconcilerProvider::Counting(
         counter.clone(),
@@ -171,9 +266,8 @@ async fn test_already_reconciled_is_no_op_and_reconciler_is_not_called() {
     let account_handle = odf::ResourceOwnerHandle::new_test("test-owner");
     let id = harness.apply_and_get_id(&account_handle, "res-a").await;
 
-    // First reconcile: Pending → reconciler called once → Ready
-    harness.simple_controller().reconcile(&id).await.unwrap();
-    harness.flush_outbox().await;
+    // First process: Pending → reconciler called once → Ready
+    harness.process(&id).await.unwrap();
 
     assert_eq!(
         counter.load(Ordering::SeqCst),
@@ -181,9 +275,8 @@ async fn test_already_reconciled_is_no_op_and_reconciler_is_not_called() {
         "reconciler must be called on first reconcile"
     );
 
-    // Second reconcile: already Ready — no-op, no outbox message posted
-    harness.simple_controller().reconcile(&id).await.unwrap();
-    harness.flush_outbox().await;
+    // Second process: already Ready — no-op, no outbox message posted
+    harness.process(&id).await.unwrap();
 
     assert_eq!(
         counter.load(Ordering::SeqCst),
@@ -225,14 +318,14 @@ async fn test_reconcile_success_posts_status_updates_to_ready() {
     let account_handle = odf::ResourceOwnerHandle::new_test("test-owner");
     let id = harness.apply_and_get_id(&account_handle, "res-a").await;
 
-    harness.simple_controller().reconcile(&id).await.unwrap();
+    harness.process(&id).await.unwrap();
     // MockOutbox verifies expected call counts on drop
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_reconcile_failure_posts_status_updates_to_failed() {
+async fn test_non_transient_failure_posts_status_updates_to_failed() {
     let mut mock_outbox = MockOutbox::new();
     BaseResourceServiceHarness::expect_applied_messages(&mut mock_outbox, 1, None);
     BaseResourceServiceHarness::expect_status_updated_message(
@@ -246,13 +339,13 @@ async fn test_reconcile_failure_posts_status_updates_to_failed() {
 
     let harness = ServiceLayerTestHarness::new_with_mock_outbox_and_reconciler(
         mock_outbox,
-        TestResourceReconcilerProvider::Failing,
+        TestResourceReconcilerProvider::Rejecting,
     );
 
     let account_handle = odf::ResourceOwnerHandle::new_test("test-owner");
     let id = harness.apply_and_get_id(&account_handle, "res-a").await;
 
-    harness.simple_controller().reconcile(&id).await.unwrap();
+    harness.process(&id).await.unwrap();
     // MockOutbox verifies expected call counts on drop
 }
 
@@ -264,7 +357,7 @@ async fn test_reconcile_failure_posts_status_updates_to_failed() {
 async fn test_finish_phase_discards_outcome_of_superseded_generation() {
     // A concurrent apply between the two reconcile phases bumps the generation.
     // The outcome computed for the old generation is dropped, and the
-    // `Applied` message of the new generation reconciles it again.
+    // runtime reconciles the new generation.
     let harness = ReconcileTestHarness::dispatching(TestResourceReconcilerProvider::Stub);
 
     let account_handle = odf::ResourceOwnerHandle::new_test("test-owner");
@@ -291,8 +384,9 @@ async fn test_finish_phase_discards_outcome_of_superseded_generation() {
         .unwrap()
         .expect_applied();
 
-    helper.finish_reconciliation_phase(started).await.unwrap();
+    let outcome = helper.finish_reconciliation_phase(started).await.unwrap();
 
+    assert_matches!(outcome, SimpleResourceReconciliationOutcome::Superseded);
     let snapshot = harness.get_snapshot_by_id(&id).await.unwrap();
     let status = snapshot.basic_status().unwrap();
     assert_eq!(snapshot.headers.generation, 2);
@@ -349,17 +443,12 @@ async fn test_reconciler_write_rolls_back_when_outcome_is_not_recorded() {
     let account_handle = odf::ResourceOwnerHandle::new_test("test-owner");
     let id = harness.apply_and_get_id(&account_handle, "res-a").await;
 
-    let result = harness.simple_controller().reconcile(&id).await;
+    // Processed again in the next pass, which reads the current state
+    let outcome = harness.process(&id).await.unwrap();
 
-    assert_matches!(
-        result,
-        Err(SimpleResourceReconciliationError::StatusConflict(
-            ResourceStatusConflictError {
-                expected: 2,
-                actual: 3,
-            }
-        )),
-        "expected StatusConflict, got: {result:?}"
+    assert_eq!(
+        outcome,
+        ResourceProcessOutcome::RetryAt(harness.time_source().now())
     );
     // The status is as the start of the reconciliation left it: the
     // reconciler's write is gone with the outcome
@@ -420,7 +509,7 @@ async fn test_reconcile_counts_status_updates() {
     let id = harness.apply_and_get_id(&account_handle, "res-a").await;
     assert_eq!(harness.load(&id).await.headers().status_generation, 1);
 
-    harness.simple_controller().reconcile(&id).await.unwrap();
+    harness.process(&id).await.unwrap();
 
     let resource = harness.load(&id).await;
     assert_eq!(resource.headers().generation, 1);
@@ -436,8 +525,11 @@ async fn test_reconcile_counts_status_updates() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_reconcile_of_resource_being_deleted_is_no_op() {
-    let harness = ReconcileTestHarness::dispatching(TestResourceReconcilerProvider::Stub);
+async fn test_process_of_resource_being_deleted_completes_its_deletion_without_reconciling() {
+    let counter = Arc::new(AtomicU32::new(0));
+    let harness = ReconcileTestHarness::dispatching(TestResourceReconcilerProvider::Counting(
+        counter.clone(),
+    ));
 
     let account_handle = odf::ResourceOwnerHandle::new_test("test-owner");
     let id = harness.apply_and_get_id(&account_handle, "res-a").await;
@@ -446,11 +538,11 @@ async fn test_reconcile_of_resource_being_deleted_is_no_op() {
         .request_resources_deletion(account_handle.did, vec![id])
         .await;
 
-    harness.simple_controller().reconcile(&id).await.unwrap();
+    harness.process(&id).await.unwrap();
 
     let resource = harness.load(&id).await;
-    assert_eq!(resource.status().phase, ResourcePhase::Deleting);
-    assert_eq!(resource.headers().status_generation, 2);
+    assert_eq!(resource.status().phase, ResourcePhase::Deleted);
+    assert_eq!(counter.load(Ordering::SeqCst), 0);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -473,8 +565,9 @@ async fn test_finish_phase_discards_outcome_of_resource_being_deleted() {
         .request_resources_deletion(account_handle.did, vec![id])
         .await;
 
-    helper.finish_reconciliation_phase(started).await.unwrap();
+    let outcome = helper.finish_reconciliation_phase(started).await.unwrap();
 
+    assert_matches!(outcome, SimpleResourceReconciliationOutcome::Superseded);
     let resource = harness.load(&id).await;
     assert!(resource.headers().deletion_requested_at.is_some());
     assert_eq!(resource.status().phase, ResourcePhase::Deleting);
@@ -496,20 +589,30 @@ struct ReconcileTestHarness {
 
 impl ReconcileTestHarness {
     fn dispatching(reconciler_provider: TestResourceReconcilerProvider) -> Self {
-        Self::new(reconciler_provider, false)
+        Self::new(reconciler_provider, false, false)
     }
 
     /// Writes roll back with the transaction they ran in
     fn transactional(reconciler_provider: TestResourceReconcilerProvider) -> Self {
-        Self::new(reconciler_provider, true)
+        Self::new(reconciler_provider, true, false)
     }
 
-    fn new(reconciler_provider: TestResourceReconcilerProvider, transactional: bool) -> Self {
+    /// Time stands still until `advance_time`, so backoffs end only then
+    fn with_fake_time(reconciler_provider: TestResourceReconcilerProvider) -> Self {
+        Self::new(reconciler_provider, false, true)
+    }
+
+    fn new(
+        reconciler_provider: TestResourceReconcilerProvider,
+        transactional: bool,
+        fake_time: bool,
+    ) -> Self {
         let base = ServiceLayerTestHarness::new_with_opts(ServiceLayerTestHarnessOpts {
             base_opts: BaseResourceServiceHarnessOpts {
                 outbox_provider: OutboxProvider::Dispatching,
                 transactional,
-                fake_time: false,
+                fake_time,
+                ..Default::default()
             },
             reconciler_provider,
             ..Default::default()

@@ -145,7 +145,7 @@ pub async fn test_summary_phase_counts(h: &impl FacadeContractHarness) {
     // transitions Pending → Reconciling → Ready within the same iteration.
     // The Reconciling phase is a very short-lived internal transient that is
     // not observable between two flush calls at facade granularity.
-    h.flush_outbox().await;
+    h.settle().await;
 
     // After flush: resource is Ready, no longer Pending.
     let after = facade
@@ -231,7 +231,7 @@ pub async fn test_summary_counts_resources_being_deleted(h: &impl FacadeContract
         .unwrap();
     assert_eq!(vs_phase_counts(&summary).deleting, 1);
 
-    h.flush_outbox().await;
+    h.settle().await;
 
     let summary = facade
         .summary(ResourcesSummaryRequest { account: None })
