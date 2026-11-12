@@ -73,9 +73,10 @@ impl BaseGQLResourceHarness {
         Self::new(base_gql_harness, catalog_base)
     }
 
-    /// See [`BackgroundWorkFinalizer`]
+    /// See [`BackgroundWorkFinalizer`]. The outbox of this harness is
+    /// immediate, or drops the messages
     pub async fn settle(&self) {
-        BackgroundWorkFinalizer
+        BackgroundWorkFinalizer::for_immediate_outbox()
             .finalize(&self.catalog_base)
             .await
             .unwrap();

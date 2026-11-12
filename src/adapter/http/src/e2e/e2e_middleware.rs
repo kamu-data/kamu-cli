@@ -33,7 +33,9 @@ pub async fn e2e_middleware_fn(request: Request, next: Next) -> Result<Response,
     let response = next.run(request).await;
 
     if is_mutable_request && response.status().is_success() {
-        BackgroundWorkFinalizer.finalize(&base_catalog).await?;
+        BackgroundWorkFinalizer::for_dispatching_outbox()
+            .finalize(&base_catalog)
+            .await?;
     }
 
     Ok(response)

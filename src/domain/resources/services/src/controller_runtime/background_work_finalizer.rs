@@ -21,14 +21,32 @@ use crate::domain::ResourceControllerRuntime;
 /// Ends once a drain processes nothing.
 ///
 /// The controller runtime drives the controllers of the catalog it is
-/// registered in, so `catalog` is the one that has both. A catalog without an
-/// outbox agent has an immediate outbox, which delivered every message
-/// already.
-pub struct BackgroundWorkFinalizer;
+/// registered in, so the catalog passed to `finalize` is the one that has both.
+pub struct BackgroundWorkFinalizer {
+    delivers_outbox: bool,
+}
 
 impl BackgroundWorkFinalizer {
+    /// For a dispatching outbox, whose messages wait for its agent
+    pub fn for_dispatching_outbox() -> Self {
+        Self {
+            delivers_outbox: true,
+        }
+    }
+
+    /// For an immediate outbox, which delivered every message already
+    pub fn for_immediate_outbox() -> Self {
+        Self {
+            delivers_outbox: false,
+        }
+    }
+
     pub async fn finalize(&self, catalog: &dill::Catalog) -> Result<(), InternalError> {
-        let outbox_agent = catalog.get_one::<dyn OutboxAgent>().ok();
+        let outbox_agent = if self.delivers_outbox {
+            Some(catalog.get_one::<dyn OutboxAgent>().int_err()?)
+        } else {
+            None
+        };
         let mut controller_drains = catalog
             .get_one::<dyn ResourceControllerRuntime>()
             .int_err()?

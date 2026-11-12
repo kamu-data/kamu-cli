@@ -16,7 +16,8 @@ macro_rules! declare_resource_service_layer {
         name = $name:ident,
         resource = $resource:ty,
         state_model = $state_model:ty,
-        controller_name = $controller_name:expr
+        controller_name = $controller_name:expr,
+        controller_revision = $controller_revision:expr
     ) => {
         $crate::paste::paste! {
             $crate::declare_resource_event_store_bridge!(
@@ -62,7 +63,8 @@ macro_rules! declare_resource_service_layer {
             $crate::declare_simple_resource_controller_adapter!(
                 adapter = [<$name SimpleResourceControllerAdapter>],
                 resource = $resource,
-                controller_name = $controller_name
+                controller_name = $controller_name,
+                controller_revision = $controller_revision
             );
 
             /// The service layer of a type whose `SimpleResourceReconciler`
