@@ -70,6 +70,32 @@ async fn test_shutdown_lets_the_current_drain_finish() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
+async fn test_loop_failing_during_a_shutdown_is_not_restarted() {
+    let harness = ControllerRuntimeHarness::new(
+        TestControllers::Main,
+        TestControllerBehavior::FinishWhenReleased,
+    )
+    .await;
+    harness.apply("res-a").await;
+    let mut agent = harness.start_agent();
+    harness.script().wait_for_total_calls(1).await;
+
+    // The drain's next pass fails, after the shutdown was requested
+    harness
+        .script()
+        .fail_next_listings(TEST_CONTROLLER_NAME, TestListingFailure::Error, 1);
+    agent.request_shutdown();
+    harness.let_agent_settle().await;
+    harness.script().release_processing();
+
+    agent.shutdown().await.unwrap();
+    assert_eq!(harness.loop_restarts_metric(TEST_CONTROLLER_NAME), 0);
+    assert_eq!(harness.script().listings_of(TEST_CONTROLLER_NAME), 2);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
 async fn test_shutdown_ends_a_loop_restart_backoff() {
     let harness = ControllerRuntimeHarness::finishing().await;
     harness
