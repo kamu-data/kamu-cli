@@ -65,7 +65,9 @@ pub async fn api_server_e2e_test<ServerRunFut, Fixture, FixtureFut>(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-async fn get_server_api_base_url(e2e_data_file_path: PathBuf) -> Result<Url, InternalError> {
+pub(crate) async fn get_server_api_base_url(
+    e2e_data_file_path: PathBuf,
+) -> Result<Url, InternalError> {
     let retry_strategy = FixedInterval::from_millis(500).take(10);
     let base_url = Retry::start(retry_strategy, || async {
         let data = tokio::fs::read_to_string(e2e_data_file_path.clone())

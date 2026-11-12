@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use std::path::{Path, PathBuf};
+use std::process::Stdio;
 use std::{env, ffi, fs};
 
 use chrono::{DateTime, Utc};
@@ -172,6 +173,50 @@ impl KamuCliPuppet {
         self.execute_impl(cmd, options).await
     }
 
+    /// Starts `kamu system api-server` as a child process, killed when dropped.
+    /// It writes its base URL to [`Self::get_e2e_output_data_path()`] and its
+    /// log to `api-server.log` next to it
+    pub fn spawn_api_server(&self) -> tokio::process::Child {
+        let e2e_data_file_path = self.get_e2e_output_data_path();
+        let log_file =
+            fs::File::create(e2e_data_file_path.with_file_name("api-server.log")).unwrap();
+
+        let mut command = tokio::process::Command::new(kamu_cli_bin_path());
+        command
+            .env("RUST_LOG", "info")
+            .current_dir(&self.workspace_path)
+            .args(["-v", "--no-color"])
+            .args(self.common_args())
+            .arg("--e2e-output-data-path")
+            .arg(&e2e_data_file_path)
+            .args(["system", "api-server", "--address", "127.0.0.1"])
+            .stdout(Stdio::null())
+            .stderr(log_file)
+            .kill_on_drop(true);
+
+        command.spawn().unwrap()
+    }
+
+    /// Arguments every command gets from the puppet's settings
+    fn common_args(&self) -> Vec<String> {
+        let mut args = Vec::new();
+
+        if let Some(system_time) = &self.system_time {
+            args.push("--system-time".to_string());
+            args.push(system_time.to_rfc3339_opts(chrono::SecondsFormat::Millis, true));
+        }
+
+        if let Some(account) = &self.account {
+            args.push("--account".to_string());
+            args.push(account.to_string());
+        }
+
+        args.push("--password-hashing-mode".to_string());
+        args.push("testing".to_string());
+
+        args
+    }
+
     async fn execute_impl<CmdIt, CmdItem, InputIt, EnvIt, EnvItem>(
         &self,
         cmd: CmdIt,
@@ -198,19 +243,7 @@ impl KamuCliPuppet {
         command.arg("--no-color");
 
         command.current_dir(self.workspace_path.clone());
-
-        if let Some(system_time) = &self.system_time {
-            let system_time = system_time.to_rfc3339_opts(chrono::SecondsFormat::Millis, true);
-
-            command.args(["--system-time", system_time.as_str()]);
-        }
-
-        if let Some(account) = &self.account {
-            command.args(["--account", account.as_str()]);
-        }
-
-        command.args(["--password-hashing-mode", "testing"]);
-
+        command.args(self.common_args());
         command.args(cmd);
 
         if let Some(input) = options.input {
