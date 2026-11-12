@@ -70,7 +70,7 @@ the next process start ([task-system.md](task-system.md#startup-recovery)).
 
 | Process | Agents |
 | --- | --- |
-| `kamu system api-server` | all of them, on `BackgroundAgentHost` (`src/app/cli/src/explore/api_server.rs`) |
+| `kamu system api-server` | all of them, on `BackgroundAgentHost` (`src/app/cli/src/explore/api_server.rs`); nothing is drained after it stops, so a shutdown stays within its bound and the next start picks up what is left (`command_needs_outbox_processing`) |
 | `kamu ui` | none: flows, tasks and resource controllers do not run there |
 | One-shot CLI commands | none: the outbox messages and resource controller work a command causes are drained before it exits (`BackgroundWorkFinalizer`, [resources-framework.md](resources-framework.md#controller-runtime)) |
 
@@ -126,9 +126,12 @@ sequenceDiagram
     H-->>S: Ok, or the fatal error
 ```
 
-- Agents and in-flight requests share `backgroundAgents.shutdownTimeout` (10s by default).
-- The host returns only once every supervisor and every agent task has ended, so nothing an
-  aborted agent held (a transaction, a connection) outlives it.
+- Agents and in-flight requests share `backgroundAgents.shutdownTimeout` (10s by default). For
+  requests it bounds graceful draining: connections still open when it expires are cancelled as
+  the process exits.
+- The host returns only once every supervisor and every agent's own task has ended. Tasks an
+  agent spawned itself (controller loops, outbox consumers) are only asked to abort; they end
+  with the process, which exits right after.
 - The host collects every supervisor's result, aborted or not, so a fatal error is returned even
   when the bound is reached at once.
 - An aborted step leaves storage as a crash would; the next start recovers it like any other

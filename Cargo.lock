@@ -8843,6 +8843,9 @@ dependencies = [
  "async-graphql",
  "async-trait",
  "chrono",
+ "container-runtime",
+ "headers",
+ "http",
  "http-common",
  "indoc 2.0.8",
  "internal-error",
@@ -8864,6 +8867,7 @@ dependencies = [
  "thiserror 2.0.21",
  "tokio",
  "tokio-retry",
+ "tokio-tungstenite 0.30.0",
 ]
 
 [[package]]
@@ -8903,6 +8907,7 @@ dependencies = [
  "async-graphql",
  "base64 0.23.1",
  "chrono",
+ "container-runtime",
  "database-common",
  "datafusion",
  "futures",
