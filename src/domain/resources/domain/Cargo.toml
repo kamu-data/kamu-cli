@@ -33,7 +33,7 @@ testing = [
 
 
 [dependencies]
-async-utils = { workspace = true }
+background-agent-host = { workspace = true }
 database-common = { workspace = true }
 dill = { version = "0.17", default-features = false }
 enum-variants = { workspace = true }

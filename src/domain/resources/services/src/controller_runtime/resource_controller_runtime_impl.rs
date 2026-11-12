@@ -10,9 +10,9 @@
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
-use async_utils::BackgroundAgent;
+use background_agent_host::{BackgroundAgent, CancellationToken};
 use dill::{CatalogWeakRef, Singleton, component, interface, scope};
-use internal_error::{ErrorIntoInternal, InternalError};
+use internal_error::{InternalError, ResultIntoInternal};
 use time_source::SystemTimeSource;
 use tokio::task::JoinSet;
 use wakeup_listener::WakeupListenerConfig;
@@ -116,14 +116,15 @@ impl BackgroundAgent for ResourceControllerRuntimeImpl {
         RESOURCE_CONTROLLER_RUNTIME_AGENT_NAME
     }
 
-    async fn run(&self) -> Result<(), InternalError> {
+    async fn run(&self, shutdown: CancellationToken) -> Result<(), InternalError> {
         let loops = self.build_loops()?;
 
-        // A returning agent stops the server, so an agent with nothing to
-        // drive waits forever instead
+        // Returning early would count as an unexpected completion, so an agent
+        // with nothing to drive waits for the shutdown instead
         if loops.is_empty() {
             tracing::info!("No resource controllers registered");
-            return std::future::pending().await;
+            shutdown.cancelled().await;
+            return Ok(());
         }
 
         self.metrics.init(
@@ -150,16 +151,15 @@ impl BackgroundAgent for ResourceControllerRuntimeImpl {
                     self.time_source.clone(),
                     self.metrics.clone(),
                 )
-                .run(),
+                .run(shutdown.clone()),
             );
         }
 
-        // Supervisors never end
-        match running.join_next().await {
-            Some(Ok(never)) => match never {},
-            Some(Err(join_error)) => Err(join_error.int_err()),
-            None => unreachable!("one supervisor per controller, and there are some"),
+        // Supervisors end only on a shutdown
+        while let Some(ended) = running.join_next().await {
+            ended.int_err()?;
         }
+        Ok(())
     }
 }
 

@@ -11,6 +11,7 @@ use std::num::NonZeroUsize;
 use std::sync::Arc;
 use std::time::Duration;
 
+use background_agent_host::CancellationToken;
 use chrono::TimeDelta;
 use database_common::DatabaseTransactionRunner;
 use dill::CatalogBuilder;
@@ -298,12 +299,15 @@ impl ControllerRuntimeHarness {
             .hint(&TypeUri::new_unchecked(TEST_OTHER_SCHEMA));
     }
 
-    /// Starts the runtime's background agent; it stops when the returned
+    /// Starts the runtime's background agent; it is aborted when the returned
     /// handle is dropped
     pub fn start_agent(&self) -> RunningControllerRuntime {
         let runtime = self.runtime();
+        let shutdown = CancellationToken::new();
+        let token = shutdown.clone();
         RunningControllerRuntime {
-            task: tokio::spawn(async move { runtime.run().await }),
+            shutdown,
+            task: tokio::spawn(async move { runtime.run(token).await }),
         }
     }
 
@@ -442,7 +446,28 @@ impl ControllerRuntimeHarness {
 
 /// The runtime's agent running in the background of a test
 pub struct RunningControllerRuntime {
+    shutdown: CancellationToken,
     task: tokio::task::JoinHandle<Result<(), InternalError>>,
+}
+
+impl RunningControllerRuntime {
+    pub fn request_shutdown(&self) {
+        self.shutdown.cancel();
+    }
+
+    pub fn has_returned(&self) -> bool {
+        self.task.is_finished()
+    }
+
+    /// Requests a shutdown and waits for the agent to return. Real time, as
+    /// the agent runs on the test's runtime
+    pub async fn shutdown(&mut self) -> Result<(), InternalError> {
+        self.request_shutdown();
+        tokio::time::timeout(Duration::from_secs(5), &mut self.task)
+            .await
+            .expect("the runtime ignored the shutdown")
+            .unwrap()
+    }
 }
 
 impl Drop for RunningControllerRuntime {

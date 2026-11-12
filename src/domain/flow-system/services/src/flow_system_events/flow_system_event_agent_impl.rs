@@ -10,7 +10,7 @@
 use std::sync::Arc;
 use std::time::Duration;
 
-use async_utils::BackgroundAgent;
+use background_agent_host::{BackgroundAgent, CancellationToken};
 use database_common_macros::transactional_method;
 use dill::Builder;
 use event_sourcing::EventID;
@@ -202,7 +202,7 @@ impl BackgroundAgent for FlowSystemEventAgentImpl {
         FLOW_SYSTEM_EVENT_AGENT_NAME
     }
 
-    async fn run(&self) -> Result<(), internal_error::InternalError> {
+    async fn run(&self, shutdown: CancellationToken) -> Result<(), internal_error::InternalError> {
         let wakeup_listener = self.flow_system_event_bridge.new_wakeup_listener();
 
         // On startup, immediately sync all projectors to catch up with existing events
@@ -213,12 +213,19 @@ impl BackgroundAgent for FlowSystemEventAgentImpl {
             ))
             .await;
 
-        // Then enter the infinite main loop
+        // Then enter the main loop, until a shutdown
         loop {
             // Wait for push or timeout - let the store handle the backoff strategy
-            let hint = wakeup_listener
-                .wait_wake(listening_timeout, self.wakeup_config.min_debounce_interval)
-                .await?;
+            let Some(hint) = shutdown
+                .run_until_cancelled(
+                    wakeup_listener
+                        .wait_wake(listening_timeout, self.wakeup_config.min_debounce_interval),
+                )
+                .await
+            else {
+                return Ok(());
+            };
+            let hint = hint?;
             tracing::debug!(hint = ?hint, "Agent woke up with a hint");
 
             listening_timeout = self.catch_up(wakeup_listener.as_ref()).await;

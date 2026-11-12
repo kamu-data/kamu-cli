@@ -9,7 +9,7 @@
 
 use std::sync::Arc;
 
-use async_utils::BackgroundAgent;
+use background_agent_host::{BackgroundAgent, CancellationToken};
 use database_common::PaginationOpts;
 use database_common_macros::transactional_method2;
 use dill::*;
@@ -89,11 +89,7 @@ impl TaskAgentImpl {
             })
     }
 
-    async fn run_task_iteration(
-        &self,
-        wakeup_listener: &dyn WakeupListener,
-    ) -> Result<(), InternalError> {
-        let task = self.take_task(wakeup_listener).await?;
+    async fn run_taken_task(&self, task: Task) -> Result<(), InternalError> {
         self.metrics.on_task_started(
             task.timing.created_at,
             task.timing.ran_at.unwrap_or_else(|| self.time_source.now()),
@@ -178,8 +174,18 @@ impl TaskAgentImpl {
         Ok(())
     }
 
-    async fn take_task(&self, wakeup_listener: &dyn WakeupListener) -> Result<Task, InternalError> {
+    /// Waits for the next task and marks it running; `None` once `shutdown`
+    /// is cancelled. Only the wait is cut short, never the taking
+    async fn take_task(
+        &self,
+        wakeup_listener: &dyn WakeupListener,
+        shutdown: &CancellationToken,
+    ) -> Result<Option<Task>, InternalError> {
         loop {
+            if shutdown.is_cancelled() {
+                return Ok(None);
+            }
+
             let maybe_task = match self.take_task_non_blocking().await {
                 Ok(maybe_task) => maybe_task,
                 Err(TakeTaskError::ConcurrentModification { task_id }) => {
@@ -193,16 +199,20 @@ impl TaskAgentImpl {
             if let Some(task) = maybe_task {
                 // Back-to-back tasks leave no room for waits
                 wakeup_listener.heartbeat();
-                return Ok(task);
+                return Ok(Some(task));
             }
 
             // Signals are only hints, so the queue is re-checked on any wakeup
-            let hint = wakeup_listener
-                .wait_wake(
+            let Some(hint) = shutdown
+                .run_until_cancelled(wakeup_listener.wait_wake(
                     self.wakeup_config.max_listening_timeout,
                     self.wakeup_config.min_debounce_interval,
-                )
-                .await?;
+                ))
+                .await
+            else {
+                return Ok(None);
+            };
+            let hint = hint?;
             tracing::debug!(hint = ?hint, "Agent woke up with a hint");
         }
     }
@@ -328,15 +338,18 @@ impl BackgroundAgent for TaskAgentImpl {
         TASK_AGENT_NAME
     }
 
-    /// Runs the update main loop
-    async fn run(&self) -> Result<(), InternalError> {
+    async fn run(&self, shutdown: CancellationToken) -> Result<(), InternalError> {
+        // A failure in the middle of a task leaves it running; the host
+        // restarts this loop, so each start requeues such tasks
+        self.recover_running_tasks().await?;
+
         // Kept across iterations, so that no change is missed between them
         let wakeup_listener = self.task_queue_wakeup_source.new_wakeup_listener();
 
-        // TODO: Error and panic handling strategy
-        loop {
-            self.run_task_iteration(wakeup_listener.as_ref()).await?;
+        while let Some(task) = self.take_task(wakeup_listener.as_ref(), &shutdown).await? {
+            self.run_taken_task(task).await?;
         }
+        Ok(())
     }
 }
 
@@ -348,7 +361,11 @@ impl TaskAgent for TaskAgentImpl {
     #[tracing::instrument(level = "info", skip_all)]
     async fn run_single_task(&self) -> Result<(), InternalError> {
         let wakeup_listener = self.task_queue_wakeup_source.new_wakeup_listener();
-        self.run_task_iteration(wakeup_listener.as_ref()).await
+        let task = self
+            .take_task(wakeup_listener.as_ref(), &CancellationToken::new())
+            .await?
+            .expect("a token never cancelled");
+        self.run_taken_task(task).await
     }
 }
 
