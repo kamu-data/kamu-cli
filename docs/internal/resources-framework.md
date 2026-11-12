@@ -555,6 +555,12 @@ existing rows/events that should move to the new schema.
 - Rows are not event-sourced: an upsert replaces the row. The FK means a resource's rows must be
   removed (`delete_states_for_resource`) before the resource itself. Nothing removes a deleted
   resource, which stays as its tombstone, so its rows stay too; every query leaves them out.
+- **A change clears the rows.** Saving a new generation or a deletion request removes the
+  resource's rows in the same transaction (`ResourcePersistenceServiceHelper`), so a retry or a
+  failure backoff recorded for the earlier state does not delay the change. The resource is
+  processed at once and backs off from scratch if it fails again. An attempt that was still
+  running when the change committed records its outcome afterwards; if it failed, its backoff
+  delays the change once more.
 - The [controller runtime](#controller-runtime) writes a row after every `process` call and
   reads them to plan its drains and its deadlines.
 - **Actionable resources.** `find_actionable_resource_ids` returns the resources a controller must
@@ -568,6 +574,10 @@ existing rows/events that should move to the new schema.
     partial index on `(resource_schema, resource_id)`.
   - `idx_resources_deletion_pending` serves "deletion requested, not completed", with the same
     shape.
+  - The status-change predicate has no index of its own yet: no controller reacts to status, and
+    the predicate is switched off for the others. The first controller that sets
+    `reacts_to_status` adds an index on `(resource_schema, resource_id)` of resources not deleted;
+    without it, that predicate reads every resource on each drain.
   - The status predicate has no index: it compares against the bookkeeping row, so it scans the
     schema's resources that are not deleted. It runs only for controllers registered to react to
     status.
@@ -897,7 +907,7 @@ restarts ([background-agents.md](background-agents.md#3-supervision)).
 
 | Source | Selected when | Left out while |
 | --- | --- | --- |
-| Eligibility predicates ([Controller bookkeeping](#controller-bookkeeping)) | not reconciled, deletion pending, or a status change for a controller reacting to status | finished at the current version and revision, or waiting for a retry or a failure backoff |
+| Eligibility predicates ([Controller bookkeeping](#controller-bookkeeping)) | not reconciled, deletion pending, or a status change for a controller reacting to status | finished at the current version and revision, or waiting for a retry or a failure backoff ([cleared by a change](#controller-bookkeeping)) |
 | `list_extra_actionable` | the controller says so, e.g. a task whose claim expired | waiting for a retry or a failure backoff |
 
 An extra resource ignores `Done` on purpose: being listed is the signal that it needs attention
@@ -906,7 +916,10 @@ retried at once. The controller lists its extra resources without knowing which 
 leaves out. If, after removing the backed-off ones, a listing yields fewer than a batch, the
 runtime lists again with the limit raised by the number skipped, until the batch is full or the
 listing ends.
-Extra resources backing off thus cannot hide the ones listed after them.
+Extra resources backing off thus cannot hide the ones listed after them. The cost grows with the
+square of the number backing off: each listing starts again from the first resource, and each
+listed one reads its row on its own. The first controller that lists many extra resources pages
+them with a cursor and reads their rows in one query.
 
 **What an outcome records** (`ResourceProcessAttempt::next_state`), in a transaction of its own
 after `process` returned:

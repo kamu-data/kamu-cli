@@ -41,8 +41,8 @@ Recommendation: for ease of reading, use the following format:
   configured by `backgroundAgents.restartBackoff` (from 1s, doubling, up to 1m by default)
 - `kamu system api-server` shuts down gracefully on Ctrl+C or SIGTERM: it stops accepting requests,
   and in-flight requests and background agents get `backgroundAgents.shutdownTimeout` (10s by
-  default) to finish their current step before they are stopped. Before, the process was killed at
-  once
+  default) to finish their current step before they are stopped; a second Ctrl+C or SIGTERM exits
+  at once. Before, the process was killed at once
 
 ## [0.273.0] - 2026-11-23
 ### Added
