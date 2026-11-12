@@ -97,8 +97,9 @@ impl<'a> ResourceControllerWait<'a> {
             return Ok(());
         }
 
-        let now = self.time_source.now();
         let deadline = self.effective_deadline(drained).await?;
+        // Read after the queries, so that their time is not slept again
+        let now = self.time_source.now();
 
         let wait_for_hint = listener.wait_wake(
             self.wakeup_config.max_listening_timeout,

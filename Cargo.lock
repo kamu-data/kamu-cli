@@ -9989,6 +9989,7 @@ name = "kamu-task-system-services"
 version = "0.272.1"
 dependencies = [
  "async-trait",
+ "async-utils",
  "background-agent-host",
  "chrono",
  "database-common",

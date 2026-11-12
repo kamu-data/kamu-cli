@@ -21,8 +21,9 @@ kamu_resources_services::declare_resource_service_layer!(
     resource = VariableSetResource,
     state_model = VariableSetStateModel,
     controller_name = VARIABLE_SET_CONTROLLER_NAME,
-    // Bumped when the reconciler's semantics change, so that resources it
-    // finished with are reconsidered
+    // Bumped when the reconciler's semantics change: resources it finished
+    // with are processed again if a predicate still selects them, such as a
+    // pending deletion; reconciled resources stay quiet
     controller_revision = 1
 );
 

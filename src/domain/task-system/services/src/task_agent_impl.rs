@@ -7,12 +7,15 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::panic::AssertUnwindSafe;
 use std::sync::Arc;
 
+use async_utils::panic_message;
 use background_agent_host::{BackgroundAgent, CancellationToken};
 use database_common::PaginationOpts;
 use database_common_macros::transactional_method2;
 use dill::*;
+use futures::FutureExt as _;
 use init_on_startup::{InitOnStartup, InitOnStartupMeta};
 use kamu_task_system::*;
 use messaging_outbox::{Outbox, OutboxExt};
@@ -240,22 +243,29 @@ impl TaskAgentImpl {
         Ok(Some(task))
     }
 
-    /// Runs the task to its outcome. An internal error fails the task rather
-    /// than the agent: a failing agent is restarted, which requeues the task
-    /// and takes it again first, so no other task would run.
+    /// Runs the task to its outcome. An internal error or a panic fails the
+    /// task rather than the agent: a failing agent is restarted, which
+    /// requeues the task and takes it again first, so no other task would run.
     async fn run_task(&self, task: &Task) -> TaskOutcome {
-        match self.try_run_task(task).await {
-            Ok(task_outcome) => task_outcome,
-            Err(e) => {
-                tracing::error!(
-                    task = ?task,
-                    error = ?e,
-                    error_msg = %e,
-                    "Task could not be run"
-                );
-                TaskOutcome::Failed(TaskError::empty_recoverable())
-            }
-        }
+        let error = match AssertUnwindSafe(self.try_run_task(task))
+            .catch_unwind()
+            .await
+        {
+            Ok(Ok(task_outcome)) => return task_outcome,
+            Ok(Err(e)) => e,
+            Err(payload) => InternalError::new(format!(
+                "Task panicked: {}",
+                panic_message(payload.as_ref())
+            )),
+        };
+
+        tracing::error!(
+            task = ?task,
+            error = ?error,
+            error_msg = %error,
+            "Task could not be run"
+        );
+        TaskOutcome::Failed(TaskError::empty_recoverable())
     }
 
     async fn try_run_task(&self, task: &Task) -> Result<TaskOutcome, InternalError> {
