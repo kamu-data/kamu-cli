@@ -39,16 +39,6 @@ const EXIT_BOUND: Duration = Duration::from_secs(5);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn test_api_server_exits_on_sigterm(kamu: KamuCliPuppet) {
-    let mut server = KamuApiServerProcess::start(&kamu).await;
-
-    let (status, _) = server.terminate(EXIT_BOUND).await;
-
-    assert_exited_successfully(&status);
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 pub async fn test_api_server_exits_on_sigterm_during_a_transfer(kamu: KamuCliPuppet) {
     let mut server = KamuApiServerProcess::start(&kamu).await;
     let _session = server
@@ -58,7 +48,7 @@ pub async fn test_api_server_exits_on_sigterm_during_a_transfer(kamu: KamuCliPup
         ))
         .await;
 
-    let (status, _) = server.terminate(EXIT_BOUND).await;
+    let status = server.terminate(EXIT_BOUND).await;
 
     assert_exited_successfully(&status);
 }

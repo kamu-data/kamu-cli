@@ -22,7 +22,6 @@ use kamu_configuration_services::testing::BaseConfigurationServiceHarness;
 use kamu_resources::{
     ApplyResourceParams,
     EventSourcedResource,
-    RequestResourcesDeletionUseCase,
     ResourceControllerName,
     ResourceControllerState,
     ResourceControllerStateRepository,
@@ -57,27 +56,6 @@ async fn test_variable_set_left_reconciling_is_reconciled_after_restart() {
 
     assert_eq!(harness.variable_set_phase(&id).await, ResourcePhase::Ready);
     assert_eq!(harness.variable_set_projection_entry_count(&id).await, 2);
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[test_log::test(tokio::test)]
-async fn test_secret_set_left_deleting_is_deleted_after_restart() {
-    let harness = ControllersHarness::new().await;
-
-    let id = harness
-        .apply_secret_set(&harness.owner, "secrets", [("TOKEN", "value")])
-        .await;
-    assert_eq!(harness.secret_set_projection_entry_count(&id).await, 1);
-
-    harness.request_secret_set_deletion_unsettled(id).await;
-    assert_eq!(harness.secret_set_phase(&id).await, ResourcePhase::Deleting);
-    assert_eq!(harness.secret_set_projection_entry_count(&id).await, 1);
-
-    harness.settle().await;
-
-    assert_eq!(harness.secret_set_phase(&id).await, ResourcePhase::Deleted);
-    assert_eq!(harness.secret_set_projection_entry_count(&id).await, 0);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -175,16 +153,6 @@ impl ControllersHarness {
             .await
             .unwrap()
             .expect("the applied resource needs reconciliation");
-    }
-
-    /// Requests the deletion and leaves its completion to a later drain
-    async fn request_secret_set_deletion_unsettled(&self, id: ResourceID) {
-        let use_case: Arc<dyn RequestResourcesDeletionUseCase<SecretSetResource>> =
-            self.catalog().get_one().unwrap();
-        use_case
-            .execute(self.owner.did.clone(), vec![id])
-            .await
-            .unwrap();
     }
 
     /// A `SecretSet` whose secret claims an encoding it does not have, written

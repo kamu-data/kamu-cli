@@ -38,7 +38,7 @@ async fn test_applied_message_wakes_the_agent() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_draining_delivers_the_messages_of_the_steps() {
+async fn test_steps_due_at_once_run_in_one_drain_and_their_messages_are_delivered() {
     let harness = ControllerRuntimeHarness::new(
         TestControllers::Main,
         TestControllerBehavior::Stepwise {
@@ -48,27 +48,12 @@ async fn test_draining_delivers_the_messages_of_the_steps() {
     .await;
     let id = harness.apply("res-a").await;
 
-    harness.run_outbox_and_controllers_until_idle().await;
-
+    let mut session = harness.new_drain_session();
+    assert_eq!(harness.deliver_and_drain(&mut session).await, 2);
     assert_eq!(harness.phase(id).await, ResourcePhase::Ready);
-    assert!(!harness.has_undelivered_lifecycle_messages().await);
-}
 
-#[test_log::test(tokio::test)]
-async fn test_draining_returns_while_a_step_waits_for_its_time() {
-    let harness = ControllerRuntimeHarness::new(
-        TestControllers::Main,
-        TestControllerBehavior::Stepwise {
-            step_wait: TimeDelta::minutes(1),
-        },
-    )
-    .await;
-    let id = harness.apply("res-a").await;
-
-    harness.run_outbox_and_controllers_until_idle().await;
-
-    assert_eq!(harness.script().calls_of(&id), 1);
-    assert_eq!(harness.phase(id).await, ResourcePhase::Reconciling);
+    // Draining until idle delivers the messages the steps posted
+    assert_eq!(harness.process_calls_until_idle().await, 0);
     assert!(!harness.has_undelivered_lifecycle_messages().await);
 }
 

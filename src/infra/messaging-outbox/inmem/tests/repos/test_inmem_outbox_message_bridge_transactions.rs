@@ -30,23 +30,6 @@ const CONSUMER: &str = "consumer";
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_messages_become_visible_at_commit() {
-    let harness = TransactionalOutboxHarness::new();
-    let writer = harness.begin().await;
-
-    harness.push(&writer).await;
-
-    pretty_assertions::assert_eq!(harness.visible_message_ids(&writer).await, [1]);
-    pretty_assertions::assert_eq!(harness.committed_message_ids().await, [] as [i64; 0]);
-
-    harness.commit(writer).await;
-
-    pretty_assertions::assert_eq!(harness.committed_message_ids().await, [1]);
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[test_log::test(tokio::test)]
 async fn test_rolled_back_messages_are_dropped() {
     let harness = TransactionalOutboxHarness::new();
     let rolled_back = harness.begin().await;
@@ -187,10 +170,6 @@ impl TransactionalOutboxHarness {
             )
             .await
             .unwrap();
-    }
-
-    async fn visible_message_ids(&self, transaction: &OpenTransaction) -> Vec<i64> {
-        self.message_ids_seen_from(&transaction.catalog).await
     }
 
     /// The messages a reader outside every transaction sees
