@@ -283,7 +283,7 @@ initial boundary: `Latest` → the producer's latest visible message, `All` (or 
 ```text
 run():  t = catch_up → loop { wait_wake(t, minDebounceInterval) or return on shutdown; t = catch_up }
 catch_up: held = has_held_back_messages(); drain; return held ? 20ms : maxListeningTimeout
-drain:  loop { n = consumption_iteration(); if n == 0 break }
+drain:  loop { n = consumption_iteration(); if n == 0 or shutdown break }   // run_while_has_tasks: no shutdown
 run_while_has_tasks(): loop { held = has_held_back_messages(); drain; if !held break; sleep(20ms) }
 ```
 
