@@ -198,6 +198,40 @@ async fn test_catchup_records_heartbeat_after_every_batch() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
+async fn test_shutdown_stops_catch_up_between_batches() {
+    let harness = FlowHarness::with_overrides(FlowHarnessOverrides {
+        flow_system_event_batch_size: Some(1),
+        with_heartbeat_probe_projector: true,
+        ..Default::default()
+    });
+
+    // A backlog of at least two events, one per batch
+    let foo_id = harness
+        .create_root_dataset(odf::DatasetAlias {
+            dataset_name: odf::DatasetName::new_unchecked("foo"),
+            account_name: None,
+        })
+        .await;
+    harness
+        .schedule_flow_for_activation(
+            &ingest_dataset_binding(&foo_id),
+            harness.aligned_now() + Duration::milliseconds(10),
+        )
+        .await;
+
+    // Requested before the start: the agent finishes the batch in progress
+    // and returns, leaving the rest of the backlog for its next run
+    harness
+        .run_flow_system_event_agent_shut_down_at_start()
+        .await;
+
+    let heartbeats_seen = harness.probe_heartbeats_seen();
+    assert!(heartbeats_seen.len() < 2, "{heartbeats_seen:?}");
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
 async fn test_flow_agents_return_on_shutdown() {
     let harness = FlowHarness::with_overrides(FlowHarnessOverrides::default());
 

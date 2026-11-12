@@ -327,7 +327,8 @@ impl APIServer {
     }
 
     /// Cancels `shutdown` on Ctrl+C, SIGTERM or the e2e shutdown route;
-    /// returns as soon as it is cancelled for any reason
+    /// returns as soon as it is cancelled for any reason. From then on, a
+    /// signal exits the process at once, in case the graceful stop hangs
     async fn cancel_on_shutdown_request(
         shutdown: CancellationToken,
         e2e_shutdown_notify: Option<Arc<Notify>>,
@@ -347,11 +348,19 @@ impl APIServer {
         };
 
         tokio::select! {
-            () = shutdown.cancelled() => return,
+            () = shutdown.cancelled() => {}
             () = signal => tracing::info!("Shutdown signal received"),
             () = e2e_shutdown => tracing::info!("Shutdown requested through the e2e route"),
         }
         shutdown.cancel();
+
+        // Detached, so that it does not hold up the end of a graceful stop
+        tokio::spawn(async {
+            if graceful_stop().await.is_ok() {
+                tracing::warn!("Second shutdown signal received, exiting at once");
+                std::process::exit(1);
+            }
+        });
     }
 }
 
