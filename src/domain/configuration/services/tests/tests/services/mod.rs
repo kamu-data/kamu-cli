@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 mod dataset_env_var_service_harness;
+mod test_configuration_resource_controllers;
 mod test_dataset_env_var_mutation_adapter;
 mod test_dataset_env_var_resolver;
 mod test_dataset_env_var_spec_resolver;
