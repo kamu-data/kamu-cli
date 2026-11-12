@@ -7,9 +7,9 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::any::Any;
 use std::collections::HashMap;
 
+use async_utils::join_error_message;
 use tokio::task::{JoinError, JoinSet};
 use tracing::Instrument as _;
 
@@ -113,11 +113,7 @@ impl<'a> ResourceProcessExecutor<'a> {
     /// A task that did not return. The runtime never aborts its tasks, so
     /// this is a panic.
     fn panicked(&self, join_error: JoinError) -> ResourceProcessAttempt {
-        let message = if join_error.is_panic() {
-            panic_message(join_error.into_panic().as_ref())
-        } else {
-            join_error.to_string()
-        };
+        let message = join_error_message(join_error);
 
         tracing::error!(
             controller = self.registration.meta().controller_name.as_str(),
@@ -125,20 +121,6 @@ impl<'a> ResourceProcessExecutor<'a> {
             "Resource processing panicked"
         );
         ResourceProcessAttempt::Failed(format!("Resource processing panicked: {message}"))
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-/// The text of a panic payload: `panic!` with a literal yields `&str`, with a
-/// format string `String`
-pub(crate) fn panic_message(payload: &(dyn Any + Send)) -> String {
-    if let Some(message) = payload.downcast_ref::<&str>() {
-        (*message).to_string()
-    } else if let Some(message) = payload.downcast_ref::<String>() {
-        message.clone()
-    } else {
-        "non-text panic payload".to_string()
     }
 }
 

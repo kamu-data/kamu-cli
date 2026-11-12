@@ -35,6 +35,7 @@ testing = [
 
 [dependencies]
 async-utils = { workspace = true }
+background-agent-host = { workspace = true }
 database-common = { workspace = true }
 email-utils = { workspace = true }
 event-sourcing = { workspace = true }

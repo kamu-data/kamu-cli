@@ -11,8 +11,10 @@ use std::assert_matches;
 use std::sync::Arc;
 use std::time::Duration;
 
+use background_agent_host::CancellationToken;
 use database_common::NoOpDatabasePlugin;
 use dill::{Catalog, CatalogBuilder};
+use internal_error::InternalError;
 use kamu::utils::ipfs_wrapper::IpfsClient;
 use kamu::*;
 use kamu_accounts::{CurrentAccountSubject, CurrentAccountSubjectCatalogExt as _};
@@ -109,6 +111,54 @@ async fn test_pre_run_requeues_running_tasks_across_pages() {
             "{task_id}"
         );
     }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_run_requeues_tasks_left_running() {
+    let harness = TaskAgentHarness::new(
+        MockOutbox::new(),
+        MockTaskDefinitionPlanner::new(),
+        MockTaskRunner::new(),
+    );
+
+    // Taken by a run of the loop that then failed
+    let task_id = harness
+        .schedule_probe_task(LogicalPlanProbe::default())
+        .await;
+    harness.try_take_task().await.unwrap();
+    assert_eq!(
+        harness.get_task(task_id).await.status(),
+        TaskStatus::Running
+    );
+
+    // Shut down before the start: the run only recovers
+    let shutdown = CancellationToken::new();
+    shutdown.cancel();
+    harness.run_agent_to_end(shutdown).await.unwrap();
+
+    assert_eq!(harness.get_task(task_id).await.status(), TaskStatus::Queued);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_run_returns_on_shutdown_while_waiting_for_tasks() {
+    let harness = TaskAgentHarness::new(
+        MockOutbox::new(),
+        MockTaskDefinitionPlanner::new(),
+        MockTaskRunner::new(),
+    );
+
+    let shutdown = CancellationToken::new();
+    let (result, ()) = tokio::join!(harness.run_agent_to_end(shutdown.clone()), async {
+        // Real time, for the agent to reach its wait for a task
+        tokio::time::sleep(Duration::from_millis(50)).await;
+        shutdown.cancel();
+    });
+
+    result.unwrap();
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -470,6 +520,14 @@ impl TaskAgentHarness {
             .await
             .unwrap()
             .task_id
+    }
+
+    /// Runs the agent until it returns; a run that outlives the test's bound
+    /// ignored its shutdown
+    async fn run_agent_to_end(&self, shutdown: CancellationToken) -> Result<(), InternalError> {
+        tokio::time::timeout(Duration::from_secs(5), self.task_agent.run(shutdown))
+            .await
+            .expect("the agent ignored the shutdown")
     }
 
     async fn try_take_task(&self) -> Option<Task> {

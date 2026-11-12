@@ -9,7 +9,7 @@
 
 use std::path::Path;
 
-use async_utils::BackgroundAgent;
+use background_agent_host::BackgroundAgent;
 use database_common::{DatabaseConnectionSettings, SqlitePoolOptions, TransactionRef};
 use dill::CatalogBuilder;
 use kamu::domain::{KamuBackgroundCatalog, ServerUrlConfig, TenancyConfig};
