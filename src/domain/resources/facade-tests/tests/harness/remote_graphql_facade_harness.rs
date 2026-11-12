@@ -184,8 +184,8 @@ impl FacadeContractHarness for RemoteGraphqlFacadeHarness {
         self.local.account_name(account)
     }
 
-    async fn flush_outbox(&self) {
-        self.local.flush_outbox().await;
+    async fn settle(&self) {
+        self.local.settle().await;
     }
 }
 

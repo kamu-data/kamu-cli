@@ -52,10 +52,10 @@ async fn test_reconcile_variable_set_populates_projection_entries() {
         })
         .await
         .unwrap();
+    harness.settle().await;
 
     let applied_id = decision.expect_applied().id;
 
-    // Reconciliation fires synchronously via OutboxImmediateImpl
     let entries = harness
         .variable_set_projection_repo()
         .get_latest_entries(&applied_id)
@@ -99,6 +99,7 @@ async fn test_reconcile_variable_set_preserves_entry_id_across_reconciliations()
         })
         .await
         .unwrap();
+    harness.settle().await;
 
     let id = decision.expect_applied().id;
 
@@ -129,6 +130,7 @@ async fn test_reconcile_variable_set_preserves_entry_id_across_reconciliations()
         })
         .await
         .unwrap();
+    harness.settle().await;
 
     decision2.expect_applied();
 

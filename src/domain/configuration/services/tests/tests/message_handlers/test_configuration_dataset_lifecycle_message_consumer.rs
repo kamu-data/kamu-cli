@@ -458,13 +458,17 @@ impl ConsumerHarness {
         .await
     }
 
+    /// Consumes the message, then lets the controller runtime complete the
+    /// deletions it requested
     async fn consume(&self, message: &DatasetLifecycleMessage) -> Result<(), InternalError> {
         let catalog = self.base.catalog();
         catalog
             .get_one::<dyn MessageConsumerT<DatasetLifecycleMessage>>()
             .unwrap()
             .consume_message(catalog, message)
-            .await
+            .await?;
+        self.settle().await;
+        Ok(())
     }
 }
 

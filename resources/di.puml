@@ -142,6 +142,7 @@ interface "ResetPlanner" <<i>>
 interface "ResourceAccountResolver" <<i>>
 interface "ResourceAggregateLoader" <<i>>
 interface "ResourceContextStore" <<i>>
+interface "ResourceController" <<i>>
 interface "ResourceControllerHints" <<i>>
 interface "ResourceControllerRuntime" <<i>>
 interface "ResourceControllerStateRepository" <<i>>
@@ -150,7 +151,6 @@ interface "ResourceExtensionSchemaDispatcher" <<i>>
 interface "ResourceFacade" <<i>>
 interface "ResourceFacadeFactory" <<i>>
 interface "ResourceLabelProjectionRepository" <<i>>
-interface "ResourceLifecycleEventDispatcher" <<i>>
 interface "ResourceLifecyclePrimitives" <<i>>
 interface "ResourceLoader" <<i>>
 interface "ResourceManifestDiscoveryService" <<i>>
@@ -179,7 +179,6 @@ interface "SetWatermarkExecutor" <<i>>
 interface "SetWatermarkPlanner" <<i>>
 interface "SetWatermarkUseCase" <<i>>
 interface "SignEip712UseCase" <<i>>
-interface "SimpleResourceController" <<i>>
 interface "SimpleResourceReconciler" <<i>>
 interface "SmartTransferProtocolClient" <<i>>
 interface "StorageEventStore" <<i>>
@@ -423,7 +422,6 @@ class "SecretSetReconcilerImpl"
 class "SecretSetRequestResourcesDeletionUseCaseImpl"
 class "SecretSetResourceAggregateLoaderImpl"
 class "SecretSetResourceCrudDispatcher"
-class "SecretSetResourceLifecycleDispatcher"
 class "SecretSetResourceLifecyclePrimitivesImpl"
 class "SecretSetResourcePersistenceServiceImpl"
 class "SecretSetResourcePresentationDispatcher"
@@ -493,7 +491,6 @@ class "StorageReconcilerImpl"
 class "StorageRequestResourcesDeletionUseCaseImpl"
 class "StorageResourceAggregateLoaderImpl"
 class "StorageResourceCrudDispatcher"
-class "StorageResourceLifecycleDispatcher"
 class "StorageResourceLifecyclePrimitivesImpl"
 class "StorageResourcePersistenceServiceImpl"
 class "StorageResourcePresentationDispatcher"
@@ -517,7 +514,6 @@ class "VariableSetReconcilerImpl"
 class "VariableSetRequestResourcesDeletionUseCaseImpl"
 class "VariableSetResourceAggregateLoaderImpl"
 class "VariableSetResourceCrudDispatcher"
-class "VariableSetResourceLifecycleDispatcher"
 class "VariableSetResourceLifecyclePrimitivesImpl"
 class "VariableSetResourcePersistenceServiceImpl"
 class "VariableSetResourcePresentationDispatcher"
@@ -975,8 +971,6 @@ class "WsSmartTransferProtocolClient"
 "SecretSetRequestResourcesDeletionUseCaseImpl"  --> "ResourceLifecyclePrimitives"
 "ResourceAggregateLoader" <|-- "SecretSetResourceAggregateLoaderImpl"
 "SecretSetResourceAggregateLoaderImpl"  --> "SecretSetEventStore"
-"ResourceLifecycleEventDispatcher" <|-- "SecretSetResourceLifecycleDispatcher"
-"SecretSetResourceLifecycleDispatcher"  --> "SimpleResourceController"
 "ResourceLifecyclePrimitives" <|-- "SecretSetResourceLifecyclePrimitivesImpl"
 "SecretSetResourceLifecyclePrimitivesImpl"  --> "ResourceAggregateLoader"
 "SecretSetResourceLifecyclePrimitivesImpl"  --> "ResourcePersistenceService"
@@ -988,8 +982,9 @@ class "WsSmartTransferProtocolClient"
 "SecretSetResourcePersistenceServiceImpl"  --> "ResourceLabelProjectionRepository"
 "SecretSetResourcePersistenceServiceImpl"  --> "ResourceRepository"
 "SecretSetResourcePersistenceServiceImpl"  --> "ResourceExtensionSchemaRegistry"
-"SimpleResourceController" <|-- "SecretSetSimpleResourceControllerAdapter"
+"ResourceController" <|-- "SecretSetSimpleResourceControllerAdapter"
 "SecretSetSimpleResourceControllerAdapter"  --> "Catalog"
+"SecretSetSimpleResourceControllerAdapter"  --> "SystemTimeSource"
 "TypedResourceQueryService" <|-- "SecretSetTypedResourceQueryServiceImpl"
 "SecretSetTypedResourceQueryServiceImpl"  --> "ResourceRepository"
 "ApplyResourceUseCase" <|-- "VariableSetApplyResourceUseCaseImpl"
@@ -1007,8 +1002,6 @@ class "WsSmartTransferProtocolClient"
 "VariableSetRequestResourcesDeletionUseCaseImpl"  --> "ResourceLifecyclePrimitives"
 "ResourceAggregateLoader" <|-- "VariableSetResourceAggregateLoaderImpl"
 "VariableSetResourceAggregateLoaderImpl"  --> "VariableSetEventStore"
-"ResourceLifecycleEventDispatcher" <|-- "VariableSetResourceLifecycleDispatcher"
-"VariableSetResourceLifecycleDispatcher"  --> "SimpleResourceController"
 "ResourceLifecyclePrimitives" <|-- "VariableSetResourceLifecyclePrimitivesImpl"
 "VariableSetResourceLifecyclePrimitivesImpl"  --> "ResourceAggregateLoader"
 "VariableSetResourceLifecyclePrimitivesImpl"  --> "ResourcePersistenceService"
@@ -1020,8 +1013,9 @@ class "WsSmartTransferProtocolClient"
 "VariableSetResourcePersistenceServiceImpl"  --> "ResourceLabelProjectionRepository"
 "VariableSetResourcePersistenceServiceImpl"  --> "ResourceRepository"
 "VariableSetResourcePersistenceServiceImpl"  --> "ResourceExtensionSchemaRegistry"
-"SimpleResourceController" <|-- "VariableSetSimpleResourceControllerAdapter"
+"ResourceController" <|-- "VariableSetSimpleResourceControllerAdapter"
 "VariableSetSimpleResourceControllerAdapter"  --> "Catalog"
+"VariableSetSimpleResourceControllerAdapter"  --> "SystemTimeSource"
 "TypedResourceQueryService" <|-- "VariableSetTypedResourceQueryServiceImpl"
 "VariableSetTypedResourceQueryServiceImpl"  --> "ResourceRepository"
 "ResourceSpecSanitizer" <|-- "SecretSetSpecSanitizer"
@@ -1323,8 +1317,6 @@ class "WsSmartTransferProtocolClient"
 "StorageRequestResourcesDeletionUseCaseImpl"  --> "ResourceLifecyclePrimitives"
 "ResourceAggregateLoader" <|-- "StorageResourceAggregateLoaderImpl"
 "StorageResourceAggregateLoaderImpl"  --> "StorageEventStore"
-"ResourceLifecycleEventDispatcher" <|-- "StorageResourceLifecycleDispatcher"
-"StorageResourceLifecycleDispatcher"  --> "SimpleResourceController"
 "ResourceLifecyclePrimitives" <|-- "StorageResourceLifecyclePrimitivesImpl"
 "StorageResourceLifecyclePrimitivesImpl"  --> "ResourceAggregateLoader"
 "StorageResourceLifecyclePrimitivesImpl"  --> "ResourcePersistenceService"
@@ -1336,8 +1328,9 @@ class "WsSmartTransferProtocolClient"
 "StorageResourcePersistenceServiceImpl"  --> "ResourceRepository"
 "StorageResourcePersistenceServiceImpl"  --> "StorageEventStore"
 "StorageResourcePersistenceServiceImpl"  --> "ResourceExtensionSchemaRegistry"
-"SimpleResourceController" <|-- "StorageSimpleResourceControllerAdapter"
+"ResourceController" <|-- "StorageSimpleResourceControllerAdapter"
 "StorageSimpleResourceControllerAdapter"  --> "Catalog"
+"StorageSimpleResourceControllerAdapter"  --> "SystemTimeSource"
 "TypedResourceQueryService" <|-- "StorageTypedResourceQueryServiceImpl"
 "StorageTypedResourceQueryServiceImpl"  --> "ResourceRepository"
 "TaskEventStore" <|-- "SqliteTaskEventStore"

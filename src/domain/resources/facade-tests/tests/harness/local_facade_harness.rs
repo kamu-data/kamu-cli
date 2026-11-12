@@ -51,16 +51,18 @@ use kamu_configuration_inmem::{
 use kamu_datasets::SecretsEncryptionConfig;
 use kamu_resources::{
     MESSAGE_PRODUCER_KAMU_RESOURCE_SERVICE,
+    ResourceControllerRuntimeConfig,
     ResourceLifecycleMessage,
     ResourceOwnerRef,
     ResourceSelector,
     ResourceVisibility,
 };
 use kamu_resources_facade::{ListResourcesError, ResourceFacade, SearchResourcesRequest};
+use kamu_resources_services::{BackgroundWorkFinalizer, ResourceControllerRuntimeImpl};
 use messaging_outbox::{OutboxAgent, OutboxProvider, register_message_dispatcher};
 use strum::IntoEnumIterator;
 use time_source::SystemTimeSourceProvider;
-use wakeup_listener::WakeupListenerMetrics;
+use wakeup_listener::{WakeupListenerConfig, WakeupListenerMetrics};
 
 use super::facade_harness_trait::{FacadeContractHarness, TestAccount};
 use crate::helpers::{VARIABLE_SET_CANONICAL_SELECTOR, sorted_handle_names};
@@ -93,7 +95,6 @@ pub struct LocalFacadeHarness {
     base_catalog: dill::Catalog,
     alice_account_id: odf::AccountID,
     bob_account_id: odf::AccountID,
-    outbox_agent: Option<Arc<dyn OutboxAgent>>,
 }
 
 impl LocalFacadeHarness {
@@ -127,19 +128,19 @@ impl LocalFacadeHarness {
         let is_dispatching = matches!(opts.outbox_provider, OutboxProvider::Dispatching);
         let base_catalog = Self::build_base_catalog(&subjects, opts.outbox_provider).await;
 
-        let outbox_agent = if is_dispatching {
-            let agent = base_catalog.get_one::<dyn OutboxAgent>().unwrap();
-            agent.run_initialization().await.unwrap();
-            Some(agent)
-        } else {
-            None
-        };
+        if is_dispatching {
+            base_catalog
+                .get_one::<dyn OutboxAgent>()
+                .unwrap()
+                .run_initialization()
+                .await
+                .unwrap();
+        }
 
         Self {
             base_catalog,
             alice_account_id,
             bob_account_id,
-            outbox_agent,
         }
     }
 
@@ -180,7 +181,15 @@ impl LocalFacadeHarness {
         if needs_bridge {
             b.add::<kamu_messaging_outbox_inmem::InMemoryOutboxMessageBridge>();
             b.add::<kamu_wakeup_listener_inmem::InMemoryWakeupHub>();
+        } else {
+            // The controller runtime needs it; the dispatching outbox brings
+            // its own
+            b.add_value(WakeupListenerConfig::local_default());
         }
+
+        // Resource controllers
+        b.add::<ResourceControllerRuntimeImpl>()
+            .add_value(ResourceControllerRuntimeConfig::default());
 
         // Accounts
         b.add::<InMemoryAccountRepository>()
@@ -240,11 +249,10 @@ impl LocalFacadeHarness {
         &self.base_catalog
     }
 
-    pub async fn flush_outbox(&self) {
-        self.outbox_agent
-            .as_ref()
-            .expect("flush_outbox requires Dispatching outbox mode")
-            .run_while_has_tasks()
+    /// See [`FacadeContractHarness::settle`]
+    pub async fn settle(&self) {
+        BackgroundWorkFinalizer
+            .finalize(&self.base_catalog)
             .await
             .unwrap();
     }
@@ -341,8 +349,8 @@ impl FacadeContractHarness for LocalFacadeHarness {
         odf::AccountName::new_unchecked(account.name())
     }
 
-    async fn flush_outbox(&self) {
-        LocalFacadeHarness::flush_outbox(self).await;
+    async fn settle(&self) {
+        LocalFacadeHarness::settle(self).await;
     }
 }
 

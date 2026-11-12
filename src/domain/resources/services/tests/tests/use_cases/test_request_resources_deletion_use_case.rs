@@ -36,6 +36,7 @@ async fn test_request_deletion_of_single_resource_completes() {
     harness
         .request_resources_deletion(account_handle.did, vec![id])
         .await;
+    harness.settle().await;
 
     assert!(harness.get_snapshot_by_id(&id).await.is_none());
 }
@@ -64,6 +65,7 @@ async fn test_request_deletion_of_multiple_resources_in_one_call() {
     harness
         .request_resources_deletion(account_handle.did, vec![id_a, id_b, id_c])
         .await;
+    harness.settle().await;
 
     for id in [&id_a, &id_b, &id_c] {
         assert!(

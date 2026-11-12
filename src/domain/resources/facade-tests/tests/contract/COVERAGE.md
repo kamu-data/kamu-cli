@@ -114,7 +114,7 @@ Each `RF-*` contract scenario is listed with its status. Test code and comments 
 | RF-124 | account_scoping.rs | Active | Unknown account name/id is rejected |  |
 | RF-125 | account_scoping.rs | Active | Account isolation across all read APIs |  |
 | RF-126 | account_scoping.rs | Active | Explicit empty account selector `{}` is rejected | Distinct from omitting `account` entirely (RF-120); rejected by account resolution, not parsing |
-| RF-130 | delete.rs | Active | Delete by name removes resource | Reports `Deleted`: with an immediate outbox, controllers clean up within the request |
+| RF-130 | delete.rs | Active | Delete by name removes resource | Reports `Deleting`: the controllers clean up after the request |
 | RF-131 | delete.rs | Active | Delete by UID removes resource |  |
 | RF-132 | delete.rs | Active | Delete missing name returns lookup problem |  |
 | RF-133 | delete.rs | Active | Delete missing UID returns lookup problem |  |
