@@ -9,6 +9,7 @@
 
 mod background_work_finalizer;
 mod resource_controller_candidate;
+mod resource_controller_drain_gate;
 mod resource_controller_drain_hold_back;
 mod resource_controller_drain_session_impl;
 mod resource_controller_hint_hub;
@@ -26,6 +27,7 @@ mod resource_process_executor;
 
 pub use background_work_finalizer::*;
 pub(crate) use resource_controller_candidate::*;
+pub(crate) use resource_controller_drain_gate::*;
 pub(crate) use resource_controller_drain_hold_back::*;
 pub(crate) use resource_controller_drain_session_impl::*;
 pub use resource_controller_hint_hub::*;
