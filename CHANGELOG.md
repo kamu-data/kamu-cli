@@ -20,6 +20,8 @@ Recommendation: for ease of reading, use the following format:
   balancers in front of the server, or they close the connection during long uploads
 - GraphQL: `setWatermark` can return `SetWatermarkCasFailed` with the expected and actual heads
   when the dataset's head moves concurrently, instead of an internal error
+- Prometheus metrics for each background agent: `background_agent_running`,
+  `background_agent_restarts_total` by reason, and `background_agent_last_failure_timestamp_seconds`
 ### Changed
 - Upgrading clears the history of tasks and flow runs, including pending manual runs. Flow
   configurations and triggers are kept, and enabled flows are scheduled again when the node starts
@@ -91,6 +93,14 @@ Recommendation: for ease of reading, use the following format:
     resource `Failed` until the next apply, and a failed cleanup during deletion is retried the
     same way
   - a resource that keeps failing no longer delays the processing of other resources
+- `kamu system api-server` keeps running when a background agent fails, panics or stops: the
+  agent is logged and restarted after a delay that grows with each consecutive failure, while the
+  API and the other agents keep working. Before, the whole server shut down. The delay is
+  configured by `backgroundAgents.restartBackoff` (from 1s, doubling, up to 1m by default)
+- `kamu system api-server` shuts down gracefully on Ctrl+C or SIGTERM: it stops accepting requests,
+  and in-flight requests and background agents get `backgroundAgents.shutdownTimeout` (10s by
+  default) to finish their current step before they are stopped. Before, the process was killed at
+  once
 ### Fixed
 - A polling source with an unsupported URL scheme (such as `s3://`) or fetch kind, an invalid
   header, an MQTT port out of range, a files glob ordered by event time or matching a file name that

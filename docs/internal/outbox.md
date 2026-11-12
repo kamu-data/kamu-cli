@@ -281,7 +281,7 @@ initial boundary: `Latest` → the producer's latest visible message, `All` (or 
 ### 5.2 Main loop
 
 ```text
-run():  t = catch_up → loop { wait_wake(t, minDebounceInterval); t = catch_up }
+run():  t = catch_up → loop { wait_wake(t, minDebounceInterval) or return on shutdown; t = catch_up }
 catch_up: held = has_held_back_messages(); drain; return held ? 20ms : maxListeningTimeout
 drain:  loop { n = consumption_iteration(); if n == 0 break }
 run_while_has_tasks(): loop { held = has_held_back_messages(); drain; if !held break; sleep(20ms) }
@@ -330,7 +330,8 @@ entrances cannot move progress back.
 A consumer that fails a message is **blocked for the rest of the iteration** (it cannot skip over
 the failed message), and added to the job's failed set: the planner excludes it from then on, so it
 neither retries nor holds back other consumers of the same producer. The failed set lives in memory
-— **a restart retries** from the stored boundary. `outbox_failed_consumers_total` shows it as `1`,
+— **a process restart retries** from the stored boundary; a restart of the agent by its host
+([background-agents.md](background-agents.md#3-supervision)) keeps the set. `outbox_failed_consumers_total` shows it as `1`,
 and `outbox_messages_pending_total` grows. When all consumers of a producer have failed, the job
 stops processing that producer.
 
