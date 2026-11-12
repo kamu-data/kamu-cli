@@ -81,6 +81,12 @@ impl ResourceControllerStateRepository for PostgresResourceControllerStateReposi
         let connection_mut = tr.connection_mut().await?;
 
         let resource_id: &uuid::Uuid = state.resource_id.as_ref();
+        // TEXT rejects NUL, and an error text the row cannot store would fail
+        // every drain that reaches the resource
+        let last_error = state
+            .last_error
+            .as_deref()
+            .map(|error| error.replace('\0', "\u{FFFD}"));
 
         sqlx::query!(
             r#"
@@ -114,7 +120,7 @@ impl ResourceControllerStateRepository for PostgresResourceControllerStateReposi
                 .map(|generation| i64::try_from(generation).unwrap()),
             state.not_before,
             i32::try_from(state.attempts).unwrap(),
-            state.last_error,
+            last_error,
         )
         .execute(connection_mut)
         .await
@@ -286,6 +292,8 @@ impl ResourceControllerStateRepository for PostgresResourceControllerStateReposi
             FROM resource_controller_state AS s
             JOIN resources AS r ON r.resource_id = s.resource_id
             WHERE s.controller = $1
+              -- Implied by a failure; lets the partial index on not_before serve the query
+              AND s.not_before IS NOT NULL
               AND s.attempts > 0
               AND r.deleted_at IS NULL
             "#,

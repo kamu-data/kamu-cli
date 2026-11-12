@@ -9,20 +9,24 @@
 
 use internal_error::InternalError;
 
+use crate::ResourceControllerSessionDrainReport;
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// Drains of every registered controller, made on demand. A caller alternates
 /// them with the work that makes resources actionable, such as delivering
-/// outbox messages, until a drain finds nothing to do.
+/// outbox messages, until a drain is idle.
 #[async_trait::async_trait]
 pub trait ResourceControllerDrainSession: Send {
     /// Processes every resource that needs attention now, controller by
-    /// controller, and returns how many `process` calls it made. Does not wait
-    /// for deadlines: a resource waiting for time stays for a later drain.
+    /// controller. Does not wait for deadlines: a resource waiting for time
+    /// stays for a later drain.
     ///
     /// A resource the controller never settles is held back for the rest of
     /// the session, so the drains of one session end up processing nothing.
-    async fn drain_due_resources(&mut self) -> Result<usize, InternalError>;
+    async fn drain_due_resources(
+        &mut self,
+    ) -> Result<ResourceControllerSessionDrainReport, InternalError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

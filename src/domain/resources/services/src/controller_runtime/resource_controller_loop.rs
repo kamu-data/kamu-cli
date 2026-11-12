@@ -96,7 +96,10 @@ impl ResourceControllerLoop {
         listener: Option<&dyn WakeupListener>,
         hold_back: &mut ResourceControllerDrainHoldBack,
     ) -> Result<ResourceControllerDrainReport, InternalError> {
-        let _guard = self.drain_lock.lock().await;
+        let (_guard, waited_for_another_drain) = match self.drain_lock.try_lock() {
+            Ok(guard) => (guard, false),
+            Err(_) => (self.drain_lock.lock().await, true),
+        };
 
         let planner = ResourceControllerPassPlanner::new(
             &self.registration,
@@ -123,6 +126,7 @@ impl ResourceControllerLoop {
                 self.update_failing_resources().await?;
                 return Ok(ResourceControllerDrainReport {
                     processed,
+                    waited_for_another_drain,
                     extras_listed_at: planned_at,
                     earliest_deferred_extra: pass.earliest_deferred_extra(),
                     held_back: pass.held_back(),
@@ -197,6 +201,7 @@ impl ResourceControllerLoop {
 #[derive(Debug)]
 pub(crate) struct ResourceControllerDrainReport {
     processed: usize,
+    waited_for_another_drain: bool,
     extras_listed_at: DateTime<Utc>,
     earliest_deferred_extra: Option<DateTime<Utc>>,
     held_back: bool,
@@ -206,6 +211,12 @@ impl ResourceControllerDrainReport {
     /// `process` calls made
     pub fn processed(&self) -> usize {
         self.processed
+    }
+
+    /// Whether the drain started only after another drain of the controller
+    /// ended
+    pub fn waited_for_another_drain(&self) -> bool {
+        self.waited_for_another_drain
     }
 
     /// The moment the last pass listed the extra resources. Those due by then

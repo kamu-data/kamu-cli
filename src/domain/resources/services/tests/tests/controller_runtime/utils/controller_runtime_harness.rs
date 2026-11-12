@@ -25,6 +25,7 @@ use kamu_resources::{
     ResourceControllerName,
     ResourceControllerRuntime,
     ResourceControllerRuntimeConfig,
+    ResourceControllerSessionDrainReport,
     ResourceControllerState,
     ResourceControllerStateRepository,
     ResourceID,
@@ -225,7 +226,7 @@ impl ControllerRuntimeHarness {
         loop {
             outbox_agent.run_while_has_tasks().await?;
 
-            if drains.drain_due_resources().await? == 0 {
+            if drains.drain_due_resources().await?.is_idle() {
                 return Ok(());
             }
         }
@@ -242,6 +243,13 @@ impl ControllerRuntimeHarness {
         session: &mut Box<dyn ResourceControllerDrainSession>,
     ) -> usize {
         self.deliver_messages().await;
+        self.drain(session).await.processed
+    }
+
+    pub async fn drain(
+        &self,
+        session: &mut Box<dyn ResourceControllerDrainSession>,
+    ) -> ResourceControllerSessionDrainReport {
         session.drain_due_resources().await.unwrap()
     }
 

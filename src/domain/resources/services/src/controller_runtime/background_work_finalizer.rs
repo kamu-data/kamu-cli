@@ -18,7 +18,8 @@ use crate::domain::ResourceControllerRuntime;
 /// server, or a test write left behind: delivers the Outbox messages,
 /// alternating with drains of the resource controllers, since a message may
 /// make a resource actionable, and processing it posts messages of its own.
-/// Ends once a drain processes nothing.
+/// Ends once a drain is idle: one that waited for the agent's drain is not,
+/// since that drain's messages may still be undelivered.
 ///
 /// The controller runtime drives the controllers of the catalog it is
 /// registered in, so the catalog passed to `finalize` is the one that has both.
@@ -57,7 +58,7 @@ impl BackgroundWorkFinalizer {
                 outbox_agent.run_while_has_tasks().await?;
             }
 
-            if controller_drains.drain_due_resources().await? == 0 {
+            if controller_drains.drain_due_resources().await?.is_idle() {
                 return Ok(());
             }
         }

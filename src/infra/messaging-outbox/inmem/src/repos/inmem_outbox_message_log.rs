@@ -10,6 +10,7 @@
 use std::collections::HashMap;
 
 use database_common::TransactionId;
+use itertools::Itertools as _;
 use messaging_outbox::{NewOutboxMessage, OutboxMessage, OutboxMessageID};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -90,16 +91,12 @@ impl OutboxMessageLog {
             .into_iter()
             .flatten();
 
-        let mut visible = self
-            .committed
+        self.committed
             .iter()
             .take_while(move |message| {
                 held_back_from.is_none_or(|held_back_from| message.message_id < held_back_from)
             })
-            .chain(own)
-            .collect::<Vec<_>>();
-        visible.sort_by_key(|message| message.message_id);
-        visible.into_iter()
+            .merge_by(own, |committed, own| committed.message_id < own.message_id)
     }
 
     /// Whether committed messages of the producers wait for another open

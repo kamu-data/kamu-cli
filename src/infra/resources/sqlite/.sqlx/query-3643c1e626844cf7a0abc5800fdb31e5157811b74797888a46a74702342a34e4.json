@@ -1,0 +1,21 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            SELECT COUNT(*) AS \"count!: i64\"\n            FROM resource_controller_state AS s\n            JOIN resources AS r ON r.resource_id = s.resource_id\n            WHERE s.controller = $1\n              -- Implied by a failure; lets the partial index on not_before serve the query\n              AND s.not_before IS NOT NULL\n              AND s.attempts > 0\n              AND r.deleted_at IS NULL\n            ",
+  "describe": {
+    "columns": [
+      {
+        "name": "count!: i64",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "3643c1e626844cf7a0abc5800fdb31e5157811b74797888a46a74702342a34e4"
+}

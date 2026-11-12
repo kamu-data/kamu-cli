@@ -399,6 +399,35 @@ async fn test_planning_failure_finishes_task_with_its_error() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[test_log::test(tokio::test)]
+async fn test_task_without_planner_fails_instead_of_the_agent() {
+    let mut mock_outbox = MockOutbox::new();
+    TaskAgentHarness::add_outbox_task_expectations(&mut mock_outbox, TaskID::new(0));
+
+    let harness = TaskAgentHarness::new(
+        mock_outbox,
+        MockTaskDefinitionPlanner::new(),
+        MockTaskRunner::new(),
+    );
+    let task_id = harness
+        .schedule_task(LogicalPlan {
+            plan_type: "dev.kamu.tasks.test.unknown".to_owned(),
+            payload: serde_json::Value::Null,
+        })
+        .await;
+
+    harness.task_agent.run_single_task().await.unwrap();
+
+    let task = harness.get_task(task_id).await;
+    assert_eq!(task.status(), TaskStatus::Finished);
+    assert_eq!(
+        task.outcome(),
+        Some(&TaskOutcome::Failed(TaskError::empty_recoverable())),
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 const LISTENING_TIMEOUT: Duration = Duration::from_mins(1);
 
 struct TaskAgentHarness {
@@ -513,10 +542,12 @@ impl TaskAgentHarness {
     }
 
     async fn schedule_probe_task(&self, probe_plan: LogicalPlanProbe) -> TaskID {
-        let probe_plan = probe_plan.into_logical_plan();
+        self.schedule_task(probe_plan.into_logical_plan()).await
+    }
 
+    async fn schedule_task(&self, logical_plan: LogicalPlan) -> TaskID {
         self.task_scheduler
-            .create_task(probe_plan, None)
+            .create_task(logical_plan, None)
             .await
             .unwrap()
             .task_id

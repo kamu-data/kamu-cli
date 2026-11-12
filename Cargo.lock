@@ -9327,6 +9327,7 @@ dependencies = [
  "database-common-macros",
  "dill",
  "internal-error",
+ "itertools 0.15.0",
  "kamu-messaging-outbox-repo-tests",
  "kamu-wakeup-listener-inmem",
  "messaging-outbox",

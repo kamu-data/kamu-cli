@@ -165,11 +165,21 @@ impl ResourceControllerStateRepository for InMemoryResourceControllerStateReposi
     }
 
     async fn upsert_state(&self, state: &ResourceControllerState) -> Result<(), InternalError> {
-        self.store.states.write(self.transaction_id, |states| {
-            states.overwrite((state.controller.clone(), state.resource_id), state.clone());
-        });
-
-        Ok(())
+        // The foreign key of the database storages. Locks in the order of
+        // `matching_resources`
+        self.resource_state.read(self.transaction_id, |resources| {
+            if resources.snapshot(&state.resource_id).is_none() {
+                return Err(InternalError::new(format!(
+                    "Resource {} not found for the state of controller {}",
+                    state.resource_id,
+                    state.controller.as_str()
+                )));
+            }
+            self.store.states.write(self.transaction_id, |states| {
+                states.overwrite((state.controller.clone(), state.resource_id), state.clone());
+            });
+            Ok(())
+        })
     }
 
     async fn delete_states_for_resource(

@@ -101,7 +101,7 @@ impl TaskAgentImpl {
                 "TaskAgent::run_task",
                 task_id = %task.task_id,
             ))
-            .await?;
+            .await;
 
         let task = self.process_task_outcome(task, task_outcome).await?;
         if let Some(outcome) = &task.outcome {
@@ -240,7 +240,25 @@ impl TaskAgentImpl {
         Ok(Some(task))
     }
 
-    async fn run_task(&self, task: &Task) -> Result<TaskOutcome, InternalError> {
+    /// Runs the task to its outcome. An internal error fails the task rather
+    /// than the agent: a failing agent is restarted, which requeues the task
+    /// and takes it again first, so no other task would run.
+    async fn run_task(&self, task: &Task) -> TaskOutcome {
+        match self.try_run_task(task).await {
+            Ok(task_outcome) => task_outcome,
+            Err(e) => {
+                tracing::error!(
+                    task = ?task,
+                    error = ?e,
+                    error_msg = %e,
+                    "Task could not be run"
+                );
+                TaskOutcome::Failed(TaskError::empty_recoverable())
+            }
+        }
+    }
+
+    async fn try_run_task(&self, task: &Task) -> Result<TaskOutcome, InternalError> {
         tracing::debug!(
             task_id = %task.task_id,
             logical_plan = ?task.logical_plan,

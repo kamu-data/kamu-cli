@@ -958,11 +958,12 @@ The hub is in-process on every backend
 (`new_drain_session()`), whose `drain_due_resources()` drains every controller once and does not
 wait for deadlines: a resource waiting for time stays for a later drain. The CLI, after a command,
 the e2e API server, after a mutating request, and the test harnesses, after a write, alternate
-it with the outbox until a drain processes nothing
+it with the outbox until a drain is idle
 ([`BackgroundWorkFinalizer`](/src/domain/resources/services/src/controller_runtime/background_work_finalizer.rs)): a message may
 make a resource actionable, and processing posts messages of its own. A session keeps what its drains held back until it ends, so
 that alternation ends too, even with a controller that never settles a resource. A session's
-drains and the agent's never overlap for one controller.
+drains and the agent's never overlap for one controller: a session's drain that waited for the
+agent's is not idle, since the messages the agent's drain posted may still be undelivered.
 
 **Failures of the runtime itself**, such as a storage error while planning or recording, a failed
 call to the controller outside `process`, or a panic, end that controller's loop only
