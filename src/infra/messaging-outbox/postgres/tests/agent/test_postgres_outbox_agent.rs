@@ -10,6 +10,7 @@
 use std::num::NonZeroUsize;
 use std::sync::{Arc, Mutex};
 
+use background_agent_host::CancellationToken;
 use chrono::Utc;
 use database_common::{DatabaseTransactionManager, PostgresTransactionManager, TransactionRef};
 use database_common_macros::transactional_method;
@@ -463,7 +464,7 @@ impl PostgresOutboxAgentHarness {
 
     fn spawn_main_loop(&self) -> tokio::task::JoinHandle<()> {
         let outbox_agent = self.outbox_agent.clone();
-        tokio::spawn(async move { outbox_agent.run().await.unwrap() })
+        tokio::spawn(async move { outbox_agent.run(CancellationToken::new()).await.unwrap() })
     }
 
     async fn wait_for_consumed_seq(&self, expected_seq: &[i64], timeout: Duration) -> Vec<i64> {

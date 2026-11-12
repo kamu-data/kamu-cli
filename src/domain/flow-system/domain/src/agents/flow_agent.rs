@@ -10,7 +10,7 @@
 use std::collections::HashMap;
 use std::num::NonZeroUsize;
 
-use async_utils::BackgroundAgent;
+use background_agent_host::BackgroundAgent;
 use chrono::{DateTime, Duration, DurationRound, Utc};
 use internal_error::{InternalError, ResultIntoInternal};
 

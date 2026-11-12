@@ -14,8 +14,8 @@ use std::path::PathBuf;
 use std::pin::Pin;
 use std::sync::Arc;
 
-use async_utils::BackgroundAgent;
 use axum::{Extension, middleware};
+use background_agent_host::{BackgroundAgent, CancellationToken};
 use internal_error::*;
 use kamu::domain::{FileUploadLimitConfig, Protocols, ServerUrlConfig, TenancyConfig};
 use kamu_accounts_services::PasswordPolicyConfig;
@@ -287,7 +287,7 @@ impl APIServer {
                 let agent_name = agent.agent_name().to_string();
                 tokio::spawn(async move {
                     tracing::info!("Starting background agent: {}", agent_name);
-                    let result = agent.run().await;
+                    let result = agent.run(CancellationToken::new()).await;
                     match &result {
                         Err(error) => {
                             tracing::error!("Background agent {} failed: {}", agent_name, error);
