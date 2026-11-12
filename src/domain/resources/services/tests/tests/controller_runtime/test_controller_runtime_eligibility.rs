@@ -22,11 +22,7 @@ use crate::tests::controller_runtime::utils::{
 
 #[test_log::test(tokio::test)]
 async fn test_done_suppresses_until_the_generation_changes() {
-    let harness = ControllerRuntimeHarness::new(
-        TestControllers::Main,
-        TestControllerBehavior::FinishAtCurrentVersion,
-    )
-    .await;
+    let harness = ControllerRuntimeHarness::finishing().await;
     let id = harness.apply("res-a").await;
 
     assert_eq!(harness.process_calls_until_idle().await, 1);
@@ -42,11 +38,7 @@ async fn test_done_suppresses_until_the_generation_changes() {
 
 #[test_log::test(tokio::test)]
 async fn test_done_suppresses_until_the_status_changes() {
-    let harness = ControllerRuntimeHarness::new(
-        TestControllers::Main,
-        TestControllerBehavior::FinishAtCurrentVersion,
-    )
-    .await;
+    let harness = ControllerRuntimeHarness::finishing().await;
     let id = harness.apply("res-a").await;
     assert_eq!(harness.process_calls_until_idle().await, 1);
 
@@ -96,11 +88,7 @@ async fn test_status_change_of_reconciled_resource_wakes_only_a_status_reacting_
 
 #[test_log::test(tokio::test)]
 async fn test_revision_bump_reconsiders_finished_resources_a_predicate_selects() {
-    let mut harness = ControllerRuntimeHarness::new(
-        TestControllers::Main,
-        TestControllerBehavior::FinishAtCurrentVersion,
-    )
-    .await;
+    let mut harness = ControllerRuntimeHarness::finishing().await;
     // Finished with but never reconciled: the predicate keeps selecting it
     let finished = harness.apply("res-finished").await;
     // Reconciled: no predicate selects it
@@ -169,11 +157,7 @@ async fn test_retry_at_waits_until_due() {
 
 #[test_log::test(tokio::test)]
 async fn test_drain_goes_through_more_resources_than_one_batch() {
-    let harness = ControllerRuntimeHarness::new(
-        TestControllers::Main,
-        TestControllerBehavior::FinishAtCurrentVersion,
-    )
-    .await;
+    let harness = ControllerRuntimeHarness::finishing().await;
     // The harness batch holds 3
     for i in 0..7 {
         harness.apply(&format!("res-{i}")).await;
@@ -187,11 +171,7 @@ async fn test_drain_goes_through_more_resources_than_one_batch() {
 
 #[test_log::test(tokio::test)]
 async fn test_extra_resource_lifts_done_but_not_backoff() {
-    let harness = ControllerRuntimeHarness::new(
-        TestControllers::Main,
-        TestControllerBehavior::FinishAtCurrentVersion,
-    )
-    .await;
+    let harness = ControllerRuntimeHarness::finishing().await;
     let id = harness.apply("res-a").await;
     assert_eq!(harness.process_calls_until_idle().await, 1);
 
@@ -215,11 +195,7 @@ async fn test_extra_resource_lifts_done_but_not_backoff() {
 
 #[test_log::test(tokio::test)]
 async fn test_backing_off_extra_resources_do_not_hide_the_ones_listed_after_them() {
-    let harness = ControllerRuntimeHarness::new(
-        TestControllers::Main,
-        TestControllerBehavior::FinishAtCurrentVersion,
-    )
-    .await;
+    let harness = ControllerRuntimeHarness::finishing().await;
     // The harness batch holds 3: as many failing extra resources as that,
     // listed first, then a healthy one
     let mut ids = Vec::new();
@@ -248,11 +224,7 @@ async fn test_backing_off_extra_resources_do_not_hide_the_ones_listed_after_them
 
 #[test_log::test(tokio::test)]
 async fn test_finished_extra_resource_that_changes_is_processed_again_in_one_session() {
-    let harness = ControllerRuntimeHarness::new(
-        TestControllers::Main,
-        TestControllerBehavior::FinishAtCurrentVersion,
-    )
-    .await;
+    let harness = ControllerRuntimeHarness::finishing().await;
     let id = harness.apply("res-a").await;
     harness.run_outbox_and_controllers_until_idle().await;
 

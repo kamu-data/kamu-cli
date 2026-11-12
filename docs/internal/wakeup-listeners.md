@@ -101,11 +101,19 @@ All agents follow the same shape: process until nothing is pending, then wait.
 
 ```rust
 loop {
-    process_until_empty().await?;        // outbox: all batches; flow events: all projectors; tasks: next task; flows: all due
-    let hint = listener.wait_wake(max_listening_timeout, min_debounce_interval).await?;
+    process_until_empty().await?;        // outbox: all batches; flow events: all projectors; tasks: next task
+    let Some(hint) = listener
+        .wait_wake_until_shutdown(max_listening_timeout, min_debounce_interval, &shutdown)
+        .await?
+    else {
+        return Ok(()); // on a shutdown
+    };
     tracing::debug!(?hint, "Agent woke up with a hint");
 }
 ```
+
+The flow agent and the resource controller runtime also wait for a deadline, so they combine
+`wait_wake` with it themselves ([deadline-driven agents](#deadline-driven-agents)).
 
 Because of invariant 2, a change committed while the agent was processing is not lost: it is either
 seen by `process_until_empty` or reported by the next `wait_wake`.

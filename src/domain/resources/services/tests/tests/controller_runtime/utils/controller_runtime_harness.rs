@@ -133,6 +133,15 @@ pub struct ControllerRuntimeHarness {
 }
 
 impl ControllerRuntimeHarness {
+    /// The main controller, finishing each resource at its current version
+    pub async fn finishing() -> Self {
+        Self::new(
+            TestControllers::Main,
+            TestControllerBehavior::FinishAtCurrentVersion,
+        )
+        .await
+    }
+
     pub async fn new(controllers: TestControllers, behavior: TestControllerBehavior) -> Self {
         let base = ServiceLayerTestHarness::new_with_opts(ServiceLayerTestHarnessOpts {
             base_opts: BaseResourceServiceHarnessOpts {

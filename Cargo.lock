@@ -16864,6 +16864,7 @@ dependencies = [
  "observability",
  "prometheus",
  "tokio",
+ "tokio-util",
 ]
 
 [[package]]

@@ -37,11 +37,7 @@ use crate::tests::utils::{
 #[test_log::test(tokio::test)]
 async fn test_cleanup_completes_requested_deletion() {
     let harness = CompleteDeletionTestHarness::new(TestResourceReconcilerProvider::Stub);
-    let account_handle = odf::ResourceOwnerHandle::new_test("test-owner");
-    let id = harness.apply_and_get_id(&account_handle, "res-a").await;
-    harness
-        .request_resources_deletion(account_handle.did, vec![id])
-        .await;
+    let [id] = harness.apply_and_request_deletion(["res-a"]).await;
 
     let outcome = harness.process(&id).await.unwrap();
 
@@ -66,11 +62,7 @@ async fn test_completed_deletion_posts_deleted_message() {
     BaseResourceServiceHarness::expect_deleted_message(&mut mock_outbox, 1);
 
     let harness = CompleteDeletionTestHarness::with_mock_outbox(mock_outbox);
-    let account_handle = odf::ResourceOwnerHandle::new_test("test-owner");
-    let id = harness.apply_and_get_id(&account_handle, "res-a").await;
-    harness
-        .request_resources_deletion(account_handle.did, vec![id])
-        .await;
+    let [id] = harness.apply_and_request_deletion(["res-a"]).await;
 
     harness.process(&id).await.unwrap();
 }
@@ -80,11 +72,7 @@ async fn test_completed_deletion_posts_deleted_message() {
 #[test_log::test(tokio::test)]
 async fn test_failed_cleanup_keeps_deletion_in_progress_and_is_returned_as_an_error() {
     let harness = CompleteDeletionTestHarness::new(TestResourceReconcilerProvider::Failing);
-    let account_handle = odf::ResourceOwnerHandle::new_test("test-owner");
-    let id = harness.apply_and_get_id(&account_handle, "res-a").await;
-    harness
-        .request_resources_deletion(account_handle.did, vec![id])
-        .await;
+    let [id] = harness.apply_and_request_deletion(["res-a"]).await;
     let status_generation_before = harness.load(&id).await.headers().status_generation;
 
     // Recorded in the status, and an error, so that the runtime retries it
@@ -108,11 +96,7 @@ async fn test_failed_cleanup_keeps_deletion_in_progress_and_is_returned_as_an_er
 async fn test_failed_cleanup_is_retried_after_backoff() {
     let harness =
         CompleteDeletionTestHarness::new(TestResourceReconcilerProvider::FailingCleanupOnce);
-    let account_handle = odf::ResourceOwnerHandle::new_test("test-owner");
-    let id = harness.apply_and_get_id(&account_handle, "res-a").await;
-    harness
-        .request_resources_deletion(account_handle.did, vec![id])
-        .await;
+    let [id] = harness.apply_and_request_deletion(["res-a"]).await;
 
     harness.settle().await;
     harness.assert_cleanup_failed(&id).await;
@@ -133,11 +117,7 @@ async fn test_failed_cleanup_is_retried_after_backoff() {
 #[test_log::test(tokio::test)]
 async fn test_processing_deleted_resource_records_nothing() {
     let harness = CompleteDeletionTestHarness::new(TestResourceReconcilerProvider::Stub);
-    let account_handle = odf::ResourceOwnerHandle::new_test("test-owner");
-    let id = harness.apply_and_get_id(&account_handle, "res-a").await;
-    harness
-        .request_resources_deletion(account_handle.did, vec![id])
-        .await;
+    let [id] = harness.apply_and_request_deletion(["res-a"]).await;
 
     harness.process(&id).await.unwrap();
     let resource = harness.load(&id).await;
@@ -165,12 +145,7 @@ async fn test_each_completed_deletion_posts_its_own_deleted_message() {
     BaseResourceServiceHarness::expect_deleted_messages(&mut mock_outbox, 2, 1);
 
     let harness = CompleteDeletionTestHarness::with_mock_outbox(mock_outbox);
-    let account_handle = odf::ResourceOwnerHandle::new_test("test-owner");
-    let id_a = harness.apply_and_get_id(&account_handle, "res-a").await;
-    let id_b = harness.apply_and_get_id(&account_handle, "res-b").await;
-    harness
-        .request_resources_deletion(account_handle.did, vec![id_a, id_b])
-        .await;
+    let [id_a, id_b] = harness.apply_and_request_deletion(["res-a", "res-b"]).await;
 
     harness.process(&id_a).await.unwrap();
     harness.process(&id_b).await.unwrap();
@@ -182,12 +157,7 @@ async fn test_each_completed_deletion_posts_its_own_deleted_message() {
 async fn test_failed_cleanup_holds_back_only_its_resource() {
     let harness =
         CompleteDeletionTestHarness::new(TestResourceReconcilerProvider::FailingCleanupOf("res-b"));
-    let account_handle = odf::ResourceOwnerHandle::new_test("test-owner");
-    let id_a = harness.apply_and_get_id(&account_handle, "res-a").await;
-    let id_b = harness.apply_and_get_id(&account_handle, "res-b").await;
-    harness
-        .request_resources_deletion(account_handle.did, vec![id_a, id_b])
-        .await;
+    let [id_a, id_b] = harness.apply_and_request_deletion(["res-a", "res-b"]).await;
 
     harness.settle().await;
 
@@ -206,12 +176,7 @@ async fn test_status_update_during_cleanup_does_not_hold_back_completion() {
         CompleteDeletionTestHarness::new(TestResourceReconcilerProvider::InterferingCleanup {
             then_fails: false,
         });
-    let account_handle = odf::ResourceOwnerHandle::new_test("test-owner");
-    let id_a = harness.apply_and_get_id(&account_handle, "res-a").await;
-    let id_b = harness.apply_and_get_id(&account_handle, "res-b").await;
-    harness
-        .request_resources_deletion(account_handle.did, vec![id_a, id_b])
-        .await;
+    let [id_a, id_b] = harness.apply_and_request_deletion(["res-a", "res-b"]).await;
 
     harness.settle().await;
 
@@ -234,11 +199,7 @@ async fn test_failed_cleanup_after_concurrent_status_update_is_not_recorded() {
         CompleteDeletionTestHarness::new(TestResourceReconcilerProvider::InterferingCleanup {
             then_fails: true,
         });
-    let account_handle = odf::ResourceOwnerHandle::new_test("test-owner");
-    let id = harness.apply_and_get_id(&account_handle, "res").await;
-    harness
-        .request_resources_deletion(account_handle.did, vec![id])
-        .await;
+    let [id] = harness.apply_and_request_deletion(["res"]).await;
 
     let result = harness.process(&id).await;
     assert_matches!(result, Err(_), "expected an error, got: {result:?}");
@@ -260,6 +221,19 @@ struct CompleteDeletionTestHarness {
 }
 
 impl CompleteDeletionTestHarness {
+    /// Applies one resource per name, all of one owner, and requests their
+    /// deletion
+    async fn apply_and_request_deletion<const N: usize>(
+        &self,
+        names: [&str; N],
+    ) -> [ResourceID; N] {
+        let account_handle = odf::ResourceOwnerHandle::new_test("test-owner");
+        let ids = self.apply_all(&account_handle, &names).await;
+        self.request_resources_deletion(account_handle.did, ids.clone())
+            .await;
+        ids.try_into().unwrap()
+    }
+
     /// Messages wait in the outbox, so each step runs only when a test calls
     /// it. Time stands still until `advance_time`, so backoffs end only then.
     fn new(reconciler_provider: TestResourceReconcilerProvider) -> Self {

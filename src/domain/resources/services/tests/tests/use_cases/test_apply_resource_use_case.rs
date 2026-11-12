@@ -304,19 +304,9 @@ async fn test_apply_update_resets_status_to_pending() {
     BaseResourceServiceHarness::assert_reconciliation_error(&status, None);
 
     // Spec update → gen bumped to 2, phase reset to Pending
-    let update_params = ApplyResourceParams {
-        id: Some(id),
-        headers: BaseResourceServiceHarness::make_headers_input(account_handle, "res-a"),
-        spec: TestResourceSpec {
-            value: "updated".to_string(),
-        },
-    };
     harness
-        .apply_test_uc()
-        .apply(update_params)
-        .await
-        .unwrap()
-        .expect_applied();
+        .update_spec(&account_handle, id, "res-a", "updated")
+        .await;
 
     let snapshot = harness.get_snapshot_by_id(&id).await.unwrap();
     let status = snapshot.basic_status().unwrap();
