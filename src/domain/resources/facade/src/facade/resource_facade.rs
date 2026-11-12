@@ -133,8 +133,8 @@ pub trait ResourceFacade: Send + Sync {
     ) -> Result<ApplyManifestBatchResponse<ApplyManifestApplicationDecision>, BatchResourceError>;
 
     /// Requests deletion of the resources. Names match live resources only; an
-    /// id also matches a resource whose deletion is in progress, and requesting
-    /// it again retries its cleanup.
+    /// id also matches a resource being deleted, and requests its deletion
+    /// again.
     async fn delete(
         &self,
         resource_refs: Vec<ResourceRef>,

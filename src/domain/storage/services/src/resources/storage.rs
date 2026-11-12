@@ -20,7 +20,10 @@ kamu_resources_services::declare_resource_service_layer!(
     name = Storage,
     resource = StorageResource,
     state_model = StorageStateModel,
-    controller_name = STORAGE_CONTROLLER_NAME
+    controller_name = STORAGE_CONTROLLER_NAME,
+    // Bumped when the reconciler's semantics change, so that resources it
+    // finished with are reconsidered
+    controller_revision = 1
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

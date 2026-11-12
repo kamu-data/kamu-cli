@@ -125,7 +125,7 @@ pub(crate) async fn process_outbox_after_command(
     background_catalog: &dill::Catalog,
     command_result: Result<(), CLIError>,
 ) -> Result<(), CLIError> {
-    let outbox_result = BackgroundWorkFinalizer
+    let outbox_result = BackgroundWorkFinalizer::for_dispatching_outbox()
         .finalize(background_catalog)
         .instrument(tracing::debug_span!(
             "Consume accumulated the Outbox messages"

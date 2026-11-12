@@ -48,6 +48,7 @@ pub struct BaseResourceServiceHarness {
     resource_repo: Arc<dyn ResourceRepository>,
     outbox: Arc<dyn Outbox>,
     time_source: Arc<dyn SystemTimeSource>,
+    dispatching_outbox: bool,
 }
 
 pub struct BaseResourceServiceHarnessOpts {
@@ -167,6 +168,7 @@ impl BaseResourceServiceHarness {
             resource_repo,
             outbox,
             time_source,
+            dispatching_outbox: needs_bridge,
         }
     }
 
@@ -177,10 +179,19 @@ impl BaseResourceServiceHarness {
 
     /// See [`BackgroundWorkFinalizer`]
     pub async fn settle(&self) {
-        BackgroundWorkFinalizer
+        self.background_work_finalizer()
             .finalize(&self.catalog)
             .await
             .unwrap();
+    }
+
+    /// The finalizer for the outbox of this harness
+    pub fn background_work_finalizer(&self) -> BackgroundWorkFinalizer {
+        if self.dispatching_outbox {
+            BackgroundWorkFinalizer::for_dispatching_outbox()
+        } else {
+            BackgroundWorkFinalizer::for_immediate_outbox()
+        }
     }
 
     pub fn catalog(&self) -> &dill::Catalog {
