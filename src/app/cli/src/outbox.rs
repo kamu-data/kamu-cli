@@ -7,10 +7,11 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use internal_error::{InternalError, ResultIntoInternal};
+use internal_error::InternalError;
 use messaging_outbox::register_message_dispatcher;
 use tracing::Instrument;
 
+use crate::background_work_finalizer::BackgroundWorkFinalizer;
 use crate::error::CLIError;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -124,38 +125,14 @@ pub(crate) async fn process_outbox_after_command(
     background_catalog: &dill::Catalog,
     command_result: Result<(), CLIError>,
 ) -> Result<(), CLIError> {
-    let outbox_result = run_outbox_and_resource_controllers(background_catalog)
+    let outbox_result = BackgroundWorkFinalizer
+        .finalize(background_catalog)
         .instrument(tracing::debug_span!(
             "Consume accumulated the Outbox messages"
         ))
         .await;
 
     command_with_outbox_result(command_result, outbox_result)
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-/// Delivers the Outbox messages, alternating with drains of the resource
-/// controllers: a message may make a resource actionable, and processing it
-/// posts messages of its own. Ends once a drain processes nothing.
-async fn run_outbox_and_resource_controllers(
-    background_catalog: &dill::Catalog,
-) -> Result<(), InternalError> {
-    let outbox_agent = background_catalog
-        .get_one::<dyn messaging_outbox::OutboxAgent>()
-        .int_err()?;
-    let mut controller_drains = background_catalog
-        .get_one::<dyn kamu_resources::ResourceControllerRuntime>()
-        .int_err()?
-        .new_drain_session()?;
-
-    loop {
-        outbox_agent.run_while_has_tasks().await?;
-
-        if controller_drains.drain_due_resources().await? == 0 {
-            return Ok(());
-        }
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

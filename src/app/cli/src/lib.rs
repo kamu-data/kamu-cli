@@ -12,6 +12,7 @@
 #![feature(panic_update_hook)]
 
 pub mod app;
+pub(crate) mod background_work_finalizer;
 pub mod cli;
 pub mod cli_commands;
 pub(crate) mod cli_value_parser;
