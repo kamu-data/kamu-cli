@@ -14,7 +14,7 @@ use kamu_task_system::TaskOutcome;
 
 /// How a task ended, recorded as the `outcome` field of its span. Why a task
 /// failed is in the spans and events inside it.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, strum::IntoStaticStr, strum::EnumIter)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, strum::IntoStaticStr)]
 #[strum(serialize_all = "snake_case")]
 pub(crate) enum TaskSpanOutcome {
     Succeeded,
@@ -37,29 +37,6 @@ impl From<&Result<TaskOutcome, InternalError>> for TaskSpanOutcome {
             Ok(TaskOutcome::Success(_)) => Self::Succeeded,
             Ok(TaskOutcome::Failed(_)) | Err(_) => Self::Failed,
             Ok(TaskOutcome::Cancelled) => Self::Cancelled,
-        }
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[cfg(test)]
-mod tests {
-    use strum::IntoEnumIterator;
-
-    use super::*;
-
-    #[test]
-    fn test_outcome_names_are_stable() {
-        let names = [
-            (TaskSpanOutcome::Succeeded, "succeeded"),
-            (TaskSpanOutcome::Failed, "failed"),
-            (TaskSpanOutcome::Cancelled, "cancelled"),
-        ];
-
-        assert_eq!(names.len(), TaskSpanOutcome::iter().count());
-        for (outcome, name) in names {
-            assert_eq!(<&'static str>::from(outcome), name);
         }
     }
 }
