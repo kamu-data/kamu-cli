@@ -22,6 +22,7 @@ doctest = false
 
 
 [dependencies]
+container-runtime = { workspace = true }
 http-common = { workspace = true }
 internal-error = { workspace = true }
 kamu-accounts-services = { workspace = true }
@@ -40,6 +41,8 @@ async-trait = "0.1"
 chrono = { version = "0.4", default-features = false, features = [
     "now",
 ] }
+headers = { version = "0.4", default-features = false }
+http = "1"
 indoc = "2"
 pretty_assertions = "1"
 reqwest = { version = "0.12", default-features = false, features = [
@@ -61,6 +64,7 @@ tokio = { version = "1", default-features = false, features = [
     "macros",
 ] }
 tokio-retry = "0.3"
+tokio-tungstenite = "0.30"
 
 
 [dev-dependencies]

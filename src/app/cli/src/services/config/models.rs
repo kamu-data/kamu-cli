@@ -52,7 +52,8 @@ pub struct CLIConfig {
     #[config(default)]
     pub identity: kamu_signing::entities::IdentityConfig,
 
-    /// Background agents configuration (outbox, flow system events, tasks)
+    /// Background agents configuration (outbox, flow system events, tasks,
+    /// resource controllers)
     #[config(default)]
     pub background_agents: BackgroundAgentsConfig,
 
@@ -754,6 +755,21 @@ pub struct BackgroundAgentsConfig {
     /// Concurrency limits of agents processing records in parallel
     #[config(default)]
     pub concurrency: BackgroundAgentsConcurrencyConfig,
+
+    /// Retry delays of the resource controller runtime
+    #[config(default)]
+    pub resource_controllers: BackgroundAgentsResourceControllersConfig,
+
+    /// Delay before an agent that failed, panicked or returned early is
+    /// restarted, growing with consecutive restarts. A run that lasted at
+    /// least `maxDelay` resets the count
+    #[config(default)]
+    pub restart_backoff: RestartBackoffConfig,
+
+    /// How long background agents and in-flight API requests get to finish
+    /// on a shutdown, before they are aborted
+    #[config(default_str = "10s")]
+    pub shutdown_timeout: DurationString,
 }
 
 #[derive(setty::Config, setty::Default)]
@@ -771,6 +787,11 @@ pub struct BackgroundAgentsBatchingConfig {
     /// 0 is treated as 1
     #[config(default = 20)]
     pub flow_activations: usize,
+
+    /// Resources a resource controller selects at once before processing
+    /// them. 0 is treated as 1
+    #[config(default = 20)]
+    pub resource_controllers: usize,
 }
 
 #[derive(setty::Config, setty::Default)]
@@ -780,9 +801,86 @@ pub struct BackgroundAgentsConcurrencyConfig {
     /// as 1
     #[config(default = 1)]
     pub outbox_consumers: usize,
+
+    /// Resources each resource controller processes at once, each in
+    /// transactions of its own: e.g. 4 with Postgres, 1 with `SQLite`. 0 is
+    /// treated as 1
+    #[config(default = 1)]
+    pub resource_controllers: usize,
+}
+
+#[derive(setty::Config, setty::Default)]
+pub struct BackgroundAgentsResourceControllersConfig {
+    /// Delay before a resource whose processing failed is processed again,
+    /// growing with consecutive failures
+    #[config(default)]
+    pub failure_backoff: ResourceControllerFailureBackoffConfig,
+
+    /// Delay before a failed resource controller loop is restarted, growing
+    /// with consecutive failures
+    #[config(default)]
+    pub loop_restart_backoff: RestartBackoffConfig,
+}
+
+// The two backoffs are separate types only for their defaults: a partial
+// override keeps the defaults of the fields it leaves out
+
+/// Delay before a retry: a function of the attempt number, from `minDelay`
+/// up to `maxDelay`
+#[derive(setty::Config, setty::Default)]
+pub struct ResourceControllerFailureBackoffConfig {
+    #[config(default = RetryPolicyConfigBackoffType::Exponential)]
+    pub backoff_type: RetryPolicyConfigBackoffType,
+
+    #[config(default_str = "1s")]
+    pub min_delay: DurationString,
+
+    #[config(default_str = "5m")]
+    pub max_delay: DurationString,
+}
+
+impl ResourceControllerFailureBackoffConfig {
+    pub fn into_system(&self) -> retry_backoff::RetryBackoff {
+        retry_backoff::RetryBackoff {
+            backoff_type: self.backoff_type.into(),
+            min_delay: self.min_delay.into(),
+            max_delay: Some(self.max_delay.into()),
+        }
+    }
+}
+
+/// Delay before a retry: a function of the attempt number, from `minDelay`
+/// up to `maxDelay`
+#[derive(setty::Config, setty::Default)]
+pub struct RestartBackoffConfig {
+    #[config(default = RetryPolicyConfigBackoffType::Exponential)]
+    pub backoff_type: RetryPolicyConfigBackoffType,
+
+    #[config(default_str = "1s")]
+    pub min_delay: DurationString,
+
+    #[config(default_str = "1m")]
+    pub max_delay: DurationString,
+}
+
+impl RestartBackoffConfig {
+    pub fn into_system(&self) -> retry_backoff::RetryBackoff {
+        retry_backoff::RetryBackoff {
+            backoff_type: self.backoff_type.into(),
+            min_delay: self.min_delay.into(),
+            max_delay: Some(self.max_delay.into()),
+        }
+    }
 }
 
 impl BackgroundAgentsConfig {
+    pub fn background_agent_host_config(&self) -> background_agent_host::BackgroundAgentHostConfig {
+        background_agent_host::BackgroundAgentHostConfig {
+            restart_backoff: self.restart_backoff.into_system(),
+            shutdown_timeout: self.shutdown_timeout.into(),
+        }
+    }
+
     pub fn wakeup_listener_config(&self) -> wakeup_listener::WakeupListenerConfig {
         wakeup_listener::WakeupListenerConfig {
             min_debounce_interval: self.min_debounce_interval.into(),
@@ -803,6 +901,19 @@ impl BackgroundAgentsConfig {
         kamu_flow_system::FlowSystemEventAgentConfig {
             batch_size: NonZeroUsize::new(self.batching.flow_system_events)
                 .unwrap_or(NonZeroUsize::MIN),
+        }
+    }
+
+    pub fn resource_controller_runtime_config(
+        &self,
+    ) -> kamu_resources::ResourceControllerRuntimeConfig {
+        kamu_resources::ResourceControllerRuntimeConfig {
+            batch_size: NonZeroUsize::new(self.batching.resource_controllers)
+                .unwrap_or(NonZeroUsize::MIN),
+            process_concurrency: NonZeroUsize::new(self.concurrency.resource_controllers)
+                .unwrap_or(NonZeroUsize::MIN),
+            failure_backoff: self.resource_controllers.failure_backoff.into_system(),
+            loop_restart_backoff: self.resource_controllers.loop_restart_backoff.into_system(),
         }
     }
 
@@ -876,7 +987,7 @@ pub enum RetryPolicyConfigBackoffType {
     ExponentialWithJitter,
 }
 
-impl From<RetryPolicyConfigBackoffType> for kamu_flow_system::RetryBackoffType {
+impl From<RetryPolicyConfigBackoffType> for retry_backoff::RetryBackoffType {
     fn from(value: RetryPolicyConfigBackoffType) -> Self {
         match value {
             RetryPolicyConfigBackoffType::Fixed => Self::Fixed,

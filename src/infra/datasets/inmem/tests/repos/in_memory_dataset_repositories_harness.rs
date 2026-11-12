@@ -7,7 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use database_common::InMemoryTransactionManager;
 use dill::{Catalog, CatalogBuilder};
 use kamu_accounts_inmem::InMemoryAccountRepository;
 
@@ -20,27 +19,13 @@ pub(crate) struct InMemoryDatasetRepositoriesHarness {
 }
 
 impl InMemoryDatasetRepositoriesHarness {
-    /// Changes apply at once, as no transaction is tracked
     pub fn new() -> Self {
-        Self {
-            catalog: Self::catalog_builder().build(),
-        }
-    }
-
-    /// Changes collect in each transaction's working set until it commits
-    pub fn new_transactional() -> Self {
-        let mut catalog_builder = Self::catalog_builder();
-        catalog_builder.add::<InMemoryTransactionManager>();
-        Self {
-            catalog: catalog_builder.build(),
-        }
-    }
-
-    fn catalog_builder() -> CatalogBuilder {
         let mut catalog_builder = CatalogBuilder::new();
         catalog_builder.add::<InMemoryAccountRepository>();
         kamu_datasets_inmem::register_dependencies(&mut catalog_builder);
-        catalog_builder
+        Self {
+            catalog: catalog_builder.build(),
+        }
     }
 }
 

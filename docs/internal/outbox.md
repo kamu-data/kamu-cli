@@ -281,19 +281,21 @@ initial boundary: `Latest` → the producer's latest visible message, `All` (or 
 ### 5.2 Main loop
 
 ```text
-run():  t = catch_up → loop { wait_wake(t, minDebounceInterval); t = catch_up }
+run():  t = catch_up → loop { wait_wake(t, minDebounceInterval) or return on shutdown; t = catch_up }
 catch_up: held = has_held_back_messages(); drain; return held ? 20ms : maxListeningTimeout
-drain:  loop { n = consumption_iteration(); if n == 0 break }
+drain:  loop { n = consumption_iteration(); if n == 0 or shutdown break }   // run_while_has_tasks: no shutdown
 run_while_has_tasks(): loop { held = has_held_back_messages(); drain; if !held break; sleep(20ms) }
 ```
 
 Waking is described in [wakeup-listeners.md](wakeup-listeners.md) (channel `outbox_messages_ready`).
 The same drain is callable as `run_while_has_tasks()`. With a database configured, the CLI calls it
 after every command that `command_needs_outbox_processing` selects, whether the command succeeded or
-failed: a failed command may still have committed work in transactions of its own. The HTTP E2E
-middleware calls it after every successful mutating request (a REST `POST` or a GraphQL
-`mutation`), so E2E tests observe
-consumers' effects synchronously. A `run_lock` keeps these entrances from overlapping with the main loop.
+failed: a failed command may still have committed work in transactions of its own. The CLI
+alternates it with drains of the resource controllers until one is idle
+([resources-framework.md](resources-framework.md#controller-runtime)). The HTTP E2E
+middleware does the same after every successful mutating request (a REST `POST` or a GraphQL
+`mutation`), with the same `BackgroundWorkFinalizer`, so E2E tests observe consumers'
+and controllers' effects synchronously. A `run_lock` keeps these entrances from overlapping with the main loop.
 
 `run_while_has_tasks()` does not stop at the first empty iteration. Committed messages can be held
 back while an older transaction runs ([§6](#reading-below-the-oldest-running-transaction)), anywhere
@@ -328,7 +330,8 @@ entrances cannot move progress back.
 A consumer that fails a message is **blocked for the rest of the iteration** (it cannot skip over
 the failed message), and added to the job's failed set: the planner excludes it from then on, so it
 neither retries nor holds back other consumers of the same producer. The failed set lives in memory
-— **a restart retries** from the stored boundary. `outbox_failed_consumers_total` shows it as `1`,
+— **a process restart retries** from the stored boundary; a restart of the agent by its host
+([background-agents.md](background-agents.md#3-supervision)) keeps the set. `outbox_failed_consumers_total` shows it as `1`,
 and `outbox_messages_pending_total` grows. When all consumers of a producer have failed, the job
 stops processing that producer.
 
@@ -421,7 +424,7 @@ the catch-up reads, which then delivers the released rows, or leaves the answer 
 | --- | --- | --- | --- |
 | Postgres | `kamu-messaging-outbox-postgres` | `(tx_id xid8, message_id)`, index `idx_om_tx_order` | `outbox_notify` trigger → `outbox_messages_ready` |
 | SQLite | `kamu-messaging-outbox-sqlite` | `message_id` only (`tx_id` is always `0`): one connection, so transactions never interleave | `SqlitePollingHub`: `SELECT MAX(message_id)` |
-| In-memory | `kamu-messaging-outbox-inmem` | `message_id` only | `InMemoryWakeupHub` signal on push |
+| In-memory | `kamu-messaging-outbox-inmem` | `message_id`; under `InMemoryTransactionManager`, read only below another open transaction's lowest ID | `InMemoryWakeupHub` signal on commit, or on push outside a transaction |
 
 Tables: `outbox_messages(message_id, producer_name, content_json, occurred_on, version, tx_id)` and
 `outbox_message_consumptions(consumer_name, producer_name, last_consumed_message_id, last_tx_id)`.
@@ -518,4 +521,4 @@ boundaries, failure isolation, self-managed consumers, batching and concurrency 
 | Testing helpers | `messaging-outbox` (`testing`) | `src/utils/messaging-outbox/src/services/testing` | `test_outbox_provider.rs`, `mock_outbox_impl.rs` |
 | Schema | — | `migrations/{postgres,sqlite}` | `*_outbox_messages_consumptions.sql`, `*_outbox_message_version.sql`, `*_outbox_listen_notify.sql`, `*_outbox_wipe*.sql` |
 | App wiring | `kamu-cli` | `src/app/cli/src` | `app.rs` (outbox components, dispatchers), `services/config/models.rs` (`BackgroundAgentsConfig`) |
-| Flushing | `kamu-cli`, `kamu-adapter-http` | `src/app/cli/src`, `src/adapter/http/src/e2e` | `app.rs` (`run_while_has_tasks` after commands), `e2e_middleware.rs` |
+| Flushing | `kamu-cli`, `kamu-resources-services`, `kamu-adapter-http` | `src/app/cli/src`, `src/domain/resources/services/src/controller_runtime`, `src/adapter/http/src/e2e` | `outbox.rs` (after commands), `background_work_finalizer.rs` (outbox and controller drains), `e2e_middleware.rs` (after e2e requests) |

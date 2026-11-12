@@ -108,6 +108,12 @@ where
         self.last_stored_event_id
     }
 
+    /// The state as last synchronized with the event store, without pending
+    /// events; `None` for an aggregate that was never saved
+    pub fn stored_state(&self) -> Option<&Proj> {
+        self.loaded_state.as_ref()
+    }
+
     /// Reverts the aggregate back to the last synchronized state.
     ///
     /// For aggregates that were never synchronized with a store this restores

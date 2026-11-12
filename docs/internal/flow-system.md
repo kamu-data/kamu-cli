@@ -169,7 +169,9 @@ flowchart TD
 | `kamu-adapter-flow-webhook` | `src/adapter/flow-webhook` |
 
 Two background agents run in the API server: `FlowAgentImpl` (activations and task progress) and
-`FlowSystemEventAgentImpl` (projections). Storage backends are chosen in
+`FlowSystemEventAgentImpl` (projections), each restarted by its host after a failure. On a
+shutdown the flow agent stops while waiting for the next activation, and the event agent between
+batches ([background-agents.md](background-agents.md)). Storage backends are chosen in
 `src/app/cli/src/database.rs`; agent configuration comes from `flowSystem` and
 `backgroundAgents` in the CLI config (`src/app/cli/src/services/config/models.rs`).
 
@@ -528,11 +530,13 @@ flowchart TD
         A --> M["bridge.mark_applied(projector, applied)<br/>watermark advances"]
     end
     M -- "batch was not empty" --> F
+    M -- "shutdown requested" --> STOP(["run() returns"])
     M -- "empty batch" --> NEXT{"more projectors?"}
     TX -- "fetch, apply or mark error" --> ERR["log, flow_system_event_projector_failing = 1,<br/>retry on next wakeup; a failed commit is only logged"]
     ERR --> NEXT
     NEXT -- yes --> P
     NEXT -- no --> W
+    W -- "shutdown during the wait" --> STOP
 ```
 
 On Postgres the watermark is a `(tx_id, event_id)` pair and only events of transactions older than

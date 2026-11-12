@@ -112,7 +112,7 @@ The domain crate depends on neither adapter. The CLI app wires everything in `sr
 | --- | --- | --- |
 | `TaskCreated` | `TaskSchedulerImpl::create_task` | Enters the queue; carries the `LogicalPlan` and optional `TaskMetadata` |
 | `TaskRunning` | `TaskSchedulerImpl::try_take` | The agent took it |
-| `TaskRequeued` | `TaskAgentImpl` startup recovery | A run interrupted by a crash or shutdown goes back to the queue |
+| `TaskRequeued` | `TaskAgentImpl` recovery, at startup and at each agent run | A run interrupted by a crash, a shutdown or an agent restart goes back to the queue |
 | `TaskCancelled` | `TaskSchedulerImpl::cancel_task` | Cancellation requested |
 | `TaskFinished` | `TaskAgentImpl` | Final outcome recorded |
 
@@ -126,7 +126,7 @@ stateDiagram-v2
     [*] --> Queued: TaskCreated
     Queued --> Running: TaskRunning<br/>(no cancellation requested)
     Queued --> Finished: TaskCancelled<br/>(outcome = Cancelled)
-    Running --> Queued: TaskRequeued<br/>(startup recovery, no cancellation requested)
+    Running --> Queued: TaskRequeued<br/>(recovery, no cancellation requested)
     Running --> Running: TaskCancelled<br/>(only sets cancellation_requested_at)
     Running --> Finished: TaskFinished(outcome)
     Finished --> [*]
@@ -198,14 +198,16 @@ Planners and runners register through dill metadata, and the agent picks the fir
 
 ## 5. The task agent
 
-`TaskAgentImpl` (`services/src/task_agent_impl.rs`) is a singleton `BackgroundAgent`, started by
-the API server together with the other background agents (`src/app/cli/src/explore/api_server.rs`).
+`TaskAgentImpl` (`services/src/task_agent_impl.rs`) is a singleton `BackgroundAgent`, run by the
+API server's `BackgroundAgentHost` together with the other background agents
+([background-agents.md](background-agents.md)).
 It runs **one task at a time, in-process**. There is no concurrency limit to configure because
 there is no concurrency.
 
 ### Startup recovery
 
-`InitOnStartup` job `JOB_KAMU_TASKS_AGENT_RECOVERY` runs before the loop:
+`InitOnStartup` job `JOB_KAMU_TASKS_AGENT_RECOVERY` runs before the loop, for every command that
+runs startup jobs:
 
 1. Pre-registers the `task_agent_task_duration_seconds` label sets for every plan type that has a
    planner.
@@ -214,6 +216,12 @@ there is no concurrency.
    and a `TaskProgressMessage::Finished` is posted; every other one is requeued with
    `TaskRequeued`.
 
+`run()` repeats step 2 before its loop, so a restart by the host after a failure in the middle of
+a task requeues that task too; at a server's first run it finds nothing left. An internal error or a
+panic while planning or running a task, such as a plan type with no planner, finishes the task as
+a recoverable failure instead of failing the agent: a restart would requeue that task first, and no
+other task would ever run.
+
 Requeued tasks keep their ID and plan, so a crash costs a re-run, not a lost task. Runners must
 therefore tolerate being re-run after a partial first attempt. The dataset runners do, because
 `HEAD` moves in a single short transaction at the very end
@@ -221,8 +229,9 @@ therefore tolerate being re-run after a partial first attempt. The dataset runne
 
 ### One iteration
 
-`run()` creates one wakeup listener for the agent's whole life and calls `run_task_iteration` in a
-loop; any error ends the loop. One iteration:
+`run()` creates one wakeup listener for the agent's whole life, then takes and runs one task at a
+time. Any error ends the run, and the host restarts it. A shutdown ends the wait for a task; a task
+taken is always run. One iteration:
 
 ```mermaid
 sequenceDiagram
@@ -235,6 +244,7 @@ sequenceDiagram
     participant R as TaskRunner
 
     loop until a task is taken
+        note over A: shutdown requested → run() returns Ok
         rect rgba(128, 128, 128, 0.12)
             note over A,O: transaction: take_task_non_blocking
             A->>S: try_take()
@@ -246,7 +256,8 @@ sequenceDiagram
         alt ConcurrentModification
             note over A: rolled back, retry at once
         else nothing queued
-            A->>W: wait_wake(max_listening_timeout, min_debounce_interval)
+            A->>W: wait_wake_until_shutdown(max_listening_timeout, min_debounce_interval)
+            note over A,W: shutdown during the wait → run() returns Ok
         end
     end
 
@@ -719,12 +730,14 @@ changes and failure reasons in flow histories, with the harness in
 
 **Gotchas.**
 
-- **A missing planner or runner stops the agent.** `get_task_planner_for` / `get_task_runner_for`
-  return an `InternalError` that propagates out of `run()`; the API server treats a finished
-  agent as fatal. The task stays `Running`, so after restart recovery requeues it and it fails
-  again. Register planners and runners in every binary that runs the agent.
-- **Storage errors also stop the agent.** There is no retry around `take_task` or
-  `process_task_outcome`.
+- **A missing planner or runner fails the task.** `get_task_planner_for` / `get_task_runner_for`
+  return an `InternalError`, which is logged and finishes the task as an empty recoverable
+  failure, so the cause is visible only in the logs. Register planners and runners in every binary
+  that runs the agent.
+- **Storage errors end the agent's run.** There is no retry around `take_task` or
+  `process_task_outcome`; the host restarts the agent after a backoff
+  ([background-agents.md](background-agents.md#3-supervision)), and the new run requeues the task
+  left `Running`.
 - **Cancelling a running task does not stop it.** It only guarantees the run is not retried after
   a restart.
 - **An internal planner error loses its cause.** `PrepareTaskDefinitionError::Internal` is logged

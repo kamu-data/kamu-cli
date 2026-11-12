@@ -1,0 +1,236 @@
+// Copyright Kamu Data, Inc. and contributors. All rights reserved.
+//
+// Use of this software is governed by the Business Source License
+// included in the LICENSE file.
+//
+// As of the Change Date specified in that file, in accordance with
+// the Business Source License, use of this software will be governed
+// by the Apache License, Version 2.0.
+
+use std::sync::Arc;
+
+use chrono::{DateTime, Utc};
+use database_common::DatabaseTransactionRunner;
+use internal_error::InternalError;
+use time_source::SystemTimeSource;
+use wakeup_listener::{WakeupListener, WakeupListenerConfig};
+
+use crate::controller_runtime::{
+    ResourceControllerDrainGate,
+    ResourceControllerDrainHoldBack,
+    ResourceControllerOutcomeRecorder,
+    ResourceControllerPassPlanner,
+    ResourceControllerRegistration,
+    ResourceControllerRuntimeMetrics,
+    ResourceControllerWait,
+    ResourceProcessExecutor,
+};
+use crate::domain::{ResourceControllerRuntimeConfig, ResourceControllerStateRepository};
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Drives one registered controller.
+///
+/// A drain repeats passes until a pass finds nothing to do:
+///
+/// ```text
+/// plan a pass (eligible + extra resources, minus suppressed ones)
+///   -> process the candidates, a few at a time
+///   -> record each outcome in the bookkeeping
+///   -> plan again
+/// ```
+///
+/// Why the drain ends: every outcome makes its resource drop out of the next
+/// pass, unless its next step is due at once:
+/// - `Done` suppresses an eligible resource until it changes. An extra one ignores `Done`, so the
+///   drain holds it back instead.
+/// - `RetryAt` in the future and a failure both set `not_before`, which suppresses either kind
+///   until then.
+/// - `RetryAt` already passed is the controller saying "the next step is due now": the resource is
+///   processed again in the next pass, which is how a multi-step reconciliation runs its steps back
+///   to back. A controller that never stops doing so is held back after a few calls
+///   (`ResourceControllerDrainHoldBack`).
+pub(crate) struct ResourceControllerLoop {
+    registration: ResourceControllerRegistration,
+    catalog: dill::Catalog,
+    config: Arc<ResourceControllerRuntimeConfig>,
+    wakeup_config: Arc<WakeupListenerConfig>,
+    time_source: Arc<dyn SystemTimeSource>,
+    metrics: Arc<ResourceControllerRuntimeMetrics>,
+    /// Shared by every loop of this controller
+    drain_gate: Arc<ResourceControllerDrainGate>,
+}
+
+impl ResourceControllerLoop {
+    pub fn new(
+        registration: ResourceControllerRegistration,
+        catalog: dill::Catalog,
+        config: Arc<ResourceControllerRuntimeConfig>,
+        wakeup_config: Arc<WakeupListenerConfig>,
+        time_source: Arc<dyn SystemTimeSource>,
+        metrics: Arc<ResourceControllerRuntimeMetrics>,
+        drain_gate: Arc<ResourceControllerDrainGate>,
+    ) -> Self {
+        Self {
+            registration,
+            catalog,
+            config,
+            wakeup_config,
+            time_source,
+            metrics,
+            drain_gate,
+        }
+    }
+
+    pub fn registration(&self) -> &ResourceControllerRegistration {
+        &self.registration
+    }
+
+    /// `process` calls every loop of this controller made so far
+    pub fn processed_by_all_drains(&self) -> usize {
+        self.drain_gate.processed()
+    }
+
+    /// Processes pass after pass until no resource needs attention now. The
+    /// listener, when the agent's loop drains, gets a heartbeat per pass, so a
+    /// long drain still proves the loop alive.
+    ///
+    /// The hold-back is the caller's, so that several drains can share one.
+    pub async fn drain(
+        &self,
+        listener: Option<&dyn WakeupListener>,
+        hold_back: &mut ResourceControllerDrainHoldBack,
+    ) -> Result<ResourceControllerDrainReport, InternalError> {
+        let _turn = self.drain_gate.enter().await;
+
+        let planner = ResourceControllerPassPlanner::new(
+            &self.registration,
+            &self.catalog,
+            self.config.batch_size.get(),
+        );
+        let executor =
+            ResourceProcessExecutor::new(&self.registration, self.config.process_concurrency.get());
+        let recorder = ResourceControllerOutcomeRecorder::new(
+            &self.registration,
+            &self.catalog,
+            &self.config.failure_backoff,
+        );
+
+        let mut processed = 0;
+
+        loop {
+            let planned_at = self.time_source.now();
+            let pass = planner.plan(planned_at, hold_back).await?;
+
+            // Only the last, empty pass tells what is left waiting: an earlier
+            // pass may have deferred a resource that a later one processed
+            if pass.is_empty() {
+                self.update_failing_resources().await?;
+                return Ok(ResourceControllerDrainReport {
+                    processed,
+                    extras_listed_at: planned_at,
+                    earliest_deferred_extra: pass.earliest_deferred_extra(),
+                    held_back: pass.held_back(),
+                });
+            }
+
+            let attempts = executor.run(pass.into_candidates()).await;
+
+            // Every call of the batch ran, so each is counted before recording,
+            // which may fail the drain halfway
+            for (candidate, attempt) in &attempts {
+                processed += 1;
+                self.drain_gate.count_processed();
+                self.metrics
+                    .on_processed(&self.registration.meta().controller_name, attempt.kind());
+                hold_back.note_attempt(
+                    candidate,
+                    attempt,
+                    self.registration.meta().controller_name.as_str(),
+                );
+            }
+
+            for (candidate, attempt) in &attempts {
+                // A failure to record fails the drain: the loop is then
+                // restarted, and the resource processed again
+                recorder
+                    .record(candidate.id(), attempt, self.time_source.now())
+                    .await?;
+            }
+
+            if let Some(listener) = listener {
+                listener.heartbeat();
+            }
+        }
+    }
+
+    /// Sets the gauge of failing resources from the bookkeeping storage
+    async fn update_failing_resources(&self) -> Result<(), InternalError> {
+        let controller_name = &self.registration.meta().controller_name;
+        let count = DatabaseTransactionRunner::new(self.catalog.clone())
+            .transactional_with(
+                |repository: Arc<dyn ResourceControllerStateRepository>| async move {
+                    repository.count_failing_resources(controller_name).await
+                },
+            )
+            .await?;
+
+        self.metrics.set_failing_resources(controller_name, count);
+        Ok(())
+    }
+
+    /// Waits until the next drain is due: see `ResourceControllerWait`
+    pub async fn wait(
+        &self,
+        listener: &dyn WakeupListener,
+        drained: &ResourceControllerDrainReport,
+    ) -> Result<(), InternalError> {
+        ResourceControllerWait::new(
+            &self.registration,
+            &self.catalog,
+            &self.wakeup_config,
+            self.time_source.as_ref(),
+            self.config.failure_backoff.min_delay,
+        )
+        .wait(listener, drained)
+        .await
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// What a drain did, and what it left waiting
+#[derive(Debug)]
+pub(crate) struct ResourceControllerDrainReport {
+    processed: usize,
+    extras_listed_at: DateTime<Utc>,
+    earliest_deferred_extra: Option<DateTime<Utc>>,
+    held_back: bool,
+}
+
+impl ResourceControllerDrainReport {
+    /// `process` calls made
+    pub fn processed(&self) -> usize {
+        self.processed
+    }
+
+    /// The moment the last pass listed the extra resources. Those due by then
+    /// were processed or deferred; those due later were not considered yet.
+    pub fn extras_listed_at(&self) -> DateTime<Utc> {
+        self.extras_listed_at
+    }
+
+    /// The earliest moment an extra resource left out for its backoff becomes
+    /// due. The bookkeeping storage cannot compute it, since it does not know
+    /// the extra set.
+    pub fn earliest_deferred_extra(&self) -> Option<DateTime<Utc>> {
+        self.earliest_deferred_extra
+    }
+
+    /// Whether the drain held back resources that are still due
+    pub fn held_back(&self) -> bool {
+        self.held_back
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

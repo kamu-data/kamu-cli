@@ -47,6 +47,7 @@ tokio = { version = "1", default-features = false }
 tracing = { version = "0.1", default-features = false }
 
 [dev-dependencies]
+background-agent-host = { workspace = true }
 database-common-macros = { workspace = true }
 kamu-messaging-outbox-repo-tests = { workspace = true }
 

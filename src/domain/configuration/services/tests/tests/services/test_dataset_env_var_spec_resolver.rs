@@ -18,8 +18,9 @@ use crate::tests::services::dataset_env_var_service_harness::DatasetEnvVarServic
 // Semantics of the spec-backed resolver, which must stay identical to the
 // projection-backed one in `test_dataset_env_var_resolver.rs`.
 //
-// This harness reconciles inline, so the read-after-write divergence itself is
-// covered at the GraphQL layer by the `test_unreconciled_*` tests.
+// This harness lets the controller runtime reconcile after every write, so the
+// read-after-write divergence itself is covered at the GraphQL layer by the `test_unreconciled_*`
+// tests.
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]

@@ -99,6 +99,22 @@ Choose by what the code under test touches, not by how small the test is.
 
 ---
 
+## What not to test
+
+Test our code, not the libraries it builds on. A test whose assertions would pass or fail only
+with a library's own behaviour is noise: it fails on a library upgrade, never on our change.
+
+| Do not assert | Example to avoid |
+|---|---|
+| The strings a derive renders | `strum` `IntoStaticStr` / `EnumString` / `serialize_all` output, listed variant by variant |
+| That a derive covers every variant | `EnumIter::iter().count()` compared with a hand-written list |
+| A library's documented formatting or defaults | `serde` field naming, `InternalError` display, `prometheus` text format |
+
+When such strings are data (persisted values, metric labels), how to keep them is in
+[`kamu-rust-style`](../kamu-rust-style/SKILL.md#enum--string-mappings-come-from-strum).
+
+---
+
 ## Assertions
 
 Use `assert_matches!(expr, pattern)` directly — never wrap it as `assert!(matches!(expr, pattern))`,
@@ -356,6 +372,7 @@ Do not re-propose these without new evidence.
 | Approach | Why it was rejected |
 |---|---|
 | An inline `#[cfg(test)]` module that writes temp files to reach a private method | It is an integration test hidden in a source file, coupled to private internals, and it keeps the logic from being reused; the fix is in [Unit or integration test](#unit-or-integration-test). |
+| A "names are stable" test listing the `strum` strings of an enum's variants | It re-tests the derive and can fail only on a `strum` upgrade, never on our change ([What not to test](#what-not-to-test)). |
 
 ## What lives elsewhere
 

@@ -7,198 +7,111 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::sync::Mutex;
+
 use chrono::Utc;
 use dill::CatalogBuilder;
-use event_sourcing::ConcurrentModificationError;
 use internal_error::InternalError;
 use kamu_resources::{
-    CompleteResourceDeletionUseCase,
-    CompleteResourceDeletionUseCaseError,
     MESSAGE_PRODUCER_KAMU_RESOURCE_SERVICE,
-    MockCompleteResourceDeletionUseCase,
-    MockReconcileResourceUseCase,
-    ReconcileResourceUseCase,
-    ReconcileResourceUseCaseError,
+    ResourceControllerHints,
+    ResourceControllerName,
     ResourceHeaders,
     ResourceHeadersExt,
     ResourceID,
     ResourceLifecycleMessage,
+    ResourceLifecycleMessageConditionChange,
     ResourceLifecycleMessageOutcome,
+    ResourceLifecycleMessageResourceRef,
     ResourceSchemaProvider,
     ResourceSnapshot,
-    ResourceStatusConflictError,
+    new_pending_resource_status,
 };
 use messaging_outbox::{MessageConsumerT, OutboxProvider, register_message_dispatcher};
 use odf::metadata::resources::TypeUri;
+use pretty_assertions::assert_eq;
+use wakeup_listener::WakeupListener;
 
-use crate::tests::utils::{TestResource, TestResourceResourceLifecycleDispatcher, make_id};
+use crate::tests::utils::{TestResource, make_id};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Tests
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_applied_message_triggers_reconciliation() {
-    // Applied message → ResourceLifecycleMessageConsumer → handle_applied →
-    // ReconcileResourceUseCase::execute.  Verified via mock expectations.
-    let id = make_id();
-
-    let harness = ResourceLifecycleConsumerHarness::new(
-        ResourceLifecycleConsumerHarness::expect_execute_once(id),
-    );
+async fn test_applied_message_hints_its_schema() {
+    let harness = ResourceLifecycleConsumerHarness::new();
+    let schema = TypeUri::new_unchecked("ControllerDrivenSchema");
 
     harness
         .consume_message(&ResourceLifecycleMessage::applied(
             Utc::now(),
             ResourceLifecycleMessageOutcome::Created,
-            ResourceLifecycleConsumerHarness::make_snapshot(id),
+            ResourceLifecycleConsumerHarness::make_snapshot_with_schema(make_id(), &schema),
         ))
         .await
         .unwrap();
+
+    assert_eq!(harness.hinted_schemas(), vec![schema]);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_applied_message_skips_reconciliation_status_conflict() {
-    // A concurrent reconciliation of the same resource already recorded its
-    // outcome, so the conflict is not an error of the message.
-    let id = make_id();
-
-    let harness = ResourceLifecycleConsumerHarness::new(
-        ResourceLifecycleConsumerHarness::expect_execute_once_with_status_conflict(id),
-    );
-
-    harness
-        .consume_message(&ResourceLifecycleMessage::applied(
-            Utc::now(),
-            ResourceLifecycleMessageOutcome::Created,
-            ResourceLifecycleConsumerHarness::make_snapshot(id),
-        ))
-        .await
-        .unwrap();
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[test_log::test(tokio::test)]
-async fn test_applied_message_skips_reconciliation_concurrent_modification() {
-    // The writer the repository detected reconciles the resource itself or
-    // makes the reconciliation unnecessary
-    let id = make_id();
-
-    let harness = ResourceLifecycleConsumerHarness::new(
-        ResourceLifecycleConsumerHarness::expect_execute_once_with_concurrent_modification(id),
-    );
-
-    harness
-        .consume_message(&ResourceLifecycleMessage::applied(
-            Utc::now(),
-            ResourceLifecycleMessageOutcome::Created,
-            ResourceLifecycleConsumerHarness::make_snapshot(id),
-        ))
-        .await
-        .unwrap();
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[test_log::test(tokio::test)]
-async fn test_deletion_requested_message_completes_deletions_in_one_batch() {
-    let id_a = make_id();
-    let id_b = make_id();
-
-    let harness = ResourceLifecycleConsumerHarness::new_with_deletion(
-        ResourceLifecycleConsumerHarness::expect_no_execute(),
-        ResourceLifecycleConsumerHarness::expect_complete_deletion(&[id_a, id_b], || Ok(())),
-    );
+async fn test_deletion_requested_message_hints_once_per_batch() {
+    let harness = ResourceLifecycleConsumerHarness::new();
 
     harness
         .consume_message(&ResourceLifecycleMessage::deletion_requested(
             Utc::now(),
             vec![
-                ResourceLifecycleConsumerHarness::make_snapshot(id_a),
-                ResourceLifecycleConsumerHarness::make_snapshot(id_b),
+                ResourceLifecycleConsumerHarness::make_snapshot(make_id()),
+                ResourceLifecycleConsumerHarness::make_snapshot(make_id()),
             ],
         ))
         .await
         .unwrap();
+
+    assert_eq!(
+        harness.hinted_schemas(),
+        vec![TestResource::schema().clone()]
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_deletion_requested_message_skips_concurrent_modification() {
-    let id = make_id();
-
-    let harness = ResourceLifecycleConsumerHarness::new_with_deletion(
-        ResourceLifecycleConsumerHarness::expect_no_execute(),
-        ResourceLifecycleConsumerHarness::expect_complete_deletion(&[id], || {
-            Err(
-                CompleteResourceDeletionUseCaseError::ConcurrentModification(
-                    ConcurrentModificationError {},
-                ),
-            )
-        }),
-    );
+async fn test_status_updated_message_hints_its_schema() {
+    let harness = ResourceLifecycleConsumerHarness::new();
 
     harness
-        .consume_message(&ResourceLifecycleMessage::deletion_requested(
-            Utc::now(),
-            vec![ResourceLifecycleConsumerHarness::make_snapshot(id)],
+        .consume_message(&ResourceLifecycleConsumerHarness::make_status_updated(
+            make_id(),
         ))
         .await
         .unwrap();
+
+    assert_eq!(
+        harness.hinted_schemas(),
+        vec![TestResource::schema().clone()]
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_deleted_message_is_no_op_for_controller() {
-    // Deleted message → handle_deleted, which is a no-op in the generated
-    // controller dispatcher: the controller already cleaned up.
-    let id = make_id();
-
-    let harness = ResourceLifecycleConsumerHarness::new(
-        ResourceLifecycleConsumerHarness::expect_no_execute(),
-    );
+async fn test_deleted_message_hints_nothing() {
+    let harness = ResourceLifecycleConsumerHarness::new();
 
     harness
         .consume_message(&ResourceLifecycleMessage::deleted(
             Utc::now(),
-            vec![ResourceLifecycleConsumerHarness::make_snapshot(id)],
+            vec![ResourceLifecycleConsumerHarness::make_snapshot(make_id())],
         ))
         .await
         .unwrap();
-}
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[test_log::test(tokio::test)]
-async fn test_applied_message_with_unregistered_schema_returns_error() {
-    // Applied message for an unknown schema: dispatcher lookup fails because no
-    // lifecycle dispatcher is registered for "UnknownSchema".
-    let id = make_id();
-
-    let harness = ResourceLifecycleConsumerHarness::new(
-        ResourceLifecycleConsumerHarness::expect_no_execute(),
-    );
-
-    let result = harness
-        .consume_message(&ResourceLifecycleMessage::applied(
-            Utc::now(),
-            ResourceLifecycleMessageOutcome::Created,
-            ResourceLifecycleConsumerHarness::make_snapshot_with_schema(
-                id,
-                &TypeUri::new_unchecked("UnknownSchema"),
-            ),
-        ))
-        .await;
-
-    assert!(
-        result.is_err(),
-        "consumer must return an error for an unregistered resource schema"
-    );
+    assert_eq!(harness.hinted_schemas(), vec![]);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -210,81 +123,7 @@ struct ResourceLifecycleConsumerHarness {
 }
 
 impl ResourceLifecycleConsumerHarness {
-    fn expect_execute_once(id: ResourceID) -> MockReconcileResourceUseCase<TestResource> {
-        let mut mock = MockReconcileResourceUseCase::<TestResource>::new();
-        mock.expect_execute()
-            .once()
-            .withf(move |id_| *id_ == id)
-            .returning(|_| Ok(()));
-        mock
-    }
-
-    fn expect_execute_once_with_status_conflict(
-        id: ResourceID,
-    ) -> MockReconcileResourceUseCase<TestResource> {
-        let mut mock = MockReconcileResourceUseCase::<TestResource>::new();
-        mock.expect_execute()
-            .once()
-            .withf(move |id_| *id_ == id)
-            .returning(|_| {
-                Err(ReconcileResourceUseCaseError::StatusConflict(
-                    ResourceStatusConflictError {
-                        expected: 2,
-                        actual: 3,
-                    },
-                ))
-            });
-        mock
-    }
-
-    fn expect_execute_once_with_concurrent_modification(
-        id: ResourceID,
-    ) -> MockReconcileResourceUseCase<TestResource> {
-        let mut mock = MockReconcileResourceUseCase::<TestResource>::new();
-        mock.expect_execute()
-            .once()
-            .withf(move |id_| *id_ == id)
-            .returning(|_| {
-                Err(ReconcileResourceUseCaseError::ConcurrentModification(
-                    ConcurrentModificationError {},
-                ))
-            });
-        mock
-    }
-
-    fn expect_no_execute() -> MockReconcileResourceUseCase<TestResource> {
-        let mut mock = MockReconcileResourceUseCase::<TestResource>::new();
-        mock.expect_execute().never();
-        mock
-    }
-
-    fn expect_complete_deletion(
-        ids: &[ResourceID],
-        outcome: fn() -> Result<(), CompleteResourceDeletionUseCaseError<TestResource>>,
-    ) -> MockCompleteResourceDeletionUseCase<TestResource> {
-        let ids = ids.to_vec();
-        let mut mock = MockCompleteResourceDeletionUseCase::<TestResource>::new();
-        mock.expect_execute()
-            .once()
-            .withf(move |ids_| *ids_ == ids[..])
-            .returning(move |_| outcome());
-        mock
-    }
-
-    fn expect_no_complete_deletion() -> MockCompleteResourceDeletionUseCase<TestResource> {
-        let mut mock = MockCompleteResourceDeletionUseCase::<TestResource>::new();
-        mock.expect_execute().never();
-        mock
-    }
-
-    fn new(mock_reconcile_uc: MockReconcileResourceUseCase<TestResource>) -> Self {
-        Self::new_with_deletion(mock_reconcile_uc, Self::expect_no_complete_deletion())
-    }
-
-    fn new_with_deletion(
-        mock_reconcile_uc: MockReconcileResourceUseCase<TestResource>,
-        mock_complete_deletion_uc: MockCompleteResourceDeletionUseCase<TestResource>,
-    ) -> Self {
+    fn new() -> Self {
         let mut b = CatalogBuilder::new();
 
         OutboxProvider::Immediate {
@@ -292,12 +131,8 @@ impl ResourceLifecycleConsumerHarness {
         }
         .embed_into_catalog(&mut b);
 
-        b.add_value(mock_reconcile_uc)
-            .bind::<dyn ReconcileResourceUseCase<TestResource>, MockReconcileResourceUseCase<TestResource>>();
-        b.add_value(mock_complete_deletion_uc)
-            .bind::<dyn CompleteResourceDeletionUseCase<TestResource>, MockCompleteResourceDeletionUseCase<TestResource>>();
-
-        b.add::<TestResourceResourceLifecycleDispatcher>();
+        b.add_value(RecordingHints::default())
+            .bind::<dyn ResourceControllerHints, RecordingHints>();
         b.add::<kamu_resources_services::ResourceLifecycleMessageConsumer>();
 
         register_message_dispatcher::<ResourceLifecycleMessage>(
@@ -307,6 +142,17 @@ impl ResourceLifecycleConsumerHarness {
 
         let catalog = b.build();
         Self { catalog }
+    }
+
+    /// The schemas the consumer hinted, in order
+    fn hinted_schemas(&self) -> Vec<TypeUri> {
+        self.catalog
+            .get_one::<RecordingHints>()
+            .unwrap()
+            .schemas
+            .lock()
+            .unwrap()
+            .clone()
     }
 
     async fn consume_message(
@@ -324,6 +170,26 @@ impl ResourceLifecycleConsumerHarness {
         Self::make_snapshot_with_schema(id, TestResource::schema())
     }
 
+    fn make_status_updated(id: ResourceID) -> ResourceLifecycleMessage {
+        let snapshot = Self::make_snapshot(id);
+        ResourceLifecycleMessage::status_updated(
+            Utc::now(),
+            ResourceLifecycleMessageResourceRef {
+                id,
+                schema: snapshot.schema,
+                headers: snapshot.headers,
+            },
+            &new_pending_resource_status(),
+            [(
+                TypeUri::new_unchecked(
+                    "https://test.kamu.dev/schemas/test/v1/conditions/TestStage",
+                ),
+                ResourceLifecycleMessageConditionChange::Removed,
+            )]
+            .into(),
+        )
+    }
+
     fn make_snapshot_with_schema(id: ResourceID, schema: &TypeUri) -> ResourceSnapshot {
         let account_handle = odf::ResourceOwnerHandle::new_test("test-oowner");
 
@@ -337,4 +203,26 @@ impl ResourceLifecycleConsumerHarness {
         }
     }
 }
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Records the schemas hinted to the controller runtime
+#[derive(Default)]
+struct RecordingHints {
+    schemas: Mutex<Vec<TypeUri>>,
+}
+
+impl ResourceControllerHints for RecordingHints {
+    fn hint(&self, schema: &TypeUri) {
+        self.schemas.lock().unwrap().push(schema.clone());
+    }
+
+    fn new_wakeup_listener(
+        &self,
+        _schema: &'static str,
+        _controller_name: &ResourceControllerName,
+    ) -> Box<dyn WakeupListener> {
+        unreachable!("the consumer never listens")
+    }
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -33,6 +33,7 @@ testing = [
 
 
 [dependencies]
+background-agent-host = { workspace = true }
 database-common = { workspace = true }
 dill = { version = "0.17", default-features = false }
 enum-variants = { workspace = true }
@@ -40,6 +41,8 @@ event-sourcing = { workspace = true }
 internal-error = { workspace = true }
 messaging-outbox = { workspace = true }
 odf = { workspace = true }
+retry-backoff = { workspace = true }
+wakeup-listener = { workspace = true }
 
 async-trait = { version = "0.1", default-features = false }
 chrono = { version = "0.4", default-features = false, features = [

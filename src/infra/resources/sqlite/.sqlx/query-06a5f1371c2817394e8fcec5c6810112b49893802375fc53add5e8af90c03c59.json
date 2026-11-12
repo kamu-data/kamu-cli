@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "DELETE FROM resource_controller_state WHERE resource_id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": []
+  },
+  "hash": "06a5f1371c2817394e8fcec5c6810112b49893802375fc53add5e8af90c03c59"
+}

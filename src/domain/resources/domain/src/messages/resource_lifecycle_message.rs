@@ -7,25 +7,33 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::collections::BTreeMap;
+
 use chrono::{DateTime, Utc};
 use messaging_outbox::Message;
 use serde::{Deserialize, Serialize};
 
-use crate::ResourceSnapshot;
+use crate::{
+    ResourceHeaders,
+    ResourceID,
+    ResourcePhase,
+    ResourceSnapshot,
+    ResourceStatus,
+    TypeUri,
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-const RESOURCE_LIFECYCLE_OUTBOX_VERSION: u32 = 3;
+const RESOURCE_LIFECYCLE_OUTBOX_VERSION: u32 = 4;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ResourceLifecycleMessage {
     Applied(ResourceLifecycleMessageApplied),
-    ReconciliationSucceeded(ResourceLifecycleMessageReconciliationSucceeded),
-    ReconciliationFailed(ResourceLifecycleMessageReconciliationFailed),
     DeletionRequested(ResourceLifecycleMessageDeletionRequested),
     Deleted(ResourceLifecycleMessageDeleted),
+    StatusUpdated(ResourceLifecycleMessageStatusUpdated),
 }
 
 impl ResourceLifecycleMessage {
@@ -37,20 +45,6 @@ impl ResourceLifecycleMessage {
         Self::Applied(ResourceLifecycleMessageApplied {
             event_time,
             outcome,
-            resource,
-        })
-    }
-
-    pub fn reconciliation_succeeded(event_time: DateTime<Utc>, resource: ResourceSnapshot) -> Self {
-        Self::ReconciliationSucceeded(ResourceLifecycleMessageReconciliationSucceeded {
-            event_time,
-            resource,
-        })
-    }
-
-    pub fn reconciliation_failed(event_time: DateTime<Utc>, resource: ResourceSnapshot) -> Self {
-        Self::ReconciliationFailed(ResourceLifecycleMessageReconciliationFailed {
-            event_time,
             resource,
         })
     }
@@ -88,6 +82,20 @@ impl ResourceLifecycleMessage {
             resources,
         })
     }
+
+    pub fn status_updated(
+        event_time: DateTime<Utc>,
+        resource: ResourceLifecycleMessageResourceRef,
+        status: &ResourceStatus,
+        changed_conditions: BTreeMap<TypeUri, ResourceLifecycleMessageConditionChange>,
+    ) -> Self {
+        Self::StatusUpdated(ResourceLifecycleMessageStatusUpdated {
+            event_time,
+            resource,
+            status: ResourceLifecycleMessageStatus::from(status),
+            changed_conditions,
+        })
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -117,24 +125,8 @@ pub struct ResourceLifecycleMessageApplied {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct ResourceLifecycleMessageReconciliationSucceeded {
-    pub event_time: DateTime<Utc>,
-    pub resource: ResourceSnapshot,
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct ResourceLifecycleMessageReconciliationFailed {
-    pub event_time: DateTime<Utc>,
-    pub resource: ResourceSnapshot,
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-/// Deletion of the resources was requested, or requested again to retry a
-/// failed cleanup. The resources are in the `Deleting` phase.
+/// Deletion of the resources was requested, possibly again for resources
+/// already being deleted. The resources are in the `Deleting` phase.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ResourceLifecycleMessageDeletionRequested {
     pub event_time: DateTime<Utc>,
@@ -150,6 +142,91 @@ pub struct ResourceLifecycleMessageDeleted {
     pub event_time: DateTime<Utc>,
     // all resources share the same `schema`
     pub resources: Vec<ResourceSnapshot>,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// The status of the resource changed: a reconciliation started, succeeded or
+/// failed, a cleanup failed, or a writer patched conditions. The message names
+/// the resource without its spec and conditions, so a large condition never
+/// travels with it
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ResourceLifecycleMessageStatusUpdated {
+    pub event_time: DateTime<Utc>,
+    pub resource: ResourceLifecycleMessageResourceRef,
+    pub status: ResourceLifecycleMessageStatus,
+    /// Every condition the update set or removed
+    pub changed_conditions: BTreeMap<TypeUri, ResourceLifecycleMessageConditionChange>,
+}
+
+impl ResourceLifecycleMessageStatusUpdated {
+    /// Whether this update recorded the reconciliation of the resource's
+    /// current generation. A later update of a reconciled resource, such as a
+    /// condition patch, keeps the earlier `reconciledAt` and does not count
+    pub fn records_reconciliation_of_current_generation(&self) -> bool {
+        self.status.phase == ResourcePhase::Ready
+            && self.status.reconciled_generation == Some(self.resource.headers.generation)
+            && self.status.reconciled_at == Some(self.event_time)
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// The status fields other than the conditions, under the keys the resource
+/// status uses
+#[serde_with::serde_as]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ResourceLifecycleMessageStatus {
+    #[serde_as(as = "odf::metadata::serde::yaml::resources::ResourcePhase")]
+    pub phase: ResourcePhase,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub observed_generation: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub observed_at: Option<DateTime<Utc>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reconciled_generation: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reconciled_at: Option<DateTime<Utc>>,
+}
+
+impl From<&ResourceStatus> for ResourceLifecycleMessageStatus {
+    fn from(status: &ResourceStatus) -> Self {
+        Self {
+            phase: status.phase,
+            observed_generation: status.observed_generation,
+            observed_at: status.observed_at,
+            reconciled_generation: status.reconciled_generation,
+            reconciled_at: status.reconciled_at,
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// A resource named by its identity and headers, including the
+/// `statusGeneration` it reached
+#[serde_with::serde_as]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ResourceLifecycleMessageResourceRef {
+    pub id: ResourceID,
+    pub schema: TypeUri,
+    #[serde_as(as = "odf::metadata::serde::yaml::resources::ResourceHeaders")]
+    pub headers: ResourceHeaders,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum ResourceLifecycleMessageConditionChange {
+    /// Set a condition whose schema is registered as carried; the value may be
+    /// JSON `null`
+    Set {
+        value: serde_json::Value,
+    },
+    /// Set a condition whose value does not travel with the message
+    SetEmpty,
+    Removed,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -114,7 +114,7 @@ Each `RF-*` contract scenario is listed with its status. Test code and comments 
 | RF-124 | account_scoping.rs | Active | Unknown account name/id is rejected |  |
 | RF-125 | account_scoping.rs | Active | Account isolation across all read APIs |  |
 | RF-126 | account_scoping.rs | Active | Explicit empty account selector `{}` is rejected | Distinct from omitting `account` entirely (RF-120); rejected by account resolution, not parsing |
-| RF-130 | delete.rs | Active | Delete by name removes resource | Reports `Deleted`: with an immediate outbox, controllers clean up within the request |
+| RF-130 | delete.rs | Active | Delete by name removes resource | Reports `Deleting`: the controllers clean up after the request |
 | RF-131 | delete.rs | Active | Delete by UID removes resource |  |
 | RF-132 | delete.rs | Active | Delete missing name returns lookup problem |  |
 | RF-133 | delete.rs | Active | Delete missing UID returns lookup problem |  |
@@ -123,7 +123,7 @@ Each `RF-*` contract scenario is listed with its status. Test code and comments 
 | RF-136 | delete.rs | Active | Repeated delete of a deleted resource returns not found |  |
 | RF-137 | delete.rs | Active | Delete reports `Deleting` until controllers clean up | While deleting: found by id, hidden from names and from both `search` and `search_handles` unless `IncludeDeleting` (a `search` summary then reports `Deleting`); once cleaned up: not found even with it |
 | RF-138 | delete.rs | Active | A resource being deleted gives up its name | Re-apply creates a new resource with a `replaces_resource_being_deleted` warning; with `IncludeDeleting`, `get_handles`, `get` and `render_manifests` by name return both under one request index, live first |
-| RF-139 | delete.rs | Active | Repeated delete of a resource being deleted retries its cleanup | By id only: `delete` resolves names to live resources |
+| RF-139 | delete.rs | Active | Repeated delete of a resource being deleted reports `Deleting` | By id only: `delete` resolves names to live resources; the controller runtime completes the deletion |
 | RF-140 | error_taxonomy.rs | Active | One-element-batch lookup taxonomy is consistent across get/get_handles/render_manifests/delete | Full 3x4 matrix (NameNotFound/IDNotFound/SchemaMismatch x 4 methods); RF-141 covers only a subset, so this was converted to batch form rather than retired |
 | RF-141 | error_taxonomy.rs | Active | Multi-ref batch lookup problem taxonomy mirrors the one-element case |  |
 | RF-142 | error_taxonomy.rs | Active | Batch-level error taxonomy (unsupported type, bad account) |  |

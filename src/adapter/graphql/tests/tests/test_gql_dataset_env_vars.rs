@@ -1288,27 +1288,34 @@ async fn test_unreconciled_secret_delete_keeps_sibling_secrets() {
 struct DatasetEnvVarsHarness {
     base_gql_resource_harness: BaseGQLResourceHarness,
     catalog_authorized: dill::Catalog,
+    /// Whether the controllers reconcile after every request
+    reconciles: bool,
 }
 
 impl DatasetEnvVarsHarness {
+    /// The controllers reconcile after every request, before it returns
     async fn new() -> Self {
-        Self::new_with_outbox(OutboxProvider::Immediate {
-            force_immediate: true,
-        })
+        Self::new_with_outbox(
+            OutboxProvider::Immediate {
+                force_immediate: true,
+            },
+            true,
+        )
         .await
     }
 
-    /// A harness where reconciliation never runs: [`OutboxProvider::Dummy`]
-    /// swallows `Applied`, so the projections stay empty.
+    /// A harness where reconciliation never runs, so the projections stay
+    /// empty.
     ///
-    /// This holds open the window every client briefly reads in. The default
-    /// [`Self::new`] reconciles inline, which production never does, so only
-    /// this variant can catch a read-after-write regression.
+    /// This keeps open the gap between a write and its reconciliation, which
+    /// every client briefly reads in. The default
+    /// [`Self::new`] reconciles within each request, which production never
+    /// does, so only this variant can catch a read-after-write regression.
     async fn new_unreconciled() -> Self {
-        Self::new_with_outbox(OutboxProvider::Dummy).await
+        Self::new_with_outbox(OutboxProvider::Dummy, false).await
     }
 
-    async fn new_with_outbox(outbox_provider: OutboxProvider) -> Self {
+    async fn new_with_outbox(outbox_provider: OutboxProvider, reconciles: bool) -> Self {
         let base_gql_resource_harness =
             BaseGQLResourceHarness::new_with_config(TenancyConfig::SingleTenant, outbox_provider);
 
@@ -1328,6 +1335,7 @@ impl DatasetEnvVarsHarness {
         Self {
             base_gql_resource_harness,
             catalog_authorized,
+            reconciles,
         }
     }
 
@@ -1335,7 +1343,11 @@ impl DatasetEnvVarsHarness {
         &self,
         query: impl Into<async_graphql::Request>,
     ) -> async_graphql::Response {
-        self.execute_query(query, &self.catalog_authorized).await
+        let response = self.execute_query(query, &self.catalog_authorized).await;
+        if self.reconciles {
+            self.settle().await;
+        }
+        response
     }
 
     async fn create_dataset(&self) -> CreateDatasetResult {

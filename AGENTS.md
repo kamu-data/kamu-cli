@@ -83,6 +83,9 @@ problem is cost.
 - Keep build, test and lint output available in full. Do not pipe it into `head` or `tail`;
   save long output to a file and read the relevant sections after checking the exit status.
 - `make lint` runs every lint CI runs, plus `lint-sqlx` and `lint-harness`.
+- Run only the tests whose outcome the change can alter, narrowed to the crates whose behaviour
+  changed. A change that only deletes tests or dead code needs `make clippy` alone; say so instead
+  of running tests. Leave nextest's build and test parallelism at its defaults.
 
 ### Migration review context
 
@@ -113,11 +116,11 @@ compact entry when the feature is finalized.
 ### In-memory repositories review context
 
 `*-inmem` repository crates exist for tests only and do not model transactions by default (no
-rollback on a failed transaction). The one exception is opt-in: under `InMemoryTransactionManager`
-(`database-common`), the `kamu-datasets-inmem` repositories keep each transaction's changes in a
-working set until it commits. Do not raise missing rollback elsewhere, or "in-memory used in
-production", as findings. Do fix genuine in-memory bugs that break test fidelity (e.g. index
-corruption on a rejected save).
+rollback on a failed transaction). The exception is opt-in: under `InMemoryTransactionManager`
+(`database-common`), the `kamu-datasets-inmem` and `kamu-resources-inmem` repositories and the
+`kamu-messaging-outbox-inmem` bridge keep each transaction's changes in a working set until it
+commits. Do not raise missing rollback elsewhere, or "in-memory used in production", as findings.
+Do fix genuine in-memory bugs that break test fidelity (e.g. index corruption on a rejected save).
 
 ## Code style and tests
 
@@ -164,6 +167,7 @@ change invalidates what it says.
 |---|---|
 | Posting messages, new message types or consumers, consumption modes, the outbox agent, delivery ordering | [`docs/internal/outbox.md`](docs/internal/outbox.md) |
 | How background agents wake up, Postgres `LISTEN`/`NOTIFY`, SQLite polling, deadline-driven waits | [`docs/internal/wakeup-listeners.md`](docs/internal/wakeup-listeners.md) |
+| Writing a background agent, its restarts and graceful shutdown, `BackgroundAgentHost` | [`docs/internal/background-agents.md`](docs/internal/background-agents.md) |
 | Exported Prometheus metrics, recommended alerts, adding metrics | [`docs/internal/metrics.md`](docs/internal/metrics.md) |
 | Task scheduling and execution, the task agent, planners and runners, new task types | [`docs/internal/task-system.md`](docs/internal/task-system.md) |
 | Flows, triggers, configurations, scheduling, sensors, flow process state, new flow types | [`docs/internal/flow-system.md`](docs/internal/flow-system.md) |

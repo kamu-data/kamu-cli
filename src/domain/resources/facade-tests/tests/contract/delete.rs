@@ -90,14 +90,15 @@ pub async fn test_delete_by_name(h: &impl FacadeContractHarness) {
     let deleted_uid =
         assert_single_batch_success(facade.delete(vec![by_name("del-name-test")]).await.unwrap());
 
-    // Controllers clean up within the request
+    // The controllers clean up after the request
     assert_eq!(
         deleted_uid,
         ResourceDeletion {
             id,
-            phase: ResourcePhase::Deleted
+            phase: ResourcePhase::Deleting
         }
     );
+    h.settle().await;
 
     // Resource must not be found by name
     let get_by_name = facade
@@ -354,6 +355,7 @@ pub async fn test_repeated_delete_is_deterministic(h: &impl FacadeContractHarnes
     // First delete succeeds.
     let deleted = assert_single_batch_success(facade.delete(vec![by_id(&id)]).await.unwrap());
     assert_eq!(deleted.id, id);
+    h.settle().await;
 
     // Second delete must return not-found.
     let result = facade.delete(vec![by_id(&id)]).await.unwrap();
@@ -435,7 +437,7 @@ pub async fn test_delete_reports_deleting_until_cleanup(h: &impl FacadeContractH
         vec![(id, Some(ResourcePhase::Deleting))]
     );
 
-    h.flush_outbox().await;
+    h.settle().await;
 
     assert_matches!(
         assert_single_batch_problem(
@@ -520,7 +522,7 @@ pub async fn test_name_of_resource_being_deleted_can_be_reused(h: &impl FacadeCo
         vec![(0, "v2".to_string()), (0, "v".to_string())]
     );
 
-    h.flush_outbox().await;
+    h.settle().await;
 
     assert_eq!(
         found_by_name(facade.as_ref(), "reused").await,
@@ -532,12 +534,12 @@ pub async fn test_name_of_resource_being_deleted_can_be_reused(h: &impl FacadeCo
 
 // RF-139
 contract_test!(
-    repeated_delete_of_resource_being_deleted_retries,
-    super::test_repeated_delete_of_resource_being_deleted_retries,
+    repeated_delete_of_resource_being_deleted_reports_deleting,
+    super::test_repeated_delete_of_resource_being_deleted_reports_deleting,
     messaging_outbox::OutboxProvider::Dispatching
 );
 
-pub async fn test_repeated_delete_of_resource_being_deleted_retries(
+pub async fn test_repeated_delete_of_resource_being_deleted_reports_deleting(
     h: &impl FacadeContractHarness,
 ) {
     let id = create_variable_set(h, TestAccount::Alice, "retry-del").await;
@@ -559,7 +561,7 @@ pub async fn test_repeated_delete_of_resource_being_deleted_retries(
         ResourceLookupProblem::NameNotFound(_)
     );
 
-    h.flush_outbox().await;
+    h.settle().await;
 
     assert_matches!(
         assert_single_batch_problem(facade.delete(vec![by_id(&id)]).await.unwrap()),

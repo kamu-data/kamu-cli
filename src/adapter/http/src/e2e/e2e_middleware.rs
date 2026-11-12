@@ -13,12 +13,15 @@ use axum::middleware::Next;
 use axum::response::Response;
 use http::Method;
 use http_common::ApiError;
-use messaging_outbox::OutboxAgent;
+use kamu_resources_services::BackgroundWorkFinalizer;
 use serde::Deserialize;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Middleware that invokes Outbox messages processing for mutable requests
+/// Middleware that completes the background work of mutable requests before
+/// responding, such as delivering their Outbox messages and letting the
+/// resource controllers process their changes, so that an e2e test sees the
+/// full effect of a request once its response arrives
 pub async fn e2e_middleware_fn(request: Request, next: Next) -> Result<Response, ApiError> {
     let base_catalog = request
         .extensions()
@@ -30,8 +33,9 @@ pub async fn e2e_middleware_fn(request: Request, next: Next) -> Result<Response,
     let response = next.run(request).await;
 
     if is_mutable_request && response.status().is_success() {
-        let outbox_agent = base_catalog.get_one::<dyn OutboxAgent>().unwrap();
-        outbox_agent.run_while_has_tasks().await?;
+        BackgroundWorkFinalizer::for_dispatching_outbox()
+            .finalize(&base_catalog)
+            .await?;
     }
 
     Ok(response)

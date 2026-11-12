@@ -78,8 +78,10 @@ hand-written mapping drifts from the variants as they change.
 
 - Keep a manual mapping only when the strings are irregular.
 - Strings that are persisted or exported (DB values, metric labels, event type names) are data:
-  pin them with a test **before** converting a manual mapping to `strum`, so the conversion
-  cannot silently change them (see `kamu-renaming-a-concept`).
+  converting a manual mapping to `strum` must keep them. Compare the old and the derived strings
+  once, while converting, and do not leave a test asserting them: it tests `strum`, not our code
+  ([what not to test](../kamu-test-harness/SKILL.md#what-not-to-test)). A later rename is
+  caught by `kamu-renaming-a-concept`.
 
 ### Matches on our enums are exhaustive — no catch-all `_` arm
 

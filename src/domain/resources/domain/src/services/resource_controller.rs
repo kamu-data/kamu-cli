@@ -7,44 +7,56 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use chrono::{DateTime, Utc};
 use internal_error::InternalError;
 
-use crate::ManagedResource;
+use crate::{ResourceID, ResourceProcessOutcome};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// The main controller of a resource type.
+/// The main lifecycle controller of one resource type, driven by the
+/// controller runtime. Registered with a `ResourceControllerMeta`.
+///
+/// The runtime asks `process` about every resource that needs attention: one
+/// that is not reconciled at its current generation, one whose deletion was
+/// requested and not completed, one whose status generation changed when the
+/// controller reacts to status, and one listed by `list_extra_actionable`.
+/// After `Done`, it asks again only once the resource changes, the controller
+/// revision changes or the resource is listed as an extra one.
 #[async_trait::async_trait]
-pub trait ResourceController<R: ManagedResource>: Send + Sync {
-    /// Brings the entities the controller manages in line with the current
-    /// generation of the resource.
-    async fn reconcile(&self, resource: &R) -> Result<(), R::ReconcileError>;
+pub trait ResourceController: Send + Sync {
+    /// Resources needing attention beyond the generic rules, such as tasks
+    /// whose claim expired. `process` must take such a resource out of this
+    /// set or return `RetryAt`; one that returns `Done` and stays in the set is
+    /// asked about at most once per drain.
+    ///
+    /// The runtime may ask again within one pass with a larger `limit`, when
+    /// the resources listed first are backing off.
+    async fn list_extra_actionable(
+        &self,
+        _now: DateTime<Utc>,
+        _limit: usize,
+    ) -> Result<Vec<ResourceID>, InternalError> {
+        Ok(Vec::new())
+    }
 
-    /// Removes the entities the controller created for a resource whose
-    /// deletion was requested. Runs before the deletion completes and may run
-    /// again after a failure, so it must be idempotent.
-    async fn cleanup(&self, resource: &R) -> Result<(), ResourceCleanupError>;
-}
+    /// Does the next step for one resource, composing lifecycle primitives in
+    /// short transactions it opens itself. Idempotent: it reads the current
+    /// state, so a second call, or a call after a crash, is safe.
+    ///
+    /// An error is retried with a backoff that grows with each failure.
+    async fn process(&self, id: &ResourceID) -> Result<ResourceProcessOutcome, InternalError>;
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub trait ResourceReconcileError: std::error::Error + Send + Sync {
-    /// Machine-readable kebab-case code of the reported `ReconciliationError`
-    fn code(&self) -> &'static str;
-    fn user_message(&self) -> String;
-    fn is_transient(&self) -> bool;
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(thiserror::Error, Debug)]
-pub enum ResourceCleanupError {
-    #[error(transparent)]
-    Internal(
-        #[from]
-        #[backtrace]
-        InternalError,
-    ),
+    /// The nearest moment after `after` that a resource joins the extra set
+    /// without any message, such as the earliest claim expiring after it.
+    /// Moments up to `after` were covered by a listing already, so returning
+    /// one of them would hide the later ones.
+    async fn next_extra_deadline(
+        &self,
+        _after: DateTime<Utc>,
+    ) -> Result<Option<DateTime<Utc>>, InternalError> {
+        Ok(None)
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

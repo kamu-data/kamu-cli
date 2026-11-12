@@ -8,9 +8,9 @@
 // by the Apache License, Version 2.0.
 
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
-use database_common::PaginationOpts;
+use database_common::{InMemoryMapWrite, PaginationOpts, TransactionId, TransactionRef};
 use dill::*;
 use event_sourcing::EventID;
 use futures::StreamExt;
@@ -41,39 +41,33 @@ use kamu_resources::{
     string_label_entries,
 };
 
+use crate::InMemoryResourceState;
+use crate::inmem_resource_state::{ResourceLookupKey, ResourceStateView};
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-struct ResourceLookupKey {
-    account_id: odf::AccountID,
-    schema: TypeUri,
-    name: ResourceName,
-}
-
-#[derive(Default)]
-struct State {
-    snapshots_by_id: HashMap<ResourceID, ResourceSnapshot>,
-    ids_by_lookup_key: HashMap<ResourceLookupKey, ResourceID>,
-}
-
 pub struct InMemoryResourceRepository {
-    state: Arc<Mutex<State>>,
-    // Resolved lazily per call rather than injected: this repository is a
-    // singleton, while `AccountRepository` may be a transaction-scoped
-    // component (whenever it is paired with a database-backed
-    // implementation). Holding an `Arc` to it here would pin a transaction
-    // reference for the lifetime of the process and trip the
-    // leaked-transaction guard.
+    state: Arc<InMemoryResourceState>,
+    transaction_id: Option<TransactionId>,
+    // Resolved lazily per call rather than injected: `AccountRepository` may
+    // be a transaction-scoped component (whenever it is paired with a
+    // database-backed implementation), and a component holding this
+    // repository for longer would pin that transaction and trip the
+    // leaked-transaction guard
     catalog: CatalogWeakRef,
 }
 
 #[component(pub)]
 #[interface(dyn ResourceRepository)]
-#[scope(Singleton)]
 impl InMemoryResourceRepository {
-    pub fn new(catalog: CatalogWeakRef) -> Self {
+    pub fn new(
+        state: Arc<InMemoryResourceState>,
+        transaction_ref: Option<TransactionRef>,
+        catalog: CatalogWeakRef,
+    ) -> Self {
         Self {
-            state: Arc::new(Mutex::new(State::default())),
+            state,
+            transaction_id: transaction_ref.map(|transaction_ref| transaction_ref.id()),
             catalog,
         }
     }
@@ -179,6 +173,40 @@ impl InMemoryResourceRepository {
                 )
             })
     }
+
+    /// Resources of `schema` carrying the label, oldest first, of one account
+    /// or of any. Resources whose deletion was requested are left out.
+    fn ids_by_schema_and_label(
+        &self,
+        account_id: Option<&odf::AccountID>,
+        schema: &TypeUri,
+        label_key: &str,
+        label_value: &str,
+    ) -> Vec<ResourceID> {
+        let mut matched = self.state.read(self.transaction_id, |state| {
+            state
+                .snapshots()
+                .filter(|snapshot| {
+                    account_id.is_none_or(|account_id| snapshot.headers.account.did == *account_id)
+                })
+                .filter(|snapshot| snapshot.schema == *schema)
+                .filter(|snapshot| snapshot.headers.deletion_requested_at.is_none())
+                .filter(|snapshot| {
+                    // Reads labels off the snapshot rather than a projection, the
+                    // same way `snapshot_matches_label_pairs` does, so the two
+                    // cannot disagree about what is indexed.
+                    string_label_entries(&snapshot.headers.labels)
+                        .iter()
+                        .any(|(key, value)| key == label_key && value == label_value)
+                })
+                .map(|snapshot| (snapshot.headers.created_at, snapshot.headers.id))
+                .collect::<Vec<_>>()
+        });
+
+        matched.sort();
+
+        matched.into_iter().map(|(_, id)| id).collect()
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -193,36 +221,28 @@ impl ResourceRepository for InMemoryResourceRepository {
         &self,
         resource_snapshot: &ResourceSnapshot,
     ) -> Result<(), CreateResourceError> {
-        let mut guard = self.state.lock().unwrap();
-
-        let lookup_key = ResourceLookupKey {
-            account_id: resource_snapshot.headers.account.did.clone(),
-            schema: resource_snapshot.schema.clone(),
-            name: resource_snapshot.headers.name.clone(),
-        };
-
+        let lookup_key = ResourceLookupKey::of(resource_snapshot);
         let holds_name = resource_snapshot.headers.deletion_requested_at.is_none();
 
-        if guard.snapshots_by_id.contains_key(&resource_snapshot.id)
-            || holds_name && guard.ids_by_lookup_key.contains_key(&lookup_key)
-        {
-            return Err(CreateResourceError::Duplicate(ResourceDuplicateError {
-                account_id: resource_snapshot.headers.account.did.clone(),
-                schema: resource_snapshot.schema.clone(),
-                name: resource_snapshot.headers.name.clone(),
-            }));
-        }
+        self.state
+            .write(self.transaction_id, |snapshots_by_id, ids_by_lookup_key| {
+                if snapshots_by_id.view().contains_key(&resource_snapshot.id)
+                    || holds_name && name_is_taken(ids_by_lookup_key, &lookup_key, None)
+                {
+                    return Err(CreateResourceError::Duplicate(ResourceDuplicateError {
+                        account_id: resource_snapshot.headers.account.did.clone(),
+                        schema: resource_snapshot.schema.clone(),
+                        name: resource_snapshot.headers.name.clone(),
+                    }));
+                }
 
-        if holds_name {
-            guard
-                .ids_by_lookup_key
-                .insert(lookup_key, resource_snapshot.id);
-        }
-        guard
-            .snapshots_by_id
-            .insert(resource_snapshot.id, resource_snapshot.clone());
+                if holds_name {
+                    ids_by_lookup_key.claim(lookup_key, resource_snapshot.id);
+                }
+                snapshots_by_id.put(resource_snapshot.id, resource_snapshot.clone());
 
-        Ok(())
+                Ok(())
+            })
     }
 
     async fn update_resource(
@@ -243,70 +263,68 @@ impl ResourceRepository for InMemoryResourceRepository {
         &self,
         resource_updates: &[ResourceSnapshotUpdate],
     ) -> Result<(), UpdateResourceError> {
-        let mut guard = self.state.lock().unwrap();
-        let mut prepared_updates = Vec::with_capacity(resource_updates.len());
+        self.state
+            .write(self.transaction_id, |snapshots_by_id, ids_by_lookup_key| {
+                let mut prepared_updates = Vec::with_capacity(resource_updates.len());
 
-        for resource_update in resource_updates {
-            let resource_snapshot = &resource_update.snapshot;
-            let previous_snapshot = guard
-                .snapshots_by_id
-                .get(&resource_snapshot.id)
-                .cloned()
-                .ok_or_else(UpdateResourceError::concurrent_modification)?;
+                for resource_update in resource_updates {
+                    let resource_snapshot = &resource_update.snapshot;
+                    let previous_snapshot = snapshots_by_id
+                        .view()
+                        .get(&resource_snapshot.id)
+                        .cloned()
+                        .ok_or_else(UpdateResourceError::concurrent_modification)?;
 
-            if previous_snapshot.last_event_id != resource_update.expected_last_event_id {
-                return Err(UpdateResourceError::concurrent_modification());
-            }
+                    if previous_snapshot.last_event_id != resource_update.expected_last_event_id {
+                        return Err(UpdateResourceError::concurrent_modification());
+                    }
 
-            let previous_lookup_key = ResourceLookupKey {
-                account_id: previous_snapshot.headers.account.did,
-                schema: previous_snapshot.schema,
-                name: previous_snapshot.headers.name,
-            };
-            let next_lookup_key = ResourceLookupKey {
-                account_id: resource_snapshot.headers.account.did.clone(),
-                schema: resource_snapshot.schema.clone(),
-                name: resource_snapshot.headers.name.clone(),
-            };
+                    let previous_lookup_key = ResourceLookupKey::of(&previous_snapshot);
+                    let next_lookup_key = ResourceLookupKey::of(resource_snapshot);
 
-            // Mirrors the partial unique index of the SQL backends: only
-            // resources whose deletion was not requested hold their name
-            let holds_name = resource_snapshot.headers.deletion_requested_at.is_none();
+                    // Mirrors the partial unique index of the SQL backends: only
+                    // resources whose deletion was not requested hold their name
+                    let holds_name = resource_snapshot.headers.deletion_requested_at.is_none();
 
-            if holds_name
-                && let Some(existing_resource_id) = guard.ids_by_lookup_key.get(&next_lookup_key)
-                && *existing_resource_id != resource_snapshot.id
-            {
-                return Err(UpdateResourceError::Duplicate(ResourceDuplicateError {
-                    account_id: resource_snapshot.headers.account.did.clone(),
-                    schema: resource_snapshot.schema.clone(),
-                    name: resource_snapshot.headers.name.clone(),
-                }));
-            }
+                    if holds_name
+                        && name_is_taken(
+                            ids_by_lookup_key,
+                            &next_lookup_key,
+                            Some(&resource_snapshot.id),
+                        )
+                    {
+                        return Err(UpdateResourceError::Duplicate(ResourceDuplicateError {
+                            account_id: resource_snapshot.headers.account.did.clone(),
+                            schema: resource_snapshot.schema.clone(),
+                            name: resource_snapshot.headers.name.clone(),
+                        }));
+                    }
 
-            prepared_updates.push((
-                resource_snapshot.clone(),
-                previous_lookup_key,
-                holds_name.then_some(next_lookup_key),
-            ));
-        }
+                    prepared_updates.push((
+                        resource_snapshot.clone(),
+                        previous_lookup_key,
+                        holds_name.then_some(next_lookup_key),
+                    ));
+                }
 
-        for (resource_snapshot, previous_lookup_key, next_lookup_key) in prepared_updates {
-            // A newer resource may hold the name this one gave up
-            if guard.ids_by_lookup_key.get(&previous_lookup_key) == Some(&resource_snapshot.id) {
-                guard.ids_by_lookup_key.remove(&previous_lookup_key);
-            }
-            if let Some(next_lookup_key) = next_lookup_key {
-                guard
-                    .ids_by_lookup_key
-                    .insert(next_lookup_key, resource_snapshot.id);
-            }
-            guard
-                .snapshots_by_id
-                .insert(resource_snapshot.id, resource_snapshot);
-        }
+                for (resource_snapshot, previous_lookup_key, next_lookup_key) in prepared_updates {
+                    // A newer resource may hold the name this one gave up
+                    let held_previous = ids_by_lookup_key.view().get(&previous_lookup_key)
+                        == Some(&resource_snapshot.id);
+                    let keeps_previous = next_lookup_key.as_ref() == Some(&previous_lookup_key);
+                    if held_previous && !keeps_previous {
+                        ids_by_lookup_key.delete(previous_lookup_key);
+                    }
+                    if let Some(next_lookup_key) = next_lookup_key
+                        && !(held_previous && keeps_previous)
+                    {
+                        ids_by_lookup_key.claim(next_lookup_key, resource_snapshot.id);
+                    }
+                    snapshots_by_id.put(resource_snapshot.id, resource_snapshot);
+                }
 
-        Ok(())
+                Ok(())
+            })
     }
 
     async fn find_resource_id_by_name(
@@ -315,18 +333,17 @@ impl ResourceRepository for InMemoryResourceRepository {
         schema: &TypeUri,
         name: &ResourceName,
     ) -> Result<Option<ResourceID>, InternalError> {
-        let guard = self.state.lock().unwrap();
+        let lookup_key = ResourceLookupKey {
+            account_id: account_id.clone(),
+            schema: schema.clone(),
+            name: name.clone(),
+        };
 
-        Ok(guard
-            .ids_by_lookup_key
-            .get(&ResourceLookupKey {
-                account_id: account_id.clone(),
-                schema: schema.clone(),
-                name: name.clone(),
-            })
-            .and_then(|id| guard.snapshots_by_id.get(id))
-            .filter(|snapshot| snapshot.headers.deletion_requested_at.is_none())
-            .map(|snapshot| snapshot.id))
+        Ok(self.state.read(self.transaction_id, |state| {
+            state
+                .live_snapshot_by_name(&lookup_key)
+                .map(|snapshot| snapshot.id)
+        }))
     }
 
     async fn find_resource_handles_by_ids(
@@ -334,23 +351,23 @@ impl ResourceRepository for InMemoryResourceRepository {
         account_id: &odf::AccountID,
         ids: &[ResourceID],
     ) -> Result<Vec<ResourceHandleRow>, InternalError> {
-        let guard = self.state.lock().unwrap();
-
-        Ok(ids
-            .iter()
-            .filter_map(|id| guard.snapshots_by_id.get(id))
-            .filter(|snapshot| {
-                snapshot.headers.account.did == *account_id && snapshot.headers.deleted_at.is_none()
-            })
-            .map(|snapshot| ResourceHandleRow {
-                id: *snapshot.id.as_ref(),
-                schema: snapshot.schema.to_string(),
-                name: snapshot.headers.name.to_string(),
-                account_id: snapshot.headers.account.did.clone(),
-                account_resource_id: *snapshot.headers.account.id.as_ref(),
-                account_name: snapshot.headers.account.name.to_string(),
-            })
-            .collect())
+        Ok(self.state.read(self.transaction_id, |state| {
+            ids.iter()
+                .filter_map(|id| state.snapshot(id))
+                .filter(|snapshot| {
+                    snapshot.headers.account.did == *account_id
+                        && snapshot.headers.deleted_at.is_none()
+                })
+                .map(|snapshot| ResourceHandleRow {
+                    id: *snapshot.id.as_ref(),
+                    schema: snapshot.schema.to_string(),
+                    name: snapshot.headers.name.to_string(),
+                    account_id: snapshot.headers.account.did.clone(),
+                    account_resource_id: *snapshot.headers.account.id.as_ref(),
+                    account_name: snapshot.headers.account.name.to_string(),
+                })
+                .collect()
+        }))
     }
 
     async fn resolve_resource_ids_by_names(
@@ -360,45 +377,41 @@ impl ResourceRepository for InMemoryResourceRepository {
         names: &[ResourceName],
         visibility: ResourceVisibility,
     ) -> Result<Vec<(ResourceName, ResourceID)>, InternalError> {
-        let guard = self.state.lock().unwrap();
-
-        let mut resolved = Vec::new();
-        for name in names {
-            let live = guard
-                .ids_by_lookup_key
-                .get(&ResourceLookupKey {
+        Ok(self.state.read(self.transaction_id, |state| {
+            let mut resolved = Vec::new();
+            for name in names {
+                let live = state.live_snapshot_by_name(&ResourceLookupKey {
                     account_id: account_id.clone(),
                     schema: schema.clone(),
                     name: name.clone(),
-                })
-                .and_then(|id| guard.snapshots_by_id.get(id))
-                .filter(|snapshot| snapshot.headers.deletion_requested_at.is_none());
-            resolved.extend(live.map(|snapshot| (snapshot.headers.name.clone(), snapshot.id)));
+                });
+                resolved.extend(live.map(|snapshot| (snapshot.headers.name.clone(), snapshot.id)));
 
-            if visibility.includes_deleting() {
-                // Oldest deletion request first, as the SQL backends order them
-                let mut deleting = guard
-                    .snapshots_by_id
-                    .values()
-                    .filter(|snapshot| {
-                        snapshot.headers.account.did == *account_id
-                            && snapshot.schema == *schema
-                            && snapshot.headers.name == *name
-                            && snapshot.headers.deletion_requested_at.is_some()
-                            && snapshot.headers.deleted_at.is_none()
-                    })
-                    .collect::<Vec<_>>();
-                deleting
-                    .sort_by_key(|snapshot| (snapshot.headers.deletion_requested_at, snapshot.id));
-                resolved.extend(
-                    deleting
-                        .into_iter()
-                        .map(|snapshot| (snapshot.headers.name.clone(), snapshot.id)),
-                );
+                if visibility.includes_deleting() {
+                    // Oldest deletion request first, as the SQL backends order them
+                    let mut deleting = state
+                        .snapshots()
+                        .filter(|snapshot| {
+                            snapshot.headers.account.did == *account_id
+                                && snapshot.schema == *schema
+                                && snapshot.headers.name == *name
+                                && snapshot.headers.deletion_requested_at.is_some()
+                                && snapshot.headers.deleted_at.is_none()
+                        })
+                        .collect::<Vec<_>>();
+                    deleting.sort_by_key(|snapshot| {
+                        (snapshot.headers.deletion_requested_at, snapshot.id)
+                    });
+                    resolved.extend(
+                        deleting
+                            .into_iter()
+                            .map(|snapshot| (snapshot.headers.name.clone(), snapshot.id)),
+                    );
+                }
             }
-        }
 
-        Ok(resolved)
+            resolved
+        }))
     }
 
     async fn search_resource_handles(
@@ -413,11 +426,9 @@ impl ResourceRepository for InMemoryResourceRepository {
         }
 
         let mut snapshots = {
-            let guard = self.state.lock().unwrap();
-            filter_scoped_snapshots(&guard, account_id, scope, visibility)
-                .into_iter()
-                .cloned()
-                .collect::<Vec<_>>()
+            self.state.read(self.transaction_id, |state| {
+                filter_scoped_snapshots(state, account_id, scope, visibility)
+            })
         };
 
         snapshots.sort_by(|lhs, rhs| {
@@ -452,9 +463,9 @@ impl ResourceRepository for InMemoryResourceRepository {
             return Ok(0);
         }
 
-        let guard = self.state.lock().unwrap();
-
-        Ok(filter_scoped_snapshots(&guard, account_id, scope, visibility).len())
+        Ok(self.state.read(self.transaction_id, |state| {
+            filter_scoped_snapshots(state, account_id, scope, visibility).len()
+        }))
     }
 
     async fn find_resource_snapshot(
@@ -462,13 +473,13 @@ impl ResourceRepository for InMemoryResourceRepository {
         query: &ResourceRawEventQuery,
     ) -> Result<Option<ResourceSnapshot>, InternalError> {
         let maybe_snapshot = {
-            let guard = self.state.lock().unwrap();
-            guard
-                .snapshots_by_id
-                .get(&query.id)
-                .filter(|snapshot| snapshot.schema == query.schema)
-                .filter(|snapshot| snapshot.headers.deleted_at.is_none())
-                .cloned()
+            self.state.read(self.transaction_id, |state| {
+                state
+                    .snapshot(&query.id)
+                    .filter(|snapshot| snapshot.schema == query.schema)
+                    .filter(|snapshot| snapshot.headers.deleted_at.is_none())
+                    .cloned()
+            })
         };
 
         match maybe_snapshot {
@@ -484,28 +495,7 @@ impl ResourceRepository for InMemoryResourceRepository {
         label_key: &str,
         label_value: &str,
     ) -> Result<Vec<ResourceID>, InternalError> {
-        let guard = self.state.lock().unwrap();
-
-        let mut matched = guard
-            .snapshots_by_id
-            .values()
-            .filter(|snapshot| snapshot.headers.account.did == *account_id)
-            .filter(|snapshot| snapshot.schema == *schema)
-            .filter(|snapshot| snapshot.headers.deletion_requested_at.is_none())
-            .filter(|snapshot| {
-                // Reads labels off the snapshot rather than a projection, the
-                // same way `snapshot_matches_label_pairs` does, so the two
-                // cannot disagree about what is indexed.
-                string_label_entries(&snapshot.headers.labels)
-                    .iter()
-                    .any(|(key, value)| key == label_key && value == label_value)
-            })
-            .map(|snapshot| (snapshot.headers.created_at, snapshot.headers.id))
-            .collect::<Vec<_>>();
-
-        matched.sort();
-
-        Ok(matched.into_iter().map(|(_, id)| id).collect())
+        Ok(self.ids_by_schema_and_label(Some(account_id), schema, label_key, label_value))
     }
 
     async fn find_resource_ids_by_schema_and_label_any_account(
@@ -514,27 +504,7 @@ impl ResourceRepository for InMemoryResourceRepository {
         label_key: &str,
         label_value: &str,
     ) -> Result<Vec<ResourceID>, InternalError> {
-        let guard = self.state.lock().unwrap();
-
-        let mut matched = guard
-            .snapshots_by_id
-            .values()
-            .filter(|snapshot| snapshot.schema == *schema)
-            .filter(|snapshot| snapshot.headers.deletion_requested_at.is_none())
-            .filter(|snapshot| {
-                // Reads labels off the snapshot rather than a projection, the
-                // same way `snapshot_matches_label_pairs` does, so the two
-                // cannot disagree about what is indexed.
-                string_label_entries(&snapshot.headers.labels)
-                    .iter()
-                    .any(|(key, value)| key == label_key && value == label_value)
-            })
-            .map(|snapshot| (snapshot.headers.created_at, snapshot.headers.id))
-            .collect::<Vec<_>>();
-
-        matched.sort();
-
-        Ok(matched.into_iter().map(|(_, id)| id).collect())
+        Ok(self.ids_by_schema_and_label(None, schema, label_key, label_value))
     }
 
     async fn find_resource_snapshots_by_schema_and_ids(
@@ -543,13 +513,14 @@ impl ResourceRepository for InMemoryResourceRepository {
         ids: &[ResourceID],
     ) -> Result<Vec<ResourceSnapshot>, InternalError> {
         let snapshots = {
-            let guard = self.state.lock().unwrap();
-            ids.iter()
-                .filter_map(|id| guard.snapshots_by_id.get(id))
-                .filter(|snapshot| snapshot.schema == *schema)
-                .filter(|snapshot| snapshot.headers.deleted_at.is_none())
-                .cloned()
-                .collect::<Vec<_>>()
+            self.state.read(self.transaction_id, |state| {
+                ids.iter()
+                    .filter_map(|id| state.snapshot(id))
+                    .filter(|snapshot| snapshot.schema == *schema)
+                    .filter(|snapshot| snapshot.headers.deleted_at.is_none())
+                    .cloned()
+                    .collect::<Vec<_>>()
+            })
         };
 
         Ok(self.resolve_snapshots(snapshots).await)
@@ -560,12 +531,12 @@ impl ResourceRepository for InMemoryResourceRepository {
         id: &ResourceID,
     ) -> Result<Option<ResourceSnapshot>, InternalError> {
         let maybe_snapshot = {
-            let guard = self.state.lock().unwrap();
-            guard
-                .snapshots_by_id
-                .get(id)
-                .filter(|snapshot| snapshot.headers.deleted_at.is_none())
-                .cloned()
+            self.state.read(self.transaction_id, |state| {
+                state
+                    .snapshot(id)
+                    .filter(|snapshot| snapshot.headers.deleted_at.is_none())
+                    .cloned()
+            })
         };
 
         match maybe_snapshot {
@@ -580,15 +551,16 @@ impl ResourceRepository for InMemoryResourceRepository {
         ids: &[ResourceID],
     ) -> Result<Vec<ResourceSnapshot>, InternalError> {
         let snapshots = {
-            let guard = self.state.lock().unwrap();
-            ids.iter()
-                .filter_map(|id| guard.snapshots_by_id.get(id))
-                .filter(|snapshot| {
-                    snapshot.headers.account.did == *account_id
-                        && snapshot.headers.deleted_at.is_none()
-                })
-                .cloned()
-                .collect::<Vec<_>>()
+            self.state.read(self.transaction_id, |state| {
+                ids.iter()
+                    .filter_map(|id| state.snapshot(id))
+                    .filter(|snapshot| {
+                        snapshot.headers.account.did == *account_id
+                            && snapshot.headers.deleted_at.is_none()
+                    })
+                    .cloned()
+                    .collect::<Vec<_>>()
+            })
         };
 
         Ok(self.resolve_snapshots(snapshots).await)
@@ -606,11 +578,9 @@ impl ResourceRepository for InMemoryResourceRepository {
 
         let stream = futures::stream::once(async move {
             let mut snapshots_page: Vec<_> = {
-                let guard = self.state.lock().unwrap();
-                filter_scoped_snapshots(&guard, &account_id, &scope, visibility)
-                    .into_iter()
-                    .cloned()
-                    .collect()
+                self.state.read(self.transaction_id, |state| {
+                    filter_scoped_snapshots(state, &account_id, &scope, visibility)
+                })
             };
 
             snapshots_page.sort_by(|lhs, rhs| {
@@ -642,13 +612,20 @@ impl ResourceRepository for InMemoryResourceRepository {
         &self,
         account_id: odf::AccountID,
     ) -> Result<Vec<ResourceSummaryRow>, InternalError> {
-        let guard = self.state.lock().unwrap();
+        let snapshots = self.state.read(self.transaction_id, |state| {
+            state
+                .snapshots()
+                .filter(|snapshot| {
+                    snapshot.headers.account.did == account_id
+                        && snapshot.headers.deleted_at.is_none()
+                })
+                .cloned()
+                .collect::<Vec<_>>()
+        });
 
         let mut rows_by_key = HashMap::<TypeUri, ResourceSummaryRow>::new();
 
-        for snapshot in guard.snapshots_by_id.values().filter(|snapshot| {
-            snapshot.headers.account.did == account_id && snapshot.headers.deleted_at.is_none()
-        }) {
+        for snapshot in &snapshots {
             let row = rows_by_key
                 .entry(snapshot.schema.clone())
                 .or_insert_with(|| ResourceSummaryRow {
@@ -777,15 +754,14 @@ fn resource_name_matches_pattern(name: &str, pattern: &str) -> bool {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-fn filter_scoped_snapshots<'a>(
-    guard: &'a State,
+fn filter_scoped_snapshots(
+    state: &ResourceStateView<'_, '_>,
     account_id: &odf::AccountID,
     scope: &ResourceScope,
     visibility: ResourceVisibility,
-) -> Vec<&'a ResourceSnapshot> {
-    guard
-        .snapshots_by_id
-        .values()
+) -> Vec<ResourceSnapshot> {
+    state
+        .snapshots()
         .filter(|snapshot| snapshot.headers.deleted_at.is_none())
         .filter(|snapshot| {
             snapshot.headers.deletion_requested_at.is_none() || visibility.includes_deleting()
@@ -794,6 +770,7 @@ fn filter_scoped_snapshots<'a>(
         // may name its own account and carry its own label pairs, and
         // `account_id` is only the default for rows that do not.
         .filter(|snapshot| snapshot_matches_scope(snapshot, scope, account_id))
+        .cloned()
         .collect()
 }
 
@@ -823,6 +800,24 @@ fn snapshot_matches_label_pairs(
             .iter()
             .any(|(entry_key, entry_value)| *entry_key == key && entry_value == value)
     })
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Whether another resource than `holder` holds the name. A name that another
+/// open transaction frees counts as free, as a database unique index makes the
+/// writer wait for that transaction: [`InMemoryMapWrite::claim`] then fails
+/// the commit unless the name was freed by then
+fn name_is_taken(
+    ids_by_lookup_key: &InMemoryMapWrite<'_, ResourceLookupKey, ResourceID>,
+    lookup_key: &ResourceLookupKey,
+    holder: Option<&ResourceID>,
+) -> bool {
+    ids_by_lookup_key
+        .view()
+        .get(lookup_key)
+        .is_some_and(|existing_id| Some(existing_id) != holder)
+        && !ids_by_lookup_key.is_deleted_by_another_transaction(lookup_key)
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

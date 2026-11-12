@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use database_common::PostgresTransactionManager;
-use database_common_macros::database_transactional_test;
+use database_common_macros::{database_concurrent_transactions_test, database_transactional_test};
 use dill::{Catalog, CatalogBuilder};
 use kamu_accounts_postgres::PostgresAccountRepository;
 use kamu_resources_postgres::{
@@ -320,6 +320,39 @@ database_transactional_test!(
 database_transactional_test!(
     storage = postgres,
     fixture = resource_repo_suite::test_search_resource_handles_partially_vacuous_scope,
+    harness = PostgresResourceRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_concurrent_transactions_test!(
+    storage = postgres,
+    fixture = resource_repo_suite::test_rolled_back_create_leaves_no_resource,
+    harness = PostgresResourceRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_concurrent_transactions_test!(
+    storage = postgres,
+    fixture = resource_repo_suite::test_create_same_name_in_concurrent_transactions,
+    harness = PostgresResourceRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_concurrent_transactions_test!(
+    storage = postgres,
+    fixture = resource_repo_suite::test_create_name_freed_by_concurrent_deletion_request,
+    harness = PostgresResourceRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_concurrent_transactions_test!(
+    storage = postgres,
+    fixture =
+        resource_repo_suite::test_create_name_twice_while_concurrent_deletion_request_frees_it,
     harness = PostgresResourceRepositoryHarness
 );
 

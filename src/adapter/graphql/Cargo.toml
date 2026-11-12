@@ -132,7 +132,9 @@ kamu-datasets-services = { workspace = true, features = [
 kamu-flow-system-inmem = { workspace = true }
 kamu-flow-system-services = { workspace = true }
 kamu-resources-inmem = { workspace = true }
-kamu-resources-services = { workspace = true }
+kamu-resources-services = { workspace = true, features = [
+    "testing",
+] }
 kamu-task-system-inmem = { workspace = true }
 kamu-task-system-services = { workspace = true }
 kamu-wakeup-listener-inmem = { workspace = true }

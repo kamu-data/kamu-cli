@@ -11,7 +11,7 @@
 
 use std::sync::{Arc, Mutex};
 
-use async_utils::BackgroundAgent;
+use background_agent_host::{BackgroundAgent, CancellationToken};
 use chrono::{DateTime, Utc};
 use database_common::PaginationOpts;
 use database_common_macros::{transactional_method, transactional_method1};
@@ -538,7 +538,7 @@ impl BackgroundAgent for FlowAgentImpl {
     }
 
     /// Runs the update main loop
-    async fn run(&self) -> Result<(), InternalError> {
+    async fn run(&self, shutdown: CancellationToken) -> Result<(), InternalError> {
         // Kept across iterations, so that no change is missed between them
         let wakeup_listener = self.flow_activation_wakeup_source.new_wakeup_listener();
 
@@ -548,9 +548,15 @@ impl BackgroundAgent for FlowAgentImpl {
                 .await?;
 
             // The deadline is re-read from the store on every iteration,
-            // so aborted or rescheduled flows need no signal
-            self.wait_for_next_activation(wakeup_listener.as_ref())
-                .await?;
+            // so aborted or rescheduled flows need no signal. The wait only
+            // reads, so a shutdown may drop it
+            let Some(waited) = shutdown
+                .run_until_cancelled(self.wait_for_next_activation(wakeup_listener.as_ref()))
+                .await
+            else {
+                return Ok(());
+            };
+            waited?;
         }
     }
 }

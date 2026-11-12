@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use chrono::{DateTime, Duration, TimeZone, Utc};
+use event_sourcing::Aggregate;
 use internal_error::InternalError;
 use kamu_resources::{
     DeclarativeResource,
@@ -15,9 +16,11 @@ use kamu_resources::{
     ManagedResource,
     ResourceCleanupError,
     ResourceEvent,
+    ResourceEventCreated,
     ResourceEventDeleted,
     ResourceEventHeadersUpdated,
     ResourceHeadersInput,
+    ResourceID,
     ResourceName,
     ResourcePhase,
     ResourceStatus,
@@ -43,15 +46,59 @@ pub struct ResourceLifecycleHarness {
 
 impl ResourceLifecycleHarness {
     pub fn new() -> Self {
-        let now = Utc.with_ymd_and_hms(2026, 1, 1, 0, 0, 0).unwrap();
+        Self::new_with_value("v1")
+    }
+
+    pub fn new_with_value(value: &str) -> Self {
+        let now = Self::start_time();
         let resource = <TestResource as ManagedResource>::try_create(
             now,
             make_id(),
             Self::headers_input(None),
-            Self::spec("v1"),
+            Self::spec(value),
         )
         .unwrap();
         Self { resource, now }
+    }
+
+    /// A resource created by a `Created` event as stored before it carried
+    /// initial conditions
+    pub fn created_by_stored_event_without_initial_conditions(value: &str) -> Self {
+        let now = Self::start_time();
+        let id = make_id();
+        let ResourceEvent::Created(event) = Self::created_event(id, value) else {
+            unreachable!()
+        };
+        let mut payload = serde_json::to_value(event).unwrap();
+        payload
+            .as_object_mut()
+            .unwrap()
+            .remove("initial_conditions");
+
+        let stored_event: ResourceEventCreated<TestResourceSpec> =
+            serde_json::from_value(payload).unwrap();
+        assert_eq!(stored_event.initial_conditions, None);
+
+        let aggregate = Aggregate::new(id, ResourceEvent::Created(stored_event)).unwrap();
+        Self {
+            resource: TestResource::from_aggregate(aggregate),
+            now,
+        }
+    }
+
+    /// The `Created` event that creating a resource with the spec `value`
+    /// records
+    pub fn created_event(id: ResourceID, value: &str) -> ResourceEvent<TestResourceSpec> {
+        TestResource::make_created_event(
+            Self::start_time(),
+            id,
+            Self::headers_input(None),
+            Self::spec(value),
+        )
+    }
+
+    fn start_time() -> DateTime<Utc> {
+        Utc.with_ymd_and_hms(2026, 1, 1, 0, 0, 0).unwrap()
     }
 
     /// A resource whose first generation was reconciled successfully.

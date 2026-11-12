@@ -11,7 +11,7 @@ use std::collections::HashMap;
 use std::num::NonZeroUsize;
 use std::sync::{Arc, Mutex};
 
-use async_utils::BackgroundAgent;
+use background_agent_host::{BackgroundAgent, CancellationToken};
 use chrono::{DateTime, Duration, DurationRound, TimeZone, Utc};
 use database_common::{DatabaseTransactionRunner, NoOpDatabasePlugin};
 use dill::*;
@@ -845,10 +845,10 @@ impl FlowHarness {
             _ = simulation_script() => Ok(()),
 
             // Run flow system event agent
-            _  = self.flow_system_event_agent.run() => Ok(()),
+            _  = self.flow_system_event_agent.run(CancellationToken::new()) => Ok(()),
 
             // Run flow agent
-            res = self.flow_agent.run() => res.int_err(),
+            res = self.flow_agent.run(CancellationToken::new()) => res.int_err(),
         }?;
 
         // Catchup remaining events
@@ -857,6 +857,57 @@ impl FlowHarness {
             .await?;
 
         Ok(())
+    }
+
+    /// Runs the flow system event agent with a shutdown requested before its
+    /// start, until it returns. A run outliving the test's bound ignored the
+    /// shutdown
+    pub async fn run_flow_system_event_agent_shut_down_at_start(&self) {
+        let shutdown = CancellationToken::new();
+        shutdown.cancel();
+        tokio::time::timeout(
+            std::time::Duration::from_secs(5),
+            self.flow_system_event_agent.run(shutdown),
+        )
+        .await
+        .expect("the flow system event agent ignored the shutdown")
+        .unwrap();
+    }
+
+    /// Batches the heartbeat probe projector applied, each with whether the
+    /// agent's heartbeat was recent
+    pub fn probe_heartbeats_seen(&self) -> Vec<bool> {
+        self.catalog
+            .get_one::<HeartbeatProbeFlowSystemEventProjector>()
+            .unwrap()
+            .heartbeats_seen()
+    }
+
+    /// Runs the flow agent and the flow system event agent, requests a
+    /// shutdown after `delay` of real time, and returns how each run ended.
+    /// A run outliving the test's bound ignored the shutdown
+    pub async fn run_agents_and_shut_down(
+        &self,
+        delay: std::time::Duration,
+    ) -> (Result<(), InternalError>, Result<(), InternalError>) {
+        use init_on_startup::InitOnStartup;
+        self.flow_agent.run_initialization().await.unwrap();
+
+        let shutdown = CancellationToken::new();
+        let bound = std::time::Duration::from_secs(5);
+        let (flow_agent, flow_system_event_agent, ()) = tokio::join!(
+            tokio::time::timeout(bound, self.flow_agent.run(shutdown.clone())),
+            tokio::time::timeout(bound, self.flow_system_event_agent.run(shutdown.clone())),
+            async {
+                tokio::time::sleep(delay).await;
+                shutdown.cancel();
+            },
+        );
+
+        (
+            flow_agent.expect("the flow agent ignored the shutdown"),
+            flow_system_event_agent.expect("the flow system event agent ignored the shutdown"),
+        )
     }
 }
 

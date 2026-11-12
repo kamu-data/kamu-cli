@@ -11,7 +11,7 @@ use std::collections::BTreeMap;
 use std::sync::Arc;
 
 use chrono::Utc;
-use database_common::NoOpDatabasePlugin;
+use database_common::{InMemoryTransactionManager, NoOpDatabasePlugin};
 use dill::CatalogBuilder;
 use kamu_accounts::{Account, AccountRepository, AccountType};
 use kamu_accounts_inmem::InMemoryAccountRepository;
@@ -19,24 +19,23 @@ use kamu_resources::{
     GenericResourceQueryService,
     MESSAGE_PRODUCER_KAMU_RESOURCE_SERVICE,
     ReconciliationError,
+    ResourceControllerRuntimeConfig,
     ResourceHeadersInput,
     ResourceID,
     ResourceLifecycleMessage,
     ResourceLifecycleMessageOutcome,
+    ResourcePhase,
     ResourceRepository,
     ResourceSnapshot,
     ResourceStatus,
     TypeUri,
     reconciliation_error_type_ref,
 };
-use kamu_resources_inmem::{
-    InMemoryRawResourceEventStore,
-    InMemoryResourceLabelProjectionRepository,
-    InMemoryResourceRepository,
-};
 use messaging_outbox::{MockOutbox, Outbox, OutboxProvider, register_message_dispatcher};
-use time_source::{SystemTimeSource, SystemTimeSourceStub};
-use wakeup_listener::WakeupListenerMetrics;
+use time_source::{FakeSystemTimeSource, SystemTimeSource, SystemTimeSourceStub};
+use wakeup_listener::{WakeupListenerConfig, WakeupListenerMetrics};
+
+use crate::{BackgroundWorkFinalizer, ResourceControllerRuntimeImpl};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -49,10 +48,25 @@ pub struct BaseResourceServiceHarness {
     resource_repo: Arc<dyn ResourceRepository>,
     outbox: Arc<dyn Outbox>,
     time_source: Arc<dyn SystemTimeSource>,
+    dispatching_outbox: bool,
 }
 
 pub struct BaseResourceServiceHarnessOpts {
     pub outbox_provider: OutboxProvider,
+    /// Runs transactions on `InMemoryTransactionManager`, so a rolled-back
+    /// transaction leaves no resource, event or outbox message behind. Needs
+    /// `OutboxProvider::Dispatching`, whose messages wait in the outbox
+    pub transactional: bool,
+    /// Time stands still until `FakeSystemTimeSource::advance`, and sleeps on
+    /// it end only then. Otherwise `SystemTimeSourceStub`, whose sleeps are real.
+    pub fake_time: bool,
+    /// Registers the controller runtime, which `settle` drains. The runtime
+    /// drives the controllers of the catalog it is registered in, so a harness
+    /// that registers types in a chained catalog registers the runtime there
+    /// instead, with
+    /// [`BaseResourceServiceHarness::register_controller_runtime`], and
+    /// finalizes that catalog with [`BackgroundWorkFinalizer`]
+    pub controller_runtime: bool,
 }
 
 impl Default for BaseResourceServiceHarnessOpts {
@@ -61,6 +75,9 @@ impl Default for BaseResourceServiceHarnessOpts {
             outbox_provider: OutboxProvider::Immediate {
                 force_immediate: true,
             },
+            transactional: false,
+            fake_time: false,
+            controller_runtime: true,
         }
     }
 }
@@ -89,24 +106,45 @@ impl BaseResourceServiceHarness {
     ) -> Self {
         let mut b = CatalogBuilder::new();
 
-        b.add_value(SystemTimeSourceStub::new_set(Utc::now()))
-            .bind::<dyn SystemTimeSource, SystemTimeSourceStub>();
+        if opts.fake_time {
+            b.add_value(FakeSystemTimeSource::new(Utc::now()))
+                .bind::<dyn SystemTimeSource, FakeSystemTimeSource>();
+        } else {
+            b.add_value(SystemTimeSourceStub::new_set(Utc::now()))
+                .bind::<dyn SystemTimeSource, SystemTimeSourceStub>();
+        }
 
         let needs_bridge = matches!(opts.outbox_provider, OutboxProvider::Dispatching);
         opts.outbox_provider.embed_into_catalog(&mut b);
 
+        // The controller hint hub needs it with any outbox
+        b.add::<WakeupListenerMetrics>();
         if needs_bridge {
             b.add::<kamu_messaging_outbox_inmem::InMemoryOutboxMessageBridge>();
             b.add::<kamu_wakeup_listener_inmem::InMemoryWakeupHub>();
-            b.add::<WakeupListenerMetrics>();
         }
 
-        b.add::<InMemoryResourceRepository>()
-            .add::<InMemoryResourceLabelProjectionRepository>()
-            .add::<InMemoryRawResourceEventStore>()
-            .add::<InMemoryAccountRepository>();
+        if !needs_bridge {
+            // The controller runtime needs it; the dispatching outbox brings
+            // its own
+            b.add_value(WakeupListenerConfig::local_default());
+        }
+        if opts.controller_runtime {
+            Self::register_controller_runtime(&mut b);
+        }
 
-        NoOpDatabasePlugin::init_database_components(&mut b);
+        kamu_resources_inmem::register_dependencies(&mut b);
+        b.add::<InMemoryAccountRepository>();
+
+        if opts.transactional {
+            assert!(
+                needs_bridge,
+                "an immediate outbox delivers messages before the transaction ends"
+            );
+            b.add::<InMemoryTransactionManager>();
+        } else {
+            NoOpDatabasePlugin::init_database_components(&mut b);
+        }
 
         crate::register_dependencies(&mut b);
         register_additional_dependencies(&mut b);
@@ -130,6 +168,29 @@ impl BaseResourceServiceHarness {
             resource_repo,
             outbox,
             time_source,
+            dispatching_outbox: needs_bridge,
+        }
+    }
+
+    pub fn register_controller_runtime(b: &mut CatalogBuilder) {
+        b.add::<ResourceControllerRuntimeImpl>();
+        b.add_value(ResourceControllerRuntimeConfig::default());
+    }
+
+    /// See [`BackgroundWorkFinalizer`]
+    pub async fn settle(&self) {
+        self.background_work_finalizer()
+            .finalize(&self.catalog)
+            .await
+            .unwrap();
+    }
+
+    /// The finalizer for the outbox of this harness
+    pub fn background_work_finalizer(&self) -> BackgroundWorkFinalizer {
+        if self.dispatching_outbox {
+            BackgroundWorkFinalizer::for_dispatching_outbox()
+        } else {
+            BackgroundWorkFinalizer::for_immediate_outbox()
         }
     }
 
@@ -286,10 +347,44 @@ impl BaseResourceServiceHarness {
             .returning(|_, _, _| Ok(()));
     }
 
-    pub fn expect_deleted_message(mock_outbox: &mut MockOutbox, expected_resource_count: usize) {
+    /// Expects one `DeletionRequested` message carrying only the resource
+    /// named `name`, with `spec`
+    pub fn expect_deletion_requested_message_of(
+        mock_outbox: &mut MockOutbox,
+        name: &'static str,
+        spec: serde_json::Value,
+    ) {
         mock_outbox
             .expect_post_message_as_json()
             .times(1)
+            .withf(move |producer, message, _version| {
+                producer == MESSAGE_PRODUCER_KAMU_RESOURCE_SERVICE
+                    && matches!(
+                        serde_json::from_value::<ResourceLifecycleMessage>(message.clone())
+                            .unwrap(),
+                        ResourceLifecycleMessage::DeletionRequested(ref m)
+                            if m.resources.len() == 1
+                                && m.resources[0].headers.name.as_str() == name
+                                && m.resources[0].spec == spec
+                    )
+            })
+            .returning(|_, _, _| Ok(()));
+    }
+
+    pub fn expect_deleted_message(mock_outbox: &mut MockOutbox, expected_resource_count: usize) {
+        Self::expect_deleted_messages(mock_outbox, 1, expected_resource_count);
+    }
+
+    /// Expects `n` `Deleted` messages, each of `expected_resource_count`
+    /// resources
+    pub fn expect_deleted_messages(
+        mock_outbox: &mut MockOutbox,
+        n: usize,
+        expected_resource_count: usize,
+    ) {
+        mock_outbox
+            .expect_post_message_as_json()
+            .times(n)
             .withf(move |producer, message, _version| {
                 producer == MESSAGE_PRODUCER_KAMU_RESOURCE_SERVICE
                     && matches!(
@@ -302,31 +397,17 @@ impl BaseResourceServiceHarness {
             .returning(|_, _, _| Ok(()));
     }
 
-    pub fn expect_reconciliation_succeeded_message(mock_outbox: &mut MockOutbox, n: usize) {
+    /// Expects one `StatusUpdated` message that leaves the resource in `phase`
+    pub fn expect_status_updated_message(mock_outbox: &mut MockOutbox, phase: ResourcePhase) {
         mock_outbox
             .expect_post_message_as_json()
-            .times(n)
+            .times(1)
             .withf(move |producer, message, _version| {
                 producer == MESSAGE_PRODUCER_KAMU_RESOURCE_SERVICE
                     && matches!(
                         serde_json::from_value::<ResourceLifecycleMessage>(message.clone())
                             .unwrap(),
-                        ResourceLifecycleMessage::ReconciliationSucceeded(_)
-                    )
-            })
-            .returning(|_, _, _| Ok(()));
-    }
-
-    pub fn expect_reconciliation_failed_message(mock_outbox: &mut MockOutbox, n: usize) {
-        mock_outbox
-            .expect_post_message_as_json()
-            .times(n)
-            .withf(move |producer, message, _version| {
-                producer == MESSAGE_PRODUCER_KAMU_RESOURCE_SERVICE
-                    && matches!(
-                        serde_json::from_value::<ResourceLifecycleMessage>(message.clone())
-                            .unwrap(),
-                        ResourceLifecycleMessage::ReconciliationFailed(_)
+                        ResourceLifecycleMessage::StatusUpdated(ref m) if m.status.phase == phase
                     )
             })
             .returning(|_, _, _| Ok(()));

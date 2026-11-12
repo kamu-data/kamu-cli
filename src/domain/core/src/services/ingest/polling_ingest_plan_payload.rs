@@ -107,7 +107,6 @@ impl TryFrom<&odf::metadata::SourceState> for PollingIngestPlanSourceState {
     Deserialize,
     strum::EnumString,
     strum::IntoStaticStr,
-    strum::EnumIter,
 )]
 pub enum PollingIngestPlanSourceStateKind {
     #[strum(serialize = "odf/etag")]
@@ -122,35 +121,8 @@ pub enum PollingIngestPlanSourceStateKind {
 mod tests {
     use chrono::TimeZone;
     use serde_json::json;
-    use strum::IntoEnumIterator;
 
     use super::*;
-
-    #[test]
-    fn test_source_state_kind_strings_are_odf_constants() {
-        let kinds = [
-            (
-                PollingIngestPlanSourceStateKind::ETag,
-                odf::metadata::SourceState::KIND_ETAG,
-            ),
-            (
-                PollingIngestPlanSourceStateKind::LastModified,
-                odf::metadata::SourceState::KIND_LAST_MODIFIED,
-            ),
-        ];
-
-        assert_eq!(
-            kinds.len(),
-            PollingIngestPlanSourceStateKind::iter().count()
-        );
-        for (kind, odf_kind) in kinds {
-            assert_eq!(<&'static str>::from(kind), odf_kind);
-            assert_eq!(
-                odf_kind.parse::<PollingIngestPlanSourceStateKind>(),
-                Ok(kind)
-            );
-        }
-    }
 
     #[test]
     fn test_plan_payload_json() {

@@ -9,6 +9,9 @@
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Declares an extension schema dispatcher. `condition` is
+/// `Some(ResourceConditionSchemaMeta { .. })` for a condition schema and `None`
+/// for any other kind
 #[rustfmt::skip]
 #[macro_export]
 macro_rules! declare_resource_extension_schema_dispatcher {
@@ -18,7 +21,8 @@ macro_rules! declare_resource_extension_schema_dispatcher {
         schema_id = $schema_id:expr,
         kind = $kind:expr,
         document = $document:expr,
-        applications = $applications:expr
+        applications = $applications:expr,
+        condition = $condition:expr
     ) => {
         #[dill::component]
         #[dill::interface(dyn kamu_resources::ResourceExtensionSchemaDispatcher)]
@@ -27,6 +31,7 @@ macro_rules! declare_resource_extension_schema_dispatcher {
             kind: $kind,
             document: $document,
             applications: $applications,
+            condition: $condition,
         })]
         pub struct $dispatcher;
 

@@ -25,12 +25,12 @@ use kamu_resources_services::testing::{
 };
 use messaging_outbox::OutboxProvider;
 
-use crate::tests::use_cases::resource_use_case_base_harness::{
-    ResourceUseCaseBaseHarness,
-    ResourceUseCaseBaseHarnessOpts,
+use crate::tests::utils::{
     SanitizerKind,
+    ServiceLayerTestHarness,
+    ServiceLayerTestHarnessOpts,
+    TestResourceSpec,
 };
-use crate::tests::utils::TestResourceSpec;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Tests
@@ -48,7 +48,7 @@ use crate::tests::utils::TestResourceSpec;
 async fn test_apply_end_to_end_create_and_retrieve() {
     // Smoke test: verifies planner → executor → persistence wiring is correct.
     // No sanitizer; just confirms the resource is created and retrievable.
-    let harness = ResourceUseCaseBaseHarness::new();
+    let harness = ServiceLayerTestHarness::new();
     let account_handle = odf::ResourceOwnerHandle::new_test("test-owner");
 
     let decision = harness
@@ -60,11 +60,12 @@ async fn test_apply_end_to_end_create_and_retrieve() {
     let result = decision.expect_applied();
     assert_eq!(result.outcome, ApplyResourceOutcome::Created);
 
+    // The controller runtime reconciles the resource after the apply
+    harness.settle().await;
+
     let snapshot = harness.get_snapshot_by_id(&result.id).await.unwrap();
     pretty_assertions::assert_eq!(snapshot.spec, serde_json::json!({ "value": "res-a" }));
 
-    // Default harness uses Immediate outbox — auto-reconcile runs synchronously
-    // after apply, so the resource must already be Ready at this point.
     let status = snapshot.basic_status().unwrap();
     assert_eq!(status.phase, ResourcePhase::Ready);
     assert_eq!(status.observed_generation, Some(1));
@@ -79,7 +80,7 @@ async fn test_apply_end_to_end_create_and_retrieve() {
 
 #[test_log::test(tokio::test)]
 async fn test_sanitizer_modifies_spec_on_create() {
-    let harness = ResourceUseCaseBaseHarness::new_with_opts(ResourceUseCaseBaseHarnessOpts {
+    let harness = ServiceLayerTestHarness::new_with_opts(ServiceLayerTestHarnessOpts {
         sanitizer: SanitizerKind::Appending,
         ..Default::default()
     });
@@ -106,7 +107,7 @@ async fn test_sanitizer_modifies_spec_on_create() {
 
 #[test_log::test(tokio::test)]
 async fn test_sanitizer_receives_current_spec_on_update() {
-    let harness = ResourceUseCaseBaseHarness::new_with_opts(ResourceUseCaseBaseHarnessOpts {
+    let harness = ServiceLayerTestHarness::new_with_opts(ServiceLayerTestHarnessOpts {
         sanitizer: SanitizerKind::Appending,
         ..Default::default()
     });
@@ -146,7 +147,7 @@ async fn test_sanitizer_receives_current_spec_on_update() {
 async fn test_sanitizer_modifies_spec_in_plan() {
     // plan() must also run sanitize_params() — the returned plan's state must
     // reflect the sanitized spec, not the raw input.
-    let harness = ResourceUseCaseBaseHarness::new_with_opts(ResourceUseCaseBaseHarnessOpts {
+    let harness = ServiceLayerTestHarness::new_with_opts(ServiceLayerTestHarnessOpts {
         sanitizer: SanitizerKind::Appending,
         ..Default::default()
     });
@@ -170,7 +171,7 @@ async fn test_sanitizer_modifies_spec_in_plan() {
 
 #[test_log::test(tokio::test)]
 async fn test_no_sanitizer_passes_spec_unchanged() {
-    let harness = ResourceUseCaseBaseHarness::new();
+    let harness = ServiceLayerTestHarness::new();
     let account_handle = odf::ResourceOwnerHandle::new_test("test-owner");
 
     let decision = harness
@@ -191,7 +192,7 @@ async fn test_no_sanitizer_passes_spec_unchanged() {
 async fn test_apply_rejected_when_sanitized_spec_fails_validation() {
     // A sanitizer that clears the value produces an empty string, which fails
     // TestResourceSpec validation → the use case must return Rejected, not panic.
-    let harness = ResourceUseCaseBaseHarness::new_with_opts(ResourceUseCaseBaseHarnessOpts {
+    let harness = ServiceLayerTestHarness::new_with_opts(ServiceLayerTestHarnessOpts {
         sanitizer: SanitizerKind::Clearing,
         ..Default::default()
     });
@@ -216,9 +217,10 @@ async fn test_apply_create_initial_status_is_pending() {
     // With a Dispatching outbox the Applied message is queued but not processed,
     // so auto-reconcile does not run. The resource must be in Pending phase with
     // generation=1 and observedGeneration absent immediately after apply.
-    let harness = ResourceUseCaseBaseHarness::new_with_opts(ResourceUseCaseBaseHarnessOpts {
+    let harness = ServiceLayerTestHarness::new_with_opts(ServiceLayerTestHarnessOpts {
         base_opts: BaseResourceServiceHarnessOpts {
             outbox_provider: OutboxProvider::Dispatching,
+            ..Default::default()
         },
         ..Default::default()
     });
@@ -250,9 +252,10 @@ async fn test_apply_update_resets_status_to_pending() {
     // Verifies that a spec update bumps generation and resets the resource back
     // to Pending, while observed_generation remains at the previously reconciled
     // generation until the next reconcile cycle.
-    let harness = ResourceUseCaseBaseHarness::new_with_opts(ResourceUseCaseBaseHarnessOpts {
+    let harness = ServiceLayerTestHarness::new_with_opts(ServiceLayerTestHarnessOpts {
         base_opts: BaseResourceServiceHarnessOpts {
             outbox_provider: OutboxProvider::Dispatching,
+            ..Default::default()
         },
         ..Default::default()
     });
@@ -260,8 +263,7 @@ async fn test_apply_update_resets_status_to_pending() {
 
     // Create + reconcile → gen=1, observed_gen=1, phase=Ready
     let id = harness.apply_and_get_id(&account_handle, "res-a").await;
-    harness.reconcile_test_uc().execute(&id).await.unwrap();
-    harness.flush_outbox().await;
+    harness.settle().await;
 
     let snapshot = harness.get_snapshot_by_id(&id).await.unwrap();
     let status = snapshot.basic_status().unwrap();
@@ -269,19 +271,9 @@ async fn test_apply_update_resets_status_to_pending() {
     BaseResourceServiceHarness::assert_reconciliation_error(&status, None);
 
     // Spec update → gen bumped to 2, phase reset to Pending
-    let update_params = ApplyResourceParams {
-        id: Some(id),
-        headers: BaseResourceServiceHarness::make_headers_input(account_handle, "res-a"),
-        spec: TestResourceSpec {
-            value: "updated".to_string(),
-        },
-    };
     harness
-        .apply_test_uc()
-        .apply(update_params)
-        .await
-        .unwrap()
-        .expect_applied();
+        .update_spec(&account_handle, id, "res-a", "updated")
+        .await;
 
     let snapshot = harness.get_snapshot_by_id(&id).await.unwrap();
     let status = snapshot.basic_status().unwrap();
@@ -299,7 +291,7 @@ async fn test_apply_update_resets_status_to_pending() {
 
 #[test_log::test(tokio::test)]
 async fn test_apply_with_precondition() {
-    let harness = ResourceUseCaseBaseHarness::new();
+    let harness = ServiceLayerTestHarness::new();
     let account_handle = odf::ResourceOwnerHandle::new_test("test-owner");
     let apply_uc = harness.apply_test_uc();
 

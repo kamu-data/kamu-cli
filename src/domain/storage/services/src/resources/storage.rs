@@ -11,11 +11,20 @@ use kamu_storage::{StorageResource, StorageStateModel};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Persisted in the controller bookkeeping and used as a metric label: changing
+/// it orphans the bookkeeping of every resource of the type
+const STORAGE_CONTROLLER_NAME: &str = "dev.kamu.domain.storage.StorageController";
+
 kamu_resources_services::declare_resource_service_layer!(
     domain = kamu_storage,
     name = Storage,
     resource = StorageResource,
-    state_model = StorageStateModel
+    state_model = StorageStateModel,
+    controller_name = STORAGE_CONTROLLER_NAME,
+    // Bumped when the reconciler's semantics change: resources it finished
+    // with are processed again if a predicate still selects them, such as a
+    // pending deletion; reconciled resources stay quiet
+    controller_revision = 1
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

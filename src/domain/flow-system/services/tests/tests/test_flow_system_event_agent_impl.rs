@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use background_agent_host::CancellationToken;
 use chrono::Duration;
 use kamu_adapter_flow_dataset::*;
 use kamu_adapter_task_dataset::*;
@@ -176,7 +177,7 @@ async fn test_catchup_records_heartbeat_after_every_batch() {
         .unwrap();
 
     tokio::select! {
-        res = harness.flow_system_event_agent.run() => {
+        res = harness.flow_system_event_agent.run(CancellationToken::new()) => {
             panic!("Flow system event agent stopped: {res:?}")
         }
         () = async {
@@ -192,6 +193,68 @@ async fn test_catchup_records_heartbeat_after_every_batch() {
         heartbeats_seen.iter().all(|seen| *seen),
         "{heartbeats_seen:?}"
     );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_shutdown_stops_catch_up_between_batches() {
+    let harness = FlowHarness::with_overrides(FlowHarnessOverrides {
+        flow_system_event_batch_size: Some(1),
+        with_heartbeat_probe_projector: true,
+        ..Default::default()
+    });
+
+    // A backlog of at least two events, one per batch
+    let foo_id = harness
+        .create_root_dataset(odf::DatasetAlias {
+            dataset_name: odf::DatasetName::new_unchecked("foo"),
+            account_name: None,
+        })
+        .await;
+    harness
+        .schedule_flow_for_activation(
+            &ingest_dataset_binding(&foo_id),
+            harness.aligned_now() + Duration::milliseconds(10),
+        )
+        .await;
+
+    // Requested before the start: the agent finishes the batch in progress
+    // and returns, leaving the rest of the backlog for its next run
+    harness
+        .run_flow_system_event_agent_shut_down_at_start()
+        .await;
+
+    let heartbeats_seen = harness.probe_heartbeats_seen();
+    assert!(heartbeats_seen.len() < 2, "{heartbeats_seen:?}");
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_flow_agents_return_on_shutdown() {
+    let harness = FlowHarness::with_overrides(FlowHarnessOverrides::default());
+
+    // A flow due later, so that the flow agent waits for its activation moment
+    let foo_id = harness
+        .create_root_dataset(odf::DatasetAlias {
+            dataset_name: odf::DatasetName::new_unchecked("foo"),
+            account_name: None,
+        })
+        .await;
+    harness
+        .schedule_flow_for_activation(
+            &ingest_dataset_binding(&foo_id),
+            harness.aligned_now() + Duration::hours(1),
+        )
+        .await;
+
+    let (flow_agent, flow_system_event_agent) = harness
+        .run_agents_and_shut_down(std::time::Duration::from_millis(50))
+        .await;
+
+    flow_agent.unwrap();
+    flow_system_event_agent.unwrap();
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

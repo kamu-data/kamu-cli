@@ -31,7 +31,6 @@ use kamu_resources::{
     DeclarativeResource,
     RequestResourcesDeletionUseCase,
     ResourceAggregateLoader,
-    ResourceController,
     ResourceHeaders,
     ResourceHeadersExt,
     ResourceHeadersInput,
@@ -41,6 +40,7 @@ use kamu_resources::{
     ResourceRepository,
     ResourceSchemaProvider,
     ResourceSnapshot,
+    SimpleResourceReconciler,
     TypeUri,
 };
 use kamu_resources_services::testing::BaseResourceServiceHarness;
@@ -92,11 +92,13 @@ impl BaseConfigurationServiceHarness {
         self.catalog.get_one().unwrap()
     }
 
-    pub fn variable_set_controller(&self) -> Arc<dyn ResourceController<VariableSetResource>> {
+    pub fn variable_set_reconciler(
+        &self,
+    ) -> Arc<dyn SimpleResourceReconciler<VariableSetResource>> {
         self.catalog.get_one().unwrap()
     }
 
-    pub fn secret_set_controller(&self) -> Arc<dyn ResourceController<SecretSetResource>> {
+    pub fn secret_set_reconciler(&self) -> Arc<dyn SimpleResourceReconciler<SecretSetResource>> {
         self.catalog.get_one().unwrap()
     }
 
@@ -289,6 +291,7 @@ impl BaseConfigurationServiceHarness {
             })
             .await
             .unwrap();
+        self.settle().await;
 
         decision.expect_applied().id
     }
@@ -324,13 +327,13 @@ impl BaseConfigurationServiceHarness {
             })
             .await
             .unwrap();
+        self.settle().await;
 
         decision.expect_applied().id
     }
 
-    /// Requests deletion of `account_id`'s `VariableSet`s. The immediate
-    /// outbox delivers `DeletionRequested` right away, so the deletion is
-    /// completed, cleanup included, before this returns.
+    /// Requests deletion of `account_id`'s `VariableSet`s, and lets the
+    /// controller runtime complete it, cleanup included, before returning.
     pub async fn request_variable_sets_deletion(
         &self,
         account_id: &odf::AccountID,
@@ -339,10 +342,22 @@ impl BaseConfigurationServiceHarness {
         let use_case: Arc<dyn RequestResourcesDeletionUseCase<VariableSetResource>> =
             self.catalog.get_one().unwrap();
         use_case.execute(account_id.clone(), ids).await.unwrap();
+        self.settle().await;
     }
 
     /// [`Self::request_variable_sets_deletion`] for `SecretSet`s.
     pub async fn request_secret_sets_deletion(
+        &self,
+        account_id: &odf::AccountID,
+        ids: Vec<ResourceID>,
+    ) {
+        self.request_secret_sets_deletion_unsettled(account_id, ids)
+            .await;
+        self.settle().await;
+    }
+
+    /// Requests the deletion, leaving its cleanup to the next `settle`
+    pub async fn request_secret_sets_deletion_unsettled(
         &self,
         account_id: &odf::AccountID,
         ids: Vec<ResourceID>,
@@ -352,21 +367,21 @@ impl BaseConfigurationServiceHarness {
         use_case.execute(account_id.clone(), ids).await.unwrap();
     }
 
-    /// Runs the `VariableSet` controller's cleanup directly, outside the
+    /// Runs the `VariableSet` reconciler's cleanup directly, outside the
     /// deletion flow.
     pub async fn cleanup_variable_set(&self, id: &ResourceID) {
         let resource = self.load_variable_set(id).await;
-        self.variable_set_controller()
+        self.variable_set_reconciler()
             .cleanup(&resource)
             .await
             .unwrap();
     }
 
-    /// Runs the `SecretSet` controller's cleanup directly, outside the
+    /// Runs the `SecretSet` reconciler's cleanup directly, outside the
     /// deletion flow.
     pub async fn cleanup_secret_set(&self, id: &ResourceID) {
         let resource = self.load_secret_set(id).await;
-        self.secret_set_controller()
+        self.secret_set_reconciler()
             .cleanup(&resource)
             .await
             .unwrap();

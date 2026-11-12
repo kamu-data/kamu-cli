@@ -17,6 +17,7 @@ mod resource_presentation;
 mod resource_snapshot;
 mod resource_state_model;
 mod resource_state_projector;
+mod resource_status_rules;
 
 pub use declarative_resource::*;
 pub use event_sourced_resource::*;
@@ -28,3 +29,4 @@ pub use resource_presentation::*;
 pub use resource_snapshot::*;
 pub use resource_state_model::*;
 pub use resource_state_projector::*;
+pub use resource_status_rules::*;

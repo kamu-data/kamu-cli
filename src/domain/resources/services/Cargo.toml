@@ -29,12 +29,13 @@ testing = [
     "dep:kamu-messaging-outbox-inmem",
     "dep:kamu-resources-inmem",
     "dep:kamu-wakeup-listener-inmem",
-    "dep:wakeup-listener",
     "messaging-outbox/testing",
 ]
 
 
 [dependencies]
+async-utils = { workspace = true }
+background-agent-host = { workspace = true }
 database-common = { workspace = true }
 email-utils = { workspace = true }
 event-sourcing = { workspace = true }
@@ -46,9 +47,13 @@ kamu-resources = { workspace = true }
 kamu-resources-inmem = { workspace = true, optional = true }
 kamu-wakeup-listener-inmem = { workspace = true, optional = true }
 messaging-outbox = { workspace = true }
+observability = { workspace = true, features = [
+    "prometheus",
+] }
 odf = { workspace = true }
+retry-backoff = { workspace = true }
 time-source = { workspace = true }
-wakeup-listener = { workspace = true, optional = true }
+wakeup-listener = { workspace = true }
 
 async-trait = { version = "0.1", default-features = false }
 chrono = { version = "0.4", default-features = false, features = [
@@ -57,12 +62,20 @@ chrono = { version = "0.4", default-features = false, features = [
 dill = { version = "0.17", default-features = false }
 enum-variants = { workspace = true }
 paste = { version = "1", default-features = false }
+prometheus = { version = "0.14", default-features = false }
 serde = { version = "1.0", features = [
     "derive",
 ] }
 serde_json = { version = "1.0", default-features = false }
+strum = { version = "0.28", features = [
+    "derive",
+] }
 thiserror = { version = "2", default-features = false, features = [
     "std",
+] }
+tokio = { version = "1", default-features = false, features = [
+    "rt",
+    "sync",
 ] }
 tokio-stream = { version = "0.1", default-features = false }
 tracing = { version = "0.1", default-features = false }
@@ -70,7 +83,9 @@ uuid = { version = "1", default-features = false }
 
 
 [dev-dependencies]
-database-common = { workspace = true }
+database-common = { workspace = true, features = [
+    "testing",
+] }
 database-common-macros = { workspace = true }
 email-utils = { workspace = true }
 event-sourcing = { workspace = true }

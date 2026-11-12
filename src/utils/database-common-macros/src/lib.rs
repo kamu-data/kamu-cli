@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use proc_macro::{Span, TokenStream};
+use proc_macro2::TokenStream as TokenStream2;
 use quote::{format_ident, quote};
 use syn::parse::{Parse, ParseStream};
 use syn::{
@@ -749,108 +750,26 @@ pub fn transactional_static_method4(attr: TokenStream, item: TokenStream) -> Tok
 
 #[proc_macro]
 pub fn database_transactional_test(input: TokenStream) -> TokenStream {
-    let tables_for_cleanup = tables_for_cleanup();
+    let args = parse_macro_input!(input as DatabaseTransactionalTestInputArgs);
+    let fixture = &args.fixture;
+    let run_fixture = quote! { #fixture (&catalog).await; };
+    let run_fixture_in_transaction = run_in_transaction(fixture);
 
-    let DatabaseTransactionalTestInputArgs {
-        storage,
-        fixture,
-        harness,
-        extra_test_groups,
-    } = parse_macro_input!(input as DatabaseTransactionalTestInputArgs);
-
-    let test_function_name = fixture.segments.last().unwrap().ident.clone();
-
-    let extra_test_groups = if let Some(extra_test_groups) = extra_test_groups {
-        parse_str(extra_test_groups.value().as_str()).unwrap()
-    } else {
-        quote! {}
-    };
-
-    let output = match storage.to_string().as_str() {
-        "inmem" => quote! {
-            #[test_group::group(#extra_test_groups)]
-            #[test_log::test(tokio::test)]
-            async fn #test_function_name () {
-                let harness = #harness ::new();
-
-                #fixture (&harness.catalog).await;
-            }
-        },
-        // Runs the fixture both as `inmem` and inside one transaction of
-        // `InMemoryTransactionManager`, which the harness registers in `new_transactional()`
+    let output = match args.storage.to_string().as_str() {
+        "inmem" => args.inmem_test(&args.test_function_name(), &harness_catalog(), &run_fixture),
+        // Also runs the fixture inside one transaction of `InMemoryTransactionManager`
         "inmem_with_transaction" => {
-            let in_transaction_function_name = format_ident!("{test_function_name}_in_transaction");
-            quote! {
-                #[test_group::group(#extra_test_groups)]
-                #[test_log::test(tokio::test)]
-                async fn #test_function_name () {
-                    let harness = #harness ::new();
-
-                    #fixture (&harness.catalog).await;
-                }
-
-                #[test_group::group(#extra_test_groups)]
-                #[test_log::test(tokio::test)]
-                async fn #in_transaction_function_name () {
-                    let harness = #harness ::new_transactional();
-
-                    database_common::DatabaseTransactionRunner::from(harness.catalog)
-                        .transactional(|catalog| async move {
-                            #fixture (&catalog).await;
-
-                            Ok::<_, internal_error::InternalError>(())
-                        })
-                        .await
-                        .unwrap();
-                }
-            }
+            let plain =
+                args.inmem_test(&args.test_function_name(), &harness_catalog(), &run_fixture);
+            let in_transaction = args.inmem_test(
+                &format_ident!("{}_in_transaction", args.test_function_name()),
+                &harness_catalog_with_in_memory_transaction_manager(),
+                &run_fixture_in_transaction,
+            );
+            quote! { #plain #in_transaction }
         }
-        "postgres" => quote! {
-            #[test_group::group(database, postgres, #extra_test_groups)]
-            #[test_log::test(sqlx::test(migrations = "../../../../migrations/postgres"))]
-            async fn #test_function_name (pg_pool: sqlx::PgPool) {
-                for table in #tables_for_cleanup {
-                    sqlx::query(sqlx::AssertSqlSafe(format!("DELETE FROM {table}")))
-                    .execute(&pg_pool)
-                    .await
-                    .unwrap();
-                }
-
-                let harness = #harness ::new(pg_pool);
-
-                database_common::DatabaseTransactionRunner::from(harness.catalog)
-                    .transactional(|catalog| async move {
-                        #fixture (&catalog).await;
-
-                        Ok::<_, internal_error::InternalError>(())
-                    })
-                    .await
-                    .unwrap();
-            }
-        },
-        "sqlite" => quote! {
-            #[test_group::group(sqlite, #extra_test_groups)]
-            #[test_log::test(sqlx::test(migrations = "../../../../migrations/sqlite"))]
-            async fn #test_function_name (sqlite_pool: sqlx::SqlitePool) {
-                for table in #tables_for_cleanup {
-                    sqlx::query(sqlx::AssertSqlSafe(format!("DELETE FROM {table}")))
-                    .execute(&sqlite_pool)
-                    .await
-                    .unwrap();
-                }
-
-                let harness = #harness ::new(sqlite_pool);
-
-                database_common::DatabaseTransactionRunner::from(harness.catalog)
-                    .transactional(|catalog| async move {
-                        #fixture (&catalog).await;
-
-                        Ok::<_, internal_error::InternalError>(())
-                    })
-                    .await
-                    .unwrap();
-            }
-        },
+        "postgres" => args.database_test(Database::Postgres, &run_fixture_in_transaction),
+        "sqlite" => args.database_test(Database::Sqlite, &run_fixture_in_transaction),
         unexpected => {
             panic!(
                 "Unexpected E2E test storage: \"{unexpected}\"!\nAllowable values: \"inmem\", \
@@ -868,63 +787,149 @@ pub fn database_transactional_test(input: TokenStream) -> TokenStream {
 
 /// Like `database_transactional_test!`, but the fixture runs outside any
 /// transaction and gets the harness catalog with its transaction manager, to
-/// open several transactions itself. `storage` is `inmem`, which builds the
-/// harness with `new_transactional()`, or `postgres`; there is no `sqlite`, as
-/// SQLite serialises writers and a race there reduces to a sequential test.
+/// open several transactions itself. `storage` is `inmem` (which adds
+/// `InMemoryTransactionManager` to the harness catalog), `postgres` or `sqlite`.
+/// Wire only fixtures whose transactions run one after another, such as a
+/// rollback, to `sqlite`: SQLite serialises writers, so a race there reduces to
+/// a sequential test.
 #[proc_macro]
 pub fn database_concurrent_transactions_test(input: TokenStream) -> TokenStream {
-    let tables_for_cleanup = tables_for_cleanup();
+    let args = parse_macro_input!(input as DatabaseTransactionalTestInputArgs);
+    let fixture = &args.fixture;
+    let run_fixture = quote! { #fixture (&catalog).await; };
 
-    let DatabaseTransactionalTestInputArgs {
-        storage,
-        fixture,
-        harness,
-        extra_test_groups,
-    } = parse_macro_input!(input as DatabaseTransactionalTestInputArgs);
-
-    let test_function_name = fixture.segments.last().unwrap().ident.clone();
-
-    let extra_test_groups = if let Some(extra_test_groups) = extra_test_groups {
-        parse_str(extra_test_groups.value().as_str()).unwrap()
-    } else {
-        quote! {}
-    };
-
-    let output = match storage.to_string().as_str() {
-        "inmem" => quote! {
-            #[test_group::group(#extra_test_groups)]
-            #[test_log::test(tokio::test)]
-            async fn #test_function_name () {
-                let harness = #harness ::new_transactional();
-
-                #fixture (&harness.catalog).await;
-            }
-        },
-        "postgres" => quote! {
-            #[test_group::group(database, postgres, #extra_test_groups)]
-            #[test_log::test(sqlx::test(migrations = "../../../../migrations/postgres"))]
-            async fn #test_function_name (pg_pool: sqlx::PgPool) {
-                for table in #tables_for_cleanup {
-                    sqlx::query(sqlx::AssertSqlSafe(format!("DELETE FROM {table}")))
-                    .execute(&pg_pool)
-                    .await
-                    .unwrap();
-                }
-
-                let harness = #harness ::new(pg_pool);
-
-                #fixture (&harness.catalog).await;
-            }
-        },
+    let output = match args.storage.to_string().as_str() {
+        "inmem" => args.inmem_test(
+            &args.test_function_name(),
+            &harness_catalog_with_in_memory_transaction_manager(),
+            &run_fixture,
+        ),
+        "postgres" => args.database_test(Database::Postgres, &run_fixture),
+        "sqlite" => args.database_test(Database::Sqlite, &run_fixture),
         unexpected => {
             panic!(
-                "Unexpected storage: \"{unexpected}\"!\nAllowable values: \"inmem\" and \
-                 \"postgres\"."
+                "Unexpected storage: \"{unexpected}\"!\nAllowable values: \"inmem\", \"postgres\" \
+                 and \"sqlite\"."
             );
         }
     };
 
     output.into()
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Clone, Copy)]
+enum Database {
+    Postgres,
+    Sqlite,
+}
+
+/// Runs the fixture on the catalog of a transaction opened on `catalog`,
+/// committing it
+fn run_in_transaction(fixture: &Path) -> TokenStream2 {
+    quote! {
+        database_common::DatabaseTransactionRunner::from(catalog)
+            .transactional(|transaction_catalog| async move {
+                #fixture (&transaction_catalog).await;
+
+                Ok::<_, internal_error::InternalError>(())
+            })
+            .await
+            .unwrap();
+    }
+}
+
+/// Binds `catalog` to the harness catalog
+fn harness_catalog() -> TokenStream2 {
+    quote! {
+        let catalog = harness.catalog;
+    }
+}
+
+/// Binds `catalog` to one chained on the harness catalog with
+/// `InMemoryTransactionManager`, so that transactions can be opened on it
+fn harness_catalog_with_in_memory_transaction_manager() -> TokenStream2 {
+    quote! {
+        let catalog = {
+            let mut catalog_builder = dill::CatalogBuilder::new_chained(&harness.catalog);
+            catalog_builder.add::<database_common::InMemoryTransactionManager>();
+            catalog_builder.build()
+        };
+    }
+}
+
+impl DatabaseTransactionalTestInputArgs {
+    fn test_function_name(&self) -> Ident {
+        self.fixture.segments.last().unwrap().ident.clone()
+    }
+
+    fn extra_test_groups(&self) -> TokenStream2 {
+        match &self.extra_test_groups {
+            Some(extra_test_groups) => parse_str(extra_test_groups.value().as_str()).unwrap(),
+            None => quote! {},
+        }
+    }
+
+    /// A test building the harness with `new()`, binding `catalog` with
+    /// `bind_catalog` and running `body`
+    fn inmem_test(
+        &self,
+        name: &Ident,
+        bind_catalog: &TokenStream2,
+        body: &TokenStream2,
+    ) -> TokenStream2 {
+        let harness = &self.harness;
+        let extra_test_groups = self.extra_test_groups();
+        quote! {
+            #[test_group::group(#extra_test_groups)]
+            #[test_log::test(tokio::test)]
+            async fn #name () {
+                let harness = #harness ::new();
+                #bind_catalog
+
+                #body
+            }
+        }
+    }
+
+    /// A test on a fresh database whose migrations ran, building the harness
+    /// with `new(pool)` and running `body` on its catalog as `catalog`
+    fn database_test(&self, database: Database, body: &TokenStream2) -> TokenStream2 {
+        let name = self.test_function_name();
+        let harness = &self.harness;
+        let extra_test_groups = self.extra_test_groups();
+        let tables_for_cleanup = tables_for_cleanup();
+        let (group, migrations, pool_type) = match database {
+            Database::Postgres => (
+                quote! { database, postgres },
+                "../../../../migrations/postgres",
+                quote! { sqlx::PgPool },
+            ),
+            Database::Sqlite => (
+                quote! { sqlite },
+                "../../../../migrations/sqlite",
+                quote! { sqlx::SqlitePool },
+            ),
+        };
+        quote! {
+            #[test_group::group(#group, #extra_test_groups)]
+            #[test_log::test(sqlx::test(migrations = #migrations))]
+            async fn #name (pool: #pool_type) {
+                for table in #tables_for_cleanup {
+                    sqlx::query(sqlx::AssertSqlSafe(format!("DELETE FROM {table}")))
+                    .execute(&pool)
+                    .await
+                    .unwrap();
+                }
+
+                let harness = #harness ::new(pool);
+                let catalog = harness.catalog;
+
+                #body
+            }
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -15,7 +15,9 @@ macro_rules! declare_resource_service_layer {
         domain = $domain:path,
         name = $name:ident,
         resource = $resource:ty,
-        state_model = $state_model:ty
+        state_model = $state_model:ty,
+        controller_name = $controller_name:expr,
+        controller_revision = $controller_revision:expr
     ) => {
         $crate::paste::paste! {
             $crate::declare_resource_event_store_bridge!(
@@ -48,38 +50,46 @@ macro_rules! declare_resource_service_layer {
                 resource = $resource
             );
 
+            $crate::declare_resource_lifecycle_primitives!(
+                primitives = [<$name ResourceLifecyclePrimitivesImpl>],
+                resource = $resource
+            );
+
             $crate::declare_request_resources_deletion_use_case!(
                 use_case = [<$name RequestResourcesDeletionUseCaseImpl>],
                 resource = $resource
             );
 
-            $crate::declare_complete_resource_deletion_use_case!(
-                use_case = [<$name CompleteResourceDeletionUseCaseImpl>],
-                resource = $resource
+            $crate::declare_simple_resource_controller_adapter!(
+                adapter = [<$name SimpleResourceControllerAdapter>],
+                resource = $resource,
+                controller_name = $controller_name,
+                controller_revision = $controller_revision
             );
 
-            $crate::declare_reconcile_resource_use_case!(
-                use_case = [<$name ReconcileResourceUseCaseImpl>],
-                resource = $resource
-            );
-
-            $crate::declare_resource_lifecycle_controller_dispatcher!(
-                dispatcher = [<$name ResourceLifecycleDispatcher>],
-                resource = $resource
-            );
-
+            /// The service layer of a type whose `SimpleResourceReconciler`
+            /// the controller runtime drives, through the generated adapter
             pub fn [<register_ $name:snake _resource_service_layer>](
                 catalog_builder: &mut dill::CatalogBuilder,
             ) {
+                [<register_ $name:snake _resource_service_layer_without_controller>](
+                    catalog_builder,
+                );
+                catalog_builder.add::<[<$name SimpleResourceControllerAdapter>]>();
+            }
+
+            /// The service layer of a type that brings its own
+            /// `ResourceController` instead of a `SimpleResourceReconciler`
+            pub fn [<register_ $name:snake _resource_service_layer_without_controller>](
+                catalog_builder: &mut dill::CatalogBuilder,
+            ) {
                 catalog_builder.add::<[<$name ApplyResourceUseCaseImpl>]>();
-                catalog_builder.add::<[<$name CompleteResourceDeletionUseCaseImpl>]>();
                 catalog_builder.add::<[<$name RequestResourcesDeletionUseCaseImpl>]>();
                 catalog_builder.add::<[<$name EventStoreBridge>]>();
                 catalog_builder.add::<[<$name ResourceAggregateLoaderImpl>]>();
-                catalog_builder.add::<[<$name ResourceLifecycleDispatcher>]>();
+                catalog_builder.add::<[<$name ResourceLifecyclePrimitivesImpl>]>();
                 catalog_builder.add::<[<$name ResourcePersistenceServiceImpl>]>();
                 catalog_builder.add::<[<$name TypedResourceQueryServiceImpl>]>();
-                catalog_builder.add::<[<$name ReconcileResourceUseCaseImpl>]>();
             }
         }
     };

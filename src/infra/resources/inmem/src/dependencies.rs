@@ -1,0 +1,31 @@
+// Copyright Kamu Data, Inc. and contributors. All rights reserved.
+//
+// Use of this software is governed by the Business Source License
+// included in the LICENSE file.
+//
+// As of the Change Date specified in that file, in accordance with
+// the Business Source License, use of this software will be governed
+// by the Apache License, Version 2.0.
+
+use dill::CatalogBuilder;
+
+use crate::*;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub fn register_dependencies(b: &mut CatalogBuilder) {
+    b.add::<InMemoryRawResourceEventState>();
+    b.add::<InMemoryRawResourceEventStore>();
+
+    b.add::<InMemoryResourceState>();
+    b.add::<InMemoryResourceRepository>();
+
+    b.add::<InMemoryResourceLabelProjectionState>();
+    b.add::<InMemoryResourceLabelProjectionRepository>();
+
+    // After the resource state: its queries lock both in this order, as a commit does
+    b.add::<InMemoryResourceControllerStateStore>();
+    b.add::<InMemoryResourceControllerStateRepository>();
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

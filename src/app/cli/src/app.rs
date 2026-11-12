@@ -575,6 +575,9 @@ pub fn configure_base_catalog(
 
     kamu_resources_facade::register_dependencies(&mut b);
     kamu_resources_services::register_dependencies(&mut b);
+    // Registered by the application, so that tests can run a runtime of their
+    // own per simulated process over shared storage
+    b.add::<kamu_resources_services::ResourceControllerRuntimeImpl>();
     kamu_configuration_services::register_dependencies(&mut b);
     kamu_storage_services::register_dependencies(&mut b);
 
@@ -594,6 +597,8 @@ pub fn configure_base_catalog(
 
     outbox::register_outbox_components(&mut b);
     b.add::<wakeup_listener::WakeupListenerMetrics>();
+    b.add::<background_agent_host::BackgroundAgentHost>();
+    b.add::<background_agent_host::BackgroundAgentHostMetrics>();
 
     kamu_auth_web3_services::register_dependencies(&mut b);
 
@@ -909,10 +914,16 @@ pub fn register_config_in_catalog(
     //
 
     // Background agents configuration
+    catalog_builder.add_value(config.background_agents.background_agent_host_config());
     catalog_builder.add_value(config.background_agents.wakeup_listener_config());
     catalog_builder.add_value(config.background_agents.outbox_agent_config());
     catalog_builder.add_value(config.background_agents.flow_system_event_agent_config());
     catalog_builder.add_value(config.background_agents.flow_agent_activation_config());
+    catalog_builder.add_value(
+        config
+            .background_agents
+            .resource_controller_runtime_config(),
+    );
     //
 
     // Password hashing mode configuration

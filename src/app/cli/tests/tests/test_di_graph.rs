@@ -9,7 +9,7 @@
 
 use std::path::Path;
 
-use async_utils::BackgroundAgent;
+use background_agent_host::{BackgroundAgent, BackgroundAgentHost};
 use database_common::{DatabaseConnectionSettings, SqlitePoolOptions, TransactionRef};
 use dill::CatalogBuilder;
 use kamu::domain::{KamuBackgroundCatalog, ServerUrlConfig, TenancyConfig};
@@ -300,6 +300,9 @@ fn test_di_server_background_catalog_acts_as_node(
         .get::<dill::AllOf<dyn BackgroundAgent>>()
         .unwrap();
     assert!(!background_agents.is_empty());
+
+    // What `api-server` runs them with
+    background_catalog.get_one::<BackgroundAgentHost>().unwrap();
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
