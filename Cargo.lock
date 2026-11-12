@@ -2394,8 +2394,20 @@ name = "background-agent-host"
 version = "0.272.1"
 dependencies = [
  "async-trait",
+ "async-utils",
+ "chrono",
+ "dill",
  "internal-error",
+ "observability",
+ "pretty_assertions",
+ "prometheus",
+ "retry-backoff",
+ "strum 0.28.0",
+ "test-log",
+ "time-source",
+ "tokio",
  "tokio-util",
+ "tracing",
 ]
 
 [[package]]
