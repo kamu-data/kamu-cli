@@ -15,7 +15,7 @@ use std::pin::Pin;
 use std::sync::Arc;
 
 use axum::{Extension, middleware};
-use background_agent_host::{BackgroundAgent, CancellationToken};
+use background_agent_host::{BackgroundAgentHost, BackgroundAgentHostConfig, CancellationToken};
 use internal_error::*;
 use kamu::domain::{FileUploadLimitConfig, Protocols, ServerUrlConfig, TenancyConfig};
 use kamu_accounts_services::PasswordPolicyConfig;
@@ -42,7 +42,10 @@ use super::{
 pub struct APIServer {
     server_future: Pin<Box<dyn Future<Output = Result<(), std::io::Error>> + Send>>,
     local_addr: SocketAddr,
-    background_agents: Vec<Arc<dyn BackgroundAgent>>,
+    background_agent_host: Arc<BackgroundAgentHost>,
+    background_agent_host_config: Arc<BackgroundAgentHostConfig>,
+    shutdown: CancellationToken,
+    e2e_shutdown_notify: Option<Arc<Notify>>,
     api_server_catalog: dill::Catalog,
 }
 
@@ -63,8 +66,9 @@ impl APIServer {
         webhooks_config: &WebhooksConfig,
     ) -> Result<Self, InternalError> {
         // Agents run as the node: they act for the system, not for whoever started the server
-        let background_agents = background_catalog
-            .get::<dill::AllOf<dyn BackgroundAgent>>()
+        let background_agent_host = background_catalog.get_one::<BackgroundAgentHost>().unwrap();
+        let background_agent_host_config = background_catalog
+            .get_one::<BackgroundAgentHostConfig>()
             .unwrap();
 
         let addr = SocketAddr::from((
@@ -228,7 +232,7 @@ impl APIServer {
             .merge(kamu_adapter_http::openapi::router().into())
             .fallback(unknown_fallback_handler);
 
-        let maybe_shutdown_notify = if is_e2e_testing {
+        let e2e_shutdown_notify = if is_e2e_testing {
             let shutdown_notify = Arc::new(Notify::new());
 
             router = router.nest("/e2e", e2e_router(shutdown_notify.clone()).into());
@@ -244,25 +248,21 @@ impl APIServer {
             .layer(Extension(ui_configuration))
             .layer(Extension(Arc::new(api)));
 
-        let server = axum::serve(listener, router.into_make_service());
-
-        let server_future: Pin<Box<dyn Future<Output = _> + Send>> =
-            if let Some(shutdown_notify) = maybe_shutdown_notify {
-                Box::pin(async move {
-                    server
-                        .with_graceful_shutdown(async move {
-                            shutdown_notify.notified().await;
-                        })
-                        .await
-                })
-            } else {
-                Box::pin(server.into_future())
-            };
+        // One token stops both the HTTP server and the agents
+        let shutdown = CancellationToken::new();
+        let server_future: Pin<Box<dyn Future<Output = _> + Send>> = Box::pin(
+            axum::serve(listener, router.into_make_service())
+                .with_graceful_shutdown(shutdown.clone().cancelled_owned())
+                .into_future(),
+        );
 
         Ok(Self {
             server_future,
             local_addr,
-            background_agents,
+            background_agent_host,
+            background_agent_host_config,
+            shutdown,
+            e2e_shutdown_notify,
             api_server_catalog,
         })
     }
@@ -275,61 +275,79 @@ impl APIServer {
         &self.api_server_catalog
     }
 
+    /// Serves until Ctrl+C, SIGTERM or the e2e shutdown route, or until a
+    /// background agent fails fatally. On a shutdown, in-flight requests and
+    /// the agents' current steps get the agents' shutdown timeout to finish
     pub async fn run(self) -> Result<(), InternalError> {
-        // Start all background agents as tasks
-        // Note: Background agents are designed to run forever in event loops.
-        // If any agent completes normally, it's considered an unexpected event
-        // that should trigger a server shutdown.
-        let agent_tasks: Vec<_> = self
-            .background_agents
-            .into_iter()
-            .map(|agent| {
-                let agent_name = agent.agent_name().to_string();
-                tokio::spawn(async move {
-                    tracing::info!("Starting background agent: {}", agent_name);
-                    let result = agent.run(CancellationToken::new()).await;
-                    match &result {
-                        Err(error) => {
-                            tracing::error!("Background agent {} failed: {}", agent_name, error);
-                        }
-                        Ok(()) => {
-                            tracing::warn!(
-                                "Background agent {} completed unexpectedly! This will cause \
-                                 server shutdown.",
-                                agent_name
-                            );
+        let Self {
+            mut server_future,
+            background_agent_host,
+            background_agent_host_config,
+            shutdown,
+            e2e_shutdown_notify,
+            ..
+        } = self;
+        let timeout = background_agent_host_config.shutdown_timeout;
+
+        let shutdown_requests =
+            Self::cancel_on_shutdown_request(shutdown.clone(), e2e_shutdown_notify);
+
+        let server = async {
+            let result = tokio::select! {
+                result = &mut server_future => {
+                    tracing::warn!("HTTP server completed unexpectedly, shutting down");
+                    shutdown.cancel();
+                    result
+                }
+                () = shutdown.cancelled() => {
+                    match tokio::time::timeout(timeout, &mut server_future).await {
+                        Ok(result) => result,
+                        Err(_) => {
+                            tracing::warn!("HTTP requests did not finish in time, dropping them");
+                            Ok(())
                         }
                     }
-                    result
-                })
-            })
-            .collect();
+                }
+            };
+            result.int_err()
+        };
 
-        // Ensure we have background agents registered
-        assert!(
-            !agent_tasks.is_empty(),
-            "No background agents found! This indicates a DI container configuration issue. Make \
-             sure all agent implementations are registered as both their specific trait (e.g., \
-             TaskAgent) AND as BackgroundAgent in the DI container."
+        let (server_result, agents_result, ()) = tokio::join!(
+            server,
+            background_agent_host.run(shutdown.clone()),
+            shutdown_requests,
         );
 
-        tokio::select! {
-            res = self.server_future => {
-                tracing::warn!("HTTP server completed unexpectedly! This will cause server shutdown.");
-                res.int_err()
-            },
-            res = async {
-                let (result, _index, _remaining) = futures::future::select_all(agent_tasks).await;
-                match result {
-                    Ok(agent_result) => agent_result,
-                    Err(join_error) => {
-                        Err(InternalError::new(format!("Background agent task panicked: {join_error}")))
-                    },
-                }
-            } => {
-                res
+        agents_result?;
+        server_result
+    }
+
+    /// Cancels `shutdown` on Ctrl+C, SIGTERM or the e2e shutdown route;
+    /// returns as soon as it is cancelled for any reason
+    async fn cancel_on_shutdown_request(
+        shutdown: CancellationToken,
+        e2e_shutdown_notify: Option<Arc<Notify>>,
+    ) {
+        // Without signals the other sources still work
+        let signal = async {
+            if let Err(e) = container_runtime::signal::graceful_stop().await {
+                tracing::warn!(error = %e, "Failed to listen for shutdown signals");
+                std::future::pending::<()>().await;
             }
+        };
+        let e2e_shutdown = async {
+            match e2e_shutdown_notify {
+                Some(notify) => notify.notified().await,
+                None => std::future::pending().await,
+            }
+        };
+
+        tokio::select! {
+            () = shutdown.cancelled() => return,
+            () = signal => tracing::info!("Shutdown signal received"),
+            () = e2e_shutdown => tracing::info!("Shutdown requested through the e2e route"),
         }
+        shutdown.cancel();
     }
 }
 
