@@ -20,7 +20,7 @@
   created, or a remote dataset behind a URL — and picks a protocol from the URLs
   ([§5](#5-choosing-a-protocol)).
 - A pull into a local dataset stops before `HEAD`: the caller commits the new blocks in its own
-  transaction with **`LocalSyncCommitter`** ([dataset-operations.md](dataset-operations.md)).
+  transaction with **`DatasetUpdateSteps::commit_sync`** ([dataset-operations.md](dataset-operations.md)).
 - The **Simple Transfer Protocol** needs only readable files on the remote (`refs/head`, `blocks/`,
   `data/`, `checkpoints/`) over the local filesystem, S3 or HTTP; the client does all the
   comparison work.
@@ -80,7 +80,7 @@ the repository model and both protocols. This page does not restate them; read t
 
 | Layer | Crate / path | Contents |
 | --- | --- | --- |
-| Domain types | `kamu-core` — [`sync_service.rs`](../../src/domain/core/src/services/sync_service.rs) | `SyncService`, `SyncRequest`, `LocalSyncRequest`, `LocalSyncTarget`, `SyncRefRemote`, `SyncOptions`, `SyncResult`, `SyncError`, listeners and stats |
+| Domain types | `kamu-core` — [`sync_service.rs`](../../src/domain/core/src/services/sync_service.rs) | `SyncService`, `SyncToRequest`, `SyncFromRequest`, `SyncFromTarget`, `SyncRefRemote`, `SyncOptions`, `SyncResult`, `SyncError`, listeners and stats |
 | Chain comparison | `kamu-core` — [`metadata_chain_comparator.rs`](../../src/domain/core/src/utils/metadata_chain_comparator.rs) | `MetadataChainComparator::compare_chains` → equal / ahead / behind / diverged |
 | Sync service and request builder | `kamu` — [`src/infra/core/src/services/sync/`](../../src/infra/core/src/services/sync) | `SyncServiceImpl` (protocol dispatch, push to IPNS), `SyncRequestBuilder` |
 | Local IPFS node | `kamu-core` — [`ipfs_service.rs`](../../src/domain/core/src/services/ipfs_service.rs); `kamu` — [`ipfs_service_impl.rs`](../../src/infra/core/src/services/ipfs_service_impl.rs) | `IpfsService` (add a dataset, find an IPNS key, resolve and publish its name), `IpfsServiceImpl`; `kamu system ipfs add` uses it directly |
@@ -88,7 +88,7 @@ the repository model and both protocols. This page does not restate them; read t
 | Smart protocol client trait | `kamu` — [`smart_transfer_protocol.rs`](../../src/infra/core/src/utils/smart_transfer_protocol.rs) | `SmartTransferProtocolClient`, `TransferOptions` |
 | Smart protocol client and server | `kamu-adapter-http` — [`src/adapter/http/src/smart_protocol/`](../../src/adapter/http/src/smart_protocol) | `WsSmartTransferProtocolClient`, `AxumServerPullProtocolInstance`, `AxumServerPushProtocolInstance`, messages, `protocol_dataset_helper` |
 | Server HTTP endpoints | `kamu-adapter-http` — [`simple_protocol/handlers.rs`](../../src/adapter/http/src/simple_protocol/handlers.rs), [`http_server_dataset_router.rs`](../../src/adapter/http/src/http_server_dataset_router.rs) | `refs`, `blocks`, `data`, `checkpoints` (GET and PUT), `pull` and `push` WebSocket upgrades |
-| Committing a pull | `kamu-core` — [`local_sync_committer.rs`](../../src/domain/core/src/services/local_sync_committer.rs); `kamu` — [`local_sync_committer_impl.rs`](../../src/infra/core/src/services/sync/local_sync_committer_impl.rs), [`local_sync_writes/`](../../src/infra/core/src/utils/local_sync_writes/) | `LocalSyncCommitter`: `HEAD` CAS through `DatasetHeadCommitter`, or creation through `CreateDatasetUseCase`; the `Seed` store and block append both protocols share |
+| Committing a pull | `kamu` — [`dataset_update_steps_impl.rs`](../../src/infra/core/src/services/dataset_update_steps_impl.rs), [`local_sync_writes/`](../../src/infra/core/src/utils/local_sync_writes/) | `DatasetUpdateSteps::commit_sync`, in a transaction of its own: `HEAD` CAS through `DatasetHeadCommitter`, or creation through `CreateDatasetUseCase`; the `Seed` store and block append both protocols share |
 | Appending incoming blocks | `kamu-datasets-services` — `AppendDatasetMetadataBatchUseCaseImpl`; `odf` — `MetadataChainExt::append_batch` | block validation, `HEAD` update on the smart push server |
 | Push | `kamu` — [`push_dataset_use_case_impl.rs`](../../src/infra/core/src/use_cases/push_dataset_use_case_impl.rs), [`push_request_planner_impl.rs`](../../src/infra/core/src/services/push_request_planner_impl.rs); CLI [`push_command.rs`](../../src/app/cli/src/commands/push_command.rs) | `kamu push` |
 | Remotes | `kamu` — [`src/infra/core/src/services/remote/`](../../src/infra/core/src/services/remote) | `RemoteRepositoryRegistryImpl`, `RemoteAliasesRegistryImpl`, `RemoteDatasetUrlResolverImpl`, `RemoteAliasResolverImpl`, `DatasetPullSourceResolverImpl` |
@@ -102,11 +102,11 @@ over the URL's storage (file, S3, HTTP, IPFS gateway).
 
 | Request | Source | Destination | Run by |
 | --- | --- | --- | --- |
-| `SyncRequest` (push) | `ResolvedDataset`: a dataset of this node | `SyncRefRemote`: a dataset that is not a dataset reference of this node | `SyncService::sync`, which also moves the destination's `HEAD` |
-| `LocalSyncRequest` (pull) | `DatasetRefRemote`: the transfer resolves and opens it | `LocalSyncTarget`: `Existing { dataset, expected_head }`, or `New(DatasetAlias)` for a dataset the commit creates from the source's `Seed` | `SyncService::transfer_into_local`, then `LocalSyncCommitter::commit` |
+| `SyncToRequest` (push) | `ResolvedDataset`: a dataset of this node | `SyncRefRemote`: a dataset that is not a dataset reference of this node | `SyncService::sync_to`, which also moves the destination's `HEAD` |
+| `SyncFromRequest` (pull) | `DatasetRefRemote`: the transfer resolves and opens it | `SyncFromTarget`: `Existing { dataset, expected_head }`, or `New(DatasetAlias)` for a dataset the commit creates from the source's `Seed` | `SyncService::sync_from`, then `DatasetUpdateSteps::commit_sync` |
 
 A pull's destination is read from the database and its source from the network, so the two are
-resolved at different steps. The destination is read as a `LocalSyncTarget`, inside a transaction,
+resolved at different steps. The destination is read as a `SyncFromTarget`, inside a transaction,
 because it reads `HEAD` as `expected_head`: a detached dataset reads the storage `HEAD`, which can
 lag behind the database. A dataset entry left without `HEAD` by an interrupted creation is
 `Existing` with no expected head. A missing destination becomes `New` when creation is allowed and
@@ -126,8 +126,8 @@ the reference carries an alias.
 | Step | Transaction | Does |
 | --- | --- | --- |
 | Target | the caller's | `PullLocalTarget::resolve_sync_target`: read `expected_head`; no remote is contacted |
-| Transfer | none held across it | `transfer_into_local`: resolve and open the source, compare the chains, store the `Seed` of a new dataset, copy objects, append blocks; no reference moves. Returns `SyncTransfer::UpToDate` or `Transferred(TransferredSync)` |
-| Commit | the caller's | `LocalSyncCommitter::commit`: for an existing dataset, `DatasetHeadCommitter` moves `HEAD` from `expected_head` to the new head; for a new one, `CreateDatasetUseCase` creates the entry with `HEAD` already at the new head (`CreateDatasetUseCaseOptions::initial_head`) |
+| Transfer | none held across it | `sync_from`: resolve and open the source, compare the chains, store the `Seed` of a new dataset, copy objects, append blocks; no reference moves. Returns `SyncFromTransfer::UpToDate` or `Transferred(SyncFromTransferred)` |
+| Commit | its own | `DatasetUpdateSteps::commit_sync`: for an existing dataset, `DatasetHeadCommitter` moves `HEAD` from `expected_head` to the new head; for a new one, `CreateDatasetUseCase` creates the entry with `HEAD` already at the new head (`CreateDatasetUseCaseOptions::initial_head`) |
 
 Opening the source fails with `RepositoryNotFound` for an unknown repository,
 `RemoteByIdUnsupported` for a remote named only by ID, and `DatasetNotFound` for a source without
@@ -163,7 +163,7 @@ new chain.
 ## 5. Choosing a protocol
 
 `SyncServiceImpl` dispatches on the remote URL: `sync_impl` on a push's destination,
-`transfer_into_local_impl` on a pull's source:
+`sync_from_impl` on a pull's source:
 
 ```mermaid
 flowchart LR
@@ -517,7 +517,7 @@ nothing themselves; callers own authorization.
 | Smart push server | full | CAS on the first new block's `prevBlockHash`; with `force`, on the request's `current_head` (the `Seed` for a dataset the push created) |
 
 Blocks are appended without moving `HEAD`, which is set once after the last one, so readers see
-either the old or the new head. A local destination's `HEAD` is set by `LocalSyncCommitter`
+either the old or the new head. A local destination's `HEAD` is set by `DatasetUpdateSteps::commit_sync`
 ([§4](#4-sync-requests)), a remote Simple destination's by `append_batch_and_set_head`
 ([§6.1](#61-client-simpletransferprotocol)), and the smart push server's by
 `AppendDatasetMetadataBatchUseCase`; IPFS publishing has no `HEAD` to set. Moving the `HEAD` of a
@@ -589,7 +589,7 @@ into the recoverability of the failed task.
 | Concern | File |
 | --- | --- |
 | Sync types and errors | [`sync_service.rs`](../../src/domain/core/src/services/sync_service.rs) |
-| Committing a pull into a local dataset | [`local_sync_committer.rs`](../../src/domain/core/src/services/local_sync_committer.rs), [`local_sync_committer_impl.rs`](../../src/infra/core/src/services/sync/local_sync_committer_impl.rs) |
+| Committing a pull into a local dataset | [`dataset_update_steps_impl.rs`](../../src/infra/core/src/services/dataset_update_steps_impl.rs) |
 | `Seed` store and block append shared by both protocols | [`local_sync_writes/`](../../src/infra/core/src/utils/local_sync_writes/) |
 | Protocol dispatch, push to IPNS | [`sync_service_impl.rs`](../../src/infra/core/src/services/sync/sync_service_impl.rs) |
 | `odf+` URL helpers | [`url_ext.rs`](../../src/infra/core/src/utils/url_ext.rs) |

@@ -96,7 +96,7 @@ impl UpdateDatasetTaskRunner {
                 return Ok(Self::failed(e.is_recoverable()));
             }
         };
-        let sync_request = LocalSyncRequest {
+        let sync_request = SyncFromRequest {
             src: remote_ref,
             dst,
         };

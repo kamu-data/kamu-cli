@@ -49,7 +49,7 @@ impl LocalSyncHelper {
         src_ref: odf::DatasetRefRemote,
         dst_ref: odf::DatasetRef,
         create_if_not_exists: bool,
-    ) -> Result<LocalSyncRequest, SyncError> {
+    ) -> Result<SyncFromRequest, SyncError> {
         let target = self
             .pull_local_target(dst_ref.clone(), create_if_not_exists)
             .await?;
@@ -60,12 +60,12 @@ impl LocalSyncHelper {
             .await?
             .ok_or_else(|| DatasetAnyRefUnresolvedError::new(dst_ref))?;
 
-        Ok(LocalSyncRequest { src: src_ref, dst })
+        Ok(SyncFromRequest { src: src_ref, dst })
     }
 
     pub async fn transfer_and_commit(
         &self,
-        request: LocalSyncRequest,
+        request: SyncFromRequest,
         options: SyncOptions,
         listener: Option<Arc<dyn SyncListener>>,
     ) -> Result<SyncResult, SyncError> {
@@ -73,6 +73,15 @@ impl LocalSyncHelper {
             .transfer_and_commit_sync(request, options, listener, None)
             .await
             .map(|maybe_result| maybe_result.expect("The sync target must not be deleted"))
+    }
+
+    /// Commits a transfer in a transaction of its own; `None` when the
+    /// existing target was deleted meanwhile
+    pub async fn commit(
+        &self,
+        transferred: SyncFromTransferred,
+    ) -> Result<Option<SyncResult>, SyncError> {
+        self.update_steps().commit_sync(transferred, None).await
     }
 
     /// Resolves `dst_ref` to a pull target the way the pull planner does

@@ -69,7 +69,7 @@ async fn test_transfer_into_existing_dataset_moves_no_head() {
 
     assert_eq!(
         harness.commit(transferred).await.unwrap(),
-        SyncResult::Updated {
+        Some(SyncResult::Updated {
             old_head: Some(old_head),
             new_head: new_head.clone(),
             num_blocks: 1,
@@ -78,7 +78,7 @@ async fn test_transfer_into_existing_dataset_moves_no_head() {
                 num_records: 10,
                 updated_watermark: None,
             },
-        }
+        })
     );
     assert_eq!(harness.destination_head().await, Some(new_head));
 }
@@ -234,7 +234,7 @@ async fn test_first_pull_creates_dataset_with_requested_visibility() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_commit_into_dataset_deleted_during_transfer_fails() {
+async fn test_commit_into_dataset_deleted_during_transfer_finds_no_target() {
     let harness = LocalPullHarness::local_fs();
 
     harness.create_source_dataset().await;
@@ -246,10 +246,7 @@ async fn test_commit_into_dataset_deleted_during_transfer_fails() {
     let transferred = harness.transfer().await;
     harness.delete_destination().await;
 
-    assert_matches!(
-        harness.commit(transferred).await,
-        Err(SyncError::DatasetNotFound(_))
-    );
+    assert_matches!(harness.commit(transferred).await, Ok(None));
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -547,7 +544,7 @@ impl LocalPullHarness {
         let transferred = self.transfer().await;
         assert_matches!(
             self.commit(transferred).await,
-            Ok(SyncResult::Updated { old_head: None, new_head, .. }) if new_head == source_head
+            Ok(Some(SyncResult::Updated { old_head: None, new_head, .. })) if new_head == source_head
         );
         assert_eq!(self.destination_head().await, Some(source_head));
     }
@@ -586,7 +583,7 @@ impl LocalPullHarness {
         }
         assert_matches!(
             self.commit(transferred).await,
-            Ok(SyncResult::Updated { new_head, .. }) if new_head == source_head
+            Ok(Some(SyncResult::Updated { new_head, .. })) if new_head == source_head
         );
     }
 
@@ -808,7 +805,7 @@ impl LocalPullHarness {
         self.source_catalog
             .get_one::<dyn SyncService>()
             .unwrap()
-            .sync(request, SyncOptions::default(), None)
+            .sync_to(request, SyncOptions::default(), None)
             .await
             .unwrap();
     }
@@ -835,30 +832,30 @@ impl LocalPullHarness {
     async fn build_request(
         &self,
         remote_ref: odf::DatasetRefRemote,
-    ) -> Result<LocalSyncRequest, SyncError> {
+    ) -> Result<SyncFromRequest, SyncError> {
         LocalSyncHelper::new(&self.destination_catalog)
             .build_request(remote_ref, self.dataset_alias.as_local_ref(), true)
             .await
     }
 
-    async fn transfer(&self) -> TransferredSync {
+    async fn transfer(&self) -> SyncFromTransferred {
         self.transfer_with_listener(None).await
     }
 
     async fn transfer_with_listener(
         &self,
         listener: Option<Arc<dyn SyncListener>>,
-    ) -> TransferredSync {
+    ) -> SyncFromTransferred {
         let request = self.build_request(self.remote_ref()).await.unwrap();
 
         let transfer = self
             .destination_catalog
             .get_one::<dyn SyncService>()
             .unwrap()
-            .transfer_into_local(request, SyncOptions::default(), listener)
+            .sync_from(request, SyncOptions::default(), listener)
             .await
             .unwrap();
-        let SyncTransfer::Transferred(transferred) = transfer else {
+        let SyncFromTransfer::Transferred(transferred) = transfer else {
             panic!("Expected a transfer, got {transfer:?}");
         };
         transferred
@@ -869,7 +866,7 @@ impl LocalPullHarness {
     async fn transfer_into_headless_dataset(
         &self,
         dataset_name: &str,
-    ) -> Result<SyncTransfer, SyncError> {
+    ) -> Result<SyncFromTransfer, SyncError> {
         let seed_block = MetadataFactory::metadata_block(
             MetadataFactory::seed(odf::DatasetKind::Root)
                 .id_from(dataset_name)
@@ -892,10 +889,10 @@ impl LocalPullHarness {
         self.destination_catalog
             .get_one::<dyn SyncService>()
             .unwrap()
-            .transfer_into_local(
-                LocalSyncRequest {
+            .sync_from(
+                SyncFromRequest {
                     src: self.remote_ref(),
-                    dst: LocalSyncTarget::Existing {
+                    dst: SyncFromTarget::Existing {
                         dataset: ResolvedDataset::new(stored.dataset, handle),
                         expected_head: None,
                     },
@@ -906,10 +903,12 @@ impl LocalPullHarness {
             .await
     }
 
-    async fn commit(&self, transferred: TransferredSync) -> Result<SyncResult, SyncError> {
-        self.destination_catalog
-            .get_one::<dyn LocalSyncCommitter>()
-            .unwrap()
+    /// `None` when the destination was deleted before the commit
+    async fn commit(
+        &self,
+        transferred: SyncFromTransferred,
+    ) -> Result<Option<SyncResult>, SyncError> {
+        LocalSyncHelper::new(&self.destination_catalog)
             .commit(transferred)
             .await
     }

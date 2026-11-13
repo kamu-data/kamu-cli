@@ -26,9 +26,9 @@ use kamu_core::{
     SyncListener,
     SyncMultiListener,
     SyncOptions,
-    SyncRequest,
     SyncResult,
     SyncService,
+    SyncToRequest,
 };
 use kamu_datasets::{
     DatasetOperation,
@@ -102,7 +102,7 @@ impl PushDatasetUseCaseImpl {
         plan: &[PushItem],
         sync_options: SyncOptions,
         push_target: Option<&odf::DatasetPushTarget>,
-    ) -> Result<(Vec<(usize, SyncRequest)>, Vec<PushResponse>), InternalError> {
+    ) -> Result<(Vec<(usize, SyncToRequest)>, Vec<PushResponse>), InternalError> {
         let mut sync_requests = Vec::new();
         let mut errors = Vec::new();
 
@@ -156,13 +156,13 @@ impl PushDatasetUseCaseImpl {
     /// commits there, so the result is final when the sync returns
     async fn sync_and_report(
         &self,
-        sync_request: SyncRequest,
+        sync_request: SyncToRequest,
         sync_options: SyncOptions,
         listener: Option<Arc<dyn SyncListener>>,
     ) -> Result<SyncResult, SyncError> {
         let result = self
             .sync_service
-            .sync(sync_request, sync_options, listener.clone())
+            .sync_to(sync_request, sync_options, listener.clone())
             .await;
         if let Some(listener) = &listener {
             match &result {

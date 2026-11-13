@@ -112,13 +112,13 @@ impl PullSyncJob {
     async fn transfer_and_commit(
         &self,
         psi: &PullSyncItem,
-        dst: LocalSyncTarget,
+        dst: SyncFromTarget,
         options: &PullOptions,
         listener: Option<Arc<dyn SyncListener>>,
     ) -> Result<Option<SyncResult>, SyncError> {
         self.update_steps
             .transfer_and_commit_sync(
-                LocalSyncRequest {
+                SyncFromRequest {
                     src: psi.remote_ref.clone(),
                     dst,
                 },

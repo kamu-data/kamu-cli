@@ -50,7 +50,8 @@ impl RacingDatasetUpdateSteps {
             .add::<Self>();
     }
 
-    /// Arms the next `commit_head` to delete its dataset first
+    /// Arms the next `commit_head`, or `transfer_and_commit_sync` into an
+    /// existing dataset, to delete that dataset first
     pub fn delete_dataset_before_next_commit(&self) {
         *self.delete_before_next_commit.lock().unwrap() = true;
     }
@@ -75,7 +76,7 @@ impl DatasetUpdateSteps for RacingDatasetUpdateSteps {
     async fn resolve_sync_target(
         &self,
         target: &PullLocalTarget,
-    ) -> Result<Option<LocalSyncTarget>, SyncError> {
+    ) -> Result<Option<SyncFromTarget>, SyncError> {
         self.steps.resolve_sync_target(target).await
     }
 
@@ -95,13 +96,30 @@ impl DatasetUpdateSteps for RacingDatasetUpdateSteps {
         self.steps.commit_head(target, old_head, new_head).await
     }
 
+    async fn commit_sync(
+        &self,
+        transferred: SyncFromTransferred,
+        maybe_pull_alias: Option<&odf::DatasetRefRemote>,
+    ) -> Result<Option<SyncResult>, SyncError> {
+        self.steps.commit_sync(transferred, maybe_pull_alias).await
+    }
+
     async fn transfer_and_commit_sync(
         &self,
-        request: LocalSyncRequest,
+        request: SyncFromRequest,
         options: SyncOptions,
         listener: Option<Arc<dyn SyncListener>>,
         maybe_pull_alias: Option<&odf::DatasetRefRemote>,
     ) -> Result<Option<SyncResult>, SyncError> {
+        if std::mem::take(&mut *self.delete_before_next_commit.lock().unwrap())
+            && let SyncFromTarget::Existing { dataset, .. } = &request.dst
+        {
+            self.dataset_storage_unit_writer
+                .delete_dataset(dataset.get_id())
+                .await
+                .unwrap();
+        }
+
         self.steps
             .transfer_and_commit_sync(request, options, listener, maybe_pull_alias)
             .await

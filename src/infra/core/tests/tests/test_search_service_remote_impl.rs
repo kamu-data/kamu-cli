@@ -109,7 +109,7 @@ async fn do_test_search(tmp_workspace_dir: &Path, repo_url: Url) {
     .unwrap();
 
     sync_svc
-        .sync(
+        .sync_to(
             sync_request_builder
                 .build_sync_request(
                     dataset_local_alias.as_local_ref(),

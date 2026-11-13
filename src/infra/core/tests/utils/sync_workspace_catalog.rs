@@ -99,7 +99,6 @@ impl SyncWorkspaceCatalog {
             .add::<odf::dataset::DatasetFactoryImpl>()
             .add::<SyncServiceImpl>()
             .add::<IpfsServiceImpl>()
-            .add::<LocalSyncCommitterImpl>()
             .add::<RemoteAliasesRegistryImpl>()
             .add::<RemoteAliasResolverImpl>()
             .add::<RemoteDatasetUrlResolverImpl>()

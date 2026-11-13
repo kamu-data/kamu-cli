@@ -153,7 +153,7 @@ async fn do_test_sync(
     dataset_registry: Arc<dyn DatasetRegistry>,
 ) {
     let _push_res = sync_svc
-        .sync(
+        .sync_to(
             sync_request_builder
                 .build_sync_request(dataset_alias.as_local_ref(), push_repo_url.clone(), true)
                 .await
@@ -164,10 +164,10 @@ async fn do_test_sync(
         .await;
 
     let _pull_res = sync_svc
-        .transfer_into_local(
-            LocalSyncRequest {
+        .sync_from(
+            SyncFromRequest {
                 src: pull_repo_url.clone(),
-                dst: LocalSyncTarget::existing(
+                dst: SyncFromTarget::existing(
                     dataset_registry
                         .get_dataset_by_ref(&dataset_alias.as_local_ref())
                         .await

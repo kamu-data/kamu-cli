@@ -153,22 +153,22 @@ impl SimpleTransferProtocol {
         &self,
         src_ref: &odf::DatasetRefAny,
         src: Arc<dyn odf::Dataset>,
-        dst: &LocalSyncTarget,
+        dst: &SyncFromTarget,
         validation: odf::dataset::AppendValidation,
         trust_source_hashes: bool,
         force: bool,
         transfer_options: SimpleProtocolTransferOptions,
         listener: Arc<dyn SyncListener + 'static>,
-    ) -> Result<SyncTransfer, SyncError> {
+    ) -> Result<SyncFromTransfer, SyncError> {
         let dst_chain = match dst {
-            LocalSyncTarget::Existing {
+            SyncFromTarget::Existing {
                 dataset,
                 expected_head,
             } => expected_head.as_ref().map(|head| ChainWithHead {
                 chain: dataset.as_metadata_chain(),
                 head,
             }),
-            LocalSyncTarget::New(_) => None,
+            SyncFromTarget::New(_) => None,
         };
         let dst_head = dst_chain.map(|dst| dst.head);
 
@@ -185,7 +185,7 @@ impl SimpleTransferProtocol {
         )
         .await?
         else {
-            return Ok(SyncTransfer::UpToDate);
+            return Ok(SyncFromTransfer::UpToDate);
         };
 
         let num_blocks = u64::try_from(blocks_desc_ordered.len()).unwrap();
@@ -230,7 +230,7 @@ impl SimpleTransferProtocol {
         let increment =
             sync_increment(dst_dataset.as_metadata_chain(), dst_head, &src_head).await?;
 
-        Ok(SyncTransfer::Transferred(TransferredSync {
+        Ok(SyncFromTransfer::Transferred(SyncFromTransferred {
             target,
             new_head: src_head,
             num_blocks,

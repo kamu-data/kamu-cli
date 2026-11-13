@@ -351,7 +351,7 @@ impl IpnsPushHarness {
     ) -> Result<SyncResult, SyncError> {
         let url = Url::parse(&format!("ipns://{key_id}")).unwrap();
         let dataset = self.dataset_factory.get_dataset(&url, true).await.unwrap();
-        let request = SyncRequest {
+        let request = SyncToRequest {
             src: ResolvedDataset::from_created(created),
             dst: SyncRefRemote {
                 url: Arc::new(url.clone()),
@@ -359,7 +359,7 @@ impl IpnsPushHarness {
                 original_remote_ref: odf::DatasetRefRemote::Url(Arc::new(url)),
             },
         };
-        self.sync_service.sync(request, options, None).await
+        self.sync_service.sync_to(request, options, None).await
     }
 
     fn copy_dir(src: &Path, dst: &Path) {

@@ -303,7 +303,7 @@ impl RemoteStatusTestHarness {
             .unwrap();
 
         self.sync_service
-            .sync(
+            .sync_to(
                 sync_request,
                 SyncOptions {
                     trust_source: None,

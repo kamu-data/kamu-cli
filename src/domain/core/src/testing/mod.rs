@@ -9,7 +9,6 @@
 
 mod mock_compaction_executor;
 mod mock_engine_provisioner;
-mod mock_local_sync_committer;
 mod mock_polling_ingest_service;
 mod mock_sync_service;
 mod mock_transform_executor;

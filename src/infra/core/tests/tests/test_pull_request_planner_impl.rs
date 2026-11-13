@@ -1139,7 +1139,6 @@ impl PullTestHarness {
             .add::<ObjectStoreRegistryImpl>()
             .add::<SyncServiceImpl>()
             .add::<IpfsServiceImpl>()
-            .add::<LocalSyncCommitterImpl>()
             .add::<RemoteAliasResolverImpl>()
             .add::<RemoteDatasetUrlResolverImpl>()
             .add::<SyncRequestBuilder>()

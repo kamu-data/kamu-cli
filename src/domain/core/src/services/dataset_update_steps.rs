@@ -40,7 +40,7 @@ pub trait DatasetUpdateSteps: Send + Sync {
     async fn resolve_sync_target(
         &self,
         target: &PullLocalTarget,
-    ) -> Result<Option<LocalSyncTarget>, SyncError>;
+    ) -> Result<Option<SyncFromTarget>, SyncError>;
 
     /// Moves `HEAD` from `old_head` to `new_head` if it is still `old_head`
     async fn commit_head(
@@ -50,13 +50,25 @@ pub trait DatasetUpdateSteps: Send + Sync {
         new_head: &odf::Multihash,
     ) -> Result<HeadCommit, InternalError>;
 
+    /// Commits what [`crate::SyncService::sync_from`] wrote, in a transaction
+    /// of its own: a compare-and-swap of `HEAD` from the head the transfer
+    /// started from, or the creation of a new dataset with `HEAD` at the
+    /// transferred head. `None` when the existing target was deleted
+    /// meanwhile; [`SyncError::HeadMoved`] when its `HEAD` moved. A dataset
+    /// the commit creates gets `maybe_pull_alias` in the same transaction
+    async fn commit_sync(
+        &self,
+        transferred: SyncFromTransferred,
+        maybe_pull_alias: Option<&odf::DatasetRefRemote>,
+    ) -> Result<Option<SyncResult>, SyncError>;
+
     /// Transfers with no transaction held, then commits; `None` when the
     /// existing target was deleted before the commit. A dataset the pull
     /// creates gets `maybe_pull_alias` in the commit's transaction, so it
     /// never exists without it
     async fn transfer_and_commit_sync(
         &self,
-        request: LocalSyncRequest,
+        request: SyncFromRequest,
         options: SyncOptions,
         listener: Option<Arc<dyn SyncListener>>,
         maybe_pull_alias: Option<&odf::DatasetRefRemote>,

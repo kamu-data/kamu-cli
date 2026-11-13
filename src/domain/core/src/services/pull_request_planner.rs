@@ -184,15 +184,15 @@ impl PullLocalTarget {
     pub async fn resolve_sync_target(
         &self,
         dataset_registry: &dyn DatasetRegistry,
-    ) -> Result<Option<LocalSyncTarget>, SyncError> {
+    ) -> Result<Option<SyncFromTarget>, SyncError> {
         let (local_ref, new_target) = match self {
             Self::Existing(hdl) => (hdl.id.as_local_ref(), None),
             Self::ToCreate(alias) => (alias.as_local_ref(), Some(alias)),
         };
 
         match dataset_registry.try_get_dataset_by_ref(&local_ref).await? {
-            Some(dataset) => Ok(Some(LocalSyncTarget::existing(dataset).await?)),
-            None => Ok(new_target.map(|alias| LocalSyncTarget::New(alias.clone()))),
+            Some(dataset) => Ok(Some(SyncFromTarget::existing(dataset).await?)),
+            None => Ok(new_target.map(|alias| SyncFromTarget::New(alias.clone()))),
         }
     }
 }

@@ -31,7 +31,6 @@ use kamu::{
     EngineProvisionerNull,
     FetchService,
     IpfsServiceImpl,
-    LocalSyncCommitterImpl,
     ObjectStoreBuilderLocalFs,
     ObjectStoreRegistryImpl,
     PollingIngestPlannerImpl,
@@ -1001,8 +1000,7 @@ impl UpdateDatasetTaskRunnerHarness {
         b.add::<UpdateDatasetTaskRunner>()
             .add::<PollingIngestPlannerImpl>()
             .add_value(RacingDatasetHeadCommitter::default())
-            .bind::<dyn DatasetHeadCommitter, RacingDatasetHeadCommitter>()
-            .add::<LocalSyncCommitterImpl>();
+            .bind::<dyn DatasetHeadCommitter, RacingDatasetHeadCommitter>();
         register_operations(&mut b, base_use_case_harness.temp_dir_path());
 
         database_common::NoOpDatabasePlugin::init_database_components(&mut b);
@@ -1057,7 +1055,7 @@ impl UpdateDatasetTaskRunnerHarness {
         self.catalog
             .get_one::<dyn SyncService>()
             .unwrap()
-            .sync(request, SyncOptions::default(), None)
+            .sync_to(request, SyncOptions::default(), None)
             .await
             .unwrap();
     }

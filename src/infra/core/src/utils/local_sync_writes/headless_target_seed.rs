@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_core::{CorruptedSourceError, DatasetIdMismatchError, LocalSyncTarget, SyncError};
+use kamu_core::{CorruptedSourceError, DatasetIdMismatchError, SyncError, SyncFromTarget};
 use odf::metadata::AsTypedBlock;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -16,21 +16,21 @@ use odf::metadata::AsTypedBlock;
 /// whole chain is transferred, starts with that dataset's `Seed`: nothing else
 /// compares the dataset IDs when the destination has no blocks to compare
 pub(crate) fn ensure_seed_matches_headless_target(
-    dst: &LocalSyncTarget,
+    dst: &SyncFromTarget,
     oldest_block: &odf::dataset::HashedMetadataBlockBytesDecoded,
 ) -> Result<(), SyncError> {
     let dataset = match dst {
-        LocalSyncTarget::Existing {
+        SyncFromTarget::Existing {
             dataset,
             expected_head: None,
         } => dataset,
         // Chains with a head are compared from it; a new dataset is stored from
         // the source's own `Seed`
-        LocalSyncTarget::Existing {
+        SyncFromTarget::Existing {
             expected_head: Some(_),
             ..
         }
-        | LocalSyncTarget::New(_) => return Ok(()),
+        | SyncFromTarget::New(_) => return Ok(()),
     };
 
     let (_, block, _) = oldest_block;

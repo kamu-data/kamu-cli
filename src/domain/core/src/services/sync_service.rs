@@ -26,32 +26,33 @@ use crate::*;
 pub trait SyncService: Send + Sync {
     /// Syncs into a destination that is not a dataset of this node: a push to
     /// a remote repository or to IPFS. A pull into a local dataset is
-    /// [`SyncService::transfer_into_local`] followed by
-    /// [`LocalSyncCommitter::commit`]
-    async fn sync(
+    /// [`SyncService::sync_from`] followed by
+    /// [`crate::DatasetUpdateSteps::commit_sync`]
+    async fn sync_to(
         &self,
-        request: SyncRequest,
+        request: SyncToRequest,
         options: SyncOptions,
         listener: Option<Arc<dyn SyncListener>>,
     ) -> Result<SyncResult, SyncError>;
 
     /// Resolves and opens the remote source and writes the blocks, data and
     /// checkpoints the local dataset lacks as unreferenced objects, with no
-    /// transaction held. Commit with [`LocalSyncCommitter`]; the listener gets
-    /// `begin` and progress, and the caller reports the outcome.
-    async fn transfer_into_local(
+    /// transaction held. Commit with [`crate::DatasetUpdateSteps::commit_sync`];
+    /// the listener gets `begin` and progress, and the caller reports the
+    /// outcome.
+    async fn sync_from(
         &self,
-        request: LocalSyncRequest,
+        request: SyncFromRequest,
         options: SyncOptions,
         listener: Option<Arc<dyn SyncListener>>,
-    ) -> Result<SyncTransfer, SyncError>;
+    ) -> Result<SyncFromTransfer, SyncError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// A push of a dataset of this node into a destination outside it
 #[derive(Debug, Clone)]
-pub struct SyncRequest {
+pub struct SyncToRequest {
     pub src: ResolvedDataset,
     pub dst: SyncRefRemote,
 }
@@ -61,16 +62,16 @@ pub struct SyncRequest {
 /// A pull from a remote dataset into a dataset of this node. The source is
 /// only a reference: the transfer resolves and opens it
 #[derive(Debug, Clone)]
-pub struct LocalSyncRequest {
+pub struct SyncFromRequest {
     pub src: odf::DatasetRefRemote,
-    pub dst: LocalSyncTarget,
+    pub dst: SyncFromTarget,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// The local dataset a pull writes into
 #[derive(Debug, Clone)]
-pub enum LocalSyncTarget {
+pub enum SyncFromTarget {
     /// An existing dataset, whose `HEAD` must still be `expected_head` when
     /// the transfer is committed. Read it in a transaction: a detached
     /// dataset reads the storage `HEAD`, which may lag behind.
@@ -84,7 +85,7 @@ pub enum LocalSyncTarget {
     New(odf::DatasetAlias),
 }
 
-impl LocalSyncTarget {
+impl SyncFromTarget {
     /// Targets an existing dataset, expecting its current `HEAD`
     pub async fn existing(dataset: ResolvedDataset) -> Result<Self, SyncError> {
         let expected_head = try_resolve_head(dataset.as_metadata_chain()).await?;
@@ -180,11 +181,11 @@ pub enum SyncResult {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// What [`SyncService::transfer_into_local`] wrote
+/// What [`SyncService::sync_from`] wrote
 #[derive(Debug)]
-pub enum SyncTransfer {
+pub enum SyncFromTransfer {
     UpToDate,
-    Transferred(TransferredSync),
+    Transferred(SyncFromTransferred),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -192,8 +193,8 @@ pub enum SyncTransfer {
 /// Blocks and objects written into a local dataset, not yet referenced by its
 /// `HEAD`
 #[derive(Debug)]
-pub struct TransferredSync {
-    pub target: TransferredSyncTarget,
+pub struct SyncFromTransferred {
+    pub target: SyncFromTransferredTarget,
     pub new_head: odf::Multihash,
     pub num_blocks: u64,
     pub increment: odf::dataset::MetadataChainIncrementInterval,
@@ -202,7 +203,7 @@ pub struct TransferredSync {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug)]
-pub enum TransferredSyncTarget {
+pub enum SyncFromTransferredTarget {
     /// The commit moves `HEAD` from `expected_head` to the new head
     Existing {
         dataset: ResolvedDataset,

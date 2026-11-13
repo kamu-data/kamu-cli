@@ -135,7 +135,7 @@ async fn do_test_sync(
     );
 
     let sync_result = sync_svc_foo
-        .sync(
+        .sync_to(
             sync_request_builder_foo
                 .build_sync_request(dataset_alias_foo.as_local_ref(), push_ref.clone(), true)
                 .await
@@ -212,7 +212,7 @@ async fn do_test_sync(
     );
 
     let sync_result = sync_svc_foo
-        .sync(
+        .sync_to(
             sync_request_builder_foo
                 .build_sync_request(dataset_alias_foo.as_local_ref(), push_ref.clone(), false)
                 .await
@@ -257,7 +257,7 @@ async fn do_test_sync(
 
     // Up to date /////////////////////////////////////////////////////////////
     let sync_result = sync_svc_foo
-        .sync(
+        .sync_to(
             sync_request_builder_foo
                 .build_sync_request(dataset_alias_foo.as_local_ref(), push_ref.clone(), false)
                 .await
@@ -295,7 +295,7 @@ async fn do_test_sync(
     .await;
 
     let sync_result = sync_svc_bar
-        .sync(
+        .sync_to(
             sync_request_builder_bar
                 .build_sync_request(dataset_alias_bar.as_local_ref(), push_ref.clone(), false)
                 .await
@@ -317,7 +317,7 @@ async fn do_test_sync(
 
     // Try push from dataset_foo
     let sync_err = sync_svc_foo
-        .sync(
+        .sync_to(
             sync_request_builder_foo
                 .build_sync_request(dataset_alias_foo.as_local_ref(), push_ref.clone(), false)
                 .await
@@ -338,7 +338,7 @@ async fn do_test_sync(
     // Try push from dataset_1 with --force: it should abandon the diverged_head
     // block
     let sync_result = sync_svc_foo
-        .sync(
+        .sync_to(
             sync_request_builder_foo
                 .build_sync_request(dataset_alias_foo.as_local_ref(), push_ref.clone(), false)
                 .await
@@ -429,7 +429,7 @@ async fn do_test_sync(
     .await;
 
     let sync_result = sync_svc_foo
-        .sync(
+        .sync_to(
             sync_request_builder_foo
                 .build_sync_request(dataset_alias_foo.as_local_ref(), push_ref.clone(), false)
                 .await
@@ -450,7 +450,7 @@ async fn do_test_sync(
     );
 
     let sync_err = sync_svc_bar
-        .sync(
+        .sync_to(
             sync_request_builder_bar
                 .build_sync_request(dataset_alias_bar.as_local_ref(), push_ref.clone(), false)
                 .await
@@ -493,7 +493,7 @@ async fn do_test_sync(
 
     for force in [false, true] {
         let sync_err = sync_svc_foo
-            .sync(
+            .sync_to(
                 sync_request_builder_foo
                     .build_sync_request(dataset_alias_baz.as_local_ref(), push_ref.clone(), false)
                     .await
@@ -567,7 +567,7 @@ async fn do_test_sync(
         }
 
         let sync_err = sync_svc_foo
-            .sync(
+            .sync_to(
                 sync_request_builder_foo
                     .build_sync_request(dataset_alias_foo.as_local_ref(), push_ref.clone(), false)
                     .await

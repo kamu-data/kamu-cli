@@ -501,7 +501,6 @@ pub fn configure_base_catalog(
 
     b.add::<SyncServiceImpl>();
     b.add::<IpfsServiceImpl>();
-    b.add::<LocalSyncCommitterImpl>();
     b.add::<SyncRequestBuilder>();
 
     b.add::<PullRequestPlannerImpl>();

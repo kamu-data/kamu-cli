@@ -9,11 +9,18 @@
 
 use std::sync::Arc;
 
-use database_common_macros::{transactional_method1, transactional_method2, transactional_method3};
+use database_common_macros::{transactional_method1, transactional_method2};
 use dill::*;
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_core::*;
-use kamu_datasets::{DatasetHeadCommitter, DatasetRegistry, DatasetRegistryExt};
+use kamu_datasets::{
+    CreateDatasetUseCase,
+    CreateDatasetUseCaseOptions,
+    DatasetHeadCommitter,
+    DatasetRegistry,
+    DatasetRegistryExt,
+    ResolvedDataset,
+};
 
 use crate::utils::span_outcome::SpanOutcome;
 
@@ -28,76 +35,46 @@ pub struct DatasetUpdateStepsImpl {
 }
 
 impl DatasetUpdateStepsImpl {
-    #[transactional_method1(local_sync_committer: Arc<dyn LocalSyncCommitter>)]
-    async fn commit_sync(&self, transferred: TransferredSync) -> Result<SyncResult, SyncError> {
-        local_sync_committer.commit(transferred).await
+    /// Moves `HEAD` of an existing dataset from the head the transfer started
+    /// from
+    #[transactional_method2(dataset_registry: Arc<dyn DatasetRegistry>, dataset_head_committer: Arc<dyn DatasetHeadCommitter>)]
+    async fn commit_sync_into_existing(
+        &self,
+        dataset: &ResolvedDataset,
+        expected_head: Option<&odf::Multihash>,
+        new_head: &odf::Multihash,
+    ) -> Result<(), SyncError> {
+        // The transfer ran detached; the commit needs this transaction, and
+        // the dataset may have been deleted meanwhile
+        let dataset = dataset_registry.get_dataset_by_id(dataset.get_id()).await?;
+        dataset_head_committer
+            .commit_head(&dataset, expected_head, new_head)
+            .await?;
+        Ok(())
     }
 
-    /// Commits, and stores the pull alias of a dataset the commit created in
-    /// the same transaction
-    #[transactional_method3(local_sync_committer: Arc<dyn LocalSyncCommitter>, dataset_registry: Arc<dyn DatasetRegistry>, remote_alias_registry: Arc<dyn RemoteAliasesRegistry>)]
-    async fn commit_sync_with_pull_alias(
+    /// Creates the dataset with `HEAD` at the transferred head, and stores its
+    /// pull alias in the same transaction
+    #[transactional_method2(create_dataset_use_case: Arc<dyn CreateDatasetUseCase>, remote_alias_registry: Arc<dyn RemoteAliasesRegistry>)]
+    async fn commit_sync_into_new(
         &self,
-        transferred: TransferredSync,
-        pull_alias: &odf::DatasetRefRemote,
-    ) -> Result<SyncResult, SyncError> {
-        let local_ref = match &transferred.target {
-            TransferredSyncTarget::Existing { dataset, .. } => dataset.get_handle().as_local_ref(),
-            TransferredSyncTarget::New { alias, .. } => alias.as_local_ref(),
-        };
+        alias: &odf::DatasetAlias,
+        seed_block: odf::MetadataBlockTyped<odf::metadata::Seed>,
+        options: CreateDatasetUseCaseOptions,
+        maybe_pull_alias: Option<&odf::DatasetRefRemote>,
+    ) -> Result<(), SyncError> {
+        let created = create_dataset_use_case
+            .execute(alias, seed_block, options)
+            .await?;
 
-        let sync_result = local_sync_committer.commit(transferred).await?;
-
-        if let SyncResult::Updated { old_head: None, .. } = &sync_result {
-            let handle = dataset_registry
-                .resolve_dataset_handle_by_ref(&local_ref)
-                .await
-                .int_err()?;
+        if let Some(pull_alias) = maybe_pull_alias {
             remote_alias_registry
-                .get_remote_aliases(&handle)
+                .get_remote_aliases(&created.dataset_handle)
                 .await?
                 .add(pull_alias, RemoteAliasKind::Pull)
                 .await?;
         }
-
-        Ok(sync_result)
-    }
-
-    async fn commit_transferred(
-        &self,
-        transferred: TransferredSync,
-        maybe_pull_alias: Option<&odf::DatasetRefRemote>,
-    ) -> Result<Option<SyncResult>, SyncError> {
-        let result = match maybe_pull_alias {
-            Some(pull_alias) => {
-                self.commit_sync_with_pull_alias(transferred, pull_alias)
-                    .await
-            }
-            None => self.commit_sync(transferred).await,
-        };
-        match result {
-            Ok(sync_result) => Ok(Some(sync_result)),
-            // The committer reopens an existing target by its ID, so a deleted one is not found
-            Err(SyncError::DatasetNotFound(_)) => Ok(None),
-            Err(
-                e @ (SyncError::RefCollision(_)
-                | SyncError::NameCollision(_)
-                | SyncError::CreateDatasetFailed(_)
-                | SyncError::UnsupportedProtocol(_)
-                | SyncError::UnsupportedIpfsStorageType(_)
-                | SyncError::RemoteByIdUnsupported(_)
-                | SyncError::InvalidDestination(_)
-                | SyncError::RepositoryNotFound(_)
-                | SyncError::DatasetsDiverged(_)
-                | SyncError::DatasetIdMismatch(_)
-                | SyncError::DestinationAhead(_)
-                | SyncError::OverwriteSeedBlock(_)
-                | SyncError::Corrupted(_)
-                | SyncError::HeadMoved(_)
-                | SyncError::Access(_)
-                | SyncError::Internal(_)),
-            ) => Err(e),
-        }
+        Ok(())
     }
 
     #[transactional_method2(dataset_registry: Arc<dyn DatasetRegistry>, polling_ingest_planner: Arc<dyn PollingIngestPlanner>)]
@@ -155,7 +132,7 @@ impl DatasetUpdateStepsImpl {
     async fn resolve_sync_target_transactionally(
         &self,
         target: &PullLocalTarget,
-    ) -> Result<Option<LocalSyncTarget>, SyncError> {
+    ) -> Result<Option<SyncFromTarget>, SyncError> {
         let sync_target = target
             .resolve_sync_target(dataset_registry.as_ref())
             .await?;
@@ -242,11 +219,11 @@ impl DatasetUpdateSteps for DatasetUpdateStepsImpl {
     async fn resolve_sync_target(
         &self,
         target: &PullLocalTarget,
-    ) -> Result<Option<LocalSyncTarget>, SyncError> {
+    ) -> Result<Option<SyncFromTarget>, SyncError> {
         let result = self.resolve_sync_target_transactionally(target).await;
         match &result {
-            Ok(Some(LocalSyncTarget::Existing { .. })) => SpanOutcome::Existing,
-            Ok(Some(LocalSyncTarget::New(_))) => SpanOutcome::New,
+            Ok(Some(SyncFromTarget::Existing { .. })) => SpanOutcome::Existing,
+            Ok(Some(SyncFromTarget::New(_))) => SpanOutcome::New,
             Ok(None) => SpanOutcome::DatasetDeleted,
             Err(e) => SpanOutcome::from(e),
         }
@@ -272,22 +249,89 @@ impl DatasetUpdateSteps for DatasetUpdateStepsImpl {
         result
     }
 
+    async fn commit_sync(
+        &self,
+        transferred: SyncFromTransferred,
+        maybe_pull_alias: Option<&odf::DatasetRefRemote>,
+    ) -> Result<Option<SyncResult>, SyncError> {
+        let SyncFromTransferred {
+            target,
+            new_head,
+            num_blocks,
+            increment,
+        } = transferred;
+
+        let committed = match target {
+            SyncFromTransferredTarget::Existing {
+                dataset,
+                expected_head,
+            } => self
+                .commit_sync_into_existing(&dataset, expected_head.as_ref(), &new_head)
+                .await
+                .map(|()| expected_head),
+            SyncFromTransferredTarget::New {
+                alias,
+                seed_block,
+                seed_block_bytes,
+                visibility,
+            } => self
+                .commit_sync_into_new(
+                    &alias,
+                    seed_block,
+                    CreateDatasetUseCaseOptions {
+                        dataset_visibility: visibility,
+                        seed_block_bytes: Some(seed_block_bytes),
+                        initial_head: Some(new_head.clone()),
+                    },
+                    maybe_pull_alias,
+                )
+                .await
+                .map(|()| None),
+        };
+
+        match committed {
+            Ok(old_head) => Ok(Some(SyncResult::Updated {
+                old_head,
+                new_head,
+                num_blocks,
+                increment,
+            })),
+            // The commit reopens an existing target by its ID, so a deleted one is not found
+            Err(SyncError::DatasetNotFound(_)) => Ok(None),
+            Err(
+                e @ (SyncError::RefCollision(_)
+                | SyncError::NameCollision(_)
+                | SyncError::CreateDatasetFailed(_)
+                | SyncError::UnsupportedProtocol(_)
+                | SyncError::UnsupportedIpfsStorageType(_)
+                | SyncError::RemoteByIdUnsupported(_)
+                | SyncError::InvalidDestination(_)
+                | SyncError::RepositoryNotFound(_)
+                | SyncError::DatasetsDiverged(_)
+                | SyncError::DatasetIdMismatch(_)
+                | SyncError::DestinationAhead(_)
+                | SyncError::OverwriteSeedBlock(_)
+                | SyncError::Corrupted(_)
+                | SyncError::HeadMoved(_)
+                | SyncError::Access(_)
+                | SyncError::Internal(_)),
+            ) => Err(e),
+        }
+    }
+
     #[tracing::instrument(level = "info", name = DatasetUpdateStepsImpl_transfer_and_commit_sync, skip_all, fields(?request, outcome))]
     async fn transfer_and_commit_sync(
         &self,
-        request: LocalSyncRequest,
+        request: SyncFromRequest,
         options: SyncOptions,
         listener: Option<Arc<dyn SyncListener>>,
         maybe_pull_alias: Option<&odf::DatasetRefRemote>,
     ) -> Result<Option<SyncResult>, SyncError> {
         let sync_service = self.sync_service.get().int_err()?;
-        let result = match sync_service
-            .transfer_into_local(request, options, listener)
-            .await
-        {
-            Ok(SyncTransfer::UpToDate) => Ok(Some(SyncResult::UpToDate)),
-            Ok(SyncTransfer::Transferred(transferred)) => {
-                self.commit_transferred(transferred, maybe_pull_alias).await
+        let result = match sync_service.sync_from(request, options, listener).await {
+            Ok(SyncFromTransfer::UpToDate) => Ok(Some(SyncResult::UpToDate)),
+            Ok(SyncFromTransfer::Transferred(transferred)) => {
+                self.commit_sync(transferred, maybe_pull_alias).await
             }
             Err(e) => Err(e),
         };

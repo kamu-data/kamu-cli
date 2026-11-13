@@ -291,17 +291,17 @@ impl WsSmartTransferProtocolClient {
     pub(super) async fn pull_flow(
         &self,
         http_src_url: &Url,
-        dst: &LocalSyncTarget,
+        dst: &SyncFromTarget,
         transfer_options: TransferOptions,
-    ) -> Result<SyncTransfer, SyncError> {
+    ) -> Result<SyncFromTransfer, SyncError> {
         let maybe_access_token = self.access_token(http_src_url);
 
         let (dst_dataset, dst_head) = match dst {
-            LocalSyncTarget::Existing {
+            SyncFromTarget::Existing {
                 dataset,
                 expected_head,
             } => (Some(dataset), expected_head.as_ref()),
-            LocalSyncTarget::New(_) => (None, None),
+            SyncFromTarget::New(_) => (None, None),
         };
 
         // A forced pull skips the head check that would otherwise reveal a
@@ -401,7 +401,7 @@ impl WsSmartTransferProtocolClient {
 
                 // Checked with or without `force`: an existing dataset without `HEAD`
                 // receives a whole chain, `Seed` included
-                if let LocalSyncTarget::Existing { dataset, .. } = dst
+                if let SyncFromTarget::Existing { dataset, .. } = dst
                     && let Some(conflict) =
                         SeedConflict::find(new_blocks.front(), dataset.get_handle())
                 {
@@ -454,14 +454,14 @@ impl WsSmartTransferProtocolClient {
                 let increment =
                     sync_increment(dst_storage.as_metadata_chain(), dst_head, &new_head).await?;
 
-                SyncTransfer::Transferred(TransferredSync {
+                SyncFromTransfer::Transferred(SyncFromTransferred {
                     target,
                     new_head,
                     num_blocks,
                     increment,
                 })
             } else {
-                SyncTransfer::UpToDate
+                SyncFromTransfer::UpToDate
             };
 
             Ok::<_, SyncError>(sync_transfer)

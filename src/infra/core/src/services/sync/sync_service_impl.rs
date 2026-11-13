@@ -114,10 +114,10 @@ impl SyncServiceImpl {
     async fn transfer_generic(
         &self,
         src: SyncRefRemote,
-        dst: &LocalSyncTarget,
+        dst: &SyncFromTarget,
         opts: SyncOptions,
         listener: Arc<dyn SyncListener>,
-    ) -> Result<SyncTransfer, SyncError> {
+    ) -> Result<SyncFromTransfer, SyncError> {
         // A remote dataset is validated unless the options say otherwise
         let trust = SourceTrust::new(opts.trust_source.unwrap_or(false));
 
@@ -141,9 +141,9 @@ impl SyncServiceImpl {
     async fn transfer_smart_pull(
         &self,
         src_url: &Url,
-        dst: &LocalSyncTarget,
+        dst: &SyncFromTarget,
         opts: SyncOptions,
-    ) -> Result<SyncTransfer, SyncError> {
+    ) -> Result<SyncFromTransfer, SyncError> {
         let http_src_url = src_url.odf_to_transport_protocol()?;
 
         tracing::info!("Starting transfer using Smart Transfer Protocol (Pull flow)");
@@ -364,7 +364,7 @@ impl SyncServiceImpl {
         })
     }
 
-    async fn sync_impl(
+    async fn sync_to_impl(
         &self,
         src: ResolvedDataset,
         dst: SyncRefRemote,
@@ -427,13 +427,13 @@ impl SyncServiceImpl {
         })
     }
 
-    async fn transfer_into_local_impl(
+    async fn sync_from_impl(
         &self,
         src_ref: odf::DatasetRefRemote,
-        dst: &LocalSyncTarget,
+        dst: &SyncFromTarget,
         opts: SyncOptions,
         listener: Arc<dyn SyncListener>,
-    ) -> Result<SyncTransfer, SyncError> {
+    ) -> Result<SyncFromTransfer, SyncError> {
         let src = self.open_remote_source(src_ref).await?;
 
         if src.url.is_odf_protocol() {
@@ -456,29 +456,29 @@ impl SyncServiceImpl {
 #[common_macros::method_names_consts]
 #[async_trait::async_trait]
 impl SyncService for SyncServiceImpl {
-    #[tracing::instrument(level = "info", name = SyncServiceImpl_sync, skip_all, fields(?request, ?options))]
-    async fn sync(
+    #[tracing::instrument(level = "info", name = SyncServiceImpl_sync_to, skip_all, fields(?request, ?options))]
+    async fn sync_to(
         &self,
-        request: SyncRequest,
+        request: SyncToRequest,
         options: SyncOptions,
         listener: Option<Arc<dyn SyncListener>>,
     ) -> Result<SyncResult, SyncError> {
         let listener = listener.unwrap_or(Arc::new(NullSyncListener));
         listener.begin();
-        self.sync_impl(request.src, request.dst, options, listener)
+        self.sync_to_impl(request.src, request.dst, options, listener)
             .await
     }
 
-    #[tracing::instrument(level = "info", name = SyncServiceImpl_transfer_into_local, skip_all, fields(?request, ?options))]
-    async fn transfer_into_local(
+    #[tracing::instrument(level = "info", name = SyncServiceImpl_sync_from, skip_all, fields(?request, ?options))]
+    async fn sync_from(
         &self,
-        request: LocalSyncRequest,
+        request: SyncFromRequest,
         options: SyncOptions,
         listener: Option<Arc<dyn SyncListener>>,
-    ) -> Result<SyncTransfer, SyncError> {
+    ) -> Result<SyncFromTransfer, SyncError> {
         let listener = listener.unwrap_or(Arc::new(NullSyncListener));
         listener.begin();
-        self.transfer_into_local_impl(request.src, &request.dst, options, listener)
+        self.sync_from_impl(request.src, &request.dst, options, listener)
             .await
     }
 }

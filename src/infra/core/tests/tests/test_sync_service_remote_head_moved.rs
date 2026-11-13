@@ -152,7 +152,7 @@ impl RemotePushHarness {
         self.catalog
             .get_one::<dyn SyncService>()
             .unwrap()
-            .sync(
+            .sync_to(
                 request,
                 SyncOptions {
                     force: true,

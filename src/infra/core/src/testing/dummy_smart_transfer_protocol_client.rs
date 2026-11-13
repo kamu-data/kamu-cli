@@ -9,7 +9,7 @@
 
 use std::sync::Arc;
 
-use kamu_core::{LocalSyncTarget, SyncError, SyncResult, SyncTransfer};
+use kamu_core::{SyncError, SyncFromTarget, SyncFromTransfer, SyncResult};
 use url::Url;
 
 use crate::utils::smart_transfer_protocol::{SmartTransferProtocolClient, TransferOptions};
@@ -25,9 +25,9 @@ impl SmartTransferProtocolClient for DummySmartTransferProtocolClient {
     async fn pull_protocol_client_flow(
         &self,
         _http_src_url: &Url,
-        _dst: &LocalSyncTarget,
+        _dst: &SyncFromTarget,
         _transfer_options: TransferOptions,
-    ) -> Result<SyncTransfer, SyncError> {
+    ) -> Result<SyncFromTransfer, SyncError> {
         unimplemented!("Not supported yet")
     }
 

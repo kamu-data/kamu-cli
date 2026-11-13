@@ -123,7 +123,7 @@ How each operation fills in the steps:
 | --- | --- | --- | --- |
 | Polling ingest | `plan_ingest` | `PollingIngestService::ingest`, one iteration | `commit_head` |
 | Transform | `elaborate_transform` | `TransformExecutor` | `commit_head` |
-| Sync into a local dataset | `resolve_sync_target` reads the head | `SyncService::transfer_into_local` | `transfer_and_commit_sync` through `LocalSyncCommitter`, which also creates a new dataset |
+| Sync into a local dataset | `resolve_sync_target` reads the head | `SyncService::sync_from` | `transfer_and_commit_sync` through `commit_sync`, which also creates a new dataset |
 | Hard compaction, reset to metadata | `CompactionPlanner`, in a short transaction of the use case or of the task planner | `CompactionExecutor` | the use case through `DatasetHeadCommitter`; the task runner through `commit_head` |
 | Reset to a block | `ResetPlanner` | — (the block already exists) | `ResetExecutor`, in the same transaction as the plan |
 | Push ingest | `PushIngestPlanner` | the push ingest executor | in the same transaction as the plan: the request's or the command's |

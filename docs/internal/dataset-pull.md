@@ -288,7 +288,7 @@ committed. It moves `HEAD` through `DatasetUpdateSteps`, the same steps the upda
 **Sync** (`PullSyncJob::run`):
 
 - reads the target's `HEAD` in a transaction of its own (`resolve_sync_target`);
-- transfers with no transaction open, then commits through `LocalSyncCommitter`, which also
+- transfers with no transaction open, then commits through `DatasetUpdateSteps::commit_sync`, which also
   creates a new dataset (`transfer_and_commit_sync`);
 - with `add_aliases` on, stores the pull alias of a dataset the sync created in the commit's
   transaction, so the dataset never exists without it.
@@ -322,8 +322,8 @@ planning.
 | --- | --- | --- | --- |
 | Pull ingest | `PollingIngestService::ingest`, per iteration | `PullIngestLoop`: `success` after each committed iteration, then `error`, or `no_polling_source` instead of both | `PullError` |
 | Pull transform | `TransformExecutor` | `PullTransformJob` | `PullError` |
-| Pull sync | `SyncService::transfer_into_local` | `PullSyncJob` | `SyncError` |
-| Push | `SyncService::sync` | `PushDatasetUseCaseImpl` | `SyncError` |
+| Pull sync | `SyncService::sync_from` | `PullSyncJob` | `SyncError` |
+| Push | `SyncService::sync_to` | `PushDatasetUseCaseImpl` | `SyncError` |
 | Push ingest | `PushIngestExecutor` | `PushIngestDataUseCaseImpl`, after moving `HEAD` | `PushIngestDataError` |
 
 The sync listener takes `SyncError` because pull and push share it.

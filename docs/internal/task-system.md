@@ -386,8 +386,8 @@ fails the task with an empty error whose recoverability is `PullError::is_recove
   task unrecoverably, and the transform flow controller decides what to do about it.
 - **Sync** — `resolve_sync_target` reads the destination's `HEAD` in one transaction; then
   `transfer_and_commit_sync` copies blocks and objects from the remote with
-  `SyncService::transfer_into_local`, without moving `HEAD` and with no transaction open, and
-  `LocalSyncCommitter` moves `HEAD` in a transaction of its own.
+  `SyncService::sync_from`, without moving `HEAD` and with no transaction open, and
+  `DatasetUpdateSteps::commit_sync` moves `HEAD` in a transaction of its own.
 
 On success the result is `TaskResultDatasetUpdate::Updated` with the old and new heads and the
 `increment` (block and record counts and the new watermark), which the flow controllers use to

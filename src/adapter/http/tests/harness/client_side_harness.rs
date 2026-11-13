@@ -189,7 +189,6 @@ impl ClientSideHarness {
         b.add::<SyncServiceImpl>();
 
         b.add::<IpfsServiceImpl>();
-        b.add::<LocalSyncCommitterImpl>();
         b.add::<SyncRequestBuilder>();
 
         b.add::<TransformPlannerImpl>();
@@ -432,7 +431,7 @@ impl ClientSideHarness {
 
         update_steps
             .transfer_and_commit_sync(
-                LocalSyncRequest { src: src_ref, dst },
+                SyncFromRequest { src: src_ref, dst },
                 SyncOptions::default(),
                 None,
                 None,

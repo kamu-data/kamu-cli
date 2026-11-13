@@ -15,7 +15,7 @@ use kamu_core::{
     RemoteDatasetUrlResolver,
     SyncError,
     SyncRefRemote,
-    SyncRequest,
+    SyncToRequest,
     try_resolve_head,
 };
 use kamu_datasets::{DatasetRegistry, DatasetRegistryExt};
@@ -38,7 +38,7 @@ impl SyncRequestBuilder {
         src_ref: odf::DatasetRef,
         dst_ref: odf::DatasetRefRemote,
         create_dst_if_not_exists: bool,
-    ) -> Result<SyncRequest, SyncError> {
+    ) -> Result<SyncToRequest, SyncError> {
         let src = self.dataset_registry.get_dataset_by_ref(&src_ref).await?;
         self.ensure_dataset_head_present(src_ref.as_any_ref(), src.as_ref())
             .await?;
@@ -47,7 +47,7 @@ impl SyncRequestBuilder {
             .resolve_dest_sync_ref_remote(dst_ref, create_dst_if_not_exists)
             .await?;
 
-        Ok(SyncRequest { src, dst })
+        Ok(SyncToRequest { src, dst })
     }
 
     async fn resolve_dest_sync_ref_remote(

@@ -29,29 +29,29 @@ impl MockSyncService {
         src_remote_ref: odf::DatasetRefRemote,
         reported_heads: Option<ReportedHeads>,
     ) -> Self {
-        self.expect_transfer_into_local()
+        self.expect_sync_from()
             .withf(move |request, _, _| {
                 request.src == src_remote_ref
                     && matches!(
                         &(request.dst),
-                        LocalSyncTarget::Existing { dataset, .. }
+                        SyncFromTarget::Existing { dataset, .. }
                         if dataset.get_alias() == &target_alias
                     )
             })
             .times(1)
             .returning(move |request, _, _| {
                 let Some(reported_heads) = &reported_heads else {
-                    return Ok(SyncTransfer::UpToDate);
+                    return Ok(SyncFromTransfer::UpToDate);
                 };
-                let LocalSyncTarget::Existing {
+                let SyncFromTarget::Existing {
                     dataset,
                     expected_head,
                 } = request.dst
                 else {
                     unreachable!()
                 };
-                Ok(SyncTransfer::Transferred(TransferredSync {
-                    target: TransferredSyncTarget::Existing {
+                Ok(SyncFromTransfer::Transferred(SyncFromTransferred {
+                    target: SyncFromTransferredTarget::Existing {
                         dataset,
                         expected_head,
                     },
@@ -70,11 +70,11 @@ impl MockSyncService {
         target_alias: odf::DatasetAlias,
         make_error: impl Fn() -> SyncError + Send + 'static,
     ) -> Self {
-        self.expect_transfer_into_local()
+        self.expect_sync_from()
             .withf(move |request, _, _| {
                 matches!(
                     &(request.dst),
-                    LocalSyncTarget::Existing { dataset, .. }
+                    SyncFromTarget::Existing { dataset, .. }
                     if dataset.get_alias() == &target_alias
                 )
             })

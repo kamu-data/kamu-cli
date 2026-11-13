@@ -42,9 +42,9 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
     async fn pull_protocol_client_flow(
         &self,
         http_src_url: &Url,
-        dst: &LocalSyncTarget,
+        dst: &SyncFromTarget,
         transfer_options: TransferOptions,
-    ) -> Result<SyncTransfer, SyncError> {
+    ) -> Result<SyncFromTransfer, SyncError> {
         self.pull_flow(http_src_url, dst, transfer_options).await
     }
 

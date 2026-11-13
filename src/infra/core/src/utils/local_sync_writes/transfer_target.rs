@@ -9,7 +9,7 @@
 
 use std::sync::Arc;
 
-use kamu_core::{LocalSyncTarget, SyncError, TransferredSyncTarget};
+use kamu_core::{SyncError, SyncFromTarget, SyncFromTransferredTarget};
 
 use super::stored_seed::StoredSeed;
 
@@ -19,7 +19,7 @@ use super::stored_seed::StoredSeed;
 pub struct TransferTarget {
     /// The dataset storage the transferred blocks and objects go into
     pub storage: Arc<dyn odf::Dataset>,
-    pub target: TransferredSyncTarget,
+    pub target: SyncFromTransferredTarget,
 }
 
 impl TransferTarget {
@@ -28,22 +28,22 @@ impl TransferTarget {
     /// blocks
     pub async fn prepare(
         catalog: &dill::Catalog,
-        dst: &LocalSyncTarget,
+        dst: &SyncFromTarget,
         visibility_for_created_dataset: odf::DatasetVisibility,
         take_seed: impl FnOnce() -> odf::dataset::HashedMetadataBlockBytesDecoded,
     ) -> Result<Self, SyncError> {
         match dst {
-            LocalSyncTarget::Existing {
+            SyncFromTarget::Existing {
                 dataset,
                 expected_head,
             } => Ok(Self {
                 storage: (**dataset).clone(),
-                target: TransferredSyncTarget::Existing {
+                target: SyncFromTransferredTarget::Existing {
                     dataset: dataset.clone(),
                     expected_head: expected_head.clone(),
                 },
             }),
-            LocalSyncTarget::New(alias) => {
+            SyncFromTarget::New(alias) => {
                 let StoredSeed {
                     dataset,
                     seed_block,
@@ -51,7 +51,7 @@ impl TransferTarget {
                 } = StoredSeed::store(catalog, take_seed()).await?;
                 Ok(Self {
                     storage: dataset,
-                    target: TransferredSyncTarget::New {
+                    target: SyncFromTransferredTarget::New {
                         alias: alias.clone(),
                         seed_block,
                         seed_block_bytes,
