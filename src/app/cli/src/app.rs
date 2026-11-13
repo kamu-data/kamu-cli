@@ -484,6 +484,7 @@ pub fn configure_base_catalog(
     b.add::<FetchService>();
 
     b.add::<PollingIngestPlannerImpl>();
+    b.add::<IngestEnvVarsResolver>();
     b.add::<PollingIngestServiceImpl>();
 
     b.add::<PushIngestExecutorImpl>();
@@ -531,6 +532,7 @@ pub fn configure_base_catalog(
     b.add::<EngineProvisionerLocal>();
 
     b.add::<kamu::utils::simple_transfer_protocol::SimpleTransferProtocol>();
+    b.add::<kamu::utils::local_sync_writes::PulledSeedStore>();
     b.add::<kamu_adapter_http::SmartTransferProtocolClientWs>();
 
     b.add::<CompactDatasetUseCaseImpl>();

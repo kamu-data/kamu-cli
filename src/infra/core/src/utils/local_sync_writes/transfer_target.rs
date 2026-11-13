@@ -11,6 +11,7 @@ use std::sync::Arc;
 
 use kamu_core::{SyncError, SyncFromTarget, SyncFromTransferredTarget};
 
+use super::PulledSeedStore;
 use super::stored_seed::StoredSeed;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -27,7 +28,7 @@ impl TransferTarget {
     /// stored from the `Seed` that `take_seed` removes from the transferred
     /// blocks
     pub async fn prepare(
-        catalog: &dill::Catalog,
+        seed_store: &PulledSeedStore,
         dst: &SyncFromTarget,
         visibility_for_created_dataset: odf::DatasetVisibility,
         take_seed: impl FnOnce() -> odf::dataset::HashedMetadataBlockBytesDecoded,
@@ -48,7 +49,7 @@ impl TransferTarget {
                     dataset,
                     seed_block,
                     seed_block_bytes,
-                } = StoredSeed::store(catalog, take_seed()).await?;
+                } = seed_store.store(take_seed()).await?;
                 Ok(Self {
                     storage: dataset,
                     target: SyncFromTransferredTarget::New {

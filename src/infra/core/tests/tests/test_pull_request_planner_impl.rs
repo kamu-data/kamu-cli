@@ -17,6 +17,7 @@ use futures::TryStreamExt;
 use kamu::domain::*;
 use kamu::testing::{BaseRepoHarness, *};
 use kamu::utils::ipfs_wrapper::IpfsClient;
+use kamu::utils::local_sync_writes::PulledSeedStore;
 use kamu::utils::simple_transfer_protocol::SimpleTransferProtocol;
 use kamu::*;
 use kamu_accounts::{CurrentAccountSubject, CurrentAccountSubjectCatalogExt as _};
@@ -1146,6 +1147,7 @@ impl PullTestHarness {
             .add::<odf::dataset::DummyOdfServerAccessTokenResolver>()
             .add::<DummySmartTransferProtocolClient>()
             .add::<SimpleTransferProtocol>()
+            .add::<PulledSeedStore>()
             .add::<CreateDatasetUseCaseImpl>()
             .add::<CreateDatasetUseCaseHelper>()
             .add::<AppendDatasetMetadataBatchUseCaseImpl>()

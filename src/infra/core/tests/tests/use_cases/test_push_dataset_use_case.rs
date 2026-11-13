@@ -18,6 +18,7 @@ use kamu::testing::{
     DummySmartTransferProtocolClient,
 };
 use kamu::utils::ipfs_wrapper::IpfsClient;
+use kamu::utils::local_sync_writes::PulledSeedStore;
 use kamu::utils::simple_transfer_protocol::SimpleTransferProtocol;
 use kamu::*;
 use kamu_core::*;
@@ -489,6 +490,7 @@ impl PushUseCaseHarness {
             .add::<odf::dataset::DummyOdfServerAccessTokenResolver>()
             .add::<DummySmartTransferProtocolClient>()
             .add::<SimpleTransferProtocol>()
+            .add::<PulledSeedStore>()
             .add_value(IpfsClient::default())
             .add_value(IpfsGateway::default())
             .add::<AppendDatasetMetadataBatchUseCaseImpl>()

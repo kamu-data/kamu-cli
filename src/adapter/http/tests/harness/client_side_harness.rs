@@ -17,6 +17,7 @@ use futures::TryStreamExt;
 use headers::Header;
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu::domain::*;
+use kamu::utils::local_sync_writes::PulledSeedStore;
 use kamu::utils::simple_transfer_protocol::SimpleTransferProtocol;
 use kamu::utils::url_ext::UrlExt;
 use kamu::*;
@@ -179,12 +180,14 @@ impl ClientSideHarness {
 
         b.add_value(EngineConfigDatafusionEmbeddedIngest::default());
         b.add::<PollingIngestPlannerImpl>();
+        b.add::<IngestEnvVarsResolver>();
         b.add::<PollingIngestServiceImpl>();
 
         b.add::<DatasetFactoryImpl>();
 
         b.add::<SmartTransferProtocolClientWs>();
         b.add::<SimpleTransferProtocol>();
+        b.add::<PulledSeedStore>();
 
         b.add::<SyncServiceImpl>();
 

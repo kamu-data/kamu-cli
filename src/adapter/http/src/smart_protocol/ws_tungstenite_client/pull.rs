@@ -422,7 +422,7 @@ impl WsSmartTransferProtocolClient {
                     storage: dst_storage,
                     target,
                 } = TransferTarget::prepare(
-                    self.catalog(),
+                    self.seed_store(),
                     dst,
                     transfer_options.visibility_for_created_dataset,
                     || new_blocks.pop_front().unwrap(),

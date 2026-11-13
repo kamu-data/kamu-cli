@@ -13,6 +13,7 @@ use std::sync::Arc;
 
 use kamu::domain::*;
 use kamu::testing::*;
+use kamu::utils::local_sync_writes::PulledSeedStore;
 use kamu::utils::simple_transfer_protocol::SimpleTransferProtocol;
 use kamu::*;
 use kamu_datasets::{CreateDatasetResult, ResolvedDataset};
@@ -255,7 +256,8 @@ impl IpnsPushHarness {
             base_repo_harness.temp_dir_path().join("repos"),
         ))
         .add::<DummySmartTransferProtocolClient>()
-        .add::<SimpleTransferProtocol>();
+        .add::<SimpleTransferProtocol>()
+        .add::<PulledSeedStore>();
         let catalog = b.build();
 
         Self {

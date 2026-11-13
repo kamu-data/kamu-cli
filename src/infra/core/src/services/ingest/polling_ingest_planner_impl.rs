@@ -7,17 +7,15 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
+use internal_error::{ErrorIntoInternal, ResultIntoInternal};
 use kamu_core::*;
-use kamu_datasets::{DatasetEnvVarResolver, ResolvedDataset, SecretsEncryptionConfig};
+use kamu_datasets::ResolvedDataset;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[dill::component]
 #[dill::interface(dyn PollingIngestPlanner)]
-pub struct PollingIngestPlannerImpl {
-    catalog: dill::Catalog,
-}
+pub struct PollingIngestPlannerImpl {}
 
 impl PollingIngestPlannerImpl {
     async fn plan_at(
@@ -100,29 +98,6 @@ impl PollingIngestPlanner for PollingIngestPlannerImpl {
         }
 
         Ok(plan)
-    }
-
-    /// Dataset environment variables are enabled only when secrets encryption
-    /// is configured and enabled and a resolver is registered
-    #[tracing::instrument(name = PollingIngestPlannerImpl_resolve_env_vars, level = "debug", skip_all, fields(%dataset_id))]
-    async fn resolve_env_vars(
-        &self,
-        dataset_id: &odf::DatasetID,
-    ) -> Result<IngestEnvVars, InternalError> {
-        let enabled = self
-            .catalog
-            .get_one::<SecretsEncryptionConfig>()
-            .is_ok_and(|config| config.is_enabled());
-        if !enabled {
-            return Ok(IngestEnvVars::default());
-        }
-
-        let Ok(resolver) = self.catalog.get_one::<dyn DatasetEnvVarResolver>() else {
-            return Ok(IngestEnvVars::default());
-        };
-
-        let env_vars = resolver.resolve_effective_env_vars(dataset_id).await?;
-        Ok(IngestEnvVars::new(env_vars))
     }
 }
 

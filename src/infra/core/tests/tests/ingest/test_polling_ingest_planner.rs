@@ -210,6 +210,7 @@ async fn test_resolve_env_vars_when_enabled() {
 struct PollingIngestPlannerHarness {
     base_repo_harness: BaseRepoHarness,
     planner: Arc<dyn PollingIngestPlanner>,
+    env_vars_resolver: Arc<IngestEnvVarsResolver>,
     env_var_resolver_calls: Arc<AtomicUsize>,
 }
 
@@ -231,7 +232,8 @@ impl PollingIngestPlannerHarness {
         let env_var_resolver_calls = Arc::new(AtomicUsize::new(0));
 
         let mut b = dill::CatalogBuilder::new_chained(base_repo_harness.catalog());
-        b.add::<PollingIngestPlannerImpl>();
+        b.add::<PollingIngestPlannerImpl>()
+            .add::<IngestEnvVarsResolver>();
         if let Some(config) = secrets_encryption_config {
             b.add_value(config)
                 .add_value(FakeDatasetEnvVarResolver {
@@ -244,6 +246,7 @@ impl PollingIngestPlannerHarness {
         Self {
             base_repo_harness,
             planner: catalog.get_one().unwrap(),
+            env_vars_resolver: catalog.get_one().unwrap(),
             env_var_resolver_calls,
         }
     }
@@ -287,8 +290,8 @@ impl PollingIngestPlannerHarness {
     }
 
     async fn resolve_env_vars(&self, created: &CreateDatasetResult) -> IngestEnvVars {
-        self.planner
-            .resolve_env_vars(&created.dataset_handle.id)
+        self.env_vars_resolver
+            .resolve(&created.dataset_handle.id)
             .await
             .unwrap()
     }

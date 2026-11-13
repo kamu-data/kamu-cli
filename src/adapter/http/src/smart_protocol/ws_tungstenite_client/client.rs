@@ -9,6 +9,7 @@
 
 use std::sync::Arc;
 
+use kamu::utils::local_sync_writes::PulledSeedStore;
 use kamu::utils::smart_transfer_protocol::{SmartTransferProtocolClient, TransferOptions};
 use kamu_core::*;
 use url::Url;
@@ -18,14 +19,20 @@ use url::Url;
 #[dill::component]
 #[dill::interface(dyn SmartTransferProtocolClient)]
 pub struct WsSmartTransferProtocolClient {
-    catalog: dill::Catalog,
+    seed_store: Arc<PulledSeedStore>,
+    dataset_factory: Arc<dyn odf::dataset::DatasetFactory>,
     dataset_credential_resolver: Arc<dyn odf::dataset::OdfServerAccessTokenResolver>,
 }
 
 impl WsSmartTransferProtocolClient {
-    /// The catalog a pulled dataset is created in
-    pub(super) fn catalog(&self) -> &dill::Catalog {
-        &self.catalog
+    /// Stores the `Seed` of a dataset the pull creates
+    pub(super) fn seed_store(&self) -> &PulledSeedStore {
+        &self.seed_store
+    }
+
+    /// Opens remote datasets to compare chains with
+    pub(super) fn dataset_factory(&self) -> &dyn odf::dataset::DatasetFactory {
+        self.dataset_factory.as_ref()
     }
 
     /// The access token this node holds for the server at `url`

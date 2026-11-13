@@ -94,7 +94,7 @@ A polling ingest has three steps, the same for every caller:
 
 | Step | Who | Transaction |
 | --- | --- | --- |
-| **Plan** | `PollingIngestPlanner::plan_ingest(target)` builds the writer state at the current head into a `PollingIngestPlan`; `resolve_env_vars(dataset_id)` resolves the dataset's environment variables | one of its own, then the target is detached; `kamu pull` and the update task both plan through `DatasetUpdateSteps::plan_ingest` |
+| **Plan** | `PollingIngestPlanner::plan_ingest(target)` builds the writer state at the current head into a `PollingIngestPlan`; `IngestEnvVarsResolver::resolve(dataset_id)` resolves the dataset's environment variables | one of its own, then the target is detached; `kamu pull` and the update task both plan through `DatasetUpdateSteps::plan_ingest` |
 | **Execute** | `PollingIngestService::ingest(target, plan, options, env_vars, operation_id, listener)` runs one iteration and appends blocks without moving `HEAD` | none |
 | **Commit** | the caller moves `HEAD` through `DatasetHeadCommitter` ([§9](#9-committing-and-concurrency)) | a new one |
 
@@ -105,7 +105,7 @@ writer state itself. `rebuild_ingest` turns it back into a plan, failing with `H
 head is no longer the expected one and with `Mismatch` when what it finds differs, which only a
 defect can cause.
 
-Environment variable values are never part of a plan or a task definition. `resolve_env_vars` is
+Environment variable values are never part of a plan or a task definition. `IngestEnvVarsResolver` is
 their only path: it returns an empty map unless secrets encryption is configured and enabled
 (`SecretsEncryptionConfig::is_enabled`) and a `DatasetEnvVarResolver` is registered, and
 `IngestEnvVars` prints keys only.
@@ -153,7 +153,7 @@ cannot be decrypted, fails the fetch. A substituted value is inserted as it is: 
 it is not expanded. With secrets encryption enabled (`DatasetKeyValueServiceImpl`), names resolve
 from the dataset's env vars only; without it (`DatasetKeyValueServiceSysEnv`), any supplied dataset
 env vars are checked first and the process environment is the fallback, which in practice means the
-process environment, since `resolve_env_vars` supplies none in that mode.
+process environment, since `IngestEnvVarsResolver` supplies none in that mode.
 
 | Fetch step | Source state written | `has_more` | Notes |
 | --- | --- | --- | --- |
@@ -319,7 +319,8 @@ hours. A long-running server does not evict while it runs.
 | --- | --- |
 | Polling planner trait, plan, env vars, planning errors | [`polling_ingest_planner.rs`](../../src/domain/core/src/services/ingest/polling_ingest_planner.rs) |
 | Stored plan form | [`polling_ingest_plan_payload.rs`](../../src/domain/core/src/services/ingest/polling_ingest_plan_payload.rs) |
-| Polling planner impl, env var gate | [`polling_ingest_planner_impl.rs`](../../src/infra/core/src/services/ingest/polling_ingest_planner_impl.rs) |
+| Polling planner impl | [`polling_ingest_planner_impl.rs`](../../src/infra/core/src/services/ingest/polling_ingest_planner_impl.rs) |
+| Dataset env vars of an ingest, and when they are enabled | [`ingest_env_vars_resolver.rs`](../../src/infra/core/src/services/ingest/ingest_env_vars_resolver.rs) |
 | Polling service trait, options, result, errors | [`polling_ingest_service.rs`](../../src/domain/core/src/services/ingest/polling_ingest_service.rs) |
 | Polling service impl, savepoints | [`polling_ingest_service_impl.rs`](../../src/infra/core/src/services/ingest/polling_ingest_service_impl.rs) |
 | Source state and savepoint types | [`polling_source_state.rs`](../../src/infra/core/src/services/ingest/polling_source_state.rs) |

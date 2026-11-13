@@ -12,6 +12,7 @@ use std::path::{Path, PathBuf};
 use kamu::domain::*;
 use kamu::testing::DummySmartTransferProtocolClient;
 use kamu::utils::ipfs_wrapper::IpfsClient;
+use kamu::utils::local_sync_writes::PulledSeedStore;
 use kamu::utils::simple_transfer_protocol::{SimpleTransferProtocol, SimpleTransferProtocolConfig};
 use kamu::*;
 use kamu_accounts::{CurrentAccountSubject, CurrentAccountSubjectCatalogExt as _};
@@ -105,6 +106,7 @@ impl SyncWorkspaceCatalog {
             .add::<SyncRequestBuilder>()
             .add::<DummySmartTransferProtocolClient>()
             .add::<SimpleTransferProtocol>()
+            .add::<PulledSeedStore>()
             .add::<CreateDatasetUseCaseImpl>()
             .add::<CreateDatasetUseCaseHelper>()
             .add::<AppendDatasetMetadataBatchUseCaseImpl>()

@@ -67,7 +67,7 @@ pub(crate) struct SimpleProtocolTransferOptions {
 /// Implements "Simple Transfer Protocol" as described in ODF spec
 #[dill::component]
 pub struct SimpleTransferProtocol {
-    catalog: dill::Catalog,
+    seed_store: Arc<PulledSeedStore>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -196,7 +196,7 @@ impl SimpleTransferProtocol {
             storage: dst_dataset,
             target,
         } = TransferTarget::prepare(
-            &self.catalog,
+            &self.seed_store,
             dst,
             transfer_options.visibility_for_created_dataset,
             || blocks_desc_ordered.pop().unwrap(),

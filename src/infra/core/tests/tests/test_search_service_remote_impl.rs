@@ -11,6 +11,7 @@ use std::path::Path;
 
 use kamu::domain::*;
 use kamu::testing::*;
+use kamu::utils::local_sync_writes::PulledSeedStore;
 use kamu::utils::simple_transfer_protocol::SimpleTransferProtocol;
 use kamu::*;
 use kamu_accounts::{CurrentAccountSubject, CurrentAccountSubjectCatalogExt as _};
@@ -66,6 +67,7 @@ async fn do_test_search(tmp_workspace_dir: &Path, repo_url: Url) {
         .add::<SyncRequestBuilder>()
         .add::<DummySmartTransferProtocolClient>()
         .add::<SimpleTransferProtocol>()
+        .add::<PulledSeedStore>()
         .add_builder(SearchServiceRemoteImpl::builder(None))
         .add::<CreateDatasetUseCaseImpl>()
         .add::<DummyOutboxImpl>()

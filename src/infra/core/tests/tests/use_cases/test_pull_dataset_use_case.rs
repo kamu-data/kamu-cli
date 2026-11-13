@@ -1825,6 +1825,7 @@ impl PullUseCaseHarness {
             .add::<DatasetUpdateKindResolverImpl>()
             .add::<DatasetPullSourceResolverImpl>()
             .add::<PollingIngestPlannerImpl>()
+            .add::<IngestEnvVarsResolver>()
             .add::<CompactionPlannerImpl>()
             .add_value(mocks.mock_compaction_executor)
             .bind::<dyn CompactionExecutor, MockCompactionExecutor>()

@@ -9,7 +9,6 @@
 
 use std::collections::HashMap;
 
-use internal_error::InternalError;
 use kamu_datasets::{DatasetEnvVar, ResolvedDataset};
 
 use crate::*;
@@ -36,14 +35,6 @@ pub trait PollingIngestPlanner: Send + Sync {
         target: ResolvedDataset,
         stored: &PollingIngestPlanPayload,
     ) -> Result<PollingIngestPlan, PollingIngestRebuildError>;
-
-    /// Resolves the dataset's environment variables for its fetch step. Empty
-    /// when dataset environment variables are not enabled on this node. The
-    /// values are never part of a plan; resolve them for each execution.
-    async fn resolve_env_vars(
-        &self,
-        dataset_id: &odf::DatasetID,
-    ) -> Result<IngestEnvVars, InternalError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

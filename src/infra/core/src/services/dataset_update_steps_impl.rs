@@ -9,7 +9,7 @@
 
 use std::sync::Arc;
 
-use database_common_macros::{transactional_method1, transactional_method2};
+use database_common_macros::{transactional_method1, transactional_method2, transactional_method3};
 use dill::*;
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_core::*;
@@ -22,6 +22,7 @@ use kamu_datasets::{
     ResolvedDataset,
 };
 
+use crate::IngestEnvVarsResolver;
 use crate::utils::span_outcome::SpanOutcome;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -77,7 +78,7 @@ impl DatasetUpdateStepsImpl {
         Ok(())
     }
 
-    #[transactional_method2(dataset_registry: Arc<dyn DatasetRegistry>, polling_ingest_planner: Arc<dyn PollingIngestPlanner>)]
+    #[transactional_method3(dataset_registry: Arc<dyn DatasetRegistry>, polling_ingest_planner: Arc<dyn PollingIngestPlanner>, ingest_env_vars_resolver: Arc<IngestEnvVarsResolver>)]
     async fn plan_ingest_transactionally(
         &self,
         target: &odf::DatasetHandle,
@@ -90,7 +91,7 @@ impl DatasetUpdateStepsImpl {
         };
 
         let plan = polling_ingest_planner.plan_ingest(dataset.clone()).await?;
-        let env_vars = polling_ingest_planner.resolve_env_vars(&target.id).await?;
+        let env_vars = ingest_env_vars_resolver.resolve(&target.id).await?;
 
         dataset.detach_from_transaction();
 

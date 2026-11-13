@@ -24,12 +24,14 @@ use kamu::testing::{
     RacingDatasetUpdateSteps,
 };
 use kamu::utils::ipfs_wrapper::IpfsClient;
+use kamu::utils::local_sync_writes::PulledSeedStore;
 use kamu::utils::simple_transfer_protocol::SimpleTransferProtocol;
 use kamu::{
     DataFormatRegistryImpl,
     EngineConfigDatafusionEmbeddedIngest,
     EngineProvisionerNull,
     FetchService,
+    IngestEnvVarsResolver,
     IpfsServiceImpl,
     ObjectStoreBuilderLocalFs,
     ObjectStoreRegistryImpl,
@@ -972,6 +974,7 @@ impl UpdateDatasetTaskRunnerHarness {
             b.add::<SyncServiceImpl>()
                 .add::<SyncRequestBuilder>()
                 .add::<SimpleTransferProtocol>()
+                .add::<PulledSeedStore>()
                 .add::<DummySmartTransferProtocolClient>()
                 .add::<IpfsServiceImpl>()
                 .add_value(IpfsClient::default())
@@ -999,6 +1002,7 @@ impl UpdateDatasetTaskRunnerHarness {
         RacingDatasetUpdateSteps::register(&mut b);
         b.add::<UpdateDatasetTaskRunner>()
             .add::<PollingIngestPlannerImpl>()
+            .add::<IngestEnvVarsResolver>()
             .add_value(RacingDatasetHeadCommitter::default())
             .bind::<dyn DatasetHeadCommitter, RacingDatasetHeadCommitter>();
         register_operations(&mut b, base_use_case_harness.temp_dir_path());

@@ -7,7 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use internal_error::ResultIntoInternal;
 use kamu_core::utils::metadata_chain_comparator::{
     ChainWithHead,
     CompareChainsResult,
@@ -82,19 +81,12 @@ impl WsSmartTransferProtocolClient {
         remote_is_src: bool,
         e: &odf::dataset::InvalidIntervalError,
     ) -> Option<SyncError> {
-        let remote = match self
-            .catalog()
-            .get_one::<dyn odf::dataset::DatasetFactory>()
-            .int_err()
-        {
-            Ok(dataset_factory) => dataset_factory
-                .get_dataset(remote_url, false)
-                .await
-                .int_err(),
-            Err(err) => Err(err),
-        }
-        .inspect_err(|err| tracing::debug!(error = ?err, "Failed to open the remote dataset"))
-        .ok()?;
+        let remote = self
+            .dataset_factory()
+            .get_dataset(remote_url, false)
+            .await
+            .inspect_err(|err| tracing::debug!(error = ?err, "Failed to open the remote dataset"))
+            .ok()?;
 
         let (src_chain, dst_chain) = if remote_is_src {
             (remote.as_metadata_chain(), local_chain)

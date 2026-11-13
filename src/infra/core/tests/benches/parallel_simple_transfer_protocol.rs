@@ -16,6 +16,7 @@ use criterion::{Criterion, criterion_group, criterion_main};
 use kamu::domain::*;
 use kamu::testing::{DatasetTestHelper, DummySmartTransferProtocolClient};
 use kamu::utils::ipfs_wrapper::IpfsClient;
+use kamu::utils::local_sync_writes::PulledSeedStore;
 use kamu::utils::simple_transfer_protocol::{
     ENV_VAR_SIMPLE_PROTOCOL_MAX_PARALLEL_TRANSFERS,
     SimpleTransferProtocol,
@@ -87,6 +88,7 @@ async fn setup_dataset(
         .add::<DummySmartTransferProtocolClient>()
         .add::<AlwaysHappyDatasetPermissionChecker>()
         .add::<SimpleTransferProtocol>()
+        .add::<PulledSeedStore>()
         .build();
 
     init_on_startup::run_startup_jobs(&catalog).await.unwrap();
