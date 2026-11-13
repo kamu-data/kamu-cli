@@ -63,7 +63,7 @@ impl DatasetIndexingHelper<'_> {
         let mut seed_visitor = odf::dataset::SearchSeedVisitor::new();
 
         use odf::dataset::*;
-        let mut visitors: [&mut dyn MetadataChainVisitor<Error = Infallible>; 4] = [
+        let mut visitors: [&mut dyn MetadataChainVisitor<Error = !>; 4] = [
             &mut attachments_visitor,
             &mut info_visitor,
             &mut schema_visitor,
@@ -174,7 +174,7 @@ impl DatasetIndexingHelper<'_> {
         let mut schema_visitor = odf::dataset::SearchSetDataSchemaVisitor::new();
 
         use odf::dataset::*;
-        let mut visitors: [&mut dyn MetadataChainVisitor<Error = Infallible>; 3] = [
+        let mut visitors: [&mut dyn MetadataChainVisitor<Error = !>; 3] = [
             &mut attachments_visitor,
             &mut info_visitor,
             &mut schema_visitor,

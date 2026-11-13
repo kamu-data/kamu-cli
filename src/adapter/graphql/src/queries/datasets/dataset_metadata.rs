@@ -384,8 +384,7 @@ impl<'a> DatasetMetadata<'a> {
 
         let resolved_dataset = self.readable_state.resolved_dataset(ctx).await?;
 
-        let mut visitors: [&mut dyn odf::dataset::MetadataChainVisitor<Error = odf::dataset::Infallible>;
-            9] = [
+        let mut visitors: [&mut dyn odf::dataset::MetadataChainVisitor<Error = !>; 9] = [
             &mut attachments_visitor,
             &mut info_visitor,
             &mut license_visitor,

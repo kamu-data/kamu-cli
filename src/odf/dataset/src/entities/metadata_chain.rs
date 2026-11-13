@@ -851,8 +851,8 @@ pub enum AcceptVisitorError<E> {
     Visitor(E),
 }
 
-impl From<AcceptVisitorError<Infallible>> for IterBlocksError {
-    fn from(value: AcceptVisitorError<Infallible>) -> Self {
+impl From<AcceptVisitorError<!>> for IterBlocksError {
+    fn from(value: AcceptVisitorError<!>) -> Self {
         match value {
             AcceptVisitorError::Traversal(err) => err,
             AcceptVisitorError::Visitor(_) => unreachable!(),

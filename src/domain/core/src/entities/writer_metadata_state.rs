@@ -52,7 +52,7 @@ impl DataWriterMetadataState {
         source_name: Option<&str>,
         head: Option<odf::Multihash>,
     ) -> Result<Self, ScanMetadataError> {
-        use odf::dataset::MetadataChainVisitorExtInfallible;
+        use odf::dataset::MetadataChainVisitorExt;
 
         let head = if let Some(head) = head {
             head
@@ -65,14 +65,14 @@ impl DataWriterMetadataState {
         };
         let dataset_kind = target.get_kind();
 
-        let mut seed_visitor = odf::dataset::SearchSeedVisitor::new().adapt_err();
-        let mut set_vocab_visitor = odf::dataset::SearchSetVocabVisitor::new().adapt_err();
+        let mut seed_visitor = odf::dataset::SearchSeedVisitor::new().map_err_into();
+        let mut set_vocab_visitor = odf::dataset::SearchSetVocabVisitor::new().map_err_into();
         let mut set_data_schema_visitor =
-            odf::dataset::SearchSetDataSchemaVisitor::new().adapt_err();
+            odf::dataset::SearchSetDataSchemaVisitor::new().map_err_into();
         let mut prev_source_state_visitor =
-            odf::dataset::SearchSourceStateVisitor::new(source_name).adapt_err();
+            odf::dataset::SearchSourceStateVisitor::new(source_name).map_err_into();
         let mut add_data_visitor =
-            odf::dataset::SearchAddDataVisitor::new(dataset_kind).adapt_err();
+            odf::dataset::SearchAddDataVisitor::new(dataset_kind).map_err_into();
         let mut add_data_collection_visitor = odf::dataset::GenericCallbackVisitor::new(
             Vec::new(),
             odf::dataset::MetadataVisitorDecision::NextOfType(
@@ -92,7 +92,7 @@ impl DataWriterMetadataState {
                 )
             },
         )
-        .adapt_err();
+        .map_err_into();
         let mut source_event_visitor = WriterSourceEventVisitor::new(source_name);
 
         use odf::dataset::MetadataChainExt;
@@ -193,6 +193,12 @@ impl From<odf::dataset::AcceptVisitorError<ScanMetadataError>> for ScanMetadataE
             )) => Self::HeadNotFound(err),
             odf::dataset::AcceptVisitorError::Traversal(err) => Self::Internal(err.int_err()),
         }
+    }
+}
+
+impl From<!> for ScanMetadataError {
+    fn from(_: !) -> Self {
+        unreachable!()
     }
 }
 

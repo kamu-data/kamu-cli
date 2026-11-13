@@ -47,25 +47,6 @@ use crate::{
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-mod infallible {
-    /// This is a special error type used for visitors that do not return
-    /// errors. Type is declared in a way that it cannot ever be constructed.
-    #[derive(thiserror::Error, Debug)]
-    #[error("Infallible")]
-    pub struct Infallible(u8);
-
-    impl Infallible {
-        /// This error can be safely converted into any other error, since it
-        /// will never exist in runtime
-        pub fn into<T>(self) -> T {
-            unreachable!()
-        }
-    }
-}
-pub use infallible::Infallible;
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 macro_rules! typed_search_single_typed_block_visitor_impl {
     ($name:ident, $event_struct:ty, $block_type_flags:expr) => {
         pub struct $name {}
@@ -95,8 +76,7 @@ macro_rules! typed_kind_based_search_single_typed_block_visitor_impl {
             )]
             pub fn new(
                 actual_dataset_kind: DatasetKind,
-            ) -> DatasetKindBasedVisitor<SearchSingleTypedBlockVisitor<$event_struct>, Infallible>
-            {
+            ) -> DatasetKindBasedVisitor<SearchSingleTypedBlockVisitor<$event_struct>, !> {
                 let visitor = SearchSingleTypedBlockVisitor::new($block_type_flags);
                 DatasetKindBasedVisitor::new($expected_kind, actual_dataset_kind, visitor)
             }
@@ -164,7 +144,7 @@ impl<'a> SearchSourceStateVisitor<'a> {
 }
 
 impl MetadataChainVisitor for SearchSourceStateVisitor<'_> {
-    type Error = Infallible;
+    type Error = !;
 
     fn initial_decision(&self) -> Decision {
         Decision::NextOfType(Flag::ADD_DATA)
@@ -225,7 +205,7 @@ impl<T> MetadataChainVisitor for SearchSingleTypedBlockVisitor<T>
 where
     T: VariantOf<MetadataEvent> + Send,
 {
-    type Error = Infallible;
+    type Error = !;
 
     fn initial_decision(&self) -> Decision {
         Decision::NextOfType(self.requested_flag)
@@ -343,7 +323,7 @@ impl SearchSingleDataBlockVisitor {
 }
 
 impl MetadataChainVisitor for SearchSingleDataBlockVisitor {
-    type Error = Infallible;
+    type Error = !;
 
     fn initial_decision(&self) -> Decision {
         Decision::NextOfType(Flag::DATA_BLOCK)
@@ -412,7 +392,7 @@ impl SearchActivePushSourcesVisitor {
 }
 
 impl MetadataChainVisitor for SearchActivePushSourcesVisitor {
-    type Error = Infallible;
+    type Error = !;
 
     fn initial_decision(&self) -> Decision {
         match self.dataset_kind {
@@ -510,7 +490,7 @@ impl SearchActivePollingSourceVisitor {
 }
 
 impl MetadataChainVisitor for SearchActivePollingSourceVisitor {
-    type Error = Infallible;
+    type Error = !;
 
     fn initial_decision(&self) -> Decision {
         match self.dataset_kind {
@@ -587,7 +567,7 @@ where
     S: Send,
     F: Fn(&mut S, &Multihash, &MetadataBlock) -> Decision + Send,
 {
-    type Error = Infallible;
+    type Error = !;
 
     fn initial_decision(&self) -> Decision {
         self.initial_decision
@@ -669,7 +649,7 @@ impl SearchKeyBlocksVisitor {
 }
 
 impl MetadataChainVisitor for SearchKeyBlocksVisitor {
-    type Error = Infallible;
+    type Error = !;
 
     fn initial_decision(&self) -> Decision {
         Decision::NextOfType(Flag::KEY_BLOCK)
