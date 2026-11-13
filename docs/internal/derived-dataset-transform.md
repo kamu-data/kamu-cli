@@ -73,7 +73,8 @@ Out of scope, each with its own owner:
 
 | Topic | Owner |
 | --- | --- |
-| How root datasets get data; the shared commit-then-CAS pattern | [root-dataset-ingest.md](root-dataset-ingest.md) |
+| How root datasets get data | [polling-ingest.md](polling-ingest.md), [push-ingest.md](push-ingest.md) |
+| The shared commit-then-CAS pattern | [dataset-operations.md](dataset-operations.md#3-committing-head) |
 | How `kamu pull` plans, orders and authorizes transform jobs among others | [dataset-pull.md](dataset-pull.md) |
 | When a transform flow runs: sensors, reactive rules, batching, breaking-change cascades | [flow-system.md](flow-system.md) |
 | How the update and reset-to-metadata tasks are queued, planned and run | [task-system.md](task-system.md) |

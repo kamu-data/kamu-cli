@@ -220,7 +220,7 @@ flowchart LR
 | Flows | a flow-driven reset or compaction reports `Breaking` through its controller; a forced smart-protocol push through `FlowDatasetsEventBridge` ([flow-system.md](flow-system.md#8-sensors-and-propagation)). `kamu reset` and `kamu system compact` notify no flow |
 | Derivatives | their next transform finds the consumed block missing from the input's history ([derived-dataset-transform.md](derived-dataset-transform.md#7-diverged-inputs)) |
 | Remote copies | push and pull refuse to continue, each protocol reporting it its own way; after a reset to an ancestor, a pull from an unchanged remote fast-forwards back; `--force` overwrites ([dataset-sync.md](dataset-sync.md#11-committing-validation-and-errors)) |
-| Polling ingest savepoints | not touched. Savepoints are keyed by fetch step and previous source state, so rewinding the source state can make an older savepoint match again, and the next ingest resumes from it; when a savepoint is ignored is owned by [root-dataset-ingest.md](root-dataset-ingest.md#53-savepoints) |
+| Polling ingest savepoints | not touched. Savepoints are keyed by fetch step and previous source state, so rewinding the source state can make an older savepoint match again, and the next ingest resumes from it; when a savepoint is ignored is owned by [polling-ingest.md](polling-ingest.md#6-savepoints) |
 
 ---
 

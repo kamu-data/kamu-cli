@@ -8,7 +8,9 @@ page describes only what is specific to it:
 | Operation | Page |
 | --- | --- |
 | Pull: choosing and ordering the operations for many datasets | [dataset-pull.md](dataset-pull.md) |
-| Ingest into a root dataset | [root-dataset-ingest.md](root-dataset-ingest.md) |
+| Polling ingest into a root dataset | [polling-ingest.md](polling-ingest.md) |
+| Push ingest into a root dataset | [push-ingest.md](push-ingest.md) |
+| Read, merge and write steps both ingest kinds share | [ingest-data-writer.md](ingest-data-writer.md) |
 | Transform of a derivative | [derived-dataset-transform.md](derived-dataset-transform.md) |
 | Sync from or to a remote | [dataset-sync.md](dataset-sync.md) |
 | Hard compaction | [dataset-hard-compaction.md](dataset-hard-compaction.md) |
@@ -214,8 +216,8 @@ in its page's authorization or entry-point section.
 | Expected head | The `HEAD` an operation planned at; its commit succeeds only while `HEAD` still points there |
 | CAS | Compare-and-swap: move `HEAD` only if it still equals the expected head |
 | Detached | A dataset handle released from the transaction it was resolved in, so slow work can read it with no transaction open |
-| Iteration | One ingest run of a polling source; a source with more data reports `has_more` ([root-dataset-ingest.md](root-dataset-ingest.md#54-iterating-has_more)) |
+| Iteration | One ingest run of a polling source; a source with more data reports `has_more` ([polling-ingest.md](polling-ingest.md#7-iterating-has_more)) |
 | Depth | A pull's ordering level: sources first, each derivative one deeper than its deepest input ([dataset-pull.md](dataset-pull.md#5-planning)) |
 | Elaborate | Turn a transform plan into a concrete request: which input slices and watermarks to consume ([derived-dataset-transform.md](derived-dataset-transform.md#42-elaborate)) |
-| Savepoint | A fetch result kept on the local disk, so a retry on the same node skips the download ([root-dataset-ingest.md](root-dataset-ingest.md#53-savepoints)) |
+| Savepoint | A fetch result kept on the local disk, so a retry on the same node skips the download ([polling-ingest.md](polling-ingest.md#6-savepoints)) |
 | History rewrite | A reset, compaction or forced sync that leaves `HEAD` on a block that is not a descendant of the old one ([dataset-reset.md](dataset-reset.md#7-after-a-history-rewrite)) |

@@ -55,7 +55,8 @@ Out of scope, each with its own owner:
 
 | Topic | Owner |
 | --- | --- |
-| What an `Ingest` job does: fetch, read, merge, write; `has_more` | [root-dataset-ingest.md](root-dataset-ingest.md) |
+| What an `Ingest` job does: fetch, prepare, `has_more` | [polling-ingest.md](polling-ingest.md) |
+| How ingested records are read, merged and written | [ingest-data-writer.md](ingest-data-writer.md) |
 | What a `Transform` job does: elaboration, engines, commit, diverged inputs | [derived-dataset-transform.md](derived-dataset-transform.md) |
 | What a `Sync` job does: `SyncService`, transfer protocols, remote aliases and repositories | [dataset-sync.md](dataset-sync.md) |
 | How the update task is queued, planned and run | [task-system.md](task-system.md) |
@@ -265,7 +266,7 @@ committed. It moves `HEAD` through `DatasetUpdateSteps`, the same steps the upda
 **Ingest** (`PullIngestLoop::run`):
 
 - plans the ingest and resolves the dataset's environment variables in one transaction
-  ([root-dataset-ingest.md](root-dataset-ingest.md#51-call-sequence));
+  ([polling-ingest.md](polling-ingest.md#4-call-sequence));
 - runs ingest iterations until the source reports no more data (`exhaust_sources`), committing
   `HEAD` after every iteration that returns `Updated`;
 - reports one result spanning the first old head to the last new head. A dataset without a polling

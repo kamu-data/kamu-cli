@@ -372,7 +372,7 @@ fails the task with an empty error whose recoverability is `PullError::is_recove
 
 - **Ingest** — `plan_ingest` plans the ingest from the target's current `HEAD` and resolves its
   environment variables in one transaction
-  ([root-dataset-ingest.md](root-dataset-ingest.md#51-call-sequence)). Then
+  ([polling-ingest.md](polling-ingest.md#4-call-sequence)). Then
   `PollingIngestService::ingest` runs one iteration with no transaction open, and `commit_head`
   moves `HEAD`. `Updated { has_more }` means the source has more to fetch: the task does not loop,
   and the ingest flow controller schedules the next iteration if its config sets
@@ -396,7 +396,7 @@ reason.
 
 Other planning and execution errors classify themselves with `is_recoverable()`, and the runner
 turns the flag into an empty recoverable or unrecoverable failure. The classification of each error
-is owned by its domain doc: ingest in [root-dataset-ingest.md](root-dataset-ingest.md#9-errors),
+is owned by its domain doc: ingest in [polling-ingest.md](polling-ingest.md#10-errors),
 transform in [derived-dataset-transform.md](derived-dataset-transform.md#9-errors), sync in
 [dataset-sync.md](dataset-sync.md#11-committing-validation-and-errors). Outcomes the runner decides
 itself:

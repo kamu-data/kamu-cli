@@ -168,7 +168,9 @@ change invalidates what it says.
 | Task scheduling and execution, the task agent, planners and runners, new task types | [`docs/internal/task-system.md`](docs/internal/task-system.md) |
 | Flows, triggers, configurations, scheduling, sensors, flow process state, new flow types | [`docs/internal/flow-system.md`](docs/internal/flow-system.md) |
 | What every dataset operation shares: plan, execute and commit steps, `HEAD` CAS commits, races, who an operation runs as | [`docs/internal/dataset-operations.md`](docs/internal/dataset-operations.md) |
-| Root dataset ingest: polling and push sources, fetch steps, savepoints, the DataFusion data writer, merge strategies | [`docs/internal/root-dataset-ingest.md`](docs/internal/root-dataset-ingest.md) |
+| Polling ingest: `SetPollingSource`, the polling planner and service, fetch and prepare steps, source state, savepoints, `has_more` | [`docs/internal/polling-ingest.md`](docs/internal/polling-ingest.md) |
+| Push ingest: `AddPushSource`, the push use case, planner and executor, data sources and formats, `kamu ingest` and the HTTP endpoint | [`docs/internal/push-ingest.md`](docs/internal/push-ingest.md) |
+| Ingest read, preprocess and write steps: the DataFusion data writer, writer state, `stage`/`commit`, merge strategies | [`docs/internal/ingest-data-writer.md`](docs/internal/ingest-data-writer.md) |
 | Dataset pull: `kamu pull` flags, pull planning and depth ordering, iteration execution, authorization, how the update task reuses the planner | [`docs/internal/dataset-pull.md`](docs/internal/dataset-pull.md) |
 | Dataset sync: `SyncService`, Simple and Smart Transfer Protocols (client and server), `kamu push`, remote repositories and aliases, IPFS | [`docs/internal/dataset-sync.md`](docs/internal/dataset-sync.md) |
 | Derived dataset transform: transform planning and elaboration, engine provisioning and containers, diverged inputs, transform replay in verification | [`docs/internal/derived-dataset-transform.md`](docs/internal/derived-dataset-transform.md) |
