@@ -47,11 +47,9 @@ impl SearchImplLazyInit {
     }
 
     async fn init(&self) -> Result<(), InternalError> {
-        let system_user_catalog = self.background_catalog.system_user_catalog();
+        let node_catalog = self.background_catalog.node_catalog();
 
-        let indexer = SearchIndexerImpl::builder()
-            .get(&system_user_catalog)
-            .int_err()?;
+        let indexer = SearchIndexerImpl::builder().get(&node_catalog).int_err()?;
 
         use init_on_startup::InitOnStartup;
         indexer.run_initialization().await
@@ -142,11 +140,9 @@ impl SearchIndexer for SearchImplLazyInit {
         &self,
         entity_names: &[SearchEntitySchemaName],
     ) -> Result<(), InternalError> {
-        let system_user_catalog = self.background_catalog.system_user_catalog();
+        let node_catalog = self.background_catalog.node_catalog();
 
-        let indexer = SearchIndexerImpl::builder()
-            .get(&system_user_catalog)
-            .int_err()?;
+        let indexer = SearchIndexerImpl::builder().get(&node_catalog).int_err()?;
 
         indexer.reset_search_indices(entity_names).await
     }

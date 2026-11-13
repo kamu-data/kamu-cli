@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_accounts::CurrentAccountSubject;
+use kamu_accounts::Principal;
 use kamu_core::*;
 use kamu_datasets::{DatasetRegistry, DatasetRegistryExt};
 use url::Url;
@@ -41,7 +41,7 @@ impl PullTarget {
 pub(super) struct PullTargetResolver<'a> {
     dataset_registry: &'a dyn DatasetRegistry,
     pull_source_resolver: &'a dyn DatasetPullSourceResolver,
-    current_account_subject: &'a CurrentAccountSubject,
+    principal: &'a Principal,
     options: &'a PullOptions,
     tenancy_config: TenancyConfig,
 }
@@ -50,14 +50,14 @@ impl<'a> PullTargetResolver<'a> {
     pub(super) fn new(
         dataset_registry: &'a dyn DatasetRegistry,
         pull_source_resolver: &'a dyn DatasetPullSourceResolver,
-        current_account_subject: &'a CurrentAccountSubject,
+        principal: &'a Principal,
         options: &'a PullOptions,
         tenancy_config: TenancyConfig,
     ) -> Self {
         Self {
             dataset_registry,
             pull_source_resolver,
-            current_account_subject,
+            principal,
             options,
             tenancy_config,
         }
@@ -146,7 +146,13 @@ impl<'a> PullTargetResolver<'a> {
 
             odf::DatasetRefRemote::Url(url) => odf::DatasetAlias::new(
                 if self.tenancy_config == TenancyConfig::MultiTenant {
-                    Some(self.current_account_subject.account_name().clone())
+                    // Without an account the pulled dataset has nowhere to go
+                    Some(
+                        self.tenancy_config
+                            .bare_alias_account_name(self.principal)
+                            .ok_or_else(cannot_infer)?
+                            .clone(),
+                    )
                 } else {
                     None
                 },

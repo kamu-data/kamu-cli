@@ -44,9 +44,9 @@ impl AdminSearchMut {
         entity_names: Option<Vec<SearchEntityName>>,
     ) -> Result<String> {
         let background_catalog = from_catalog_n!(ctx, KamuBackgroundCatalog);
-        let system_user_catalog = background_catalog.system_user_catalog();
+        let node_catalog = background_catalog.node_catalog();
 
-        let search_indexer = system_user_catalog.get_one::<dyn SearchIndexer>().unwrap();
+        let search_indexer = node_catalog.get_one::<dyn SearchIndexer>().unwrap();
         let entity_schema_names = entity_names
             .unwrap_or_default()
             .into_iter()

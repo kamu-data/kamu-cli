@@ -194,8 +194,8 @@ impl ResourceFacade for LocalResourceFacadeImpl {
         &self,
         request: SearchResourcesRequest,
     ) -> Result<SearchResourcesResponse, ListResourcesError> {
-        // The authenticated subject: the default for selectors naming no
-        // account, and the check that an anonymous caller cannot search.
+        // The principal's own account: the default for selectors naming no
+        // account, and the check that a principal without one cannot search.
         let target_account = self
             .resource_account_resolver
             .resolve_target_account(&self.principal, None)
@@ -236,8 +236,8 @@ impl ResourceFacade for LocalResourceFacadeImpl {
         &self,
         request: SearchResourcesRequest,
     ) -> Result<SearchResourceHandlesResponse, ListResourcesError> {
-        // The authenticated subject: the default for selectors naming no
-        // account, and the check that an anonymous caller cannot search.
+        // The principal's own account: the default for selectors naming no
+        // account, and the check that a principal without one cannot search.
         let target_account = self
             .resource_account_resolver
             .resolve_target_account(&self.principal, None)
@@ -772,8 +772,8 @@ impl LocalResourceFacadeImpl {
         // Resolved in one batch, deduplicated by spelling, with the permission
         // check applied per distinct account. Any denial fails the whole call.
         //
-        // `None` stays `None` rather than resolving to the caller's own
-        // account: the repository takes the authenticated subject as the
+        // `None` stays `None` rather than resolving to the principal's own
+        // account: the repository takes that account as the
         // default for exactly those rows, so resolving here would be redundant
         // work and would lose the "unset" distinction the scope relies on.
         let account_refs = selectors

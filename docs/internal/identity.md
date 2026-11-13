@@ -4,11 +4,11 @@ Two values describe who is behind a piece of work, and they are not the same thi
 
 | Value | What it is | Read by |
 |---|---|---|
-| `CurrentAccountSubject` | The **caller**: whoever authenticated the request or started the command | Name scope of unqualified aliases, the account new resources are placed in, adapter guards (`LoggedInGuard`, `AdminGuard`, `CanProvisionAccountsGuard`) |
-| `Principal` | The identity whose **permissions are checked** ([RFC-020, Principals](https://github.com/open-data-fabric/open-data-fabric/blob/master/rfcs/020-auth.md#principals)) | The permission layer: `DatasetPermissionChecker`, `DatasetOperationGuard`, `RebacDatasetRegistryFacade`, `AccountAuthorizationHelper`, `ResourceAccountResolver`, `QueryService`, `ProvenanceService` |
+| `CurrentAccountSubject` | The **caller**: whoever authenticated the request or started the command | Adapters and the app only: guards (`LoggedInGuard`, `AdminGuard`, `CanProvisionAccountsGuard`), GraphQL "me", CLI commands and the CLI's saved remote-server tokens |
+| `Principal` | The identity **acting**: whose permissions are checked ([RFC-020, Principals](https://github.com/open-data-fabric/open-data-fabric/blob/master/rfcs/020-auth.md#principals)), whose account a bare alias names, and who owns what it creates | The permission layer (`DatasetPermissionChecker`, `DatasetOperationGuard`, `RebacDatasetRegistryFacade`, `AccountAuthorizationHelper`, `ResourceAccountResolver`, `QueryService`, `ProvenanceService`), the dataset registries, pull planning, dataset creation |
 
-For a request or a CLI command the principal is derived from the caller. Background work keeps the
-caller of the process but runs as `Principal::Node`.
+For a request or a CLI command the principal is derived from the caller. Background work has no
+caller and runs as `Principal::Node`.
 
 ## The principal
 
@@ -21,12 +21,28 @@ caller of the process but runs as `Principal::Node`.
 | `Anonymous` | An unauthenticated request | Public datasets only |
 
 `Principal::handle()` gives the ODF `odf::metadata::auth::PrincipalHandle`, or `None` for
-`Anonymous`. The handle of `Node` has the reserved name `node`, a resource ID seeded from that
-name, and no DID.
+`Anonymous`. The handle of `Node` has the name `node`, a resource ID seeded from that name, and no
+DID. RFC-020 reserves the name, but account creation does not refuse it yet, so nothing may look up
+an account by the node's name.
 
 Match on `Principal` exhaustively, including in `==` and `matches!` tests: adding a variant must
 fail to compile at every site that decides permissions
 ([`kamu-rust-style`](../../.claude/skills/kamu-rust-style/SKILL.md)).
+
+## Name scope and ownership
+
+A bare dataset alias (`foo`, no account) names a dataset of one account, chosen by
+`TenancyConfig::bare_alias_account_name`:
+
+| Principal | Single-tenant | Multi-tenant |
+|---|---|---|
+| `User` | The default account | The user's own account |
+| `Node` | The default account | None: the node has no account, so a bare alias names no dataset, whatever accounts exist |
+| `Anonymous` | The default account | The default account |
+
+A dataset is created under the principal's own account unless its alias names another one. A
+`User` creates it; `Node` gets an `Access` error, having no account; `Anonymous` still panics. A resource manifest without an account selector is placed in the `User`'s account; `Node`
+must name one.
 
 ## Who registers it
 
@@ -38,12 +54,17 @@ the caller is known; that job must not reach the permission layer.
 | Boundary | Registers |
 |---|---|
 | HTTP authentication layer, Flight SQL auth layer, the CLI catalog (`app.rs`) | The caller with `CurrentAccountSubject::register`, which adds `Principal::from(&subject)` beside it |
-| Background catalog (`configure_background_catalog` in `app.rs`) | The process caller and `Principal::Node` |
-| `KamuBackgroundCatalog::system_user_catalog` (search lazy init, the admin index reset) | The process caller and `Principal::Node` |
+| Background catalog (`configure_background_catalog` in `app.rs`) | `Principal::Node` only |
+| `KamuBackgroundCatalog::node_catalog` (search lazy init, the admin index reset) | `Principal::Node` only |
 | Test harnesses | `CurrentAccountSubject::register`, or a `Principal` value directly where a mock ignores it |
 
 Register the caller through `CurrentAccountSubject::register`, never with a bare
 `add_value(subject)`, so the two cannot disagree.
+
+The process catalog (`configure_process_catalog`), between the base catalog and everything else,
+binds the CLI's saved remote-server tokens (`AccessTokenRegistryService`) to the process caller
+without registering a caller. Background pulls from remote nodes therefore authenticate with the
+tokens of the account that started the process, not of the user who initiated the task.
 
 ## Who reads it
 
@@ -72,13 +93,15 @@ built in `app.rs`:
 ```mermaid
 flowchart TD
     BASE["Base catalog<br/>no principal<br/>predefined-accounts registrator"]
+    PROC["Process catalog<br/>saved tokens of the process caller"]
     CLIBASE["CLI base catalog<br/>+ server components when the command needs them"]
     CLI["CLI catalog<br/>caller + Principal::from(caller)"]
-    BG["Background catalog<br/>caller + Principal::Node"]
+    BG["Background catalog<br/>Principal::Node, no caller"]
     CMD(["The command"])
     AG(["Agents, startup jobs,<br/>outbox drain"])
 
-    BASE --> CLIBASE
+    BASE --> PROC
+    PROC --> CLIBASE
     CLIBASE --> CLI
     CLIBASE --> BG
     CLI --> CMD
@@ -87,8 +110,8 @@ flowchart TD
 ```
 
 
-- It is a *sibling* of the CLI catalog: the same CLI components on the same parent, with the process
-  caller and `Principal::Node` instead of the caller's principal.
+- It is a *sibling* of the CLI catalog on the same parent, holding `Principal::Node` and no caller;
+  the CLI components that read the caller stay in the CLI catalog.
 - It cannot be chained from the CLI catalog: a child catalog cannot override its parent's
   `Principal` ([`kamu-dill-di`](../../.claude/skills/kamu-dill-di/SKILL.md#chaining-catalogs)).
 - System singletons are resolved from it first: metrics registration, then the startup jobs, then
@@ -104,9 +127,9 @@ The command itself still resolves from the CLI catalog and runs as the caller.
 
 These parts of the [RFC-020](https://github.com/open-data-fabric/open-data-fabric/blob/master/rfcs/020-auth.md) model have no counterpart in `Principal`:
 
-- name scope and ownership, which come from the caller;
+- the node as an account, so it resolves no bare alias and owns no dataset;
+- remote-server credentials of the user who initiated a background task;
 - a `ServiceAccount` variant;
-- the node as an account;
 - a domain layer free of the caller.
 
 ## Rejected approaches
@@ -116,3 +139,5 @@ These parts of the [RFC-020](https://github.com/open-data-fabric/open-data-fabri
 | Deriving `Principal` from `CurrentAccountSubject` in a dill component | Background work must have a principal other than its caller; a derived value cannot differ |
 | Injecting the principal into services such as `QueryService` | Fixes one principal per instance, so a shared service could not decide for another; inconsistent with the use cases being the entry points |
 | Chaining the background catalog from the CLI catalog and adding `Principal::Node` | dill reports the type as ambiguous; it does not override values from a parent |
+| Keeping the process caller in the background catalog for name scope and ownership | Background work would resolve bare aliases against whoever started the process |
+| A name-scope value of its own beside the principal | It equals the principal's own account in every case; a second value could disagree with it |

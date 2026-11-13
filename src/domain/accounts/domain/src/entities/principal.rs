@@ -21,10 +21,11 @@ static NODE_PRINCIPAL_RESOURCE_ID: LazyLock<odf::ResourceID> =
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// The identity whose permissions are checked (RFC-020, "Principals").
+/// The identity acting (RFC-020, "Principals"): whose permissions are checked,
+/// whose account a bare dataset alias names, and who owns what it creates.
 ///
-/// Usually the authenticated caller, but not always: background work runs as
-/// [`Principal::Node`] while its catalog still holds a caller.
+/// Derived from the authenticated caller for a request or a command;
+/// background work runs as [`Principal::Node`], with no caller.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Principal {
     /// An authenticated account of a person

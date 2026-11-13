@@ -15,7 +15,7 @@ use container_runtime::ContainerRuntime;
 use indoc::indoc;
 use kamu::domain::*;
 use kamu::*;
-use kamu_accounts::CurrentAccountSubject;
+use kamu_accounts::{CurrentAccountSubject, Principal};
 use kamu_datasets::{AlwaysHappyDatasetPermissionChecker, ResolvedDataset};
 use kamu_datasets_services::DatasetKeyValueServiceSysEnv;
 use odf::dataset::testing::create_test_dataset_from_snapshot;
@@ -42,7 +42,7 @@ async fn test_engine_io_common<
 
     let dataset_registry = DatasetRegistrySoloUnitBridge::new(
         storage_unit.clone(),
-        Arc::new(CurrentAccountSubject::new_test()),
+        Arc::new(Principal::new_test()),
         Arc::new(TenancyConfig::SingleTenant),
     );
 
@@ -78,7 +78,7 @@ async fn test_engine_io_common<
     let transform_helper = TransformTestHelper::build(
         Arc::new(DatasetRegistrySoloUnitBridge::new(
             storage_unit.clone(),
-            Arc::new(CurrentAccountSubject::new_test()),
+            Arc::new(Principal::new_test()),
             Arc::new(TenancyConfig::SingleTenant),
         )),
         time_source.clone(),

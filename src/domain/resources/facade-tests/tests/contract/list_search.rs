@@ -16,7 +16,8 @@ use kamu_resources::{
 };
 use kamu_resources_facade::{
     ListResourcesError,
-    ResourceAccountAccessError,
+    ResourceAccountResolutionError,
+    ResourceAccountResolutionProblemCode,
     ResourceLabelFilterProblemCode,
     SearchResourcesRequest,
 };
@@ -304,36 +305,41 @@ async fn test_admin_may_search_another_account() {
 
 // RF-105C
 #[test_log::test(tokio::test)]
-async fn test_node_may_search_another_account_than_the_caller() {
+async fn test_node_cannot_search_even_naming_an_account() {
     let h = LocalFacadeHarness::new().await;
     create_variable_set(&h, TestAccount::Bob, "bob-own").await;
 
-    let names = h
-        .search_variable_set_names(
-            h.facade_for_node(Some(TestAccount::Alice)),
-            Some(TestAccount::Bob),
-        )
-        .await
-        .expect("the node may read any account's resources");
+    let result = h
+        .search_variable_set_names(h.facade_for_node(), Some(TestAccount::Bob))
+        .await;
 
-    assert_eq!(names, vec!["bob-own"]);
+    assert_matches!(
+        result,
+        Err(ListResourcesError::AccountResolution(
+            ResourceAccountResolutionError {
+                code: ResourceAccountResolutionProblemCode::EmptySelector,
+                ..
+            }
+        ))
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 // RF-105D
 #[test_log::test(tokio::test)]
-async fn test_node_with_anonymous_caller_needs_an_account_selector() {
+async fn test_node_without_an_account_selector_cannot_search() {
     let h = LocalFacadeHarness::new().await;
 
-    let result = h
-        .search_variable_set_names(h.facade_for_node(None), None)
-        .await;
+    let result = h.search_variable_set_names(h.facade_for_node(), None).await;
 
     assert_matches!(
         result,
-        Err(ListResourcesError::AccountAccess(
-            ResourceAccountAccessError::AnonymousSubject
+        Err(ListResourcesError::AccountResolution(
+            ResourceAccountResolutionError {
+                code: ResourceAccountResolutionProblemCode::EmptySelector,
+                ..
+            }
         ))
     );
 }

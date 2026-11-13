@@ -11,7 +11,7 @@ use std::sync::Arc;
 
 use dill::*;
 use internal_error::InternalError;
-use kamu_accounts::CurrentAccountSubject;
+use kamu_accounts::Principal;
 use kamu_core::*;
 use kamu_datasets::{DatasetRegistry, DatasetRegistryExt};
 use tokio_stream::StreamExt;
@@ -21,7 +21,7 @@ use tokio_stream::StreamExt;
 #[component(pub)]
 #[interface(dyn DatasetPullSourceResolver)]
 pub struct DatasetPullSourceResolverImpl {
-    current_account_subject: Arc<CurrentAccountSubject>,
+    principal: Arc<Principal>,
     dataset_registry: Arc<dyn DatasetRegistry>,
     remote_alias_registry: Arc<dyn RemoteAliasesRegistry>,
     remote_dataset_url_resolver: Arc<dyn RemoteDatasetUrlResolver>,
@@ -115,8 +115,10 @@ impl DatasetPullSourceResolver for DatasetPullSourceResolverImpl {
             return Ok(Some(local_handle));
         }
 
-        let CurrentAccountSubject::Logged(account) = self.current_account_subject.as_ref() else {
-            return Ok(None);
+        // Only a user owns datasets to search
+        let account = match self.principal.as_ref() {
+            Principal::User(account) => account,
+            Principal::Node | Principal::Anonymous => return Ok(None),
         };
 
         let mut datasets = self

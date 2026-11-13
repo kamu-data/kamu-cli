@@ -788,7 +788,7 @@ impl DatasetPermissionCheckerHarness {
         }
 
         let base = BaseOsoRebacHarness::new(predefined_accounts_config, |b| {
-            b.add_value(current_account_subject);
+            current_account_subject.register(b);
         })
         .await;
 

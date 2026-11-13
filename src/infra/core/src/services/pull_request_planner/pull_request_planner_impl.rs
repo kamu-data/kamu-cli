@@ -12,7 +12,7 @@ use std::sync::Arc;
 use dill::*;
 use futures::TryStreamExt;
 use internal_error::InternalError;
-use kamu_accounts::CurrentAccountSubject;
+use kamu_accounts::Principal;
 use kamu_core::*;
 use kamu_datasets::{DatasetRegistry, DependencyGraphService};
 
@@ -28,7 +28,7 @@ pub struct PullRequestPlannerImpl {
     pull_source_resolver: Arc<dyn DatasetPullSourceResolver>,
     update_kind_resolver: Arc<dyn DatasetUpdateKindResolver>,
     transform_planner: Arc<dyn TransformPlanner>,
-    current_account_subject: Arc<CurrentAccountSubject>,
+    principal: Arc<Principal>,
 }
 
 #[common_macros::method_names_consts]
@@ -41,7 +41,7 @@ impl PullRequestPlannerImpl {
         pull_source_resolver: Arc<dyn DatasetPullSourceResolver>,
         update_kind_resolver: Arc<dyn DatasetUpdateKindResolver>,
         transform_planner: Arc<dyn TransformPlanner>,
-        current_account_subject: Arc<CurrentAccountSubject>,
+        principal: Arc<Principal>,
     ) -> Self {
         Self {
             dataset_registry,
@@ -49,7 +49,7 @@ impl PullRequestPlannerImpl {
             pull_source_resolver,
             update_kind_resolver,
             transform_planner,
-            current_account_subject,
+            principal,
         }
     }
 
@@ -62,7 +62,7 @@ impl PullRequestPlannerImpl {
             PullTargetResolver::new(
                 self.dataset_registry.as_ref(),
                 self.pull_source_resolver.as_ref(),
-                self.current_account_subject.as_ref(),
+                self.principal.as_ref(),
                 options,
                 tenancy_config,
             ),
@@ -321,12 +321,17 @@ impl PullRequestPlanner for PullRequestPlannerImpl {
         options: &PullOptions,
         tenancy_config: TenancyConfig,
     ) -> Result<PullPlan, InternalError> {
-        let requests: Vec<_> = self
-            .dataset_registry
-            .all_dataset_handles_by_owner_name(self.current_account_subject.account_name())
-            .map_ok(|hdl| PullRequest::local(hdl.as_local_ref()))
-            .try_collect()
-            .await?;
+        // A principal without an account owns no datasets
+        let requests: Vec<_> = match tenancy_config.bare_alias_account_name(&self.principal) {
+            Some(owner_name) => {
+                self.dataset_registry
+                    .all_dataset_handles_by_owner_name(owner_name)
+                    .map_ok(|hdl| PullRequest::local(hdl.as_local_ref()))
+                    .try_collect()
+                    .await?
+            }
+            None => Vec::new(),
+        };
 
         Ok(self
             .build_pull_multi_plan(&requests, options, tenancy_config)

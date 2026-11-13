@@ -12,7 +12,13 @@ use std::sync::{Arc, RwLock};
 
 use chrono::{DateTime, TimeZone, Utc};
 use init_on_startup::InitOnStartup;
-use kamu_accounts::{Account, AccountRepository, CurrentAccountSubject, DidSecretEncryptionConfig};
+use kamu_accounts::{
+    Account,
+    AccountRepository,
+    CurrentAccountSubject,
+    DidSecretEncryptionConfig,
+    Principal,
+};
 use kamu_accounts_inmem::{InMemoryAccountRepository, InMemoryDidSecretKeyRepository};
 use kamu_accounts_services::AccountServiceImpl;
 use kamu_core::TenancyConfig;
@@ -36,6 +42,7 @@ test_utils::test_for_each_tenancy!(test_indexes_datasets_correctly);
 test_utils::test_for_each_tenancy!(test_try_to_resolve_non_existing_dataset);
 test_utils::test_for_each_tenancy!(test_try_to_resolve_all_datasets_for_non_existing_user);
 test_utils::test_for_each_tenancy!(test_resolve_dataset_handles_by_refs);
+test_utils::test_for_each_tenancy!(test_node_resolves_bare_alias_only_in_single_tenant);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Implementations
@@ -222,6 +229,53 @@ async fn test_try_to_resolve_all_datasets_for_non_existing_user(tenancy_config: 
     let list_dataset: Vec<_> = resolve_dataset_result.try_collect().await.unwrap();
 
     assert_eq!(list_dataset, []);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+async fn test_node_resolves_bare_alias_only_in_single_tenant(tenancy_config: TenancyConfig) {
+    let harness = DatasetEntryServiceHarness::new_as_node(tenancy_config);
+    let default_dataset = harness.create_dataset("kamu", "foo").await;
+    // An account named like the node must not capture its bare aliases
+    let node_account_dataset = match tenancy_config {
+        TenancyConfig::SingleTenant => None,
+        TenancyConfig::MultiTenant => Some(harness.create_dataset("node", "bar").await),
+    };
+
+    let foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo")).as_local_ref();
+    let bar = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("bar")).as_local_ref();
+
+    match tenancy_config {
+        TenancyConfig::SingleTenant => {
+            assert_eq!(harness.resolve(&foo).await.unwrap(), default_dataset);
+        }
+        TenancyConfig::MultiTenant => {
+            for bare_ref in [&foo, &bar] {
+                assert_matches!(
+                    harness.resolve(bare_ref).await,
+                    Err(odf::DatasetRefUnresolvedError::NotFound(_))
+                );
+            }
+
+            let batch = harness
+                .dataset_registry
+                .resolve_dataset_handles_by_refs(&[&foo, &bar])
+                .await
+                .unwrap();
+            assert_eq!(batch.resolved_handles, []);
+            assert_eq!(batch.unresolved_refs.len(), 2);
+        }
+    }
+
+    for dataset_handle in std::iter::once(&default_dataset).chain(&node_account_dataset) {
+        assert_eq!(
+            harness
+                .resolve(&dataset_handle.id.as_local_ref())
+                .await
+                .unwrap(),
+            *dataset_handle
+        );
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -633,12 +687,30 @@ struct DatasetEntryServiceHarness {
     dataset_registry: Arc<dyn DatasetRegistry>,
     dataset_storage_unit_writer: Arc<dyn odf::DatasetStorageUnitWriter>,
     dataset_entry_writer: Arc<dyn kamu_datasets_services::DatasetEntryWriter>,
+    tenancy_config: TenancyConfig,
 }
 
 impl DatasetEntryServiceHarness {
     fn new(
         test_dataset_entry_repository: TestDatasetEntryRepository,
         tenancy_config: TenancyConfig,
+    ) -> Self {
+        Self::build(test_dataset_entry_repository, tenancy_config, |b| {
+            CurrentAccountSubject::new_test().register(b);
+        })
+    }
+
+    /// Background work: the node acts, with no caller
+    fn new_as_node(tenancy_config: TenancyConfig) -> Self {
+        Self::build(TestDatasetEntryRepository::InMemory, tenancy_config, |b| {
+            b.add_value(Principal::Node);
+        })
+    }
+
+    fn build(
+        test_dataset_entry_repository: TestDatasetEntryRepository,
+        tenancy_config: TenancyConfig,
+        register_identity: impl FnOnce(&mut dill::CatalogBuilder),
     ) -> Self {
         let temp_dir = tempfile::tempdir().unwrap();
         let datasets_dir = temp_dir.path().join("datasets");
@@ -680,7 +752,7 @@ impl DatasetEntryServiceHarness {
             ));
             b.bind::<dyn Outbox, OutboxImmediateImpl>();
 
-            CurrentAccountSubject::new_test().register(&mut b);
+            register_identity(&mut b);
 
             b.add_value(tenancy_config);
 
@@ -699,7 +771,43 @@ impl DatasetEntryServiceHarness {
             dataset_registry: catalog.get_one().unwrap(),
             dataset_storage_unit_writer: catalog.get_one().unwrap(),
             dataset_entry_writer: catalog.get_one().unwrap(),
+            tenancy_config,
         }
+    }
+
+    async fn resolve(
+        &self,
+        dataset_ref: &odf::DatasetRef,
+    ) -> Result<odf::DatasetHandle, odf::DatasetRefUnresolvedError> {
+        self.dataset_registry
+            .resolve_dataset_handle_by_ref(dataset_ref)
+            .await
+    }
+
+    async fn create_dataset(&self, account_name: &str, dataset_name: &str) -> odf::DatasetHandle {
+        let account = Account::test(odf::AccountID::new_generated_ed25519().1, account_name);
+        self.account_repo.save_account(&account).await.unwrap();
+
+        let dataset_handle = odf::DatasetHandle::new(
+            odf::DatasetID::new_seeded_ed25519(dataset_name.as_bytes()),
+            self.tenancy_config.make_alias(
+                account.account_name.clone(),
+                odf::DatasetName::new_unchecked(dataset_name),
+            ),
+            odf::DatasetKind::Root,
+        );
+        self.dataset_entry_writer
+            .create_entry(
+                &dataset_handle.id,
+                &account.id,
+                &account.account_name,
+                &dataset_handle.alias.dataset_name,
+                dataset_handle.kind,
+            )
+            .await
+            .unwrap();
+
+        dataset_handle
     }
 
     // Expectation: MockDatasetEntryRepository

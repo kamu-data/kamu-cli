@@ -11,7 +11,7 @@ use std::sync::Arc;
 
 use dill::{component, interface};
 use internal_error::*;
-use kamu_accounts::CurrentAccountSubject;
+use kamu_accounts::Principal;
 use kamu_datasets::{
     CreateDatasetError,
     CreateDatasetResult,
@@ -27,7 +27,7 @@ use crate::utils::CreateDatasetUseCaseHelper;
 #[component]
 #[interface(dyn CreateDatasetUseCase)]
 pub struct CreateDatasetUseCaseImpl {
-    current_account_subject: Arc<CurrentAccountSubject>,
+    principal: Arc<Principal>,
     create_helper: Arc<CreateDatasetUseCaseHelper>,
 
     // TODO: Rebac is here temporarily - using Lazy to avoid modifying all tests
@@ -50,10 +50,14 @@ impl CreateDatasetUseCase for CreateDatasetUseCaseImpl {
             "Initiating creation of dataset from seed block"
         );
 
-        // There must be a logged-in user
-        let subject = match self.current_account_subject.as_ref() {
-            CurrentAccountSubject::Logged(subj) => subj,
-            CurrentAccountSubject::Anonymous(_) => {
+        let principal_account = match self.principal.as_ref() {
+            Principal::User(account) => account,
+            Principal::Node => {
+                return Err(CreateDatasetError::Access(odf::AccessError::Unauthorized(
+                    "The node has no account to own a dataset".into(),
+                )));
+            }
+            Principal::Anonymous => {
                 panic!("Anonymous account cannot create dataset");
             }
         };
@@ -61,7 +65,7 @@ impl CreateDatasetUseCase for CreateDatasetUseCaseImpl {
         // Resolve target account and full alias of the dataset
         let (canonical_alias, target_account_id) = self
             .create_helper
-            .resolve_alias_target(dataset_alias, subject)?;
+            .resolve_alias_target(dataset_alias, principal_account)?;
 
         // Dataset entry goes first, this guarantees name collision check
         self.create_helper
@@ -97,17 +101,17 @@ impl CreateDatasetUseCase for CreateDatasetUseCaseImpl {
             .await?;
 
         // TODO: HACK: SEC: When creating a dataset under another account we currently
-        // give subject a "maintainer" role on it. In future this should be refactored
+        // give the principal a "maintainer" role on it. In future this should be refactored
         // into organization-level permissions.
         //
         // See: https://github.com/kamu-data/kamu-node/issues/233
-        if target_account_id != subject.did {
+        if target_account_id != principal_account.did {
             let _ = self
                 .rebac_svc
                 .get()
                 .int_err()?
                 .set_account_dataset_relation(
-                    &subject.did,
+                    &principal_account.did,
                     kamu_auth_rebac::AccountToDatasetRelation::Maintainer,
                     &store_result.dataset_id,
                 )

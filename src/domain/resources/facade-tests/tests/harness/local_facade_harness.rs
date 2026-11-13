@@ -15,7 +15,6 @@ use dill::CatalogBuilder;
 use kamu_accounts::{
     AccountConfig,
     AccountPropertyName,
-    AnonymousAccountReason,
     CurrentAccountSubject,
     DidSecretEncryptionConfig,
     JOB_KAMU_ACCOUNTS_PREDEFINED_ACCOUNTS_REGISTRATOR,
@@ -263,17 +262,9 @@ impl LocalFacadeHarness {
         Self::facade_in(&catalog)
     }
 
-    /// A facade of background work: the caller is `account`, or anonymous
-    /// when `None`, while permissions are checked for [`Principal::Node`]
-    pub fn facade_for_node(&self, account: Option<TestAccount>) -> Arc<dyn ResourceFacade> {
-        let subject = match account {
-            Some(account) => CurrentAccountSubject::new_test_with(&account),
-            None => {
-                CurrentAccountSubject::anonymous(AnonymousAccountReason::NoAuthenticationProvided)
-            }
-        };
+    /// A facade of background work: [`Principal::Node`] acting, with no caller
+    pub fn facade_for_node(&self) -> Arc<dyn ResourceFacade> {
         let catalog = dill::CatalogBuilder::new_chained(&self.base_catalog)
-            .add_value(subject)
             .add_value(Principal::Node)
             .build();
         Self::facade_in(&catalog)

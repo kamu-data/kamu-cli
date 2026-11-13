@@ -102,9 +102,7 @@ fn test_di_background_catalog_acts_as_node(
         build_test_base_catalog(temp_dir.path(), tenancy_config, repositories_config);
     let subject = CurrentAccountSubject::new_test();
 
-    let mut background_catalog_builder =
-        kamu_cli::configure_background_catalog(&base_catalog, subject.clone(), tenancy_config);
-    add_test_command_values(&mut background_catalog_builder);
+    let mut background_catalog_builder = kamu_cli::configure_background_catalog(&base_catalog);
     let validate_result = background_catalog_builder.validate();
     assert!(validate_result.is_ok(), "{}", validate_result.unwrap_err());
 
@@ -119,21 +117,23 @@ fn test_di_background_catalog_acts_as_node(
         *background_catalog.get_one::<Principal>().unwrap(),
         Principal::Node
     );
-    // Name scope reads the caller's subject, not the node
-    assert_eq!(
+    // Background work has no caller
+    assert!(
         background_catalog
             .get_one::<CurrentAccountSubject>()
-            .unwrap()
-            .account_handle(),
-        subject.account_handle()
+            .is_err()
     );
+    // Remote pulls in background still find the process account's saved tokens
+    background_catalog
+        .get_one::<dyn odf::dataset::DatasetFactory>()
+        .unwrap();
 
-    let system_user_catalog =
-        KamuBackgroundCatalog::new(base_catalog, subject).system_user_catalog();
+    let node_catalog = KamuBackgroundCatalog::new(base_catalog).node_catalog();
     assert_eq!(
-        *system_user_catalog.get_one::<Principal>().unwrap(),
+        *node_catalog.get_one::<Principal>().unwrap(),
         Principal::Node
     );
+    assert!(node_catalog.get_one::<CurrentAccountSubject>().is_err());
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -166,7 +166,9 @@ fn build_test_base_catalog(
     )
     .unwrap();
     base_catalog_builder.add_value(Interact::new(false, false));
-    base_catalog_builder.build()
+    let base_catalog = base_catalog_builder.build();
+
+    kamu_cli::configure_process_catalog(&base_catalog, &CurrentAccountSubject::new_test()).build()
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -203,12 +205,12 @@ fn build_test_server_catalog(
     .unwrap();
     base_catalog_builder.add_value(Interact::new(false, false));
     let base_catalog = base_catalog_builder.build();
+    let process_catalog =
+        kamu_cli::configure_process_catalog(&base_catalog, &CurrentAccountSubject::new_test())
+            .build();
 
-    let wrapped_catalog = dill::CatalogBuilder::new_chained(&base_catalog)
-        .add_value(KamuBackgroundCatalog::new(
-            base_catalog,
-            CurrentAccountSubject::new_test(),
-        ))
+    let wrapped_catalog = dill::CatalogBuilder::new_chained(&process_catalog)
+        .add_value(KamuBackgroundCatalog::new(process_catalog.clone()))
         .build();
 
     let mut server_catalog_builder =
@@ -277,11 +279,7 @@ fn test_di_server_background_catalog_acts_as_node(
     let server_catalog =
         build_test_server_catalog(temp_dir.path(), tenancy_config, repositories_config);
 
-    let mut background_catalog_builder = kamu_cli::configure_background_catalog(
-        &server_catalog,
-        CurrentAccountSubject::new_test(),
-        tenancy_config,
-    );
+    let mut background_catalog_builder = kamu_cli::configure_background_catalog(&server_catalog);
     let validate_result = background_catalog_builder.validate();
     assert!(validate_result.is_ok(), "{}", validate_result.unwrap_err());
 
@@ -330,8 +328,11 @@ async fn update_di_graph() {
     .unwrap();
     base_catalog_builder.add_value(Interact::new(false, false));
     let base_catalog = base_catalog_builder.build();
+    let process_catalog =
+        kamu_cli::configure_process_catalog(&base_catalog, &CurrentAccountSubject::new_test())
+            .build();
 
-    let mut cli_catalog_builder = kamu_cli::configure_cli_catalog(&base_catalog, tenancy_config);
+    let mut cli_catalog_builder = kamu_cli::configure_cli_catalog(&process_catalog, tenancy_config);
 
     CurrentAccountSubject::new_test().register(&mut cli_catalog_builder);
     cli_catalog_builder.add_value(JwtAuthenticationConfig::default());

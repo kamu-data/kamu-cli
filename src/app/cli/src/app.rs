@@ -228,11 +228,11 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
             )
             .await?;
 
-        let wrapped_base_catalog = dill::CatalogBuilder::new_chained(&base_catalog)
-            .add_value(KamuBackgroundCatalog::new(
-                base_catalog.clone(),
-                cli_account_subject.clone(),
-            ))
+        let process_catalog =
+            configure_process_catalog(&base_catalog, &cli_account_subject).build();
+
+        let wrapped_base_catalog = dill::CatalogBuilder::new_chained(&process_catalog)
+            .add_value(KamuBackgroundCatalog::new(process_catalog.clone()))
             .build();
 
         let maybe_server_catalog = if cli_commands::command_needs_server_components(&args) {
@@ -249,12 +249,7 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
 
         // System singletons are first resolved from here, so their background work runs as
         // the node, not as the CLI user
-        let background_catalog = &configure_background_catalog(
-            cli_base_catalog,
-            cli_account_subject.clone(),
-            tenancy_config,
-        )
-        .build();
+        let background_catalog = &configure_background_catalog(cli_base_catalog).build();
 
         let cli_catalog = {
             let mut b = configure_cli_catalog(cli_base_catalog, tenancy_config);
@@ -635,17 +630,33 @@ pub fn configure_cli_catalog(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Catalog of background work (agents, startup jobs, the outbox), a sibling of
-/// the CLI catalog acting as [`Principal::Node`]. It still holds the CLI
-/// subject, which name scope and ownership read.
+/// Components bound to the account that runs the process, once it is known
 // Public only for tests
-pub fn configure_background_catalog(
-    cli_base_catalog: &dill::Catalog,
-    cli_account_subject: CurrentAccountSubject,
-    tenancy_config: TenancyConfig,
+pub fn configure_process_catalog(
+    base_catalog: &dill::Catalog,
+    cli_account_subject: &CurrentAccountSubject,
 ) -> dill::CatalogBuilder {
-    let mut b = configure_cli_catalog(cli_base_catalog, tenancy_config);
-    b.add_value(cli_account_subject);
+    use dill::Component;
+
+    let mut b = dill::CatalogBuilder::new_chained(base_catalog);
+
+    // TODO: Background tasks pull from remote nodes with the process account's tokens;
+    // they should pull on behalf of the user who initiated the task
+    b.add_builder(
+        odf_server::AccessTokenRegistryService::builder()
+            .with_current_account_subject(Arc::new(cli_account_subject.clone())),
+    );
+
+    b
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Catalog of background work (agents, startup jobs, the outbox), a sibling of
+/// the CLI catalog acting as [`Principal::Node`], with no caller
+// Public only for tests
+pub fn configure_background_catalog(cli_base_catalog: &dill::Catalog) -> dill::CatalogBuilder {
+    let mut b = dill::CatalogBuilder::new_chained(cli_base_catalog);
     b.add_value(Principal::Node);
     b
 }
