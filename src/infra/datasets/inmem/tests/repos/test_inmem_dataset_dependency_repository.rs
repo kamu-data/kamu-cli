@@ -7,110 +7,113 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use database_common_macros::database_transactional_test;
-use dill::{Catalog, CatalogBuilder};
-use kamu_accounts_inmem::InMemoryAccountRepository;
-use kamu_datasets_inmem::{InMemoryDatasetDependencyRepository, InMemoryDatasetEntryRepository};
+use database_common_macros::{database_concurrent_transactions_test, database_transactional_test};
 use kamu_datasets_repo_tests::dataset_dependency_repo;
 
+use super::InMemoryDatasetRepositoriesHarness;
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 database_transactional_test!(
-    storage = inmem,
+    storage = inmem_with_transaction,
     fixture = dataset_dependency_repo::test_crud_single_dependency,
-    harness = InMemoryDatasetDependencyRepositoryHarness
+    harness = InMemoryDatasetRepositoriesHarness
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 database_transactional_test!(
-    storage = inmem,
+    storage = inmem_with_transaction,
     fixture = dataset_dependency_repo::test_several_unrelated_dependencies,
-    harness = InMemoryDatasetDependencyRepositoryHarness
+    harness = InMemoryDatasetRepositoriesHarness
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 database_transactional_test!(
-    storage = inmem,
+    storage = inmem_with_transaction,
     fixture = dataset_dependency_repo::test_dependency_chain,
-    harness = InMemoryDatasetDependencyRepositoryHarness
+    harness = InMemoryDatasetRepositoriesHarness
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 database_transactional_test!(
-    storage = inmem,
+    storage = inmem_with_transaction,
     fixture = dataset_dependency_repo::test_dependency_fanins,
-    harness = InMemoryDatasetDependencyRepositoryHarness
+    harness = InMemoryDatasetRepositoriesHarness
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 database_transactional_test!(
-    storage = inmem,
+    storage = inmem_with_transaction,
     fixture = dataset_dependency_repo::test_dependency_fanouts,
-    harness = InMemoryDatasetDependencyRepositoryHarness
+    harness = InMemoryDatasetRepositoriesHarness
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 database_transactional_test!(
-    storage = inmem,
+    storage = inmem_with_transaction,
     fixture = dataset_dependency_repo::test_add_duplicate_dependency,
-    harness = InMemoryDatasetDependencyRepositoryHarness
+    harness = InMemoryDatasetRepositoriesHarness
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 database_transactional_test!(
-    storage = inmem,
+    storage = inmem_with_transaction,
+    fixture = dataset_dependency_repo::test_add_dependency_twice_in_one_request,
+    harness = InMemoryDatasetRepositoriesHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = inmem_with_transaction,
     fixture = dataset_dependency_repo::test_remove_dependency,
-    harness = InMemoryDatasetDependencyRepositoryHarness
+    harness = InMemoryDatasetRepositoriesHarness
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 database_transactional_test!(
-    storage = inmem,
+    storage = inmem_with_transaction,
     fixture = dataset_dependency_repo::test_remove_missing_dependency,
-    harness = InMemoryDatasetDependencyRepositoryHarness
+    harness = InMemoryDatasetRepositoriesHarness
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 database_transactional_test!(
-    storage = inmem,
+    storage = inmem_with_transaction,
     fixture = dataset_dependency_repo::test_remove_all_dataset_dependencies,
-    harness = InMemoryDatasetDependencyRepositoryHarness
+    harness = InMemoryDatasetRepositoriesHarness
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 database_transactional_test!(
-    storage = inmem,
+    storage = inmem_with_transaction,
     fixture = dataset_dependency_repo::test_remove_orphan_dependencies,
-    harness = InMemoryDatasetDependencyRepositoryHarness
+    harness = InMemoryDatasetRepositoriesHarness
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-struct InMemoryDatasetDependencyRepositoryHarness {
-    catalog: Catalog,
-}
+database_concurrent_transactions_test!(
+    storage = inmem,
+    fixture = dataset_dependency_repo::test_add_same_dependency_in_concurrent_transactions,
+    harness = InMemoryDatasetRepositoriesHarness
+);
 
-impl InMemoryDatasetDependencyRepositoryHarness {
-    pub fn new() -> Self {
-        let mut catalog_builder = CatalogBuilder::new();
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-        catalog_builder.add::<InMemoryAccountRepository>();
-        catalog_builder.add::<InMemoryDatasetEntryRepository>();
-        catalog_builder.add::<InMemoryDatasetDependencyRepository>();
-
-        Self {
-            catalog: catalog_builder.build(),
-        }
-    }
-}
+database_concurrent_transactions_test!(
+    storage = inmem,
+    fixture = dataset_dependency_repo::test_add_different_dependencies_in_concurrent_transactions,
+    harness = InMemoryDatasetRepositoriesHarness
+);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

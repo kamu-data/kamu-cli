@@ -8,17 +8,20 @@
 // by the Apache License, Version 2.0.
 
 use internal_error::{ErrorIntoInternal, InternalError};
-use kamu_datasets::DatasetActionUnauthorizedError;
+use kamu_accounts::Principal;
+use kamu_datasets::DatasetPermissionError;
 use thiserror::Error;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
 pub trait ProvenanceService: Sync + Send {
-    /// Passes the visitor through the dependency graph of a dataset
+    /// Passes the visitor through the dependency graph of a dataset, as far as
+    /// the principal may read it.
     /// Some predefined visitors are available.
     async fn get_dataset_lineage(
         &self,
+        principal: &Principal,
         dataset_ref: &odf::DatasetRef,
         visitor: &mut dyn LineageVisitor,
         options: LineageOptions,
@@ -105,9 +108,9 @@ impl From<odf::DatasetRefUnresolvedError> for GetLineageError {
     }
 }
 
-impl From<DatasetActionUnauthorizedError> for GetLineageError {
-    fn from(v: DatasetActionUnauthorizedError) -> Self {
-        use DatasetActionUnauthorizedError as E;
+impl From<DatasetPermissionError> for GetLineageError {
+    fn from(v: DatasetPermissionError) -> Self {
+        use DatasetPermissionError as E;
 
         match v {
             E::NotFound(e) => Self::NotFound(e),

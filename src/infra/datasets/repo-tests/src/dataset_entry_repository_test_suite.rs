@@ -10,6 +10,12 @@
 use std::borrow::Cow;
 
 use database_common::PaginationOpts;
+use database_common::testing::{
+    RacingTransactionOutcome,
+    in_committed_transaction,
+    race_transactions,
+};
+use internal_error::InternalError;
 use kamu_accounts::{Account, AccountRepository};
 use kamu_datasets::{
     DatasetEntriesDeletionResult,
@@ -802,6 +808,44 @@ pub async fn test_update_dataset_entry_name(catalog: &dill::Catalog) {
 
         assert_matches!(count_res, Ok(1));
     }
+    {
+        // Renaming again frees the name the entry leaves
+        let newer_name = odf::DatasetName::new_unchecked("newer-name");
+        dataset_entry_repo
+            .update_dataset_entry_name(&dataset_entry.id, &newer_name)
+            .await
+            .unwrap();
+        let stored = dataset_entry_repo
+            .get_dataset_entry(&dataset_entry.id)
+            .await
+            .unwrap();
+        assert_eq!(stored.name, newer_name);
+
+        let other_entry = new_dataset_entry_with(&account, "new-name", odf::DatasetKind::Root);
+        assert_matches!(
+            dataset_entry_repo.save_dataset_entry(&other_entry).await,
+            Ok(())
+        );
+    }
+    {
+        // Renaming the owner keeps the entry's own name
+        let new_owner_name = odf::AccountName::new_unchecked("renamed-owner");
+        dataset_entry_repo
+            .update_owner_entries_after_rename(&account.id, &new_owner_name)
+            .await
+            .unwrap();
+        let stored = dataset_entry_repo
+            .get_dataset_entry(&dataset_entry.id)
+            .await
+            .unwrap();
+        assert_eq!(
+            (stored.name, stored.owner_name),
+            (
+                odf::DatasetName::new_unchecked("newer-name"),
+                new_owner_name
+            )
+        );
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1034,6 +1078,211 @@ pub async fn test_delete_multiple_dataset_entries(catalog: &dill::Catalog) {
         );
         assert_eq!(dataset_entry_repo.dataset_entries_count().await.unwrap(), 0);
     }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Two transactions of one owner take the same name, which differs only in
+/// case: the one that commits first keeps it, the other never commits
+pub async fn test_save_same_name_in_concurrent_transactions(catalog: &dill::Catalog) {
+    let (owner, _) = init_committed_entries(catalog, &[]).await;
+
+    let first_entry = new_dataset_entry_with(&owner, "foo", odf::DatasetKind::Root);
+    let second_entry = new_dataset_entry_with(&owner, "Foo", odf::DatasetKind::Root);
+    let first_id = first_entry.id.clone();
+
+    let outcome = race_transactions(
+        catalog,
+        |catalog| async move {
+            save_entry(&catalog, &first_entry).await.unwrap();
+        },
+        move |catalog| async move { save_entry(&catalog, &second_entry).await },
+    )
+    .await;
+
+    assert_matches!(
+        outcome,
+        RacingTransactionOutcome::FailedAtWrite(SaveDatasetEntryError::NameCollision(_))
+            | RacingTransactionOutcome::FailedAtCommit(_)
+    );
+    let committed_id = in_committed_transaction(catalog, |catalog| async move {
+        catalog
+            .get_one::<dyn DatasetEntryRepository>()
+            .unwrap()
+            .get_dataset_entry_by_owner_and_name(&owner.id, &odf::DatasetName::new_unchecked("foo"))
+            .await
+            .unwrap()
+            .id
+    })
+    .await;
+    assert_eq!(committed_id, first_id);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+async fn save_entry(
+    catalog: &dill::Catalog,
+    entry: &DatasetEntry,
+) -> Result<(), SaveDatasetEntryError> {
+    catalog
+        .get_one::<dyn DatasetEntryRepository>()
+        .unwrap()
+        .save_dataset_entry(entry)
+        .await
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Two transactions rename different entries of one owner to names that differ
+/// only in case: the one that commits first takes the name, the other never
+/// commits
+pub async fn test_rename_to_same_name_in_concurrent_transactions(catalog: &dill::Catalog) {
+    let (owner, entries) = init_committed_entries(
+        catalog,
+        &[
+            ("foo", odf::DatasetKind::Root),
+            ("bar", odf::DatasetKind::Root),
+        ],
+    )
+    .await;
+    let (foo_id, bar_id) = (entries[0].id.clone(), entries[1].id.clone());
+    let second_bar_id = bar_id.clone();
+
+    let outcome = race_transactions(
+        catalog,
+        |catalog| async move {
+            rename_entry(&catalog, &foo_id, "baz").await.unwrap();
+        },
+        move |catalog| async move { rename_entry(&catalog, &second_bar_id, "Baz").await },
+    )
+    .await;
+
+    assert_matches!(
+        outcome,
+        RacingTransactionOutcome::FailedAtWrite(UpdateDatasetEntryNameError::NameCollision(_))
+            | RacingTransactionOutcome::FailedAtCommit(_)
+    );
+    let baz_id = in_committed_transaction(catalog, |catalog| async move {
+        catalog
+            .get_one::<dyn DatasetEntryRepository>()
+            .unwrap()
+            .get_dataset_entry_by_owner_and_name(&owner.id, &odf::DatasetName::new_unchecked("baz"))
+            .await
+            .unwrap()
+            .id
+    })
+    .await;
+    assert_eq!(baz_id, entries[0].id);
+    assert_eq!(
+        get_committed_entry(catalog, &bar_id).await.name,
+        odf::DatasetName::new_unchecked("bar")
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+async fn rename_entry(
+    catalog: &dill::Catalog,
+    dataset_id: &odf::DatasetID,
+    new_name: &str,
+) -> Result<(), UpdateDatasetEntryNameError> {
+    catalog
+        .get_one::<dyn DatasetEntryRepository>()
+        .unwrap()
+        .update_dataset_entry_name(dataset_id, &odf::DatasetName::new_unchecked(new_name))
+        .await
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Two transactions rename one entry to different names: both commit, the one
+/// that commits last sets the name, and the other name stays free
+pub async fn test_rename_in_concurrent_transactions(catalog: &dill::Catalog) {
+    let (owner, entries) =
+        init_committed_entries(catalog, &[("foo", odf::DatasetKind::Root)]).await;
+    let foo_id = entries[0].id.clone();
+    let second_foo_id = foo_id.clone();
+
+    let outcome = race_transactions(
+        catalog,
+        |catalog| async move {
+            rename_entry(&catalog, &foo_id, "bar").await.unwrap();
+        },
+        move |catalog| async move { rename_entry(&catalog, &second_foo_id, "baz").await },
+    )
+    .await;
+
+    assert_matches!(outcome, RacingTransactionOutcome::Committed);
+    assert_eq!(
+        get_committed_entry(catalog, &entries[0].id).await.name,
+        odf::DatasetName::new_unchecked("baz")
+    );
+    let other_entry = new_dataset_entry_with(&owner, "bar", odf::DatasetKind::Root);
+    let other_entry_saved = in_committed_transaction(catalog, |catalog| async move {
+        save_entry(&catalog, &other_entry).await
+    })
+    .await;
+    assert_matches!(other_entry_saved, Ok(()));
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// One transaction renames an entry while another renames its owner: both
+/// commit, and the entry keeps both changes
+pub async fn test_rename_and_rename_owner_in_concurrent_transactions(catalog: &dill::Catalog) {
+    let (owner, entries) =
+        init_committed_entries(catalog, &[("foo", odf::DatasetKind::Root)]).await;
+    let foo_id = entries[0].id.clone();
+
+    let outcome = race_transactions(
+        catalog,
+        |catalog| async move {
+            rename_entry(&catalog, &foo_id, "bar").await.unwrap();
+        },
+        move |catalog| async move { rename_owner(&catalog, &owner.id, "bob").await },
+    )
+    .await;
+
+    assert_matches!(outcome, RacingTransactionOutcome::Committed);
+    let committed_entry = get_committed_entry(catalog, &entries[0].id).await;
+    assert_eq!(
+        (committed_entry.name, committed_entry.owner_name),
+        (
+            odf::DatasetName::new_unchecked("bar"),
+            odf::AccountName::new_unchecked("bob")
+        )
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+async fn rename_owner(
+    catalog: &dill::Catalog,
+    owner_id: &odf::AccountID,
+    new_owner_name: &str,
+) -> Result<(), InternalError> {
+    catalog
+        .get_one::<dyn DatasetEntryRepository>()
+        .unwrap()
+        .update_owner_entries_after_rename(
+            owner_id,
+            &odf::AccountName::new_unchecked(new_owner_name),
+        )
+        .await
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+async fn get_committed_entry(catalog: &dill::Catalog, dataset_id: &odf::DatasetID) -> DatasetEntry {
+    in_committed_transaction(catalog, |catalog| async move {
+        catalog
+            .get_one::<dyn DatasetEntryRepository>()
+            .unwrap()
+            .get_dataset_entry(dataset_id)
+            .await
+            .unwrap()
+    })
+    .await
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

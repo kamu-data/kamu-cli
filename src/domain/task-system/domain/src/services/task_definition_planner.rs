@@ -9,7 +9,7 @@
 
 use internal_error::InternalError;
 
-use crate::{LogicalPlan, TaskDefinition, TaskID};
+use crate::{LogicalPlan, TaskDefinition, TaskError, TaskID};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -20,7 +20,19 @@ pub trait TaskDefinitionPlanner: Send + Sync {
         &self,
         task_id: TaskID,
         logical_plan: &LogicalPlan,
-    ) -> Result<TaskDefinition, InternalError>;
+    ) -> Result<TaskDefinition, PrepareTaskDefinitionError>;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(thiserror::Error, Debug)]
+pub enum PrepareTaskDefinitionError {
+    /// The task cannot run, and fails with this error without reaching a
+    /// runner
+    #[error("Task planning failed: {}", .0.error_type)]
+    Failed(TaskError),
+    #[error(transparent)]
+    Internal(#[from] InternalError),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -12,7 +12,7 @@ use std::sync::Arc;
 
 use database_common::{PaginationOpts, collect_stream_page};
 use internal_error::{InternalError, ResultIntoInternal};
-use kamu_accounts::{CurrentAccountSubject, DEFAULT_ACCOUNT_NAME_STR};
+use kamu_accounts::{DEFAULT_ACCOUNT_NAME_STR, Principal};
 use kamu_core::TenancyConfig;
 use kamu_datasets::{
     DatasetHandlesResolution,
@@ -28,12 +28,13 @@ use odf::dataset::ResolveDatasetHandlesByRefsResponse;
 #[dill::interface(dyn DatasetRegistry)]
 pub struct DatasetRegistrySoloUnitBridge {
     dataset_storage_unit: Arc<dyn odf::DatasetStorageUnit>,
-    current_account_subject: Arc<CurrentAccountSubject>,
+    principal: Arc<Principal>,
     tenancy_config: Arc<TenancyConfig>,
 }
 
 impl DatasetRegistrySoloUnitBridge {
-    fn normalize_alias(&self, alias: &odf::DatasetAlias) -> odf::DatasetAlias {
+    /// `None` for a bare alias the principal has no account to scope
+    fn normalize_alias(&self, alias: &odf::DatasetAlias) -> Option<odf::DatasetAlias> {
         match self.tenancy_config.as_ref() {
             TenancyConfig::SingleTenant => {
                 if alias.is_multi_tenant() {
@@ -44,21 +45,19 @@ impl DatasetRegistrySoloUnitBridge {
                          validations"
                     );
                 }
-                alias.clone()
+                Some(alias.clone())
             }
             TenancyConfig::MultiTenant => {
                 if alias.is_multi_tenant() {
-                    alias.clone()
+                    Some(alias.clone())
                 } else {
-                    match self.current_account_subject.as_ref() {
-                        CurrentAccountSubject::Anonymous(_) => {
-                            panic!("Anonymous account misused, use multi-tenant alias");
-                        }
-                        CurrentAccountSubject::Logged(l) => odf::DatasetAlias::new(
-                            Some(l.account_handle.name.clone()),
-                            alias.dataset_name.clone(),
-                        ),
-                    }
+                    let owner_name = self
+                        .tenancy_config
+                        .bare_alias_account_name(&self.principal)?;
+                    Some(odf::DatasetAlias::new(
+                        Some(owner_name.clone()),
+                        alias.dataset_name.clone(),
+                    ))
                 }
             }
         }
@@ -110,14 +109,14 @@ impl odf::dataset::DatasetHandleResolver for DatasetRegistrySoloUnitBridge {
         match dataset_ref {
             odf::DatasetRef::Handle(h) => Ok(h.clone()),
             odf::DatasetRef::Alias(alias) => {
-                let normalized_alias = self.normalize_alias(alias);
-
-                use futures::StreamExt;
-                let mut datasets = self.all_dataset_handles();
-                while let Some(hdl) = datasets.next().await {
-                    let hdl = hdl?;
-                    if hdl.alias == normalized_alias {
-                        return Ok(hdl);
+                if let Some(normalized_alias) = self.normalize_alias(alias) {
+                    use futures::StreamExt;
+                    let mut datasets = self.all_dataset_handles();
+                    while let Some(hdl) = datasets.next().await {
+                        let hdl = hdl?;
+                        if hdl.alias == normalized_alias {
+                            return Ok(hdl);
+                        }
                     }
                 }
                 Err(odf::DatasetRefUnresolvedError::NotFound(
@@ -234,17 +233,12 @@ impl DatasetRegistry for DatasetRegistrySoloUnitBridge {
 
                 let maybe_owned_dataset_handle = match self.tenancy_config.as_ref() {
                     TenancyConfig::SingleTenant => Some(dataset_handle),
-                    TenancyConfig::MultiTenant => match self.current_account_subject.as_ref() {
-                        CurrentAccountSubject::Anonymous(_) => {
-                            panic!("Logged subject only");
+                    // Storage keeps no owners: the principal's own datasets are all of them
+                    TenancyConfig::MultiTenant => match self.principal.as_ref() {
+                        Principal::User(account_handle) if account_handle.did == owner_id => {
+                            Some(dataset_handle)
                         }
-                        CurrentAccountSubject::Logged(l) => {
-                            if l.account_handle.did == owner_id {
-                                Some(dataset_handle)
-                            } else {
-                                None
-                            }
-                        }
+                        Principal::User(_) | Principal::Node | Principal::Anonymous => None,
                     },
                 };
 

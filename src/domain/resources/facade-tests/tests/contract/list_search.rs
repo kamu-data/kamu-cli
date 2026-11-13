@@ -16,13 +16,15 @@ use kamu_resources::{
 };
 use kamu_resources_facade::{
     ListResourcesError,
+    ResourceAccountResolutionError,
+    ResourceAccountResolutionProblemCode,
     ResourceLabelFilterProblemCode,
     SearchResourcesRequest,
 };
 use pretty_assertions::{assert_eq, assert_matches};
 
 use crate::contract_test;
-use crate::harness::{FacadeContractHarness, TestAccount};
+use crate::harness::{FacadeContractHarness, LocalFacadeHarness, TestAccount};
 use crate::helpers::{
     SECRET_SET_CANONICAL_SELECTOR,
     SECRET_SET_SCHEMA_STR,
@@ -281,6 +283,65 @@ pub async fn test_per_selector_account_is_authorized(h: &impl FacadeContractHarn
         .await
         .expect("the caller's own resources must remain readable");
     assert_eq!(sorted_handle_names(response.items), vec!["alice-own"]);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// RF-105B
+#[test_log::test(tokio::test)]
+async fn test_admin_may_search_another_account() {
+    let h = LocalFacadeHarness::new().await;
+    create_variable_set(&h, TestAccount::Bob, "bob-own").await;
+
+    let names = h
+        .search_variable_set_names(h.facade_for_admin(), Some(TestAccount::Bob))
+        .await
+        .expect("an admin may read another account's resources");
+
+    assert_eq!(names, vec!["bob-own"]);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// RF-105C
+#[test_log::test(tokio::test)]
+async fn test_node_cannot_search_even_naming_an_account() {
+    let h = LocalFacadeHarness::new().await;
+    create_variable_set(&h, TestAccount::Bob, "bob-own").await;
+
+    let result = h
+        .search_variable_set_names(h.facade_for_node(), Some(TestAccount::Bob))
+        .await;
+
+    assert_matches!(
+        result,
+        Err(ListResourcesError::AccountResolution(
+            ResourceAccountResolutionError {
+                code: ResourceAccountResolutionProblemCode::EmptySelector,
+                ..
+            }
+        ))
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// RF-105D
+#[test_log::test(tokio::test)]
+async fn test_node_without_an_account_selector_cannot_search() {
+    let h = LocalFacadeHarness::new().await;
+
+    let result = h.search_variable_set_names(h.facade_for_node(), None).await;
+
+    assert_matches!(
+        result,
+        Err(ListResourcesError::AccountResolution(
+            ResourceAccountResolutionError {
+                code: ResourceAccountResolutionProblemCode::EmptySelector,
+                ..
+            }
+        ))
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

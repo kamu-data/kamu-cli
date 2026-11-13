@@ -15,9 +15,16 @@ use chrono::Utc;
 use chrono::prelude::*;
 use container_runtime::ContainerRuntime;
 use indoc::indoc;
+use internal_error::ErrorIntoInternal;
 use kamu::domain::*;
 use kamu::ingest::*;
 use kamu::utils::docker_images;
+use kamu_datasets::{
+    DatasetEnvVar,
+    DatasetEnvVarValue,
+    DatasetKeyValueService,
+    FindDatasetEnvVarError,
+};
 use kamu_datasets_services::DatasetKeyValueServiceSysEnv;
 use url::Url;
 
@@ -1434,6 +1441,235 @@ async fn test_fetch_container_has_more_data_is_more_than_a_batch() {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Invalid fetch steps
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[tokio::test]
+async fn test_fetch_misconfigured_steps_are_invalid_fetch_step() {
+    let harness = FetchTestHarness::new();
+    let url_step = |url: &str, headers| {
+        odf::metadata::FetchStep::Url(odf::metadata::FetchStepUrl {
+            url: url.to_owned(),
+            event_time: None,
+            cache: None,
+            headers,
+        })
+    };
+    let cases = [
+        ("unsupported scheme", url_step("s3://bucket/data.csv", None)),
+        (
+            "invalid HTTP header name",
+            url_step(
+                "http://localhost:123/data.csv",
+                Some(vec![odf::metadata::RequestHeader {
+                    name: "not a header name".to_owned(),
+                    value: "value".to_owned(),
+                }]),
+            ),
+        ),
+        (
+            "URL unparsable after templating",
+            url_step("${{ env.KAMU_TEST_UNSET || 'not a url' }}", None),
+        ),
+        (
+            "glob ordered by event time",
+            odf::metadata::FetchStep::FilesGlob(odf::metadata::FetchStepFilesGlob {
+                path: harness
+                    .temp_dir
+                    .path()
+                    .join("data-*.csv")
+                    .to_str()
+                    .unwrap()
+                    .to_owned(),
+                event_time: None,
+                cache: None,
+                order: Some(odf::metadata::SourceOrdering::ByEventTime),
+            }),
+        ),
+    ];
+
+    for (case, fetch_step) in cases {
+        let res = harness.fetch_once(&fetch_step).await;
+
+        assert_matches!(res, Err(PollingIngestError::InvalidFetchStep(_)), "{case}");
+    }
+}
+
+#[cfg(feature = "ingest-mqtt")]
+#[tokio::test]
+async fn test_fetch_mqtt_port_out_of_range_is_invalid_fetch_step() {
+    let harness = FetchTestHarness::new();
+
+    let res = harness
+        .fetch_once(&odf::metadata::FetchStep::Mqtt(
+            odf::metadata::FetchStepMqtt {
+                host: "localhost".to_owned(),
+                port: -5,
+                username: None,
+                password: None,
+                topics: vec![],
+            },
+        ))
+        .await;
+
+    assert_matches!(res, Err(PollingIngestError::InvalidFetchStep(_)));
+}
+
+#[cfg(feature = "ingest-evm")]
+#[tokio::test]
+async fn test_fetch_ethereum_logs_without_node_or_chain_is_invalid_fetch_step() {
+    let harness = FetchTestHarness::new();
+
+    let res = harness
+        .fetch_once(&odf::metadata::FetchStep::EthereumLogs(
+            odf::metadata::FetchStepEthereumLogs {
+                chain_id: None,
+                node_url: None,
+                filter: None,
+                signature: None,
+            },
+        ))
+        .await;
+
+    assert_matches!(res, Err(PollingIngestError::InvalidFetchStep(_)));
+}
+
+#[tokio::test]
+async fn test_fetch_url_http_invalid_header_value_is_reported_by_name_only() {
+    let harness = FetchTestHarness::new();
+
+    let res = harness
+        .fetch_once(&odf::metadata::FetchStep::Url(
+            odf::metadata::FetchStepUrl {
+                url: "http://localhost:123/data.csv".to_owned(),
+                event_time: None,
+                cache: None,
+                headers: Some(vec![odf::metadata::RequestHeader {
+                    name: "x-api-key".to_owned(),
+                    value: "secret\nvalue".to_owned(),
+                }]),
+            },
+        ))
+        .await;
+
+    assert_matches!(
+        res,
+        Err(PollingIngestError::InvalidFetchStep(e))
+            if e.source.to_string() == "Invalid value of HTTP header x-api-key"
+    );
+}
+
+#[tokio::test]
+async fn test_fetch_files_glob_bad_event_time_from_path_is_invalid_fetch_step() {
+    let cases = [
+        ("bad regex", r"data-(\d+", None),
+        ("pattern not matching", r"other-(\d{4}-\d{2}-\d{2})", None),
+        ("pattern without group", r"data-\d{4}-\d{2}-\d{2}", None),
+        (
+            "bad timestamp format",
+            r"data-(\d{4}-\d{2}-\d{2})",
+            Some("%Y/%m/%d"),
+        ),
+    ];
+
+    for (case, pattern, timestamp_format) in cases {
+        let harness = FetchTestHarness::new();
+
+        let res = harness
+            .fetch_glob_with_event_time_from_path(pattern, timestamp_format)
+            .await;
+
+        assert_matches!(res, Err(PollingIngestError::InvalidFetchStep(_)), "{case}");
+    }
+}
+
+#[tokio::test]
+async fn test_fetch_url_env_var_lookup_failure_does_not_fall_back_to_default() {
+    let harness = FetchTestHarness::with_failing_env_var_lookup();
+
+    let res = harness
+        .fetch_once(&odf::metadata::FetchStep::Url(
+            odf::metadata::FetchStepUrl {
+                url: "http://localhost:1/${{ env.KAMU_TEST || 'data.csv' }}".to_owned(),
+                event_time: None,
+                cache: None,
+                headers: None,
+            },
+        ))
+        .await;
+
+    assert_matches!(res, Err(PollingIngestError::Internal(_)));
+}
+
+#[cfg(feature = "ingest-evm")]
+#[tokio::test]
+async fn test_fetch_ethereum_logs_with_malformed_etag_fails() {
+    let harness = FetchTestHarness::new();
+
+    let res = harness
+        .fetch_once_with_state(
+            &FetchTestHarness::ethereum_logs_step(),
+            &PollingSourceState::ETag("not-a-block".to_owned()),
+        )
+        .await;
+
+    assert_matches!(
+        res,
+        Err(PollingIngestError::Internal(e)) if format!("{e:?}").contains("Malformed ETag")
+    );
+}
+
+#[cfg(feature = "ingest-evm")]
+#[tokio::test]
+async fn test_fetch_ethereum_logs_with_last_modified_state_fails() {
+    let harness = FetchTestHarness::new();
+
+    let res = harness
+        .fetch_once_with_state(
+            &FetchTestHarness::ethereum_logs_step(),
+            &PollingSourceState::LastModified(Utc.with_ymd_and_hms(2020, 1, 1, 0, 0, 0).unwrap()),
+        )
+        .await;
+
+    assert_matches!(
+        res,
+        Err(PollingIngestError::Internal(e)) if format!("{e:?}").contains("should only use ETag")
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// URL: http without a cache validator
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[tokio::test]
+async fn test_fetch_url_http_unparsable_last_modified_is_ignored() {
+    let harness = FetchTestHarness::new();
+    let url = harness
+        .serve_once(&[("Last-Modified", "garbage")], CSV_BATCH_OUTPUT)
+        .await;
+
+    let res = harness
+        .fetch_once(&odf::metadata::FetchStep::Url(
+            odf::metadata::FetchStepUrl {
+                url: url.to_string(),
+                event_time: None,
+                cache: None,
+                headers: None,
+            },
+        ))
+        .await;
+
+    assert_matches!(
+        res,
+        Ok(FetchResult::Updated(FetchResultUpdated {
+            source_state: None,
+            source_event_time: None,
+            ..
+        }))
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Harness
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -1444,6 +1680,17 @@ struct FetchTestHarness {
 
 impl FetchTestHarness {
     fn new() -> Self {
+        Self::with_dataset_key_value_service(Arc::new(DatasetKeyValueServiceSysEnv::new()))
+    }
+
+    /// Every env var lookup fails with an internal error
+    fn with_failing_env_var_lookup() -> Self {
+        Self::with_dataset_key_value_service(Arc::new(FailingDatasetKeyValueService))
+    }
+
+    fn with_dataset_key_value_service(
+        dataset_key_value_svc: Arc<dyn DatasetKeyValueService>,
+    ) -> Self {
         let temp_dir = tempfile::tempdir().unwrap();
 
         let fetch_svc = FetchService::new(
@@ -1452,7 +1699,7 @@ impl FetchTestHarness {
             None,
             None,
             None,
-            Arc::new(DatasetKeyValueServiceSysEnv::new()),
+            dataset_key_value_svc,
             Arc::new(RunInfoDir::new(temp_dir.path().join("run"))),
         );
 
@@ -1460,6 +1707,125 @@ impl FetchTestHarness {
             temp_dir,
             fetch_svc,
         }
+    }
+
+    /// Fetches once, with no previous state and no env vars
+    async fn fetch_once(
+        &self,
+        fetch_step: &odf::metadata::FetchStep,
+    ) -> Result<FetchResult, PollingIngestError> {
+        self.fetch(fetch_step, None).await
+    }
+
+    async fn fetch_once_with_state(
+        &self,
+        fetch_step: &odf::metadata::FetchStep,
+        prev_source_state: &PollingSourceState,
+    ) -> Result<FetchResult, PollingIngestError> {
+        self.fetch(fetch_step, Some(prev_source_state)).await
+    }
+
+    async fn fetch(
+        &self,
+        fetch_step: &odf::metadata::FetchStep,
+        prev_source_state: Option<&PollingSourceState>,
+    ) -> Result<FetchResult, PollingIngestError> {
+        self.fetch_svc
+            .fetch(
+                &mock_dataset_handle(),
+                &generate_unique_operation_id(),
+                fetch_step,
+                prev_source_state,
+                &self.temp_dir.path().join("fetched.bin"),
+                &Utc::now(),
+                &HashMap::new(),
+                None,
+            )
+            .await
+    }
+
+    /// Globs a single `data-2020-01-01.csv`, taking event time from its name
+    async fn fetch_glob_with_event_time_from_path(
+        &self,
+        pattern: &str,
+        timestamp_format: Option<&str>,
+    ) -> Result<FetchResult, PollingIngestError> {
+        let src_dir = self.temp_dir.path().join("src");
+        std::fs::create_dir(&src_dir).unwrap();
+        std::fs::write(src_dir.join("data-2020-01-01.csv"), CSV_BATCH_OUTPUT).unwrap();
+
+        self.fetch_once(&odf::metadata::FetchStep::FilesGlob(
+            odf::metadata::FetchStepFilesGlob {
+                path: src_dir.join("data-*.csv").to_str().unwrap().to_owned(),
+                event_time: Some(odf::metadata::EventTimeSource::FromPath(
+                    odf::metadata::EventTimeSourceFromPath {
+                        pattern: pattern.to_owned(),
+                        timestamp_format: timestamp_format.map(str::to_owned),
+                    },
+                )),
+                cache: None,
+                order: None,
+            },
+        ))
+        .await
+    }
+
+    /// A step whose previous state is read before any node is contacted
+    #[cfg(feature = "ingest-evm")]
+    fn ethereum_logs_step() -> odf::metadata::FetchStep {
+        odf::metadata::FetchStep::EthereumLogs(odf::metadata::FetchStepEthereumLogs {
+            chain_id: None,
+            node_url: Some("http://localhost:1".to_owned()),
+            filter: None,
+            signature: None,
+        })
+    }
+
+    /// Answers the first request with `200 OK`, the given headers and `body`,
+    /// and returns the URL it listens on
+    async fn serve_once(&self, headers: &[(&str, &str)], body: &str) -> Url {
+        use std::fmt::Write;
+
+        use tokio::io::{AsyncReadExt, AsyncWriteExt};
+
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        let headers = headers
+            .iter()
+            .fold(String::new(), |mut headers, (name, value)| {
+                writeln!(headers, "{name}: {value}\r").unwrap();
+                headers
+            });
+        let response = format!(
+            "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nConnection: close\r\n{headers}\r\n{body}",
+            body.len()
+        );
+
+        tokio::spawn(async move {
+            let (mut socket, _) = listener.accept().await.unwrap();
+            let mut request = [0u8; 4096];
+            let _request_len = socket.read(&mut request).await.unwrap();
+            socket.write_all(response.as_bytes()).await.unwrap();
+            socket.shutdown().await.unwrap();
+        });
+
+        Url::parse(&format!("http://{addr}/data.csv")).unwrap()
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+struct FailingDatasetKeyValueService;
+
+impl DatasetKeyValueService for FailingDatasetKeyValueService {
+    fn find_dataset_env_var_value_by_key(
+        &self,
+        _dataset_env_var_key: &str,
+        _dataset_env_vars: &HashMap<String, DatasetEnvVar>,
+    ) -> Result<DatasetEnvVarValue, FindDatasetEnvVarError> {
+        Err(FindDatasetEnvVarError::Internal(
+            "Secrets storage is unavailable".int_err(),
+        ))
     }
 }
 

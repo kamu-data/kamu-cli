@@ -14,6 +14,7 @@ use kamu_cli_e2e_common::prelude::*;
 kamu_cli_run_api_server_e2e_test!(
     storage = sqlite,
     fixture = kamu_cli_e2e_repo_tests::rest_api::test_swagger_page_st,
+    sqlite_only = "serves a static API description; it reads no repository"
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -21,7 +22,8 @@ kamu_cli_run_api_server_e2e_test!(
 kamu_cli_run_api_server_e2e_test!(
     storage = sqlite,
     fixture = kamu_cli_e2e_repo_tests::rest_api::test_swagger_page_mt,
-    options = Options::default().with_multi_tenant()
+    options = Options::default().with_multi_tenant(),
+    sqlite_only = "serves a static API description; it reads no repository"
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -29,6 +31,7 @@ kamu_cli_run_api_server_e2e_test!(
 kamu_cli_run_api_server_e2e_test!(
     storage = sqlite,
     fixture = kamu_cli_e2e_repo_tests::rest_api::test_swagger_schema_st,
+    sqlite_only = "serves a static API description; it reads no repository"
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -36,7 +39,8 @@ kamu_cli_run_api_server_e2e_test!(
 kamu_cli_run_api_server_e2e_test!(
     storage = sqlite,
     fixture = kamu_cli_e2e_repo_tests::rest_api::test_swagger_schema_mt,
-    options = Options::default().with_multi_tenant()
+    options = Options::default().with_multi_tenant(),
+    sqlite_only = "serves a static API description; it reads no repository"
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

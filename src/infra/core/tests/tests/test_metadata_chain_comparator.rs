@@ -26,12 +26,16 @@ fn init_chain() -> impl odf::MetadataChain {
     MetadataChainImpl::new(meta_block_repo, meta_ref_repo)
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 async fn push_block(chain: &dyn odf::MetadataChain, block: odf::MetadataBlock) -> odf::Multihash {
     chain
         .append(block, odf::dataset::AppendOpts::default())
         .await
         .unwrap()
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 async fn compare_chains(
     lhs_chain: &dyn odf::MetadataChain,
@@ -43,8 +47,10 @@ async fn compare_chains(
     MetadataChainComparator::compare_chains(
         lhs_chain,
         &lhs_head,
-        rhs_chain,
-        rhs_head.as_ref(),
+        rhs_head.as_ref().map(|head| ChainWithHead {
+            chain: rhs_chain,
+            head,
+        }),
         &NullCompareChainsListener,
     )
     .await

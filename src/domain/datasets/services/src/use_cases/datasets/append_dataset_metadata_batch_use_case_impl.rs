@@ -7,67 +7,31 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::sync::Arc;
+
 use dill::{component, interface};
 use kamu_datasets::{
     AppendDatasetMetadataBatchUseCase,
-    AppendDatasetMetadataBatchUseCaseBlockAppendError,
     AppendDatasetMetadataBatchUseCaseError,
     AppendDatasetMetadataBatchUseCaseOptions,
-    SetRefCheckRefMode,
+    DatasetHeadCommitter,
+    ResolvedDataset,
 };
+use odf::dataset::MetadataChainExt as _;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+pub struct AppendDatasetMetadataBatchUseCaseImpl {
+    dataset_head_committer: Arc<dyn DatasetHeadCommitter>,
+}
+
 #[component(pub)]
 #[interface(dyn AppendDatasetMetadataBatchUseCase)]
-pub struct AppendDatasetMetadataBatchUseCaseImpl {}
-
 impl AppendDatasetMetadataBatchUseCaseImpl {
-    fn append_block_options<'a>(
-        block_hash: &'a odf::Multihash,
-        block_data: &'a [u8],
-        options: &AppendDatasetMetadataBatchUseCaseOptions,
-    ) -> odf::dataset::AppendOpts<'a> {
-        let mut opts = odf::dataset::AppendOpts {
-            update_ref: None,
-            expected_hash: Some(block_hash),
-            block_data: Some(block_data),
-            ..Default::default()
-        };
-        if let Some(trust_source_hashes) = options.trust_source_hashes {
-            opts.precomputed_hash = if !trust_source_hashes {
-                None
-            } else {
-                Some(block_hash)
-            };
+    pub fn new(dataset_head_committer: Arc<dyn DatasetHeadCommitter>) -> Self {
+        Self {
+            dataset_head_committer,
         }
-        if let Some(validation) = options.append_validation {
-            opts.validation = validation;
-        }
-        opts
-    }
-
-    fn set_ref_options<'a>(
-        old_head: Option<&'a odf::Multihash>,
-        options: &'a AppendDatasetMetadataBatchUseCaseOptions,
-    ) -> odf::dataset::SetRefOpts<'a> {
-        let mut opts = odf::dataset::SetRefOpts {
-            validate_block_present: false,
-            ..Default::default()
-        };
-        if let Some(set_ref_check_ref_mode) = &options.set_ref_check_ref_mode {
-            opts.check_ref_is = match set_ref_check_ref_mode {
-                SetRefCheckRefMode::ForceUpdateIfDiverged(force_update_if_diverged) => {
-                    if *force_update_if_diverged {
-                        None
-                    } else {
-                        Some(old_head)
-                    }
-                }
-                SetRefCheckRefMode::Explicit(head) => Some(head.as_ref()),
-            };
-        }
-        opts
     }
 }
 
@@ -78,65 +42,33 @@ impl AppendDatasetMetadataBatchUseCase for AppendDatasetMetadataBatchUseCaseImpl
         level = "info",
         name = AppendDatasetMetadataBatchUseCaseImpl_execute,
         skip_all,
-        fields(dataset_handle, ?new_blocks_len = new_blocks_into_it.size_hint(), options)
+        fields(dataset_id = %target.get_id(), ?new_blocks_len = new_blocks_into_it.size_hint())
     )]
     async fn execute(
         &self,
-        dataset: &dyn odf::Dataset,
+        target: &ResolvedDataset,
         new_blocks_into_it: Box<
             dyn Iterator<Item = odf::dataset::HashedMetadataBlockBytesDecoded> + Send,
         >,
         options: AppendDatasetMetadataBatchUseCaseOptions,
     ) -> Result<Option<odf::Multihash>, AppendDatasetMetadataBatchUseCaseError> {
-        let mut new_blocks_it = new_blocks_into_it.into_iter().peekable();
-
-        let mut new_head = None;
-
-        let old_head = if let Some(first_block) = new_blocks_it.peek() {
-            first_block.1.prev_block_hash.clone()
-        } else {
-            // No blocks
-            return Ok(new_head);
+        let Some(appended) = target
+            .as_metadata_chain()
+            .append_batch(new_blocks_into_it, options.append_opts)
+            .await?
+        else {
+            return Ok(None);
         };
 
-        let metadata_chain = dataset.as_metadata_chain();
+        let expected_head = options
+            .set_ref_check_ref_mode
+            .expected_head(appended.base_head);
 
-        while let Some((hash, block, block_bytes)) = new_blocks_it.next() {
-            tracing::debug!(sequence_number = %block.sequence_number, hash = %hash, "Appending block");
-
-            let block_sequence_number = block.sequence_number;
-            if let Err(append_error) = metadata_chain
-                .append(
-                    block,
-                    Self::append_block_options(&hash, &block_bytes, &options),
-                )
-                .await
-            {
-                return Err(AppendDatasetMetadataBatchUseCaseBlockAppendError {
-                    append_error,
-                    block_sequence_number,
-                    block_hash: hash,
-                }
-                .into());
-            }
-
-            let is_last_block = new_blocks_it.peek().is_none();
-            if is_last_block {
-                new_head = Some(hash);
-            }
-        }
-
-        // Safety: there are blocks, so we are guaranteed to have
-        //         a hash of the last one.
-        metadata_chain
-            .set_ref(
-                &odf::BlockRef::Head,
-                new_head.as_ref().unwrap(),
-                Self::set_ref_options(old_head.as_ref(), &options),
-            )
+        self.dataset_head_committer
+            .commit_head(target, expected_head.as_ref(), &appended.new_head)
             .await?;
 
-        Ok(new_head)
+        Ok(Some(appended.new_head))
     }
 }
 

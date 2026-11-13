@@ -41,6 +41,7 @@ oso = { version = "0.27", default-features = false, features = [
     "derive",
 ] }
 rayon = { version = "1", default-features = false }
+strum = { version = "0.28", default-features = false }
 thiserror = { version = "2", default-features = false }
 tokio = { version = "1", default-features = false, features = [
     "macros",
@@ -70,6 +71,7 @@ time-source = { workspace = true }
 
 chrono = "0.4"
 indoc = { version = "2" }
+oop = "0.0.2"
 pretty_assertions = { version = "1", default-features = false, features = [
     "std",
     "unstable",

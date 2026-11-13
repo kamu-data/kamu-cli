@@ -34,11 +34,7 @@ impl Guard for AdminGuard {
 
         match current_account_subject.as_ref() {
             CurrentAccountSubject::Logged(a) => {
-                if rebac_service
-                    .is_account_admin(&a.account_handle.did)
-                    .await
-                    .int_err()?
-                {
+                if rebac_service.is_account_admin(&a.did).await.int_err()? {
                     return Ok(());
                 }
                 Err(async_graphql::Error::new(STAFF_ONLY_MESSAGE))

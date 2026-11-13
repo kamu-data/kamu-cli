@@ -14,14 +14,14 @@ use std::sync::Arc;
 use chrono::{TimeZone, Utc};
 use kamu_core::MockDidGenerator;
 use kamu_datasets::{
-    DatasetAction,
+    DatasetPermission,
     DeleteDatasetError,
     DeleteDatasetPlan,
     DeleteDatasetPlanEvaluationError,
     DeleteDatasetPlanTarget,
     DeleteDatasetPlanningError,
     DeleteDatasetUseCase,
-    MockDatasetActionAuthorizer,
+    MockDatasetPermissionChecker,
 };
 use kamu_datasets_services::DeleteDatasetUseCaseImpl;
 use time_source::{SystemTimeSourceProvider, SystemTimeSourceStub};
@@ -39,7 +39,7 @@ async fn test_delete_dataset_success_via_plan() {
     let (_, foo_id) = odf::DatasetID::new_generated_ed25519();
 
     let harness = DeleteUseCaseHarness::new(
-        MockDatasetActionAuthorizer::allowing(),
+        MockDatasetPermissionChecker::allowing(),
         Some(MockDidGenerator::predefined_dataset_ids(vec![
             foo_id.clone(),
         ])),
@@ -85,7 +85,7 @@ async fn test_delete_dataset_success_via_resolved_handle_plan() {
     let (_, foo_id) = odf::DatasetID::new_generated_ed25519();
 
     let harness = DeleteUseCaseHarness::new(
-        MockDatasetActionAuthorizer::allowing(),
+        MockDatasetPermissionChecker::allowing(),
         Some(MockDidGenerator::predefined_dataset_ids(vec![
             foo_id.clone(),
         ])),
@@ -129,7 +129,7 @@ async fn test_delete_dataset_success_via_resolved_handle_plan() {
 async fn test_execute_plan_is_idempotent_for_stale_plan() {
     let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
 
-    let harness = DeleteUseCaseHarness::new(MockDatasetActionAuthorizer::allowing(), None).await;
+    let harness = DeleteUseCaseHarness::new(MockDatasetPermissionChecker::allowing(), None).await;
 
     let foo = harness
         .create_root_dataset(&harness.catalog, &alias_foo)
@@ -173,7 +173,7 @@ async fn test_execute_plan_is_idempotent_for_stale_plan() {
 
 #[tokio::test]
 async fn test_delete_dataset_plan_recursive_not_found() {
-    let harness = DeleteUseCaseHarness::new(MockDatasetActionAuthorizer::new(), None).await;
+    let harness = DeleteUseCaseHarness::new(MockDatasetPermissionChecker::new(), None).await;
 
     let missing_dataset_handle = odf::DatasetHandle::new(
         odf::DatasetID::new_seeded_ed25519(b"missing"),
@@ -200,8 +200,8 @@ async fn test_delete_unauthorized() {
     let (_, dataset_id_foo) = odf::DatasetID::new_generated_ed25519();
 
     let harness = DeleteUseCaseHarness::new(
-        MockDatasetActionAuthorizer::new().make_expect_classify_datasets_by_allowance(
-            DatasetAction::Own,
+        MockDatasetPermissionChecker::new().make_expect_classify_datasets_by_allowance(
+            DatasetPermission::Own,
             1,
             HashSet::new(),
         ),
@@ -233,7 +233,7 @@ async fn test_delete_dataset_respects_dangling_refs() {
     let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
     let alias_bar = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("bar"));
 
-    let harness = DeleteUseCaseHarness::new(MockDatasetActionAuthorizer::allowing(), None).await;
+    let harness = DeleteUseCaseHarness::new(MockDatasetPermissionChecker::allowing(), None).await;
 
     let root = harness
         .create_root_dataset(&harness.catalog, &alias_foo)
@@ -306,8 +306,8 @@ async fn test_plan_delete_selected_unauthorized() {
     let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
 
     let harness = DeleteUseCaseHarness::new(
-        MockDatasetActionAuthorizer::new().make_expect_classify_datasets_by_allowance(
-            DatasetAction::Own,
+        MockDatasetPermissionChecker::new().make_expect_classify_datasets_by_allowance(
+            DatasetPermission::Own,
             1,
             HashSet::new(),
         ),
@@ -346,7 +346,7 @@ async fn test_plan_delete_recursive_orders_authorized_targets() {
     let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
     let alias_bar = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("bar"));
 
-    let harness = DeleteUseCaseHarness::new(MockDatasetActionAuthorizer::allowing(), None).await;
+    let harness = DeleteUseCaseHarness::new(MockDatasetPermissionChecker::allowing(), None).await;
 
     let root = harness
         .create_root_dataset(&harness.catalog, &alias_foo)
@@ -382,8 +382,8 @@ async fn test_plan_delete_recursive_foreign_downstream_blocks_without_force() {
     let alias_bar = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("bar"));
 
     let harness = DeleteUseCaseHarness::new(
-        MockDatasetActionAuthorizer::new().make_expect_classify_datasets_by_allowance(
-            DatasetAction::Own,
+        MockDatasetPermissionChecker::new().make_expect_classify_datasets_by_allowance(
+            DatasetPermission::Own,
             1,
             HashSet::from([alias_foo.clone()]),
         ),
@@ -428,8 +428,8 @@ async fn test_plan_delete_recursive_force_orphans_foreign_downstream() {
     let alias_bar = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("bar"));
 
     let harness = DeleteUseCaseHarness::new(
-        MockDatasetActionAuthorizer::new().make_expect_classify_datasets_by_allowance(
-            DatasetAction::Own,
+        MockDatasetPermissionChecker::new().make_expect_classify_datasets_by_allowance(
+            DatasetPermission::Own,
             1,
             HashSet::from([alias_foo.clone()]),
         ),
@@ -469,7 +469,7 @@ async fn test_plan_delete_non_recursive_dangling_refs_allowed_with_force() {
     let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
     let alias_bar = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("bar"));
 
-    let harness = DeleteUseCaseHarness::new(MockDatasetActionAuthorizer::allowing(), None).await;
+    let harness = DeleteUseCaseHarness::new(MockDatasetPermissionChecker::allowing(), None).await;
 
     let root = harness
         .create_root_dataset(&harness.catalog, &alias_foo)
@@ -509,7 +509,7 @@ struct DeleteUseCaseHarness {
 
 impl DeleteUseCaseHarness {
     async fn new(
-        mock_dataset_action_authorizer: MockDatasetActionAuthorizer,
+        mock_dataset_permission_checker: MockDatasetPermissionChecker,
         maybe_mock_did_generator: Option<MockDidGenerator>,
     ) -> Self {
         let dataset_base_use_case_harness =
@@ -520,7 +520,7 @@ impl DeleteUseCaseHarness {
                     ),
                 ),
                 maybe_mock_did_generator,
-                maybe_mock_dataset_action_authorizer: Some(mock_dataset_action_authorizer),
+                maybe_mock_dataset_permission_checker: Some(mock_dataset_permission_checker),
                 ..DatasetBaseUseCaseHarnessOpts::default()
             })
             .await;

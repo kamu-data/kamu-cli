@@ -10,17 +10,22 @@
 
 ## Agent / newcomer quick-start
 
-**One-paragraph mental model.** A root dataset that receives many small appends ends up with many
-small Parquet files, one per `AddData` block that carries data, and queries pay for every file
-header. **Hard compaction** rewrites the dataset's history as if the data had arrived in a few
-large batches. The **planner** walks the chain from `HEAD` back to the `Seed` and groups runs of
-consecutive `AddData` blocks into batches bounded by a maximum file size and record count; every
-other metadata event ends a batch and is kept. The **executor** merges each batch's files into one
-with embedded DataFusion, then rebuilds the chain on top of the original `Seed`: kept events are
-re-committed, and each batch becomes one `AddData` covering the same offset range. The caller then
-moves `HEAD` to the new chain with a compare-and-swap. Every block hash after the `Seed` changes,
-so derivatives and remote copies that saw the old blocks can no longer continue from them. Nothing
-is deleted: the old blocks and files stay in storage.
+**At a glance.**
+
+- **Why.** A root dataset with many small appends has many small Parquet files, one per `AddData`
+  that carries data, and queries pay for every file header.
+- **What.** Hard compaction rewrites the history as if the data had arrived in a few large batches
+  (the diagram in [§6](#6-execution)).
+- **Plan.** The planner walks the chain from `HEAD` to the `Seed` and groups runs of consecutive
+  `AddData` blocks into batches bounded by a file size and a record count; any other event ends a
+  batch and is kept ([§5](#5-planning)).
+- **Execute.** The executor merges each batch's files into one with embedded DataFusion, then
+  rebuilds the chain on the original `Seed`: kept events are re-committed, each batch becomes one
+  `AddData` over the same offset range.
+- **Commit.** The caller moves `HEAD` to the new chain with a compare-and-swap
+  ([dataset-operations.md](dataset-operations.md#3-committing-head)).
+- **Consequences.** Every block hash after the `Seed` changes, so derivatives and remote copies
+  cannot continue from the old blocks ([§8](#8-after-compaction)). Nothing is deleted.
 
 **Where to start reading, by intent:**
 
@@ -32,21 +37,6 @@ is deleted: the old blocks and files stay in storage.
 | Know what happens to old files | [§7 Storage](#7-storage) |
 | Know what breaks downstream | [§8 After compaction](#8-after-compaction) |
 | Find the file for X | [§10 Reference map](#10-filecrate-reference-map) |
-
----
-
-## Table of contents
-
-- [1. Purpose \& scope](#1-purpose--scope)
-- [2. ODF concepts](#2-odf-concepts)
-- [3. Layers and crates](#3-layers-and-crates)
-- [4. Entry points](#4-entry-points)
-- [5. Planning](#5-planning)
-- [6. Execution](#6-execution)
-- [7. Storage](#7-storage)
-- [8. After compaction](#8-after-compaction)
-- [9. Testing \& gotchas](#9-testing--gotchas)
-- [10. File/crate reference map](#10-filecrate-reference-map)
 
 ---
 
@@ -90,11 +80,11 @@ history and treats the metadata chain as append-only. The pieces compaction work
 | Layer | Crate / path | Contents |
 | --- | --- | --- |
 | Domain interfaces | `kamu-core` — [`src/domain/core/src/services/compaction/`](../../src/domain/core/src/services/compaction) | `CompactionPlanner`, `CompactionExecutor`, `CompactionOptions`, `CompactionPlan`, `CompactionResult`, listeners, errors |
-| Use case | `kamu` — [`compact_dataset_use_case_impl.rs`](../../src/infra/core/src/use_cases/compact_dataset_use_case_impl.rs) | `CompactDatasetUseCaseImpl`: authorization, plan, execute, move `HEAD` |
+| Use case | `kamu` — [`compact_dataset_use_case_impl.rs`](../../src/infra/core/src/use_cases/compact_dataset_use_case_impl.rs) | `CompactDatasetUseCaseImpl`: authorization and plan, execute, move `HEAD`, each step in its own transaction or none |
 | Services | `kamu` — [`src/infra/core/src/services/compaction/`](../../src/infra/core/src/services/compaction) | `CompactionPlannerImpl`, `CompactionExecutorImpl` |
 | DataFusion session config | `kamu` — [`engine_config_embedded.rs`](../../src/infra/core/src/engine/engine_config_embedded.rs) | `EngineConfigDatafusionEmbeddedCompaction` |
 | CLI | `kamu-cli` — [`compact_command.rs`](../../src/app/cli/src/commands/compact_command.rs) | `kamu system compact` |
-| Task adapter | `kamu-adapter-task-dataset` | `HardCompactDatasetTaskPlanner`, `HardCompactDatasetTaskRunner` |
+| Task adapter | `kamu-adapter-task-dataset` | `CompactionDatasetTaskPlanner`, `CompactionDatasetTaskRunner` (both shared with reset to metadata) |
 | Flow adapter | `kamu-adapter-flow-dataset` | `FlowControllerCompact`, `FlowConfigRuleCompact` |
 
 ---
@@ -104,7 +94,7 @@ history and treats the metadata chain as append-only. The pieces compaction work
 | Entry point | Path | Authorization | Moves `HEAD` |
 | --- | --- | --- | --- |
 | `kamu system compact --hard <pattern>…` | `CompactCommand` → `CompactDatasetUseCase::execute_multi` | Maintain, per dataset, in the use case | the use case, CAS on the planned head |
-| Compaction flow, manual or scheduled | GraphQL `runs.triggerCompactionFlow` or a schedule set with `triggers.setTrigger` → `FlowControllerCompact` → hard compaction task | Maintain, checked by the GraphQL mutations ([flow-system.md](flow-system.md#12-graphql-api)); the task runs as the system | the task runner, CAS on the planned head |
+| Compaction flow, manual or scheduled | GraphQL `runs.triggerCompactionFlow` or a schedule set with `triggers.setTrigger` → `FlowControllerCompact` → hard compaction task | Maintain, checked by the GraphQL mutations ([flow-system.md](flow-system.md#12-graphql-api)); the task runs as `Principal::Node` ([identity.md](identity.md#background-work-runs-as-the-node)) | the task runner, CAS on the planned head |
 | Metadata-only, from `kamu pull` or a reset-to-metadata flow | see [dataset-reset.md](dataset-reset.md#6-reset-to-metadata) | | |
 
 **CLI.** `kamu system compact` requires `--hard`; without it the command fails with "Soft
@@ -112,14 +102,24 @@ compactions are not yet supported". It expands local patterns, asks for confirma
 verifies every dataset first (`--verify`, stopping at the first failure), then compacts the
 datasets one after another. `--max-slice-size` (bytes, default 300 MB) and `--max-slice-records`
 (default 10 000) bound each merged file. `--keep-metadata-only` turns the run into a reset to
-metadata. The command runs in a single database transaction, merges included, and processes the
-outbox afterwards. If any dataset fails, the command returns an error and the transaction rolls
-back the `HEAD` updates of every dataset, including those reported as compacted.
+metadata. The command holds no database transaction of its own: listing the datasets and each
+verification run in short transactions, and the use case opens its own around each dataset's
+compaction. Each dataset commits on its own, so when one fails the command returns an error, but
+the datasets reported as compacted stay compacted. The outbox is processed afterwards, also when
+the command fails, so the deferred consumers of the compacted datasets run before it exits.
 
-**Use case.** `CompactDatasetUseCaseImpl::execute` resolves the dataset with
-`DatasetAction::Maintain`, plans, executes, and on `Success` sets `HEAD` with
-`check_ref_is: Some(old_head)` and `validate_block_present`. `execute_multi` calls `execute` per
-dataset and returns one `CompactionResponse` each; one failure does not stop the others.
+**Use case.** `CompactDatasetUseCaseImpl::execute` works in three steps, so that no transaction is
+open during the merge:
+
+| Step | Transaction | Does |
+| --- | --- | --- |
+| Plan | a short one | authorizes `Compaction` (or `ResetToMetadata` with `keep_metadata_only`) through [`DatasetOperationGuard`](../../src/domain/datasets/domain/src/services/dataset_operation_guard.rs), which needs Maintain; resolves the dataset, plans, detaches the dataset from the transaction |
+| Execute | none | `CompactionExecutor::execute`, which writes only blocks and files that no reference points to yet |
+| Commit | a new short one | on `Success`, re-resolves the dataset and moves `HEAD` from `old_head` through `DatasetHeadCommitter` |
+
+A `HEAD` moved by another writer during the merge fails the commit ([§6](#6-execution)).
+`execute_multi` calls `execute` per dataset and returns one `CompactionResponse`
+each; one failure does not stop the others.
 
 **Flow.** The flow's preconditions, configuration and logical plan are owned by
 [flow-system.md](flow-system.md#10-flow-types); how the task plans, runs and moves `HEAD`, by
@@ -136,20 +136,22 @@ output is just more `AddData` blocks.
 
 | Block | Planner action |
 | --- | --- |
-| `AddData` with data | added to the current batch; if adding it would exceed `max_slice_size` or `max_slice_records`, the current batch is closed first and this slice starts a new one |
-| `AddData` without data (watermark or source state only) | contributes its watermark, source state and checkpoint to the current batch's upper bound and is never kept as a block of its own; if the batch ends as a `SingleBlock`, those values are lost |
+| `AddData` with data | added to the current batch; if adding it would exceed `max_slice_size` or `max_slice_records` of a batch that already has data, the current batch is closed first and this slice starts a new one |
+| `AddData` without data (watermark, source state or checkpoint only) | added to the current batch without counting towards the limits |
 | `Seed` | recorded as the base of the new chain |
 | Any other event (`SetDataSchema`, `SetPollingSource`, `AddPushSource`, `SetVocab`, `SetInfo`, `ExecuteTransform`, …) | closes the current batch and is kept as a `SingleBlock` |
 
-Batches therefore never cross a schema change or any other metadata event. A closed batch becomes:
+Batches therefore never cross a schema change or any other metadata event, and each one starts
+with empty size and record counts. A closed batch becomes:
 
 - a **`CompactedBatch`** when it holds two or more slices: the slice URLs; a **lower bound** from
-  the oldest block (`start_offset`, `prev_offset`, `prev_checkpoint`); an **upper bound** from the
-  newest (`end_offset`, plus the newest non-empty `new_checkpoint`, `new_source_state` and
-  `new_watermark`); and the summed linked-object summaries;
-- a **`SingleBlock(hash)`** when it holds one slice: the original block is carried over and the
-  upper bound is not used;
-- nothing when it is empty.
+  the oldest block (`start_offset` from the oldest slice, `prev_offset`, `prev_checkpoint`); an
+  **upper bound** with `end_offset` from the newest slice and the `new_checkpoint`,
+  `new_source_state` and `new_watermark` of the newest block, whether or not that block carries
+  data, and absent values included, since every `AddData` restates them; and the summed
+  linked-object summaries;
+- otherwise (one slice or none), a **`SingleBlock(hash)`** for each of its blocks, so the slice
+  and the blocks without data around it are carried over as they are.
 
 `CompactionPlan` holds the batches newest first, the `Seed` hash, the old head and block count, and
 the offset column name from the oldest `SetVocab` in the chain (the default vocabulary if there is
@@ -159,6 +161,26 @@ count.
 ---
 
 ## 6. Execution
+
+A chain before and after hard compaction with the default limits; `′` marks a block re-committed
+with the same event but a new hash:
+
+```mermaid
+flowchart TB
+    subgraph Before["Before"]
+        direction LR
+        A0[Seed] --> A1[SetPollingSource] --> A2[SetDataSchema] --> A3["AddData s1"] --> A4["AddData s2"] --> A5["AddData s3"] --> A6[SetInfo] --> A7["AddData s4<br/>HEAD"]
+    end
+    subgraph After["After"]
+        direction LR
+        B0[Seed] --> B1["SetPollingSource′"] --> B2["SetDataSchema′"] --> B3["AddData s1+s2+s3<br/>one merged file"] --> B6["SetInfo′"] --> B7["AddData s4′<br/>HEAD"]
+    end
+    Before ~~~ After
+```
+
+The `Seed` is the same block. `s1`–`s3` merge because no other event separates them; `s4` is alone
+after `SetInfo`, so it is carried over. The old blocks and files stay in storage
+([§7](#7-storage)).
 
 `CompactionExecutorImpl::execute` returns `NothingToDo` for a plan with no effect. Otherwise:
 
@@ -173,16 +195,21 @@ count.
    by its existing hash, and the merged file, whose hashes and size are computed on commit. Every
    block gets a new `system_time` and `prev_block_hash`, so every hash after the `Seed` changes.
    Blocks are written with `update_block_ref: false`.
-3. **Report.** `Success { old_head, new_head, old_num_blocks, new_num_blocks }`. The executor never
-   moves `HEAD`.
+3. **Report.** `Success { old_head, new_head, old_num_blocks, new_num_blocks }`. The
+   executor never moves `HEAD`. The run directory is removed when `execute` returns, with whatever
+   a failed run left in it.
 
 The caller moves `HEAD` with a compare-and-swap against `old_head`. A write that moved `HEAD`
-after planning (an ingest, a push, another compaction) makes the swap fail; the failure surfaces as
-an internal error, and the new blocks and merged files stay unreferenced.
+after planning (an ingest, a push, another compaction) makes the swap fail, and the new blocks and
+merged files stay unreferenced. The use case returns `CompactionError::RefCASFailed` with the
+expected and actual heads; the task runners return the recoverable `DatasetCommitError`
+([task-system.md](task-system.md#72-hard-compaction-and-reset-to-metadata)).
 
-`CompactionListener` receives the plan, the result, and the `GatherChainInfo`, `MergeDataslices`
-and `CommitNewBlocks` phases. In the CLI, `CompactionMultiProgress` (a
-`CompactionMultiListener`) hands each dataset a `CompactionProgress` listener.
+`CompactionListener` hears `begin`, the plan, the start and end of the `GatherChainInfo`,
+`MergeDataslices` and `CommitNewBlocks` phases, and then either `success`, once the use case has set
+the new `HEAD`, or `error` with the `CompactionError` of any step. In the CLI,
+`CompactionMultiProgress` (a `CompactionMultiListener`) hands each dataset a `CompactionProgress`
+listener.
 
 ---
 
@@ -192,7 +219,7 @@ and `CommitNewBlocks` phases. In the CLI, `CompactionMultiProgress` (a
 | --- | --- |
 | Old blocks, data files, checkpoints | kept, and nothing deletes them. From the new `HEAD` only the `Seed`, the data files and checkpoints of blocks re-committed unchanged (`SingleBlock`), and the newest checkpoint of each merged batch stay reachable; the other old blocks and the original data files of merged batches do not |
 | Merged files | moved into the dataset's data store on commit |
-| `compaction-*` run directories | left in place; every `kamu` invocation, the API server included, wipes the run directory at startup, so they accumulate only for the lifetime of a long-running process |
+| `compaction-*` run directories | removed when the executor returns, after a failure too |
 | Blocks and files from an attempt that lost the `HEAD` swap | kept, unreferenced |
 
 `kamu system gc` only purges the workspace cache; it does not collect unreferenced objects.
@@ -245,5 +272,5 @@ unchanged, the Smart protocol accepts a forced push of the compacted chain.
 | Executor | [`compaction_executor_impl.rs`](../../src/infra/core/src/services/compaction/compaction_executor_impl.rs) |
 | Use case | [`compact_dataset_use_case_impl.rs`](../../src/infra/core/src/use_cases/compact_dataset_use_case_impl.rs) |
 | CLI command, arguments, progress | [`compact_command.rs`](../../src/app/cli/src/commands/compact_command.rs), `SystemCompact` in [`cli.rs`](../../src/app/cli/src/cli.rs), [`compact_progress.rs`](../../src/app/cli/src/output/compact_progress.rs) |
-| Task planner and runner | [`hard_compact_dataset_task_planner.rs`](../../src/adapter/task-dataset/src/planners/hard_compact_dataset_task_planner.rs), [`hard_compact_dataset_task_runner.rs`](../../src/adapter/task-dataset/src/runners/hard_compact_dataset_task_runner.rs) |
+| Task planner and runner | [`compaction_dataset_task_planner.rs`](../../src/adapter/task-dataset/src/planners/compaction_dataset_task_planner.rs), [`compaction_dataset_task_runner.rs`](../../src/adapter/task-dataset/src/runners/compaction_dataset_task_runner.rs) |
 | Flow controller and rule | [`flow_controller_compact.rs`](../../src/adapter/flow-dataset/src/flow_controllers/flow_controller_compact.rs), [`flow_config_rule_compact.rs`](../../src/adapter/flow-dataset/src/entities/flow_config_rules/flow_config_rule_compact.rs) |

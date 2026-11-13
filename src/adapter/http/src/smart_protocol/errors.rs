@@ -7,19 +7,20 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::fmt::{self, Display};
-
-use internal_error::{BoxedError, InternalError};
-use kamu_core::OverwriteSeedBlockError;
+use internal_error::{BoxedError, ErrorIntoInternal, InternalError};
+use kamu_core::{OverwriteSeedBlockError, SyncError, SyncHeadMovedError};
 use kamu_datasets::NameCollisionError;
+use reqwest::StatusCode;
 use thiserror::Error;
 
+use super::messages::{ObjectFileReference, TransferInternalError};
 use super::phases::*;
 use crate::ws_common::{ReadMessageError, WriteMessageError};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Error, Debug)]
+#[error("read_error: {read_error}, pull_phase: {pull_phase:?}")]
 pub struct PullReadError {
     pub read_error: ReadMessageError,
     pub pull_phase: PullPhase,
@@ -34,19 +35,10 @@ impl PullReadError {
     }
 }
 
-impl Display for PullReadError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "read_error: {}, pull_phase: {:?})",
-            self.read_error, self.pull_phase
-        )
-    }
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Error, Debug)]
+#[error("read_error: {read_error}, push_phase: {push_phase:?}")]
 pub struct PushReadError {
     pub read_error: ReadMessageError,
     pub push_phase: PushPhase,
@@ -61,19 +53,10 @@ impl PushReadError {
     }
 }
 
-impl Display for PushReadError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "read_error: {}, push_phase: {:?})",
-            self.read_error, self.push_phase
-        )
-    }
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Error, Debug)]
+#[error("write_error: {write_error}, pull_phase: {pull_phase:?}")]
 pub struct PullWriteError {
     write_error: WriteMessageError,
     pull_phase: PullPhase,
@@ -88,19 +71,10 @@ impl PullWriteError {
     }
 }
 
-impl Display for PullWriteError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "write_error: {}, pull_phase: {:?})",
-            self.write_error, self.pull_phase
-        )
-    }
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Error, Debug)]
+#[error("write_error: {write_error}, push_phase: {push_phase:?}")]
 pub struct PushWriteError {
     write_error: WriteMessageError,
     push_phase: PushPhase,
@@ -112,16 +86,6 @@ impl PushWriteError {
             write_error,
             push_phase,
         }
-    }
-}
-
-impl Display for PushWriteError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "write_error: {}, push_phase: {:?})",
-            self.write_error, self.push_phase
-        )
     }
 }
 
@@ -182,8 +146,35 @@ pub enum PushServerError {
     #[error(transparent)]
     NameCollision(NameCollisionError),
 
+    /// `HEAD` differs from the one the client planned the push from; nothing
+    /// was transferred
+    #[error(transparent)]
+    InvalidHead(odf::dataset::RefCASError),
+
+    /// `HEAD` moved while the pushed blocks were being committed
+    #[error(transparent)]
+    UpdatedConcurrently(odf::dataset::RefCASError),
+
+    /// The client completed the push without uploading every file the pushed
+    /// blocks reference; nothing was committed
+    #[error(transparent)]
+    ObjectsNotUploaded(ObjectsNotUploadedError),
+
     #[error(transparent)]
     Internal(PhaseInternalError),
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Error, Debug)]
+#[error(
+    "Client did not upload {num_missing} file(s) the pushed blocks reference, such as {:?} {}",
+    first_missing.object_type,
+    first_missing.physical_hash
+)]
+pub struct ObjectsNotUploadedError {
+    pub num_missing: usize,
+    pub first_missing: ObjectFileReference,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -209,6 +200,12 @@ pub enum PushClientError {
     NameCollision(NameCollisionError),
 
     #[error(transparent)]
+    UpdatedConcurrently(DestinationUpdatedConcurrentlyError),
+
+    #[error(transparent)]
+    ObjectsNotUploaded(DestinationMissingObjectsError),
+
+    #[error(transparent)]
     Internal(
         #[from]
         #[backtrace]
@@ -218,62 +215,86 @@ pub enum PushClientError {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug)]
+impl From<PushClientError> for SyncError {
+    fn from(e: PushClientError) -> Self {
+        match e {
+            PushClientError::OverwriteSeedBlock(e) => Self::OverwriteSeedBlock(e),
+            PushClientError::RefCollision(e) => Self::RefCollision(e),
+            PushClientError::NameCollision(e) => Self::NameCollision(e),
+            PushClientError::InvalidHead(e) => Self::HeadMoved(e.into()),
+            PushClientError::UpdatedConcurrently(_) => {
+                Self::HeadMoved(SyncHeadMovedError::unreported())
+            }
+            e @ (PushClientError::ReadFailed(_)
+            | PushClientError::WriteFailed(_)
+            | PushClientError::ObjectsNotUploaded(_)
+            | PushClientError::Internal(_)) => Self::Internal(e.int_err()),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// The destination `HEAD` moved while the pushed blocks were being committed;
+/// nothing was committed
+#[derive(Error, Debug)]
+#[error("Destination dataset head was updated concurrently, nothing was committed")]
+pub struct DestinationUpdatedConcurrentlyError;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// The destination refused to commit the pushed blocks, because some files
+/// they reference were not uploaded; nothing was committed
+#[derive(Error, Debug)]
+#[error(
+    "Destination refused the commit: {num_objects} file(s) the pushed blocks reference were not \
+     uploaded"
+)]
+pub struct DestinationMissingObjectsError {
+    pub num_objects: usize,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Error, Debug)]
+#[error("{details} during phase: {phase}")]
 pub struct ClientInternalError {
     phase: TransferPhase,
     details: String,
 }
 
-impl ClientInternalError {
-    pub fn new(msg: &str, phase: TransferPhase) -> Self {
+impl From<TransferInternalError> for ClientInternalError {
+    fn from(e: TransferInternalError) -> Self {
         Self {
-            phase,
-            details: msg.to_string(),
+            phase: e.phase,
+            details: e.error_message,
         }
     }
 }
 
-impl fmt::Display for ClientInternalError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{} during phase: {}", self.details, self.phase)
-    }
-}
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl std::error::Error for ClientInternalError {
-    fn description(&self) -> &str {
-        &self.details
-    }
+#[derive(Error, Debug)]
+#[error("Object download failed with status {status}")]
+pub struct ObjectDownloadError {
+    pub status: StatusCode,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Error, Debug)]
+#[error("Object upload failed with status {status}")]
 pub struct ObjectUploadError {
-    pub response: reqwest::Response,
-}
-
-impl fmt::Display for ObjectUploadError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "ObjectUploadError: status={}", self.response.status())
-    }
+    pub status: StatusCode,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Error, Debug)]
+#[error("Smart protocol phase internal error: phase={phase}, error={error}")]
 pub struct PhaseInternalError {
     pub phase: TransferPhase,
     pub error: InternalError,
-}
-
-impl fmt::Display for PhaseInternalError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(
-            f,
-            "Smart protocol phase internal error: phase={}, error={}",
-            self.phase, self.error
-        )
-    }
 }
 
 impl From<PhaseInternalError> for PushServerError {
@@ -331,3 +352,61 @@ where
         }
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[cfg(test)]
+mod tests {
+    use std::assert_matches;
+
+    use kamu_core::{SyncError, SyncHeadMovedError};
+
+    use super::{DestinationUpdatedConcurrentlyError, PushClientError};
+
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+    #[test]
+    fn test_stale_push_head_is_a_recoverable_head_move_with_heads() {
+        let fixtures = PushErrorFixtures;
+
+        let sync_error = SyncError::from(PushClientError::InvalidHead(fixtures.stale_head_error()));
+
+        assert!(sync_error.is_recoverable());
+        assert_matches!(
+            sync_error,
+            SyncError::HeadMoved(SyncHeadMovedError { heads: Some(heads) })
+                if heads == fixtures.stale_head_error()
+        );
+    }
+
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+    #[test]
+    fn test_head_moved_during_push_commit_is_a_recoverable_head_move_without_heads() {
+        let sync_error = SyncError::from(PushClientError::UpdatedConcurrently(
+            DestinationUpdatedConcurrentlyError,
+        ));
+
+        assert!(sync_error.is_recoverable());
+        assert_matches!(
+            sync_error,
+            SyncError::HeadMoved(SyncHeadMovedError { heads: None })
+        );
+    }
+
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+    struct PushErrorFixtures;
+
+    impl PushErrorFixtures {
+        fn stale_head_error(&self) -> odf::dataset::RefCASError {
+            odf::dataset::RefCASError {
+                reference: odf::BlockRef::Head,
+                expected: Some(odf::Multihash::from_digest_sha3_256(b"planned")),
+                actual: Some(odf::Multihash::from_digest_sha3_256(b"concurrent")),
+            }
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

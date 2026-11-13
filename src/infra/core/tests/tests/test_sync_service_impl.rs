@@ -14,22 +14,17 @@ use std::str::FromStr;
 use kamu::domain::*;
 use kamu::testing::*;
 use kamu::utils::ipfs_wrapper::IpfsClient;
-use kamu::utils::simple_transfer_protocol::SimpleTransferProtocol;
 use kamu::*;
-use kamu_accounts::CurrentAccountSubject;
 use kamu_datasets::*;
-use kamu_datasets_inmem::*;
-use kamu_datasets_services::utils::CreateDatasetUseCaseHelper;
 use kamu_datasets_services::*;
-use messaging_outbox::*;
+use odf::dataset::IpfsGateway;
 use odf::dataset::testing::create_test_dataset_from_snapshot;
-use odf::dataset::{DatasetFactoryImpl, IpfsGateway};
 use odf::metadata::testing::MetadataFactory;
 use test_utils::{HttpFileServer, LocalS3Server};
-use time_source::{SystemTimeSource, SystemTimeSourceDefault};
+use time_source::SystemTimeSource;
 use url::Url;
 
-use crate::utils::IpfsDaemon;
+use crate::utils::{IpfsDaemon, LocalSyncHelper, SyncWorkspaceCatalog};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -59,65 +54,13 @@ async fn do_test_sync(
     // Tests sync between "foo" -> remote -> "bar"
     let dataset_alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
     let dataset_alias_bar = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("bar"));
-    let is_ipfs = ipfs.is_none();
+    let not_ipfs = ipfs.is_none();
 
     let (ipfs_gateway, ipfs_client) = ipfs.unwrap_or_default();
 
-    let datasets_dir_foo = tmp_workspace_dir_foo.join("datasets");
-    let datasets_dir_bar = tmp_workspace_dir_bar.join("datasets");
-    std::fs::create_dir(&datasets_dir_foo).unwrap();
-    std::fs::create_dir(&datasets_dir_bar).unwrap();
-
-    let mut catalog_foo_builder = dill::CatalogBuilder::new();
-    catalog_foo_builder
-        .add::<DidGeneratorDefault>()
-        .add::<SystemTimeSourceDefault>()
-        .add_value(ipfs_gateway.clone())
-        .add_value(ipfs_client.clone())
-        .add_value(CurrentAccountSubject::new_test())
-        .add_value(TenancyConfig::SingleTenant)
-        .add_builder(odf::dataset::DatasetStorageUnitLocalFs::builder(
-            datasets_dir_foo,
-        ))
-        .add::<odf::dataset::DatasetLfsBuilderDefault>()
-        .add::<DatasetRegistrySoloUnitBridge>()
-        .add_value(RemoteReposDir::new_with_creation(
-            tmp_workspace_dir_foo.join("repos"),
-        ))
-        .add::<RemoteRepositoryRegistryImpl>()
-        .add::<odf::dataset::DummyOdfServerAccessTokenResolver>()
-        .add::<DatasetFactoryImpl>()
-        .add::<SyncServiceImpl>()
-        .add::<RemoteAliasesRegistryImpl>()
-        .add::<RemoteAliasResolverImpl>()
-        .add::<SyncRequestBuilder>()
-        .add::<DummySmartTransferProtocolClient>()
-        .add::<SimpleTransferProtocol>()
-        .add::<CreateDatasetUseCaseImpl>()
-        .add::<CreateDatasetUseCaseHelper>()
-        .add_builder(messaging_outbox::OutboxImmediateImpl::builder(
-            messaging_outbox::ConsumerFilter::AllConsumers,
-        ))
-        .bind::<dyn Outbox, OutboxImmediateImpl>()
-        .add_value(MockDatasetEntryWriter::new())
-        .bind::<dyn DatasetEntryWriter, MockDatasetEntryWriter>()
-        .add::<DatasetReferenceServiceImpl>()
-        .add::<InMemoryDatasetReferenceRepository>()
-        .add::<AppendDatasetMetadataBatchUseCaseImpl>();
-
-    register_message_dispatcher::<DatasetLifecycleMessage>(
-        &mut catalog_foo_builder,
-        MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
-    );
-
-    register_message_dispatcher::<DatasetReferenceMessage>(
-        &mut catalog_foo_builder,
-        MESSAGE_PRODUCER_KAMU_DATASET_REFERENCE_SERVICE,
-    );
-
-    database_common::NoOpDatabasePlugin::init_database_components(&mut catalog_foo_builder);
-
-    let catalog_foo = catalog_foo_builder.build();
+    let catalog_foo = SyncWorkspaceCatalog::new(tmp_workspace_dir_foo)
+        .with_ipfs(ipfs_gateway.clone(), ipfs_client.clone())
+        .build();
 
     let mut mock_dataset_entry_writer_bar = MockDatasetEntryWriter::new();
     mock_dataset_entry_writer_bar
@@ -125,56 +68,10 @@ async fn do_test_sync(
         .times(1)
         .returning(|_, _, _, _, _| Ok(()));
 
-    let mut catalog_bar_builder = dill::CatalogBuilder::new();
-    catalog_bar_builder
-        .add::<DidGeneratorDefault>()
-        .add::<SystemTimeSourceDefault>()
-        .add_value(ipfs_gateway.clone())
-        .add_value(ipfs_client.clone())
-        .add_value(CurrentAccountSubject::new_test())
-        .add_value(TenancyConfig::SingleTenant)
-        .add_builder(odf::dataset::DatasetStorageUnitLocalFs::builder(
-            datasets_dir_bar,
-        ))
-        .add::<odf::dataset::DatasetLfsBuilderDefault>()
-        .add::<DatasetRegistrySoloUnitBridge>()
-        .add_value(RemoteReposDir::new_with_creation(
-            tmp_workspace_dir_bar.join("repos"),
-        ))
-        .add::<RemoteRepositoryRegistryImpl>()
-        .add::<odf::dataset::DummyOdfServerAccessTokenResolver>()
-        .add::<DatasetFactoryImpl>()
-        .add::<SyncServiceImpl>()
-        .add::<RemoteAliasesRegistryImpl>()
-        .add::<RemoteAliasResolverImpl>()
-        .add::<SyncRequestBuilder>()
-        .add::<DummySmartTransferProtocolClient>()
-        .add::<SimpleTransferProtocol>()
-        .add::<CreateDatasetUseCaseImpl>()
-        .add::<CreateDatasetUseCaseHelper>()
-        .add::<AppendDatasetMetadataBatchUseCaseImpl>()
-        .add_builder(messaging_outbox::OutboxImmediateImpl::builder(
-            messaging_outbox::ConsumerFilter::AllConsumers,
-        ))
-        .bind::<dyn Outbox, OutboxImmediateImpl>()
-        .add_value(mock_dataset_entry_writer_bar)
-        .bind::<dyn DatasetEntryWriter, MockDatasetEntryWriter>()
-        .add::<DatasetReferenceServiceImpl>()
-        .add::<InMemoryDatasetReferenceRepository>();
-
-    register_message_dispatcher::<DatasetLifecycleMessage>(
-        &mut catalog_bar_builder,
-        MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
-    );
-
-    register_message_dispatcher::<DatasetReferenceMessage>(
-        &mut catalog_bar_builder,
-        MESSAGE_PRODUCER_KAMU_DATASET_REFERENCE_SERVICE,
-    );
-
-    database_common::NoOpDatabasePlugin::init_database_components(&mut catalog_bar_builder);
-
-    let catalog_bar = catalog_bar_builder.build();
+    let catalog_bar = SyncWorkspaceCatalog::new(tmp_workspace_dir_bar)
+        .with_ipfs(ipfs_gateway, ipfs_client)
+        .with_dataset_entry_writer(mock_dataset_entry_writer_bar)
+        .build();
 
     let sync_svc_foo = catalog_foo.get_one::<dyn SyncService>().unwrap();
     let sync_request_builder_foo = catalog_foo.get_one::<SyncRequestBuilder>().unwrap();
@@ -195,14 +92,18 @@ async fn do_test_sync(
     // Dataset does not exist locally / remotely
     assert_matches!(
         sync_request_builder_foo
-            .build_sync_request(dataset_alias_foo.as_any_ref(), push_ref.as_any_ref(), true)
+            .build_sync_request(dataset_alias_foo.as_local_ref(), push_ref.clone(), true)
             .await,
         Err(SyncError::DatasetNotFound(e)) if e.dataset_ref == dataset_alias_foo.as_any_ref()
     );
 
     assert_matches!(
-        sync_request_builder_bar
-            .build_sync_request(pull_ref.as_any_ref(), dataset_alias_bar.as_any_ref(), true)
+        LocalSyncHelper::new(&catalog_bar)
+            .pull(
+                pull_ref.clone(),
+                dataset_alias_bar.as_local_ref(),
+                SyncOptions::default(),
+            )
             .await,
         Err(SyncError::DatasetNotFound(e)) if e.dataset_ref == pull_ref.as_any_ref()
     );
@@ -228,15 +129,15 @@ async fn do_test_sync(
     // Initial sync ///////////////////////////////////////////////////////////
     assert_matches!(
         sync_request_builder_foo
-            .build_sync_request(dataset_alias_foo.as_any_ref(), push_ref.as_any_ref(), false)
+            .build_sync_request(dataset_alias_foo.as_local_ref(), push_ref.clone(), false)
             .await,
         Err(SyncError::DatasetNotFound(e)) if e.dataset_ref == push_ref.as_any_ref()
     );
 
     let sync_result = sync_svc_foo
-        .sync(
+        .sync_to(
             sync_request_builder_foo
-                .build_sync_request(dataset_alias_foo.as_any_ref(), push_ref.as_any_ref(), true)
+                .build_sync_request(dataset_alias_foo.as_local_ref(), push_ref.clone(), true)
                 .await
                 .unwrap(),
             SyncOptions::default(),
@@ -254,14 +155,11 @@ async fn do_test_sync(
         } if new_head == b1
     );
 
-    let sync_result = sync_svc_bar
-        .sync(
-            sync_request_builder_bar
-                .build_sync_request(pull_ref.as_any_ref(), dataset_alias_bar.as_any_ref(), true)
-                .await
-                .unwrap(),
+    let sync_result = LocalSyncHelper::new(&catalog_bar)
+        .pull(
+            pull_ref.clone(),
+            dataset_alias_bar.as_local_ref(),
             SyncOptions::default(),
-            None,
         )
         .await
         .unwrap();
@@ -292,14 +190,14 @@ async fn do_test_sync(
     )
     .await;
 
-    let sync_err = sync_svc_foo
-        .sync(
-            sync_request_builder_foo
-                .build_sync_request(pull_ref.as_any_ref(), dataset_alias_foo.as_any_ref(), false)
-                .await
-                .unwrap(),
-            SyncOptions::default(),
-            None,
+    let sync_err = LocalSyncHelper::new(&catalog_foo)
+        .pull(
+            pull_ref.clone(),
+            dataset_alias_foo.as_local_ref(),
+            SyncOptions {
+                create_if_not_exists: false,
+                ..SyncOptions::default()
+            },
         )
         .await
         .err()
@@ -314,9 +212,9 @@ async fn do_test_sync(
     );
 
     let sync_result = sync_svc_foo
-        .sync(
+        .sync_to(
             sync_request_builder_foo
-                .build_sync_request(dataset_alias_foo.as_any_ref(), push_ref.as_any_ref(), false)
+                .build_sync_request(dataset_alias_foo.as_local_ref(), push_ref.clone(), false)
                 .await
                 .unwrap(),
             SyncOptions::default(),
@@ -334,14 +232,14 @@ async fn do_test_sync(
         } if old_head.as_ref() == Some(&b1) && new_head == b3
     );
 
-    let sync_result = sync_svc_bar
-        .sync(
-            sync_request_builder_bar
-                .build_sync_request(pull_ref.as_any_ref(), dataset_alias_bar.as_any_ref(), false)
-                .await
-                .unwrap(),
-            SyncOptions::default(),
-            None,
+    let sync_result = LocalSyncHelper::new(&catalog_bar)
+        .pull(
+            pull_ref.clone(),
+            dataset_alias_bar.as_local_ref(),
+            SyncOptions {
+                create_if_not_exists: false,
+                ..SyncOptions::default()
+            },
         )
         .await
         .unwrap();
@@ -359,9 +257,9 @@ async fn do_test_sync(
 
     // Up to date /////////////////////////////////////////////////////////////
     let sync_result = sync_svc_foo
-        .sync(
+        .sync_to(
             sync_request_builder_foo
-                .build_sync_request(dataset_alias_foo.as_any_ref(), push_ref.as_any_ref(), false)
+                .build_sync_request(dataset_alias_foo.as_local_ref(), push_ref.clone(), false)
                 .await
                 .unwrap(),
             SyncOptions::default(),
@@ -371,14 +269,14 @@ async fn do_test_sync(
         .unwrap();
     assert_matches!(sync_result, SyncResult::UpToDate,);
 
-    let sync_result = sync_svc_bar
-        .sync(
-            sync_request_builder_bar
-                .build_sync_request(pull_ref.as_any_ref(), dataset_alias_bar.as_any_ref(), false)
-                .await
-                .unwrap(),
-            SyncOptions::default(),
-            None,
+    let sync_result = LocalSyncHelper::new(&catalog_bar)
+        .pull(
+            pull_ref.clone(),
+            dataset_alias_bar.as_local_ref(),
+            SyncOptions {
+                create_if_not_exists: false,
+                ..SyncOptions::default()
+            },
         )
         .await
         .unwrap();
@@ -397,9 +295,9 @@ async fn do_test_sync(
     .await;
 
     let sync_result = sync_svc_bar
-        .sync(
+        .sync_to(
             sync_request_builder_bar
-                .build_sync_request(dataset_alias_bar.as_any_ref(), push_ref.as_any_ref(), false)
+                .build_sync_request(dataset_alias_bar.as_local_ref(), push_ref.clone(), false)
                 .await
                 .unwrap(),
             SyncOptions::default(),
@@ -419,9 +317,9 @@ async fn do_test_sync(
 
     // Try push from dataset_foo
     let sync_err = sync_svc_foo
-        .sync(
+        .sync_to(
             sync_request_builder_foo
-                .build_sync_request(dataset_alias_foo.as_any_ref(), push_ref.as_any_ref(), false)
+                .build_sync_request(dataset_alias_foo.as_local_ref(), push_ref.clone(), false)
                 .await
                 .unwrap(),
             SyncOptions::default(),
@@ -440,9 +338,9 @@ async fn do_test_sync(
     // Try push from dataset_1 with --force: it should abandon the diverged_head
     // block
     let sync_result = sync_svc_foo
-        .sync(
+        .sync_to(
             sync_request_builder_foo
-                .build_sync_request(dataset_alias_foo.as_any_ref(), push_ref.as_any_ref(), false)
+                .build_sync_request(dataset_alias_foo.as_local_ref(), push_ref.clone(), false)
                 .await
                 .unwrap(),
             SyncOptions {
@@ -464,14 +362,14 @@ async fn do_test_sync(
     );
 
     // Try pulling dataset_bar: should fail, destination is ahead
-    let sync_err = sync_svc_bar
-        .sync(
-            sync_request_builder_bar
-                .build_sync_request(pull_ref.as_any_ref(), dataset_alias_bar.as_any_ref(), false)
-                .await
-                .unwrap(),
-            SyncOptions::default(),
-            None,
+    let sync_err = LocalSyncHelper::new(&catalog_bar)
+        .pull(
+            pull_ref.clone(),
+            dataset_alias_bar.as_local_ref(),
+            SyncOptions {
+                create_if_not_exists: false,
+                ..SyncOptions::default()
+            },
         )
         .await
         .err()
@@ -485,17 +383,15 @@ async fn do_test_sync(
     );
 
     // Try pulling dataset_bar with --force: should abandon diverged_head
-    let sync_result = sync_svc_bar
-        .sync(
-            sync_request_builder_bar
-                .build_sync_request(pull_ref.as_any_ref(), dataset_alias_bar.as_any_ref(), false)
-                .await
-                .unwrap(),
+    let sync_result = LocalSyncHelper::new(&catalog_bar)
+        .pull(
+            pull_ref.clone(),
+            dataset_alias_bar.as_local_ref(),
             SyncOptions {
+                create_if_not_exists: false,
                 force: true,
                 ..SyncOptions::default()
             },
-            None,
         )
         .await
         .unwrap();
@@ -533,9 +429,9 @@ async fn do_test_sync(
     .await;
 
     let sync_result = sync_svc_foo
-        .sync(
+        .sync_to(
             sync_request_builder_foo
-                .build_sync_request(dataset_alias_foo.as_any_ref(), push_ref.as_any_ref(), false)
+                .build_sync_request(dataset_alias_foo.as_local_ref(), push_ref.clone(), false)
                 .await
                 .unwrap(),
             SyncOptions::default(),
@@ -554,9 +450,9 @@ async fn do_test_sync(
     );
 
     let sync_err = sync_svc_bar
-        .sync(
+        .sync_to(
             sync_request_builder_bar
-                .build_sync_request(dataset_alias_bar.as_any_ref(), push_ref.as_any_ref(), false)
+                .build_sync_request(dataset_alias_bar.as_local_ref(), push_ref.clone(), false)
                 .await
                 .unwrap(),
             SyncOptions::default(),
@@ -597,13 +493,9 @@ async fn do_test_sync(
 
     for force in [false, true] {
         let sync_err = sync_svc_foo
-            .sync(
+            .sync_to(
                 sync_request_builder_foo
-                    .build_sync_request(
-                        dataset_alias_baz.as_any_ref(),
-                        push_ref.as_any_ref(),
-                        false,
-                    )
+                    .build_sync_request(dataset_alias_baz.as_local_ref(), push_ref.clone(), false)
                     .await
                     .unwrap(),
                 SyncOptions {
@@ -624,21 +516,15 @@ async fn do_test_sync(
             if src_dataset_id == stored_baz.dataset_id && dst_dataset_id == stored_foo.dataset_id
         );
 
-        let sync_err = sync_svc_foo
-            .sync(
-                sync_request_builder_foo
-                    .build_sync_request(
-                        pull_ref.as_any_ref(),
-                        dataset_alias_baz.as_any_ref(),
-                        false,
-                    )
-                    .await
-                    .unwrap(),
+        let sync_err = LocalSyncHelper::new(&catalog_foo)
+            .pull(
+                pull_ref.clone(),
+                dataset_alias_baz.as_local_ref(),
                 SyncOptions {
+                    create_if_not_exists: false,
                     force,
                     ..SyncOptions::default()
                 },
-                None,
             )
             .await
             .err()
@@ -654,7 +540,7 @@ async fn do_test_sync(
     }
 
     // Datasets corrupted transfer flow /////////////////////////////////////////
-    if is_ipfs {
+    if not_ipfs {
         let _b6 = DatasetTestHelper::append_random_data(
             dataset_registry_foo.as_ref(),
             &dataset_alias_foo,
@@ -681,13 +567,9 @@ async fn do_test_sync(
         }
 
         let sync_err = sync_svc_foo
-            .sync(
+            .sync_to(
                 sync_request_builder_foo
-                    .build_sync_request(
-                        dataset_alias_foo.as_any_ref(),
-                        push_ref.as_any_ref(),
-                        false,
-                    )
+                    .build_sync_request(dataset_alias_foo.as_local_ref(), push_ref.clone(), false)
                     .await
                     .unwrap(),
                 SyncOptions::default(),

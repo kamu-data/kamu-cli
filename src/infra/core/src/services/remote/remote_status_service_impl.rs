@@ -13,6 +13,7 @@ use async_trait::async_trait;
 use dill::{component, interface};
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_core::utils::metadata_chain_comparator::{
+    ChainWithHead,
     CompareChainsResult,
     MetadataChainComparator,
     NullCompareChainsListener,
@@ -76,8 +77,10 @@ impl RemoteStatusServiceImpl {
         let result = match MetadataChainComparator::compare_chains(
             lhs_chain,
             lhs_head,
-            rhs_chain,
-            Some(&rhs_head),
+            Some(ChainWithHead {
+                chain: rhs_chain,
+                head: &rhs_head,
+            }),
             &NullCompareChainsListener,
         )
         .await
@@ -109,8 +112,7 @@ impl RemoteStatusService for RemoteStatusServiceImpl {
         let aliases = self
             .remote_alias_reg
             .get_remote_aliases(dataset_handle)
-            .await
-            .int_err()?;
+            .await?;
         let push_aliases: Vec<&odf::DatasetRefRemote> =
             aliases.get_by_kind(RemoteAliasKind::Push).collect();
 
@@ -130,3 +132,5 @@ impl RemoteStatusService for RemoteStatusServiceImpl {
         Ok(DatasetPushStatuses { statuses })
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

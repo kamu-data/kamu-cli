@@ -184,7 +184,7 @@ where
             if let Some(session_id) = session_id {
                 derived_catalog_builder.add_value(session_id);
             }
-            derived_catalog_builder.add_value(subject);
+            subject.register(&mut derived_catalog_builder);
 
             let derived_catalog = derived_catalog_builder.build();
             request.extensions_mut().insert(derived_catalog);

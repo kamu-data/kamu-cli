@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use crate::{TaskOutcome, logical_plan_struct};
+use crate::{TaskError, TaskOutcome, logical_plan_struct};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -18,6 +18,7 @@ logical_plan_struct! {
         pub dataset_id: Option<odf::DatasetID>,
         pub busy_time: Option<std::time::Duration>,
         pub end_with_outcome: Option<TaskOutcome>,
+        pub fail_planning_with: Option<TaskError>,
     }
     => "Probe"
 }

@@ -275,6 +275,25 @@ $$;
 
 
 --
+-- Name: wipe_flow_run_data(); Type: PROCEDURE; Schema: public; Owner: -
+--
+
+CREATE PROCEDURE public.wipe_flow_run_data()
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+    TRUNCATE TABLE flow_activation_links, flow_events, flows;
+
+    UPDATE flow_process_states SET running_since = NULL;
+
+    -- Flow process lifecycle messages name the wiped flows
+    DELETE FROM outbox_messages
+    WHERE producer_name = 'dev.kamu.domain.flow-system.FlowProcessStateProjector';
+END;
+$$;
+
+
+--
 -- Name: wipe_outbox_data(); Type: PROCEDURE; Schema: public; Owner: -
 --
 
@@ -288,6 +307,23 @@ BEGIN
 
     -- Explicitly reset the sequence
     PERFORM setval('outbox_message_id_seq', 1, false);
+END;
+$$;
+
+
+--
+-- Name: wipe_task_data(); Type: PROCEDURE; Schema: public; Owner: -
+--
+
+CREATE PROCEDURE public.wipe_task_data()
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+    TRUNCATE TABLE task_events, tasks;
+
+    -- Task progress messages carry task outcomes
+    DELETE FROM outbox_messages
+    WHERE producer_name = 'dev.kamu.domain.task-system.TaskAgent';
 END;
 $$;
 

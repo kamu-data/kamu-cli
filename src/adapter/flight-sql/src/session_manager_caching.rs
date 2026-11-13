@@ -13,7 +13,7 @@ use std::sync::{Arc, Mutex};
 use chrono::{DateTime, Utc};
 use datafusion::logical_expr::LogicalPlan;
 use datafusion::prelude::SessionContext;
-use kamu_accounts::CurrentAccountSubject;
+use kamu_accounts::{CurrentAccountSubject, Principal};
 use kamu_core::QueryService;
 use time_source::SystemTimeSource;
 use tonic::Status;
@@ -68,6 +68,7 @@ pub struct SessionManagerCaching {
     conf: Arc<SessionCachingConfig>,
     timer: Arc<dyn SystemTimeSource>,
     query_svc: dill::Lazy<Arc<dyn QueryService>>,
+    principal: Arc<Principal>,
     state: Arc<SessionManagerCachingState>,
 }
 
@@ -104,7 +105,10 @@ impl SessionManagerCaching {
     async fn create_context(&self) -> Result<Arc<SessionContext>, Status> {
         let query_svc = self.query_svc.get().map_err(internal_error)?;
 
-        let ctx = query_svc.create_session().await.map_err(internal_error)?;
+        let ctx = query_svc
+            .create_session(&self.principal)
+            .await
+            .map_err(internal_error)?;
 
         Ok(Arc::new(ctx))
     }

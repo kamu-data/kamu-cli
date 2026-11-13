@@ -16,9 +16,9 @@ use pretty_assertions::assert_eq;
 
 #[tokio::test]
 async fn test_logged_in_guard_logged() {
-    let catalog = dill::CatalogBuilder::new()
-        .add_value(CurrentAccountSubject::new_test())
-        .build();
+    let mut b = dill::CatalogBuilder::new();
+    CurrentAccountSubject::new_test().register(&mut b);
+    let catalog = b.build();
 
     let schema = TestSchema::build(TestQuery, TestMutation, EmptySubscription)
         .data(catalog)
@@ -69,11 +69,10 @@ async fn test_logged_in_guard_logged() {
 
 #[tokio::test]
 async fn test_logged_in_guard_anonymous() {
-    let catalog = dill::CatalogBuilder::new()
-        .add_value(CurrentAccountSubject::anonymous(
-            AnonymousAccountReason::NoAuthenticationProvided,
-        ))
-        .build();
+    let mut b = dill::CatalogBuilder::new();
+    CurrentAccountSubject::anonymous(AnonymousAccountReason::NoAuthenticationProvided)
+        .register(&mut b);
+    let catalog = b.build();
 
     let schema = TestSchema::build(TestQuery, TestMutation, EmptySubscription)
         .data(catalog)

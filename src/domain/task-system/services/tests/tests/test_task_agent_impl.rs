@@ -18,7 +18,6 @@ use kamu::*;
 use kamu_accounts::CurrentAccountSubject;
 use kamu_core::{DidGeneratorDefault, TenancyConfig};
 use kamu_datasets::SecretsEncryptionConfig;
-use kamu_datasets_inmem::InMemoryDatasetDependencyRepository;
 use kamu_datasets_services::{DatasetEnvVarServiceNull, DependencyGraphServiceImpl};
 use kamu_task_system::*;
 use kamu_task_system_inmem::{InMemoryTaskEventStore, InMemoryTaskQueueWakeupSource};
@@ -308,6 +307,48 @@ async fn test_task_metrics_track_outcomes_and_running_task() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[test_log::test(tokio::test)]
+async fn test_planning_failure_finishes_task_with_its_error() {
+    let planning_errors = [
+        TaskError::empty_unrecoverable(),
+        // Distinct from the empty recoverable error other failure paths produce
+        TaskError {
+            error_type: "ProbePlanningFailed".to_owned(),
+            payload: serde_json::json!({ "reason": "probe" }),
+            recoverable: true,
+        },
+    ];
+
+    for planning_error in planning_errors {
+        let mut mock_outbox = MockOutbox::new();
+        TaskAgentHarness::add_outbox_task_expectations(&mut mock_outbox, TaskID::new(0));
+
+        let harness = TaskAgentHarness::new(
+            mock_outbox,
+            MockTaskDefinitionPlanner::new(),
+            MockTaskRunner::new(),
+        );
+        let task_id = harness
+            .schedule_probe_task(LogicalPlanProbe {
+                fail_planning_with: Some(planning_error.clone()),
+                ..LogicalPlanProbe::default()
+            })
+            .await;
+
+        harness.task_agent.run_single_task().await.unwrap();
+
+        let task = harness.get_task(task_id).await;
+        assert_eq!(task.status(), TaskStatus::Finished, "{planning_error:?}");
+        assert_eq!(
+            task.outcome(),
+            Some(&TaskOutcome::Failed(planning_error.clone())),
+        );
+        assert_eq!(harness.finished_tasks("failed"), 1, "{planning_error:?}");
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 const LISTENING_TIMEOUT: Duration = Duration::from_mins(1);
 
 struct TaskAgentHarness {
@@ -333,6 +374,7 @@ impl TaskAgentHarness {
         std::fs::create_dir(&repos_dir).unwrap();
 
         let mut b = CatalogBuilder::new();
+        kamu_datasets_inmem::register_dependencies(&mut b);
         b.add::<TaskAgentImpl>()
             .add::<TaskAgentMetrics>()
             .add::<DidGeneratorDefault>()
@@ -349,28 +391,30 @@ impl TaskAgentHarness {
             .bind::<dyn Outbox, MockOutbox>()
             .add::<SystemTimeSourceDefault>()
             .add::<PullRequestPlannerImpl>()
+            .add::<DatasetUpdateKindResolverImpl>()
+            .add::<DatasetPullSourceResolverImpl>()
             .add::<CompactionPlannerImpl>()
             .add::<ResetPlannerImpl>()
-            .add::<TransformRequestPlannerImpl>()
+            .add::<TransformPlannerImpl>()
             .add::<SyncRequestBuilder>()
             .add::<DatasetFactoryImpl>()
             .add::<RemoteAliasesRegistryImpl>()
             .add_value(RemoteReposDir::new(repos_dir))
             .add::<RemoteRepositoryRegistryImpl>()
             .add::<RemoteAliasResolverImpl>()
+            .add::<RemoteDatasetUrlResolverImpl>()
             .add_value(IpfsGateway::default())
             .add_value(IpfsClient::default())
             .add::<odf::dataset::DummyOdfServerAccessTokenResolver>()
             .add::<DatasetEnvVarServiceNull>()
             .add::<DependencyGraphServiceImpl>()
-            .add::<InMemoryDatasetDependencyRepository>()
             .add_builder(odf::dataset::DatasetStorageUnitLocalFs::builder(
                 datasets_dir,
             ))
             .add::<DatasetRegistrySoloUnitBridge>()
-            .add::<odf::dataset::DatasetLfsBuilderDefault>()
-            .add_value(CurrentAccountSubject::new_test())
-            .add_value(TenancyConfig::SingleTenant)
+            .add::<odf::dataset::DatasetLfsBuilderDefault>();
+        CurrentAccountSubject::new_test().register(&mut b);
+        b.add_value(TenancyConfig::SingleTenant)
             .add_value(WakeupListenerConfig {
                 min_debounce_interval: Duration::from_millis(10),
                 // Long enough to make sure tests never rely on listening timeouts

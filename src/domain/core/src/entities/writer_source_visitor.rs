@@ -18,6 +18,7 @@ pub struct WriterSourceEventVisitor<'a> {
     maybe_source_name: Option<&'a str>,
     next_block_flags: Flag,
     maybe_source_event: Option<SourceEvent>,
+    maybe_source_block: Option<odf::Multihash>,
 }
 
 enum SourceEvent {
@@ -54,12 +55,22 @@ impl<'a> WriterSourceEventVisitor<'a> {
             next_block_flags: INITIAL_NEXT_BLOCK_FLAGS,
 
             maybe_source_event: None,
+            maybe_source_block: None,
         }
     }
 
+    /// The source event found, the hash of the block that holds it, and the
+    /// merge strategy to write with
     pub fn get_source_event_and_merge_strategy(
         self,
-    ) -> Result<(Option<odf::MetadataEvent>, odf::metadata::MergeStrategy), ScanMetadataError> {
+    ) -> Result<
+        (
+            Option<odf::MetadataEvent>,
+            Option<odf::Multihash>,
+            odf::metadata::MergeStrategy,
+        ),
+        ScanMetadataError,
+    > {
         let merge_strategy = match (&self.maybe_source_event, self.maybe_source_name) {
             // Source found
             (Some(e), _) => Ok(e.merge_strategy().clone()),
@@ -77,12 +88,14 @@ impl<'a> WriterSourceEventVisitor<'a> {
         Ok((
             self.maybe_source_event
                 .map(SourceEvent::into_metadata_event),
+            self.maybe_source_block,
             merge_strategy,
         ))
     }
 
     fn handle_set_polling_source(
         &mut self,
+        block_hash: &odf::Multihash,
         e: &odf::metadata::SetPollingSource,
     ) -> Result<(), ScanMetadataError> {
         if self.maybe_source_name.is_some() {
@@ -94,12 +107,14 @@ impl<'a> WriterSourceEventVisitor<'a> {
         }
 
         self.maybe_source_event = Some(SourceEvent::Polling(e.clone()));
+        self.maybe_source_block = Some(block_hash.clone());
 
         Ok(())
     }
 
     fn handle_add_push_source(
         &mut self,
+        block_hash: &odf::Multihash,
         e: &odf::metadata::AddPushSource,
     ) -> Result<(), ScanMetadataError> {
         match &self.maybe_source_event {
@@ -108,6 +123,7 @@ impl<'a> WriterSourceEventVisitor<'a> {
                     || self.maybe_source_name == Some(e.source_name.as_str())
                 {
                     self.maybe_source_event = Some(SourceEvent::Push(e.clone()));
+                    self.maybe_source_block = Some(block_hash.clone());
                 }
             }
             Some(SourceEvent::Push(s)) if s.source_name == e.source_name => {
@@ -141,18 +157,18 @@ impl odf::dataset::MetadataChainVisitor for WriterSourceEventVisitor<'_> {
 
     fn visit(
         &mut self,
-        (_, block): odf::dataset::HashedMetadataBlockRef,
+        (block_hash, block): odf::dataset::HashedMetadataBlockRef,
     ) -> Result<Decision, Self::Error> {
         match &block.event {
             odf::MetadataEvent::SetPollingSource(e) => {
-                self.handle_set_polling_source(e)?;
+                self.handle_set_polling_source(block_hash, e)?;
 
                 if self.maybe_source_name.is_none() {
                     self.next_block_flags -= Flag::SET_POLLING_SOURCE;
                 }
             }
             odf::MetadataEvent::AddPushSource(e) => {
-                self.handle_add_push_source(e)?;
+                self.handle_add_push_source(block_hash, e)?;
 
                 if self.maybe_source_name.is_some() && self.maybe_source_event.is_some() {
                     self.next_block_flags -= Flag::ADD_PUSH_SOURCE;

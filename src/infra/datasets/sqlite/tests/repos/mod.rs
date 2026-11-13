@@ -7,6 +7,9 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+// The race fixtures (`*_in_concurrent_transactions`) are not wired for SQLite: it
+// serialises writers, so a race there plays out as the sequential cases wired here
+
 mod test_sqlite_dataset_block_query_repository;
 mod test_sqlite_dataset_data_blocks_repository;
 mod test_sqlite_dataset_dependency_repository;

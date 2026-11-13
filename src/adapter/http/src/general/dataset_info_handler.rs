@@ -13,8 +13,9 @@ use database_common_macros::transactional_handler;
 use dill::Catalog;
 use http_common::*;
 use internal_error::{ErrorIntoInternal, ResultIntoInternal};
+use kamu_accounts::Principal;
 use kamu_auth_rebac::{RebacDatasetRefUnresolvedError, RebacDatasetRegistryFacade};
-use kamu_datasets::{DatasetAction, DatasetEntryService};
+use kamu_datasets::{DatasetEntryService, DatasetPermission};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -93,15 +94,22 @@ pub async fn dataset_info_handler(
     Ok(response)
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 async fn get_dataset_by_id(
     catalog: &Catalog,
     dataset_id: &odf::DatasetID,
 ) -> Result<Json<DatasetInfoResponse>, ApiError> {
     let rebac_dataset_registry_facade =
         catalog.get_one::<dyn RebacDatasetRegistryFacade>().unwrap();
+    let principal = catalog.get_one::<Principal>().unwrap();
 
     let dataset_handle = rebac_dataset_registry_facade
-        .resolve_dataset_handle_by_ref(&dataset_id.as_local_ref(), DatasetAction::Read)
+        .resolve_dataset_handle_by_ref(
+            &principal,
+            &dataset_id.as_local_ref(),
+            DatasetPermission::Read,
+        )
         .await
         .map_err(|e| {
             use RebacDatasetRefUnresolvedError as E;

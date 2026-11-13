@@ -159,7 +159,7 @@ The rules below hold across the framework. They are the contract a maintainer (o
 not break; most are enforced in code and exercised by tests — pointers given where useful.
 
 - **`ResourceID` is immutable and server-allocated.** A new resource's UID comes from
-  `GenericResourceQueryService::allocate_uid()`; callers cannot choose it. Once assigned it never
+  `GenericResourceQueryService::allocate_id()`; callers cannot choose it. Once assigned it never
   changes (it is the primary key — see [§6](#6-persistence-model)).
 - **`(account_id, schema, name)` is unique among resources not being deleted.** Enforced by a
   case-insensitive unique index on `(account_id, resource_schema, resource_name)`, partial
@@ -266,24 +266,7 @@ A resource is layered as a stack of traits. The base is **`DeclarativeResource`*
 ([`core/declarative_resource.rs`](/src/domain/resources/domain/src/core/declarative_resource.rs)).
 Unlike `Spec`, status is **not** an associated type: every resource kind shares one canonical
 `ResourceStatus` (the ODF RFC-018 shape — phase/conditions/observed-generation), so there is no
-per-kind variation to parameterize over. `status()` returns the concrete `ResourceStatus` directly:
-
-```rust
-pub trait DeclarativeResource:
-    Sized + Send + Sync + std::fmt::Debug + AsRef<Self::ResourceState>
-{
-    type Spec: std::fmt::Debug + Send + Sync;
-    type SpecInput: std::fmt::Debug + Send + Sync;
-    type ResourceState: DeclarativeResourceState<Spec = Self::Spec>
-        + TryFrom<ResourceSnapshot, Error = InternalError>
-        + From<Self>;
-
-    fn id(&self) -> &ResourceID;
-    fn headers(&self) -> &ResourceHeaders;
-    fn spec(&self) -> &Self::Spec;
-    fn status(&self) -> &ResourceStatus;
-}
-```
+per-kind variation to parameterize over. `status()` returns the concrete `ResourceStatus` directly.
 
 **`Spec` vs `SpecInput`.** `Spec` is the resolved, stored shape — what a snapshot persists and what
 `get`/`list` return. `SpecInput` is the write-path shape decoded straight from a manifest/apply
@@ -293,10 +276,9 @@ request; it is validated and linted (`ResourceValidateSpec`/`ResourceLinterSpec`
 time (`ResourceSpecFromInput::from_input`, called from `project_resource_state` in
 `core/resource_state_projector.rs`) — mirroring how `ResourceHeadersInput` is threaded through
 events and converted to `ResourceHeaders` via `ResourceHeaders::from_input` at the same projection
-step (see below). For a resource kind with no server-side defaulting, `Spec` and `SpecInput` are the
-same type and `from_input` is the identity — `VariableSetResource` and `SecretSetResource` are both
-such cases today; `StorageResource` (WIP) is expected to be the first case where they genuinely
-diverge, once reference resolution (`ValueRef` -> concrete value) is implemented.
+step (see below). `VariableSet` and `SecretSet` declare `SpecInput` as a separate newtype,
+field-identical to `Spec`, so validation and linting attach to the write-path type. `Storage` uses
+one type for both, with the identity conversion from `declare_identity_resource_spec_from_input!`.
 
 **Validating an update.** A create runs `ResourceValidateSpec::validate`; a spec update runs
 `validate_update(current)`, where `current` is the stored spec in input form. Its default is
@@ -421,7 +403,7 @@ schema plus presentation metadata as `dill` metadata for registry lookup
 Generic, `R`-parameterized contracts in `use_cases/`: `ApplyResourceUseCase<R>` (two-phase, below),
 `ReconcileResourceUseCase<R>`, `RequestResourcesDeletionUseCase<R>`,
 `CompleteResourceDeletionUseCase<R>`, plus the non-generic
-`ListAllResourcesUseCase` and `RequestAccountResourcesDeletionUseCase`.
+`RequestAccountResourcesDeletionUseCase`.
 
 Reads are deliberately absent from this list. Typed per-type read use cases would each run their own
 paginated query, which cannot paginate correctly across types — page 2 of a merged result is not
@@ -486,7 +468,7 @@ columns are derived from the current spec/read model instead: `VariableSet.varia
 **Optimistic concurrency.** `update_resource` is a compare-and-set on `last_event_id`: the update
 only applies if the stored `last_event_id` equals the caller's `expected_last_event_id`; otherwise it
 returns `UpdateResourceError::concurrent_modification()`. A unique-constraint violation surfaces as
-`UpdateResourceError::Duplicate`.
+`UpdateResourceError::Duplicate`, which the apply use case reports as an internal error.
 
 **Soft delete in two steps.** Rows are never removed ([(c) Deletion](#c-deletion)):
 
@@ -557,13 +539,16 @@ Resolution + permission checks live in `ResourceAccountResolverImpl`
   `name` → `SelectorMismatch`). An empty selector (`{}`) parses successfully (the struct derives
   `Default`) but is rejected by the resolver itself with `EmptySelector`. So is a selector with only
   `id`: lookup needs `did` or `name`.
-- **Remote calls.** For a remote context the CLI authenticates with an access token; the server then
-  resolves the *authenticated principal* into the current account subject exactly as above — the
-  client never asserts its own account id, the server derives it.
-- **Local workspace context.** The local facade uses the workspace's current account subject
-  (`CurrentAccountSubject`) as the caller; the same admin rule applies for cross-account targeting.
-- **UID belonging to a different account.** Lookups are account-scoped (`find_account_snapshot`
-  filters by `account_id`). A UID that exists but belongs to another account is reported as
+- **Remote calls.** For a remote context the CLI sends an access token. The server's authentication
+  layer turns it into the caller (`CurrentAccountSubject`) and its `Principal`
+  ([identity](identity.md#who-registers-it)), and the server's local facade resolves the account
+  exactly as above — the client never asserts its own account id.
+- **Local workspace context.** The resolver defaults `headers.account` to the workspace's caller
+  (`CurrentAccountSubject`) and checks access for the `Principal` the CLI catalog registers beside
+  it ([identity](identity.md#who-registers-it)); the same admin rule applies for cross-account
+  targeting. Background work runs as `Principal::Node`, which may target any account.
+- **UID belonging to a different account.** Lookups are account-scoped: `find_account_snapshot`
+  treats a snapshot owned by another account as absent. A UID that exists but belongs to another account is reported as
   **not-found** (`ResourceIDNotFoundError`), not "forbidden" — so existence is not leaked across
   accounts. A UID of the wrong schema yields `ResourceTypeMismatchError` in the domain and
   `ResourceLookupProblem::SchemaMismatch` at the facade boundary.
@@ -593,7 +578,7 @@ Concrete conflict cases:
 | `id` whose resource has a different schema | **Reject** — `ResourceTypeMismatchError` in domain code, mapped to `SchemaMismatch` in the facade. |
 | `id` resolving to a resource in a different account | **Not found** — `ResourceIDNotFoundError` (account-scoped lookup; existence not leaked). |
 | `headers.account` targeting another account without admin | **Reject** — `AccessError::Unauthorized` ([§7](#7-account-resolution--authorization)). |
-| Rename target name already taken (same account+schema) | **Reject** — unique-constraint `Duplicate` at persistence. |
+| Rename target name already taken (same account+schema) | **Reject** — the unique index fails the update, reported as an internal error. |
 | Update by name where another account has the same name | **No conflict** — the account disambiguates; each `(account, schema, name)` is independent. |
 | Apply re-using the name of a resource being deleted | **Create** — the resource being deleted gave up its name. The outcome carries a `replaces_resource_being_deleted` warning naming its id. |
 | Apply re-using the name of a deleted resource | **Create** — the deleted resource was renamed to a tombstone. |
@@ -679,8 +664,8 @@ impl ResourceDispatcherFactory {
 }
 ```
 
-The CRUD lookups find exactly one dispatcher; zero → `NotFound`, more than one → `Duplicate`. The
-distinction between (1) (fresh, unvalidated input → user error) and (2) (schema the system itself
+The CRUD lookups find exactly one dispatcher; zero → `NotFound`, more than one → `InternalError`.
+The distinction between (1) (fresh, unvalidated input → user error) and (2) (schema the system itself
 produced → a miss means corrupt storage/registration, i.e. `InternalError`) is the point of having
 both.
 
@@ -692,10 +677,11 @@ The factory is therefore `Transient` and injects the catalog **by value**, which
 resolution *started from*: a factory injected into a component built from a transaction-chained
 catalog carries that chained catalog, so the dispatchers it builds see the transaction.
 
-The one place that still passes a catalog explicitly is `ResourceLifecycleMessageConsumer`, which
-receives the per-message transaction catalog as a *method argument* — a component-held catalog would
-be the wrong one there, so it keeps using
-[`ResourceDispatcherFactory::lifecycle_dispatcher_in`](/src/domain/resources/services/src/crud_dispatchers/resource_dispatcher_factory.rs).
+Outbox consumers pass the catalog explicitly: `ResourceLifecycleMessageConsumer` and
+`ConfigurationDatasetLifecycleMessageConsumer` receive the per-message transaction catalog as a
+*method argument*, and a component-held catalog would be the wrong one there. They call the static
+`*_in` methods of
+[`ResourceDispatcherFactory`](/src/domain/resources/services/src/crud_dispatchers/resource_dispatcher_factory.rs).
 
 **Message handlers** (outbox consumers — see [§13](#13-data-flow-walkthroughs)):
 `ResourceLifecycleMessageConsumer` and `AccountLifecycleMessageConsumer`.
@@ -1690,11 +1676,13 @@ grants nobody access to anything, and a dead link must not survive merely becaus
 someone else's namespace.
 
 *Authority.* The consumer runs below the facade, which is where authorization lives, so it resolves
-dispatchers from the message-scoped catalog and never touches `CurrentAccountSubject` — there is no
-system principal in this codebase and none is needed. The `account_id` it passes to
-`ResourceCrudDispatcherDeletionRequest` is an ownership **scope**, read back off each selected
-resource's own snapshot, not an actor claim: the use case feeds it to `find_owned_snapshots`, which
-hard-errors on ids owned by anyone else. Nothing in `ResourceEventDeleted` or
+dispatchers from the message-scoped catalog and checks no permissions. The outbox delivers it from
+the background catalog, so it runs as `Principal::Node`
+([identity](identity.md#background-work-runs-as-the-node)), but nothing in it reads the principal.
+The `account_id` it passes to `ResourceCrudDispatcherDeletionRequest` is an ownership **scope**,
+read back off each selected resource's own snapshot, not an actor claim: the use case looks the ids
+up with `find_owned_snapshots` and rejects the whole request with an access error if any of them
+belongs to another account. Nothing in `ResourceEventDeleted` or
 `ResourceLifecycleMessageDeleted` records an actor, so there is no attribution to distort.
 
 *Stripping is a full apply* — get the current definition, remove the label, apply it back, the
@@ -1755,8 +1743,8 @@ assumption:
    rewrite the resource `spec`.
 
 **Reading back:** the secret-set spec-view dispatcher's `reveal_spec` decrypts each encrypted
-secret (`contentEncoding` set) only under `SpecViewMode::Revealed`; the default `Encrypted` returns
-the stored ciphertext unchanged.
+secret (`contentEncoding` set) only under `SpecViewOpts::REVEALED`; the default
+`SpecViewOpts::ENCRYPTED` returns the stored ciphertext unchanged.
 
 Domain types live in `src/domain/configuration/domain/src/resources/<type>/`
 (`resource.rs`, `spec.rs`, `state.rs`, `event.rs`, `reconciliation.rs`, …) — there is no per-kind
@@ -1917,7 +1905,8 @@ Otherwise the behavior is already guaranteed for both implementations by the con
 ## 17. Extension points & gotchas
 
 - **Dispatch is by schema.** A missing schema yields
-  `UnsupportedResourceDescriptorError::NotFound`; two matching registrations yield `Duplicate`.
+  `UnsupportedResourceDescriptorError::NotFound`; two matching registrations yield an
+  `InternalError`.
   Selector-based lookup (`variablesets`, `vs`, etc.) is a separate metadata path and yields
   selector-specific not-found/duplicate errors.
 - **A miss reports not-found or no-match, by what was asked — not by whether a type was named.**
@@ -1950,9 +1939,10 @@ Otherwise the behavior is already guaranteed for both implementations by the con
   preserves the accepted string (stored as the inner `TypeUri`) and allows non-`opendatafabric.org`
   hosts for future custom schema namespaces.
 - **Secrets are encrypted before the first durable write** (by the spec sanitizer, not the
-  controller) and only decrypted on read with `SpecViewMode::Revealed` (CLI `--revealed`, GraphQL
-  `revealed: true`); the default `Encrypted` returns the stored ciphertext envelope. See
-  [Secret handling](#secret-handling-invariant) — never assume plaintext is safe to log or emit.
+  controller) and only decrypted on read with `SpecViewOpts::REVEALED` (CLI `--revealed`,
+  GraphQL `revealed: true`); the default `SpecViewOpts::ENCRYPTED` returns the stored ciphertext
+  envelope. See [Secret handling](#secret-handling-invariant) — never assume plaintext is safe to
+  log or emit.
 - **Two-phase apply** — `--dry-run` / `plan_apply_manifest` never writes; only `apply_manifest`
   persists and publishes the outbox message.
 - **Local ≡ remote is a contract-test invariant for covered behavior** — the `contract_test!` suite

@@ -11,25 +11,28 @@ use async_graphql::value;
 use bon::bon;
 use indoc::indoc;
 use kamu_accounts::*;
-use kamu_adapter_graphql::data_loader::account_entity_data_loader;
-use kamu_auth_rebac_services::RebacDatasetRegistryFacadeImpl;
-use kamu_datasets_inmem::InMemoryDatasetStatisticsRepository;
-use kamu_datasets_services::{
-    AccountQuotaCheckerStorageImpl,
-    DatasetStatisticsServiceImpl,
-    QuotaDefaultsConfig,
+use kamu_accounts_inmem::{InMemoryAccessTokenRepository, InMemoryOAuthDeviceCodeRepository};
+use kamu_accounts_services::utils::AccountAuthorizationHelperImpl;
+use kamu_accounts_services::{
+    AccessTokenServiceImpl,
+    AuthenticationServiceImpl,
+    DeleteAccountUseCaseImpl,
+    ModifyAccountPasswordUseCaseImpl,
+    OAuthDeviceCodeGeneratorDefault,
+    OAuthDeviceCodeServiceImpl,
 };
-use messaging_outbox::{ConsumerFilter, Outbox, OutboxImmediateImpl};
+use kamu_core::TenancyConfig;
+use messaging_outbox::OutboxProvider;
 use pretty_assertions::assert_eq;
 use serde_json::json;
-use time_source::SystemTimeSourceDefault;
 
-use crate::utils::{PredefinedAccountOpts, authentication_catalogs};
+use crate::utils::{BaseGQLDatasetHarness, PredefinedAccountOpts, authentication_catalogs};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[oop::extend(BaseGQLDatasetHarness, base_gql_harness)]
 struct GraphQLAccountQuotasHarness {
-    schema: kamu_adapter_graphql::Schema,
+    base_gql_harness: BaseGQLDatasetHarness,
     catalog_authorized: dill::Catalog,
 }
 
@@ -40,44 +43,32 @@ impl GraphQLAccountQuotasHarness {
         #[builder(default = PredefinedAccountOpts::default())]
         predefined_account_opts: PredefinedAccountOpts,
     ) -> Self {
-        let mut b = dill::CatalogBuilder::new();
-        database_common::NoOpDatabasePlugin::init_database_components(&mut b);
+        let base_gql_harness = BaseGQLDatasetHarness::builder()
+            .tenancy_config(TenancyConfig::MultiTenant)
+            .outbox_provider(OutboxProvider::Immediate {
+                force_immediate: true,
+            })
+            .build();
 
-        let base_catalog = b.build();
-
-        let catalog = dill::CatalogBuilder::new_chained(&base_catalog)
-            .add_value(kamu_core::TenancyConfig::MultiTenant)
-            .add::<kamu_accounts_inmem::InMemoryAccessTokenRepository>()
-            .add::<kamu_accounts_inmem::InMemoryDidSecretKeyRepository>()
-            .add::<kamu_accounts_inmem::InMemoryOAuthDeviceCodeRepository>()
-            .add::<kamu_accounts_inmem::InMemoryAccountQuotaEventStore>()
-            .add::<kamu_accounts_services::AccountQuotaServiceImpl>()
-            .add::<AccountQuotaCheckerStorageImpl>()
-            .add::<InMemoryDatasetStatisticsRepository>()
-            .add::<DatasetStatisticsServiceImpl>()
-            .add::<kamu_accounts_services::AccessTokenServiceImpl>()
-            .add::<kamu_accounts_services::AuthenticationServiceImpl>()
-            .add::<kamu_accounts_services::CreateAccountUseCaseImpl>()
-            .add::<kamu_accounts_services::ModifyAccountPasswordUseCaseImpl>()
-            .add::<kamu_accounts_services::DeleteAccountUseCaseImpl>()
-            .add::<kamu_accounts_services::UpdateAccountUseCaseImpl>()
-            .add::<kamu_accounts_services::OAuthDeviceCodeGeneratorDefault>()
-            .add::<kamu_accounts_services::OAuthDeviceCodeServiceImpl>()
-            .add::<kamu_accounts_services::utils::AccountAuthorizationHelperImpl>()
-            .add::<RebacDatasetRegistryFacadeImpl>()
-            .add::<SystemTimeSourceDefault>()
+        let catalog = dill::CatalogBuilder::new_chained(base_gql_harness.catalog())
+            .add::<InMemoryAccessTokenRepository>()
+            .add::<InMemoryOAuthDeviceCodeRepository>()
+            .add::<AccessTokenServiceImpl>()
+            .add::<AuthenticationServiceImpl>()
+            .add::<ModifyAccountPasswordUseCaseImpl>()
+            .add::<DeleteAccountUseCaseImpl>()
+            .add::<OAuthDeviceCodeGeneratorDefault>()
+            .add::<OAuthDeviceCodeServiceImpl>()
+            .add::<AccountAuthorizationHelperImpl>()
             .add_value(JwtAuthenticationConfig::default())
-            .add_value(QuotaDefaultsConfig::default())
             .add_value(AuthConfig::sample())
-            .add_builder(OutboxImmediateImpl::builder(ConsumerFilter::AllConsumers))
-            .bind::<dyn Outbox, OutboxImmediateImpl>()
             .build();
 
         let (_, catalog_authorized) =
             authentication_catalogs(&catalog, predefined_account_opts).await;
 
         Self {
-            schema: kamu_adapter_graphql::schema_quiet(),
+            base_gql_harness,
             catalog_authorized,
         }
     }
@@ -86,14 +77,7 @@ impl GraphQLAccountQuotasHarness {
         &self,
         query: impl Into<async_graphql::Request>,
     ) -> async_graphql::Response {
-        self.schema
-            .execute(
-                query
-                    .into()
-                    .data(account_entity_data_loader(&self.catalog_authorized))
-                    .data(self.catalog_authorized.clone()),
-            )
-            .await
+        self.execute_query(query, &self.catalog_authorized).await
     }
 
     async fn create_account(&self, account_name: &str) {

@@ -24,15 +24,7 @@ use kamu_accounts_services::PasswordPolicyConfig;
 use kamu_adapter_http::platform::{FileDownloadServiceJwt, UploadServiceLocal};
 use kamu_adapter_oauth::GithubAuthenticationConfig;
 use kamu_datasets_services::QuotaDefaultsConfig;
-use kamu_flow_system::{
-    MESSAGE_PRODUCER_KAMU_FLOW_CONFIGURATION_SERVICE,
-    MESSAGE_PRODUCER_KAMU_FLOW_PROCESS_STATE_PROJECTOR,
-    MESSAGE_PRODUCER_KAMU_FLOW_TRIGGER_SERVICE,
-};
 use kamu_search_services::EmbeddingsProviderImpl;
-use kamu_task_system_inmem::domain::MESSAGE_PRODUCER_KAMU_TASK_AGENT;
-use kamu_webhooks::MESSAGE_PRODUCER_KAMU_WEBHOOK_SUBSCRIPTION_SERVICE;
-use messaging_outbox::{Outbox, OutboxDispatchingImpl, register_message_dispatcher};
 use time_source::{SystemTimeSource, SystemTimeSourceDefault, SystemTimeSourceStub};
 use tracing::{Instrument, warn};
 
@@ -60,6 +52,7 @@ use crate::{
     get_app_database_config,
     move_initial_database_to_workspace,
     odf_server,
+    outbox,
     resource_context,
     resources,
     spawn_password_refreshing_job,
@@ -235,11 +228,11 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
             )
             .await?;
 
-        let wrapped_base_catalog = dill::CatalogBuilder::new_chained(&base_catalog)
-            .add_value(KamuBackgroundCatalog::new(
-                base_catalog.clone(),
-                cli_account_subject.clone(),
-            ))
+        let process_catalog =
+            configure_process_catalog(&base_catalog, &cli_account_subject).build();
+
+        let wrapped_base_catalog = dill::CatalogBuilder::new_chained(&process_catalog)
+            .add_value(KamuBackgroundCatalog::new(process_catalog.clone()))
             .build();
 
         let maybe_server_catalog = if cli_commands::command_needs_server_components(&args) {
@@ -250,15 +243,22 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
             None
         };
 
-        let cli_catalog = build_cli_catalog(
-            &wrapped_base_catalog,
-            maybe_server_catalog.as_ref(),
-            cli_account_subject,
-            tenancy_config,
-        );
+        let cli_base_catalog = maybe_server_catalog
+            .as_ref()
+            .unwrap_or(&wrapped_base_catalog);
+
+        // System singletons are first resolved from here, so their background work runs as
+        // the node, not as the CLI user
+        let background_catalog = &configure_background_catalog(cli_base_catalog).build();
+
+        let cli_catalog = {
+            let mut b = configure_cli_catalog(cli_base_catalog, tenancy_config);
+            cli_account_subject.register(&mut b);
+            b.build()
+        };
 
         // Register metrics
-        maybe_metrics_registry = Some(observability::metrics::register_all(&cli_catalog));
+        maybe_metrics_registry = Some(observability::metrics::register_all(background_catalog));
 
         let is_workspace_upgrade_needed = workspace_svc.is_upgrade_needed()?;
 
@@ -288,14 +288,14 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
 
         if cli_commands::command_needs_startup_jobs(&args) {
             run_startup_initializations(
-                &cli_catalog,
+                background_catalog,
                 // Registrator was already called on base_catalog
                 JobSelector::NoneOf(HashSet::from([
                     JOB_KAMU_ACCOUNTS_PREDEFINED_ACCOUNTS_REGISTRATOR,
                 ])),
             )
             .instrument(tracing::debug_span!(
-                "app::run_startup_initializations(cli_catalog)"
+                "app::run_startup_initializations(background_catalog)"
             ))
             .await?;
         }
@@ -304,19 +304,17 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
             && cli_commands::command_needs_transaction(&args);
         let is_outbox_processing_required = maybe_db_connection_settings.is_some()
             && cli_commands::command_needs_outbox_processing(&args);
-        let work_catalog = maybe_server_catalog
-            .as_ref()
-            .unwrap_or(&wrapped_base_catalog);
 
         let tx_runner = DatabaseTransactionRunner::new(cli_catalog.clone());
 
-        tx_runner
+        let command_run_result = tx_runner
             .maybe_transactional(
                 is_transactional,
                 |maybe_transactional_cli_catalog: dill::Catalog| async move {
                     let command_builder = cli_commands::get_command(
-                        work_catalog,
+                        cli_base_catalog,
                         &maybe_transactional_cli_catalog,
+                        background_catalog,
                         args,
                         current_account,
                     )?;
@@ -340,19 +338,14 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
                 },
             )
             .instrument(tracing::debug_span!("app::run_command"))
-            .await?;
+            .await;
 
+        // A failed command may still have committed some of its work in
+        // transactions of its own, so the Outbox is processed either way
         if is_outbox_processing_required {
-            // Process the Outbox messages while they are present
-            let outbox_agent = cli_catalog
-                .get_one::<dyn messaging_outbox::OutboxAgent>()
-                .int_err()?;
-            outbox_agent
-                .run_while_has_tasks()
-                .instrument(tracing::debug_span!(
-                    "Consume accumulated the Outbox messages"
-                ))
-                .await?;
+            outbox::process_outbox_after_command(background_catalog, command_run_result).await?;
+        } else {
+            command_run_result?;
         }
 
         let post_command_actions = cli_catalog.get_one::<PostCommandActions>().int_err()?;
@@ -411,6 +404,7 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 // Catalog
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -475,6 +469,8 @@ pub fn configure_base_catalog(
     b.add::<RemoteAliasesRegistryImpl>();
 
     b.add::<RemoteAliasResolverImpl>();
+    b.add::<RemoteDatasetUrlResolverImpl>();
+    b.add::<DatasetPullSourceResolverImpl>();
 
     b.add::<ResourceLoaderImpl>();
 
@@ -484,13 +480,14 @@ pub fn configure_base_catalog(
 
     b.add::<FetchService>();
 
+    b.add::<PollingIngestPlannerImpl>();
+    b.add::<IngestEnvVarsResolver>();
     b.add::<PollingIngestServiceImpl>();
 
     b.add::<PushIngestExecutorImpl>();
     b.add::<PushIngestPlannerImpl>();
 
-    b.add::<TransformRequestPlannerImpl>();
-    b.add::<TransformElaborationServiceImpl>();
+    b.add::<TransformPlannerImpl>();
     b.add::<TransformExecutorImpl>();
 
     b.add::<VerificationServiceImpl>();
@@ -501,9 +498,11 @@ pub fn configure_base_catalog(
     b.add_builder(SearchServiceRemoteImpl::builder(None));
 
     b.add::<SyncServiceImpl>();
+    b.add::<IpfsServiceImpl>();
     b.add::<SyncRequestBuilder>();
 
     b.add::<PullRequestPlannerImpl>();
+    b.add::<DatasetUpdateKindResolverImpl>();
 
     b.add::<PushRequestPlannerImpl>();
 
@@ -530,12 +529,14 @@ pub fn configure_base_catalog(
     b.add::<EngineProvisionerLocal>();
 
     b.add::<kamu::utils::simple_transfer_protocol::SimpleTransferProtocol>();
+    b.add::<kamu::utils::local_sync_writes::PulledSeedStore>();
     b.add::<kamu_adapter_http::SmartTransferProtocolClientWs>();
 
     b.add::<CompactDatasetUseCaseImpl>();
     b.add::<GetDatasetSchemaUseCaseImpl>();
     b.add::<PushIngestDataUseCaseImpl>();
     b.add::<PullDatasetUseCaseImpl>();
+    b.add::<DatasetUpdateStepsImpl>();
     b.add::<PushDatasetUseCaseImpl>();
     b.add::<QueryDatasetDataUseCaseImpl>();
     b.add::<ResetDatasetUseCaseImpl>();
@@ -589,14 +590,7 @@ pub fn configure_base_catalog(
     );
     b.add::<kamu_adapter_flight_sql::KamuFlightSqlService>();
 
-    b.add_builder(messaging_outbox::OutboxImmediateImpl::builder(
-        messaging_outbox::ConsumerFilter::ImmediateConsumers,
-    ));
-    b.add::<messaging_outbox::OutboxTransactionalImpl>();
-    b.add::<messaging_outbox::OutboxDispatchingImpl>();
-    b.bind::<dyn Outbox, OutboxDispatchingImpl>();
-    b.add::<messaging_outbox::OutboxAgentImpl>();
-    b.add::<messaging_outbox::OutboxAgentMetrics>();
+    outbox::register_outbox_components(&mut b);
     b.add::<wakeup_listener::WakeupListenerMetrics>();
 
     kamu_auth_web3_services::register_dependencies(&mut b);
@@ -605,53 +599,12 @@ pub fn configure_base_catalog(
 
     explore::register_dependencies(&mut b);
 
-    register_message_dispatcher::<AccountLifecycleMessage>(
-        &mut b,
-        MESSAGE_PRODUCER_KAMU_ACCOUNTS_SERVICE,
-    );
-
-    register_message_dispatcher::<kamu_datasets::DatasetLifecycleMessage>(
-        &mut b,
-        kamu_datasets::MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
-    );
-
-    register_message_dispatcher::<kamu_datasets::DatasetReferenceMessage>(
-        &mut b,
-        kamu_datasets::MESSAGE_PRODUCER_KAMU_DATASET_REFERENCE_SERVICE,
-    );
-
-    register_message_dispatcher::<kamu_datasets::DatasetDependenciesMessage>(
-        &mut b,
-        kamu_datasets::MESSAGE_PRODUCER_KAMU_DATASET_DEPENDENCY_GRAPH_SERVICE,
-    );
-
-    register_message_dispatcher::<kamu_datasets::DatasetKeyBlocksMessage>(
-        &mut b,
-        kamu_datasets::MESSAGE_PRODUCER_KAMU_DATASET_KEY_BLOCK_UPDATE_HANDLER,
-    );
-
-    register_message_dispatcher::<kamu_datasets::DatasetExternallyChangedMessage>(
-        &mut b,
-        kamu_datasets::MESSAGE_PRODUCER_KAMU_HTTP_ADAPTER,
-    );
-
-    register_message_dispatcher::<kamu_auth_rebac::RebacDatasetPropertiesMessage>(
-        &mut b,
-        kamu_auth_rebac::MESSAGE_PRODUCER_KAMU_REBAC_DATASET_PROPERTIES_SERVICE,
-    );
-
-    register_message_dispatcher::<kamu_auth_rebac::RebacDatasetRelationsMessage>(
-        &mut b,
-        kamu_auth_rebac::MESSAGE_PRODUCER_KAMU_REBAC_DATASET_RELATIONS_SERVICE,
-    );
-
-    register_message_dispatcher::<kamu_resources::ResourceLifecycleMessage>(
-        &mut b,
-        kamu_resources::MESSAGE_PRODUCER_KAMU_RESOURCE_SERVICE,
-    );
+    outbox::register_base_message_dispatchers(&mut b);
 
     b
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 // Public only for tests
 pub fn configure_cli_catalog(
@@ -675,18 +628,40 @@ pub fn configure_cli_catalog(
     b
 }
 
-fn build_cli_catalog(
-    base_catalog: &dill::Catalog,
-    maybe_server_catalog: Option<&dill::Catalog>,
-    cli_account_subject: CurrentAccountSubject,
-    tenancy_config: TenancyConfig,
-) -> dill::Catalog {
-    let cli_base_catalog = maybe_server_catalog.unwrap_or(base_catalog);
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-    configure_cli_catalog(cli_base_catalog, tenancy_config)
-        .add_value(cli_account_subject)
-        .build()
+/// Components bound to the account that runs the process, once it is known
+// Public only for tests
+pub fn configure_process_catalog(
+    base_catalog: &dill::Catalog,
+    cli_account_subject: &CurrentAccountSubject,
+) -> dill::CatalogBuilder {
+    use dill::Component;
+
+    let mut b = dill::CatalogBuilder::new_chained(base_catalog);
+
+    // TODO: Background tasks pull from remote nodes with the process account's tokens;
+    // they should pull on behalf of the user who initiated the task
+    b.add_builder(
+        odf_server::AccessTokenRegistryService::builder()
+            .with_current_account_subject(Arc::new(cli_account_subject.clone())),
+    );
+
+    b
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Catalog of background work (agents, startup jobs, the outbox), a sibling of
+/// the CLI catalog acting as [`Principal::Node`], with no caller
+// Public only for tests
+pub fn configure_background_catalog(cli_base_catalog: &dill::Catalog) -> dill::CatalogBuilder {
+    let mut b = dill::CatalogBuilder::new_chained(cli_base_catalog);
+    b.add_value(Principal::Node);
+    b
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 // Public only for tests
 pub fn configure_server_catalog(
@@ -716,39 +691,12 @@ pub fn configure_server_catalog(
 
     b.add_value(kamu_adapter_graphql::GqlFeatureFlags::new());
 
-    register_message_dispatcher::<kamu_flow_system::FlowConfigurationUpdatedMessage>(
-        &mut b,
-        MESSAGE_PRODUCER_KAMU_FLOW_CONFIGURATION_SERVICE,
-    );
-    register_message_dispatcher::<kamu_flow_system::FlowTriggerUpdatedMessage>(
-        &mut b,
-        MESSAGE_PRODUCER_KAMU_FLOW_TRIGGER_SERVICE,
-    );
-    register_message_dispatcher::<kamu_flow_system::FlowProcessLifecycleMessage>(
-        &mut b,
-        MESSAGE_PRODUCER_KAMU_FLOW_PROCESS_STATE_PROJECTOR,
-    );
-    register_message_dispatcher::<kamu_task_system::TaskProgressMessage>(
-        &mut b,
-        MESSAGE_PRODUCER_KAMU_TASK_AGENT,
-    );
-
-    register_message_dispatcher::<AccessTokenLifecycleMessage>(
-        &mut b,
-        MESSAGE_PRODUCER_KAMU_ACCESS_TOKEN_SERVICE,
-    );
-
-    register_message_dispatcher::<kamu_webhooks::WebhookSubscriptionLifecycleMessage>(
-        &mut b,
-        MESSAGE_PRODUCER_KAMU_WEBHOOK_SUBSCRIPTION_SERVICE,
-    );
-    register_message_dispatcher::<kamu_webhooks::WebhookSubscriptionEventChangesMessage>(
-        &mut b,
-        kamu_webhooks::MESSAGE_PRODUCER_KAMU_WEBHOOK_SUBSCRIPTION_EVENT_CHANGES_SERVICE,
-    );
+    outbox::register_server_message_dispatchers(&mut b);
 
     b
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 async fn run_startup_initializations(
     catalog: &dill::Catalog,
@@ -786,6 +734,8 @@ fn load_config(workspace_layout: &WorkspaceLayout) -> Result<config::CLIConfig, 
     tracing::info!(?config, "Loaded configuration");
     Ok(config)
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub fn register_config_in_catalog(
     config: &config::CLIConfig,
@@ -849,6 +799,10 @@ pub fn register_config_in_catalog(
     // Flight SQL configuration
     catalog_builder.add_value(config.protocol.flight_sql.to_session_auth_config());
     catalog_builder.add_value(config.protocol.flight_sql.to_session_caching_config());
+    //
+
+    // Smart transfer protocol configuration
+    catalog_builder.add_value(config.protocol.smart_transfer_protocol.to_server_config()?);
     //
 
     // Tenancy configuration
@@ -1107,6 +1061,8 @@ pub fn register_config_in_catalog(
     Ok(())
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub enum WorkspaceStatus {
     NoWorkspace,
@@ -1148,6 +1104,8 @@ fn prepare_run_dir(run_dir: &Path) {
         });
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 fn configure_logging(
     output_config: &OutputConfig,

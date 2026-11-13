@@ -7,7 +7,11 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_adapter_task_dataset::{TaskErrorDatasetReset, TaskErrorDatasetUpdate};
+use kamu_adapter_task_dataset::{
+    TaskErrorDatasetCommit,
+    TaskErrorDatasetReset,
+    TaskErrorDatasetUpdate,
+};
 use kamu_adapter_task_webhook::TaskErrorWebhookDelivery;
 use kamu_datasets::DatasetRegistry;
 use kamu_task_system as ts;
@@ -148,12 +152,30 @@ impl TaskFailureReason {
                 }
             }
 
+            TaskErrorDatasetCommit::TYPE_ID => {
+                let commit_error = TaskErrorDatasetCommit::from_task_error(e)?;
+                match commit_error {
+                    TaskErrorDatasetCommit::HeadMoved(_) => {
+                        TaskFailureReason::General(TaskFailureReasonGeneral {
+                            message: "Dataset head was moved by a concurrent update".to_owned(),
+                            recoverable: e.recoverable,
+                        })
+                    }
+                }
+            }
+
             TaskErrorDatasetReset::TYPE_ID => {
                 let reset_error = TaskErrorDatasetReset::from_task_error(e)?;
                 match reset_error {
                     TaskErrorDatasetReset::ResetHeadNotFound => {
                         TaskFailureReason::General(TaskFailureReasonGeneral {
                             message: "New head hash to reset not found".to_owned(),
+                            recoverable: e.recoverable,
+                        })
+                    }
+                    TaskErrorDatasetReset::OldHeadMismatch(_) => {
+                        TaskFailureReason::General(TaskFailureReasonGeneral {
+                            message: "Dataset head is not the expected old head".to_owned(),
                             recoverable: e.recoverable,
                         })
                     }

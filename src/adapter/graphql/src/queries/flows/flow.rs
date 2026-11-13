@@ -49,7 +49,7 @@ impl Flow {
                 flow_related_trigger_states_by_id.remove(&flow_state.flow_binding);
 
             // Construct flow description
-            let flow_description = flow_description_builder.build(ctx, &flow_state).await?;
+            let flow_description = flow_description_builder.build(&flow_state)?;
 
             // Finally, compose all values
             result.push(Self {

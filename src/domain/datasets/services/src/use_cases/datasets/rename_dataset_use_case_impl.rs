@@ -11,6 +11,7 @@ use std::sync::Arc;
 
 use dill::{component, interface};
 use internal_error::ErrorIntoInternal;
+use kamu_accounts::Principal;
 use kamu_auth_rebac::RebacDatasetRegistryFacade;
 use kamu_datasets::*;
 use messaging_outbox::{Outbox, OutboxExt};
@@ -24,6 +25,7 @@ use crate::{DatasetEntryWriter, RenameDatasetEntryError};
 #[interface(dyn RenameDatasetUseCase)]
 pub struct RenameDatasetUseCaseImpl {
     rebac_dataset_registry_facade: Arc<dyn RebacDatasetRegistryFacade>,
+    principal: Arc<Principal>,
     dataset_entry_writer: Arc<dyn DatasetEntryWriter>,
     time_source: Arc<dyn SystemTimeSource>,
     outbox: Arc<dyn Outbox>,
@@ -46,7 +48,11 @@ impl RenameDatasetUseCase for RenameDatasetUseCaseImpl {
         // Locate dataset
         let dataset_handle = self
             .rebac_dataset_registry_facade
-            .resolve_dataset_handle_by_ref(dataset_ref, DatasetAction::Maintain)
+            .resolve_dataset_handle_by_ref(
+                &self.principal,
+                dataset_ref,
+                DatasetPermission::Maintain,
+            )
             .await
             .map_err(|e| {
                 use kamu_auth_rebac::RebacDatasetRefUnresolvedError as E;

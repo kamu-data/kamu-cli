@@ -27,7 +27,6 @@ use kamu_auth_rebac_services::{
     RebacServiceImpl,
 };
 use kamu_datasets::*;
-use kamu_datasets_inmem::InMemoryDatasetStatisticsRepository;
 use kamu_datasets_services::{
     AccountQuotaCheckerStorageImpl,
     DatasetStatisticsServiceImpl,
@@ -101,6 +100,7 @@ async fn test_ingest_push_url_stream() {
         )
         .await
         .unwrap();
+    assert_eq!(harness.ingest_dirs_left(), Vec::<String>::new());
 
     data_helper
         .assert_last_data_eq(
@@ -1343,12 +1343,14 @@ impl IngestTestHarness {
         std::fs::create_dir(&cache_dir).unwrap();
         std::fs::create_dir(&datasets_dir).unwrap();
 
-        let catalog = dill::CatalogBuilder::new()
-            .add::<DidGeneratorDefault>()
+        let mut b = dill::CatalogBuilder::new();
+        kamu_datasets_inmem::register_dependencies(&mut b);
+        b.add::<DidGeneratorDefault>()
             .add_value(RunInfoDir::new(run_info_dir))
-            .add_value(CacheDir::new(cache_dir))
-            .add_value(CurrentAccountSubject::new_test())
-            .add::<AlwaysHappyDatasetActionAuthorizer>()
+            .add_value(CacheDir::new(cache_dir));
+        CurrentAccountSubject::new_test().register(&mut b);
+        let catalog = b
+            .add::<AlwaysHappyDatasetPermissionChecker>()
             .add_value(TenancyConfig::SingleTenant)
             .add_builder(odf::dataset::DatasetStorageUnitLocalFs::builder(
                 datasets_dir,
@@ -1365,7 +1367,6 @@ impl IngestTestHarness {
             .add::<InMemoryAccountRepository>()
             .add::<InMemoryAccountQuotaEventStore>()
             .add::<AccountQuotaServiceImpl>()
-            .add::<InMemoryDatasetStatisticsRepository>()
             .add::<DatasetStatisticsServiceImpl>()
             .add_value(QuotaDefaultsConfig::default())
             .add::<AccountQuotaCheckerStorageImpl>()
@@ -1405,6 +1406,14 @@ impl IngestTestHarness {
         )
         .await
         .unwrap()
+    }
+
+    fn ingest_dirs_left(&self) -> Vec<String> {
+        std::fs::read_dir(self.temp_dir.path().join("run"))
+            .unwrap()
+            .map(|entry| entry.unwrap().file_name().to_string_lossy().into_owned())
+            .filter(|name| name.starts_with("ingest-"))
+            .collect()
     }
 
     async fn dataset_data_helper(&self, dataset_alias: &odf::DatasetAlias) -> DatasetDataHelper {

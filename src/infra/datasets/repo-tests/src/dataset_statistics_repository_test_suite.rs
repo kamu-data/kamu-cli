@@ -10,10 +10,20 @@
 use std::assert_matches;
 
 use chrono::{TimeZone, Utc};
+use database_common::testing::{
+    RacingTransactionOutcome,
+    in_committed_transaction,
+    race_transactions,
+};
 use dill::Catalog;
 use kamu_datasets::*;
 
-use crate::helpers::{init_dataset_entry, init_test_account, remove_dataset_entry};
+use crate::helpers::{
+    init_committed_entries,
+    init_dataset_entry,
+    init_test_account,
+    remove_dataset_entry,
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -327,6 +337,64 @@ pub async fn test_get_total_statistics(catalog: &Catalog) {
     };
 
     assert_matches!(total_statistic, Ok(s) if s == expected_total_statistic);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Two transactions set statistics of one dataset reference: both commit, and
+/// the one that commits last wins, as with an upsert
+pub async fn test_set_statistics_in_concurrent_transactions(catalog: &Catalog) {
+    let (_, entries) = init_committed_entries(catalog, &[("foo", odf::DatasetKind::Root)]).await;
+    let dataset_id = entries[0].id.clone();
+    let second_dataset_id = dataset_id.clone();
+
+    let first_statistics = DatasetStatistics {
+        num_records: 1,
+        ..DatasetStatistics::default()
+    };
+    let second_statistics = DatasetStatistics {
+        num_records: 2,
+        ..DatasetStatistics::default()
+    };
+
+    let outcome = race_transactions(
+        catalog,
+        |catalog| async move {
+            set_statistics(&catalog, &dataset_id, first_statistics)
+                .await
+                .unwrap();
+        },
+        move |catalog| async move {
+            set_statistics(&catalog, &second_dataset_id, second_statistics).await
+        },
+    )
+    .await;
+
+    assert_matches!(outcome, RacingTransactionOutcome::Committed);
+    let committed_statistics = in_committed_transaction(catalog, |catalog| async move {
+        catalog
+            .get_one::<dyn DatasetStatisticsRepository>()
+            .unwrap()
+            .get_dataset_statistics(&entries[0].id, &odf::BlockRef::Head)
+            .await
+            .unwrap()
+    })
+    .await;
+    pretty_assertions::assert_eq!(committed_statistics, second_statistics);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+async fn set_statistics(
+    catalog: &Catalog,
+    dataset_id: &odf::DatasetID,
+    statistics: DatasetStatistics,
+) -> Result<(), SetDatasetStatisticsError> {
+    catalog
+        .get_one::<dyn DatasetStatisticsRepository>()
+        .unwrap()
+        .set_dataset_statistics(dataset_id, &odf::BlockRef::Head, statistics)
+        .await
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

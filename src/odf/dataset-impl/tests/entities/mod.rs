@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 mod test_metadata_chain_impl;
+mod test_metadata_chain_ref_repo;
 
 mod test_dataset_storage_unit_local_fs;
 mod test_dataset_storage_unit_s3;

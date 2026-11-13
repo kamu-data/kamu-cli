@@ -54,6 +54,25 @@ impl NamedObjectRepository for NamedObjectRepositoryInMemory {
         Ok(())
     }
 
+    #[tracing::instrument(level = "debug", name = NamedObjectRepositoryInMemory_compare_and_set, skip_all, fields(%name))]
+    async fn compare_and_set(
+        &self,
+        name: &str,
+        expected: Option<&[u8]>,
+        data: &[u8],
+    ) -> Result<(), CompareAndSetNamedError> {
+        let mut objects_by_name = self.objects_by_name.lock().unwrap();
+        if objects_by_name.get(name).map(|bytes| &bytes[..]) != expected {
+            return Err(CompareAndSetNamedError::Mismatch(
+                NamedObjectMismatchError {
+                    name: String::from(name),
+                },
+            ));
+        }
+        objects_by_name.insert(String::from(name), Bytes::copy_from_slice(data));
+        Ok(())
+    }
+
     #[tracing::instrument(level = "debug", name = NamedObjectRepositoryInMemory_delete, skip_all, fields(%name))]
     async fn delete(&self, name: &str) -> Result<(), DeleteNamedError> {
         let mut objects_by_name = self.objects_by_name.lock().unwrap();

@@ -9,6 +9,7 @@
 
 use std::sync::Arc;
 
+use kamu_accounts::Principal;
 use kamu_auth_rebac::RebacDatasetRegistryFacade;
 use kamu_core::{GetDatasetSchemaUseCase, QueryError, SchemaService};
 
@@ -21,6 +22,7 @@ use super::helpers;
 pub struct GetDatasetSchemaUseCaseImpl {
     schema_service: Arc<dyn SchemaService>,
     rebac_dataset_registry_facade: Arc<dyn RebacDatasetRegistryFacade>,
+    principal: Arc<Principal>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -36,6 +38,7 @@ impl GetDatasetSchemaUseCase for GetDatasetSchemaUseCaseImpl {
         // Resolve source with ReBAC check
         let source = helpers::resolve_dataset_for_querying(
             self.rebac_dataset_registry_facade.as_ref(),
+            &self.principal,
             dataset_ref,
         )
         .await?;
@@ -52,6 +55,7 @@ impl GetDatasetSchemaUseCase for GetDatasetSchemaUseCaseImpl {
         // Resolve source with ReBAC check
         let source = helpers::resolve_dataset_for_querying(
             self.rebac_dataset_registry_facade.as_ref(),
+            &self.principal,
             dataset_ref,
         )
         .await?;
@@ -70,6 +74,7 @@ impl GetDatasetSchemaUseCase for GetDatasetSchemaUseCaseImpl {
         // Resolve source with ReBAC check
         let source = helpers::resolve_dataset_for_querying(
             self.rebac_dataset_registry_facade.as_ref(),
+            &self.principal,
             dataset_ref,
         )
         .await?;

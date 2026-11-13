@@ -82,6 +82,20 @@ pub enum PushIngestDataError {
     ),
 
     #[error(transparent)]
+    NotFound(
+        #[from]
+        #[backtrace]
+        odf::DatasetNotFoundError,
+    ),
+
+    #[error(transparent)]
+    Access(
+        #[from]
+        #[backtrace]
+        odf::AccessError,
+    ),
+
+    #[error(transparent)]
     Internal(#[from] InternalError),
 }
 

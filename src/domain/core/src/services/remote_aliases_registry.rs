@@ -20,19 +20,7 @@ pub trait RemoteAliasesRegistry: Send + Sync {
     async fn get_remote_aliases(
         &self,
         dataset_handle: &odf::DatasetHandle,
-    ) -> Result<Box<dyn RemoteAliases>, GetAliasesError>;
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Error, Debug)]
-pub enum GetAliasesError {
-    #[error(transparent)]
-    Internal(
-        #[from]
-        #[backtrace]
-        InternalError,
-    ),
+    ) -> Result<Box<dyn RemoteAliases>, InternalError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -49,11 +37,6 @@ pub trait RemoteAliasResolver: Send + Sync {
         dataset_handle: &odf::DatasetHandle,
         dataset_push_target_maybe: Option<odf::DatasetPushTarget>,
     ) -> Result<RemoteTarget, ResolveAliasError>;
-
-    async fn resolve_pull_url(
-        &self,
-        remote_ref: &odf::DatasetRefRemote,
-    ) -> Result<url::Url, ResolveAliasError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -116,9 +99,8 @@ impl From<GetRepoError> for ResolveAliasError {
 impl From<ResolveAliasError> for PushError {
     fn from(val: ResolveAliasError) -> Self {
         match val {
-            ResolveAliasError::AmbiguousAlias | ResolveAliasError::AmbiguousRepository => {
-                Self::AmbiguousTarget
-            }
+            ResolveAliasError::AmbiguousAlias => Self::AmbiguousTarget,
+            ResolveAliasError::AmbiguousRepository => Self::AmbiguousRepository,
             ResolveAliasError::EmptyRepositoryList => Self::NoTarget,
             ResolveAliasError::RepositoryNotFound(e) => Self::DestinationNotFound(e),
             ResolveAliasError::Internal(e) => Self::Internal(e),

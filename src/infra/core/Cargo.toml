@@ -54,6 +54,7 @@ query-extensions-nested-functions = [
 testing = [
     # Deps: kamu
     "dep:kamu-auth-rebac-services",
+    "dep:kamu-datasets-services",
     # Deps: 3-rd party
     "dep:bon",
     "dep:mockall",
@@ -136,6 +137,9 @@ serde_json = "1"
 serde_with = { version = "3", default-features = false }
 serde_yaml = { package = "serde_yaml_ng", version = "0.10", default-features = false }
 sha3 = "0.12"
+strum = { version = "0.28", features = [
+    "derive",
+] }
 tempfile = "3"
 thiserror = { version = "2", default-features = false, features = [
     "std",
@@ -181,6 +185,7 @@ datafusion-ethers = { optional = true, version = "~55.0", features = [
 ] }
 datafusion-functions-json = { optional = true, version = "0.55" }
 kamu-auth-rebac-services = { optional = true, workspace = true }
+kamu-datasets-services = { optional = true, workspace = true, default-features = false }
 mockall = { optional = true, version = "0.15", default-features = false }
 oop = { optional = true, version = "0.0.2" }
 rumqttc = { optional = true, version = "0.25", default-features = false, features = [

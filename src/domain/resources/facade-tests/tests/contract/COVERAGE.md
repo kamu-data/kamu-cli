@@ -95,6 +95,9 @@ Each `RF-*` contract scenario is listed with its status. Test code and comments 
 | RF-103 | search_any_type.rs | Active | search empty account returns empty result |  |
 | RF-104 | search_any_type.rs | Active | search narrowed by selectors: type subset + per-selector pattern | Pins per-selector type/pattern pairing, so a cross-wired selector list fails |
 | RF-105 | list_search.rs | Active | Per-selector `account` is authorized, and denial fails the whole call | Denial leaks nothing about the named account; one denied selector fails the call. Covers both `search_handles` and `search` |
+| RF-105B | list_search.rs | Active | An admin may search another account's resources | Local only: the admin is a predefined account outside `TestAccount` |
+| RF-105C | list_search.rs | Active | `Principal::Node` cannot search, even naming an account | Local only: the remote transport cannot express `Principal::Node`. The node has no account to default unscoped selectors to, and search always resolves that default |
+| RF-105D | list_search.rs | Active | `Principal::Node` without an account selector cannot search | Local only, as RF-105C; reported as an account selector problem |
 | RF-106 | list_search.rs | Active | Type-less selector scope limits (`UnrepresentableScopeError`) | `AnyType` limits: mixed with typed selectors, multiple query modes, and two type-less selectors naming different accounts. Asserted on message, not variant |
 | RF-107 | list_search.rs | Active | Typed list columns are rendered, across several types in one search | The schema-specific columns `kamu list` shows (`variables`, `secrets`), rendered across several types in one search |
 | RF-108 | batch_ops.rs | Active | One batch spans several types, and one account spelled several ways | Asserts positional indexes, so a fan-out that lost ordering fails |

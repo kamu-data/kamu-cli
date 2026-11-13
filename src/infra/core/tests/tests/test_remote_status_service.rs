@@ -15,10 +15,13 @@ use datafusion::arrow::datatypes::{DataType, Field, Schema};
 use dill::CatalogBuilder;
 use kamu::testing::{BaseRepoHarness, DummySmartTransferProtocolClient};
 use kamu::utils::ipfs_wrapper::IpfsClient;
+use kamu::utils::local_sync_writes::PulledSeedStore;
 use kamu::utils::simple_transfer_protocol::SimpleTransferProtocol;
 use kamu::{
+    IpfsServiceImpl,
     RemoteAliasResolverImpl,
     RemoteAliasesRegistryImpl,
+    RemoteDatasetUrlResolverImpl,
     RemoteReposDir,
     RemoteRepositoryRegistryImpl,
     RemoteStatusServiceImpl,
@@ -28,7 +31,11 @@ use kamu::{
 use kamu_core::utils::metadata_chain_comparator::CompareChainsResult;
 use kamu_core::*;
 use kamu_datasets::CreateDatasetResult;
-use kamu_datasets_services::{AppendDatasetMetadataBatchUseCaseImpl, DependencyGraphServiceImpl};
+use kamu_datasets_services::{
+    AppendDatasetMetadataBatchUseCaseImpl,
+    DatasetHeadCommitterImpl,
+    DependencyGraphServiceImpl,
+};
 use odf::dataset::{DatasetFactoryImpl, IpfsGateway};
 use odf::metadata::testing::MetadataFactory;
 use url::Url;
@@ -248,9 +255,11 @@ impl RemoteStatusTestHarness {
         let mut b = CatalogBuilder::new_chained(base_repo_harness.catalog());
         b.add::<RemoteStatusServiceImpl>()
             .add::<SyncServiceImpl>()
+            .add::<IpfsServiceImpl>()
             .add::<SyncRequestBuilder>()
             .add::<DatasetFactoryImpl>()
             .add::<RemoteAliasResolverImpl>()
+            .add::<RemoteDatasetUrlResolverImpl>()
             .add::<RemoteAliasesRegistryImpl>()
             .add::<odf::dataset::DummyOdfServerAccessTokenResolver>()
             .add_value(IpfsGateway::default())
@@ -259,7 +268,9 @@ impl RemoteStatusTestHarness {
             .add::<RemoteRepositoryRegistryImpl>()
             .add::<DummySmartTransferProtocolClient>()
             .add::<SimpleTransferProtocol>()
+            .add::<PulledSeedStore>()
             .add::<AppendDatasetMetadataBatchUseCaseImpl>()
+            .add::<DatasetHeadCommitterImpl>()
             .add::<DependencyGraphServiceImpl>();
 
         database_common::NoOpDatabasePlugin::init_database_components(&mut b);
@@ -289,12 +300,12 @@ impl RemoteStatusTestHarness {
         let remote = odf::DatasetRefRemote::from(&repo_url);
         let sync_request = self
             .sync_builder
-            .build_sync_request(handle.alias.as_any_ref(), remote.as_any_ref(), true)
+            .build_sync_request(handle.alias.as_local_ref(), remote.clone(), true)
             .await
             .unwrap();
 
         self.sync_service
-            .sync(
+            .sync_to(
                 sync_request,
                 SyncOptions {
                     trust_source: None,

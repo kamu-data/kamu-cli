@@ -10,7 +10,7 @@
 use internal_error::InternalError;
 use thiserror::Error;
 
-use crate::ClassifyByAllowanceDatasetActionUnauthorizedError;
+use crate::ClassifyByAllowanceDatasetPermissionError;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -74,7 +74,7 @@ pub struct DeleteDatasetPlanIssues {
     /// found), which are hard errors we can't proceed with even with --force.
     pub unauthorized_selected_handles: Vec<(
         odf::DatasetHandle,
-        ClassifyByAllowanceDatasetActionUnauthorizedError,
+        ClassifyByAllowanceDatasetPermissionError,
     )>,
 
     /// Downstream datasets pulled in by recursive expansion that we cannot
@@ -82,7 +82,7 @@ pub struct DeleteDatasetPlanIssues {
     /// `--force` is used.
     pub inaccessible_downstream_handles: Vec<(
         odf::DatasetHandle,
-        ClassifyByAllowanceDatasetActionUnauthorizedError,
+        ClassifyByAllowanceDatasetPermissionError,
     )>,
 
     /// Authorized targets whose direct downstream datasets will not be deleted
@@ -173,16 +173,16 @@ pub enum DeleteDatasetPlanEvaluationError {
 }
 
 fn classify_error_to_delete_plan_evaluation_error(
-    error: ClassifyByAllowanceDatasetActionUnauthorizedError,
+    error: ClassifyByAllowanceDatasetPermissionError,
 ) -> DeleteDatasetPlanEvaluationError {
     match error {
-        ClassifyByAllowanceDatasetActionUnauthorizedError::NotFound(e) => {
+        ClassifyByAllowanceDatasetPermissionError::NotFound(e) => {
             DeleteDatasetPlanEvaluationError::NotFound(e)
         }
-        ClassifyByAllowanceDatasetActionUnauthorizedError::Access(e) => {
+        ClassifyByAllowanceDatasetPermissionError::Access(e) => {
             DeleteDatasetPlanEvaluationError::Access(e)
         }
-        ClassifyByAllowanceDatasetActionUnauthorizedError::Internal(e) => {
+        ClassifyByAllowanceDatasetPermissionError::Internal(e) => {
             DeleteDatasetPlanEvaluationError::Internal(e)
         }
     }

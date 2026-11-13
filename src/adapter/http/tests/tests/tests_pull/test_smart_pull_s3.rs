@@ -54,6 +54,13 @@ test_client_server_s3_harness_permutations!(
 
 test_client_server_s3_harness_permutations!(
     test_smart_pull_shared,
+    test_smart_pull_existing_diverged_dataset_fails_without_force
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+test_client_server_s3_harness_permutations!(
+    test_smart_pull_shared,
     test_smart_pull_existing_advanced_dataset_fails
 );
 

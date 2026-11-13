@@ -9,16 +9,18 @@
 
 use std::sync::Arc;
 
-use super::{TransformElaborateError, TransformExecuteError, TransformResult};
-use crate::EngineProvisioningListener;
+use super::TransformResult;
+use crate::{EngineProvisioningListener, PullError};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Progress of a transform. The executor reports `begin`; the pull ends it
+/// with `success` once the result is committed, or with `error` for any
+/// failure of the job
 pub trait TransformListener: Send + Sync {
     fn begin(&self) {}
     fn success(&self, _result: &TransformResult) {}
-    fn elaborate_error(&self, _error: &TransformElaborateError) {}
-    fn execute_error(&self, _error: &TransformExecuteError) {}
+    fn error(&self, _error: &PullError) {}
 
     fn get_engine_provisioning_listener(
         self: Arc<Self>,
@@ -37,8 +39,5 @@ pub trait TransformMultiListener: Send + Sync {
         None
     }
 }
-
-pub struct NullTransformMultiListener;
-impl TransformMultiListener for NullTransformMultiListener {}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -58,16 +58,26 @@ impl DatasetTestHelper {
         dataset_ref: impl Into<odf::DatasetRef>,
         data_size: usize,
     ) -> odf::Multihash {
-        let tmp_dir = tempfile::tempdir().unwrap();
-
         let resolved_dataset = dataset_registry
             .get_dataset_by_ref(&dataset_ref.into())
             .await
             .unwrap();
 
+        Self::append_random_data_to(&**resolved_dataset, data_size).await
+    }
+
+    /// Appends a block claiming 10 records, with sample data and a random
+    /// checkpoint of `data_size` bytes, to a dataset opened directly, such as a
+    /// copy in a repository
+    pub async fn append_random_data_to(
+        dataset: &dyn odf::Dataset,
+        data_size: usize,
+    ) -> odf::Multihash {
+        let tmp_dir = tempfile::tempdir().unwrap();
+
         use odf::dataset::{MetadataChainExt, TryStreamExtExt};
 
-        let prev_data = resolved_dataset
+        let prev_data = dataset
             .as_metadata_chain()
             .iter_blocks()
             .filter_map_ok(|(_, b)| {
@@ -103,7 +113,7 @@ impl DatasetTestHelper {
             end: start + num_records - 1,
         };
 
-        resolved_dataset
+        dataset
             .commit_add_data(
                 odf::dataset::AddDataParams {
                     prev_checkpoint,

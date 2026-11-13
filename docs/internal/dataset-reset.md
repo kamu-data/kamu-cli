@@ -11,18 +11,22 @@
 
 ## Agent / newcomer quick-start
 
-**One-paragraph mental model.** Kamu has two unrelated mechanisms that are both called "reset".
-**Reset to a block** moves `HEAD` to a block that already exists in the dataset's block store, by
-default the `Seed`; nothing is rewritten. Usually the target is an ancestor and the chain simply
-ends earlier, but nothing checks that, so it can also select another branch
-([§5](#5-reset-to-a-block)). **Reset to metadata** keeps the dataset's
-definition and drops its data: it runs the hard compaction services with `keep_metadata_only`,
-which rebuild the chain on the original `Seed` from every metadata event except `AddData` and
-`ExecuteTransform`. A derivative reset to metadata recomputes from its inputs' first blocks; this
-is how derivatives recover after an input's history was rewritten. Neither deletes anything:
-abandoned blocks and data stay in storage. Every history rewrite moves `HEAD` to a block that is
-not a descendant of the old one, and the read models that follow `HEAD` (block index, statistics,
-search, dependency graph) detect that and rebuild; this page owns that behaviour for all rewrites.
+**At a glance.** Two unrelated mechanisms are both called "reset":
+
+- **Reset to a block** moves `HEAD` to a block already in the dataset's block store, by default the
+  `Seed`. Nothing is rewritten. The target is usually an ancestor, but nothing checks that, so it
+  can also select another branch ([§5](#5-reset-to-a-block)).
+- **Reset to metadata** keeps the dataset's definition and drops its data. It runs the hard
+  compaction services with `keep_metadata_only`, rebuilding the chain on the original `Seed` from
+  every event except `AddData` and `ExecuteTransform` ([§6](#6-reset-to-metadata)). This is how a
+  derivative recovers after an input's history was rewritten: it recomputes from its inputs' first
+  blocks.
+- **Neither deletes anything.** Abandoned blocks and data stay in storage.
+- **Every history rewrite** — reset, compaction, forced sync — leaves `HEAD` on a block that is not
+  a descendant of the old one. The read models that follow `HEAD` detect it and rebuild; this page
+  owns that behaviour ([§7](#7-after-a-history-rewrite)).
+- Both follow the shared plan, execute, commit shape
+  ([dataset-operations.md](dataset-operations.md)).
 
 **Where to start reading, by intent:**
 
@@ -33,21 +37,6 @@ search, dependency graph) detect that and rebuild; this page owns that behaviour
 | Understand what reset to metadata keeps | [§6 Reset to metadata](#6-reset-to-metadata) |
 | Know what any history rewrite does to indexes, statistics and caches | [§7 After a history rewrite](#7-after-a-history-rewrite) |
 | Find the file for X | [§10 Reference map](#10-filecrate-reference-map) |
-
----
-
-## Table of contents
-
-- [1. Purpose \& scope](#1-purpose--scope)
-- [2. ODF concepts](#2-odf-concepts)
-- [3. Layers and crates](#3-layers-and-crates)
-- [4. Entry points](#4-entry-points)
-- [5. Reset to a block](#5-reset-to-a-block)
-- [6. Reset to metadata](#6-reset-to-metadata)
-- [7. After a history rewrite](#7-after-a-history-rewrite)
-- [8. Errors and results](#8-errors-and-results)
-- [9. Testing \& gotchas](#9-testing--gotchas)
-- [10. File/crate reference map](#10-filecrate-reference-map)
 
 ---
 
@@ -94,7 +83,7 @@ latest block. The ideas reset relies on:
 | Services | `kamu` — [`src/infra/core/src/services/reset/`](../../src/infra/core/src/services/reset) | `ResetPlannerImpl`, `ResetExecutorImpl` |
 | Reset to metadata | `kamu` — compaction services | see [dataset-hard-compaction.md](dataset-hard-compaction.md#3-layers-and-crates) |
 | CLI | `kamu-cli` — [`reset_command.rs`](../../src/app/cli/src/commands/reset_command.rs) | `kamu reset` |
-| Task adapter | `kamu-adapter-task-dataset` | `ResetDatasetTaskPlanner` / `ResetDatasetTaskRunner`, `ResetToMetadataDatasetTaskPlanner` / `ResetDatasetToMetadataTaskRunner` |
+| Task adapter | `kamu-adapter-task-dataset` | `ResetDatasetTaskPlanner` / `ResetDatasetTaskRunner`, `CompactionDatasetTaskPlanner` / `CompactionDatasetTaskRunner` (both shared with hard compaction) |
 | Flow adapter | `kamu-adapter-flow-dataset` | `FlowControllerReset`, `FlowControllerResetToMetadata`, `FlowConfigRuleReset`, `DerivedDatasetFlowSensor` |
 | Read models that follow `HEAD` | `kamu-datasets-services` | `DatasetBlockUpdateHandler`, `DatasetStatisticsUpdateHandler`, `DatasetSearchUpdater`, `DependencyGraphImmediateListener` |
 
@@ -104,12 +93,12 @@ latest block. The ideas reset relies on:
 
 | Entry point | Mechanism | Authorization | `HEAD` swap |
 | --- | --- | --- | --- |
-| `kamu reset <dataset> <hash>` | reset to a block, via `ResetDatasetUseCase` | Maintain, in the use case | none, see [§5](#5-reset-to-a-block) |
-| GraphQL `runs.triggerResetFlow` | reset to a block (custom hash or `toSeed`), via the reset task | Maintain, checked by the mutation; the task runs as the system | none |
-| `kamu system compact --hard --keep-metadata-only <pattern>…` | reset to metadata, via `CompactDatasetUseCase` | Maintain, in the use case | CAS on the planned head |
+| `kamu reset <dataset> <hash>` | reset to a block, via `ResetDatasetUseCase` | Maintain (`Reset` through [`DatasetOperationGuard`](../../src/domain/datasets/domain/src/services/dataset_operation_guard.rs)), in the use case | CAS on the planned head, see [§5](#5-reset-to-a-block) |
+| GraphQL `runs.triggerResetFlow` | reset to a block (custom hash or `toSeed`), via the reset task | Maintain, checked by the mutation; the task runs as `Principal::Node` | CAS on the planned head |
+| `kamu system compact --hard --keep-metadata-only <pattern>…` | reset to metadata, via `CompactDatasetUseCase` | Maintain (`ResetToMetadata`), in the use case | CAS on the planned head |
 | GraphQL `runs.triggerResetToMetadataFlow` | reset to metadata, via the reset-to-metadata task | Maintain, checked by the mutation | CAS on the planned head |
-| `DerivedDatasetFlowSensor` with the `Recover` rule | reset to metadata of a derivative whose input broke | the downstream owner's opt-in; runs as the system | CAS on the planned head |
-| `kamu pull --reset-derivatives-on-diverged-input` | reset to metadata during transform elaboration | Write, as for any pull job | CAS on the planned head |
+| `DerivedDatasetFlowSensor` with the `Recover` rule | reset to metadata of a derivative whose input broke | the downstream owner's opt-in; runs as `Principal::Node` ([identity.md](identity.md#background-work-runs-as-the-node)) | CAS on the planned head |
+| `kamu pull --reset-derivatives-on-diverged-input` | reset to metadata by the pull use case when elaboration finds a diverged input, before elaborating again | Maintain (`ResetToMetadata`), checked by the transform job before it resets ([dataset-pull.md](dataset-pull.md#7-authorization)) | CAS on the planned head |
 
 Reset flows run only when triggered, or (reset to metadata) when a sensor recovers from a breaking
 change. The GraphQL preconditions, configuration and trigger rules are owned by
@@ -125,6 +114,15 @@ afterwards.
 
 ## 5. Reset to a block
 
+```mermaid
+flowchart LR
+    S[Seed] --> B1[block 1] --> B2[block 2] --> B3[block 3]
+    OLD(["HEAD before"]) -.-> B3
+    NEW(["HEAD after reset to block 1"]) -.-> B1
+```
+
+Blocks 2 and 3 are not deleted; another reset can move `HEAD` back to block 3.
+
 **Plan.** `ResetPlannerImpl::plan_reset` takes an optional new head and an optional expected old
 head:
 
@@ -133,17 +131,16 @@ head:
   `OldHeadMismatch`;
 - the result is `ResetPlan { old_head: current head, new_head }`.
 
-The planner does not check that the new head is an ancestor of the current one.
+The new head need not be an ancestor of the current one: any block in the dataset's block store is
+a target. That is how a breaking change is undone, since a compaction or an earlier reset leaves
+the blocks it replaced stored but outside the history of `HEAD`.
 
-**Execute.** `ResetExecutorImpl::execute` calls `set_ref(Head, new_head)` with
-`validate_block_present: true` and `check_ref_is: None`. "Present" means the block exists in the
-dataset's block store, which also holds blocks no longer reachable from `HEAD` (from an earlier
-reset, compaction, or an attempt that lost its `HEAD` swap). With no expected value, the
-database-backed reference repository uses the dataset's cached reference as the expected head. In
-the CLI the planner and executor share one resolved dataset, so that is the head the planner read
-and a concurrent move fails as `CASFailed`; the reset task re-resolves the dataset in a new
-transaction, reads the current head, and overwrites a move that landed after planning without an
-error ([task-system.md](task-system.md#73-reset)).
+**Execute.** `ResetExecutorImpl::execute` moves `HEAD` from the plan's `old_head` to its
+`new_head` through `DatasetHeadCommitter`, which checks that the new block is present. "Present"
+means the block exists in the dataset's block store, which also holds blocks no longer reachable
+from `HEAD` (from an earlier reset, compaction, or an attempt that lost its `HEAD` swap). A `HEAD`
+moved after planning fails the swap as `SetReferenceFailed(CASFailed)` and nothing changes, in the
+CLI and in the reset task alike ([task-system.md](task-system.md#73-reset)).
 
 Nothing else changes: no block is written, and data, checkpoints and blocks after the new head
 stay in storage. The dataset's watermark, offsets, checkpoint and source state are whatever the
@@ -152,6 +149,22 @@ target block's history recorded, so the next ingest or transform continues from 
 ---
 
 ## 6. Reset to metadata
+
+```mermaid
+flowchart TB
+    subgraph Before["Before"]
+        direction LR
+        A0[Seed] --> A1[SetTransform] --> A2[SetDataSchema] --> A3[ExecuteTransform] --> A4[SetInfo] --> A5["ExecuteTransform<br/>HEAD"]
+    end
+    subgraph After["After"]
+        direction LR
+        B0[Seed] --> B1["SetTransform′"] --> B2["SetDataSchema′"] --> B4["SetInfo′<br/>HEAD"]
+    end
+    Before ~~~ After
+```
+
+A derivative loses its `ExecuteTransform` blocks, a root its `AddData` blocks; `′` marks a block
+re-committed with the same event but a new hash.
 
 Reset to metadata runs `CompactionPlanner::plan_compaction` with `keep_metadata_only: true` and
 `CompactionExecutor::execute`; the compaction page owns the chain walk and the rebuild
@@ -186,6 +199,17 @@ of the current head move `HEAD` off the previous head's line. On database-backed
 `DatasetReferenceMessage::Updated` with the previous and new heads in the same transaction. The
 consumers handle a rewrite as follows:
 
+```mermaid
+flowchart LR
+    MOVE["HEAD moves off<br/>the old line"] --> MSG[("DatasetReferenceMessage::Updated")]
+    MSG --> IDX["Block index:<br/>divergence, re-save chain"]
+    IDX --> KEY[("DatasetKeyBlocksMessage")]
+    KEY --> DEP["Dependency graph"]
+    MSG --> STATS["Statistics: recompute"]
+    MSG --> SEARCH["Search: full reindex"]
+    MSG --> REF["Storage reference file"]
+```
+
 | Consumer | On a rewrite |
 | --- | --- |
 | Storage-level reference file | written from the message like any other update |
@@ -196,7 +220,7 @@ consumers handle a rewrite as follows:
 | Flows | a flow-driven reset or compaction reports `Breaking` through its controller; a forced smart-protocol push through `FlowDatasetsEventBridge` ([flow-system.md](flow-system.md#8-sensors-and-propagation)). `kamu reset` and `kamu system compact` notify no flow |
 | Derivatives | their next transform finds the consumed block missing from the input's history ([derived-dataset-transform.md](derived-dataset-transform.md#7-diverged-inputs)) |
 | Remote copies | push and pull refuse to continue, each protocol reporting it its own way; after a reset to an ancestor, a pull from an unchanged remote fast-forwards back; `--force` overwrites ([dataset-sync.md](dataset-sync.md#11-committing-validation-and-errors)) |
-| Polling ingest savepoints | not touched. Savepoints are keyed by fetch step and previous source state, so rewinding the source state can make an older savepoint match again, and the next ingest resumes from it; when a savepoint is ignored is owned by [root-dataset-ingest.md](root-dataset-ingest.md#53-savepoints) |
+| Polling ingest savepoints | not touched. Savepoints are keyed by fetch step and previous source state, so rewinding the source state can make an older savepoint match again, and the next ingest resumes from it; when a savepoint is ignored is owned by [polling-ingest.md](polling-ingest.md#6-savepoints) |
 
 ---
 
@@ -207,7 +231,9 @@ consumers handle a rewrite as follows:
 | `ResetError::NotFound`, `Access` | use case | the dataset is missing, or the caller lacks Maintain |
 | `ResetPlanningError::OldHeadMismatch` | planner | the head changed since the caller looked |
 | `ResetExecutionError::SetReferenceFailed(BlockNotFound)` | executor | the target block is not in the dataset's block store |
-| `ResetExecutionError::SetReferenceFailed(…)`, `Internal` | executor | storage or database failure, or a lost compare-and-swap (`CASFailed`) |
+| `ResetExecutionError::SetReferenceFailed(CASFailed)` | executor | `HEAD` moved after planning |
+| `ResetExecutionError::SetReferenceFailed(Access)` | executor | moving `HEAD` is not allowed |
+| `ResetExecutionError::SetReferenceFailed(Internal)` | executor | storage or database failure |
 
 `ResetResult { old_head, new_head }` reports the head the planner read and the new head. The CLI
 prints errors as failures; task and GraphQL mappings are owned by
@@ -248,7 +274,7 @@ prints errors as failures; task and GraphQL mappings are owned by
 | Planner and executor | [`reset_planner_impl.rs`](../../src/infra/core/src/services/reset/reset_planner_impl.rs), [`reset_executor_impl.rs`](../../src/infra/core/src/services/reset/reset_executor_impl.rs) |
 | Use case | [`reset_dataset_use_case.rs`](../../src/domain/core/src/use_cases/reset_dataset_use_case.rs), [`reset_dataset_use_case_impl.rs`](../../src/infra/core/src/use_cases/reset_dataset_use_case_impl.rs) |
 | CLI | [`reset_command.rs`](../../src/app/cli/src/commands/reset_command.rs), `Reset` in [`cli.rs`](../../src/app/cli/src/cli.rs) |
-| Task planners and runners | [`reset_dataset_task_planner.rs`](../../src/adapter/task-dataset/src/planners/reset_dataset_task_planner.rs), [`reset_dataset_task_runner.rs`](../../src/adapter/task-dataset/src/runners/reset_dataset_task_runner.rs), [`reset_to_metadata_dataset_task_planner.rs`](../../src/adapter/task-dataset/src/planners/reset_to_metadata_dataset_task_planner.rs), [`reset_dataset_to_metadata_runner.rs`](../../src/adapter/task-dataset/src/runners/reset_dataset_to_metadata_runner.rs) |
+| Task planners and runners | [`reset_dataset_task_planner.rs`](../../src/adapter/task-dataset/src/planners/reset_dataset_task_planner.rs), [`reset_dataset_task_runner.rs`](../../src/adapter/task-dataset/src/runners/reset_dataset_task_runner.rs), [`compaction_dataset_task_planner.rs`](../../src/adapter/task-dataset/src/planners/compaction_dataset_task_planner.rs), [`compaction_dataset_task_runner.rs`](../../src/adapter/task-dataset/src/runners/compaction_dataset_task_runner.rs) |
 | Flow controllers | [`flow_controller_reset.rs`](../../src/adapter/flow-dataset/src/flow_controllers/flow_controller_reset.rs), [`flow_controller_reset_to_metadata.rs`](../../src/adapter/flow-dataset/src/flow_controllers/flow_controller_reset_to_metadata.rs) |
 | Block index, statistics, search, dependency graph after a rewrite | [`dataset_block_update_handler.rs`](../../src/domain/datasets/services/src/services/blocks/dataset_block_update_handler.rs), [`dataset_statistics_update_handler.rs`](../../src/domain/datasets/services/src/services/statistics/dataset_statistics_update_handler.rs), [`dataset_statistics_helper.rs`](../../src/domain/datasets/services/src/services/statistics/dataset_statistics_helper.rs), [`dataset_search_updater.rs`](../../src/domain/datasets/services/src/search/dataset_search_updater.rs), [`dataset_search_indexer.rs`](../../src/domain/datasets/services/src/search/dataset_search_indexer.rs), [`dependency_graph_immediate_listener.rs`](../../src/domain/datasets/services/src/services/graph/dependency_graph_immediate_listener.rs) |
 | Dependency extraction | [`dependency_extraction_helper.rs`](../../src/domain/datasets/services/src/services/graph/dependency_extraction_helper.rs) |

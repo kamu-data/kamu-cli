@@ -11,11 +11,11 @@ use std::sync::Arc;
 
 use internal_error::*;
 use kamu_accounts::{
-    CurrentAccountSubject,
     DidEntity,
     DidSecretEncryptionConfig,
     DidSecretKey,
     DidSecretKeyRepository,
+    Principal,
 };
 use kamu_core::DidGenerator;
 use kamu_datasets::{
@@ -34,7 +34,7 @@ use crate::utils::CreateDatasetUseCaseHelper;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct CreateDatasetFromSnapshotUseCaseImpl {
-    current_account_subject: Arc<CurrentAccountSubject>,
+    principal: Arc<Principal>,
     system_time_source: Arc<dyn SystemTimeSource>,
     did_generator: Arc<dyn DidGenerator>,
     dataset_registry: Arc<dyn DatasetRegistry>,
@@ -54,7 +54,7 @@ impl CreateDatasetFromSnapshotUseCaseImpl {
         reason = "dill passes injected dependencies by value"
     )]
     pub fn new(
-        current_account_subject: Arc<CurrentAccountSubject>,
+        principal: Arc<Principal>,
         system_time_source: Arc<dyn SystemTimeSource>,
         did_generator: Arc<dyn DidGenerator>,
         dataset_registry: Arc<dyn DatasetRegistry>,
@@ -64,7 +64,7 @@ impl CreateDatasetFromSnapshotUseCaseImpl {
         rebac_svc: dill::Lazy<Arc<dyn kamu_auth_rebac::RebacService>>,
     ) -> Self {
         Self {
-            current_account_subject,
+            principal,
             system_time_source,
             did_generator,
             dataset_registry,
@@ -94,10 +94,16 @@ impl CreateDatasetFromSnapshotUseCase for CreateDatasetFromSnapshotUseCaseImpl {
             "Initiating creation of dataset from snapshot"
         );
 
-        // There must be a logged-in user
-        let subject = match self.current_account_subject.as_ref() {
-            CurrentAccountSubject::Logged(subj) => subj,
-            CurrentAccountSubject::Anonymous(_) => {
+        let principal_account = match self.principal.as_ref() {
+            Principal::User(account) => account,
+            Principal::Node => {
+                return Err(CreateDatasetFromSnapshotError::Access(
+                    odf::AccessError::Unauthorized(
+                        "The node has no account to own a dataset".into(),
+                    ),
+                ));
+            }
+            Principal::Anonymous => {
                 panic!("Anonymous account cannot create dataset");
             }
         };
@@ -112,7 +118,7 @@ impl CreateDatasetFromSnapshotUseCase for CreateDatasetFromSnapshotUseCaseImpl {
         // Resolve a target account and full alias of the dataset
         let (canonical_alias, target_account_id) = self
             .create_helper
-            .resolve_alias_target(&snapshot.name, subject)?;
+            .resolve_alias_target(&snapshot.name, principal_account)?;
 
         let dataset_did = self.did_generator.generate_dataset_id();
         // Make a seed block
@@ -135,7 +141,7 @@ impl CreateDatasetFromSnapshotUseCase for CreateDatasetFromSnapshotUseCaseImpl {
                 DidSecretKey::try_new(&dataset_did.1, did_secret_encryption_key.expose_secret())
                     .int_err()?;
 
-            // Note: subject and target might be two different accounts, but we use subject
+            // Note: principal and target might be two different accounts, but we use the principal
             // here as the creator of the key
             self.did_secret_key_repo
                 .save_did_secret_key(
@@ -168,17 +174,17 @@ impl CreateDatasetFromSnapshotUseCase for CreateDatasetFromSnapshotUseCaseImpl {
         .await?;
 
         // TODO: HACK: SEC: When creating a dataset under another account we currently
-        // give subject a "maintainer" role on it. In future this should be refactored
+        // give the principal a "maintainer" role on it. In future this should be refactored
         // into organization-level permissions.
         //
         // See: https://github.com/kamu-data/kamu-node/issues/233
-        if target_account_id != subject.account_handle.did {
+        if target_account_id != principal_account.did {
             let _ = self
                 .rebac_svc
                 .get()
                 .int_err()?
                 .set_account_dataset_relation(
-                    &subject.account_handle.did,
+                    &principal_account.did,
                     kamu_auth_rebac::AccountToDatasetRelation::Maintainer,
                     &store_result.dataset_id,
                 )

@@ -54,9 +54,10 @@ creates its own lightweight per-channel handle (`HubWakeupListener`) onto the ba
 
 ## 1. Purpose & scope
 
-Agents used to poll with a fixed interval, issuing a transaction and a query every second even when
-idle — noisy for the database and for telemetry. Wakeup listeners replace that with
-"sleep until something might have changed", keeping a slow fallback timeout as a safety net.
+A wakeup listener lets an agent sleep until its data might have changed, so an idle agent issues
+no transaction and no query; a slow fallback timeout is the safety net. Polling at a fixed interval
+would query the database every second even when idle, which is noisy for the database and for
+telemetry.
 
 In scope: the `WakeupListener` abstraction, the hubs behind it, its three storage implementations, the Postgres triggers that feed
 it, and how the four agents use it. Out of scope: what the agents do once awake (outbox routing —
@@ -139,14 +140,8 @@ loop {
 - **The sleep uses `SystemTimeSource`**, not a tokio timer, so tests on a fake clock control it.
 - **Cancelling `wait_wake` in `select!` is safe**: a signal it consumed was committed before, and the
   next iteration re-reads storage anyway.
-- **Activations run in pages.** A pass pages through flows due by its start time,
-  `batching.flowActivations` at a time, each page listed and loaded in one transaction. Each flow is
-  then activated in its own transaction, one by one in `(activation moment, flow ID)` order: an
-  activation is a few writes, and a single task agent runs the resulting tasks anyway. Pages continue after the last key seen rather than from the
-  first due flow: failed flows stay due and would otherwise fill every page. A flow changed after loading fails to save as a concurrent
-  modification, and only its own transaction (including its new task) rolls back.
-- **Failed activations don't spin.** A flow still due right after a pass failed to activate; it is
-  retried after `awaiting_step`. Other flows are not blocked by it.
+- How a pass pages through due flows and retries a failed activation is in
+  [flow-system.md](flow-system.md#main-loop).
 
 ### Hubs and handles
 
@@ -239,9 +234,10 @@ flowchart LR
     HUB -- flow_activation_scheduled --> L4[listener handle] --> A4[FlowAgent]
 ```
 
-**`PostgresNotificationHub`** (dill `Singleton`, depends only on the pool) owns one `PgListener`
-checked out of the pool, `LISTEN`ing on every subscribed channel. A background task, spawned on the first
-subscription, routes each notification to the subscribers of its channel.
+**`PostgresNotificationHub`** (dill `Singleton`, depends on the pool and `WakeupListenerMetrics`)
+owns one `PgListener` checked out of the pool, `LISTEN`ing on every subscribed channel. A
+background task, spawned on the first subscription, routes each notification to the subscribers of
+its channel.
 
 Bridges hold a `HubWakeupListener<PostgresNotificationHub>` for their channel (see
 [Hubs and handles](#hubs-and-handles)).
@@ -358,15 +354,8 @@ backgroundAgents:
 - `batching` — records processed per transaction; for the flow agent, due flows loaded per page.
   The task agent has no entry: it claims and runs one task at a time (its analogue would be
   concurrency, not batching).
-- `concurrency` — defaults to 1, as SQLite has a single connection: more would only queue on it,
-  and an outbox consumer timing out on it stays failed until restart. Postgres deployments raise
-  it (`production_default()`: 8).
-- `concurrency.outboxConsumers` — outbox consumers handling messages at once, across all producers,
-  each in its own transaction. Messages of one producer are still handled in order: all consumers
-  finish message N before any gets N+1. Without a limit, a burst over several producers could
-  demand more connections than the pool has. The limit, the flow, task and flow system event agents
-  (one each), the hub's `LISTEN` connection and API requests all share one pool, so keep their sum
-  in mind when sizing `database.maxConnections` (default `20`).
+- `batching.outboxMessages` and `concurrency.outboxConsumers` — see
+  [outbox.md](outbox.md#8-configuration--metrics).
 - Internal constants: Postgres reconnect retry `1s` (`postgres_notification_hub.rs`), SQLite poll
   floor `10ms` (`sqlite_polling_hub.rs`).
 

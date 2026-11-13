@@ -8,5 +8,8 @@
 // by the Apache License, Version 2.0.
 
 mod test_dataset_entry_service_impl;
+mod test_dataset_head_committer_impl;
 mod test_dataset_increment_query_service_impl;
+mod test_dataset_operation_guard_impl;
 mod test_dependency_graph_service_impl;
+mod test_metadata_chain_ref_repo_db_backed_impl;

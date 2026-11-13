@@ -15,7 +15,8 @@ use datafusion::prelude::*;
 use indoc::indoc;
 use kamu::domain::*;
 use kamu::*;
-use kamu_datasets::{DatasetRegistry, MockDatasetActionAuthorizer, ResolvedDataset};
+use kamu_accounts::Principal;
+use kamu_datasets::{DatasetRegistry, MockDatasetPermissionChecker, ResolvedDataset};
 use kamu_ingest_datafusion::{DataWriterDataFusion, ReaderCsv};
 use odf::dataset::testing::create_test_dataset_from_snapshot;
 use odf::metadata::testing::MetadataFactory;
@@ -1238,14 +1239,14 @@ impl ToTableHarness {
             .map(|name| Self::dataset_id(name))
             .collect::<HashSet<_>>();
 
-        Self::with_authorizer(MockDatasetActionAuthorizer::denying_ids(denied_ids))
+        Self::with_permission_checker(MockDatasetPermissionChecker::denying_ids(denied_ids))
     }
 
-    fn with_authorizer(dataset_action_authorizer: MockDatasetActionAuthorizer) -> Self {
+    fn with_permission_checker(dataset_permission_checker: MockDatasetPermissionChecker) -> Self {
         let temp_dir = tempfile::tempdir().unwrap();
         let base_catalog = helpers::create_base_catalog_with_local_workspace(
             temp_dir.path(),
-            dataset_action_authorizer,
+            dataset_permission_checker,
         );
 
         let catalog = dill::CatalogBuilder::new_chained(&base_catalog)
@@ -1398,7 +1399,7 @@ impl ToTableHarness {
 
     async fn sql(&self, statement: &str) -> odf::utils::data::DataFrameExt {
         self.query_svc
-            .sql_statement(statement, QueryOptions::default())
+            .sql_statement(&Principal::new_test(), statement, QueryOptions::default())
             .await
             .unwrap()
             .df
@@ -1406,14 +1407,18 @@ impl ToTableHarness {
 
     async fn sql_state(&self, statement: &str) -> QueryState {
         self.query_svc
-            .sql_statement(statement, QueryOptions::default())
+            .sql_statement(&Principal::new_test(), statement, QueryOptions::default())
             .await
             .unwrap()
             .state
     }
 
     async fn sql_query_error(&self, statement: &str, options: QueryOptions) -> QueryError {
-        let Err(err) = self.query_svc.sql_statement(statement, options).await else {
+        let Err(err) = self
+            .query_svc
+            .sql_statement(&Principal::new_test(), statement, options)
+            .await
+        else {
             panic!("Expected statement to fail: {statement}");
         };
         err
@@ -1427,7 +1432,7 @@ impl ToTableHarness {
     /// Runs the statement in a session of the kind `FlightSQL` and the SQL shell use
     async fn session_sql(&self, statement: &str) -> odf::utils::data::DataFrameExt {
         self.query_svc
-            .create_session()
+            .create_session(&Principal::new_test())
             .await
             .unwrap()
             .sql(statement)
@@ -1438,7 +1443,11 @@ impl ToTableHarness {
 
     /// Error messages of a statement failing in a session, including all their sources
     async fn session_sql_error(&self, statement: &str) -> String {
-        let session = self.query_svc.create_session().await.unwrap();
+        let session = self
+            .query_svc
+            .create_session(&Principal::new_test())
+            .await
+            .unwrap();
         let Err(err) = session.sql(statement).await else {
             panic!("Expected statement to fail: {statement}");
         };
@@ -1471,7 +1480,7 @@ impl ToTableHarness {
         options: QueryOptions,
     ) -> odf::utils::data::DataFrameExt {
         self.query_svc
-            .sql_statement(statement, options)
+            .sql_statement(&Principal::new_test(), statement, options)
             .await
             .unwrap()
             .df
@@ -1486,6 +1495,7 @@ impl ToTableHarness {
     ) -> odf::utils::data::DataFrameExt {
         self.query_svc
             .sql_statement(
+                &Principal::new_test(),
                 statement,
                 QueryOptions {
                     input_datasets: Some(BTreeMap::from([(

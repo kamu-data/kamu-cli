@@ -47,9 +47,9 @@ impl BaseGQLFlowHarness {
     }
 
     pub fn catalog_for_subject(&self, subject: CurrentAccountSubject) -> dill::Catalog {
-        dill::CatalogBuilder::new_chained(&self.catalog_no_subject)
-            .add_value(subject)
-            .build()
+        let mut b = dill::CatalogBuilder::new_chained(&self.catalog_no_subject);
+        subject.register(&mut b);
+        b.build()
     }
 
     pub fn make_base_gql_flow_catalog(base_catalog: &dill::Catalog) -> dill::Catalog {
@@ -71,7 +71,6 @@ impl BaseGQLFlowHarness {
 
     pub fn logged_account_id(&self) -> odf::AccountID {
         self.logged_account_from_catalog(&self.catalog_authorized)
-            .account_handle
             .did
     }
 

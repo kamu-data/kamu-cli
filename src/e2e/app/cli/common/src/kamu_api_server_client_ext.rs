@@ -122,6 +122,34 @@ pub static DATASET_DERIVATIVE_LEADERBOARD_SNAPSHOT: LazyLock<String> = LazyLock:
 pub static DATASET_DERIVATIVE_LEADERBOARD_NAME: LazyLock<odf::DatasetName> =
     LazyLock::new(|| odf::DatasetName::new_unchecked("leaderboard"));
 
+/// The query of `DATASET_DERIVATIVE_LEADERBOARD_SNAPSHOT_STR`, for a
+/// `SetTransform` that changes only the leaderboard's input
+pub const DATASET_DERIVATIVE_LEADERBOARD_QUERY: &str =
+    "SELECT ROW_NUMBER() OVER (PARTITION BY 1 ORDER BY score DESC) AS place, match_time, \
+     match_id, player_id, score FROM player_scores LIMIT 2";
+
+/// `SetTransform` event that replaces the leaderboard's transform with
+/// `query`, reading `input_id` as `player_scores`
+pub fn leaderboard_set_transform_event(input_id: &odf::DatasetID, query: &str) -> String {
+    indoc::formatdoc!(
+        r#"
+        kind: MetadataEvent
+        version: 1
+        content:
+          kind: SetTransform
+          inputs:
+            - datasetRef: {}
+              alias: player_scores
+          transform:
+            kind: Sql
+            engine: datafusion
+            queries:
+              - query: "{query}"
+        "#,
+        input_id.as_did_str()
+    )
+}
+
 /// Root dataset `root-dataset`, polling CSV chunks of city populations from
 /// the files matching `<chunks_glob>`
 pub const DATASET_ROOT_CITY_POPULATION_SNAPSHOT_STR: &str = indoc::indoc!(
@@ -190,6 +218,34 @@ pub static DATASET_DERIVATIVE_CITY_POPULATION_SNAPSHOT: LazyLock<String> = LazyL
         .to_string()
 });
 
+/// Root dataset `dataset_name` appending CSV rows of `city` and `population`
+/// from a polling source whose fetch step is the YAML flow mapping `fetch`
+pub fn city_population_root_snapshot(dataset_name: &str, fetch: &str) -> String {
+    indoc::formatdoc!(
+        r#"
+        kind: DatasetSnapshot
+        version: 1
+        content:
+          name: {dataset_name}
+          kind: Root
+          metadata:
+            - kind: SetPollingSource
+              fetch: {fetch}
+              read:
+                kind: Csv
+                header: true
+                schema:
+                  fields:
+                    - name: city
+                      type: String
+                    - name: population
+                      type: Int64
+              merge:
+                kind: Append
+        "#
+    )
+}
+
 pub static E2E_USER_ACCOUNT_NAME: LazyLock<odf::AccountName> =
     LazyLock::new(|| odf::AccountName::new_unchecked(E2E_USER_ACCOUNT_NAME_STR));
 
@@ -248,6 +304,8 @@ pub trait KamuApiServerClientExt {
 
     fn swagger(&self) -> SwaggerApi<'_>;
 
+    fn system(&self) -> SystemApi<'_>;
+
     fn upload(&self) -> UploadApi<'_>;
 
     fn webhook(&self) -> WebhookApi<'_>;
@@ -291,6 +349,10 @@ impl KamuApiServerClientExt for KamuApiServerClient {
 
     fn swagger(&self) -> SwaggerApi<'_> {
         SwaggerApi { client: self }
+    }
+
+    fn system(&self) -> SystemApi<'_> {
+        SystemApi { client: self }
     }
 
     fn upload(&self) -> UploadApi<'_> {
@@ -941,6 +1003,99 @@ impl DatasetApi<'_> {
             .await;
     }
 
+    /// Ingests the file of an upload and returns the response status
+    pub async fn ingest_upload(
+        &self,
+        dataset_alias: &odf::DatasetAlias,
+        upload_context: &UploadContext,
+    ) -> StatusCode {
+        let query_params =
+            serde_urlencoded::to_string([("uploadToken", upload_context.upload_token.to_string())])
+                .unwrap();
+
+        self.client
+            .rest_api_call(
+                Method::POST,
+                &format!("{dataset_alias}/ingest?{query_params}"),
+                None,
+            )
+            .await
+            .status()
+    }
+
+    /// Advances the watermark without data; the new block carries the source
+    /// state over
+    pub async fn set_watermark(&self, dataset_id: &odf::DatasetID, watermark: DateTime<Utc>) {
+        let response = self
+            .client
+            .graphql_api_call(
+                indoc::indoc!(
+                    r#"
+                    mutation {
+                      datasets {
+                        byId(datasetId: "<dataset_id>") {
+                          setWatermark(watermark: "<watermark>") {
+                            __typename
+                          }
+                        }
+                      }
+                    }
+                    "#,
+                )
+                .replace("<dataset_id>", &dataset_id.as_did_str().to_stack_string())
+                .replace("<watermark>", &watermark.to_rfc3339())
+                .as_str(),
+                None,
+            )
+            .await
+            .data();
+
+        pretty_assertions::assert_eq!(
+            "SetWatermarkUpdated",
+            response["datasets"]["byId"]["setWatermark"]["__typename"]
+                .as_str()
+                .unwrap()
+        );
+    }
+
+    pub async fn commit_event(&self, dataset_id: &odf::DatasetID, event_yaml: &str) {
+        let response = self
+            .client
+            .graphql_api_call(
+                indoc::indoc!(
+                    r#"
+                    mutation ($event: String!) {
+                      datasets {
+                        byId(datasetId: "<dataset_id>") {
+                          metadata {
+                            chain {
+                              commitEvent(event: $event, eventFormat: YAML) {
+                                __typename
+                                message
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                    "#,
+                )
+                .replace("<dataset_id>", &dataset_id.as_did_str().to_stack_string())
+                .as_str(),
+                Some(serde_json::json!({ "event": event_yaml })),
+            )
+            .await
+            .data();
+
+        pretty_assertions::assert_eq!(
+            "CommitResultSuccess",
+            response["datasets"]["byId"]["metadata"]["chain"]["commitEvent"]["__typename"]
+                .as_str()
+                .unwrap(),
+            "{response}"
+        );
+    }
+
     pub async fn tail_data(&self, dataset_id: &odf::DatasetID) -> String {
         let tail_response = self
             .client
@@ -977,6 +1132,11 @@ impl DatasetApi<'_> {
             .as_str()
             .map(ToOwned::to_owned)
             .unwrap()
+    }
+
+    /// Hashes of the dataset's blocks, in the order of [`Self::blocks`]
+    pub async fn block_hashes(&self, dataset_id: &odf::DatasetID) -> Vec<odf::Multihash> {
+        self.blocks(dataset_id).await.block_hashes()
     }
 
     pub async fn blocks(&self, dataset_id: &odf::DatasetID) -> DatasetBlocksResponse {
@@ -1442,6 +1602,12 @@ pub struct DatasetBlocksResponse {
     pub blocks: Vec<DatasetBlock>,
 }
 
+impl DatasetBlocksResponse {
+    pub fn block_hashes(&self) -> Vec<odf::Multihash> {
+        self.blocks.iter().map(|b| b.block_hash.clone()).collect()
+    }
+}
+
 #[derive(Debug, Deserialize, PartialEq, Eq)]
 pub struct AccountDataset {
     pub id: odf::DatasetID,
@@ -1642,6 +1808,17 @@ impl FlowApi<'_> {
         dataset_id: &odf::DatasetID,
         mutation_name: &str,
     ) -> FlowTriggerResponse {
+        self.trigger_flow_with(dataset_id, mutation_name, "").await
+    }
+
+    /// `arguments` is the mutation's argument list with its parentheses, or
+    /// empty
+    async fn trigger_flow_with(
+        &self,
+        dataset_id: &odf::DatasetID,
+        mutation_name: &str,
+        arguments: &str,
+    ) -> FlowTriggerResponse {
         let mutation = format!(
             r#"
             mutation {{
@@ -1649,7 +1826,7 @@ impl FlowApi<'_> {
                 byId(datasetId: "<dataset_id>") {{
                   flows {{
                     runs {{
-                      {mutation_name} {{
+                      {mutation_name}{arguments} {{
                         message
                         ... on TriggerFlowSuccess {{
                           flow {{
@@ -1684,8 +1861,34 @@ impl FlowApi<'_> {
         self.trigger_flow(dataset_id, "triggerIngestFlow").await
     }
 
+    /// Triggers an ingest that fetches even a source without source state
+    pub async fn trigger_ingest_fetching_uncacheable(
+        &self,
+        dataset_id: &odf::DatasetID,
+    ) -> FlowTriggerResponse {
+        self.trigger_flow_with(
+            dataset_id,
+            "triggerIngestFlow",
+            "(ingestConfigInput: { fetchUncacheable: true, fetchNextIteration: false })",
+        )
+        .await
+    }
+
     pub async fn trigger_transform(&self, dataset_id: &odf::DatasetID) -> FlowTriggerResponse {
         self.trigger_flow(dataset_id, "triggerTransformFlow").await
+    }
+
+    /// Triggers a transform flow and waits for it to finish
+    pub async fn run_transform(&self, dataset_id: &odf::DatasetID) -> FlowSummary {
+        let FlowTriggerResponse::Success(flow_id) = self.trigger_transform(dataset_id).await else {
+            panic!("Transform flow was not triggered");
+        };
+        let flow_id = flow_id.to_string();
+
+        self.wait_for_flow(dataset_id, |flow| {
+            flow.flow_id == flow_id && flow.status == "FINISHED"
+        })
+        .await
     }
 
     pub async fn trigger_compaction(&self, dataset_id: &odf::DatasetID) -> FlowTriggerResponse {
@@ -1802,6 +2005,7 @@ impl FlowApi<'_> {
         &self,
         dataset_id: &odf::DatasetID,
         fetch_uncacheable: bool,
+        fetch_next_iteration: bool,
         retry_max_attempts: u32,
     ) {
         let mutation = indoc::indoc!(
@@ -1814,7 +2018,7 @@ impl FlowApi<'_> {
                       setIngestConfig(
                         ingestConfigInput: {
                           fetchUncacheable: <fetch_uncacheable>,
-                          fetchNextIteration: false
+                          fetchNextIteration: <fetch_next_iteration>
                         },
                         retryPolicyInput: {
                           maxAttempts: <retry_max_attempts>,
@@ -1833,6 +2037,7 @@ impl FlowApi<'_> {
         )
         .replace("<dataset_id>", &dataset_id.as_did_str().to_stack_string())
         .replace("<fetch_uncacheable>", &fetch_uncacheable.to_string())
+        .replace("<fetch_next_iteration>", &fetch_next_iteration.to_string())
         .replace("<retry_max_attempts>", &retry_max_attempts.to_string());
 
         let response = self.client.graphql_api_call(&mutation, None).await.data();
@@ -1845,10 +2050,8 @@ impl FlowApi<'_> {
         );
     }
 
-    /// Waits until the dataset has a waiting flow that satisfies the
-    /// condition: flows follow trigger and configuration changes
-    /// asynchronously
-    pub async fn wait_for_waiting_flow(
+    /// Waits until the dataset has a flow that satisfies the condition
+    pub async fn wait_for_flow(
         &self,
         dataset_id: &odf::DatasetID,
         condition: impl Fn(&FlowSummary) -> bool,
@@ -1859,11 +2062,55 @@ impl FlowApi<'_> {
             self.list_flows(dataset_id)
                 .await
                 .into_iter()
-                .find(|flow| flow.status == "WAITING" && condition(flow))
+                .find(&condition)
                 .ok_or(())
         })
         .await
         .unwrap()
+    }
+
+    /// Waits until the dataset has a waiting flow that satisfies the
+    /// condition: flows follow trigger and configuration changes
+    /// asynchronously
+    pub async fn wait_for_waiting_flow(
+        &self,
+        dataset_id: &odf::DatasetID,
+        condition: impl Fn(&FlowSummary) -> bool,
+    ) -> FlowSummary {
+        self.wait_for_flow(dataset_id, |flow| {
+            flow.status == "WAITING" && condition(flow)
+        })
+        .await
+    }
+
+    /// Waits for `expected_count` finished flows, advancing the frozen system
+    /// time an hour per attempt so that each follow-up flow passes its
+    /// throttling period
+    pub async fn wait_finished_advancing_time(
+        &self,
+        dataset_id: &odf::DatasetID,
+        expected_count: usize,
+    ) -> Vec<FlowSummary> {
+        let retry_strategy = FixedInterval::from_millis(1_000).take(59); // 1m
+
+        let mut hours = 0;
+        Retry::start(retry_strategy, || {
+            hours += 1;
+            let hours_after_start = hours;
+            async move {
+                let flows = self.list_flows(dataset_id).await;
+                if flows.len() >= expected_count && flows.iter().all(|f| f.status == "FINISHED") {
+                    return Ok(flows);
+                }
+                self.client
+                    .e2e()
+                    .advance_frozen_system_time(hours_after_start)
+                    .await;
+                Err(())
+            }
+        })
+        .await
+        .unwrap_or_else(|()| panic!("Expected {expected_count} finished flows"))
     }
 
     // Method to wait for a flow to finish
@@ -1906,11 +2153,27 @@ impl FlowApi<'_> {
                                     flowId
                                     description {
                                       __typename
+                                      ... on FlowDescriptionDatasetExecuteTransform {
+                                        transformResult {
+                                          __typename
+                                          ... on FlowDescriptionUpdateResultSuccess {
+                                            numRecords
+                                            updatedWatermark
+                                          }
+                                        }
+                                      }
                                     }
                                     status
                                     taskIds
                                     outcome {
                                       __typename
+                                      ... on FlowFailedError {
+                                        reason {
+                                          ... on TaskFailureReasonGeneral {
+                                            recoverable
+                                          }
+                                        }
+                                      }
                                     }
                                     startCondition {
                                       __typename
@@ -1956,9 +2219,18 @@ impl FlowApi<'_> {
                         .unwrap()
                         .to_owned(),
                     status: node["status"].as_str().unwrap().to_owned(),
+                    transform_result: node["description"]["transformResult"]["__typename"]
+                        .as_str()
+                        .map(ToOwned::to_owned),
+                    transformed_records: node["description"]["transformResult"]["numRecords"]
+                        .as_u64(),
+                    updated_watermark: node["description"]["transformResult"]["updatedWatermark"]
+                        .as_str()
+                        .map(|watermark| DateTime::parse_from_rfc3339(watermark).unwrap().into()),
                     outcome: node["outcome"]["__typename"]
                         .as_str()
                         .map(ToOwned::to_owned),
+                    failure_recoverable: node["outcome"]["reason"]["recoverable"].as_bool(),
                     task_ids: node["taskIds"]
                         .as_array()
                         .unwrap()
@@ -2070,9 +2342,14 @@ pub struct FlowSummary {
     pub flow_id: String,
     /// GraphQL type name of the flow description, identifying the flow type
     pub description: String,
+    /// GraphQL type name of a transform flow's result, once it succeeded
+    pub transform_result: Option<String>,
+    pub transformed_records: Option<u64>,
+    pub updated_watermark: Option<DateTime<Utc>>,
     pub status: String,
     /// GraphQL type name of the outcome, if the flow finished
     pub outcome: Option<String>,
+    pub failure_recoverable: Option<bool>,
     pub task_ids: Vec<String>,
     /// GraphQL type name of the start condition, if the flow waits for one
     pub start_condition: Option<String>,
@@ -2157,6 +2434,12 @@ pub struct OdfQuery<'a> {
 }
 
 impl OdfQuery<'_> {
+    /// The CSV rows of a successful query, without the header
+    pub async fn query_rows(&self, query: &str) -> Vec<String> {
+        let result = self.query(query).await.unwrap();
+        result.lines().skip(1).map(ToOwned::to_owned).collect()
+    }
+
     pub async fn query(&self, query: &str) -> Result<String, QueryError> {
         let response = self
             .client
@@ -2466,6 +2749,47 @@ impl SwaggerApi<'_> {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// API: System
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub struct SystemApi<'a> {
+    client: &'a KamuApiServerClient,
+}
+
+impl SystemApi<'_> {
+    pub async fn metrics(&self) -> String {
+        let response = self
+            .client
+            .rest_api_call(Method::GET, "system/metrics", None)
+            .await;
+
+        pretty_assertions::assert_eq!(StatusCode::OK, response.status());
+
+        response.text().await.unwrap()
+    }
+
+    /// Waits until the metrics contain `expected`: background work may record
+    /// its metrics after the server becomes ready
+    pub async fn wait_for_metrics_containing(&self, expected: &str) {
+        let retry_strategy = FixedInterval::from_millis(200).take(49); // 10s
+
+        let result = Retry::start(retry_strategy, || async {
+            let metrics = self.metrics().await;
+            if metrics.contains(expected) {
+                Ok(())
+            } else {
+                Err(metrics)
+            }
+        })
+        .await;
+
+        if let Err(metrics) = result {
+            panic!("No '{expected}' in metrics:\n{metrics}");
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // API: Upload
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -2474,6 +2798,22 @@ pub struct UploadApi<'a> {
 }
 
 impl UploadApi<'_> {
+    /// Prepares an upload of `file_data` and uploads it
+    pub async fn prepare_and_upload(&self, file_name: &str, file_data: &str) -> UploadContext {
+        let upload_context = self
+            .prepare(PlatformFileUploadQuery {
+                file_name: file_name.into(),
+                content_length: file_data.len(),
+                content_type: None,
+            })
+            .await
+            .unwrap();
+        self.upload_file(&upload_context, file_name, file_data)
+            .await
+            .unwrap();
+        upload_context
+    }
+
     pub async fn prepare(
         &self,
         options: PlatformFileUploadQuery,

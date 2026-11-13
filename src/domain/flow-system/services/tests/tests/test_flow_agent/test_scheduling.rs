@@ -12,8 +12,7 @@ use std::str::FromStr;
 use chrono::{Duration, DurationRound};
 use kamu_adapter_flow_dataset::*;
 use kamu_adapter_task_dataset::*;
-use kamu_core::{PullResult, TransformStatus};
-use kamu_datasets::MockDatasetIncrementQueryService;
+use kamu_core::TransformStatus;
 use kamu_flow_system::*;
 use kamu_task_system::*;
 use odf::dataset::MetadataChainIncrementInterval;
@@ -21,7 +20,6 @@ use odf::dataset::MetadataChainIncrementInterval;
 use crate::tests::{
     FlowHarness,
     FlowHarnessOverrides,
-    FlowSystemTestListener,
     ManualFlowAbortArgs,
     ManualFlowActivationArgs,
     SCHEDULING_ALIGNMENT_MS,
@@ -107,7 +105,7 @@ async fn test_read_initial_config_and_queue_without_waiting() {
         .await
         .unwrap();
 
-    let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
+    let test_flow_listener = harness.flow_listener();
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
 
     pretty_assertions::assert_eq!(
@@ -272,7 +270,7 @@ async fn test_read_initial_config_should_not_queue_in_recovery_case() {
         .await
         .unwrap();
 
-    let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
+    let test_flow_listener = harness.flow_listener();
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
 
     pretty_assertions::assert_eq!(
@@ -327,7 +325,7 @@ async fn test_cron_config() {
     // Remember start time
     let _start_time = harness.now().duration_round(Duration::seconds(1)).unwrap();
 
-    let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
+    let test_flow_listener = harness.flow_listener();
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
 
     // Run scheduler concurrently with simulation script
@@ -460,7 +458,7 @@ async fn test_ingest_trigger_with_ingest_config() {
         )
         .await;
 
-    let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
+    let test_flow_listener = harness.flow_listener();
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
     test_flow_listener.define_dataset_display_name(bar_id.clone(), "bar".to_string());
 
@@ -664,13 +662,6 @@ async fn test_ingest_flow_with_multiple_iterations() {
 
     let harness = FlowHarness::with_overrides(FlowHarnessOverrides {
         mock_transform_flow_evaluator: Some(mock_transform_flow_evaluator),
-        mock_dataset_changes: Some(MockDatasetIncrementQueryService::with_increment_between(
-            MetadataChainIncrementInterval {
-                num_blocks: 1,
-                num_records: 3,
-                updated_watermark: None,
-            },
-        )),
         ..Default::default()
     });
 
@@ -717,7 +708,7 @@ async fn test_ingest_flow_with_multiple_iterations() {
         .await;
 
     // Flow listener will collect snapshots at important moments of time
-    let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
+    let test_flow_listener = harness.flow_listener();
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
     test_flow_listener.define_dataset_display_name(bar_id.clone(), "bar".to_string());
 
@@ -730,17 +721,20 @@ async fn test_ingest_flow_with_multiple_iterations() {
                 task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),
                 dataset_id: Some(foo_id.clone()),
                 run_since_start: Duration::milliseconds(10),
-                // Send some PullResult with records and has_more flag to trigger another iteration
+                // Send some update result with records and has_more flag to trigger another
+                // iteration
                 finish_in_with: Some((
                     Duration::milliseconds(20),
                     TaskOutcome::Success(
-                        TaskResultDatasetUpdate {
-                            pull_result: PullResult::Updated {
-                                old_head: Some(odf::Multihash::from_digest_sha3_256(b"new-slice")),
-                                new_head: odf::Multihash::from_digest_sha3_256(b"newest-slice"),
-                                has_more: true,
+                        TaskResultDatasetUpdate::Updated {
+                            old_head: Some(odf::Multihash::from_digest_sha3_256(b"new-slice")),
+                            new_head: odf::Multihash::from_digest_sha3_256(b"newest-slice"),
+                            has_more: true,
+                            increment: MetadataChainIncrementInterval {
+                                num_blocks: 1,
+                                num_records: 3,
+                                updated_watermark: None,
                             },
-                            data_increment: None,
                         }
                         .into_task_result(),
                     ),
@@ -759,19 +753,20 @@ async fn test_ingest_flow_with_multiple_iterations() {
                 task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "1")]),
                 dataset_id: Some(foo_id.clone()),
                 run_since_start: Duration::milliseconds(40),
-                // Send some PullResult with records and has_more flag to trigger another iteration
+                // Send some update result with records and has_more flag to trigger another
+                // iteration
                 finish_in_with: Some((
                     Duration::milliseconds(20),
                     TaskOutcome::Success(
-                        TaskResultDatasetUpdate {
-                            pull_result: PullResult::Updated {
-                                old_head: Some(odf::Multihash::from_digest_sha3_256(
-                                    b"newest-slice",
-                                )),
-                                new_head: odf::Multihash::from_digest_sha3_256(b"newest-slice-1"),
-                                has_more: true,
+                        TaskResultDatasetUpdate::Updated {
+                            old_head: Some(odf::Multihash::from_digest_sha3_256(b"newest-slice")),
+                            new_head: odf::Multihash::from_digest_sha3_256(b"newest-slice-1"),
+                            has_more: true,
+                            increment: MetadataChainIncrementInterval {
+                                num_blocks: 1,
+                                num_records: 3,
+                                updated_watermark: None,
                             },
-                            data_increment: None,
                         }
                         .into_task_result(),
                     ),
@@ -1035,7 +1030,7 @@ async fn test_dataset_flow_configuration_paused_resumed_modified() {
         )
         .await;
 
-    let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
+    let test_flow_listener = harness.flow_listener();
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
     test_flow_listener.define_dataset_display_name(bar_id.clone(), "bar".to_string());
 
@@ -1288,7 +1283,7 @@ async fn test_respect_last_success_time_when_schedule_resumes() {
     // Enforce dependency graph initialization
 
     // Flow listener will collect snapshots at important moments of time
-    let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
+    let test_flow_listener = harness.flow_listener();
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
     test_flow_listener.define_dataset_display_name(bar_id.clone(), "bar".to_string());
 
@@ -1540,7 +1535,7 @@ async fn test_task_completions_trigger_next_loop_on_success() {
     // Enforce dependency graph initialization
 
     // Flow listener will collect snapshots at important moments of time
-    let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
+    let test_flow_listener = harness.flow_listener();
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
     test_flow_listener.define_dataset_display_name(bar_id.clone(), "bar".to_string());
     test_flow_listener.define_dataset_display_name(baz_id.clone(), "baz".to_string());
@@ -1758,7 +1753,7 @@ async fn test_respect_last_success_time_for_root_dataset_when_activate_configura
     // Enforce dependency graph initialization
 
     // Flow listener will collect snapshots at important moments of time
-    let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
+    let test_flow_listener = harness.flow_listener();
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
 
     // Remember start time
@@ -1884,7 +1879,7 @@ async fn test_trigger_enable_during_flow_throttling() {
     // Enforce dependency graph initialization
 
     // Flow listener will collect snapshots at important moments of time
-    let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
+    let test_flow_listener = harness.flow_listener();
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
 
     // Run scheduler concurrently with simulation script
@@ -2148,7 +2143,7 @@ async fn test_flow_failing_to_schedule_does_not_block_later_flows() {
         .await
         .unwrap();
 
-    let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
+    let test_flow_listener = harness.flow_listener();
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
 
     pretty_assertions::assert_eq!(
@@ -2288,7 +2283,7 @@ async fn test_independent_flows_due_at_same_moment() {
         )
         .await;
 
-    let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
+    let test_flow_listener = harness.flow_listener();
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
     test_flow_listener.define_dataset_display_name(bar_id.clone(), "bar".to_string());
 
@@ -2369,7 +2364,7 @@ async fn test_activation_moment_between_scheduling_steps() {
         )
         .await;
 
-    let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
+    let test_flow_listener = harness.flow_listener();
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
 
     harness

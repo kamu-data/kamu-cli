@@ -190,7 +190,12 @@ impl DatasetStorageUnitWriter for DatasetStorageUnitS3 {
                 }
 
                 // No head, so continue creating
-                Err(GetRefError::NotFound(_)) => {}
+                Err(GetRefError::NotFound(_)) => {
+                    tracing::info!(
+                        dataset_id = %seed_block.event.dataset_id,
+                        "Taking over a stored dataset left without HEAD"
+                    );
+                }
 
                 // Errors...
                 Err(GetRefError::Access(e)) => {
@@ -205,16 +210,12 @@ impl DatasetStorageUnitWriter for DatasetStorageUnitS3 {
         let dataset_kind = seed_block.event.dataset_kind;
         let dataset = self.get_dataset_impl(&dataset_id);
 
-        // Write seed block.
-        // Set HEAD only if specified in the options
+        // Write seed block; the caller sets `HEAD`
         let seed: Multihash = match dataset
             .as_metadata_chain()
             .append(
                 seed_block.into(),
                 AppendOpts {
-                    // We are using head ref CAS to detect previous existence of a dataset
-                    // as atomically as possible
-                    check_ref_is: Some(None),
                     update_ref: None,
                     block_data: opts
                         .seed_block_bytes

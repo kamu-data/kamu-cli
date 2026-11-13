@@ -113,7 +113,7 @@ def nudges(rel: str, added: list[str]) -> list[str]:
     m = re.match(r"src/e2e/app/cli/(postgres|sqlite)/", rel)
     if m:
         twin = "sqlite" if m.group(1) == "postgres" else "postgres"
-        out.append(f"E2E wiring changed: mirror it in `src/e2e/app/cli/{twin}/` (lockstep rule, kamu-cli-e2e-tests).")
+        out.append(f"E2E wiring changed: mirror it in `src/e2e/app/cli/{twin}/`, or mark it `{m.group(1)}_only = \"<reason>\"` (kamu-cli-e2e-tests).")
     return out
 
 

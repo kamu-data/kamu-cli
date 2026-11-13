@@ -12,6 +12,7 @@ use std::sync::Arc;
 
 use datafusion::arrow::array::RecordBatch;
 use datafusion::prelude::SessionContext;
+use file_utils::OwnedDir;
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_accounts::{AccountQuotaStorageChecker, AccountService};
 use kamu_core::ingest::*;
@@ -91,6 +92,8 @@ impl PushIngestExecutorImpl {
 
         listener.begin();
 
+        let operation_dir = OwnedDir::new(plan.args.operation_dir.clone(), "ingest directory");
+
         match self
             .do_ingest_inner(
                 target,
@@ -104,12 +107,13 @@ impl PushIngestExecutorImpl {
         {
             Ok(res) => {
                 tracing::info!(result = ?res, "Ingest iteration successful");
-                listener.success(&res);
                 Ok(res)
             }
             Err(err) => {
+                // A failed attempt keeps its directory: errors point at the logs in it
+                operation_dir.keep();
+
                 tracing::error!(error = ?err, error_msg = %err, "Ingest iteration failed");
-                listener.error(&err);
                 Err(err)
             }
         }
@@ -191,7 +195,11 @@ impl PushIngestExecutorImpl {
             Ok(staged) => {
                 if !args.opts.skip_quota_check {
                     let estimated_size = Self::estimate_staged_size(&staged)?;
-                    self.ensure_quota(&target, estimated_size).await?;
+                    self.ensure_quota(
+                        &target,
+                        estimated_size.saturating_add(args.opts.uncommitted_bytes),
+                    )
+                    .await?;
                 }
 
                 listener.on_stage_progress(PushIngestStage::Commit, 0, TotalSteps::Exact(1));

@@ -9,10 +9,12 @@
 
 use std::future::IntoFuture;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
+use std::time::Duration;
 
 use ::serde::Deserialize;
 use axum::extract::{FromRequestParts, Path};
 use database_common::{DatabaseTransactionRunner, NoOpDatabasePlugin};
+use headers::Header as _;
 use kamu::domain::*;
 use kamu_accounts::{CurrentAccountSubject, DidSecretEncryptionConfig, PredefinedAccountsConfig};
 use kamu_accounts_inmem::{InMemoryAccountRepository, InMemoryDidSecretKeyRepository};
@@ -23,7 +25,9 @@ use kamu_accounts_services::{
     PredefinedAccountsRegistrator,
     UpdateAccountUseCaseImpl,
 };
-use kamu_adapter_http::DatasetAuthorizationLayer;
+use kamu_adapter_http::smart_protocol::SmartTransferProtocolServerConfig;
+use kamu_adapter_http::smart_protocol::messages::SMART_TRANSFER_PROTOCOL_VERSION;
+use kamu_adapter_http::{DatasetAuthorizationLayer, OdfSmtpVersion};
 use kamu_auth_rebac_inmem::InMemoryRebacRepository;
 use kamu_auth_rebac_services::{
     DefaultAccountProperties,
@@ -31,19 +35,15 @@ use kamu_auth_rebac_services::{
     RebacServiceImpl,
 };
 use kamu_datasets::*;
-use kamu_datasets_inmem::{
-    InMemoryDatasetDataBlockRepository,
-    InMemoryDatasetDependencyRepository,
-    InMemoryDatasetEntryRepository,
-    InMemoryDatasetKeyBlockRepository,
-    InMemoryDatasetReferenceRepository,
-};
 use kamu_datasets_services::utils::CreateDatasetUseCaseHelper;
 use kamu_datasets_services::*;
 use messaging_outbox::{Outbox, OutboxImmediateImpl, register_message_dispatcher};
 use odf::dataset::{DatasetFactoryImpl, IpfsGateway};
 use odf::metadata::testing::MetadataFactory;
 use time_source::SystemTimeSourceDefault;
+use tokio_tungstenite::connect_async;
+use tokio_tungstenite::tungstenite::Error;
+use tokio_tungstenite::tungstenite::client::IntoClientRequest;
 use utoipa_axum::router::OpenApiRouter;
 
 use crate::harness::await_client_server_flow;
@@ -56,88 +56,123 @@ struct RepoFixture {
     created_dataset: CreateDatasetResult,
 }
 
-async fn setup_repo() -> RepoFixture {
-    let tmp_dir = tempfile::tempdir().unwrap();
-    let datasets_dir = tmp_dir.path().join("datasets");
-    std::fs::create_dir(&datasets_dir).unwrap();
+impl RepoFixture {
+    async fn new() -> Self {
+        let tmp_dir = tempfile::tempdir().unwrap();
+        let datasets_dir = tmp_dir.path().join("datasets");
+        std::fs::create_dir(&datasets_dir).unwrap();
 
-    let mut b = dill::CatalogBuilder::new();
-    b.add::<SystemTimeSourceDefault>()
-        .add::<DidGeneratorDefault>()
-        .add_builder(messaging_outbox::OutboxImmediateImpl::builder(
-            messaging_outbox::ConsumerFilter::AllConsumers,
-        ))
-        .bind::<dyn Outbox, OutboxImmediateImpl>()
-        .add::<DatabaseTransactionRunner>()
-        .add::<DependencyGraphServiceImpl>()
-        .add::<InMemoryDatasetDependencyRepository>()
-        .add_value(TenancyConfig::SingleTenant)
-        .add_builder(odf::dataset::DatasetStorageUnitLocalFs::builder(
-            datasets_dir,
-        ))
-        .add::<DatasetLfsBuilderDatabaseBackedImpl>()
-        .add_value(MetadataChainDbBackedConfig::default())
-        .add_value(CurrentAccountSubject::new_test())
-        .add::<AlwaysHappyDatasetActionAuthorizer>()
-        .add::<CreateDatasetFromSnapshotUseCaseImpl>()
-        .add::<CreateDatasetUseCaseImpl>()
-        .add::<CreateDatasetUseCaseHelper>()
-        .add::<DatasetReferenceServiceImpl>()
-        .add::<InMemoryDatasetReferenceRepository>()
-        .add::<DatasetEntryServiceImpl>()
-        .add::<InMemoryDatasetEntryRepository>()
-        .add::<InMemoryDatasetKeyBlockRepository>()
-        .add::<InMemoryDatasetDataBlockRepository>()
-        .add::<AccountServiceImpl>()
-        .add::<UpdateAccountUseCaseImpl>()
-        .add::<CreateAccountUseCaseImpl>()
-        .add::<InMemoryAccountRepository>()
-        .add::<PredefinedAccountsRegistrator>()
-        .add::<RebacServiceImpl>()
-        .add::<InMemoryRebacRepository>()
-        .add::<InMemoryDidSecretKeyRepository>()
-        .add_value(DidSecretEncryptionConfig::sample())
-        .add_value(DefaultAccountProperties::default())
-        .add_value(DefaultDatasetProperties::default())
-        .add_value(PredefinedAccountsConfig::test_single_tenant_with_id())
-        .add::<LoginPasswordAuthProvider>();
+        let mut b = dill::CatalogBuilder::new();
+        kamu_datasets_inmem::register_dependencies(&mut b);
+        b.add::<SystemTimeSourceDefault>()
+            .add::<DidGeneratorDefault>()
+            .add_builder(messaging_outbox::OutboxImmediateImpl::builder(
+                messaging_outbox::ConsumerFilter::AllConsumers,
+            ))
+            .bind::<dyn Outbox, OutboxImmediateImpl>()
+            .add::<DatabaseTransactionRunner>()
+            .add::<DependencyGraphServiceImpl>()
+            .add_value(TenancyConfig::SingleTenant)
+            .add_builder(odf::dataset::DatasetStorageUnitLocalFs::builder(
+                datasets_dir,
+            ))
+            .add::<DatasetLfsBuilderDatabaseBackedImpl>()
+            .add_value(MetadataChainDbBackedConfig::default());
+        CurrentAccountSubject::new_test().register(&mut b);
+        b.add::<AlwaysHappyDatasetPermissionChecker>()
+            .add::<CreateDatasetFromSnapshotUseCaseImpl>()
+            .add::<CreateDatasetUseCaseImpl>()
+            .add::<CreateDatasetUseCaseHelper>()
+            .add::<DatasetHeadCommitterImpl>()
+            .add::<DatasetReferenceServiceImpl>()
+            .add::<DatasetEntryServiceImpl>()
+            .add::<AccountServiceImpl>()
+            .add::<UpdateAccountUseCaseImpl>()
+            .add::<CreateAccountUseCaseImpl>()
+            .add::<InMemoryAccountRepository>()
+            .add::<PredefinedAccountsRegistrator>()
+            .add::<RebacServiceImpl>()
+            .add::<InMemoryRebacRepository>()
+            .add::<InMemoryDidSecretKeyRepository>()
+            .add_value(DidSecretEncryptionConfig::sample())
+            .add_value(DefaultAccountProperties::default())
+            .add_value(DefaultDatasetProperties::default())
+            .add_value(PredefinedAccountsConfig::test_single_tenant_with_id())
+            .add::<LoginPasswordAuthProvider>()
+            .add_value(ServerUrlConfig::new_test(None))
+            .add_value(SmartTransferProtocolServerConfig {
+                upload_progress_interval: Duration::from_secs(10),
+            });
 
-    NoOpDatabasePlugin::init_database_components(&mut b);
+        NoOpDatabasePlugin::init_database_components(&mut b);
 
-    register_message_dispatcher::<DatasetLifecycleMessage>(
-        &mut b,
-        MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
-    );
+        register_message_dispatcher::<DatasetLifecycleMessage>(
+            &mut b,
+            MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
+        );
 
-    register_message_dispatcher::<DatasetReferenceMessage>(
-        &mut b,
-        MESSAGE_PRODUCER_KAMU_DATASET_REFERENCE_SERVICE,
-    );
+        register_message_dispatcher::<DatasetReferenceMessage>(
+            &mut b,
+            MESSAGE_PRODUCER_KAMU_DATASET_REFERENCE_SERVICE,
+        );
 
-    let catalog = b.build();
+        let catalog = b.build();
 
-    init_on_startup::run_startup_jobs(&catalog).await.unwrap();
+        init_on_startup::run_startup_jobs(&catalog).await.unwrap();
 
-    let create_dataset_from_snapshot = catalog
-        .get_one::<dyn CreateDatasetFromSnapshotUseCase>()
-        .unwrap();
+        let create_dataset_from_snapshot = catalog
+            .get_one::<dyn CreateDatasetFromSnapshotUseCase>()
+            .unwrap();
 
-    let created_dataset = create_dataset_from_snapshot
-        .execute(
-            MetadataFactory::dataset_snapshot()
-                .name("foo")
-                .kind(odf::DatasetKind::Root)
-                .push_event(MetadataFactory::set_polling_source().build())
-                .build(),
-            Default::default(),
-        )
-        .await
-        .unwrap();
+        let created_dataset = create_dataset_from_snapshot
+            .execute(
+                MetadataFactory::dataset_snapshot()
+                    .name("foo")
+                    .kind(odf::DatasetKind::Root)
+                    .push_event(MetadataFactory::set_polling_source().build())
+                    .build(),
+                Default::default(),
+            )
+            .await
+            .unwrap();
 
-    RepoFixture {
-        _tmp_dir: tmp_dir,
-        catalog,
-        created_dataset,
+        Self {
+            _tmp_dir: tmp_dir,
+            catalog,
+            created_dataset,
+        }
+    }
+
+    async fn is_dataset_stored(&self, dataset_ref: &odf::DatasetRef) -> bool {
+        match self
+            .catalog
+            .get_one::<dyn DatasetRegistry>()
+            .unwrap()
+            .resolve_dataset_handle_by_ref(dataset_ref)
+            .await
+        {
+            Ok(_) => true,
+            Err(odf::DatasetRefUnresolvedError::NotFound(_)) => false,
+            Err(e @ odf::DatasetRefUnresolvedError::Internal(_)) => panic!("{e}"),
+        }
+    }
+
+    /// Status of a push websocket upgrade request for the dataset at
+    /// `dataset_url`
+    async fn push_upgrade_status(dataset_url: &str) -> http::StatusCode {
+        let mut request = format!("ws://{dataset_url}/push")
+            .into_client_request()
+            .unwrap();
+        request.headers_mut().append(
+            OdfSmtpVersion::name(),
+            http::HeaderValue::from(SMART_TRANSFER_PROTOCOL_VERSION),
+        );
+
+        match connect_async(request).await {
+            Ok((_, response)) => response.status(),
+            Err(Error::Http(response)) => response.status(),
+            Err(e) => panic!("{e}"),
+        }
     }
 }
 
@@ -161,7 +196,7 @@ where
                 .layer(DatasetAuthorizationLayer::default())
                 .layer(kamu_adapter_http::DatasetResolverLayer::new(
                     identity_extractor,
-                    |_| false, /* does not matter for routing tests */
+                    |request| request.uri().path() == "/push",
                 ))
                 .layer(axum::extract::Extension(catalog)),
         )
@@ -208,7 +243,7 @@ async fn setup_client(dataset_url: url::Url, head_expected: odf::Multihash) {
 
 #[test_log::test(tokio::test)]
 async fn test_routing_root() {
-    let repo = setup_repo().await;
+    let repo = RepoFixture::new().await;
 
     let dataset_ref = repo.created_dataset.dataset_handle.as_local_ref();
 
@@ -255,7 +290,7 @@ struct DatasetByID {
 
 #[test_log::test(tokio::test)]
 async fn test_routing_dataset_id() {
-    let repo = setup_repo().await;
+    let repo = RepoFixture::new().await;
 
     let (server, local_addr) = setup_server(
         repo.catalog,
@@ -285,7 +320,7 @@ struct DatasetByName {
 
 #[test_log::test(tokio::test)]
 async fn test_routing_dataset_name() {
-    let repo = setup_repo().await;
+    let repo = RepoFixture::new().await;
 
     let (server, local_addr) = setup_server(
         repo.catalog,
@@ -307,9 +342,11 @@ async fn test_routing_dataset_name() {
     await_client_server_flow!(server, client);
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[test_log::test(tokio::test)]
 async fn test_routing_dataset_name_case_insensetive() {
-    let repo = setup_repo().await;
+    let repo = RepoFixture::new().await;
 
     let (server, local_addr) = setup_server(
         repo.catalog,
@@ -348,7 +385,7 @@ struct DatasetByAccountAndName {
 
 #[test_log::test(tokio::test)]
 async fn test_routing_dataset_account_and_name() {
-    let repo = setup_repo().await;
+    let repo = RepoFixture::new().await;
 
     let (server, local_addr) = setup_server(
         repo.catalog,
@@ -374,7 +411,7 @@ async fn test_routing_dataset_account_and_name() {
 
 #[test_log::test(tokio::test)]
 async fn test_routing_err_invalid_identity_format() {
-    let repo = setup_repo().await;
+    let repo = RepoFixture::new().await;
 
     let (server, local_addr) = setup_server(
         repo.catalog,
@@ -396,8 +433,62 @@ async fn test_routing_err_invalid_identity_format() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
+async fn test_routing_push_to_missing_dataset_id_is_not_found() {
+    let repo = RepoFixture::new().await;
+    let missing_id = odf::DatasetID::new_seeded_ed25519(b"missing");
+
+    let (server, local_addr) = setup_server(
+        repo.catalog.clone(),
+        "/{dataset_id}",
+        |Path(p): Path<DatasetByID>| p.dataset_id.as_local_ref(),
+    )
+    .await;
+
+    let dataset_url = format!("{local_addr}/{}", missing_id.as_did_str());
+
+    let client = async {
+        assert_eq!(
+            http::StatusCode::NOT_FOUND,
+            RepoFixture::push_upgrade_status(&dataset_url).await
+        );
+        assert!(!repo.is_dataset_stored(&missing_id.as_local_ref()).await);
+    };
+
+    await_client_server_flow!(server, client);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_routing_push_to_missing_dataset_alias_upgrades() {
+    let repo = RepoFixture::new().await;
+
+    let (server, local_addr) = setup_server(
+        repo.catalog.clone(),
+        "/{dataset_name}",
+        |Path(p): Path<DatasetByName>| {
+            odf::DatasetAlias::new(None, p.dataset_name).into_local_ref()
+        },
+    )
+    .await;
+
+    let dataset_url = format!("{local_addr}/new.dataset");
+
+    let client = async {
+        assert_eq!(
+            http::StatusCode::SWITCHING_PROTOCOLS,
+            RepoFixture::push_upgrade_status(&dataset_url).await
+        );
+    };
+
+    await_client_server_flow!(server, client);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
 async fn test_routing_err_dataset_not_found() {
-    let repo = setup_repo().await;
+    let repo = RepoFixture::new().await;
 
     let (server, local_addr) = setup_server(
         repo.catalog,

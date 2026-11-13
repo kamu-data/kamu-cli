@@ -9,14 +9,11 @@
 
 use std::sync::Arc;
 
-use internal_error::{InternalError, ResultIntoInternal};
 use kamu_accounts::{
     Account,
-    AccountLifecycleMessage,
     AccountNotFoundByIdError,
-    AccountProvider,
     AccountService,
-    MESSAGE_PRODUCER_KAMU_ACCOUNTS_SERVICE,
+    Principal,
     UpdateAccountError,
     UpdateAccountUseCase,
 };
@@ -27,45 +24,33 @@ use crate::utils;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[dill::component(pub)]
-#[dill::interface(dyn UpdateAccountUseCase)]
 pub struct UpdateAccountUseCaseImpl {
     account_service: Arc<dyn AccountService>,
-    outbox: Arc<dyn Outbox>,
-    time_source: Arc<dyn SystemTimeSource>,
-    account_authorization_helper: dill::Lazy<Arc<dyn utils::AccountAuthorizationHelper>>,
+    update_account_helper: utils::UpdateAccountUseCaseHelper,
+    account_authorization_helper: Arc<dyn utils::AccountAuthorizationHelper>,
+    principal: Arc<Principal>,
 }
 
+#[dill::component(pub)]
+#[dill::interface(dyn UpdateAccountUseCase)]
 impl UpdateAccountUseCaseImpl {
-    async fn notify_account_updated(
-        &self,
-        updated_account: &Account,
-        original_account: &Account,
-    ) -> Result<(), InternalError> {
-        use messaging_outbox::OutboxExt;
-
-        if original_account.account_name != updated_account.account_name
-            || original_account.display_name != updated_account.display_name
-            || original_account.email != updated_account.email
-        {
-            self.outbox
-                .post_message(
-                    MESSAGE_PRODUCER_KAMU_ACCOUNTS_SERVICE,
-                    AccountLifecycleMessage::updated(
-                        self.time_source.now(),
-                        updated_account.id.clone(),
-                        original_account.email.clone(),
-                        updated_account.email.clone(),
-                        original_account.account_name.clone(),
-                        updated_account.account_name.clone(),
-                        original_account.display_name.clone(),
-                        updated_account.display_name.clone(),
-                    ),
-                )
-                .await?;
+    pub fn new(
+        account_service: Arc<dyn AccountService>,
+        outbox: Arc<dyn Outbox>,
+        time_source: Arc<dyn SystemTimeSource>,
+        account_authorization_helper: Arc<dyn utils::AccountAuthorizationHelper>,
+        principal: Arc<Principal>,
+    ) -> Self {
+        Self {
+            update_account_helper: utils::UpdateAccountUseCaseHelper::new(
+                account_service.clone(),
+                outbox,
+                time_source,
+            ),
+            account_service,
+            account_authorization_helper,
+            principal,
         }
-
-        Ok(())
     }
 }
 
@@ -80,9 +65,9 @@ impl UpdateAccountUseCase for UpdateAccountUseCaseImpl {
             }));
         };
 
-        let account_authorization_helper = self.account_authorization_helper.get().int_err()?;
-        if !account_authorization_helper
-            .can_modify_account(&original_account.account_name)
+        if !self
+            .account_authorization_helper
+            .can_modify_account(&self.principal, &original_account.account_name)
             .await?
         {
             return Err(UpdateAccountError::Access(odf::AccessError::Unauthorized(
@@ -90,29 +75,9 @@ impl UpdateAccountUseCase for UpdateAccountUseCaseImpl {
             )));
         }
 
-        self.execute_internal(account, &original_account).await
-    }
-
-    async fn execute_internal(
-        &self,
-        account: &Account,
-        original_account: &Account,
-    ) -> Result<(), UpdateAccountError> {
-        let mut account_to_update = account.clone();
-        if original_account.account_name != account_to_update.account_name
-            && AccountProvider::is_password(&account.provider)
-        {
-            account_to_update.provider_identity_key = account_to_update.account_name.to_string();
-        }
-
-        self.account_service
-            .update_account(&account_to_update)
-            .await?;
-
-        self.notify_account_updated(&account_to_update, original_account)
-            .await?;
-
-        Ok(())
+        self.update_account_helper
+            .update(account, &original_account)
+            .await
     }
 }
 

@@ -49,7 +49,7 @@ pub struct APIServer {
 impl APIServer {
     pub async fn new(
         base_catalog: &dill::Catalog,
-        cli_catalog: &dill::Catalog,
+        background_catalog: &dill::Catalog,
         tenancy_config: TenancyConfig,
         address: Option<IpAddr>,
         port: Option<u16>,
@@ -62,9 +62,8 @@ impl APIServer {
         password_policy_config: &PasswordPolicyConfig,
         webhooks_config: &WebhooksConfig,
     ) -> Result<Self, InternalError> {
-        // Background task executor must run with server privileges to execute tasks on
-        // behalf of the system, as they are automatically scheduled
-        let background_agents = cli_catalog
+        // Agents run as the node: they act for the system, not for whoever started the server
+        let background_agents = background_catalog
             .get::<dill::AllOf<dyn BackgroundAgent>>()
             .unwrap();
 

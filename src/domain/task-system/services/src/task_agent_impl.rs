@@ -244,7 +244,15 @@ impl TaskAgentImpl {
             .await
         {
             Ok(task_definition) => task_definition,
-            Err(e) => {
+            Err(PrepareTaskDefinitionError::Failed(task_error)) => {
+                tracing::warn!(
+                    task_id = %task.task_id,
+                    ?task_error,
+                    "Task planning failed"
+                );
+                return Ok(TaskOutcome::Failed(task_error));
+            }
+            Err(PrepareTaskDefinitionError::Internal(e)) => {
                 tracing::error!(
                     task = ?task,
                     error = ?e,

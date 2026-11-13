@@ -10,10 +10,10 @@
 use async_graphql::{Context, ErrorExtensionValues, ErrorExtensions};
 use chrono::{DateTime, Utc};
 use internal_error::*;
-use kamu_accounts::{CurrentAccountSubject, GetAccessTokenError, LoggedAccount};
+use kamu_accounts::{AccountHandle, CurrentAccountSubject, GetAccessTokenError};
 use kamu_auth_rebac::{RebacService, RebacServiceExt};
 use kamu_core::TenancyConfig;
-use kamu_datasets::{DatasetAction, SecretsEncryptionConfig};
+use kamu_datasets::{DatasetPermission, SecretsEncryptionConfig};
 use kamu_task_system as ts;
 use time_source::SystemTimeSource;
 
@@ -79,7 +79,7 @@ pub(crate) fn get_dataset_handle_data_loader<'a>(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub(crate) fn get_logged_account(ctx: &Context<'_>) -> LoggedAccount {
+pub(crate) fn get_logged_account(ctx: &Context<'_>) -> AccountHandle {
     let current_account_subject = from_catalog_n!(ctx, CurrentAccountSubject);
 
     match current_account_subject.as_ref() {
@@ -96,7 +96,7 @@ pub(crate) async fn check_dataset_maintain_access(
     ctx: &Context<'_>,
     dataset_request_state: &DatasetRequestState,
 ) -> Result<(), GqlError> {
-    check_dataset_access(ctx, dataset_request_state, DatasetAction::Maintain).await
+    check_dataset_access(ctx, dataset_request_state, DatasetPermission::Maintain).await
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -104,11 +104,13 @@ pub(crate) async fn check_dataset_maintain_access(
 async fn check_dataset_access(
     ctx: &Context<'_>,
     dataset_request_state: &DatasetRequestState,
-    action: DatasetAction,
+    permission: DatasetPermission,
 ) -> Result<(), GqlError> {
-    let allowed_actions = dataset_request_state.allowed_dataset_actions(ctx).await?;
+    let granted_permissions = dataset_request_state
+        .granted_dataset_permissions(ctx)
+        .await?;
 
-    if allowed_actions.contains(&action) {
+    if granted_permissions.contains(&permission) {
         Ok(())
     } else {
         Err(make_dataset_access_error(
@@ -159,7 +161,7 @@ pub(crate) fn check_logged_account_id_match(
     let current_account_subject = from_catalog_n!(ctx, CurrentAccountSubject);
 
     if let CurrentAccountSubject::Logged(logged_account) = current_account_subject.as_ref()
-        && logged_account.account_handle.did == *account_id
+        && logged_account.did == *account_id
     {
         return Ok(());
     }
@@ -182,7 +184,7 @@ pub(crate) async fn is_logged_account_id_match_or_admin(
         return Ok(false);
     };
 
-    let logged_account_id = &logged_account.account_handle.did;
+    let logged_account_id = &logged_account.did;
     if logged_account_id == account_id {
         return Ok(true);
     }
@@ -227,7 +229,7 @@ pub(crate) async fn check_access_token_valid(
         })?;
 
     if let CurrentAccountSubject::Logged(logged_account) = current_account_subject.as_ref()
-        && logged_account.account_handle.did == existing_access_token.account_id
+        && logged_account.did == existing_access_token.account_id
     {
         return Ok(());
     }

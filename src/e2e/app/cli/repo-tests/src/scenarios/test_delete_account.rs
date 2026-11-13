@@ -22,11 +22,7 @@ pub async fn test_delete_account_with_datasets_mt(mut kamu: KamuCliPuppet) {
     // NOTE: When running through kamu-cli we automatically simulate kamu-api-server
     //       restarts and various reindexing operations.
 
-    let alice = odf::AccountName::new_unchecked("alice");
-    let bob = odf::AccountName::new_unchecked("bob");
-
-    kamu.create_account(&alice).await;
-    kamu.create_account(&bob).await;
+    let [alice, bob] = kamu.create_accounts(["alice", "bob"]).await;
 
     {
         kamu.set_account(Some(alice.clone()));

@@ -11,7 +11,7 @@ use std::borrow::Cow;
 use std::sync::Arc;
 
 use futures::{StreamExt, TryStreamExt};
-use internal_error::ResultIntoInternal;
+use internal_error::{InternalError, ResultIntoInternal};
 use kamu::domain::*;
 use kamu::utils::datasets_filtering::filter_datasets_by_local_pattern;
 use kamu_datasets::{DatasetRegistry, DependencyGraphService};
@@ -19,6 +19,8 @@ use kamu_datasets::{DatasetRegistry, DependencyGraphService};
 use super::{BatchError, CLIError, Command};
 use crate::VerificationMultiProgress;
 use crate::output::OutputConfig;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 type GenericVerificationResult = Result<Vec<VerificationResult>, CLIError>;
 
@@ -30,7 +32,7 @@ pub struct VerifyCommand {
     verify_dataset_use_case: Arc<dyn VerifyDatasetUseCase>,
     dataset_registry: Arc<dyn DatasetRegistry>,
     dependency_graph_service: Arc<dyn DependencyGraphService>,
-    remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
+    pull_source_resolver: Arc<dyn DatasetPullSourceResolver>,
     output_config: Arc<OutputConfig>,
 
     #[dill::component(explicit)]
@@ -111,7 +113,7 @@ impl VerifyCommand {
         };
 
         let (filtered_dataset_handles, missed_remote_dependencies) =
-            self.detect_remote_datasets(dataset_handles).await;
+            self.detect_remote_datasets(dataset_handles).await?;
 
         if !missed_remote_dependencies.is_empty() {
             let missed_dependency_warnings: Vec<String> = missed_remote_dependencies
@@ -164,19 +166,12 @@ impl VerifyCommand {
     async fn detect_remote_datasets(
         &self,
         dataset_handles: Vec<odf::DatasetHandle>,
-    ) -> (Vec<odf::DatasetHandle>, Vec<RemoteRefDependency>) {
+    ) -> Result<(Vec<odf::DatasetHandle>, Vec<RemoteRefDependency>), InternalError> {
         let mut result = vec![];
         let mut missed_dependencies = vec![];
 
         for hdl in dataset_handles {
-            let is_remote = self
-                .remote_alias_reg
-                .get_remote_aliases(&hdl)
-                .await
-                .unwrap()
-                .get_by_kind(RemoteAliasKind::Pull)
-                .next()
-                .is_some();
+            let is_remote = self.pull_source_resolver.has_pull_source(&hdl).await?;
             if !is_remote || self.integrity {
                 result.push(hdl);
                 continue;
@@ -211,7 +206,7 @@ impl VerifyCommand {
             }
         }
 
-        (result, missed_dependencies)
+        Ok((result, missed_dependencies))
     }
 }
 
@@ -288,3 +283,5 @@ impl Command for VerifyCommand {
         }
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

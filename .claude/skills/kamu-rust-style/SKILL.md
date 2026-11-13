@@ -149,6 +149,8 @@ siblings" is not a reason. Ask the user before adding a new suppression (AGENTS.
 ### Formatting
 
 Inline captured identifiers: `format!("value={value}")`, not `format!("value={}", value)`.
+Clippy's `uninlined_format_args` checks only the standard formatting macros, so `tracing::*!`
+and our own macros are on review.
 
 ### Macros
 
@@ -173,10 +175,27 @@ macro calls — macro bodies are hard to read, debug and test.
 - One concept per file. A module that grows several independent concepts becomes a directory with
   a file per type, with its errors and its tests in files of their own.
 
+### No extension traits for convenience methods
+
+A trait that only adds methods to an existing type (`FooExt for Bar`) saves no code: every caller
+must import the trait, and a reader cannot tell where the method comes from.
+
+| The helper is about | Write |
+|---|---|
+| A type of ours | An inherent method on it: `CurrentAccountSubject::register(self, &mut CatalogBuilder)`, not a `CatalogBuilder` extension |
+| A foreign type | A free function: `add_player_scores_with_derivative(&kamu)` in the e2e common crate |
+
+A blanket extension over a trait of ours (`impl<T: Trait + ?Sized> TraitExt for T`) stays
+legitimate when its helpers must not be part of the trait, e.g. because `mockall::automock`
+would mock provided methods away (`DatasetPermissionCheckerExt`).
+
 ### Visibility and re-exports
 
 - Default to the tightest visibility: private, then `pub(crate)`. Use `pub` only at a real crate
   boundary.
+- The crate's own `tests/` tree is outside the crate: an item its integration tests use stays
+  `pub`. After narrowing an item, a `private_interfaces` warning means a `pub` signature still
+  exposes it.
 - Do not publicly re-export internal helper modules unless external consumers or macro expansion
   truly require it.
 
@@ -193,6 +212,7 @@ Do not re-propose these without new evidence.
 | Hand-written `match` for enum ↔ string | Drifts from the variants; `strum` derives stay in sync. |
 | Catch-all `_` arm on an enum we own, "to keep the match short" | A new variant silently takes the fallback path instead of failing to compile where a decision is needed. |
 | One file of free functions passing the same data along, "since it is only a few helpers" | Reads as a procedure and hides which concepts exist; a type per concept, in its own file, names them and keeps each one's parsing and checks together. |
+| An extension trait to attach helpers to a type, "so calls read as methods" | Callers import the trait anyway and the method's origin is hidden; use an inherent method on our types and a free function on foreign ones ([rule](#no-extension-traits-for-convenience-methods)). |
 | Silencing a lint instead of fixing it, or without a `reason` | Hides the problem; most suppressions removed in the cleanup turned out to be fixable or stale. |
 
 ## What lives elsewhere

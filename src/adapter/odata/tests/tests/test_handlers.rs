@@ -14,7 +14,12 @@ use database_common::NoOpDatabasePlugin;
 use indoc::indoc;
 use kamu::domain::*;
 use kamu::*;
-use kamu_accounts::{CurrentAccountSubject, DidSecretEncryptionConfig, PredefinedAccountsConfig};
+use kamu_accounts::{
+    CurrentAccountSubject,
+    DidSecretEncryptionConfig,
+    PredefinedAccountsConfig,
+    Principal,
+};
 use kamu_accounts_inmem::{
     InMemoryAccountQuotaEventStore,
     InMemoryAccountRepository,
@@ -36,7 +41,6 @@ use kamu_auth_rebac_services::{
     RebacServiceImpl,
 };
 use kamu_datasets::*;
-use kamu_datasets_inmem::*;
 use kamu_datasets_services::utils::CreateDatasetUseCaseHelper;
 use kamu_datasets_services::{AccountQuotaCheckerStorageImpl, DatasetStatisticsServiceImpl, *};
 use messaging_outbox::{Outbox, OutboxImmediateImpl, register_message_dispatcher};
@@ -77,6 +81,49 @@ async fn test_service_handler() {
             res.headers()["content-type"],
             "application/xml;charset=utf-8"
         );
+
+        let body = res.text().await.unwrap();
+        pretty_assertions::assert_eq!(
+            body,
+            indoc!(
+                r#"
+                <?xml version="1.0" encoding="utf-8"?>
+                <service xml:base="http://example.com/odata"
+                 xmlns="http://www.w3.org/2007/app"
+                 xmlns:atom="http://www.w3.org/2005/Atom">
+                <workspace>
+                <atom:title>default</atom:title>
+                <collection href="foo.bar">
+                <atom:title>foo.bar</atom:title>
+                </collection>
+                </workspace>
+                </service>
+                "#
+            )
+            .replace('\n', "")
+        );
+    };
+
+    await_client_server_flow!(harness.api_server.run(), client);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_group::group(engine, datafusion)]
+#[test_log::test(tokio::test)]
+async fn test_service_handler_hides_unreadable_datasets() {
+    let harness =
+        TestHarness::new_with_permission_checker(TestHarness::reading_only("foo.bar")).await;
+
+    harness.create_simple_dataset().await;
+    harness.create_empty_dataset("foo.hidden").await;
+
+    let service_url = format!("http://{}/odata", harness.api_server.local_addr());
+
+    let client = async move {
+        let cl = reqwest::Client::new();
+        let res = cl.get(&service_url).send().await.unwrap();
+        assert_eq!(res.status(), http::StatusCode::OK);
 
         let body = res.text().await.unwrap();
         pretty_assertions::assert_eq!(
@@ -337,7 +384,8 @@ async fn test_collection_handler_by_name_not_found() {
 #[test_group::group(engine, datafusion)]
 #[test_log::test(tokio::test)]
 async fn test_collection_handler_by_private_dataset_name_not_found() {
-    let harness = TestHarness::new_with_authorizer(MockDatasetActionAuthorizer::denying()).await;
+    let harness =
+        TestHarness::new_with_permission_checker(MockDatasetPermissionChecker::denying()).await;
 
     harness.create_simple_dataset().await;
 
@@ -367,11 +415,13 @@ struct TestHarness {
 
 impl TestHarness {
     async fn new() -> Self {
-        Self::new_with_authorizer(AlwaysHappyDatasetActionAuthorizer::new()).await
+        Self::new_with_permission_checker(AlwaysHappyDatasetPermissionChecker::new()).await
     }
 
-    async fn new_with_authorizer<TDatasetAuthorizer: DatasetActionAuthorizer + 'static>(
-        dataset_action_authorizer: TDatasetAuthorizer,
+    async fn new_with_permission_checker<
+        TDatasetPermissionChecker: DatasetPermissionChecker + 'static,
+    >(
+        dataset_permission_checker: TDatasetPermissionChecker,
     ) -> Self {
         let temp_dir = tempfile::tempdir().unwrap();
         let run_info_dir = temp_dir.path().join("run");
@@ -384,6 +434,7 @@ impl TestHarness {
         let catalog = {
             let mut b = dill::CatalogBuilder::new();
 
+            kamu_datasets_inmem::register_dependencies(&mut b);
             b.add_value(RunInfoDir::new(run_info_dir))
                 .add_builder(messaging_outbox::OutboxImmediateImpl::builder(
                     messaging_outbox::ConsumerFilter::AllConsumers,
@@ -393,10 +444,10 @@ impl TestHarness {
                 .add_value(CacheDir::new(cache_dir))
                 .add::<ObjectStoreRegistryImpl>()
                 .add::<ObjectStoreBuilderLocalFs>()
-                .add::<DataFormatRegistryImpl>()
-                .add_value(CurrentAccountSubject::new_test())
-                .add_value(dataset_action_authorizer)
-                .bind::<dyn DatasetActionAuthorizer, TDatasetAuthorizer>()
+                .add::<DataFormatRegistryImpl>();
+            CurrentAccountSubject::new_test().register(&mut b);
+            b.add_value(dataset_permission_checker)
+                .bind::<dyn DatasetPermissionChecker, TDatasetPermissionChecker>()
                 .add_value(TenancyConfig::SingleTenant)
                 .add_builder(odf::dataset::DatasetStorageUnitLocalFs::builder(
                     datasets_dir,
@@ -405,6 +456,7 @@ impl TestHarness {
                 .add_value(MetadataChainDbBackedConfig::default())
                 .add::<CreateDatasetFromSnapshotUseCaseImpl>()
                 .add::<CreateDatasetUseCaseHelper>()
+                .add::<DatasetHeadCommitterImpl>()
                 .add_value(SystemTimeSourceStub::new_set(
                     Utc.with_ymd_and_hms(2050, 1, 1, 12, 0, 0).unwrap(),
                 ))
@@ -419,13 +471,8 @@ impl TestHarness {
                 .add::<SessionContextBuilder>()
                 .add_value(ServerUrlConfig::new_test(None))
                 .add::<DatasetEntryServiceImpl>()
-                .add::<InMemoryDatasetEntryRepository>()
                 .add::<DatasetReferenceServiceImpl>()
-                .add::<InMemoryDatasetReferenceRepository>()
                 .add::<DependencyGraphServiceImpl>()
-                .add::<InMemoryDatasetDependencyRepository>()
-                .add::<InMemoryDatasetKeyBlockRepository>()
-                .add::<InMemoryDatasetDataBlockRepository>()
                 .add_value(PredefinedAccountsConfig::test_single_tenant_with_id())
                 .add::<PredefinedAccountsRegistrator>()
                 .add::<RebacServiceImpl>()
@@ -441,7 +488,6 @@ impl TestHarness {
                 .add::<InMemoryAccountRepository>()
                 .add::<InMemoryAccountQuotaEventStore>()
                 .add::<AccountQuotaServiceImpl>()
-                .add::<InMemoryDatasetStatisticsRepository>()
                 .add::<DatasetStatisticsServiceImpl>()
                 .add::<AccountQuotaCheckerStorageImpl>()
                 .add_value(QuotaDefaultsConfig::default())
@@ -474,6 +520,40 @@ impl TestHarness {
             catalog,
             api_server,
         }
+    }
+
+    /// Grants `Read` to the test account on the named dataset only
+    fn reading_only(readable_dataset_name: &'static str) -> MockDatasetPermissionChecker {
+        let expected_principal = Principal::from(&CurrentAccountSubject::new_test());
+        let mut checker = MockDatasetPermissionChecker::new();
+        checker
+            .expect_filter_datasets_allowing()
+            .withf(move |principal, _, permission| {
+                *principal == expected_principal && *permission == DatasetPermission::Read
+            })
+            .returning(move |_, handles, _| {
+                Ok(handles
+                    .into_iter()
+                    .filter(|hdl| hdl.alias.dataset_name.as_str() == readable_dataset_name)
+                    .collect())
+            });
+        checker
+    }
+
+    /// A root dataset with no data
+    async fn create_empty_dataset(&self, name: &str) -> CreateDatasetResult {
+        self.catalog
+            .get_one::<dyn CreateDatasetFromSnapshotUseCase>()
+            .unwrap()
+            .execute(
+                MetadataFactory::dataset_snapshot()
+                    .name(name)
+                    .kind(odf::DatasetKind::Root)
+                    .build(),
+                Default::default(),
+            )
+            .await
+            .unwrap()
     }
 
     async fn create_simple_dataset(&self) -> CreateDatasetResult {
@@ -565,3 +645,5 @@ impl TestHarness {
         }
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

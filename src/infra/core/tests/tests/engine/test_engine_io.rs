@@ -15,8 +15,8 @@ use container_runtime::ContainerRuntime;
 use indoc::indoc;
 use kamu::domain::*;
 use kamu::*;
-use kamu_accounts::CurrentAccountSubject;
-use kamu_datasets::{AlwaysHappyDatasetActionAuthorizer, ResolvedDataset};
+use kamu_accounts::{CurrentAccountSubject, Principal};
+use kamu_datasets::{AlwaysHappyDatasetPermissionChecker, ResolvedDataset};
 use kamu_datasets_services::DatasetKeyValueServiceSysEnv;
 use odf::dataset::testing::create_test_dataset_from_snapshot;
 use odf::metadata::testing::MetadataFactory;
@@ -42,7 +42,7 @@ async fn test_engine_io_common<
 
     let dataset_registry = DatasetRegistrySoloUnitBridge::new(
         storage_unit.clone(),
-        Arc::new(CurrentAccountSubject::new_test()),
+        Arc::new(Principal::new_test()),
         Arc::new(TenancyConfig::SingleTenant),
     );
 
@@ -78,17 +78,10 @@ async fn test_engine_io_common<
     let transform_helper = TransformTestHelper::build(
         Arc::new(DatasetRegistrySoloUnitBridge::new(
             storage_unit.clone(),
-            Arc::new(CurrentAccountSubject::new_test()),
+            Arc::new(Principal::new_test()),
             Arc::new(TenancyConfig::SingleTenant),
         )),
         time_source.clone(),
-        Arc::new(CompactionPlannerImpl {}),
-        Arc::new(CompactionExecutorImpl::new(
-            object_store_registry.clone(),
-            time_source.clone(),
-            run_info_dir.clone(),
-            Arc::new(EngineConfigDatafusionEmbeddedCompaction::default()),
-        )),
         engine_provisioner.clone(),
     );
 
@@ -287,10 +280,10 @@ async fn test_engine_io_local_file_mount() {
     let mut b = dill::CatalogBuilder::new();
     b.add::<DidGeneratorDefault>()
         .add::<SystemTimeSourceDefault>()
-        .add::<AlwaysHappyDatasetActionAuthorizer>()
-        .add::<DatasetKeyValueServiceSysEnv>()
-        .add_value(CurrentAccountSubject::new_test())
-        .add_value(TenancyConfig::SingleTenant)
+        .add::<AlwaysHappyDatasetPermissionChecker>()
+        .add::<DatasetKeyValueServiceSysEnv>();
+    CurrentAccountSubject::new_test().register(&mut b);
+    b.add_value(TenancyConfig::SingleTenant)
         .add_builder(odf::dataset::DatasetStorageUnitLocalFs::builder(
             datasets_dir,
         ))
@@ -335,9 +328,9 @@ async fn test_engine_io_s3_to_local_file_mount_proxy() {
     let mut b = dill::CatalogBuilder::new();
     b.add::<DidGeneratorDefault>()
         .add::<SystemTimeSourceDefault>()
-        .add::<AlwaysHappyDatasetActionAuthorizer>()
-        .add_value(CurrentAccountSubject::new_test())
-        .add_value(TenancyConfig::SingleTenant)
+        .add::<AlwaysHappyDatasetPermissionChecker>();
+    CurrentAccountSubject::new_test().register(&mut b);
+    b.add_value(TenancyConfig::SingleTenant)
         .add_builder(odf::dataset::DatasetStorageUnitS3::builder(s3.ctx.clone()))
         .add_builder(odf::dataset::DatasetS3BuilderDefault::builder(None));
 
@@ -385,8 +378,10 @@ async fn ingest(
     let ingest_result = ingest_svc
         .ingest(
             target.clone(),
-            metadata_state,
+            PollingIngestPlan::new(target.get_handle(), metadata_state).unwrap(),
             PollingIngestOptions::default(),
+            &IngestEnvVars::default(),
+            &random_strings::get_random_name(None, 10),
             None,
         )
         .await
@@ -394,7 +389,7 @@ async fn ingest(
 
     if let PollingIngestResult::Updated {
         old_head, new_head, ..
-    } = &ingest_result.result
+    } = &ingest_result
     {
         target
             .as_metadata_chain()
@@ -410,3 +405,5 @@ async fn ingest(
             .unwrap();
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

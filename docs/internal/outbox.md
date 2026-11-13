@@ -287,11 +287,13 @@ drain:  loop { n = consumption_iteration(); if n == 0 break }
 run_while_has_tasks(): loop { held = has_held_back_messages(); drain; if !held break; sleep(20ms) }
 ```
 
-Waking is described in [wakeup-listeners.md](wakeup-listeners.md) (channel
-`outbox_messages_ready`). The same drain is callable as `run_while_has_tasks()`: the CLI calls it
-after commands that need it, and the HTTP E2E middleware after every successful mutating request,
-so E2E tests observe consumers' effects synchronously. A `run_lock` keeps these entrances from
-overlapping with the main loop.
+Waking is described in [wakeup-listeners.md](wakeup-listeners.md) (channel `outbox_messages_ready`).
+The same drain is callable as `run_while_has_tasks()`. With a database configured, the CLI calls it
+after every command that `command_needs_outbox_processing` selects, whether the command succeeded or
+failed: a failed command may still have committed work in transactions of its own. The HTTP E2E
+middleware calls it after every successful mutating request (a REST `POST` or a GraphQL
+`mutation`), so E2E tests observe
+consumers' effects synchronously. A `run_lock` keeps these entrances from overlapping with the main loop.
 
 `run_while_has_tasks()` does not stop at the first empty iteration. Committed messages can be held
 back while an older transaction runs ([§6](#reading-below-the-oldest-running-transaction)), anywhere
@@ -447,9 +449,11 @@ backgroundAgents:
   save planning round trips when catching up on a backlog; smaller ones hand the SQLite connection
   back to API requests sooner.
 - `concurrency.outboxConsumers` — consumer tasks running at once, across all producers, each holding
-  a pooled connection. 1 by default for SQLite's single connection; 8 in `production_default()`. It shares the pool with the flow, task and flow system
-  event agents, the Postgres `LISTEN` connection and API requests, so size `database.maxConnections`
-  (default `20`) for their sum.
+  a pooled connection. 1 by default for SQLite's single connection, where a consumer waiting on it
+  times out and stays failed until restart; 8 in `OutboxAgentConfig::production_default()`. Messages
+  of one producer are still handled in order: all consumers finish message N before any gets N+1.
+  The limit shares the pool with the flow, task and flow system event agents, the Postgres `LISTEN`
+  connection and API requests, so size `database.maxConnections` (default `20`) for their sum.
 
 Prometheus metrics (`OutboxAgentMetrics`), labelled by `producer` and `consumer`:
 

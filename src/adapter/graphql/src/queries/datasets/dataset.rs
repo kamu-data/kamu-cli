@@ -11,7 +11,7 @@ use std::collections::HashSet;
 
 use chrono::prelude::*;
 use kamu_core::ServerUrlConfig;
-use kamu_datasets::DatasetAction;
+use kamu_datasets::DatasetPermission;
 
 use crate::prelude::*;
 use crate::queries::*;
@@ -48,12 +48,12 @@ impl Dataset {
         }
     }
 
-    pub(crate) async fn allowed_dataset_actions(
+    pub(crate) async fn granted_dataset_permissions(
         &self,
         ctx: &Context<'_>,
-    ) -> Result<&HashSet<DatasetAction>> {
+    ) -> Result<&HashSet<DatasetPermission>> {
         self.dataset_request_state
-            .allowed_dataset_actions(ctx)
+            .granted_dataset_permissions(ctx)
             .await
     }
 
@@ -217,12 +217,12 @@ impl Dataset {
 
         let allowed_actions = self
             .dataset_request_state
-            .allowed_dataset_actions(ctx)
+            .granted_dataset_permissions(ctx)
             .await?;
-        let can_read = allowed_actions.contains(&DatasetAction::Read);
-        let can_write = allowed_actions.contains(&DatasetAction::Write);
-        let can_maintain = allowed_actions.contains(&DatasetAction::Maintain);
-        let is_owner = allowed_actions.contains(&DatasetAction::Own);
+        let can_read = allowed_actions.contains(&DatasetPermission::Read);
+        let can_write = allowed_actions.contains(&DatasetPermission::Write);
+        let can_maintain = allowed_actions.contains(&DatasetPermission::Maintain);
+        let is_owner = allowed_actions.contains(&DatasetPermission::Own);
 
         Ok(DatasetPermissions {
             collaboration: DatasetCollaborationPermissions {

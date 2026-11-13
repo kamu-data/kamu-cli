@@ -232,13 +232,7 @@ pub fn configure_in_memory_components(b: &mut CatalogBuilder) {
     b.add::<kamu_task_system_inmem::InMemoryTaskEventStore>();
     b.add::<kamu_task_system_inmem::InMemoryTaskQueueWakeupSource>();
 
-    b.add::<kamu_datasets_inmem::InMemoryDatasetEntryRepository>();
-    b.add::<kamu_datasets_inmem::InMemoryDatasetDependencyRepository>();
-    b.add::<kamu_datasets_inmem::InMemoryDatasetReferenceRepository>();
-    b.add::<kamu_datasets_inmem::InMemoryDatasetStatisticsRepository>();
-    b.add::<kamu_datasets_inmem::InMemoryDatasetKeyBlockRepository>();
-    b.add::<kamu_datasets_inmem::InMemoryDatasetDataBlockRepository>();
-    b.add::<kamu_datasets_inmem::InMemoryDatasetBlockQueryRepository>();
+    kamu_datasets_inmem::register_dependencies(b);
 
     b.add::<kamu_resources_inmem::InMemoryRawResourceEventStore>();
     b.add::<kamu_resources_inmem::InMemoryResourceRepository>();

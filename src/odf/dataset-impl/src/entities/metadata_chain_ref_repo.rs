@@ -53,6 +53,28 @@ where
     pub fn new(ref_repo: RefRepo) -> Self {
         Self { ref_repo }
     }
+
+    async fn try_get_ref(&self, r: &BlockRef) -> Result<Option<Multihash>, SetChainRefError> {
+        match self.ref_repo.get(r.as_str()).await {
+            Ok(hash) => Ok(Some(hash)),
+            Err(GetRefError::NotFound(_)) => Ok(None),
+            Err(GetRefError::Access(e)) => Err(SetChainRefError::Access(e)),
+            Err(GetRefError::Internal(e)) => Err(SetChainRefError::Internal(e)),
+        }
+    }
+
+    fn cas_failed(
+        r: &BlockRef,
+        expected: Option<&Multihash>,
+        actual: Option<Multihash>,
+    ) -> SetChainRefError {
+        RefCASError {
+            reference: r.cheap_clone(),
+            expected: expected.cloned(),
+            actual,
+        }
+        .into()
+    }
 }
 
 #[async_trait::async_trait]
@@ -70,27 +92,33 @@ where
         hash: &Multihash,
         check_ref_is: Option<Option<&'a Multihash>>,
     ) -> Result<(), SetChainRefError> {
-        // TODO: CONCURRENCY: Implement true CAS
-        if let Some(prev_expected) = check_ref_is {
-            let prev_actual = match self.ref_repo.get(r.as_str()).await {
-                Ok(r) => Ok(Some(r)),
-                Err(GetRefError::NotFound(_)) => Ok(None),
-                Err(GetRefError::Access(e)) => Err(SetChainRefError::Access(e)),
-                Err(GetRefError::Internal(e)) => Err(SetChainRefError::Internal(e)),
-            }?;
-            if prev_expected != prev_actual.as_ref() {
-                return Err(RefCASError {
-                    reference: r.cheap_clone(),
-                    expected: prev_expected.cloned(),
-                    actual: prev_actual,
-                }
-                .into());
+        let Some(expected) = check_ref_is else {
+            self.ref_repo.set(r.as_str(), hash).await?;
+            return Ok(());
+        };
+
+        match self
+            .ref_repo
+            .compare_and_set(r.as_str(), expected, hash)
+            .await
+        {
+            Ok(()) => Ok(()),
+            Err(CompareAndSetRefError::Mismatch(_)) => {
+                let actual = self.try_get_ref(r).await?;
+                Err(Self::cas_failed(r, expected, actual))
             }
+            // Best effort: a write landing between this check and `set` is lost
+            Err(CompareAndSetRefError::NotSupported) => {
+                let actual = self.try_get_ref(r).await?;
+                if expected != actual.as_ref() {
+                    return Err(Self::cas_failed(r, expected, actual));
+                }
+                self.ref_repo.set(r.as_str(), hash).await?;
+                Ok(())
+            }
+            Err(CompareAndSetRefError::Access(e)) => Err(SetChainRefError::Access(e)),
+            Err(CompareAndSetRefError::Internal(e)) => Err(SetChainRefError::Internal(e)),
         }
-
-        self.ref_repo.set(r.as_str(), hash).await?;
-
-        Ok(())
     }
 
     fn as_uncached_ref_repo(&self) -> &dyn ReferenceRepository {

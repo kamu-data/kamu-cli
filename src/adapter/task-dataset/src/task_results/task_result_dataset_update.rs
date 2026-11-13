@@ -7,65 +7,93 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use internal_error::{InternalError, ResultIntoInternal};
-use kamu_core::{PullResult, PullResultUpToDate};
+use kamu_core::PullResultUpToDate;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-kamu_task_system::task_result_struct! {
-    pub struct TaskResultDatasetUpdate {
-        pub pull_result: PullResult,
-        #[serde(default)]
-        pub data_increment: Option<odf::dataset::MetadataChainIncrementInterval>,
+kamu_task_system::task_result_enum! {
+    pub enum TaskResultDatasetUpdate {
+        /// `HEAD` moved; the increment is the data between the old and the new
+        /// head
+        Updated {
+            old_head: Option<odf::Multihash>,
+            new_head: odf::Multihash,
+            has_more: bool,
+            increment: odf::dataset::MetadataChainIncrementInterval,
+        },
+        UpToDate(PullResultUpToDate),
     }
     => "UpdateDatasetResult"
 }
 
-impl TaskResultDatasetUpdate {
-    pub fn try_as_increment(&self) -> Option<(Option<&odf::Multihash>, &odf::Multihash)> {
-        match &self.pull_result {
-            PullResult::Updated {
-                old_head, new_head, ..
-            } => Some((old_head.as_ref(), new_head)),
-            PullResult::UpToDate(_) => None,
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[cfg(test)]
+mod tests {
+    use kamu_core::PollingIngestResultUpToDate;
+    use pretty_assertions::assert_eq;
+    use serde_json::json;
+
+    use super::*;
+
+    #[test]
+    fn test_updated_result_json_is_stable() {
+        let old_head = odf::Multihash::from_digest_sha3_256(b"old");
+        let new_head = odf::Multihash::from_digest_sha3_256(b"new");
+        let result = TaskResultDatasetUpdate::Updated {
+            old_head: Some(old_head.clone()),
+            new_head: new_head.clone(),
+            has_more: true,
+            increment: odf::dataset::MetadataChainIncrementInterval {
+                num_blocks: 2,
+                num_records: 10,
+                updated_watermark: None,
+            },
         }
+        .into_task_result();
+
+        assert_eq!(result.result_type, "UpdateDatasetResult");
+        assert_eq!(
+            result.payload,
+            json!({
+                "Updated": {
+                    "old_head": old_head.to_string(),
+                    "new_head": new_head.to_string(),
+                    "has_more": true,
+                    "increment": {
+                        "num_blocks": 2,
+                        "num_records": 10,
+                        "updated_watermark": null,
+                    },
+                }
+            })
+        );
+        assert_eq!(
+            TaskResultDatasetUpdate::from_task_result(&result).unwrap(),
+            TaskResultDatasetUpdate::Updated {
+                old_head: Some(old_head),
+                new_head,
+                has_more: true,
+                increment: odf::dataset::MetadataChainIncrementInterval {
+                    num_blocks: 2,
+                    num_records: 10,
+                    updated_watermark: None,
+                },
+            }
+        );
     }
 
-    pub fn try_as_up_to_date(&self) -> Option<&PullResultUpToDate> {
-        match &self.pull_result {
-            PullResult::UpToDate(up_to_date) => Some(up_to_date),
-            PullResult::Updated { .. } => None,
-        }
-    }
+    #[test]
+    fn test_up_to_date_result_json_is_stable() {
+        let result = TaskResultDatasetUpdate::UpToDate(PullResultUpToDate::PollingIngest(
+            PollingIngestResultUpToDate { uncacheable: true },
+        ))
+        .into_task_result();
 
-    pub fn has_more(&self) -> bool {
-        match &self.pull_result {
-            PullResult::Updated { has_more, .. } => *has_more,
-            PullResult::UpToDate(_) => false,
-        }
-    }
-
-    pub async fn from_pull_result(
-        pull_result: PullResult,
-        dataset_increment_query_service: &dyn kamu_datasets::DatasetIncrementQueryService,
-        dataset_id: &odf::DatasetID,
-    ) -> Result<Self, InternalError> {
-        let data_increment = match &pull_result {
-            PullResult::Updated {
-                old_head, new_head, ..
-            } => Some(
-                dataset_increment_query_service
-                    .get_increment_between(dataset_id, old_head.as_ref(), new_head)
-                    .await
-                    .int_err()?,
-            ),
-            PullResult::UpToDate(_) => None,
-        };
-
-        Ok(Self {
-            pull_result,
-            data_increment,
-        })
+        assert_eq!(
+            result.payload,
+            json!({ "UpToDate": { "PollingIngest": { "uncacheable": true } } })
+        );
     }
 }
 

@@ -10,7 +10,7 @@
 use std::sync::Arc;
 
 use internal_error::{ErrorIntoInternal, InternalError};
-use kamu_datasets::DatasetActionUnauthorizedError;
+use kamu_datasets::DatasetPermissionError;
 use thiserror::Error;
 
 use crate::{
@@ -70,6 +70,10 @@ pub enum CompactionError {
         CompactionExecutionError,
     ),
 
+    /// `HEAD` was moved concurrently; nothing was committed.
+    #[error(transparent)]
+    RefCASFailed(#[from] odf::dataset::RefCASError),
+
     #[error(transparent)]
     Access(
         #[from]
@@ -83,9 +87,9 @@ pub enum CompactionError {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl From<DatasetActionUnauthorizedError> for CompactionError {
-    fn from(v: DatasetActionUnauthorizedError) -> Self {
-        use DatasetActionUnauthorizedError as E;
+impl From<DatasetPermissionError> for CompactionError {
+    fn from(v: DatasetPermissionError) -> Self {
+        use DatasetPermissionError as E;
 
         match v {
             E::NotFound(e) => Self::NotFound(e),
@@ -102,8 +106,8 @@ impl From<odf::dataset::SetChainRefError> for CompactionError {
         match v {
             odf::dataset::SetChainRefError::Access(e) => Self::Access(e),
             odf::dataset::SetChainRefError::Internal(e) => Self::Internal(e),
-            odf::dataset::SetChainRefError::BlockNotFound(_)
-            | odf::dataset::SetChainRefError::CASFailed(_) => Self::Internal(v.int_err()),
+            odf::dataset::SetChainRefError::CASFailed(e) => Self::RefCASFailed(e),
+            odf::dataset::SetChainRefError::BlockNotFound(_) => Self::Internal(v.int_err()),
         }
     }
 }

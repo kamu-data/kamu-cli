@@ -146,20 +146,19 @@ async fn test_push_remote_no_target_presaved_push_alias() {
     let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
     let foo = harness.create_root_dataset(&alias_foo).await;
 
-    let remote_repo_data = harness.maybe_remote_repo_data.unwrap();
-
-    let mut aliases = harness
-        .remote_aliases_registry
-        .get_remote_aliases(&foo.dataset_handle)
-        .await
-        .unwrap();
-    aliases
-        .add(
-            &odf::DatasetRefRemote::Url(Arc::new(remote_repo_data.remote_repo_url.clone())),
+    let remote_repo_url = harness
+        .maybe_remote_repo_data
+        .as_ref()
+        .unwrap()
+        .remote_repo_url
+        .clone();
+    harness
+        .add_remote_alias(
+            &foo.dataset_handle,
+            remote_repo_url.as_str(),
             RemoteAliasKind::Push,
         )
-        .await
-        .unwrap();
+        .await;
 
     let (items, errors) = harness
         .push_request_planner
@@ -173,13 +172,45 @@ async fn test_push_remote_no_target_presaved_push_alias() {
         PushItem {
             local_handle: foo.dataset_handle,
             remote_target: RemoteTarget {
-                url: remote_repo_data.remote_repo_url,
+                url: remote_repo_url,
                 repo_name: None,
                 dataset_name: None,
                 account_name: None,
             },
             push_target: None,
         }
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_push_remote_no_target_several_push_aliases_is_ambiguous() {
+    let harness = PushTestHarness::new(TenancyConfig::SingleTenant, false);
+
+    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let foo = harness.create_root_dataset(&alias_foo).await;
+
+    for url in ["http://example.com/a", "http://example.com/b"] {
+        harness
+            .add_remote_alias(&foo.dataset_handle, url, RemoteAliasKind::Push)
+            .await;
+    }
+
+    let (items, errors) = harness
+        .push_request_planner
+        .collect_plan(std::slice::from_ref(&foo.dataset_handle), None)
+        .await;
+    assert_eq!(items, []);
+
+    assert_eq!(1, errors.len());
+    assert_matches!(
+        errors.first().unwrap(),
+        PushResponse {
+            local_handle: Some(a_local_handle),
+            target: None,
+            result: Err(PushError::AmbiguousTarget),
+        } if *a_local_handle == foo.dataset_handle
     );
 }
 
@@ -248,7 +279,7 @@ async fn test_push_remote_no_target_no_alias_multiple_repos_exist() {
         PushResponse {
             local_handle: Some(a_local_handle),
             target: None,
-            result: Err(PushError::AmbiguousTarget),
+            result: Err(PushError::AmbiguousRepository),
         } if *a_local_handle == foo.dataset_handle
     );
 }
@@ -285,7 +316,6 @@ async fn test_push_remote_no_target_no_alias_no_repositories() {
 struct PushTestHarness {
     base_repo_harness: BaseRepoHarness,
     push_request_planner: Arc<dyn PushRequestPlanner>,
-    remote_aliases_registry: Arc<dyn RemoteAliasesRegistry>,
     remote_repo_registry: Arc<dyn RemoteRepositoryRegistry>,
     maybe_remote_repo_data: Option<RemoteRepoData>,
 }
@@ -311,6 +341,7 @@ impl PushTestHarness {
             .add::<odf::dataset::DummyOdfServerAccessTokenResolver>()
             .add::<PushRequestPlannerImpl>()
             .add::<RemoteAliasResolverImpl>()
+            .add::<RemoteDatasetUrlResolverImpl>()
             .add::<RemoteAliasesRegistryImpl>()
             .build();
 
@@ -336,7 +367,6 @@ impl PushTestHarness {
         Self {
             base_repo_harness,
             push_request_planner: catalog.get_one().unwrap(),
-            remote_aliases_registry: catalog.get_one().unwrap(),
             remote_repo_registry: catalog.get_one().unwrap(),
             maybe_remote_repo_data,
         }

@@ -41,6 +41,8 @@
 //! get a `Vec<ResourceView>` and never branch on cardinality.
 //! [`ResourceCtx::get_one`] is the sugar for the "exactly one" case.
 
+use std::time::Duration;
+
 use chrono::{DateTime, Utc};
 use serde_json::Value;
 
@@ -292,6 +294,18 @@ impl ResourceCtx {
             .collect();
         idents.sort();
         idents
+    }
+
+    /// Waits until the variable set is `Ready`: flows resolve variables from
+    /// reconciled sets only, and reconciliation follows `apply` asynchronously
+    pub async fn wait_until_variable_set_ready(&self, variable_set_name: &str) {
+        for _ in 0..60 {
+            if self.get_one(["get", "vs", variable_set_name]).await.phase() == "Ready" {
+                return;
+            }
+            tokio::time::sleep(Duration::from_millis(500)).await;
+        }
+        panic!("VariableSet {variable_set_name} did not become ready");
     }
 }
 

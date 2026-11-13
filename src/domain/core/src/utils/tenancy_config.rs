@@ -9,7 +9,7 @@
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-use kamu_accounts::DEFAULT_ACCOUNT_NAME_STR;
+use kamu_accounts::{DEFAULT_ACCOUNT_NAME, DEFAULT_ACCOUNT_NAME_STR, Principal};
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Default)]
 pub enum TenancyConfig {
@@ -63,11 +63,72 @@ impl TenancyConfig {
         }
     }
 
+    /// The account a bare dataset alias belongs to when `principal` resolves
+    /// it: the default account in a single-tenant workspace; otherwise the
+    /// user's own account and the default account for an anonymous request.
+    /// `None` for the node in a multi-tenant workspace: it has no account, so
+    /// a bare alias names no dataset
+    pub fn bare_alias_account_name<'a>(
+        &self,
+        principal: &'a Principal,
+    ) -> Option<&'a odf::AccountName> {
+        match (*self, principal) {
+            (TenancyConfig::SingleTenant, _)
+            | (TenancyConfig::MultiTenant, Principal::Anonymous) => Some(&DEFAULT_ACCOUNT_NAME),
+            (TenancyConfig::MultiTenant, Principal::User(account_handle)) => {
+                Some(&account_handle.name)
+            }
+            (TenancyConfig::MultiTenant, Principal::Node) => None,
+        }
+    }
+
     pub fn default_dataset_visibility(&self) -> odf::DatasetVisibility {
         match *self {
             TenancyConfig::MultiTenant => odf::DatasetVisibility::Private,
             TenancyConfig::SingleTenant => odf::DatasetVisibility::Public,
         }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[cfg(test)]
+mod tests {
+    use kamu_accounts::{Account, AccountHandle};
+
+    use super::*;
+
+    fn user(name: &str) -> Principal {
+        Principal::User(AccountHandle {
+            id: Account::seed_resource_id_from_name(name),
+            did: odf::metadata::testing::account_id(&name),
+            name: odf::AccountName::new_unchecked(name),
+        })
+    }
+
+    #[test]
+    fn test_bare_alias_account_name_single_tenant_is_always_default() {
+        for principal in [user("alice"), Principal::Node, Principal::Anonymous] {
+            assert_eq!(
+                TenancyConfig::SingleTenant.bare_alias_account_name(&principal),
+                Some(&*DEFAULT_ACCOUNT_NAME)
+            );
+        }
+    }
+
+    #[test]
+    fn test_bare_alias_account_name_multi_tenant_follows_principal() {
+        let mt = TenancyConfig::MultiTenant;
+
+        assert_eq!(
+            mt.bare_alias_account_name(&user("alice")),
+            Some(&odf::AccountName::new_unchecked("alice"))
+        );
+        assert_eq!(mt.bare_alias_account_name(&Principal::Node), None);
+        assert_eq!(
+            mt.bare_alias_account_name(&Principal::Anonymous),
+            Some(&*DEFAULT_ACCOUNT_NAME)
+        );
     }
 }
 

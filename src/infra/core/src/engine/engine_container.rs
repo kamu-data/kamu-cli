@@ -27,10 +27,11 @@ pub(crate) struct EngineContainer {
     logs_config: LogsConfig,
 }
 
+#[common_macros::method_names_consts]
 impl EngineContainer {
     const ADAPTER_PORT: u16 = 2884;
 
-    #[tracing::instrument(level = "info", name = "init_engine", skip_all, fields(%image))]
+    #[tracing::instrument(level = "info", name = EngineContainer_new, skip_all, fields(%image))]
     pub async fn new(
         container_runtime: Arc<ContainerRuntime>,
         engine_config: ODFEngineConfig,

@@ -7,26 +7,23 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-// Copyright Kamu Data, Inc. and contributors. All rights reserved.
-//
-// Use of this software is governed by the Business Source License
-// included in the LICENSE file.
-//
-// As of the Change Date specified in that file, in accordance with
-// the Business Source License, use of this software will be governed
-// by the Apache License, Version 2.0.
-
 use std::assert_matches;
 
-use kamu::domain::PullResult;
+use kamu::domain::{
+    CorruptedSourceError,
+    DatasetIdMismatchError,
+    PullError,
+    PullResult,
+    SyncError,
+    SyncResult,
+};
+use kamu_adapter_http::smart_protocol::messages::DatasetPullRequest;
 use kamu_core::TenancyConfig;
 
 use crate::harness::{
-    ClientSideHarness,
-    ClientSideHarnessOptions,
+    LocalFsTransferOptions,
+    ScriptedPullServer,
     ServerSideHarness,
-    ServerSideHarnessOptions,
-    ServerSideLocalFsHarness,
     await_client_server_flow,
 };
 use crate::tests::tests_pull::scenarios::*;
@@ -35,20 +32,15 @@ use crate::tests::tests_pull::scenarios::*;
 
 #[test_log::test(tokio::test)]
 async fn test_smart_pull_unauthenticated() {
-    let scenario = SmartPullNewDatasetScenario::prepare(
-        ClientSideHarness::new(ClientSideHarnessOptions {
-            tenancy_config: TenancyConfig::SingleTenant,
-            authenticated_remotely: false,
-        })
-        .await,
-        ServerSideLocalFsHarness::new(ServerSideHarnessOptions {
-            tenancy_config: TenancyConfig::SingleTenant,
-            authorized_writes: true,
-            base_catalog: None,
-        })
-        .await,
-    )
+    let (client_harness, server_harness) = LocalFsTransferOptions {
+        client_tenancy: TenancyConfig::SingleTenant,
+        authenticated_remotely: false,
+        server_tenancy: TenancyConfig::SingleTenant,
+        authorized_writes: true,
+    }
+    .build()
     .await;
+    let scenario = SmartPullNewDatasetScenario::prepare(client_harness, server_harness).await;
     let dataset_fixture = scenario.server_harness.dataset_fixture();
 
     let api_server_handle = scenario.server_harness.api_server_run();
@@ -87,20 +79,15 @@ async fn test_smart_pull_unauthenticated() {
 
 #[test_log::test(tokio::test)]
 async fn test_smart_pull_incompatible_version_err() {
-    let scenario = SmartPullNewDatasetScenario::prepare(
-        ClientSideHarness::new(ClientSideHarnessOptions {
-            tenancy_config: TenancyConfig::MultiTenant,
-            authenticated_remotely: true,
-        })
-        .await,
-        ServerSideLocalFsHarness::new(ServerSideHarnessOptions {
-            tenancy_config: TenancyConfig::MultiTenant,
-            authorized_writes: true,
-            base_catalog: None,
-        })
-        .await,
-    )
+    let (client_harness, server_harness) = LocalFsTransferOptions {
+        client_tenancy: TenancyConfig::MultiTenant,
+        authenticated_remotely: true,
+        server_tenancy: TenancyConfig::MultiTenant,
+        authorized_writes: true,
+    }
+    .build()
     .await;
+    let scenario = SmartPullNewDatasetScenario::prepare(client_harness, server_harness).await;
 
     let api_server_handle = scenario.server_harness.api_server_run();
 
@@ -118,6 +105,456 @@ async fn test_smart_pull_incompatible_version_err() {
     };
 
     await_client_server_flow!(api_server_handle, client_handle);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_smart_pull_of_missing_dataset_fails() {
+    let (client_harness, server_harness) = LocalFsTransferOptions {
+        client_tenancy: TenancyConfig::MultiTenant,
+        authenticated_remotely: true,
+        server_tenancy: TenancyConfig::MultiTenant,
+        authorized_writes: true,
+    }
+    .build()
+    .await;
+    let scenario = SmartPullNewDatasetScenario::prepare(client_harness, server_harness).await;
+    let missing_dataset_url = scenario.server_harness.dataset_url(&odf::DatasetAlias::new(
+        Some(scenario.server_harness.api_server_account().account_name),
+        odf::DatasetName::new_unchecked("missing"),
+    ));
+
+    let api_server_handle = scenario.server_harness.api_server_run();
+
+    let client_handle = async {
+        let pull_responses = scenario
+            .client_harness
+            .pull_datasets(odf::DatasetRefAny::from(missing_dataset_url), false)
+            .await;
+
+        assert_matches!(
+            &pull_responses[0].result,
+            Err(PullError::SyncError(SyncError::DatasetNotFound(_)))
+        );
+    };
+
+    await_client_server_flow!(api_server_handle, client_handle);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_smart_pull_without_referenced_objects_is_not_committed() {
+    // The new data block references a data file and a checkpoint, and neither is sent
+    MissingObjectsCase { mislabeled: false }
+        .assert_pull_fails()
+        .await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// The object type picks the repository a file is stored in, so a file sent
+/// as the other type does not count as sent
+#[test_log::test(tokio::test)]
+async fn test_smart_pull_with_mislabeled_objects_is_not_committed() {
+    MissingObjectsCase { mislabeled: true }
+        .assert_pull_fails()
+        .await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_smart_pull_with_corrupted_objects_is_not_committed() {
+    CorruptedSourceCase::CorruptingObjects
+        .assert_pull_fails("file hash didn't match the computed")
+        .await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_smart_pull_with_undecodable_metadata_is_not_committed() {
+    CorruptedSourceCase::SendingUndecodableMetadata
+        .assert_pull_fails("Server sent a metadata batch that cannot be read")
+        .await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_smart_pull_without_planned_blocks_is_not_committed() {
+    CorruptedSourceCase::SendingNoBlocks
+        .assert_pull_fails("Server sent no blocks for a non-empty transfer plan")
+        .await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_smart_pull_into_existing_reports_increment() {
+    let (client_harness, server_harness) = LocalFsTransferOptions {
+        client_tenancy: TenancyConfig::SingleTenant,
+        authenticated_remotely: true,
+        server_tenancy: TenancyConfig::SingleTenant,
+        authorized_writes: true,
+    }
+    .build()
+    .await;
+    let scenario =
+        SmartPullExistingEvolvedDatasetScenario::prepare(client_harness, server_harness).await;
+    let dataset_handle = &scenario.server_create_result.dataset_handle;
+
+    let api_server_handle = scenario.server_harness.api_server_run();
+
+    let client_handle = async {
+        let sync_result = scenario
+            .client_harness
+            .sync_into_existing(scenario.server_dataset_ref.clone(), dataset_handle)
+            .await;
+
+        // The server added a `SetInfo` and an `AddData` of 10 records
+        pretty_assertions::assert_eq!(
+            sync_result,
+            SyncResult::Updated {
+                old_head: Some(scenario.server_create_result.head.clone()),
+                new_head: scenario.server_commit_result.new_head.clone(),
+                num_blocks: 2,
+                increment: odf::dataset::MetadataChainIncrementInterval {
+                    num_blocks: 2,
+                    num_records: 10,
+                    updated_watermark: None,
+                },
+            }
+        );
+        pretty_assertions::assert_eq!(
+            scenario
+                .client_harness
+                .stored_head(&dataset_handle.id)
+                .await,
+            scenario.server_commit_result.new_head
+        );
+    };
+
+    await_client_server_flow!(api_server_handle, client_handle);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// A dataset left without `HEAD` receives the whole chain, `Seed` included, so
+/// the `Seed` of another dataset must be refused. With `force`, the ID
+/// comparison before the transfer refuses it first
+#[test_log::test(tokio::test)]
+async fn test_smart_pull_into_headless_dataset_of_another_id_fails() {
+    let (client_harness, server_harness) = LocalFsTransferOptions {
+        client_tenancy: TenancyConfig::SingleTenant,
+        authenticated_remotely: true,
+        server_tenancy: TenancyConfig::SingleTenant,
+        authorized_writes: true,
+    }
+    .build()
+    .await;
+    let scenario = SmartPullNewDatasetScenario::prepare(client_harness, server_harness).await;
+    let headless_dataset_handle = scenario
+        .client_harness
+        .create_headless_dataset(scenario.server_dataset_handle.alias.dataset_name.as_str())
+        .await;
+
+    let api_server_handle = scenario.server_harness.api_server_run();
+
+    let client_handle = async {
+        for force in [false, true] {
+            let pull_responses = scenario
+                .client_harness
+                .pull_datasets(
+                    odf::DatasetRefAny::from(scenario.server_dataset_ref.clone()),
+                    force,
+                )
+                .await;
+
+            pretty_assertions::assert_eq!(pull_responses.len(), 1);
+            assert_matches!(
+                &pull_responses[0].result,
+                Err(PullError::SyncError(SyncError::DatasetIdMismatch(DatasetIdMismatchError {
+                    src_dataset_id,
+                    dst_dataset_id,
+                })))
+                if *src_dataset_id == scenario.server_dataset_handle.id
+                    && *dst_dataset_id == headless_dataset_handle.id
+            );
+            pretty_assertions::assert_eq!(
+                scenario
+                    .client_harness
+                    .find_stored_head(&headless_dataset_handle.id)
+                    .await,
+                None
+            );
+        }
+    };
+
+    await_client_server_flow!(api_server_handle, client_handle);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// The real client requests the metadata right after the plan, so only a raw
+/// session lets the server's `HEAD` move in between
+#[test_log::test(tokio::test)]
+async fn test_smart_pull_metadata_ends_at_planned_head() {
+    let (client_harness, server_harness) = LocalFsTransferOptions {
+        client_tenancy: TenancyConfig::SingleTenant,
+        authenticated_remotely: true,
+        server_tenancy: TenancyConfig::SingleTenant,
+        authorized_writes: true,
+    }
+    .build()
+    .await;
+    let scenario =
+        SmartPullExistingEvolvedDatasetScenario::prepare(client_harness, server_harness).await;
+    let dataset_handle = &scenario.server_create_result.dataset_handle;
+    let server_commits = scenario.server_harness.server_commits();
+    let stored_heads = scenario.server_harness.stored_heads();
+
+    let api_server_handle = scenario.server_harness.api_server_run();
+
+    let client_handle = async {
+        let mut session = scenario
+            .client_harness
+            .open_raw_pull_session(scenario.server_dataset_ref.url().unwrap())
+            .await;
+        let transfer_plan = session
+            .plan_pull(DatasetPullRequest {
+                begin_after: Some(scenario.server_create_result.head.clone()),
+                stop_at: None,
+                force_update_if_diverged: false,
+            })
+            .await;
+
+        let concurrent_head = server_commits.commit_set_info(dataset_handle).await;
+        pretty_assertions::assert_eq!(stored_heads.get(&dataset_handle.id).await, concurrent_head);
+
+        let metadata = session.request_metadata().await;
+
+        pretty_assertions::assert_eq!(transfer_plan.num_blocks, 2);
+        pretty_assertions::assert_eq!(metadata.num_blocks, transfer_plan.num_blocks);
+        pretty_assertions::assert_eq!(
+            metadata.block_hashes,
+            vec![
+                scenario.server_commit_result.old_head.clone().unwrap(),
+                scenario.server_commit_result.new_head.clone(),
+            ]
+        );
+    };
+
+    await_client_server_flow!(api_server_handle, client_handle);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_smart_pull_head_moved_concurrently() {
+    HeadMovedConcurrentlyCase { force: false }
+        .assert_pull_fails()
+        .await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_smart_pull_forced_head_moved_concurrently() {
+    HeadMovedConcurrentlyCase { force: true }
+        .assert_pull_fails()
+        .await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// `HEAD` moves after the pull read it: the commit fails and keeps the
+/// concurrent head, with or without `force`
+struct HeadMovedConcurrentlyCase {
+    force: bool,
+}
+
+impl HeadMovedConcurrentlyCase {
+    async fn assert_pull_fails(self) {
+        let (client_harness, server_harness) = LocalFsTransferOptions {
+            client_tenancy: TenancyConfig::SingleTenant,
+            authenticated_remotely: true,
+            server_tenancy: TenancyConfig::SingleTenant,
+            authorized_writes: true,
+        }
+        .build()
+        .await;
+        let scenario =
+            SmartPullExistingEvolvedDatasetScenario::prepare(client_harness, server_harness).await;
+
+        let api_server_handle = scenario.server_harness.api_server_run();
+
+        let client_handle = async {
+            let dataset_handle = &scenario.server_create_result.dataset_handle;
+            let concurrent_head = scenario
+                .client_harness
+                .append_unreferenced_block(dataset_handle)
+                .await;
+            scenario
+                .client_harness
+                .move_head_before_next_commit(concurrent_head.clone());
+
+            let pull_responses = scenario
+                .client_harness
+                .pull_datasets(
+                    odf::DatasetRefAny::from(scenario.server_dataset_ref),
+                    self.force,
+                )
+                .await;
+
+            pretty_assertions::assert_eq!(pull_responses.len(), 1);
+            assert_matches!(
+                &pull_responses[0].result,
+                Err(PullError::HeadMoved(e))
+                    if e.actual.as_ref() == Some(&concurrent_head)
+            );
+            pretty_assertions::assert_eq!(
+                scenario
+                    .client_harness
+                    .stored_head(&dataset_handle.id)
+                    .await,
+                concurrent_head
+            );
+        };
+
+        await_client_server_flow!(api_server_handle, client_handle);
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// A server that sends the blocks of a new dataset, but none of the files
+/// they reference under the type the client asked for
+struct MissingObjectsCase {
+    mislabeled: bool,
+}
+
+impl MissingObjectsCase {
+    async fn assert_pull_fails(self) {
+        let (client_harness, server_harness) = LocalFsTransferOptions {
+            client_tenancy: TenancyConfig::SingleTenant,
+            authenticated_remotely: false,
+            server_tenancy: TenancyConfig::SingleTenant,
+            authorized_writes: true,
+        }
+        .build()
+        .await;
+        let scenario = SmartPullNewDatasetScenario::prepare(client_harness, server_harness).await;
+        let dataset_registry = scenario.server_harness.cli_dataset_registry();
+        let server = if self.mislabeled {
+            ScriptedPullServer::mislabeling_objects(
+                dataset_registry.as_ref(),
+                &scenario.server_dataset_handle,
+            )
+            .await
+        } else {
+            ScriptedPullServer::omitting_objects(
+                dataset_registry.as_ref(),
+                &scenario.server_dataset_handle,
+            )
+            .await
+        };
+        let server_dataset_url = server.dataset_url("foo");
+
+        let server_handle = server.run();
+
+        let client_handle = async {
+            let pull_responses = scenario
+                .client_harness
+                .pull_datasets(odf::DatasetRefAny::from(server_dataset_url), false)
+                .await;
+
+            assert_matches!(
+                &pull_responses[0].result,
+                Err(PullError::SyncError(SyncError::Corrupted(CorruptedSourceError { message, .. })))
+                    if message.starts_with("Server did not send 2 file(s)")
+            );
+            pretty_assertions::assert_eq!(
+                scenario
+                    .client_harness
+                    .find_stored_head(&scenario.server_dataset_handle.id)
+                    .await,
+                None
+            );
+        };
+
+        await_client_server_flow!(server_handle, client_handle);
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// A server whose transfer of a new dataset breaks the same way on every
+/// retry
+enum CorruptedSourceCase {
+    CorruptingObjects,
+    SendingUndecodableMetadata,
+    SendingNoBlocks,
+}
+
+impl CorruptedSourceCase {
+    async fn assert_pull_fails(self, expected_message: &str) {
+        let (client_harness, server_harness) = LocalFsTransferOptions {
+            client_tenancy: TenancyConfig::SingleTenant,
+            authenticated_remotely: false,
+            server_tenancy: TenancyConfig::SingleTenant,
+            authorized_writes: true,
+        }
+        .build()
+        .await;
+        let scenario = SmartPullNewDatasetScenario::prepare(client_harness, server_harness).await;
+        let dataset_registry = scenario.server_harness.cli_dataset_registry();
+        let dataset_handle = &scenario.server_dataset_handle;
+        let server = match self {
+            Self::CorruptingObjects => {
+                ScriptedPullServer::corrupting_objects(dataset_registry.as_ref(), dataset_handle)
+                    .await
+            }
+            Self::SendingUndecodableMetadata => {
+                ScriptedPullServer::sending_undecodable_metadata(
+                    dataset_registry.as_ref(),
+                    dataset_handle,
+                )
+                .await
+            }
+            Self::SendingNoBlocks => {
+                ScriptedPullServer::sending_no_blocks(dataset_registry.as_ref(), dataset_handle)
+                    .await
+            }
+        };
+        let server_dataset_url = server.dataset_url("foo");
+
+        let server_handle = server.run();
+
+        let client_handle = async {
+            let pull_responses = scenario
+                .client_harness
+                .pull_datasets(odf::DatasetRefAny::from(server_dataset_url), false)
+                .await;
+
+            assert_matches!(
+                &pull_responses[0].result,
+                Err(PullError::SyncError(e @ SyncError::Corrupted(CorruptedSourceError { message, .. })))
+                    if message.contains(expected_message) && !e.is_recoverable()
+            );
+            pretty_assertions::assert_eq!(
+                scenario
+                    .client_harness
+                    .find_stored_head(&scenario.server_dataset_handle.id)
+                    .await,
+                None
+            );
+        };
+
+        await_client_server_flow!(server_handle, client_handle);
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

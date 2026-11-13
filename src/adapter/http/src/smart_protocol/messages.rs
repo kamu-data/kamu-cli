@@ -45,6 +45,8 @@ pub struct DatasetPullSuccessResponse {
 /// Unsuccessful response to initial dataset pull request
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
 pub enum DatasetPullRequestError {
+    /// Servers do not send it, since the client checks the `Seed` itself; it
+    /// stays so that a reply from an older server can still be read
     SeedBlockOverwriteRestricted(DatasetPushMetadataSeedBlockOverwriteRestrictedError),
     Internal(TransferInternalError),
     InvalidInterval(DatasetPullInvalidIntervalError),
@@ -61,13 +63,13 @@ pub struct DatasetPullInvalidIntervalError {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Pull stage 1: request metadata update
+/// Pull phase 1: request metadata update
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
 pub struct DatasetPullMetadataRequest {}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Pull stage 1: metadata update response
+/// Pull phase 1: metadata update response
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
 pub struct DatasetMetadataPullResponse {
     pub blocks: MetadataBlocksBatch,
@@ -75,7 +77,7 @@ pub struct DatasetMetadataPullResponse {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Pull stage 2: object transfer request
+/// Pull phase 2: object transfer request
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
 pub struct DatasetPullObjectsTransferRequest {
     pub object_files: Vec<ObjectFileReference>,
@@ -83,7 +85,7 @@ pub struct DatasetPullObjectsTransferRequest {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Pull stage 2: object transfer response
+/// Pull phase 2: object transfer response
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
 pub struct DatasetPullObjectsTransferResponse {
     pub object_transfer_strategies: Vec<PullObjectTransferStrategy>,
@@ -144,8 +146,29 @@ pub enum DatasetPushRequestError {
 /// of date.
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
 pub struct DatasetPushInvalidHeadError {
+    /// The server's `HEAD`
     pub actual_head: Option<odf::Multihash>,
+    /// The `HEAD` the client planned the push from
     pub expected_head: Option<odf::Multihash>,
+}
+
+impl From<&odf::dataset::RefCASError> for DatasetPushInvalidHeadError {
+    fn from(e: &odf::dataset::RefCASError) -> Self {
+        Self {
+            actual_head: e.actual.clone(),
+            expected_head: e.expected.clone(),
+        }
+    }
+}
+
+impl From<DatasetPushInvalidHeadError> for odf::dataset::RefCASError {
+    fn from(e: DatasetPushInvalidHeadError) -> Self {
+        Self {
+            reference: odf::BlockRef::Head,
+            expected: e.expected_head,
+            actual: e.actual_head,
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -172,13 +195,13 @@ pub enum DatasetPushMetadataError {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// Rewriting seed block is restricted
+/// Error: the push would replace the destination's Seed block
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
 pub struct DatasetPushMetadataSeedBlockOverwriteRestrictedError {}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Push phase 2: object transfer response
+/// Push phase 1: push metadata response
 pub type DatasetPushMetadataResponse =
     Result<DatasetPushMetadataAccepted, DatasetPushMetadataError>;
 
@@ -217,7 +240,7 @@ pub enum DatasetPushObjectsTransferError {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// Dataset with such id already exists with different alias
+/// Error: a dataset with the pushed dataset's ID exists under another alias
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
 pub struct DatasetPushObjectsTransferRefCollisionError {
     pub dataset_id: odf::DatasetID,
@@ -225,7 +248,7 @@ pub struct DatasetPushObjectsTransferRefCollisionError {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// Dataset with such id already exists
+/// Error: another dataset already has the alias pushed to
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
 pub struct DatasetPushObjectsTransferNameCollisionError {
     pub dataset_alias: odf::DatasetAlias,
@@ -252,13 +275,20 @@ pub enum ObjectPushStrategy {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Push stage 3: object upload progress request
+/// Push phase 3: object upload progress request, sent by the server
+/// periodically while the client uploads objects
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
-pub struct DatasetPushObjectsUploadProgressRequest {}
+pub struct DatasetPushObjectsUploadProgressRequest {
+    /// Always `true` when sent, so a request read with the complete response
+    /// is not taken for an older server's bare `{}` confirmation. An older
+    /// server's request is also `{}` and stays indistinguishable from it.
+    #[serde(default)]
+    pub progress_requested: bool,
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Push stage 3: object upload progress response
+/// Push phase 3: object upload progress response
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
 pub struct DatasetPushObjectsUploadProgressResponse {
     pub details: ObjectsUploadProgressDetails,
@@ -281,15 +311,84 @@ pub struct ObjectsUploadProgressDetailsRunning {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Push stage 4: complete handshake indication
+/// Push phase 4: complete handshake indication
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
 pub struct DatasetPushComplete {}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Push stage 3: complete handshake acknowledge
+/// Push phase 4: complete handshake acknowledge
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
 pub struct DatasetPushCompleteConfirmed {}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Push phase 4: response to the complete request.
+///
+/// A client that predates this type reads `{"Ok": {}}` as a bare
+/// `DatasetPushCompleteConfirmed`, ignoring the unknown key.
+pub type DatasetPushCompleteResponse =
+    Result<DatasetPushCompleteConfirmed, DatasetPushCompleteError>;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Push phase 4: the pushed blocks could not be committed
+#[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
+pub enum DatasetPushCompleteError {
+    Internal(TransferInternalError),
+    UpdatedConcurrently(DatasetPushUpdatedConcurrentlyError),
+    ObjectsNotUploaded(DatasetPushObjectsNotUploadedError),
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// The destination `HEAD` moved while the pushed blocks were being committed;
+/// nothing was committed.
+///
+/// It carries no heads: errors of this phase travel as the close frame reason,
+/// which is limited to 123 bytes. A text message would not do, since a client
+/// that predates `DatasetPushCompleteResponse` takes any text reply for a
+/// confirmation.
+#[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
+pub struct DatasetPushUpdatedConcurrentlyError {}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Some data or checkpoint files the pushed blocks reference were not
+/// uploaded; nothing was committed. Like every error of this phase, it
+/// travels as the close frame reason, so it carries only their number
+#[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
+pub struct DatasetPushObjectsNotUploadedError {
+    pub num_objects: usize,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Push phase 4: the complete response as a client reads it, accepting the
+/// bare confirmation sent by a server that predates
+/// `DatasetPushCompleteResponse`, and skipping an upload progress request
+/// the server sent before it read that the upload had finished
+#[derive(Deserialize, Clone, PartialEq, Eq, Debug)]
+#[serde(untagged)]
+pub enum DatasetPushCompleteReply {
+    Response(DatasetPushCompleteResponse),
+    Legacy(DatasetPushCompleteLegacyConfirmed),
+    StaleProgressRequest(DatasetPushStaleProgressRequest),
+}
+
+/// The bare confirmation of a server that predates
+/// `DatasetPushCompleteResponse`. Only an empty object matches, so an error
+/// this client does not know is never taken for a confirmation.
+#[derive(Deserialize, Clone, PartialEq, Eq, Debug)]
+#[serde(deny_unknown_fields)]
+pub struct DatasetPushCompleteLegacyConfirmed {}
+
+/// An upload progress request read while awaiting the complete response
+#[derive(Deserialize, Clone, PartialEq, Eq, Debug)]
+#[serde(deny_unknown_fields)]
+pub struct DatasetPushStaleProgressRequest {
+    pub progress_requested: bool,
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -327,7 +426,7 @@ pub struct ObjectFileReference {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// Object type enumeration
-#[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
+#[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Hash, Debug)]
 pub enum ObjectType {
     DataSlice,
     Checkpoint,
@@ -357,6 +456,181 @@ pub struct HeaderRow {
 pub struct TransferInternalError {
     pub phase: TransferPhase,
     pub error_message: String,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// The internal error any phase may end with, in the shape of the `Err` of a
+/// phase response: `{"Err":{"Internal":{..}}}`
+#[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
+pub enum TransferInternalErrorReply {
+    Err(TransferInternalErrorKind),
+}
+
+#[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
+pub enum TransferInternalErrorKind {
+    Internal(TransferInternalError),
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[cfg(test)]
+mod tests {
+    use std::assert_matches;
+
+    use pretty_assertions::assert_eq;
+
+    use super::*;
+
+    // Push replies cross versions in both directions, so these tests pin
+    // their JSON form
+
+    #[test]
+    fn test_confirmation_is_read_by_clients_that_predate_the_typed_reply() {
+        let json = serde_json::to_string(&DatasetPushCompleteResponse::Ok(
+            DatasetPushCompleteConfirmed {},
+        ))
+        .unwrap();
+
+        assert_eq!(json, r#"{"Ok":{}}"#);
+        assert_matches!(
+            serde_json::from_str::<DatasetPushCompleteConfirmed>(&json),
+            Ok(DatasetPushCompleteConfirmed {})
+        );
+    }
+
+    #[test]
+    fn test_bare_confirmation_of_servers_that_predate_the_typed_reply_is_accepted() {
+        assert_matches!(
+            serde_json::from_str::<DatasetPushCompleteReply>("{}"),
+            Ok(DatasetPushCompleteReply::Legacy(_))
+        );
+    }
+
+    #[test]
+    fn test_internal_error_of_servers_that_predate_the_typed_reply_is_read_as_internal() {
+        // What such a server sends on any failure of the complete request
+        let json = r#"{"Err":{"Internal":{"phase":{"Push":"CompleteRequest"},"error_message":"Internal error"}}}"#;
+
+        assert_matches!(
+            serde_json::from_str::<DatasetPushCompleteReply>(json),
+            Ok(DatasetPushCompleteReply::Response(Err(DatasetPushCompleteError::Internal(e))))
+                if e.error_message == "Internal error"
+        );
+    }
+
+    #[test]
+    fn test_updated_concurrently_fits_a_close_frame() {
+        let json = serde_json::to_string(&DatasetPushCompleteResponse::Err(
+            DatasetPushCompleteError::UpdatedConcurrently(DatasetPushUpdatedConcurrentlyError {}),
+        ))
+        .unwrap();
+
+        assert_eq!(json, r#"{"Err":{"UpdatedConcurrently":{}}}"#);
+        assert_matches!(
+            serde_json::from_str::<DatasetPushCompleteReply>(&json),
+            Ok(DatasetPushCompleteReply::Response(Err(
+                DatasetPushCompleteError::UpdatedConcurrently(_)
+            )))
+        );
+    }
+
+    #[test]
+    fn test_unknown_error_is_not_taken_for_a_confirmation() {
+        assert_matches!(
+            serde_json::from_str::<DatasetPushCompleteReply>(r#"{"Err":{"FutureError":{}}}"#),
+            Err(_)
+        );
+    }
+
+    #[test]
+    fn test_progress_request_read_with_the_complete_reply_is_not_a_confirmation() {
+        let json = serde_json::to_string(&DatasetPushObjectsUploadProgressRequest {
+            progress_requested: true,
+        })
+        .unwrap();
+
+        assert_eq!(json, r#"{"progress_requested":true}"#);
+        assert_matches!(
+            serde_json::from_str::<DatasetPushCompleteReply>(&json),
+            Ok(DatasetPushCompleteReply::StaleProgressRequest(_))
+        );
+    }
+
+    #[test]
+    fn test_progress_request_is_read_by_clients_that_predate_its_field() {
+        #[derive(serde::Deserialize, Debug)]
+        struct ProgressRequestBeforeTheField {}
+
+        assert_matches!(
+            serde_json::from_str::<ProgressRequestBeforeTheField>(r#"{"progress_requested":true}"#),
+            Ok(ProgressRequestBeforeTheField {})
+        );
+        // And the progress request of an older server is read by this one
+        assert_eq!(
+            serde_json::from_str::<DatasetPushObjectsUploadProgressRequest>("{}").unwrap(),
+            DatasetPushObjectsUploadProgressRequest {
+                progress_requested: false
+            }
+        );
+    }
+
+    #[test]
+    fn test_name_collision_reply_for_a_long_alias_is_read_back() {
+        let dataset_alias = odf::DatasetAlias::new(
+            Some(odf::AccountName::new_unchecked(
+                "an-account-with-a-rather-long-name",
+            )),
+            odf::DatasetName::new_unchecked(
+                "a-dataset-whose-name-alone-is-longer-than-a-close-frame-allows",
+            ),
+        );
+
+        let json = serde_json::to_string(&DatasetPushObjectsTransferResponse::Err(
+            DatasetPushObjectsTransferError::NameCollision(
+                DatasetPushObjectsTransferNameCollisionError {
+                    dataset_alias: dataset_alias.clone(),
+                },
+            ),
+        ))
+        .unwrap();
+
+        // Too long for a close frame reason, so the server sends it as a message
+        assert!(json.len() > 123, "{json}");
+        assert_matches!(
+            serde_json::from_str::<DatasetPushObjectsTransferResponse>(&json),
+            Ok(Err(DatasetPushObjectsTransferError::NameCollision(e)))
+                if e.dataset_alias == dataset_alias
+        );
+    }
+
+    #[test]
+    fn test_invalid_head_reply_keeps_expected_and_actual_heads() {
+        let cas_error = odf::dataset::RefCASError {
+            reference: odf::BlockRef::Head,
+            expected: Some(odf::Multihash::from_digest_sha3_256(b"planned")),
+            actual: Some(odf::Multihash::from_digest_sha3_256(b"concurrent")),
+        };
+
+        let json = serde_json::to_string(&DatasetPushResponse::Err(
+            DatasetPushRequestError::InvalidHead((&cas_error).into()),
+        ))
+        .unwrap();
+        let DatasetPushResponse::Err(DatasetPushRequestError::InvalidHead(reply)) =
+            serde_json::from_str::<DatasetPushResponse>(&json).unwrap()
+        else {
+            panic!("Unexpected reply: {json}");
+        };
+
+        assert_eq!(
+            reply,
+            DatasetPushInvalidHeadError {
+                actual_head: cas_error.actual.clone(),
+                expected_head: cas_error.expected.clone(),
+            }
+        );
+        assert_eq!(odf::dataset::RefCASError::from(reply), cas_error);
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

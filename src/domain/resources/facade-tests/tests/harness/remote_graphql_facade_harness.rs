@@ -60,7 +60,7 @@ impl RemoteGraphqlFacadeHarness {
             );
 
             let mut b = dill::CatalogBuilder::new_chained(local.base_catalog());
-            b.add_value(subject);
+            subject.register(&mut b);
             kamu_resources_facade::register_dependencies(&mut b);
             let catalog = b.build();
             token_to_catalog.insert(test_token(account), catalog);
@@ -104,7 +104,7 @@ impl RemoteGraphqlFacadeHarness {
         );
 
         let mut b = dill::CatalogBuilder::new_chained(self.local.base_catalog());
-        b.add_value(subject);
+        subject.register(&mut b);
         kamu_resources_facade::register_dependencies(&mut b);
         let catalog = b.build();
 
