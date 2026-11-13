@@ -18,7 +18,8 @@ use kamu_cli_e2e_common::{
     DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_1,
     DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_2,
     DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR,
-    KamuCliPuppetFixturesExt,
+    add_city_population_files_dataset,
+    add_player_scores_with_derivative,
     city_population_root_snapshot,
     leaderboard_set_transform_event,
 };
@@ -286,8 +287,7 @@ pub async fn test_pull_failed_alias_save_creates_no_dataset(kamu: KamuCliPuppet)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_pull_reports_progress_before_failed_iteration(kamu: KamuCliPuppet) {
-    kamu.add_city_population_files_dataset("test.pull-from-files")
-        .await;
+    add_city_population_files_dataset(&kamu, "test.pull-from-files").await;
 
     // One file per iteration; the third does not parse
     for (i, row) in ["A,1000", "B,2000", "C,not-a-number"].iter().enumerate() {
@@ -387,8 +387,7 @@ pub async fn test_pull_multiple_datasets_with_mixed_outcomes(mut kamu: KamuCliPu
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_pull_set_watermark_keeps_source_state(kamu: KamuCliPuppet) {
-    kamu.add_city_population_files_dataset("test.pull-from-files")
-        .await;
+    add_city_population_files_dataset(&kamu, "test.pull-from-files").await;
     std::fs::write(
         kamu.workspace_path().join("data-1.csv"),
         "city,population\nA,1000\n",
@@ -442,7 +441,7 @@ pub async fn test_pull_set_watermark_keeps_source_state(kamu: KamuCliPuppet) {
 
 pub async fn test_pull_datasets_sharing_a_fetch_step_keep_own_source_state(kamu: KamuCliPuppet) {
     for dataset_name in ["test.first", "test.second"] {
-        kamu.add_city_population_files_dataset(dataset_name).await;
+        add_city_population_files_dataset(&kamu, dataset_name).await;
     }
     let write_file = |name: &str, city: &str| {
         std::fs::write(
@@ -586,7 +585,7 @@ pub async fn test_pull_uncacheable_source(kamu: KamuCliPuppet) {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_pull_derivative_after_inputs_changed_fails(kamu: KamuCliPuppet) {
-    kamu.add_player_scores_with_derivative().await;
+    add_player_scores_with_derivative(&kamu).await;
     kamu.execute(["pull", DATASET_DERIVATIVE_LEADERBOARD_NAME.as_str()])
         .await
         .success();
@@ -629,7 +628,7 @@ pub async fn test_pull_derivative_after_inputs_changed_fails(kamu: KamuCliPuppet
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_pull_derivative_leaves_no_working_files(kamu: KamuCliPuppet) {
-    kamu.add_player_scores_with_derivative().await;
+    add_player_scores_with_derivative(&kamu).await;
 
     kamu.assert_success_command_execution(
         ["pull", DATASET_DERIVATIVE_LEADERBOARD_NAME.as_str()],
@@ -757,7 +756,7 @@ async fn test_pull_reset_derivative(kamu: KamuCliPuppet) {
     let dataset_derivative_alias =
         odf::DatasetAlias::new(None, DATASET_DERIVATIVE_LEADERBOARD_NAME.clone());
 
-    kamu.add_player_scores_with_derivative().await;
+    add_player_scores_with_derivative(&kamu).await;
 
     kamu.assert_success_command_execution(
         ["pull", dataset_derivative_alias.dataset_name.as_str()],
@@ -893,7 +892,7 @@ async fn test_pull_reset_derivative(kamu: KamuCliPuppet) {
 async fn test_pull_derivative(kamu: KamuCliPuppet) {
     let dataset_derivative_name = DATASET_DERIVATIVE_LEADERBOARD_NAME.clone();
 
-    kamu.add_player_scores_with_derivative().await;
+    add_player_scores_with_derivative(&kamu).await;
 
     kamu.assert_success_command_execution(
         [

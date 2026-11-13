@@ -369,7 +369,7 @@ impl UpdateAccountUseCaseImplHarness {
                 b.add_value(current_account_subject);
             }
         } else if let Some(current_account_subject) = current_account_subject {
-            b.add_current_account_subject(current_account_subject);
+            current_account_subject.register(&mut b);
         } else {
             // The mocked authorization helper decides, whoever the principal is
             b.add_value(Principal::new_test());

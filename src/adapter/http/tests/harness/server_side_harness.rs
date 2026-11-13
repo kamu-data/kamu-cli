@@ -14,13 +14,7 @@ use std::time::Duration;
 use chrono::Utc;
 use email_utils::Email;
 use internal_error::InternalError;
-use kamu_accounts::{
-    Account,
-    AccountProvider,
-    AccountType,
-    CurrentAccountSubject,
-    CurrentAccountSubjectCatalogExt as _,
-};
+use kamu_accounts::{Account, AccountProvider, AccountType, CurrentAccountSubject};
 use kamu_adapter_http::smart_protocol::SmartTransferProtocolServerConfig;
 use kamu_core::{CompactionExecutor, CompactionPlanner, TenancyConfig};
 use kamu_datasets::{
@@ -180,10 +174,10 @@ pub(crate) fn create_cli_user_catalog(
         ),
     };
 
-    dill::CatalogBuilder::new_chained(base_catalog)
-        .add_current_account_subject(current_account_subject)
-        .add::<AlwaysHappyDatasetPermissionChecker>()
-        .build()
+    let mut b = dill::CatalogBuilder::new_chained(base_catalog);
+    current_account_subject.register(&mut b);
+    b.add::<AlwaysHappyDatasetPermissionChecker>();
+    b.build()
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

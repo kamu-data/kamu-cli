@@ -20,7 +20,7 @@ use kamu::utils::ipfs_wrapper::IpfsClient;
 use kamu::utils::local_sync_writes::PulledSeedStore;
 use kamu::utils::simple_transfer_protocol::SimpleTransferProtocol;
 use kamu::*;
-use kamu_accounts::{CurrentAccountSubject, CurrentAccountSubjectCatalogExt as _};
+use kamu_accounts::CurrentAccountSubject;
 use kamu_datasets::{
     DatasetReferenceMessage,
     DatasetRegistry,
@@ -167,15 +167,15 @@ async fn create_graph_remote(
     let tmp_registry_dir = tempfile::tempdir().unwrap();
 
     let (tmp_dataset_registry, tmp_storage_unit) = {
-        let catalog = dill::CatalogBuilder::new()
-            .add_builder(odf::dataset::DatasetStorageUnitLocalFs::builder(
-                tmp_registry_dir.path().to_owned(),
-            ))
-            .add::<odf::dataset::DatasetLfsBuilderDefault>()
-            .add::<DatasetRegistrySoloUnitBridge>()
-            .add_current_account_subject(CurrentAccountSubject::new_test())
-            .add_value(TenancyConfig::SingleTenant)
-            .build();
+        let mut b = dill::CatalogBuilder::new();
+        b.add_builder(odf::dataset::DatasetStorageUnitLocalFs::builder(
+            tmp_registry_dir.path().to_owned(),
+        ))
+        .add::<odf::dataset::DatasetLfsBuilderDefault>()
+        .add::<DatasetRegistrySoloUnitBridge>();
+        CurrentAccountSubject::new_test().register(&mut b);
+        b.add_value(TenancyConfig::SingleTenant);
+        let catalog = b.build();
 
         (
             catalog.get_one::<dyn DatasetRegistry>().unwrap(),

@@ -424,9 +424,11 @@ impl ServerHarness {
             .await
             .unwrap();
 
-        let catalog_system = dill::CatalogBuilder::new_chained(&base_catalog)
-            .add_current_account_subject(CurrentAccountSubject::new_test())
-            .build();
+        let catalog_system = {
+            let mut b = dill::CatalogBuilder::new_chained(&base_catalog);
+            CurrentAccountSubject::new_test().register(&mut b);
+            b.build()
+        };
 
         let create_dataset = catalog_system
             .get_one::<dyn CreateDatasetUseCase>()
@@ -445,9 +447,11 @@ impl ServerHarness {
             .await
             .unwrap();
 
-        let catalog_test = dill::CatalogBuilder::new_chained(&base_catalog)
-            .add_current_account_subject(current_account_subject)
-            .build();
+        let catalog_test = {
+            let mut b = dill::CatalogBuilder::new_chained(&base_catalog);
+            current_account_subject.register(&mut b);
+            b.build()
+        };
 
         let app = axum::Router::new()
             .route(

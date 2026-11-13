@@ -16,7 +16,6 @@ use kamu_accounts::{
     AccountService,
     CreateAccountUseCase,
     CurrentAccountSubject,
-    CurrentAccountSubjectCatalogExt as _,
     DeleteAccountUseCase,
     DidSecretEncryptionConfig,
     PredefinedAccountsConfig,
@@ -130,11 +129,12 @@ impl AccountBaseUseCaseHarness {
         // Execute update on user's behalf in authenticated context
         {
             let mut b = dill::CatalogBuilder::new_chained(catalog);
-            b.add_current_account_subject(CurrentAccountSubject::logged(
+            CurrentAccountSubject::logged(
                 account.resource_id,
                 account.id.clone(),
                 account.account_name.clone(),
-            ));
+            )
+            .register(&mut b);
             let authenticated_catalog = b.build();
 
             let update_account_uc = authenticated_catalog
@@ -156,11 +156,12 @@ impl AccountBaseUseCaseHarness {
         // Execute delete on user's behalf in authenticated context
         {
             let mut b = dill::CatalogBuilder::new_chained(catalog);
-            b.add_current_account_subject(CurrentAccountSubject::logged(
+            CurrentAccountSubject::logged(
                 account.resource_id,
                 account.id.clone(),
                 account.account_name.clone(),
-            ));
+            )
+            .register(&mut b);
             let authenticated_catalog = b.build();
 
             let delete_account_uc = authenticated_catalog

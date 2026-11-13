@@ -15,7 +15,6 @@ use kamu_accounts::{
     AccountConfig,
     AccountPropertyName,
     CurrentAccountSubject,
-    CurrentAccountSubjectCatalogExt as _,
     DidEntity,
     DidSecretEncryptionConfig,
     DidSecretKey,
@@ -724,7 +723,7 @@ impl SignEip712UseCaseHarness {
                 b.add_value(current_account_subject).add_value(principal);
             }
             None => {
-                b.add_current_account_subject(current_account_subject);
+                current_account_subject.register(&mut b);
             }
         }
 

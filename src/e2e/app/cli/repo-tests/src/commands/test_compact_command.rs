@@ -15,7 +15,7 @@ use kamu_cli_e2e_common::{
     DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_1,
     DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_2,
     DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR,
-    KamuCliPuppetFixturesExt,
+    add_player_scores_with_derivative,
 };
 use kamu_cli_puppet::KamuCliPuppet;
 use kamu_cli_puppet::extensions::KamuCliPuppetExt;
@@ -169,7 +169,7 @@ pub async fn test_compact_partial_failure_keeps_storage_in_sync(kamu: KamuCliPup
     let root_name = DATASET_ROOT_PLAYER_NAME.clone();
     let derivative_name = DATASET_DERIVATIVE_LEADERBOARD_NAME.clone();
 
-    kamu.add_player_scores_with_derivative().await;
+    add_player_scores_with_derivative(&kamu).await;
     kamu.ingest_data(
         &root_name,
         DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_2,

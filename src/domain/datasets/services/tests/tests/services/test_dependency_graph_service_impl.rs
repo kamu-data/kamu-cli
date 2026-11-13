@@ -14,11 +14,7 @@ use dill::*;
 use futures::{StreamExt, future};
 use internal_error::ResultIntoInternal;
 use kamu::DatasetRegistrySoloUnitBridge;
-use kamu_accounts::{
-    CurrentAccountSubject,
-    CurrentAccountSubjectCatalogExt as _,
-    DidSecretEncryptionConfig,
-};
+use kamu_accounts::{CurrentAccountSubject, DidSecretEncryptionConfig};
 use kamu_accounts_inmem::InMemoryDidSecretKeyRepository;
 use kamu_auth_rebac_services::RebacDatasetRegistryFacadeImpl;
 use kamu_core::*;
@@ -725,9 +721,11 @@ impl DependencyGraphHarness {
         );
 
         let catalog_without_subject = b.build();
-        let catalog = CatalogBuilder::new_chained(&catalog_without_subject)
-            .add_current_account_subject(CurrentAccountSubject::new_test())
-            .build();
+        let catalog = {
+            let mut b = CatalogBuilder::new_chained(&catalog_without_subject);
+            CurrentAccountSubject::new_test().register(&mut b);
+            b.build()
+        };
 
         Self {
             _temp_dir: temp_dir,
@@ -1130,9 +1128,9 @@ impl DependencyGraphHarness {
         // If we have an account name, then we're in multi-tenant mode -- emulating
         // authorization.
         if let Some(account_name) = account_name {
-            CatalogBuilder::new_chained(&self.catalog_without_subject)
-                .add_current_account_subject(CurrentAccountSubject::new_test_with(account_name))
-                .build()
+            let mut b = CatalogBuilder::new_chained(&self.catalog_without_subject);
+            CurrentAccountSubject::new_test_with(account_name).register(&mut b);
+            b.build()
         } else {
             self.catalog.clone()
         }

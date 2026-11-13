@@ -207,10 +207,9 @@ so registering a type the parent already provides makes `get_one` fail with `Amb
 (precedent: the background catalog in `app.rs`, [identity](../../../docs/internal/identity.md)).
 
 ```rust
-let child = CatalogBuilder::new_chained(&base_catalog)
-    .add_current_account_subject(CurrentAccountSubject::new_test_with(&"alice"))
-    .add::<SomePerRequestService>()
-    .build();
+let mut b = CatalogBuilder::new_chained(&base_catalog);
+CurrentAccountSubject::new_test_with(&"alice").register(&mut b);
+let child = b.add::<SomePerRequestService>().build();
 ```
 
 The parent catalog's singletons remain alive as long as the parent `Catalog` object is kept alive. Dropping the parent while child catalogs are still in use will cause the child catalogs to panic when attempting to access inherited singletons.

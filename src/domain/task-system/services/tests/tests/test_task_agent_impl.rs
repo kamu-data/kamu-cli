@@ -15,7 +15,7 @@ use database_common::NoOpDatabasePlugin;
 use dill::{Catalog, CatalogBuilder};
 use kamu::utils::ipfs_wrapper::IpfsClient;
 use kamu::*;
-use kamu_accounts::{CurrentAccountSubject, CurrentAccountSubjectCatalogExt as _};
+use kamu_accounts::CurrentAccountSubject;
 use kamu_core::{DidGeneratorDefault, TenancyConfig};
 use kamu_datasets::SecretsEncryptionConfig;
 use kamu_datasets_services::{DatasetEnvVarServiceNull, DependencyGraphServiceImpl};
@@ -412,9 +412,9 @@ impl TaskAgentHarness {
                 datasets_dir,
             ))
             .add::<DatasetRegistrySoloUnitBridge>()
-            .add::<odf::dataset::DatasetLfsBuilderDefault>()
-            .add_current_account_subject(CurrentAccountSubject::new_test())
-            .add_value(TenancyConfig::SingleTenant)
+            .add::<odf::dataset::DatasetLfsBuilderDefault>();
+        CurrentAccountSubject::new_test().register(&mut b);
+        b.add_value(TenancyConfig::SingleTenant)
             .add_value(WakeupListenerConfig {
                 min_debounce_interval: Duration::from_millis(10),
                 // Long enough to make sure tests never rely on listening timeouts

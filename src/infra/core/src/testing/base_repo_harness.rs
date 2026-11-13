@@ -12,7 +12,7 @@ use std::sync::Arc;
 
 use bon::bon;
 use chrono::{DateTime, Utc};
-use kamu_accounts::{CurrentAccountSubject, CurrentAccountSubjectCatalogExt as _};
+use kamu_accounts::CurrentAccountSubject;
 use kamu_core::{
     DidGenerator,
     DidGeneratorDefault,
@@ -69,9 +69,9 @@ impl BaseRepoHarness {
                 .add::<DatasetRegistrySoloUnitBridge>();
 
             if let Some(current_account_subject) = current_account_subject {
-                b.add_current_account_subject(current_account_subject);
+                current_account_subject.register(&mut b);
             } else {
-                b.add_current_account_subject(CurrentAccountSubject::new_test());
+                CurrentAccountSubject::new_test().register(&mut b);
             }
 
             if let Some(mock_did_generator) = mock_did_generator {

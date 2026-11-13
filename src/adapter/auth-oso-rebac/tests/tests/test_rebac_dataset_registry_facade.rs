@@ -10,7 +10,7 @@
 use std::sync::Arc;
 
 use kamu_accounts::testing::CurrentAccountSubjectTestHelper;
-use kamu_accounts::{CurrentAccountSubject, CurrentAccountSubjectCatalogExt as _, Principal};
+use kamu_accounts::{CurrentAccountSubject, Principal};
 use kamu_auth_rebac::{RebacDatasetRefUnresolvedError, RebacDatasetRegistryFacade};
 use kamu_auth_rebac_services::RebacDatasetRegistryFacadeImpl;
 use kamu_datasets::DatasetPermission;
@@ -65,7 +65,7 @@ impl RebacDatasetRegistryFacadeHarness {
     async fn new(current_account_subject: CurrentAccountSubject) -> Self {
         let base =
             BaseOsoRebacHarness::new(BaseOsoRebacHarness::predefined_accounts(&ACCOUNTS), |b| {
-                b.add_current_account_subject(current_account_subject);
+                current_account_subject.register(b);
             })
             .await;
 

@@ -13,7 +13,7 @@ use std::path::PathBuf;
 use chrono::{DateTime, TimeZone, Utc};
 use datafusion::prelude::*;
 use indoc::indoc;
-use kamu_accounts::{CurrentAccountSubject, CurrentAccountSubjectCatalogExt as _};
+use kamu_accounts::CurrentAccountSubject;
 use kamu_core::*;
 use kamu_datasets::*;
 use kamu_ingest_datafusion::*;
@@ -2683,16 +2683,16 @@ impl Harness {
 
         let system_time = Utc.with_ymd_and_hms(2010, 1, 1, 12, 0, 0).unwrap();
 
-        let catalog = dill::CatalogBuilder::new()
-            .add::<DidGeneratorDefault>()
-            .add::<SystemTimeSourceDefault>()
-            .add_current_account_subject(CurrentAccountSubject::new_test())
-            .add_value(TenancyConfig::SingleTenant)
+        let mut b = dill::CatalogBuilder::new();
+        b.add::<DidGeneratorDefault>()
+            .add::<SystemTimeSourceDefault>();
+        CurrentAccountSubject::new_test().register(&mut b);
+        b.add_value(TenancyConfig::SingleTenant)
             .add_builder(odf::dataset::DatasetStorageUnitLocalFs::builder(
                 datasets_dir,
             ))
-            .add::<odf::dataset::DatasetLfsBuilderDefault>()
-            .build();
+            .add::<odf::dataset::DatasetLfsBuilderDefault>();
+        let catalog = b.build();
 
         let storage_unit = catalog
             .get_one::<odf::dataset::DatasetStorageUnitLocalFs>()

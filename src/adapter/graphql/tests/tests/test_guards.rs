@@ -8,11 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use async_graphql::{EmptySubscription, Object, value};
-use kamu_accounts::{
-    AnonymousAccountReason,
-    CurrentAccountSubject,
-    CurrentAccountSubjectCatalogExt as _,
-};
+use kamu_accounts::{AnonymousAccountReason, CurrentAccountSubject};
 use kamu_adapter_graphql::*;
 use pretty_assertions::assert_eq;
 
@@ -20,9 +16,9 @@ use pretty_assertions::assert_eq;
 
 #[tokio::test]
 async fn test_logged_in_guard_logged() {
-    let catalog = dill::CatalogBuilder::new()
-        .add_current_account_subject(CurrentAccountSubject::new_test())
-        .build();
+    let mut b = dill::CatalogBuilder::new();
+    CurrentAccountSubject::new_test().register(&mut b);
+    let catalog = b.build();
 
     let schema = TestSchema::build(TestQuery, TestMutation, EmptySubscription)
         .data(catalog)
@@ -73,11 +69,10 @@ async fn test_logged_in_guard_logged() {
 
 #[tokio::test]
 async fn test_logged_in_guard_anonymous() {
-    let catalog = dill::CatalogBuilder::new()
-        .add_current_account_subject(CurrentAccountSubject::anonymous(
-            AnonymousAccountReason::NoAuthenticationProvided,
-        ))
-        .build();
+    let mut b = dill::CatalogBuilder::new();
+    CurrentAccountSubject::anonymous(AnonymousAccountReason::NoAuthenticationProvided)
+        .register(&mut b);
+    let catalog = b.build();
 
     let schema = TestSchema::build(TestQuery, TestMutation, EmptySubscription)
         .data(catalog)

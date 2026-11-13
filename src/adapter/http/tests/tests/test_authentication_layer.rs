@@ -18,7 +18,6 @@ use kamu_accounts::{
     AnonymousAccountReason,
     AuthenticationService,
     CurrentAccountSubject,
-    CurrentAccountSubjectCatalogExt as _,
     DEFAULT_ACCOUNT_NAME_STR,
     DUMMY_ACCESS_TOKEN,
     MockAuthenticationService,
@@ -176,7 +175,7 @@ impl ServerHarness {
                 .bind::<dyn AuthenticationService, MockAuthenticationService>();
 
             if let Some(current_account_subject) = initial_current_account_subject {
-                b.add_current_account_subject(current_account_subject);
+                current_account_subject.register(&mut b);
             }
 
             database_common::NoOpDatabasePlugin::init_database_components(&mut b);

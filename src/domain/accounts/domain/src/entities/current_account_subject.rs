@@ -129,20 +129,12 @@ impl CurrentAccountSubject {
             CurrentAccountSubject::Logged(l) => l,
         }
     }
-}
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-/// Registers the caller of a request or command together with the
-/// [`Principal`] it authenticates
-pub trait CurrentAccountSubjectCatalogExt {
-    fn add_current_account_subject(&mut self, subject: CurrentAccountSubject) -> &mut Self;
-}
-
-impl CurrentAccountSubjectCatalogExt for dill::CatalogBuilder {
-    fn add_current_account_subject(&mut self, subject: CurrentAccountSubject) -> &mut Self {
-        self.add_value(Principal::from(&subject));
-        self.add_value(subject)
+    /// Registers the caller of a request or command together with the
+    /// [`Principal`] it authenticates
+    pub fn register(self, catalog_builder: &mut dill::CatalogBuilder) {
+        catalog_builder.add_value(Principal::from(&self));
+        catalog_builder.add_value(self);
     }
 }
 

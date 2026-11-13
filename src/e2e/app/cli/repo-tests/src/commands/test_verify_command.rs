@@ -14,7 +14,7 @@ use kamu_cli_e2e_common::{
     DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_1,
     DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_2,
     DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR,
-    KamuCliPuppetFixturesExt,
+    add_player_scores_with_derivative,
     leaderboard_set_transform_event,
 };
 use kamu_cli_puppet::KamuCliPuppet;
@@ -48,7 +48,7 @@ pub async fn test_verify_regular_dataset(kamu: KamuCliPuppet) {
 pub async fn test_verify_recursive(kamu: KamuCliPuppet) {
     let dataset_derivative_name = DATASET_DERIVATIVE_LEADERBOARD_NAME.clone();
 
-    kamu.add_player_scores_with_derivative().await;
+    add_player_scores_with_derivative(&kamu).await;
 
     kamu.execute(["pull", dataset_derivative_name.as_str()])
         .await
@@ -97,7 +97,7 @@ pub async fn test_verify_integrity(kamu: KamuCliPuppet) {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_verify_derivative_after_query_change(kamu: KamuCliPuppet) {
-    kamu.add_player_scores_with_derivative().await;
+    add_player_scores_with_derivative(&kamu).await;
     kamu.execute(["pull", DATASET_DERIVATIVE_LEADERBOARD_NAME.as_str()])
         .await
         .success();
@@ -181,7 +181,7 @@ pub async fn test_verify_replay_denied_when_input_became_unreadable(mut kamu: Ka
 
 pub async fn test_verify_pulled_derivative_without_its_input(kamu: KamuCliPuppet) {
     let source = KamuCliPuppet::new_workspace_tmp_single_tenant().await;
-    source.add_player_scores_with_derivative().await;
+    add_player_scores_with_derivative(&source).await;
     source
         .execute(["pull", DATASET_DERIVATIVE_LEADERBOARD_NAME.as_str()])
         .await

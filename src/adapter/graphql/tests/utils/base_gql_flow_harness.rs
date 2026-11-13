@@ -9,7 +9,7 @@
 
 use async_graphql::value;
 use kamu::MetadataQueryServiceImpl;
-use kamu_accounts::{CurrentAccountSubject, CurrentAccountSubjectCatalogExt as _};
+use kamu_accounts::CurrentAccountSubject;
 use kamu_datasets::*;
 use kamu_flow_system_inmem::*;
 use kamu_wakeup_listener_inmem::InMemoryWakeupHub;
@@ -47,9 +47,9 @@ impl BaseGQLFlowHarness {
     }
 
     pub fn catalog_for_subject(&self, subject: CurrentAccountSubject) -> dill::Catalog {
-        dill::CatalogBuilder::new_chained(&self.catalog_no_subject)
-            .add_current_account_subject(subject)
-            .build()
+        let mut b = dill::CatalogBuilder::new_chained(&self.catalog_no_subject);
+        subject.register(&mut b);
+        b.build()
     }
 
     pub fn make_base_gql_flow_catalog(base_catalog: &dill::Catalog) -> dill::Catalog {

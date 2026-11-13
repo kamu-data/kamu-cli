@@ -14,7 +14,6 @@ use kamu::*;
 use kamu_accounts::{
     AuthenticationService,
     CurrentAccountSubject,
-    CurrentAccountSubjectCatalogExt as _,
     DEFAULT_ACCOUNT_NAME,
     MockAuthenticationService,
 };
@@ -783,13 +782,17 @@ impl DatasetMetadataHarness {
         } = authentication_catalogs_ext(&catalog_base, None, PredefinedAccountOpts::default())
             .await;
 
-        let catalog_other_account = dill::CatalogBuilder::new_chained(&catalog_no_subject)
-            .add_current_account_subject(CurrentAccountSubject::new_test_with(&"other-account"))
-            .build();
+        let catalog_other_account = {
+            let mut b = dill::CatalogBuilder::new_chained(&catalog_no_subject);
+            CurrentAccountSubject::new_test_with(&"other-account").register(&mut b);
+            b.build()
+        };
 
-        let catalog_third_account = dill::CatalogBuilder::new_chained(&catalog_no_subject)
-            .add_current_account_subject(CurrentAccountSubject::new_test_with(&"third-account"))
-            .build();
+        let catalog_third_account = {
+            let mut b = dill::CatalogBuilder::new_chained(&catalog_no_subject);
+            CurrentAccountSubject::new_test_with(&"third-account").register(&mut b);
+            b.build()
+        };
 
         Self {
             base_gql_harness,

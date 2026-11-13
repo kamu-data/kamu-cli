@@ -37,13 +37,13 @@ the caller is known; that job must not reach the permission layer.
 
 | Boundary | Registers |
 |---|---|
-| HTTP authentication layer, Flight SQL auth layer, the CLI catalog (`app.rs`) | The caller with `add_current_account_subject`, which adds `Principal::from(&subject)` beside it |
+| HTTP authentication layer, Flight SQL auth layer, the CLI catalog (`app.rs`) | The caller with `CurrentAccountSubject::register`, which adds `Principal::from(&subject)` beside it |
 | Background catalog (`configure_background_catalog` in `app.rs`) | The process caller and `Principal::Node` |
 | `KamuBackgroundCatalog::system_user_catalog` (search lazy init, the admin index reset) | The process caller and `Principal::Node` |
-| Test harnesses | `add_current_account_subject`, or a `Principal` value directly where a mock ignores it |
+| Test harnesses | `CurrentAccountSubject::register`, or a `Principal` value directly where a mock ignores it |
 
-Register the caller through `CurrentAccountSubjectCatalogExt::add_current_account_subject`, never
-with a bare `add_value(subject)`, so the two cannot disagree.
+Register the caller through `CurrentAccountSubject::register`, never with a bare
+`add_value(subject)`, so the two cannot disagree.
 
 ## Who reads it
 

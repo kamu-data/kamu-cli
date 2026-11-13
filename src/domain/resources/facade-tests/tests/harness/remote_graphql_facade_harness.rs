@@ -12,7 +12,7 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 
 use axum::Extension;
-use kamu_accounts::{CurrentAccountSubject, CurrentAccountSubjectCatalogExt as _};
+use kamu_accounts::CurrentAccountSubject;
 use kamu_adapter_graphql::data_loader::{account_entity_data_loader, dataset_handle_data_loader};
 use kamu_adapter_resources_facade_graphql::RemoteGraphqlResourceFacadeImpl;
 use kamu_resources_facade::ResourceFacade;
@@ -60,7 +60,7 @@ impl RemoteGraphqlFacadeHarness {
             );
 
             let mut b = dill::CatalogBuilder::new_chained(local.base_catalog());
-            b.add_current_account_subject(subject);
+            subject.register(&mut b);
             kamu_resources_facade::register_dependencies(&mut b);
             let catalog = b.build();
             token_to_catalog.insert(test_token(account), catalog);
@@ -104,7 +104,7 @@ impl RemoteGraphqlFacadeHarness {
         );
 
         let mut b = dill::CatalogBuilder::new_chained(self.local.base_catalog());
-        b.add_current_account_subject(subject);
+        subject.register(&mut b);
         kamu_resources_facade::register_dependencies(&mut b);
         let catalog = b.build();
 

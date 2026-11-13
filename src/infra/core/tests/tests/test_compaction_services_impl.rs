@@ -19,7 +19,7 @@ use indoc::indoc;
 use kamu::domain::*;
 use kamu::testing::DatasetDataHelper;
 use kamu::*;
-use kamu_accounts::{CurrentAccountSubject, CurrentAccountSubjectCatalogExt as _, Principal};
+use kamu_accounts::{CurrentAccountSubject, Principal};
 use kamu_accounts_inmem::{InMemoryAccountQuotaEventStore, InMemoryAccountRepository};
 use kamu_accounts_services::{AccountQuotaServiceImpl, AccountServiceImpl};
 use kamu_auth_rebac_inmem::InMemoryRebacRepository;
@@ -1828,10 +1828,10 @@ impl CompactTestHarness {
 
         let mut b = dill::CatalogBuilder::new();
         kamu_datasets_inmem::register_dependencies(&mut b);
+        b.add::<DidGeneratorDefault>()
+            .add_value(RunInfoDir::new(run_info_dir));
+        CurrentAccountSubject::new_test().register(&mut b);
         let catalog = b
-            .add::<DidGeneratorDefault>()
-            .add_value(RunInfoDir::new(run_info_dir))
-            .add_current_account_subject(CurrentAccountSubject::new_test())
             .add_value(TenancyConfig::SingleTenant)
             .add_builder(odf::dataset::DatasetStorageUnitLocalFs::builder(
                 datasets_dir,
@@ -1904,8 +1904,7 @@ impl CompactTestHarness {
 
         let mut b = dill::CatalogBuilder::new();
         kamu_datasets_inmem::register_dependencies(&mut b);
-        let catalog = b
-            .add::<DidGeneratorDefault>()
+        b.add::<DidGeneratorDefault>()
             .add_builder(run_info_dir.clone())
             .add_value(TenancyConfig::SingleTenant)
             .add_builder(odf::dataset::DatasetStorageUnitS3::builder(s3.ctx.clone()))
@@ -1952,9 +1951,9 @@ impl CompactTestHarness {
             .add::<ResetExecutorImpl>()
             .add::<QueryServiceImpl>()
             .add::<SessionContextBuilder>()
-            .add_value(EngineConfigDatafusionEmbeddedBatchQuery::default())
-            .add_current_account_subject(CurrentAccountSubject::new_test())
-            .build();
+            .add_value(EngineConfigDatafusionEmbeddedBatchQuery::default());
+        CurrentAccountSubject::new_test().register(&mut b);
+        let catalog = b.build();
 
         let transform_helper = TransformTestHelper::from_catalog(&catalog);
 

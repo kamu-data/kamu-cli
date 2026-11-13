@@ -155,11 +155,10 @@ so state written through one account's service is visible from another's.
 impl MyHarness {
     // Build a fresh chained catalog for this account. Cheap — call freely.
     fn catalog_for(&self, account_name: &str) -> dill::Catalog {
-        CatalogBuilder::new_chained(&self.base_catalog)
-            .add_current_account_subject(CurrentAccountSubject::new_test_with(&account_name))
-            .add::<FooRegistryService>()
-            .add::<FooStateService>()
-            .build()
+        let mut b = CatalogBuilder::new_chained(&self.base_catalog);
+        CurrentAccountSubject::new_test_with(&account_name).register(&mut b);
+        b.add::<FooRegistryService>().add::<FooStateService>();
+        b.build()
     }
 
     // Shortcut accessor — hides catalog resolution from test bodies

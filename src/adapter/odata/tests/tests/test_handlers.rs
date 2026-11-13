@@ -16,7 +16,6 @@ use kamu::domain::*;
 use kamu::*;
 use kamu_accounts::{
     CurrentAccountSubject,
-    CurrentAccountSubjectCatalogExt as _,
     DidSecretEncryptionConfig,
     PredefinedAccountsConfig,
     Principal,
@@ -445,9 +444,9 @@ impl TestHarness {
                 .add_value(CacheDir::new(cache_dir))
                 .add::<ObjectStoreRegistryImpl>()
                 .add::<ObjectStoreBuilderLocalFs>()
-                .add::<DataFormatRegistryImpl>()
-                .add_current_account_subject(CurrentAccountSubject::new_test())
-                .add_value(dataset_permission_checker)
+                .add::<DataFormatRegistryImpl>();
+            CurrentAccountSubject::new_test().register(&mut b);
+            b.add_value(dataset_permission_checker)
                 .bind::<dyn DatasetPermissionChecker, TDatasetPermissionChecker>()
                 .add_value(TenancyConfig::SingleTenant)
                 .add_builder(odf::dataset::DatasetStorageUnitLocalFs::builder(

@@ -30,7 +30,7 @@ use kamu::{
     SyncRequestBuilder,
     SyncServiceImpl,
 };
-use kamu_accounts::{CurrentAccountSubject, CurrentAccountSubjectCatalogExt as _};
+use kamu_accounts::CurrentAccountSubject;
 use kamu_datasets::{AlwaysHappyDatasetPermissionChecker, DatasetRegistry, DatasetRegistryExt};
 use kamu_datasets_services::DependencyGraphServiceImpl;
 use odf::dataset::testing::create_test_dataset_from_snapshot;
@@ -66,11 +66,11 @@ async fn setup_dataset(
 
     let mut b = dill::CatalogBuilder::new();
     kamu_datasets_inmem::register_dependencies(&mut b);
-    let catalog = b
-        .add::<DependencyGraphServiceImpl>()
+    b.add::<DependencyGraphServiceImpl>()
         .add_value(ipfs_gateway)
-        .add_value(ipfs_client)
-        .add_current_account_subject(CurrentAccountSubject::new_test())
+        .add_value(ipfs_client);
+    CurrentAccountSubject::new_test().register(&mut b);
+    let catalog = b
         .add_value(TenancyConfig::SingleTenant)
         .add_builder(odf::dataset::DatasetStorageUnitLocalFs::builder(
             datasets_dir,

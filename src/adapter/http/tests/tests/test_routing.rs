@@ -16,12 +16,7 @@ use axum::extract::{FromRequestParts, Path};
 use database_common::{DatabaseTransactionRunner, NoOpDatabasePlugin};
 use headers::Header as _;
 use kamu::domain::*;
-use kamu_accounts::{
-    CurrentAccountSubject,
-    CurrentAccountSubjectCatalogExt as _,
-    DidSecretEncryptionConfig,
-    PredefinedAccountsConfig,
-};
+use kamu_accounts::{CurrentAccountSubject, DidSecretEncryptionConfig, PredefinedAccountsConfig};
 use kamu_accounts_inmem::{InMemoryAccountRepository, InMemoryDidSecretKeyRepository};
 use kamu_accounts_services::{
     AccountServiceImpl,
@@ -82,9 +77,9 @@ impl RepoFixture {
                 datasets_dir,
             ))
             .add::<DatasetLfsBuilderDatabaseBackedImpl>()
-            .add_value(MetadataChainDbBackedConfig::default())
-            .add_current_account_subject(CurrentAccountSubject::new_test())
-            .add::<AlwaysHappyDatasetPermissionChecker>()
+            .add_value(MetadataChainDbBackedConfig::default());
+        CurrentAccountSubject::new_test().register(&mut b);
+        b.add::<AlwaysHappyDatasetPermissionChecker>()
             .add::<CreateDatasetFromSnapshotUseCaseImpl>()
             .add::<CreateDatasetUseCaseImpl>()
             .add::<CreateDatasetUseCaseHelper>()

@@ -15,7 +15,7 @@ use kamu::utils::ipfs_wrapper::IpfsClient;
 use kamu::utils::local_sync_writes::PulledSeedStore;
 use kamu::utils::simple_transfer_protocol::{SimpleTransferProtocol, SimpleTransferProtocolConfig};
 use kamu::*;
-use kamu_accounts::{CurrentAccountSubject, CurrentAccountSubjectCatalogExt as _};
+use kamu_accounts::CurrentAccountSubject;
 use kamu_auth_rebac_inmem::InMemoryRebacRepository;
 use kamu_auth_rebac_services::{
     DefaultAccountProperties,
@@ -84,9 +84,9 @@ impl SyncWorkspaceCatalog {
         b.add::<DidGeneratorDefault>()
             .add::<SystemTimeSourceDefault>()
             .add_value(self.ipfs_gateway)
-            .add_value(self.ipfs_client)
-            .add_current_account_subject(CurrentAccountSubject::new_test())
-            .add_value(TenancyConfig::SingleTenant)
+            .add_value(self.ipfs_client);
+        CurrentAccountSubject::new_test().register(&mut b);
+        b.add_value(TenancyConfig::SingleTenant)
             .add_builder(odf::dataset::DatasetStorageUnitLocalFs::builder(
                 datasets_dir,
             ))

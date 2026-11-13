@@ -14,7 +14,7 @@ use kamu::testing::*;
 use kamu::utils::local_sync_writes::PulledSeedStore;
 use kamu::utils::simple_transfer_protocol::SimpleTransferProtocol;
 use kamu::*;
-use kamu_accounts::{CurrentAccountSubject, CurrentAccountSubjectCatalogExt as _};
+use kamu_accounts::CurrentAccountSubject;
 use kamu_datasets::{AlwaysHappyDatasetPermissionChecker, DatasetRegistry};
 use kamu_datasets_services::{
     AppendDatasetMetadataBatchUseCaseImpl,
@@ -42,9 +42,9 @@ async fn do_test_search(tmp_workspace_dir: &Path, repo_url: Url) {
 
     let mut b = dill::CatalogBuilder::new();
     b.add::<DidGeneratorDefault>()
-        .add::<SystemTimeSourceDefault>()
-        .add_current_account_subject(CurrentAccountSubject::new_test())
-        .add_value(TenancyConfig::SingleTenant)
+        .add::<SystemTimeSourceDefault>();
+    CurrentAccountSubject::new_test().register(&mut b);
+    b.add_value(TenancyConfig::SingleTenant)
         .add_builder(odf::dataset::DatasetStorageUnitLocalFs::builder(
             datasets_dir,
         ))

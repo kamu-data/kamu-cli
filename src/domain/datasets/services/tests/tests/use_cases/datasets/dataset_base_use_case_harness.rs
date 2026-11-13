@@ -127,7 +127,7 @@ impl DatasetBaseUseCaseHarness {
 
         let intermediate_catalog = {
             let mut b = CatalogBuilder::new_chained(&no_subject_catalog);
-            b.add_current_account_subject(CurrentAccountSubject::new_test());
+            CurrentAccountSubject::new_test().register(&mut b);
             b.build()
         };
 

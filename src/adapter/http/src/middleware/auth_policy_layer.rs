@@ -172,16 +172,15 @@ where
 
 #[cfg(test)]
 mod tests {
-    use kamu_accounts::CurrentAccountSubjectCatalogExt as _;
-
     use super::*;
 
     #[tokio::test]
     async fn test_anonymous_subject_error_is_json() {
         let mut catalog_builder = dill::CatalogBuilder::new();
-        catalog_builder.add_current_account_subject(CurrentAccountSubject::anonymous(
+        CurrentAccountSubject::anonymous(
             kamu_accounts::AnonymousAccountReason::NoAuthenticationProvided,
-        ));
+        )
+        .register(&mut catalog_builder);
         let catalog = catalog_builder.build();
 
         let response = AuthPolicyMiddleware::<()>::check_http_subject(&catalog).unwrap_err();

@@ -18,7 +18,6 @@ use kamu_accounts::{
     AnonymousAccountReason,
     AuthenticationService,
     CurrentAccountSubject,
-    CurrentAccountSubjectCatalogExt as _,
     GetAccountInfoError,
 };
 use tonic::Status;
@@ -185,7 +184,7 @@ where
             if let Some(session_id) = session_id {
                 derived_catalog_builder.add_value(session_id);
             }
-            derived_catalog_builder.add_current_account_subject(subject);
+            subject.register(&mut derived_catalog_builder);
 
             let derived_catalog = derived_catalog_builder.build();
             request.extensions_mut().insert(derived_catalog);

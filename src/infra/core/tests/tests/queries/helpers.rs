@@ -22,7 +22,7 @@ use kamu::{
     ObjectStoreRegistryImpl,
     SessionContextBuilder,
 };
-use kamu_accounts::{CurrentAccountSubject, CurrentAccountSubjectCatalogExt as _};
+use kamu_accounts::CurrentAccountSubject;
 use kamu_core::{DidGenerator, DidGeneratorDefault, TenancyConfig};
 use kamu_datasets::{
     DatasetPermissionChecker,
@@ -149,18 +149,18 @@ pub(crate) async fn create_test_dataset(
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 fn create_base_catalog(dataset_permission_checker: MockDatasetPermissionChecker) -> dill::Catalog {
-    dill::CatalogBuilder::new()
-        .add::<DidGeneratorDefault>()
+    let mut b = dill::CatalogBuilder::new();
+    b.add::<DidGeneratorDefault>()
         .add::<SystemTimeSourceStub>()
         .add_value(TenancyConfig::SingleTenant)
         .add::<DatasetRegistrySoloUnitBridge>()
         .add_value(EngineConfigDatafusionEmbeddedBatchQuery::default())
         .add::<SessionContextBuilder>()
-        .add::<ObjectStoreRegistryImpl>()
-        .add_current_account_subject(CurrentAccountSubject::new_test())
-        .add_value(dataset_permission_checker)
-        .bind::<dyn DatasetPermissionChecker, MockDatasetPermissionChecker>()
-        .build()
+        .add::<ObjectStoreRegistryImpl>();
+    CurrentAccountSubject::new_test().register(&mut b);
+    b.add_value(dataset_permission_checker)
+        .bind::<dyn DatasetPermissionChecker, MockDatasetPermissionChecker>();
+    b.build()
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

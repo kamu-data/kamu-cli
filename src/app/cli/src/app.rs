@@ -256,9 +256,11 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
         )
         .build();
 
-        let cli_catalog = configure_cli_catalog(cli_base_catalog, tenancy_config)
-            .add_current_account_subject(cli_account_subject)
-            .build();
+        let cli_catalog = {
+            let mut b = configure_cli_catalog(cli_base_catalog, tenancy_config);
+            cli_account_subject.register(&mut b);
+            b.build()
+        };
 
         // Register metrics
         maybe_metrics_registry = Some(observability::metrics::register_all(background_catalog));

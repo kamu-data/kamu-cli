@@ -283,7 +283,7 @@ impl ElasticsearchDatasetBaseHarness {
 
             let user_specific_catalog = {
                 let mut b = dill::CatalogBuilder::new_chained(self.no_subject_catalog());
-                b.add_current_account_subject(CurrentAccountSubject::new_test_with(&account_name));
+                CurrentAccountSubject::new_test_with(&account_name).register(&mut b);
                 b.build()
             };
 
@@ -430,11 +430,9 @@ impl InitOnStartup for PredefinedDatasetsRegistrator {
             let user_specific_catalog = {
                 let mut b = dill::CatalogBuilder::new_chained(&self.catalog);
                 if let Some(account_name) = &alias.account_name {
-                    b.add_current_account_subject(CurrentAccountSubject::new_test_with(
-                        &account_name,
-                    ));
+                    CurrentAccountSubject::new_test_with(&account_name).register(&mut b);
                 } else {
-                    b.add_current_account_subject(CurrentAccountSubject::new_test());
+                    CurrentAccountSubject::new_test().register(&mut b);
                 }
                 b.build()
             };

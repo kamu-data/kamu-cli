@@ -17,7 +17,7 @@ use indoc::indoc;
 use kamu::domain::*;
 use kamu::testing::*;
 use kamu::*;
-use kamu_accounts::{CurrentAccountSubject, CurrentAccountSubjectCatalogExt as _};
+use kamu_accounts::CurrentAccountSubject;
 use kamu_accounts_inmem::{InMemoryAccountQuotaEventStore, InMemoryAccountRepository};
 use kamu_accounts_services::{AccountQuotaServiceImpl, AccountServiceImpl};
 use kamu_auth_rebac_inmem::InMemoryRebacRepository;
@@ -1345,11 +1345,11 @@ impl IngestTestHarness {
 
         let mut b = dill::CatalogBuilder::new();
         kamu_datasets_inmem::register_dependencies(&mut b);
-        let catalog = b
-            .add::<DidGeneratorDefault>()
+        b.add::<DidGeneratorDefault>()
             .add_value(RunInfoDir::new(run_info_dir))
-            .add_value(CacheDir::new(cache_dir))
-            .add_current_account_subject(CurrentAccountSubject::new_test())
+            .add_value(CacheDir::new(cache_dir));
+        CurrentAccountSubject::new_test().register(&mut b);
+        let catalog = b
             .add::<AlwaysHappyDatasetPermissionChecker>()
             .add_value(TenancyConfig::SingleTenant)
             .add_builder(odf::dataset::DatasetStorageUnitLocalFs::builder(

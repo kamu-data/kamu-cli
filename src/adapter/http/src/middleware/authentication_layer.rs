@@ -21,7 +21,6 @@ use kamu_accounts::{
     AnonymousAccountReason,
     AuthenticationService,
     CurrentAccountSubject,
-    CurrentAccountSubjectCatalogExt as _,
     GetAccountInfoError,
 };
 use tower::{Layer, Service};
@@ -156,7 +155,7 @@ where
             tracing::debug!(subject = ?current_account_subject, "Authenticated request");
 
             let mut derived_catalog_builder = dill::CatalogBuilder::new_chained(base_catalog);
-            derived_catalog_builder.add_current_account_subject(current_account_subject);
+            current_account_subject.register(&mut derived_catalog_builder);
             if let Some(access_token) = maybe_access_token {
                 derived_catalog_builder.add_value(access_token);
             }

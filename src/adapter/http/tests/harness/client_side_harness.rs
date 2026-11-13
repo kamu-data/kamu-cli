@@ -123,15 +123,16 @@ impl ClientSideHarness {
 
         match options.tenancy_config {
             TenancyConfig::SingleTenant => {
-                b.add_current_account_subject(CurrentAccountSubject::new_test());
+                CurrentAccountSubject::new_test().register(&mut b);
                 b.add_value(PredefinedAccountsConfig::test_single_tenant_with_id());
             }
             TenancyConfig::MultiTenant => {
-                b.add_current_account_subject(CurrentAccountSubject::logged(
+                CurrentAccountSubject::logged(
                     kamu_accounts::Account::seed_resource_id_from_name(CLIENT_ACCOUNT_NAME),
                     odf::metadata::testing::account_id(&CLIENT_ACCOUNT_NAME),
                     odf::AccountName::new_unchecked(CLIENT_ACCOUNT_NAME),
-                ));
+                )
+                .register(&mut b);
 
                 let mut predefined_accounts_config = PredefinedAccountsConfig::new();
                 predefined_accounts_config.predefined.push(

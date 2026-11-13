@@ -1223,9 +1223,11 @@ impl GraphQLDatasetsHarness {
         match caller {
             Caller::Anonymous => self.catalog_anonymous.clone(),
             Caller::Owner => self.catalog_authorized.clone(),
-            Caller::Stranger => dill::CatalogBuilder::new_chained(&self.catalog_no_subject)
-                .add_current_account_subject(CurrentAccountSubject::new_test_with(&"stranger"))
-                .build(),
+            Caller::Stranger => {
+                let mut b = dill::CatalogBuilder::new_chained(&self.catalog_no_subject);
+                CurrentAccountSubject::new_test_with(&"stranger").register(&mut b);
+                b.build()
+            }
         }
     }
 

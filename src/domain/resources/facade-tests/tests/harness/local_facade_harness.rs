@@ -17,7 +17,6 @@ use kamu_accounts::{
     AccountPropertyName,
     AnonymousAccountReason,
     CurrentAccountSubject,
-    CurrentAccountSubjectCatalogExt as _,
     DidSecretEncryptionConfig,
     JOB_KAMU_ACCOUNTS_PREDEFINED_ACCOUNTS_REGISTRATOR,
     PredefinedAccountsConfig,
@@ -258,9 +257,9 @@ impl LocalFacadeHarness {
     /// A facade acting as the admin account
     pub fn facade_for_admin(&self) -> Arc<dyn ResourceFacade> {
         let subject = Self::admin_subject();
-        let catalog = dill::CatalogBuilder::new_chained(&self.base_catalog)
-            .add_current_account_subject(subject)
-            .build();
+        let mut b = dill::CatalogBuilder::new_chained(&self.base_catalog);
+        subject.register(&mut b);
+        let catalog = b.build();
         Self::facade_in(&catalog)
     }
 
@@ -322,9 +321,9 @@ impl LocalFacadeHarness {
             odf::AccountName::new_unchecked(account.name()),
         );
 
-        dill::CatalogBuilder::new_chained(&self.base_catalog)
-            .add_current_account_subject(subject)
-            .build()
+        let mut b = dill::CatalogBuilder::new_chained(&self.base_catalog);
+        subject.register(&mut b);
+        b.build()
     }
 }
 
