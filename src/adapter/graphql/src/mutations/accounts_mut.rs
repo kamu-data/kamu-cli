@@ -40,7 +40,7 @@ impl AccountsMut {
         match subject.as_ref() {
             CurrentAccountSubject::Logged(account) => {
                 let account = account_service
-                    .try_get_account_by_id(&account.account_handle.did)
+                    .try_get_account_by_id(&account.did)
                     .await?
                     .expect("Account exists");
 

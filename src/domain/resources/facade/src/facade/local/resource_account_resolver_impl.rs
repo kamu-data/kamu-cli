@@ -94,7 +94,7 @@ impl ResourceAccountResolverImpl {
         &self,
     ) -> Result<odf::ResourceOwnerHandle, ResolveManifestAccountError> {
         match self.current_account_subject.as_ref() {
-            CurrentAccountSubject::Logged(account) => Ok((&account.account_handle).into()),
+            CurrentAccountSubject::Logged(account) => Ok(account.into()),
             CurrentAccountSubject::Anonymous(_) => {
                 Err(ResourceAccountAccessError::AnonymousSubject.into())
             }

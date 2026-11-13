@@ -81,7 +81,7 @@ impl Principal {
 impl From<&CurrentAccountSubject> for Principal {
     fn from(subject: &CurrentAccountSubject) -> Self {
         match subject {
-            CurrentAccountSubject::Logged(logged) => Self::User(logged.account_handle.clone()),
+            CurrentAccountSubject::Logged(handle) => Self::User(handle.clone()),
             CurrentAccountSubject::Anonymous(_) => Self::Anonymous,
         }
     }

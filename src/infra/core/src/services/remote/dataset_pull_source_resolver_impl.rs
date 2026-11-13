@@ -121,7 +121,7 @@ impl DatasetPullSourceResolver for DatasetPullSourceResolverImpl {
 
         let mut datasets = self
             .dataset_registry
-            .all_dataset_handles_by_owner_name(&account.account_handle.name);
+            .all_dataset_handles_by_owner_name(&account.name);
         while let Some(dataset_handle) = datasets.next().await {
             let dataset_handle = dataset_handle?;
             if self.has_pull_alias(&dataset_handle, remote_ref).await? {

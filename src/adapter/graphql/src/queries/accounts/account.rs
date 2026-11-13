@@ -124,10 +124,9 @@ impl Account {
 
                     Some(Self::new(account.id.into(), account.account_name.into()))
                 }
-                CurrentAccountSubject::Logged(l) => Some(Self::new(
-                    l.account_handle.did.clone().into(),
-                    l.account_handle.name.clone().into(),
-                )),
+                CurrentAccountSubject::Logged(l) => {
+                    Some(Self::new(l.did.clone().into(), l.name.clone().into()))
+                }
             })
         }
     }

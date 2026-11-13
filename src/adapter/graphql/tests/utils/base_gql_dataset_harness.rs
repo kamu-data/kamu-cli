@@ -9,7 +9,7 @@
 
 use bon::bon;
 use database_common::{DatabaseTransactionRunner, NoOpDatabasePlugin};
-use kamu_accounts::{CurrentAccountSubject, LoggedAccount};
+use kamu_accounts::{AccountHandle, CurrentAccountSubject};
 use kamu_accounts_inmem::{InMemoryAccountQuotaEventStore, InMemoryDidSecretKeyRepository};
 use kamu_accounts_services::{
     AccountQuotaServiceImpl,
@@ -154,7 +154,7 @@ impl BaseGQLDatasetHarness {
         &self.catalog
     }
 
-    pub fn logged_account_from_catalog(&self, catalog: &dill::Catalog) -> LoggedAccount {
+    pub fn logged_account_from_catalog(&self, catalog: &dill::Catalog) -> AccountHandle {
         let current_account_subject = catalog.get_one::<CurrentAccountSubject>().unwrap();
         if let CurrentAccountSubject::Logged(logged) = current_account_subject.as_ref() {
             logged.clone()

@@ -763,7 +763,6 @@ impl SearchSecurityHarness {
 
     fn logged_account_id(&self) -> String {
         self.logged_account_from_catalog(&self.catalog_authorized)
-            .account_handle
             .id
             .to_string()
     }
