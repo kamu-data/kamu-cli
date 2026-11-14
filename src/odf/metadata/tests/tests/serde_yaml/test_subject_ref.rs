@@ -127,12 +127,9 @@ fn test_subject_ref_full_form(#[case] data: &str, #[case] expected: SubjectRef) 
           name: employees
         "#
     ),
-    SubjectRef::Group(ResourceRef {
-        r#type: Some(TypeRef::Name("Group".parse().unwrap())),
-        account: None,
-        id: None,
-        did: None,
+    SubjectRef::Group(ResourceRefT {
         name: Some("employees".parse().unwrap()),
+        ..Default::default()
     }),
 )]
 #[case(

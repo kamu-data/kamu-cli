@@ -10,7 +10,7 @@
 use flatbuffers::{FlatBufferBuilder, UnionWIPOffset, WIPOffset};
 
 use crate::auth::*;
-use crate::resources::ResourceRef;
+use crate::resources::ResourceHandleT;
 use crate::serde::flatbuffers::{
     FlatbuffersEnumDeserializable,
     FlatbuffersEnumSerializable,
@@ -22,7 +22,7 @@ use crate::serde::flatbuffers::{
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SubjectHandle {
     Principal(PrincipalHandle),
-    Group(ResourceRef),
+    Group(ResourceHandleT<Group>),
     Authenticated,
     Anonymous,
     Everyone,

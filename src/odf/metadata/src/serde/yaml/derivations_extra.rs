@@ -9,6 +9,7 @@
 
 use crate::dtos;
 use crate::errors::ValidationError;
+use crate::resources::ResourceRefT;
 use crate::serde::yaml as proxies;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -29,7 +30,7 @@ impl From<dtos::auth::SubjectRef> for proxies::auth::SubjectRef {
                 did,
                 name,
             }),
-            dtos::auth::SubjectRef::Group(dtos::resources::ResourceRef {
+            dtos::auth::SubjectRef::Group(ResourceRefT {
                 account,
                 id,
                 did: _,
@@ -74,11 +75,11 @@ impl TryFrom<proxies::auth::SubjectRef> for dtos::auth::SubjectRef {
                 account,
                 id,
                 name,
-            }) => Ok(Self::Group(dtos::resources::ResourceRef {
+            }) => Ok(Self::Group(ResourceRefT {
                 account: account.map(TryInto::try_into).transpose()?,
                 id,
                 did: None,
-                r#type: Some("Group".parse().unwrap()),
+                r#type: std::marker::PhantomData,
                 name,
             })),
             proxies::auth::SubjectRef::Authenticated(proxies::auth::SubjectRefAuthenticated {}) => {
