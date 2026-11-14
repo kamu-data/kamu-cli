@@ -42,11 +42,11 @@ impl Accounts {
     pub async fn by_id(
         &self,
         ctx: &Context<'_>,
-        account_id: AccountID<'_>,
+        account_id: AccountDid<'_>,
     ) -> Result<Option<Account>> {
         let account_entity_data_loader = utils::get_account_entity_data_loader(ctx);
 
-        let account_id: odf::AccountID = account_id.into();
+        let account_id: odf::metadata::auth::AccountDid = account_id.into();
         let maybe_account = account_entity_data_loader
             .load_one(account_id)
             .await
@@ -63,7 +63,7 @@ impl Accounts {
     async fn by_ids(
         &self,
         ctx: &Context<'_>,
-        account_ids: Vec<AccountID<'_>>,
+        account_ids: Vec<AccountDid<'_>>,
         #[graphql(
             desc = "Whether to skip unresolved accounts or return an error if one or more are \
                     missing"
@@ -89,7 +89,7 @@ impl Accounts {
         // Reorder resolved accounts to match the order of inputs
         let found_accounts: Vec<kamu_accounts::Account> = {
             let found_accounts_map: std::collections::BTreeMap<
-                odf::AccountID,
+                odf::metadata::auth::AccountDid,
                 kamu_accounts::Account,
             > = lookup
                 .found

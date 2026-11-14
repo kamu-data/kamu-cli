@@ -60,14 +60,14 @@ fn test_dataset_refs() {
     assert_eq!(
         DatasetRefAny::from_str("did:odf:z6MkmgVreHBu2ABaD59Jq1J2JneXwzpsUWwEWXS4kLhjb4V4")
             .unwrap(),
-        DatasetRefAny::ID(None, DatasetID::new_seeded_ed25519(b"key"))
+        DatasetRefAny::ID(None, DatasetDid::new_seeded_ed25519(b"key"))
     );
     assert_eq!(
         DatasetRefAny::from_str("repo/did:odf:z6MkmgVreHBu2ABaD59Jq1J2JneXwzpsUWwEWXS4kLhjb4V4")
             .unwrap(),
         DatasetRefAny::ID(
             Some(RepoName::new_unchecked("repo")),
-            DatasetID::new_seeded_ed25519(b"key")
+            DatasetDid::new_seeded_ed25519(b"key")
         )
     );
     assert_eq!(
@@ -212,36 +212,36 @@ fn test_dataset_refs_conversions() {
     fn takes_ref_remote<R: Into<DatasetRefRemote>>(_: R) {}
     fn takes_ref_any<R: Into<DatasetRefAny>>(_: R) {}
 
-    takes_ref_local(DatasetID::new_seeded_ed25519(b"key"));
+    takes_ref_local(DatasetDid::new_seeded_ed25519(b"key"));
     takes_ref_local(DatasetName::new_unchecked("bar"));
     takes_ref_local(&DatasetName::new_unchecked("baz"));
     takes_ref_local(DatasetHandle {
-        id: DatasetID::new_seeded_ed25519(b"key"),
+        id: DatasetDid::new_seeded_ed25519(b"key"),
         alias: DatasetAlias::try_from("bar").unwrap(),
         kind: DatasetKind::Root,
     });
     takes_ref_local(&DatasetHandle {
-        id: DatasetID::new_seeded_ed25519(b"key"),
+        id: DatasetDid::new_seeded_ed25519(b"key"),
         alias: DatasetAlias::try_from("bar").unwrap(),
         kind: DatasetKind::Root,
     });
 
-    takes_ref_remote(DatasetID::new_seeded_ed25519(b"key"));
+    takes_ref_remote(DatasetDid::new_seeded_ed25519(b"key"));
     takes_ref_remote(DatasetAliasRemote::try_from("foo/bar").unwrap());
     takes_ref_remote(&DatasetAliasRemote::try_from("foo/bar").unwrap());
 
-    takes_ref_any(DatasetID::new_seeded_ed25519(b"key"));
+    takes_ref_any(DatasetDid::new_seeded_ed25519(b"key"));
     takes_ref_any(DatasetName::new_unchecked("bar"));
     takes_ref_any(&DatasetName::new_unchecked("baz"));
     takes_ref_any(DatasetAliasRemote::try_from("foo/bar").unwrap());
     takes_ref_any(&DatasetAliasRemote::try_from("foo/bar").unwrap());
     takes_ref_any(DatasetHandle {
-        id: DatasetID::new_seeded_ed25519(b"key"),
+        id: DatasetDid::new_seeded_ed25519(b"key"),
         alias: DatasetAlias::try_from("bar").unwrap(),
         kind: DatasetKind::Root,
     });
     takes_ref_any(&DatasetHandle {
-        id: DatasetID::new_seeded_ed25519(b"key"),
+        id: DatasetDid::new_seeded_ed25519(b"key"),
         alias: DatasetAlias::try_from("bar").unwrap(),
         kind: DatasetKind::Root,
     });

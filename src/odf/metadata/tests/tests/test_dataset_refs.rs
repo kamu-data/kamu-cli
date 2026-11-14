@@ -83,7 +83,7 @@ fn test_dataset_ref_pattern() {
 fn test_dataset_ref_pattern_match() {
     let dataset_id_str =
         "did:odf:fed012126262ba49e1ba8392c26f7a39e1ba8d756c7469786d3365200c68402ff65dc";
-    let default_dataset_id = DatasetID::from_did_str(dataset_id_str).unwrap();
+    let default_dataset_id = DatasetDid::from_did_str(dataset_id_str).unwrap();
     let expression = "%odf%";
     let pattern = DatasetRefPattern::from_str(expression).unwrap();
 
@@ -230,7 +230,7 @@ fn test_dataset_ref_any_pattern() {
         res,
         DatasetRefAnyPattern::Ref(DatasetRefAny::ID(
             None,
-            DatasetID::from_did_str(param).unwrap()
+            DatasetDid::from_did_str(param).unwrap()
         ))
     );
 

@@ -85,24 +85,24 @@ impl SeedBuilder {
     fn new(kind: DatasetKind) -> Self {
         Self {
             v: Seed {
-                dataset_id: DatasetID::new_seeded_ed25519(b""),
+                dataset_id: DatasetDid::new_seeded_ed25519(b""),
                 dataset_kind: kind,
             },
         }
     }
 
-    pub fn id(mut self, dataset_id: DatasetID) -> Self {
+    pub fn id(mut self, dataset_id: DatasetDid) -> Self {
         self.v.dataset_id = dataset_id;
         self
     }
 
     pub fn id_random(mut self) -> Self {
-        self.v.dataset_id = DatasetID::new_generated_ed25519().1;
+        self.v.dataset_id = DatasetDid::new_generated_ed25519().1;
         self
     }
 
     pub fn id_from<B: AsRef<[u8]>>(mut self, key: B) -> Self {
-        self.v.dataset_id = DatasetID::new_seeded_ed25519(key.as_ref());
+        self.v.dataset_id = DatasetDid::new_seeded_ed25519(key.as_ref());
         self
     }
 
@@ -438,7 +438,7 @@ impl SetTransformBuilder {
             .map(|a| {
                 let alias = a.into();
                 TransformInput {
-                    dataset_ref: DatasetID::new_seeded_ed25519(alias.as_bytes()).into(),
+                    dataset_ref: DatasetDid::new_seeded_ed25519(alias.as_bytes()).into(),
                     alias: Some(alias),
                 }
             })
@@ -665,7 +665,7 @@ impl ExecuteTransformBuilder {
 
     pub fn empty_query_inputs_from_particular_ids<I>(mut self, dataset_ids: I) -> Self
     where
-        I: IntoIterator<Item = DatasetID>,
+        I: IntoIterator<Item = DatasetDid>,
     {
         self.v.query_inputs = dataset_ids
             .into_iter()
@@ -688,7 +688,7 @@ impl ExecuteTransformBuilder {
         self.v.query_inputs = aliases
             .into_iter()
             .map(|i| ExecuteTransformInput {
-                dataset_id: DatasetID::new_seeded_ed25519(i.into().as_bytes()),
+                dataset_id: DatasetDid::new_seeded_ed25519(i.into().as_bytes()),
                 prev_block_hash: None,
                 new_block_hash: None,
                 prev_offset: None,

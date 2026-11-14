@@ -8,8 +8,8 @@
 // by the Apache License, Version 2.0.
 
 mod serde_yaml;
-mod test_account_id;
-mod test_dataset_id;
+mod test_account_did;
+mod test_dataset_did;
 mod test_dataset_identity;
 mod test_dataset_refs;
 mod test_dto_extra;

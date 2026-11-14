@@ -483,7 +483,7 @@ pub enum FlowProcessOrderField {
 
 struct FlowProcessListingState {
     account: Account,
-    dataset_handles_by_id: HashMap<odf::DatasetID, odf::DatasetHandle>,
+    dataset_handles_by_id: HashMap<odf::metadata::datasets::DatasetDid, odf::DatasetHandle>,
     webhook_subscriptions_by_id:
         HashMap<kamu_webhooks::WebhookSubscriptionID, kamu_webhooks::WebhookSubscription>,
 }

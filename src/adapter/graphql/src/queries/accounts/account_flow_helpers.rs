@@ -20,7 +20,7 @@ use crate::prelude::*;
 
 pub(crate) async fn list_accessible_datasets_with_flows(
     ctx: &Context<'_>,
-    account_id: &odf::AccountID,
+    account_id: &odf::metadata::auth::AccountDid,
     page: usize,
     per_page: usize,
 ) -> Result<(Vec<odf::DatasetHandle>, usize)> {

@@ -12,13 +12,13 @@
 // Combine this module's types with generated DTOs
 pub use crate::dtos::datasets::*;
 
-mod dataset_id;
+mod dataset_did;
 mod dataset_selector;
 pub mod legacy;
 mod metadata_block_types;
 mod metadata_event_type;
 
-pub use dataset_id::*;
+pub use dataset_did::*;
 pub use dataset_selector::*;
 pub use metadata_block_types::*;
 pub use metadata_event_type::*;

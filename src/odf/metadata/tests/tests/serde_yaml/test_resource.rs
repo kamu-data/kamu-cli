@@ -399,7 +399,7 @@ fn test_serde_resource_canonical() {
                 name: "my-secret".parse().unwrap(),
                 account: ResourceOwnerHandle {
                     id: "c27331ce-ce88-4ff9-8c5a-4ce8107cc03f".parse().unwrap(),
-                    did: AccountID::from_did_str("did:odf:fed01816ef0a9abe93aba816ef0a9abe93aba90e6065747170300c0d3d30c2cd8d7a4").unwrap(),
+                    did: AccountDid::from_did_str("did:odf:fed01816ef0a9abe93aba816ef0a9abe93aba90e6065747170300c0d3d30c2cd8d7a4").unwrap(),
                     name: "sergiimk".parse().unwrap(),
                 },
                 labels: ResourceLabels {
@@ -513,7 +513,7 @@ fn test_serde_resource_canonical() {
 #[test]
 fn test_serde_resource_owner_ref() {
     let resource_id = ResourceID::new(uuid::Uuid::new_v4());
-    let did = AccountID::new_generated_ed25519().1;
+    let did = AccountDid::new_generated_ed25519().1;
 
     assert_eq!(
         serde_json::from_value::<serde::auth::ResourceOwnerRef>(json!({ "did": did.to_string() }))

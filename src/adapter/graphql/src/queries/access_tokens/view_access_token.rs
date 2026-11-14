@@ -60,7 +60,7 @@ impl ViewAccessToken {
 #[derive(Debug)]
 pub struct CreatedAccessToken<'a> {
     token: KamuAccessToken,
-    account_id: AccountID<'a>,
+    account_id: AccountDid<'a>,
     token_name: String,
 }
 
@@ -68,7 +68,7 @@ pub struct CreatedAccessToken<'a> {
 #[Object]
 impl<'a> CreatedAccessToken<'a> {
     #[graphql(skip)]
-    pub fn new(token: KamuAccessToken, account_id: AccountID<'a>, token_name: &str) -> Self {
+    pub fn new(token: KamuAccessToken, account_id: AccountDid<'a>, token_name: &str) -> Self {
         Self {
             token,
             account_id,

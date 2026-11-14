@@ -3388,7 +3388,7 @@ table FlowStatus {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // SubjectRef
-// Reference to a party a grant is given to. Unlike a principal, a subject may stand for many principals at once. Short form is either a well-known subject name (e.g. `Authenticated`) or a resource reference with a type prefix that determines the subject kind (e.g. `User:alice`, `Group:acme/engineering`).
+// Reference to a party a grant is given to. Unlike a principal, a subject may stand for many principals at once. Short form always starts with a prefix that determines the subject kind: a resource type followed by a resource name (e.g. `User:alice`, `Group:acme/engineering`), or a well-known subject followed by `*` (e.g. `Authenticated:*`).
 //
 // Schema: https://opendatafabric.org/schemas/auth/v1alpha1/SubjectRef
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -3691,7 +3691,7 @@ table MetadataBlock {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 table NodeSpecInput {
-  // DID associated with the account by ODF or an external system.
+  // DID associated with the ODF node.
   did: [ubyte];
   // Human-friendly display name.
   display_name: string;
@@ -3705,7 +3705,7 @@ table NodeSpecInput {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 table NodeSpec {
-  // DID associated with the account by ODF or an external system.
+  // DID associated with the ODF node.
   did: [ubyte];
   // Human-friendly display name.
   display_name: string;

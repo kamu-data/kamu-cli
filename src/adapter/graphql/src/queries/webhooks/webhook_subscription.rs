@@ -42,7 +42,7 @@ impl WebhookSubscription {
 
     /// Associated dataset ID
     /// Not present for system subscriptions
-    pub async fn dataset_id(&self) -> Option<DatasetID<'_>> {
+    pub async fn dataset_id(&self) -> Option<DatasetDid<'_>> {
         self.state.dataset_id().map(Into::into)
     }
 

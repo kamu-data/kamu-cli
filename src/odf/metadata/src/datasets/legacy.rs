@@ -35,13 +35,13 @@ use crate::storage::RepoName;
 /// A resolved handle to the local dataset
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub struct DatasetHandle {
-    pub id: DatasetID,
+    pub id: DatasetDid,
     pub alias: DatasetAlias,
     pub kind: DatasetKind,
 }
 
 impl DatasetHandle {
-    pub fn new(id: DatasetID, alias: DatasetAlias, kind: DatasetKind) -> Self {
+    pub fn new(id: DatasetDid, alias: DatasetAlias, kind: DatasetKind) -> Self {
         Self { id, alias, kind }
     }
 
@@ -82,12 +82,12 @@ impl fmt::Debug for DatasetHandle {
 /// A resolved handle to the remote dataset
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub struct DatasetHandleRemote {
-    pub id: DatasetID,
+    pub id: DatasetDid,
     pub alias: DatasetAliasRemote,
 }
 
 impl DatasetHandleRemote {
-    pub fn new(id: DatasetID, alias: DatasetAliasRemote) -> Self {
+    pub fn new(id: DatasetDid, alias: DatasetAliasRemote) -> Self {
         Self { id, alias }
     }
 
@@ -130,7 +130,7 @@ impl fmt::Debug for DatasetHandleRemote {
 /// References local dataset by ID or alias
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum DatasetRef {
-    ID(DatasetID),
+    ID(DatasetDid),
     Alias(DatasetAlias),
     Handle(DatasetHandle),
 }
@@ -140,7 +140,7 @@ pub enum DatasetRef {
 /// References remote dataset by ID, URL, or alias
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum DatasetRefRemote {
-    ID(Option<RepoName>, DatasetID),
+    ID(Option<RepoName>, DatasetDid),
     Alias(DatasetAliasRemote),
     Url(Arc<Url>),
     Handle(DatasetHandleRemote),
@@ -156,7 +156,7 @@ pub enum DatasetRefRemote {
 /// before accessing those parameters.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum DatasetRefAny {
-    ID(Option<RepoName>, DatasetID),
+    ID(Option<RepoName>, DatasetDid),
     RemoteAlias(RepoName, Option<AccountName>, DatasetName),
     LocalAlias(Option<AccountName>, DatasetName),
     AmbiguousAlias(Arc<str>, DatasetName),
@@ -170,14 +170,14 @@ pub enum DatasetRefAny {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl DatasetRef {
-    pub fn id(&self) -> Option<&DatasetID> {
+    pub fn id(&self) -> Option<&DatasetDid> {
         match self {
             Self::ID(id) | Self::Handle(DatasetHandle { id, .. }) => Some(id),
             Self::Alias(_) => None,
         }
     }
 
-    pub fn into_id(self) -> Option<DatasetID> {
+    pub fn into_id(self) -> Option<DatasetDid> {
         match self {
             Self::ID(id) | Self::Handle(DatasetHandle { id, .. }) => Some(id),
             Self::Alias(_) => None,
@@ -222,7 +222,7 @@ impl std::str::FromStr for DatasetRef {
     type Err = ParseError<Self>;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match DatasetID::from_did_str(s) {
+        match DatasetDid::from_did_str(s) {
             Ok(id) => Ok(Self::ID(id)),
             Err(_) => match DatasetAlias::from_str(s) {
                 Ok(alias) => Ok(Self::Alias(alias)),
@@ -248,14 +248,14 @@ impl fmt::Display for DatasetRef {
 
 impl_serde!(DatasetRef, DatasetRefSerdeVisitor);
 
-impl From<DatasetID> for DatasetRef {
-    fn from(v: DatasetID) -> Self {
+impl From<DatasetDid> for DatasetRef {
+    fn from(v: DatasetDid) -> Self {
         Self::ID(v.clone())
     }
 }
 
-impl From<&DatasetID> for DatasetRef {
-    fn from(v: &DatasetID) -> Self {
+impl From<&DatasetDid> for DatasetRef {
+    fn from(v: &DatasetDid) -> Self {
         Self::ID(v.clone())
     }
 }
@@ -315,7 +315,7 @@ impl PartialOrd for DatasetRef {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl DatasetRefRemote {
-    pub fn id(&self) -> Option<&DatasetID> {
+    pub fn id(&self) -> Option<&DatasetDid> {
         match self {
             Self::ID(_, id) => Some(id),
             Self::Alias(_) | Self::Url(_) => None,
@@ -377,7 +377,7 @@ impl std::str::FromStr for DatasetRefRemote {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match Grammar::match_remote_dataset_id(s) {
-            Some((repo, id, "")) => match DatasetID::from_did_str(id) {
+            Some((repo, id, "")) => match DatasetDid::from_did_str(id) {
                 Ok(id) => Ok(Self::ID(repo.map(RepoName::new_unchecked), id)),
                 Err(_) => Err(Self::Err::new(s)),
             },
@@ -413,14 +413,14 @@ impl fmt::Display for DatasetRefRemote {
 
 impl_serde!(DatasetRefRemote, DatasetRefRemoteSerdeVisitor);
 
-impl From<DatasetID> for DatasetRefRemote {
-    fn from(v: DatasetID) -> Self {
+impl From<DatasetDid> for DatasetRefRemote {
+    fn from(v: DatasetDid) -> Self {
         Self::ID(None, v)
     }
 }
 
-impl From<&DatasetID> for DatasetRefRemote {
-    fn from(v: &DatasetID) -> Self {
+impl From<&DatasetDid> for DatasetRefRemote {
+    fn from(v: &DatasetDid) -> Self {
         Self::ID(None, v.clone())
     }
 }
@@ -480,7 +480,7 @@ impl std::cmp::PartialOrd for DatasetRefRemote {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl DatasetRefAny {
-    pub fn id(&self) -> Option<&DatasetID> {
+    pub fn id(&self) -> Option<&DatasetDid> {
         match self {
             Self::ID(_, id) => Some(id),
             Self::RemoteAlias(..)
@@ -620,7 +620,7 @@ impl std::str::FromStr for DatasetRefAny {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match Grammar::match_remote_dataset_id(s) {
-            Some((repo, id, "")) => match DatasetID::from_did_str(id) {
+            Some((repo, id, "")) => match DatasetDid::from_did_str(id) {
                 Ok(id) => Ok(Self::ID(repo.map(RepoName::new_unchecked), id)),
                 Err(_) => Err(Self::Err::new(s)),
             },
@@ -660,14 +660,14 @@ impl_parse_error!(DatasetRefAny);
 
 impl_serde!(DatasetRefAny, DatasetRefAnySerdeVisitor);
 
-impl From<DatasetID> for DatasetRefAny {
-    fn from(v: DatasetID) -> Self {
+impl From<DatasetDid> for DatasetRefAny {
+    fn from(v: DatasetDid) -> Self {
         Self::ID(None, v)
     }
 }
 
-impl From<&DatasetID> for DatasetRefAny {
-    fn from(v: &DatasetID) -> Self {
+impl From<&DatasetDid> for DatasetRefAny {
+    fn from(v: &DatasetDid) -> Self {
         Self::ID(None, v.clone())
     }
 }
@@ -804,7 +804,7 @@ impl std::cmp::Ord for DatasetRefAny {
             Option<&'a str>,
             Option<&'a str>,
             Option<&'a DatasetName>,
-            Option<&'a DatasetID>,
+            Option<&'a DatasetDid>,
             Option<&'a Url>,
         );
 

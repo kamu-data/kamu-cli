@@ -16,9 +16,9 @@ use crate::prelude::*;
 
 simple_string_scalar!(
     /// Unique and stable identifier of an account (`did:...`)
-    AccountID,
-    odf::AccountID,
-    from_did_str
+    AccountDid as "AccountID",
+    odf::metadata::auth::AccountDid,
+    from_did_str,
 );
 simple_string_scalar!(
     /// Unique symbolic name of an account

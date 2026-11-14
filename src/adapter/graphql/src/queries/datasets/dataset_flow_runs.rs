@@ -224,7 +224,7 @@ pub(crate) enum InitiatorFilterInput {
     /// Flows started by the system, the value is ignored
     System(bool),
     /// Flows started by any of these accounts
-    Accounts(Vec<AccountID<'static>>),
+    Accounts(Vec<AccountDid<'static>>),
 }
 
 /// Selects flows by process kind

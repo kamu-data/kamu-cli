@@ -40,21 +40,21 @@ impl AccountEntityLoader {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// AccountEntityLoader: odf::AccountID -> Account
+// AccountEntityLoader: odf::AccountDid -> Account
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl Loader<odf::AccountID> for AccountEntityLoader {
+impl Loader<odf::metadata::auth::AccountDid> for AccountEntityLoader {
     type Value = Account;
     type Error = Arc<InternalError>;
 
-    #[tracing::instrument(level = "debug", name = "Gql::AccountEntityLoader::byAccountID::load", skip_all, fields(num_keys = keys.len()))]
+    #[tracing::instrument(level = "debug", name = "Gql::AccountEntityLoader::byAccountDid::load", skip_all, fields(num_keys = keys.len()))]
     async fn load(
         &self,
-        keys: &[odf::AccountID],
-    ) -> Result<HashMap<odf::AccountID, Self::Value>, Self::Error> {
+        keys: &[odf::metadata::auth::AccountDid],
+    ) -> Result<HashMap<odf::metadata::auth::AccountDid, Self::Value>, Self::Error> {
         let catalog = self.catalog.upgrade();
         let account_service = catalog.get_one::<dyn AccountService>().unwrap();
-        let key_refs: Vec<&odf::AccountID> = keys.iter().collect();
+        let key_refs: Vec<&odf::metadata::auth::AccountDid> = keys.iter().collect();
 
         let lookup = account_service
             .get_accounts_by_ids(&key_refs)

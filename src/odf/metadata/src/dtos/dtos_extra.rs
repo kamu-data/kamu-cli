@@ -155,8 +155,8 @@ impl std::str::FromStr for auth::ResourceOwnerRef {
 impl_parse_error!(auth::ResourceOwnerRef);
 impl_try_from_str!(auth::ResourceOwnerRef);
 
-impl From<auth::AccountID> for auth::ResourceOwnerRef {
-    fn from(value: AccountID) -> Self {
+impl From<auth::AccountDid> for auth::ResourceOwnerRef {
+    fn from(value: auth::AccountDid) -> Self {
         Self {
             id: None,
             did: Some(value),

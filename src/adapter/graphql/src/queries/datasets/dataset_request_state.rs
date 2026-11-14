@@ -53,7 +53,7 @@ impl DatasetRequestState {
     }
 
     #[inline]
-    pub fn dataset_id(&self) -> &odf::DatasetID {
+    pub fn dataset_id(&self) -> &odf::metadata::datasets::DatasetDid {
         &self.dataset_handle.id
     }
 

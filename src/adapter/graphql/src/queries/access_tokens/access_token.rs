@@ -15,7 +15,7 @@ use crate::queries::ViewAccessToken;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct AccountAccessTokens<'a> {
-    account_id: &'a AccountID<'a>,
+    account_id: &'a AccountDid<'a>,
 }
 
 /// Access tokens of an account
@@ -25,7 +25,7 @@ impl<'a> AccountAccessTokens<'a> {
     const DEFAULT_PER_PAGE: usize = 15;
 
     #[graphql(skip)]
-    pub fn new(account_id: &'a AccountID) -> Self {
+    pub fn new(account_id: &'a AccountDid) -> Self {
         Self { account_id }
     }
 

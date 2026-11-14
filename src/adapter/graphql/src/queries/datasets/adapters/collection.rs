@@ -199,14 +199,14 @@ impl CollectionProjection<'_> {
     pub async fn entries_by_ref(
         &self,
         ctx: &Context<'_>,
-        refs: Vec<DatasetID<'_>>,
+        refs: Vec<DatasetDid<'_>>,
     ) -> Result<Vec<CollectionEntry>> {
         let readable_dataset = self.readable_state.resolved_dataset(ctx).await?;
 
         let odf_refs = refs
             .iter()
-            .map(|r| r as &odf::DatasetID)
-            .collect::<Vec<&odf::DatasetID>>();
+            .map(|r| r as &odf::metadata::datasets::DatasetDid)
+            .collect::<Vec<&odf::metadata::datasets::DatasetDid>>();
 
         let find_collection_entries = from_catalog_n!(ctx, dyn FindCollectionEntriesUseCase);
         let entries = find_collection_entries

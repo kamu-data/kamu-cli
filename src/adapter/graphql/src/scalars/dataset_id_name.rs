@@ -15,8 +15,8 @@ use crate::prelude::*;
 
 simple_string_scalar!(
     /// Unique and stable identifier of a dataset (`did:odf:...`)
-    DatasetID,
-    odf::DatasetID,
+    DatasetDid as "DatasetID",
+    odf::metadata::datasets::DatasetDid,
     from_did_str
 );
 simple_string_scalar!(

@@ -209,7 +209,7 @@ pub struct CollectionEntryInput {
 
     /// DID of the linked dataset
     #[graphql(name = "ref")]
-    pub reference: DatasetID<'static>,
+    pub reference: DatasetDid<'static>,
 
     /// Json object containing extra column values
     pub extra_data: Option<ExtraData>,

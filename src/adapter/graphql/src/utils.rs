@@ -154,7 +154,7 @@ pub(crate) fn ensure_secrets_encryption_enabled(ctx: &Context<'_>) -> Result<(),
 
 pub(crate) fn check_logged_account_id_match(
     ctx: &Context<'_>,
-    account_id: &odf::AccountID,
+    account_id: &odf::metadata::auth::AccountDid,
 ) -> Result<(), GqlError> {
     let current_account_subject = from_catalog_n!(ctx, CurrentAccountSubject);
 
@@ -173,7 +173,7 @@ pub(crate) fn check_logged_account_id_match(
 
 pub(crate) async fn is_logged_account_id_match_or_admin(
     ctx: &Context<'_>,
-    account_id: &odf::AccountID,
+    account_id: &odf::metadata::auth::AccountDid,
 ) -> Result<bool, InternalError> {
     let (current_account_subject, rebac_service) =
         from_catalog_n!(ctx, CurrentAccountSubject, dyn RebacService);
@@ -195,7 +195,7 @@ pub(crate) async fn is_logged_account_id_match_or_admin(
 
 pub(crate) async fn check_logged_account_id_match_or_admin(
     ctx: &Context<'_>,
-    account_id: &odf::AccountID,
+    account_id: &odf::metadata::auth::AccountDid,
 ) -> Result<(), GqlError> {
     if is_logged_account_id_match_or_admin(ctx, account_id).await? {
         return Ok(());

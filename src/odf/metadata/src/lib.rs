@@ -36,7 +36,7 @@ pub mod testing;
 // These re-exports are to support legacy flat type structure. You should not be
 // adding more types to this list. New code should import types as
 // `odf::{context}::{type}`.
-pub use auth::{AccountID, AccountName};
+pub use auth::{AccountDid as AccountID, AccountName};
 pub use data as schema;
 pub use data::{
     ArrowBufferEncoding,
@@ -73,7 +73,7 @@ pub use datasets::{
     AttachmentsEmbedded,
     Checkpoint,
     DataSlice,
-    DatasetID,
+    DatasetDid as DatasetID,
     DatasetKind,
     DatasetVocabulary,
     ExecuteTransform,

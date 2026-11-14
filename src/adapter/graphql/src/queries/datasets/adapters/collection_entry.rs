@@ -52,8 +52,8 @@ impl CollectionEntry {
 
     /// DID of the linked dataset
     #[graphql(name = "ref")]
-    pub async fn reference(&self) -> DatasetID<'_> {
-        DatasetID::from(&self.entity.reference)
+    pub async fn reference(&self) -> DatasetDid<'_> {
+        DatasetDid::from(&self.entity.reference)
     }
 
     /// Extra data associated with this entry

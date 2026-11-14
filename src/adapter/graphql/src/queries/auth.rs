@@ -50,7 +50,7 @@ impl Auth {
     async fn relations(
         &self,
         ctx: &Context<'_>,
-        account_ids: Vec<AccountID<'_>>,
+        account_ids: Vec<AccountDid<'_>>,
         page: Option<usize>,
         per_page: Option<usize>,
     ) -> Result<AuthRelationConnection> {

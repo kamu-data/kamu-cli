@@ -22,11 +22,11 @@ use crate::prelude::*;
 #[derive(InputObject)]
 pub struct AccountDatasetRelationOperation {
     /// Account whose role changes
-    pub account_id: AccountID<'static>,
+    pub account_id: AccountDid<'static>,
     /// Change to apply
     pub operation: DatasetRoleOperation,
     /// Dataset the role applies to
-    pub dataset_id: DatasetID<'static>,
+    pub dataset_id: DatasetDid<'static>,
 }
 
 /// Change to an account's role in a dataset

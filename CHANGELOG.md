@@ -16,6 +16,8 @@ Recommendation: for ease of reading, use the following format:
 ## [Unreleased]
 ### Added
 - Data types now support a shorthand for optionality, e.g. `Float64?`
+### Changed
+- **Breaking:** GQL: Renamed `AccountID` to `AccountDid` and `DatasetID` to `DatasetDid`
 
 ## [0.272.1] - 2026-11-05
 ### Added

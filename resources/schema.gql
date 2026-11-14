@@ -7521,6 +7521,10 @@ Schema: https://opendatafabric.org/schemas/auth/v1alpha1/ResourceOwnerHandle
 """
 type ResourceOwnerHandle {
 	"""
+	Type URI of the account.
+	"""
+	type: TypeUri!
+	"""
 	ID of the account resource.
 	"""
 	id: ResourceID!
@@ -7541,6 +7545,10 @@ Resolves by `did` if given, else by `name`; any other field present is then
 checked for agreement, so a mismatch is reported rather than ignored.
 """
 input ResourceOwnerRefInput {
+	"""
+	Schema URI identifying the type
+	"""
+	type: TypeRef
 	"""
 	Resource ID of the account, only checked for agreement
 	"""
@@ -9082,6 +9090,11 @@ type TriggerFlowSuccess implements TriggerFlowResult {
 Name of a resource type
 """
 scalar TypeName
+
+"""
+Reference to a resource type by name or by schema URI
+"""
+scalar TypeRef
 
 """
 URI of a resource type schema

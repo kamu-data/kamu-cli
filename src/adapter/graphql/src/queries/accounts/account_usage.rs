@@ -14,14 +14,14 @@ use crate::prelude::*;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct AccountUsage<'a> {
-    account_id: &'a AccountID<'a>,
+    account_id: &'a AccountDid<'a>,
 }
 
 /// Resource usage of an account
 #[Object]
 impl<'a> AccountUsage<'a> {
     #[graphql(skip)]
-    pub fn new(account_id: &'a AccountID) -> Self {
+    pub fn new(account_id: &'a AccountDid) -> Self {
         Self { account_id }
     }
 

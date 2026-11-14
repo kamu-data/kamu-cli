@@ -74,7 +74,7 @@ impl DatasetsMut {
     async fn by_id(
         &self,
         ctx: &Context<'_>,
-        dataset_id: DatasetID<'_>,
+        dataset_id: DatasetDid<'_>,
     ) -> Result<Option<DatasetMut>> {
         // TODO: PERF: GQL: DataLoader?
 
@@ -113,7 +113,7 @@ impl DatasetsMut {
     async fn by_ids(
         &self,
         ctx: &Context<'_>,
-        dataset_ids: Vec<DatasetID<'_>>,
+        dataset_ids: Vec<DatasetDid<'_>>,
         #[graphql(
             desc = "Whether to skip unresolved datasets or return an error if one or more are \
                     missing"

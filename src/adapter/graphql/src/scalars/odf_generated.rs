@@ -414,7 +414,7 @@ impl From<odf::metadata::datasets::ExecuteTransform> for ExecuteTransform {
 #[derive(SimpleObject, Debug, Clone)]
 pub struct ExecuteTransformInput {
     /// Input dataset identifier.
-    pub dataset_id: DatasetID<'static>,
+    pub dataset_id: DatasetDid<'static>,
     /// Last block of the input dataset that was previously incorporated into the derivative
     /// transformation, if any. Must be equal to the last non-empty `newBlockHash`. Together with
     /// `newBlockHash` defines a half-open `(prevBlockHash, newBlockHash]` interval of blocks that
@@ -1755,10 +1755,12 @@ impl async_graphql::ScalarType for ResourceLabels {
 /// Schema: https://opendatafabric.org/schemas/auth/v1alpha1/ResourceOwnerHandle
 #[derive(SimpleObject, Debug, Clone)]
 pub struct ResourceOwnerHandle {
+    /// Type URI of the account.
+    pub r#type: TypeUri<'static>,
     /// ID of the account resource.
     pub id: ResourceID<'static>,
     /// DID of the account.
-    pub did: AccountID<'static>,
+    pub did: AccountDid<'static>,
     /// Name of the account.
     pub name: AccountName<'static>,
 }
@@ -1766,6 +1768,7 @@ pub struct ResourceOwnerHandle {
 impl From<odf::metadata::auth::ResourceOwnerHandle> for ResourceOwnerHandle {
     fn from(v: odf::metadata::auth::ResourceOwnerHandle) -> Self {
         Self {
+            r#type: v.r#type.into(),
             id: v.id.into(),
             did: v.did.into(),
             name: v.name.into(),
@@ -1833,7 +1836,7 @@ impl From<odf::metadata::resources::ResourceStatus> for ResourceStatus {
 #[derive(SimpleObject, Debug, Clone)]
 pub struct Seed {
     /// Unique identity of the dataset.
-    pub dataset_id: DatasetID<'static>,
+    pub dataset_id: DatasetDid<'static>,
     /// Type of the dataset.
     pub dataset_kind: DatasetKind,
 }

@@ -298,14 +298,17 @@ pub(crate) struct ResourceHeaders {
 
 #[derive(cynic::QueryFragment, Debug, Clone)]
 pub(crate) struct ResourceOwnerHandle {
+    #[cynic(rename = "type")]
+    pub r#type: kamu_resources::TypeUri,
     pub id: kamu_resources::ResourceID,
-    pub did: odf::AccountID,
+    pub did: odf::metadata::auth::AccountDid,
     pub name: AccountName,
 }
 
 impl From<ResourceOwnerHandle> for odf::ResourceOwnerHandle {
     fn from(value: ResourceOwnerHandle) -> Self {
         Self {
+            r#type: value.r#type,
             id: value.id,
             did: value.did,
             name: odf::AccountName::new_unchecked(&value.name.0),

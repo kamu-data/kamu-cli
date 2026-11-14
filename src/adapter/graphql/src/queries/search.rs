@@ -501,7 +501,7 @@ pub struct LookupFilters {
 #[derive(InputObject, Debug)]
 pub struct AccountLookupFilter {
     /// Accounts to leave out of the results
-    exclude_accounts_by_ids: Vec<AccountID<'static>>,
+    exclude_accounts_by_ids: Vec<AccountDid<'static>>,
 }
 
 page_based_connection!(

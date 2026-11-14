@@ -153,19 +153,30 @@ pub(crate) use simple_scalar;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Defines a string-backed GraphQL scalar wrapping `$source_type`.
+///
+/// `Name as "GqlName"` publishes the scalar in the schema as `GqlName`
+/// instead of the Rust type name.
 macro_rules! simple_string_scalar {
-    ($(#[$attr:meta])* $name: ident, $source_type: ty) => {
+    (
+        $(#[$attr:meta])* $name: ident $(as $gql_name: literal)?,
+        $source_type: ty $(,)?
+    ) => {
         crate::scalars::__simple_string_scalar_general!($(#[$attr])* $name, $source_type);
         crate::scalars::__simple_string_scalar_scalar_type!(
-            $(#[$attr])* $name,
+            $(#[$attr])* $name $(as $gql_name)?,
             $source_type,
             try_from
         );
     };
-    ($(#[$attr:meta])* $name: ident, $source_type: ty, $source_parse_method: ident) => {
+    (
+        $(#[$attr:meta])* $name: ident $(as $gql_name: literal)?,
+        $source_type: ty,
+        $source_parse_method: ident $(,)?
+    ) => {
         crate::scalars::__simple_string_scalar_general!($(#[$attr])* $name, $source_type);
         crate::scalars::__simple_string_scalar_scalar_type!(
-            $(#[$attr])* $name,
+            $(#[$attr])* $name $(as $gql_name)?,
             $source_type,
             $source_parse_method
         );
@@ -224,9 +235,13 @@ macro_rules! __simple_string_scalar_general {
 }
 
 macro_rules! __simple_string_scalar_scalar_type {
-    ($(#[$attr:meta])* $name: ident, $source_type: ty, $source_parse_method: ident) => {
+    (
+        $(#[$attr:meta])* $name: ident $(as $gql_name: literal)?,
+        $source_type: ty,
+        $source_parse_method: ident
+    ) => {
         $(#[$attr])*
-        #[async_graphql::Scalar]
+        #[async_graphql::Scalar($(name = $gql_name)?)]
         impl async_graphql::ScalarType for $name<'_> {
             fn parse(value: async_graphql::Value) -> async_graphql::InputValueResult<Self> {
                 if let async_graphql::Value::String(value) = &value {

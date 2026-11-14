@@ -99,7 +99,7 @@ impl Dataset {
 #[Object]
 impl Dataset {
     /// Unique identifier of the dataset
-    async fn id(&self) -> DatasetID<'_> {
+    async fn id(&self) -> DatasetDid<'_> {
         self.dataset_request_state.dataset_id().into()
     }
 
