@@ -14,6 +14,36 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+macro_rules! impl_struct_or_string {
+    ($proxy:path, $dto:path) => {
+        impl std::str::FromStr for $proxy {
+            type Err = String;
+
+            fn from_str(s: &str) -> Result<Self, Self::Err> {
+                let v = <$dto>::try_from(s).map_err(|e| e.to_string())?;
+                Ok(v.into())
+            }
+        }
+
+        impl From<$dto> for StructOrString<$proxy> {
+            fn from(v: $dto) -> Self {
+                Self(v.into())
+            }
+        }
+
+        impl TryFrom<StructOrString<$proxy>> for $dto {
+            type Error = ValidationError;
+            fn try_from(v: StructOrString<$proxy>) -> Result<Self, Self::Error> {
+                v.0.try_into()
+            }
+        }
+    };
+}
+
+pub(crate) use impl_struct_or_string;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 pub struct StructOrString<T>(pub T);
 
 impl<T> std::fmt::Debug for StructOrString<T>
@@ -91,127 +121,6 @@ where
         M: serde::de::MapAccess<'de>,
     {
         Deserialize::deserialize(serde::de::value::MapAccessDeserializer::new(map))
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub struct UnionOrString<T>(pub T);
-
-impl<T> std::fmt::Debug for UnionOrString<T>
-where
-    T: std::fmt::Debug,
-{
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.0.fmt(f)
-    }
-}
-
-impl<T> From<T> for UnionOrString<T> {
-    fn from(value: T) -> Self {
-        Self(value)
-    }
-}
-
-impl<T> Serialize for UnionOrString<T>
-where
-    T: Serialize,
-{
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        T::serialize(&self.0, serializer)
-    }
-}
-
-impl<'de, T> Deserialize<'de> for UnionOrString<T>
-where
-    T: Deserialize<'de>,
-{
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        let inner =
-            deserializer.deserialize_any(UnionOrStringVisitor::<T>(std::marker::PhantomData))?;
-
-        Ok(Self(inner))
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-struct UnionOrStringVisitor<T>(std::marker::PhantomData<fn() -> T>);
-
-impl<'de, T> serde::de::Visitor<'de> for UnionOrStringVisitor<T>
-where
-    T: Deserialize<'de>,
-{
-    type Value = T;
-
-    fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-        formatter.write_str("Tagged enum of short-form type name")
-    }
-
-    fn visit_str<E>(self, value: &str) -> Result<T, E>
-    where
-        E: serde::de::Error,
-    {
-        let map = StringToUnionMapAdapter::new(value);
-        self.visit_map(map)
-    }
-
-    fn visit_map<M>(self, map: M) -> Result<T, M::Error>
-    where
-        M: serde::de::MapAccess<'de>,
-    {
-        Deserialize::deserialize(serde::de::value::MapAccessDeserializer::new(map))
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-/// Helper to expand the `"typename"` string into `{"kind": "typename"}`
-struct StringToUnionMapAdapter<'a, Err> {
-    typename: Option<&'a str>,
-    phantom: std::marker::PhantomData<Err>,
-}
-
-impl<'a, Err> StringToUnionMapAdapter<'a, Err> {
-    fn new(typename: &'a str) -> Self {
-        Self {
-            typename: Some(typename),
-            phantom: std::marker::PhantomData,
-        }
-    }
-}
-
-impl<'de, Err> ::serde::de::MapAccess<'de> for StringToUnionMapAdapter<'_, Err>
-where
-    Err: ::serde::de::Error,
-{
-    type Error = Err;
-
-    fn next_key_seed<K>(&mut self, seed: K) -> Result<Option<K::Value>, Self::Error>
-    where
-        K: ::serde::de::DeserializeSeed<'de>,
-    {
-        if self.typename.is_some() {
-            seed.deserialize(::serde::de::value::StrDeserializer::new("kind"))
-                .map(Some)
-        } else {
-            Ok(None)
-        }
-    }
-
-    fn next_value_seed<V>(&mut self, seed: V) -> Result<V::Value, Self::Error>
-    where
-        V: ::serde::de::DeserializeSeed<'de>,
-    {
-        seed.deserialize(::serde::de::value::StrDeserializer::new(
-            self.typename.take().unwrap(),
-        ))
     }
 }
 

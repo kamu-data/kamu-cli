@@ -20,6 +20,7 @@ pub mod engines;
 pub mod errors;
 pub mod resources;
 pub mod serde;
+pub mod sources;
 pub mod storage;
 
 // Re-exports

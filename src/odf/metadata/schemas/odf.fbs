@@ -987,29 +987,46 @@ table AwsCredentialsInput {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 union SubjectHandle {
-  SubjectHandleResource,
+  SubjectHandlePrincipal,
+  SubjectHandleGroup,
   SubjectHandleAuthenticated,
   SubjectHandleAnonymous,
   SubjectHandleEveryone,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// SubjectHandleResource
-// A specific `User`, `ServiceAccount`, `Node`, or members of a `Group`.
+// SubjectHandlePrincipal
+// A specific `User`, `ServiceAccount`, or `Node`.
 //
-// Schema: https://opendatafabric.org/schemas/auth/v1alpha1/SubjectHandle#/$defs/Resource
+// Schema: https://opendatafabric.org/schemas/auth/v1alpha1/SubjectHandle#/$defs/Principal
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-table SubjectHandleResource {
-  // Type URI of the subject resource.
+table SubjectHandlePrincipal {
+  // Type URI of the principal.
   type: string;
-  // Account that owns the subject resource (for service accounts and groups).
+  // Account that owns the service account.
   account: ResourceOwnerHandle;
-  // ID of the subject resource.
+  // ID of the principal resource.
   id: [ubyte];
-  // DID of the subject resource, if applicable.
+  // DID of the principal, if applicable.
   did: [ubyte];
-  // Name of the subject resource.
+  // Name of the principal resource.
+  name: string;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// SubjectHandleGroup
+// Members of a `Group`, including members of nested groups.
+//
+// Schema: https://opendatafabric.org/schemas/auth/v1alpha1/SubjectHandle#/$defs/Group
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+table SubjectHandleGroup {
+  // Account that owns the group.
+  account: ResourceOwnerHandle;
+  // ID of the group resource.
+  id: [ubyte];
+  // Name of the group resource.
   name: string;
 }
 
@@ -3371,35 +3388,52 @@ table FlowStatus {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // SubjectRef
-// Reference to a party a grant is given to. Unlike a principal, a subject may stand for many principals at once. Short form is either a well-known subject name (e.g. `Authenticated`) or a resource reference with a type prefix, DID, or ID (e.g. `Group:acme/engineering`).
+// Reference to a party a grant is given to. Unlike a principal, a subject may stand for many principals at once. Short form is either a well-known subject name (e.g. `Authenticated`) or a resource reference with a type prefix that determines the subject kind (e.g. `User:alice`, `Group:acme/engineering`).
 //
 // Schema: https://opendatafabric.org/schemas/auth/v1alpha1/SubjectRef
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 union SubjectRef {
-  SubjectRefResource,
+  SubjectRefPrincipal,
+  SubjectRefGroup,
   SubjectRefAuthenticated,
   SubjectRefAnonymous,
   SubjectRefEveryone,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// SubjectRefResource
-// A specific `User`, `ServiceAccount`, `Node`, or members of a `Group`.
+// SubjectRefPrincipal
+// A specific `User`, `ServiceAccount`, or `Node`.
 //
-// Schema: https://opendatafabric.org/schemas/auth/v1alpha1/SubjectRef#/$defs/Resource
+// Schema: https://opendatafabric.org/schemas/auth/v1alpha1/SubjectRef#/$defs/Principal
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-table SubjectRefResource {
-  // Short type name or full type URI of the subject resource.
+table SubjectRefPrincipal {
+  // Short type name or full type URI of the principal.
   type: string;
-  // Reference to an account that owns the subject resource (for service accounts and groups).
+  // Reference to an account that owns the service account.
   account: ResourceOwnerRef;
-  // ID of the subject resource.
+  // ID of the principal resource.
   id: [ubyte];
-  // DID of the subject resource.
+  // DID of the principal.
   did: [ubyte];
-  // Name of the subject resource.
+  // Name of the principal resource.
+  name: string;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// SubjectRefGroup
+// Members of a `Group`, including members of nested groups.
+//
+// Schema: https://opendatafabric.org/schemas/auth/v1alpha1/SubjectRef#/$defs/Group
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+table SubjectRefGroup {
+  // Reference to an account that owns the group.
+  account: ResourceOwnerRef;
+  // ID of the group resource.
+  id: [ubyte];
+  // Name of the group resource.
   name: string;
 }
 
@@ -3445,7 +3479,7 @@ table SubjectRefWrapper {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 table GroupSpecInput {
-  // Members of the group. Only the `Resource` subject kind is allowed, so that well-known subjects like `Everyone` cannot be nested into a group.
+  // Members of the group. Only the `Principal` and `Group` subject kinds are allowed, so that well-known subjects like `Everyone` cannot be nested into a group.
   members: [SubjectRefWrapper];
 }
 
@@ -3461,7 +3495,7 @@ table SubjectHandleWrapper {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 table GroupSpec {
-  // Members of the group. Only the `Resource` subject kind is allowed, so that well-known subjects like `Everyone` cannot be nested into a group.
+  // Members of the group. Only the `Principal` and `Group` subject kinds are allowed, so that well-known subjects like `Everyone` cannot be nested into a group.
   members: [SubjectHandleWrapper];
 }
 

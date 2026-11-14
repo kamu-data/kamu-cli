@@ -13,16 +13,20 @@ pub use crate::dtos::data::*;
 #[cfg(feature = "arrow")]
 mod arrow_conversions;
 mod arrow_encoding;
+mod data_field;
+mod data_schema;
+mod data_type;
+mod errors;
 pub mod ext;
 mod extra_attributes_impl;
 mod operation_type;
 mod schema_cmp;
-mod schema_impl;
 
 #[cfg(feature = "arrow")]
 pub use arrow_conversions::*;
 pub use arrow_encoding::*;
+pub use data_schema::*;
+pub use errors::*;
 pub use extra_attributes_impl::*;
 pub use operation_type::*;
 pub use schema_cmp::*;
-pub use schema_impl::*;

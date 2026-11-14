@@ -12,6 +12,10 @@ pub use crate::dtos::auth::*;
 
 mod account_id;
 mod account_name;
+mod subject_handle;
+mod subject_ref;
 
 pub use account_id::*;
 pub use account_name::*;
+pub use subject_handle::*;
+pub use subject_ref::*;

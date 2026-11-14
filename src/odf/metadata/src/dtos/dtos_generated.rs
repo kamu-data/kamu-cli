@@ -78,8 +78,8 @@ pub mod auth {
     /// Schema: https://opendatafabric.org/schemas/auth/v1alpha1/GroupSpec
     #[derive(Clone, Debug, Eq, PartialEq, Default)]
     pub struct GroupSpec {
-        /// Members of the group. Only the `Resource` subject kind is allowed, so that well-known
-        /// subjects like `Everyone` cannot be nested into a group.
+        /// Members of the group. Only the `Principal` and `Group` subject kinds are allowed, so
+        /// that well-known subjects like `Everyone` cannot be nested into a group.
         pub members: Option<Vec<auth::SubjectHandle>>,
     }
 
@@ -88,8 +88,8 @@ pub mod auth {
     /// Schema: https://opendatafabric.org/schemas/auth/v1alpha1/GroupSpecInput
     #[derive(Clone, Debug, Eq, PartialEq, Default)]
     pub struct GroupSpecInput {
-        /// Members of the group. Only the `Resource` subject kind is allowed, so that well-known
-        /// subjects like `Everyone` cannot be nested into a group.
+        /// Members of the group. Only the `Principal` and `Group` subject kinds are allowed, so
+        /// that well-known subjects like `Everyone` cannot be nested into a group.
         pub members: Option<Vec<auth::SubjectRef>>,
     }
 
@@ -553,24 +553,7 @@ pub mod auth {
         }
     }
 
-    /// Resolved reference to a party a grant is given to.
-    ///
-    /// Schema: https://opendatafabric.org/schemas/auth/v1alpha1/SubjectHandle
-    #[derive(Clone, PartialEq, Eq, Debug)]
-    pub enum SubjectHandle {
-        Resource(auth::SubjectHandleResource),
-        Authenticated(auth::SubjectHandleAuthenticated),
-        Anonymous(auth::SubjectHandleAnonymous),
-        Everyone(auth::SubjectHandleEveryone),
-    }
-
-    impl_enum_with_variants!(SubjectHandle);
-    impl_enum_variant!(SubjectHandle::Resource(auth::SubjectHandleResource));
-    impl_enum_variant!(SubjectHandle::Authenticated(
-        auth::SubjectHandleAuthenticated
-    ));
-    impl_enum_variant!(SubjectHandle::Anonymous(auth::SubjectHandleAnonymous));
-    impl_enum_variant!(SubjectHandle::Everyone(auth::SubjectHandleEveryone));
+    pub use crate::auth::SubjectHandle;
 
     /// Matches any unauthenticated principal.
     ///
@@ -590,41 +573,37 @@ pub mod auth {
     #[derive(Clone, Debug, Eq, PartialEq, Default)]
     pub struct SubjectHandleEveryone {}
 
-    /// A specific `User`, `ServiceAccount`, `Node`, or members of a `Group`.
+    /// Members of a `Group`, including members of nested groups.
     ///
-    /// Schema: https://opendatafabric.org/schemas/auth/v1alpha1/SubjectHandle#/$defs/Resource
+    /// Schema: https://opendatafabric.org/schemas/auth/v1alpha1/SubjectHandle#/$defs/Group
     #[derive(Clone, Debug, Eq, PartialEq)]
-    pub struct SubjectHandleResource {
-        /// Type URI of the subject resource.
-        pub r#type: TypeUri,
-        /// Account that owns the subject resource (for service accounts and groups).
-        pub account: Option<auth::ResourceOwnerHandle>,
-        /// ID of the subject resource.
+    pub struct SubjectHandleGroup {
+        /// Account that owns the group.
+        pub account: auth::ResourceOwnerHandle,
+        /// ID of the group resource.
         pub id: ResourceID,
-        /// DID of the subject resource, if applicable.
-        pub did: Option<Did>,
-        /// Name of the subject resource.
+        /// Name of the group resource.
         pub name: ResourceName,
     }
 
-    /// Reference to a party a grant is given to. Unlike a principal, a subject may stand for many
-    /// principals at once. Short form is either a well-known subject name (e.g. `Authenticated`) or
-    /// a resource reference with a type prefix, DID, or ID (e.g. `Group:acme/engineering`).
+    /// A specific `User`, `ServiceAccount`, or `Node`.
     ///
-    /// Schema: https://opendatafabric.org/schemas/auth/v1alpha1/SubjectRef
-    #[derive(Clone, PartialEq, Eq, Debug)]
-    pub enum SubjectRef {
-        Resource(auth::SubjectRefResource),
-        Authenticated(auth::SubjectRefAuthenticated),
-        Anonymous(auth::SubjectRefAnonymous),
-        Everyone(auth::SubjectRefEveryone),
+    /// Schema: https://opendatafabric.org/schemas/auth/v1alpha1/SubjectHandle#/$defs/Principal
+    #[derive(Clone, Debug, Eq, PartialEq)]
+    pub struct SubjectHandlePrincipal {
+        /// Type URI of the principal.
+        pub r#type: TypeUri,
+        /// Account that owns the service account.
+        pub account: Option<auth::ResourceOwnerHandle>,
+        /// ID of the principal resource.
+        pub id: ResourceID,
+        /// DID of the principal, if applicable.
+        pub did: Option<Did>,
+        /// Name of the principal resource.
+        pub name: ResourceName,
     }
 
-    impl_enum_with_variants!(SubjectRef);
-    impl_enum_variant!(SubjectRef::Resource(auth::SubjectRefResource));
-    impl_enum_variant!(SubjectRef::Authenticated(auth::SubjectRefAuthenticated));
-    impl_enum_variant!(SubjectRef::Anonymous(auth::SubjectRefAnonymous));
-    impl_enum_variant!(SubjectRef::Everyone(auth::SubjectRefEveryone));
+    pub use crate::auth::SubjectRef;
 
     /// Matches any unauthenticated principal.
     ///
@@ -644,21 +623,33 @@ pub mod auth {
     #[derive(Clone, Debug, Eq, PartialEq, Default)]
     pub struct SubjectRefEveryone {}
 
-    /// A specific `User`, `ServiceAccount`, `Node`, or members of a `Group`.
+    /// Members of a `Group`, including members of nested groups.
     ///
-    /// Schema: https://opendatafabric.org/schemas/auth/v1alpha1/SubjectRef#/$defs/Resource
+    /// Schema: https://opendatafabric.org/schemas/auth/v1alpha1/SubjectRef#/$defs/Group
     #[derive(Clone, Debug, Eq, PartialEq, Default)]
-    pub struct SubjectRefResource {
-        /// Short type name or full type URI of the subject resource.
-        pub r#type: Option<TypeRef>,
-        /// Reference to an account that owns the subject resource (for service accounts and
-        /// groups).
+    pub struct SubjectRefGroup {
+        /// Reference to an account that owns the group.
         pub account: Option<auth::ResourceOwnerRef>,
-        /// ID of the subject resource.
+        /// ID of the group resource.
         pub id: Option<ResourceID>,
-        /// DID of the subject resource.
+        /// Name of the group resource.
+        pub name: Option<ResourceName>,
+    }
+
+    /// A specific `User`, `ServiceAccount`, or `Node`.
+    ///
+    /// Schema: https://opendatafabric.org/schemas/auth/v1alpha1/SubjectRef#/$defs/Principal
+    #[derive(Clone, Debug, Eq, PartialEq, Default)]
+    pub struct SubjectRefPrincipal {
+        /// Short type name or full type URI of the principal.
+        pub r#type: Option<TypeRef>,
+        /// Reference to an account that owns the service account.
+        pub account: Option<auth::ResourceOwnerRef>,
+        /// ID of the principal resource.
+        pub id: Option<ResourceID>,
+        /// DID of the principal.
         pub did: Option<Did>,
-        /// Name of the subject resource.
+        /// Name of the principal resource.
         pub name: Option<ResourceName>,
     }
 

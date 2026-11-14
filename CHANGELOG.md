@@ -13,6 +13,10 @@ Recommendation: for ease of reading, use the following format:
 ### Fixed
 -->
 
+## [Unreleased]
+### Added
+- Data types now support a shorthand for optionality, e.g. `Float64?`
+
 ## [0.272.1] - 2026-11-05
 ### Added
 - Versioned files can be viewed and downloaded on nodes with local storage, including every
