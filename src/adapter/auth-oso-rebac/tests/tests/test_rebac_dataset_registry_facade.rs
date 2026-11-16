@@ -9,8 +9,7 @@
 
 use std::sync::Arc;
 
-use kamu_accounts::testing::CurrentAccountSubjectTestHelper;
-use kamu_accounts::{CurrentAccountSubject, Principal};
+use kamu_accounts::Principal;
 use kamu_auth_rebac::{RebacDatasetRefUnresolvedError, RebacDatasetRegistryFacade};
 use kamu_auth_rebac_services::RebacDatasetRegistryFacadeImpl;
 use kamu_datasets::DatasetPermission;
@@ -21,28 +20,31 @@ use crate::harness::BaseOsoRebacHarness;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_facade_checks_the_given_principal_not_the_current_account() {
-    let harness =
-        RebacDatasetRegistryFacadeHarness::new(CurrentAccountSubjectTestHelper::logged("owner"))
-            .await;
-    let owned = harness.create_private_dataset("owner", "owned").await;
-    let stranger = BaseOsoRebacHarness::user("stranger");
+async fn test_facade_checks_the_principal_of_its_catalog() {
+    let stranger_harness =
+        RebacDatasetRegistryFacadeHarness::new(BaseOsoRebacHarness::user("stranger")).await;
+    let owned = stranger_harness
+        .create_private_dataset("owner", "owned")
+        .await;
 
     assert_matches!(
-        harness.resolve_handle_as(&stranger, &owned).await,
+        stranger_harness.resolve_handle(&owned).await,
         Err(RebacDatasetRefUnresolvedError::Access(_))
     );
     assert_eq!(
-        harness.accessible_refs_as(&stranger, &owned).await,
+        stranger_harness.accessible_refs(&owned).await,
         Vec::<odf::DatasetRef>::new()
     );
 
+    let node_harness = RebacDatasetRegistryFacadeHarness::new(Principal::Node).await;
+    let owned = node_harness.create_private_dataset("owner", "owned").await;
+
     assert_matches!(
-        harness.resolve_handle_as(&Principal::Node, &owned).await,
+        node_harness.resolve_handle(&owned).await,
         Ok(handle) if handle == owned
     );
     assert_eq!(
-        harness.accessible_refs_as(&Principal::Node, &owned).await,
+        node_harness.accessible_refs(&owned).await,
         vec![owned.as_local_ref()]
     );
 }
@@ -60,12 +62,11 @@ struct RebacDatasetRegistryFacadeHarness {
 }
 
 impl RebacDatasetRegistryFacadeHarness {
-    /// `current_account_subject` is the catalog's subject; each call names its
-    /// principal on its own
-    async fn new(current_account_subject: CurrentAccountSubject) -> Self {
+    /// `principal` is the only principal of the catalog the facade is built in
+    async fn new(principal: Principal) -> Self {
         let base =
             BaseOsoRebacHarness::new(BaseOsoRebacHarness::predefined_accounts(&ACCOUNTS), |b| {
-                current_account_subject.register(b);
+                b.add_value(principal);
             })
             .await;
 
@@ -79,32 +80,19 @@ impl RebacDatasetRegistryFacadeHarness {
         }
     }
 
-    async fn resolve_handle_as(
+    async fn resolve_handle(
         &self,
-        principal: &Principal,
         dataset: &odf::DatasetHandle,
     ) -> Result<odf::DatasetHandle, RebacDatasetRefUnresolvedError> {
         self.rebac_dataset_registry_facade
-            .resolve_dataset_handle_by_ref(
-                principal,
-                &dataset.as_local_ref(),
-                DatasetPermission::Read,
-            )
+            .resolve_dataset_handle_by_ref(&dataset.as_local_ref(), DatasetPermission::Read)
             .await
     }
 
-    /// The refs among `[dataset]` the principal may read
-    async fn accessible_refs_as(
-        &self,
-        principal: &Principal,
-        dataset: &odf::DatasetHandle,
-    ) -> Vec<odf::DatasetRef> {
+    /// The refs among `[dataset]` the catalog's principal may read
+    async fn accessible_refs(&self, dataset: &odf::DatasetHandle) -> Vec<odf::DatasetRef> {
         self.rebac_dataset_registry_facade
-            .classify_dataset_refs_by_allowance(
-                principal,
-                &[&dataset.as_local_ref()],
-                DatasetPermission::Read,
-            )
+            .classify_dataset_refs_by_allowance(&[&dataset.as_local_ref()], DatasetPermission::Read)
             .await
             .unwrap()
             .accessible_resolved_refs

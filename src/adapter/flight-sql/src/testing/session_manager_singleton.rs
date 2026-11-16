@@ -12,7 +12,6 @@ use std::sync::{Arc, Mutex};
 
 use datafusion::logical_expr::LogicalPlan;
 use datafusion::prelude::SessionContext;
-use kamu_accounts::Principal;
 use kamu_core::QueryService;
 use tonic::Status;
 
@@ -29,7 +28,6 @@ use crate::{PlanId, SessionManager, internal_error};
 #[dill::interface(dyn SessionManager)]
 pub struct SessionManagerSingleton {
     query_svc: dill::Lazy<Arc<dyn QueryService>>,
-    principal: Arc<Principal>,
     state: Arc<SessionManagerSingletonState>,
 }
 
@@ -71,7 +69,7 @@ impl SessionManager for SessionManagerSingleton {
         let query_svc = self.query_svc.get().map_err(internal_error)?;
 
         let ctx = query_svc
-            .create_session(&self.principal)
+            .create_session()
             .await
             .map_err(|e| Status::internal(e.to_string()))?;
 

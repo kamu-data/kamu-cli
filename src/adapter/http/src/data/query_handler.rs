@@ -13,7 +13,6 @@ use database_common_macros::transactional_handler;
 use dill::Catalog;
 use http_common::*;
 use internal_error::*;
-use kamu_accounts::Principal;
 use kamu_core::*;
 
 use super::query_types::{QueryResponse, *};
@@ -181,7 +180,6 @@ pub async fn query_handler_impl(
     tracing::debug!(request = ?body, "Query");
 
     let query_svc = catalog.get_one::<dyn QueryService>().unwrap();
-    let principal = catalog.get_one::<Principal>().unwrap();
     let identity_config = catalog
         .get_one::<kamu_signing::entities::IdentityConfig>()
         .unwrap();
@@ -209,7 +207,7 @@ pub async fn query_handler_impl(
     }
 
     let res = query_svc
-        .sql_statement(&principal, &body.query, body.to_options())
+        .sql_statement(&body.query, body.to_options())
         .await
         .map_err(map_query_error)?;
 

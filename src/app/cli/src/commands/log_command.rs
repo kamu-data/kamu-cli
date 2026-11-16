@@ -15,7 +15,6 @@ use std::sync::Arc;
 use chrono::prelude::*;
 use console::style;
 use futures::{StreamExt, TryStreamExt};
-use kamu_accounts::Principal;
 use kamu_auth_rebac::RebacDatasetRegistryFacade;
 use kamu_datasets::{DatasetPermission, DatasetRegistry};
 
@@ -46,7 +45,6 @@ pub struct LogCommand {
     output_config: Arc<OutputConfig>,
     dataset_registry: Arc<dyn DatasetRegistry>,
     rebac_dataset_registry_facade: Arc<dyn RebacDatasetRegistryFacade>,
-    principal: Arc<Principal>,
 
     #[dill::component(explicit)]
     dataset_ref: odf::DatasetRef,
@@ -138,7 +136,7 @@ impl Command for LogCommand {
 
         let resolved_dataset = self
             .rebac_dataset_registry_facade
-            .resolve_dataset_by_ref(&self.principal, &self.dataset_ref, DatasetPermission::Read)
+            .resolve_dataset_by_ref(&self.dataset_ref, DatasetPermission::Read)
             .await?;
 
         use odf::dataset::{MetadataChainExt, TryStreamExtExt};

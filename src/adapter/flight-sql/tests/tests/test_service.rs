@@ -9,12 +9,14 @@
 
 use std::assert_matches;
 use std::net::SocketAddr;
+use std::sync::Arc;
 
 use arrow_flight::flight_service_server::FlightServiceServer;
 use arrow_flight::sql::client::FlightSqlServiceClient;
 use datafusion::prelude::*;
 use futures::TryStreamExt;
 use indoc::indoc;
+use internal_error::InternalError;
 use kamu_accounts::{
     Account,
     AccountHandle,
@@ -25,7 +27,19 @@ use kamu_accounts::{
 };
 use kamu_adapter_flight_sql::testing::{SessionManagerSingleton, SessionManagerSingletonState};
 use kamu_adapter_flight_sql::*;
-use kamu_core::{MockQueryService, QueryService};
+use kamu_core::{
+    CreateSessionError,
+    EngineDesc,
+    GetChangelogProjectionOptions,
+    GetDataOptions,
+    GetDataResponse,
+    MockQueryService,
+    QueryError,
+    QueryOptions,
+    QueryResponse,
+    QueryService,
+};
+use kamu_datasets::ResolvedDataset;
 use odf::utils::data::DataFrameExt;
 use tokio::net::TcpListener;
 use tonic::transport::{Channel, Server};
@@ -77,8 +91,7 @@ async fn run_server(session_principal: Principal) -> FlightServer {
     let mut query_svc: kamu_core::MockQueryService = kamu_core::MockQueryService::new();
     query_svc
         .expect_create_session()
-        .withf(move |principal| *principal == session_principal)
-        .return_once(move |_| Ok(ctx));
+        .return_once(move || Ok(ctx));
 
     let mut b = dill::Catalog::builder();
 
@@ -89,7 +102,8 @@ async fn run_server(session_principal: Principal) -> FlightServer {
         .add_value(mock_authentication_service)
         .bind::<dyn AuthenticationService, MockAuthenticationService>()
         .add_value(query_svc)
-        .bind::<dyn QueryService, MockQueryService>()
+        .add_value(ExpectedSessionPrincipal(session_principal))
+        .add::<PrincipalCheckingQueryService>()
         .add::<SessionManagerSingleton>()
         .add::<SessionManagerSingletonState>()
         .add_value(
@@ -121,6 +135,72 @@ async fn run_server(session_principal: Principal) -> FlightServer {
     let task = tokio::task::spawn(service);
 
     FlightServer { addr, task }
+}
+
+/// The principal a test expects the auth layer to register for its session
+struct ExpectedSessionPrincipal(Principal);
+
+/// Creates sessions only for the expected principal, read from the request
+/// catalog the auth layer built, and otherwise delegates to the mock
+#[dill::component]
+#[dill::interface(dyn QueryService)]
+struct PrincipalCheckingQueryService {
+    principal: Arc<Principal>,
+    expected: Arc<ExpectedSessionPrincipal>,
+    inner: Arc<MockQueryService>,
+}
+
+#[async_trait::async_trait]
+impl QueryService for PrincipalCheckingQueryService {
+    async fn create_session(&self) -> Result<SessionContext, CreateSessionError> {
+        assert_eq!(*self.principal, self.expected.0);
+        self.inner.create_session().await
+    }
+
+    async fn tail(
+        &self,
+        source: ResolvedDataset,
+        skip: u64,
+        limit: u64,
+        options: GetDataOptions,
+    ) -> Result<GetDataResponse, QueryError> {
+        self.inner.tail(source, skip, limit, options).await
+    }
+
+    async fn get_data(
+        &self,
+        source: ResolvedDataset,
+        options: GetDataOptions,
+    ) -> Result<GetDataResponse, QueryError> {
+        self.inner.get_data(source, options).await
+    }
+
+    async fn get_data_multi(
+        &self,
+        sources: Vec<ResolvedDataset>,
+    ) -> Result<Vec<GetDataResponse>, QueryError> {
+        self.inner.get_data_multi(sources).await
+    }
+
+    async fn sql_statement(
+        &self,
+        statement: &str,
+        options: QueryOptions,
+    ) -> Result<QueryResponse, QueryError> {
+        self.inner.sql_statement(statement, options).await
+    }
+
+    async fn get_known_engines(&self) -> Result<Vec<EngineDesc>, InternalError> {
+        self.inner.get_known_engines().await
+    }
+
+    async fn get_changelog_projection(
+        &self,
+        source: ResolvedDataset,
+        options: GetChangelogProjectionOptions,
+    ) -> Result<GetDataResponse, QueryError> {
+        self.inner.get_changelog_projection(source, options).await
+    }
 }
 
 async fn get_client(addr: &SocketAddr) -> FlightSqlServiceClient<Channel> {

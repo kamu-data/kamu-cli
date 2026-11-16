@@ -13,7 +13,6 @@ use std::sync::Arc;
 
 use datafusion::prelude::SessionContext;
 use internal_error::*;
-use kamu_accounts::Principal;
 use kamu_datasets::{DatasetPermissionError, ResolvedDataset};
 use odf::utils::data::DataFrameExt;
 use thiserror::Error;
@@ -24,11 +23,9 @@ use thiserror::Error;
 #[cfg_attr(feature = "testing", mockall::automock)]
 #[async_trait::async_trait]
 pub trait QueryService: Send + Sync {
-    /// Creates an SQL session with the datasets the principal may read
-    async fn create_session(
-        &self,
-        principal: &Principal,
-    ) -> Result<SessionContext, CreateSessionError>;
+    /// Creates an SQL session with the datasets the current principal may
+    /// read
+    async fn create_session(&self) -> Result<SessionContext, CreateSessionError>;
 
     /// Returns the specified number of the latest records in the dataset
     /// This is equivalent to SQL query like:
@@ -76,7 +73,6 @@ pub trait QueryService: Send + Sync {
     /// information that can be used for reproducibility.
     async fn sql_statement(
         &self,
-        principal: &Principal,
         statement: &str,
         options: QueryOptions,
     ) -> Result<QueryResponse, QueryError>;

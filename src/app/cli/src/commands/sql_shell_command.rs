@@ -17,7 +17,6 @@ use internal_error::*;
 use itertools::Itertools;
 use kamu::domain::{ExportFormat, ExportService, QueryOptions, QueryService};
 use kamu::*;
-use kamu_accounts::Principal;
 use kamu_datafusion_cli::exec;
 use kamu_datafusion_cli::print_format::PrintFormat;
 use kamu_datafusion_cli::print_options::{MaxRows, PrintOptions};
@@ -52,7 +51,6 @@ pub enum SqlShellEngine {
 #[dill::interface(dyn Command)]
 pub struct SqlShellCommand {
     query_svc: Arc<dyn QueryService>,
-    principal: Arc<Principal>,
     workspace_layout: Arc<WorkspaceLayout>,
     engine_prov_config: Arc<EngineProvisionerLocalConfig>,
     output_config: Arc<OutputConfig>,
@@ -134,11 +132,7 @@ impl SqlShellCommand {
     async fn run_datafusion_command(&self) -> Result<(), CLIError> {
         let res = self
             .query_svc
-            .sql_statement(
-                &self.principal,
-                self.command.as_ref().unwrap(),
-                QueryOptions::default(),
-            )
+            .sql_statement(self.command.as_ref().unwrap(), QueryOptions::default())
             .await
             .map_err(CLIError::failure)?;
 
@@ -163,11 +157,7 @@ impl SqlShellCommand {
             instrumented_registry: Arc::new(kamu_datafusion_cli::object_storage::instrumented::InstrumentedObjectStoreRegistry::new()),
         };
 
-        let ctx = self
-            .query_svc
-            .create_session(&self.principal)
-            .await
-            .unwrap();
+        let ctx = self.query_svc.create_session().await.unwrap();
 
         eprintln!(
             "{}",
@@ -200,7 +190,7 @@ impl SqlShellCommand {
 
                 let res = self
                     .query_svc
-                    .sql_statement(&self.principal, command, QueryOptions::default())
+                    .sql_statement(command, QueryOptions::default())
                     .await
                     .map_err(CLIError::failure)?;
 

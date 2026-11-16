@@ -56,21 +56,16 @@ impl Datasets {
     ) -> Result<Vec<Dataset>> {
         // TODO: PERF: GQL: DataLoader?
 
-        let (rebac_dataset_registry_facade, account_service, current_account_subject, principal) = from_catalog_n!(
+        let (rebac_dataset_registry_facade, account_service, current_account_subject) = from_catalog_n!(
             ctx,
             dyn kamu_auth_rebac::RebacDatasetRegistryFacade,
             dyn kamu_accounts::AccountService,
-            CurrentAccountSubject,
-            Principal
+            CurrentAccountSubject
         );
 
         let dataset_refs_refs = dataset_refs.iter().collect::<Vec<_>>();
         let resolution = rebac_dataset_registry_facade
-            .classify_dataset_refs_by_allowance(
-                &principal,
-                &dataset_refs_refs,
-                DatasetPermission::Read,
-            )
+            .classify_dataset_refs_by_allowance(&dataset_refs_refs, DatasetPermission::Read)
             .await?;
 
         if !skip_missing && !resolution.inaccessible_refs.is_empty() {

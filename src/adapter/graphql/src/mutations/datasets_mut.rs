@@ -7,7 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_accounts::Principal;
 use kamu_auth_rebac::RebacDatasetRegistryFacade;
 use kamu_datasets::{CreateDatasetFromSnapshotError, DatasetPermission, DatasetPermissionAccess};
 
@@ -126,8 +125,7 @@ impl DatasetsMut {
     ) -> Result<Vec<DatasetMut>> {
         // TODO: PERF: GQL: DataLoader?
 
-        let (rebac_dataset_registry_facade, principal) =
-            from_catalog_n!(ctx, dyn RebacDatasetRegistryFacade, Principal);
+        let rebac_dataset_registry_facade = from_catalog_n!(ctx, dyn RebacDatasetRegistryFacade);
 
         let dataset_refs = dataset_ids
             .into_iter()
@@ -136,11 +134,7 @@ impl DatasetsMut {
         let dataset_refs_refs = dataset_refs.iter().collect::<Vec<_>>();
 
         let resolution = rebac_dataset_registry_facade
-            .classify_dataset_refs_by_access(
-                &principal,
-                &dataset_refs_refs,
-                DatasetPermission::Write,
-            )
+            .classify_dataset_refs_by_access(&dataset_refs_refs, DatasetPermission::Write)
             .await?;
 
         if let Some(error_msg) = resolution.try_get_user_error_report(skip_missing) {

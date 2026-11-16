@@ -5,7 +5,7 @@ Two values describe who is behind a piece of work, and they are not the same thi
 | Value | What it is | Read by |
 |---|---|---|
 | `CurrentAccountSubject` | The **caller**: whoever authenticated the request or started the command | Adapters and the app only: guards (`LoggedInGuard`, `AdminGuard`, `CanProvisionAccountsGuard`), GraphQL "me", CLI commands and the CLI's saved remote-server tokens |
-| `Principal` | The identity **acting**: whose permissions are checked ([RFC-020, Principals](https://github.com/open-data-fabric/open-data-fabric/blob/master/rfcs/020-auth.md#principals)), whose account a bare alias names, and who owns what it creates | The permission layer (`DatasetPermissionChecker`, `DatasetOperationGuard`, `RebacDatasetRegistryFacade`, `AccountAuthorizationHelper`, `ResourceAccountResolver`, `QueryService`, `ProvenanceService`), the dataset registries, pull planning, dataset creation |
+| `Principal` | The identity **acting**: whose permissions are checked ([RFC-020, Principals](https://github.com/open-data-fabric/open-data-fabric/blob/master/rfcs/020-auth.md#principals)), whose account a bare alias names, and who owns what it creates | The auth layer (`DatasetPermissionChecker`, `DatasetOperationGuard`, `AccountAuthorizationHelper`, `ResourceAccountResolver`), through the components that call it ([Who reads it](#who-reads-it)); the dataset registries, pull planning, dataset creation |
 
 For a request or a CLI command the principal is derived from the caller. Background work has no
 caller and runs as `Principal::Node`.
@@ -68,22 +68,21 @@ tokens of the account that started the process, not of the user who initiated th
 
 ## Who reads it
 
-| Layer | Takes the principal |
+The principal is fixed for a unit of work, so it is passed explicitly only where a decision is
+made:
+
+| Tier | Takes the principal |
 |---|---|
-| Permission services listed above | **Explicitly**, as a `&Principal` argument of every method that decides access |
-| Use cases | Injected `Arc<Principal>`, passed down on each call |
-| Adapters (GraphQL resolvers, HTTP handlers and middleware, OData, Flight SQL session managers) | Read from the request catalog, passed down |
-| CLI commands | Injected `Arc<Principal>`, passed down |
-| `LocalResourceFacadeImpl` | Injected, as the entry point of the resources subsystem |
+| The auth layer: `DatasetPermissionChecker` (with `DatasetPermissionCheckerExt`), `DatasetOperationGuard`, `AccountAuthorizationHelper`, `ResourceAccountResolver` | **Explicitly**, as a `&Principal` argument of every method that decides access |
+| Components that call the auth layer (use cases, CLI commands, `QueryService`, `RebacDatasetRegistryFacade`, `LocalResourceFacadeImpl`) | Inject the current `Arc<Principal>`; adapters (GraphQL resolvers, HTTP handlers and middleware, OData) read it from the request catalog |
+| Everything else | Nothing: no service or use case passes it further. An intermediate service such as `ProvenanceService` reaches the auth layer through components that inject the principal themselves |
 
-Services take it explicitly because one service instance may decide for several principals: a
-background task checks permissions for the principal it runs under, not for whoever owns the
-catalog. Use cases are the entry points of one piece of work, so they are where the principal of
-that work is fixed.
+Only the auth layer decides for a principal it is given. Checking another identity (a service
+account, a delegating user) means calling the auth layer directly with that principal.
 
-`QueryService` takes the principal only where it selects datasets itself (`create_session`,
-`sql_statement`). Its other methods receive a `ResolvedDataset`, which the caller has already
-authorized.
+A component that injects `Principal`, or holds one that does, must not be a `Singleton`: it would
+pin the principal of the first catalog that built it. dill's `validate` does not catch it, because
+a value registered with `add_value` has Singleton scope itself.
 
 ## Background work runs as the node
 
@@ -130,14 +129,15 @@ These parts of the [RFC-020](https://github.com/open-data-fabric/open-data-fabri
 - the node as an account, so it resolves no bare alias and owns no dataset;
 - remote-server credentials of the user who initiated a background task;
 - a `ServiceAccount` variant;
-- a domain layer free of the caller.
+- a domain layer free of the caller;
+- switching principal within a unit of work (an impersonation guard, should a case arise).
 
 ## Rejected approaches
 
 | Approach | Why it was rejected |
 |---|---|
 | Deriving `Principal` from `CurrentAccountSubject` in a dill component | Background work must have a principal other than its caller; a derived value cannot differ |
-| Injecting the principal into services such as `QueryService` | Fixes one principal per instance, so a shared service could not decide for another; inconsistent with the use cases being the entry points |
+| Passing the current principal through services and use cases | Spreads auth through every call chain, while the principal is fixed for the unit of work |
 | Chaining the background catalog from the CLI catalog and adding `Principal::Node` | dill reports the type as ambiguous; it does not override values from a parent |
 | Keeping the process caller in the background catalog for name scope and ownership | Background work would resolve bare aliases against whoever started the process |
 | A name-scope value of its own beside the principal | It equals the principal's own account in every case; a second value could disagree with it |

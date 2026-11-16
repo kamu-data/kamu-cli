@@ -36,13 +36,13 @@ use kamu_datasets::{
 pub struct RebacDatasetRegistryFacadeImpl {
     dataset_registry: Arc<dyn DatasetRegistry>,
     dataset_permission_checker: Arc<dyn DatasetPermissionChecker>,
+    principal: Arc<Principal>,
 }
 
 #[async_trait::async_trait]
 impl RebacDatasetRegistryFacade for RebacDatasetRegistryFacadeImpl {
     async fn resolve_dataset_handle_by_ref(
         &self,
-        principal: &Principal,
         dataset_ref: &odf::DatasetRef,
         permission: DatasetPermission,
     ) -> Result<odf::DatasetHandle, RebacDatasetRefUnresolvedError> {
@@ -62,7 +62,7 @@ impl RebacDatasetRegistryFacade for RebacDatasetRegistryFacadeImpl {
             })?;
 
         self.dataset_permission_checker
-            .check_permission(principal, &handle.id, permission)
+            .check_permission(&self.principal, &handle.id, permission)
             .await
             .map_err(|e| {
                 use DatasetPermissionError as SourceError;
@@ -79,12 +79,11 @@ impl RebacDatasetRegistryFacade for RebacDatasetRegistryFacadeImpl {
 
     async fn resolve_dataset_by_ref(
         &self,
-        principal: &Principal,
         dataset_ref: &odf::DatasetRef,
         permission: DatasetPermission,
     ) -> Result<ResolvedDataset, RebacDatasetRefUnresolvedError> {
         let dataset_handle = self
-            .resolve_dataset_handle_by_ref(principal, dataset_ref, permission)
+            .resolve_dataset_handle_by_ref(dataset_ref, permission)
             .await?;
         let resolved_dataset = self
             .dataset_registry
@@ -96,12 +95,11 @@ impl RebacDatasetRegistryFacade for RebacDatasetRegistryFacadeImpl {
 
     async fn resolve_dataset_by_handle(
         &self,
-        principal: &Principal,
         dataset_handle: &odf::DatasetHandle,
         permission: DatasetPermission,
     ) -> Result<ResolvedDataset, RebacDatasetIdUnresolvedError> {
         self.dataset_permission_checker
-            .check_permission(principal, &dataset_handle.id, permission)
+            .check_permission(&self.principal, &dataset_handle.id, permission)
             .await
             .map_err(|e| {
                 use DatasetPermissionError as SourceError;
@@ -123,7 +121,6 @@ impl RebacDatasetRegistryFacade for RebacDatasetRegistryFacadeImpl {
 
     async fn classify_dataset_refs_by_allowance(
         &self,
-        principal: &Principal,
         dataset_refs: &[&odf::DatasetRef],
         permission: DatasetPermission,
     ) -> Result<ClassifyDatasetRefsByAllowanceResponse, InternalError> {
@@ -157,7 +154,7 @@ impl RebacDatasetRegistryFacade for RebacDatasetRegistryFacadeImpl {
         // Run vectorized classification
         let classification = self
             .dataset_permission_checker
-            .classify_dataset_handles_by_allowance(principal, resolved_handles, permission)
+            .classify_dataset_handles_by_allowance(&self.principal, resolved_handles, permission)
             .await?;
 
         // Collect authorized handles
@@ -192,7 +189,6 @@ impl RebacDatasetRegistryFacade for RebacDatasetRegistryFacadeImpl {
 
     async fn classify_dataset_refs_by_access(
         &self,
-        principal: &Principal,
         dataset_refs: &[&odf::DatasetRef],
         permission: DatasetPermission,
     ) -> Result<ClassifyDatasetRefsByAccessResponse, InternalError> {
@@ -208,11 +204,10 @@ impl RebacDatasetRegistryFacade for RebacDatasetRegistryFacadeImpl {
 
         // Parallel execution
         let mut tasks = tokio::task::JoinSet::<Result<_, InternalError>>::new();
-        let principal = Arc::new(principal.clone());
 
         for (dataset_ref, dataset_handle) in handles_resolution.resolved_handles {
             let permission_checker = self.dataset_permission_checker.clone();
-            let principal = principal.clone();
+            let principal = self.principal.clone();
 
             tasks.spawn(async move {
                 let granted_permissions = permission_checker

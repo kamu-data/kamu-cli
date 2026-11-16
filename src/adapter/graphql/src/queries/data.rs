@@ -8,7 +8,6 @@
 // by the Apache License, Version 2.0.
 use std::convert::TryFrom;
 
-use kamu_accounts::Principal;
 use kamu_core as domain;
 
 use crate::prelude::*;
@@ -45,7 +44,7 @@ impl DataQueries {
             "Query",
         );
 
-        let (query_svc, principal) = from_catalog_n!(ctx, dyn domain::QueryService, Principal);
+        let query_svc = from_catalog_n!(ctx, dyn domain::QueryService);
 
         // TODO: Default to JsonSoA format once implemented
         let data_format = data_format.unwrap_or(DataBatchFormat::Json);
@@ -55,7 +54,7 @@ impl DataQueries {
         let query_result = match query_dialect {
             QueryDialect::SqlDataFusion => {
                 match query_svc
-                    .sql_statement(&principal, &query, domain::QueryOptions::default())
+                    .sql_statement(&query, domain::QueryOptions::default())
                     .await
                 {
                     Ok(r) => r,

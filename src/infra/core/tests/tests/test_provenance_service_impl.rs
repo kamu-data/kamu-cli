@@ -13,7 +13,6 @@ use std::sync::Arc;
 use internal_error::InternalError;
 use kamu::ProvenanceServiceImpl;
 use kamu::testing::{BaseUseCaseHarness, BaseUseCaseHarnessOptions};
-use kamu_accounts::Principal;
 use kamu_core::{
     GetLineageError,
     LineageOptions,
@@ -62,7 +61,6 @@ struct ProvenanceHarness {
     base_use_case_harness: BaseUseCaseHarness,
     provenance_service: Arc<dyn ProvenanceService>,
     dependency_graph_indexer: Arc<DependencyGraphIndexer>,
-    principal: Arc<Principal>,
 }
 
 impl ProvenanceHarness {
@@ -91,7 +89,6 @@ impl ProvenanceHarness {
             base_use_case_harness,
             provenance_service: catalog.get_one().unwrap(),
             dependency_graph_indexer: catalog.get_one().unwrap(),
-            principal: catalog.get_one().unwrap(),
         }
     }
 
@@ -111,12 +108,7 @@ impl ProvenanceHarness {
         let mut visitor = EnteredRecordingVisitor::default();
         let result = self
             .provenance_service
-            .get_dataset_lineage(
-                &self.principal,
-                &alias.as_local_ref(),
-                &mut visitor,
-                LineageOptions {},
-            )
+            .get_dataset_lineage(&alias.as_local_ref(), &mut visitor, LineageOptions {})
             .await;
         (result, visitor.entered)
     }

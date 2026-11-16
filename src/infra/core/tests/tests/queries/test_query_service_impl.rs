@@ -18,7 +18,6 @@ use datafusion::arrow::datatypes::{DataType, Field, Schema};
 use datafusion::arrow::record_batch::RecordBatch;
 use kamu::domain::*;
 use kamu::*;
-use kamu_accounts::Principal;
 use kamu_datasets::{MockDatasetPermissionChecker, ResolvedDataset};
 use kamu_ingest_datafusion::DataWriterDataFusion;
 use odf::utils::data::DataFrameExt;
@@ -155,11 +154,7 @@ async fn test_dataset_sql_authorized_common(catalog: dill::Catalog, tempdir: &Te
     let query_svc = catalog.get_one::<dyn QueryService>().unwrap();
     let statement = format!("SELECT COUNT(*) AS num_records FROM {dataset_alias}");
     let res = query_svc
-        .sql_statement(
-            &Principal::new_test(),
-            statement.as_str(),
-            QueryOptions::default(),
-        )
+        .sql_statement(statement.as_str(), QueryOptions::default())
         .await
         .unwrap();
 
@@ -210,11 +205,7 @@ async fn test_dataset_sql_unauthorized_infer_common(catalog: dill::Catalog, temp
     let query_svc = catalog.get_one::<dyn QueryService>().unwrap();
     let statement = format!("SELECT COUNT(*) FROM {dataset_alias}");
     let result = query_svc
-        .sql_statement(
-            &Principal::new_test(),
-            statement.as_str(),
-            QueryOptions::default(),
-        )
+        .sql_statement(statement.as_str(), QueryOptions::default())
         .await;
 
     assert_matches!(
@@ -261,7 +252,6 @@ async fn test_dataset_sql_unauthorized_specific() {
     let statement = format!("SELECT COUNT(*) FROM {dataset_alias}");
     let result = query_svc
         .sql_statement(
-            &Principal::new_test(),
             statement.as_str(),
             QueryOptions {
                 input_datasets: Some(BTreeMap::from([(
@@ -297,7 +287,7 @@ async fn test_sql_statement_not_found() {
     let query_svc = catalog.get_one::<dyn QueryService>().unwrap();
     let statement = "select count(*) from does_not_exist";
     let result = query_svc
-        .sql_statement(&Principal::new_test(), statement, QueryOptions::default())
+        .sql_statement(statement, QueryOptions::default())
         .await;
 
     assert_matches!(
@@ -324,7 +314,6 @@ async fn test_sql_statement_by_alias() {
     let statement = "select count(*) as num_records from foobar";
     let result = query_svc
         .sql_statement(
-            &Principal::new_test(),
             statement,
             QueryOptions {
                 input_datasets: Some(BTreeMap::from([(
@@ -375,7 +364,6 @@ async fn test_sql_statement_alias_not_found() {
     let statement = format!("select count(*) as num_records from {dataset_alias}");
     let result = query_svc
         .sql_statement(
-            &Principal::new_test(),
             statement.as_str(),
             QueryOptions {
                 input_datasets: Some(BTreeMap::from([(
@@ -456,7 +444,6 @@ async fn test_sql_statement_with_state_simple() {
     let query_svc = catalog.get_one::<dyn QueryService>().unwrap();
     let res = query_svc
         .sql_statement(
-            &Principal::new_test(),
             &format!(
                 r#"
                 select
@@ -532,7 +519,6 @@ async fn test_sql_statement_with_state_simple() {
     // Query: again with previous state info
     let res = query_svc
         .sql_statement(
-            &Principal::new_test(),
             &format!(
                 r#"
                 select
@@ -583,7 +569,6 @@ async fn test_sql_statement_with_state_simple() {
     // Query: again without state info
     let res = query_svc
         .sql_statement(
-            &Principal::new_test(),
             &format!(
                 r#"
                 select
@@ -714,7 +699,6 @@ async fn test_sql_statement_with_state_cte() {
     let query_svc = catalog.get_one::<dyn QueryService>().unwrap();
     let res = query_svc
         .sql_statement(
-            &Principal::new_test(),
             &format!(
                 r#"
                 with concat as (
@@ -836,7 +820,6 @@ async fn test_sql_statement_with_state_cte() {
     let query_svc = catalog.get_one::<dyn QueryService>().unwrap();
     let res2 = query_svc
         .sql_statement(
-            &Principal::new_test(),
             &format!(
                 r#"
                 with concat as (
@@ -877,7 +860,6 @@ async fn test_sql_statement_with_state_cte() {
     let query_svc = catalog.get_one::<dyn QueryService>().unwrap();
     let res2 = query_svc
         .sql_statement(
-            &Principal::new_test(),
             &format!(
                 r#"
                 with concat as (
@@ -935,7 +917,6 @@ async fn test_sql_statement_with_state_cte() {
     let query_svc = catalog.get_one::<dyn QueryService>().unwrap();
     let res2 = query_svc
         .sql_statement(
-            &Principal::new_test(),
             r#"
             with concat as (
                 select * from fooz
@@ -1087,7 +1068,6 @@ async fn test_sql_statement_with_schema_migration() {
     let query_svc = catalog.get_one::<dyn QueryService>().unwrap();
     let res = query_svc
         .sql_statement(
-            &Principal::new_test(),
             &format!(
                 r#"
                 select * from {foo_alias}
@@ -1177,7 +1157,6 @@ async fn test_sql_statement_with_schema_migration() {
     let query_svc = catalog.get_one::<dyn QueryService>().unwrap();
     let res = query_svc
         .sql_statement(
-            &Principal::new_test(),
             &format!(
                 r#"
                 select * from {foo_alias}
