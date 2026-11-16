@@ -1587,6 +1587,55 @@ async fn test_pull_sync_into_new_dataset_skips_authorization() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[tokio::test]
+async fn test_pull_sync_into_new_dataset_records_its_pull_alias() {
+    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let remote_ref = PullUseCaseHarness::remote_ref_of(&alias_foo);
+    let harness = PullUseCaseHarness::new(
+        PullUseCaseHarnessMocks::default().for_sync_into_new(&alias_foo, &remote_ref),
+    );
+
+    let pull_response = harness
+        .pull_remote_into(&alias_foo, &remote_ref, PullOptions::default())
+        .await;
+
+    assert_matches!(
+        pull_response.result,
+        Ok(PullResult::Updated { old_head: None, .. })
+    );
+    assert_eq!(harness.pull_aliases_of(&alias_foo).await, vec![remote_ref]);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[tokio::test]
+async fn test_pull_sync_into_new_dataset_without_aliases_records_none() {
+    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let remote_ref = PullUseCaseHarness::remote_ref_of(&alias_foo);
+    let harness = PullUseCaseHarness::new(
+        PullUseCaseHarnessMocks::default().for_sync_into_new(&alias_foo, &remote_ref),
+    );
+
+    let pull_response = harness
+        .pull_remote_into(
+            &alias_foo,
+            &remote_ref,
+            PullOptions {
+                add_aliases: false,
+                ..PullOptions::default()
+            },
+        )
+        .await;
+
+    assert_matches!(
+        pull_response.result,
+        Ok(PullResult::Updated { old_head: None, .. })
+    );
+    assert_eq!(harness.pull_aliases_of(&alias_foo).await, vec![]);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[tokio::test]
 async fn test_pull_transform_reset_with_nothing_to_compact_keeps_diverged_error() {
     let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
     let alias_bar = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("bar"));
@@ -2042,6 +2091,23 @@ impl PullUseCaseHarness {
 
     async fn pull(&self, request: PullRequest, options: PullOptions) -> PullResponse {
         self.use_case.execute(request, options, None).await.unwrap()
+    }
+
+    /// Pulls `alias` from `remote_ref` with `options`
+    async fn pull_remote_into(
+        &self,
+        alias: &odf::DatasetAlias,
+        remote_ref: &odf::DatasetRefRemote,
+        options: PullOptions,
+    ) -> PullResponse {
+        self.pull(
+            PullRequest::Remote(PullRequestRemote {
+                remote_ref: remote_ref.clone(),
+                maybe_local_alias: Some(alias.clone()),
+            }),
+            options,
+        )
+        .await
     }
 
     /// Pulls with a listener and returns the ingest and transform events it

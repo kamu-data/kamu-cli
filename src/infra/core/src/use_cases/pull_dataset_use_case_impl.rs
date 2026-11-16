@@ -114,11 +114,13 @@ impl PullDatasetUseCaseImpl {
                                 &psi.local_target.as_local_ref().as_any_ref(),
                             )
                         });
-                        tasks.spawn(PullSyncJob::new(self.update_steps.clone()).run(
-                            psi,
-                            options.clone(),
-                            maybe_listener,
-                        ))
+                        tasks.spawn(
+                            PullSyncJob::new(self.update_steps.clone(), self.catalog.clone()).run(
+                                psi,
+                                options.clone(),
+                                maybe_listener,
+                            ),
+                        )
                     }
                 };
             }

@@ -102,9 +102,8 @@ impl DatasetUpdateSteps for RacingDatasetUpdateSteps {
     async fn commit_sync(
         &self,
         transferred: SyncFromTransferred,
-        maybe_pull_alias: Option<&odf::DatasetRefRemote>,
     ) -> Result<Option<SyncResult>, SyncError> {
-        self.steps.commit_sync(transferred, maybe_pull_alias).await
+        self.steps.commit_sync(transferred).await
     }
 
     async fn transfer_and_commit_sync(
@@ -112,7 +111,6 @@ impl DatasetUpdateSteps for RacingDatasetUpdateSteps {
         request: SyncFromRequest,
         options: SyncOptions,
         listener: Option<Arc<dyn SyncListener>>,
-        maybe_pull_alias: Option<&odf::DatasetRefRemote>,
     ) -> Result<Option<SyncResult>, SyncError> {
         if std::mem::take(&mut *self.delete_before_next_update.lock().unwrap())
             && let SyncFromTarget::Existing { dataset, .. } = &request.dst
@@ -124,7 +122,7 @@ impl DatasetUpdateSteps for RacingDatasetUpdateSteps {
         }
 
         self.steps
-            .transfer_and_commit_sync(request, options, listener, maybe_pull_alias)
+            .transfer_and_commit_sync(request, options, listener)
             .await
     }
 }

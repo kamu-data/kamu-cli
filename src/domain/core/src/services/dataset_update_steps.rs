@@ -56,24 +56,19 @@ pub trait DatasetUpdateSteps: Send + Sync {
     /// of its own: a compare-and-swap of `HEAD` from the head the transfer
     /// started from, or the creation of a new dataset with `HEAD` at the
     /// transferred head. `None` when the existing target was deleted
-    /// meanwhile; [`SyncError::RefMoved`] when its reference moved. A dataset
-    /// the commit creates gets `maybe_pull_alias` in the same transaction
+    /// meanwhile; [`SyncError::RefMoved`] when its reference moved
     async fn commit_sync(
         &self,
         transferred: SyncFromTransferred,
-        maybe_pull_alias: Option<&odf::DatasetRefRemote>,
     ) -> Result<Option<SyncResult>, SyncError>;
 
     /// Transfers with no transaction held, then commits; `None` when the
-    /// existing target was deleted before the commit. A dataset the pull
-    /// creates gets `maybe_pull_alias` in the commit's transaction, so it
-    /// never exists without it
+    /// existing target was deleted before the commit
     async fn transfer_and_commit_sync(
         &self,
         request: SyncFromRequest,
         options: SyncOptions,
         listener: Option<Arc<dyn SyncListener>>,
-        maybe_pull_alias: Option<&odf::DatasetRefRemote>,
     ) -> Result<Option<SyncResult>, SyncError>;
 }
 

@@ -70,7 +70,7 @@ impl LocalSyncHelper {
         listener: Option<Arc<dyn SyncListener>>,
     ) -> Result<SyncResult, SyncError> {
         self.update_steps()
-            .transfer_and_commit_sync(request, options, listener, None)
+            .transfer_and_commit_sync(request, options, listener)
             .await
             .map(|maybe_result| maybe_result.expect("The sync target must not be deleted"))
     }
@@ -81,7 +81,7 @@ impl LocalSyncHelper {
         &self,
         transferred: SyncFromTransferred,
     ) -> Result<Option<SyncResult>, SyncError> {
-        self.update_steps().commit_sync(transferred, None).await
+        self.update_steps().commit_sync(transferred).await
     }
 
     /// Resolves `dst_ref` to a pull target the way the pull planner does

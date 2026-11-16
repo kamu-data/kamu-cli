@@ -24,7 +24,7 @@ use kamu_cli_e2e_common::{
     leaderboard_set_transform_event,
 };
 use kamu_cli_puppet::KamuCliPuppet;
-use kamu_cli_puppet::extensions::{KamuCliPuppetExt, RepoAlias};
+use kamu_cli_puppet::extensions::KamuCliPuppetExt;
 
 use crate::mock_csv_source::MockCsvSource;
 
@@ -216,10 +216,10 @@ pub async fn test_pull_derivative_reports_why_it_cannot_run(kamu: KamuCliPuppet)
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// test_pull_failed_alias_save_creates_no_dataset
+// test_pull_failed_alias_save_keeps_the_created_dataset
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn test_pull_failed_alias_save_creates_no_dataset(kamu: KamuCliPuppet) {
+pub async fn test_pull_failed_alias_save_keeps_the_created_dataset(kamu: KamuCliPuppet) {
     let source = KamuCliPuppet::new_workspace_tmp_single_tenant().await;
     source
         .execute_with_input(["add", "--stdin"], DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR)
@@ -247,7 +247,7 @@ pub async fn test_pull_failed_alias_save_creates_no_dataset(kamu: KamuCliPuppet)
         .success();
 
     // A directory where the dataset's alias config belongs makes saving the
-    // pull alias fail after the dataset is created in the same transaction
+    // pull alias fail; the alias is stored after the dataset is committed
     let dataset_id = &source.list_datasets().await[0].id;
     let alias_config_path = kamu.dataset_alias_config_path(dataset_id);
     std::fs::create_dir_all(&alias_config_path).unwrap();
@@ -263,23 +263,17 @@ pub async fn test_pull_failed_alias_save_creates_no_dataset(kamu: KamuCliPuppet)
     )
     .await;
     std::fs::remove_dir_all(&alias_config_path).unwrap();
-    assert_eq!(kamu.list_datasets().await.len(), 0);
 
-    // The next pull continues into the transferred blocks and saves the alias
-    kamu.execute(["pull", dataset_url.as_str()]).await.success();
-
+    // The dataset stays, without the alias; the next pull finds it up to date
     let datasets = kamu.list_datasets().await;
     assert_eq!(datasets.len(), 1);
     assert_eq!(datasets[0].name.as_str(), dataset_name);
-    pretty_assertions::assert_eq!(
-        kamu.get_list_of_repo_aliases(&odf::DatasetRef::from(datasets[0].name.clone()))
-            .await,
-        [RepoAlias {
-            dataset: odf::DatasetAlias::new(None, datasets[0].name.clone()),
-            kind: "Pull".to_string(),
-            alias: dataset_url.to_string(),
-        }]
-    );
+    kamu.assert_success_command_execution(
+        ["pull", dataset_url.as_str()],
+        None,
+        Some([r#"1 dataset\(s\) up-to-date"#]),
+    )
+    .await;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

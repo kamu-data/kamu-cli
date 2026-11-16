@@ -290,8 +290,11 @@ committed. It moves `HEAD` through `DatasetUpdateSteps`, the same steps the upda
 - reads the target's `HEAD` in a transaction of its own (`resolve_sync_target`);
 - transfers with no transaction open, then commits through `DatasetUpdateSteps::commit_sync`, which also
   creates a new dataset (`transfer_and_commit_sync`);
-- with `add_aliases` on, stores the pull alias of a dataset the sync created in the commit's
-  transaction, so the dataset never exists without it.
+- with `add_aliases` on, then stores the pull alias of a dataset the sync created, in a transaction
+  of its own (`PullSyncJob::store_pull_alias`). Aliases live in the dataset's `info` storage, not
+  in the database, so no transaction makes them atomic with the commit; a failure to store one
+  fails the pull of that dataset with `SyncError::Internal` and leaves the dataset without it. Only `kamu pull` sets the option: the
+  update task never records an alias.
 
 **How a commit that did not happen is reported.** `ReferenceUpdate::into_pull_result` turns each
 outcome of [the shared commit](dataset-operations.md#3-committing-head) into that dataset's error:

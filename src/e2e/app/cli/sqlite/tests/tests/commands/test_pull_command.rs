@@ -115,12 +115,13 @@ kamu_cli_execute_command_e2e_test!(
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// test_pull_failed_alias_save_creates_no_dataset
+// test_pull_failed_alias_save_keeps_the_created_dataset
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 kamu_cli_execute_command_e2e_test!(
     storage = sqlite,
-    fixture = kamu_cli_e2e_repo_tests::commands::test_pull_failed_alias_save_creates_no_dataset,
+    fixture =
+        kamu_cli_e2e_repo_tests::commands::test_pull_failed_alias_save_keeps_the_created_dataset,
     extra_test_groups = "ingest, datafusion"
 );
 

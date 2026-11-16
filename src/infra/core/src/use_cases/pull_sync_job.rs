@@ -9,22 +9,29 @@
 
 use std::sync::Arc;
 
-use internal_error::InternalError;
+use database_common_macros::transactional_method2;
+use internal_error::{InternalError, ResultIntoInternal};
 use kamu_core::*;
+use kamu_datasets::DatasetRegistry;
 
 use crate::utils::span_outcome::SpanOutcome;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Runs one sync job of `kamu pull`: reads the target, transfers and commits
+/// Runs one sync job of `kamu pull`: reads the target, transfers and commits,
+/// then records the pull alias of a dataset the sync created
 pub(crate) struct PullSyncJob {
     update_steps: Arc<dyn DatasetUpdateSteps>,
+    catalog: dill::Catalog,
 }
 
 #[common_macros::method_names_consts]
 impl PullSyncJob {
-    pub(crate) fn new(update_steps: Arc<dyn DatasetUpdateSteps>) -> Self {
-        Self { update_steps }
+    pub(crate) fn new(update_steps: Arc<dyn DatasetUpdateSteps>, catalog: dill::Catalog) -> Self {
+        Self {
+            update_steps,
+            catalog,
+        }
     }
 
     #[tracing::instrument(level = "info", name = PullSyncJob_run, skip_all, fields(target = %psi.local_target.as_local_ref(), outcome))]
@@ -119,7 +126,8 @@ impl PullSyncJob {
         options: &PullOptions,
         listener: Option<Arc<dyn SyncListener>>,
     ) -> Result<Option<SyncResult>, SyncError> {
-        self.update_steps
+        let sync_result = self
+            .update_steps
             .transfer_and_commit_sync(
                 SyncFromRequest {
                     src: psi.remote_ref.clone(),
@@ -127,9 +135,36 @@ impl PullSyncJob {
                 },
                 options.sync_options,
                 listener,
-                options.add_aliases.then_some(&psi.remote_ref),
             )
+            .await?;
+
+        if options.add_aliases
+            && let Some(SyncResult::Updated { old_head: None, .. }) = &sync_result
+        {
+            self.store_pull_alias(&psi.local_target.as_local_ref(), &psi.remote_ref)
+                .await?;
+        }
+
+        Ok(sync_result)
+    }
+
+    /// Records `remote_ref` as the pull alias of the dataset the sync created
+    #[transactional_method2(dataset_registry: Arc<dyn DatasetRegistry>, remote_alias_registry: Arc<dyn RemoteAliasesRegistry>)]
+    async fn store_pull_alias(
+        &self,
+        local_ref: &odf::DatasetRef,
+        remote_ref: &odf::DatasetRefRemote,
+    ) -> Result<(), SyncError> {
+        let dataset_handle = dataset_registry
+            .resolve_dataset_handle_by_ref(local_ref)
             .await
+            .int_err()?;
+        remote_alias_registry
+            .get_remote_aliases(&dataset_handle)
+            .await?
+            .add(remote_ref, RemoteAliasKind::Pull)
+            .await?;
+        Ok(())
     }
 }
 

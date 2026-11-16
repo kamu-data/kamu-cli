@@ -383,6 +383,20 @@ impl BaseRepoHarness {
         self.remote_aliases_of(&created.dataset_handle).await
     }
 
+    /// The stored pull aliases of the dataset named `alias`
+    pub async fn pull_aliases_of(&self, alias: &odf::DatasetAlias) -> Vec<odf::DatasetRefRemote> {
+        let target = self
+            .dataset_registry
+            .resolve_dataset_handle_by_ref(&alias.as_local_ref())
+            .await
+            .unwrap();
+        self.remote_aliases_of(&target)
+            .await
+            .get_by_kind(RemoteAliasKind::Pull)
+            .cloned()
+            .collect()
+    }
+
     async fn remote_aliases_of(&self, target: &odf::DatasetHandle) -> Box<dyn RemoteAliases> {
         dill::CatalogBuilder::new_chained(&self.catalog)
             .add::<RemoteAliasesRegistryImpl>()

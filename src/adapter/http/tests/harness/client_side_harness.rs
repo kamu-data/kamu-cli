@@ -438,7 +438,6 @@ impl ClientSideHarness {
                 SyncFromRequest { src: src_ref, dst },
                 SyncOptions::default(),
                 None,
-                None,
             )
             .await
             .unwrap()

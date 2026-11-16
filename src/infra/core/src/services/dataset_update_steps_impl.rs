@@ -54,27 +54,17 @@ impl DatasetUpdateStepsImpl {
         Ok(())
     }
 
-    /// Creates the dataset with `HEAD` at the transferred head, and stores its
-    /// pull alias in the same transaction
-    #[transactional_method2(create_dataset_use_case: Arc<dyn CreateDatasetUseCase>, remote_alias_registry: Arc<dyn RemoteAliasesRegistry>)]
+    /// Creates the dataset with `HEAD` at the transferred head
+    #[transactional_method1(create_dataset_use_case: Arc<dyn CreateDatasetUseCase>)]
     async fn commit_sync_into_new(
         &self,
         alias: &odf::DatasetAlias,
         seed_block: odf::MetadataBlockTyped<odf::metadata::Seed>,
         options: CreateDatasetUseCaseOptions,
-        maybe_pull_alias: Option<&odf::DatasetRefRemote>,
     ) -> Result<(), SyncError> {
-        let created = create_dataset_use_case
+        create_dataset_use_case
             .execute(alias, seed_block, options)
             .await?;
-
-        if let Some(pull_alias) = maybe_pull_alias {
-            remote_alias_registry
-                .get_remote_aliases(&created.dataset_handle)
-                .await?
-                .add(pull_alias, RemoteAliasKind::Pull)
-                .await?;
-        }
         Ok(())
     }
 
@@ -265,7 +255,6 @@ impl DatasetUpdateSteps for DatasetUpdateStepsImpl {
     async fn commit_sync(
         &self,
         transferred: SyncFromTransferred,
-        maybe_pull_alias: Option<&odf::DatasetRefRemote>,
     ) -> Result<Option<SyncResult>, SyncError> {
         let SyncFromTransferred {
             target,
@@ -296,7 +285,6 @@ impl DatasetUpdateSteps for DatasetUpdateStepsImpl {
                         seed_block_bytes: Some(seed_block_bytes),
                         initial_head: Some(new_head.clone()),
                     },
-                    maybe_pull_alias,
                 )
                 .await
                 .map(|()| None),
@@ -338,14 +326,11 @@ impl DatasetUpdateSteps for DatasetUpdateStepsImpl {
         request: SyncFromRequest,
         options: SyncOptions,
         listener: Option<Arc<dyn SyncListener>>,
-        maybe_pull_alias: Option<&odf::DatasetRefRemote>,
     ) -> Result<Option<SyncResult>, SyncError> {
         let sync_service = self.sync_service.get().int_err()?;
         let result = match sync_service.sync_from(request, options, listener).await {
             Ok(SyncFromTransfer::UpToDate) => Ok(Some(SyncResult::UpToDate)),
-            Ok(SyncFromTransfer::Transferred(transferred)) => {
-                self.commit_sync(transferred, maybe_pull_alias).await
-            }
+            Ok(SyncFromTransfer::Transferred(transferred)) => self.commit_sync(transferred).await,
             Err(e) => Err(e),
         };
         match &result {

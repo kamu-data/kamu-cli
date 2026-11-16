@@ -103,7 +103,7 @@ impl UpdateDatasetTaskRunner {
 
         let sync_result = self
             .update_steps
-            .transfer_and_commit_sync(sync_request, sync_opts, None, None)
+            .transfer_and_commit_sync(sync_request, sync_opts, None)
             .await;
 
         match sync_result {
