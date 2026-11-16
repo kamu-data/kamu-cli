@@ -144,6 +144,11 @@ rejects direct reference writes elsewhere. It runs in the caller's transaction, 
 - fails with `BlockNotFound` when `new_block_hash` is not in the dataset's block store;
 - with `expected_block_hash = None`, requires the reference not to exist yet.
 
+The compare-and-swap belongs to ODF itself: `MetadataChain::set_ref` takes the expected block hash
+as an argument, and an append that moves a reference expects the block's previous block, so the
+chain API has no unconditional write. The updater is still the single entry point, for audit and
+for injecting races in tests (`RacingDatasetReferenceUpdater`).
+
 Every layer below the operation takes `block_ref`; the operation picks it. Today every operation
 moves `HEAD`, the only reference ODF defines, and passes `odf::BlockRef::Head` where it calls the
 update. Errors and task outcomes for a lost race (`RefMoved`) carry the reference that moved.

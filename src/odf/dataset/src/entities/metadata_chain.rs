@@ -92,12 +92,15 @@ pub trait MetadataChain: Send + Sync {
     /// Resolves reference to the block hash it's pointing to
     async fn resolve_ref(&self, r: &BlockRef) -> Result<Multihash, GetRefError>;
 
-    /// Update reference to point at the specified block
-    async fn set_ref<'a>(
-        &'a self,
+    /// Moves reference `r` from `expected` to `hash` (compare-and-swap).
+    /// `expected = None` means the reference must not exist yet. Fails with
+    /// `CASFailed` when `r` points elsewhere; there is no unconditional move
+    async fn set_ref(
+        &self,
         r: &BlockRef,
+        expected: Option<&Multihash>,
         hash: &Multihash,
-        opts: SetRefOpts<'a>,
+        opts: SetRefOpts,
     ) -> Result<(), SetChainRefError>;
 
     /// Returns uncached version of the metadata chain
@@ -169,7 +172,6 @@ pub trait MetadataChainExt: MetadataChain {
                         precomputed_hash: opts.trust_hashes.then_some(&hash),
                         expected_hash: Some(&hash),
                         block_data: Some(&block_bytes),
-                        ..Default::default()
                     },
                 )
                 .await
@@ -194,8 +196,8 @@ pub trait MetadataChainExt: MetadataChain {
     /// Appends the blocks like `append_batch`, then moves `HEAD` once to the
     /// last one by compare-and-set from `expected_head`. Returns `None` for an
     /// empty batch. Meant for chains whose `HEAD` is written directly, such as
-    /// remote datasets; local datasets move `HEAD` through the node's head
-    /// committer.
+    /// remote datasets; local datasets move `HEAD` through the node's
+    /// reference updater.
     async fn append_batch_and_set_head(
         &self,
         new_blocks: Box<dyn Iterator<Item = HashedMetadataBlockBytesDecoded> + Send>,
@@ -208,10 +210,10 @@ pub trait MetadataChainExt: MetadataChain {
 
         self.set_ref(
             &BlockRef::Head,
+            expected_head,
             &appended.new_head,
             SetRefOpts {
                 validate_block_present: false,
-                check_ref_is: Some(expected_head),
             },
         )
         .await?;
@@ -780,20 +782,15 @@ impl Default for AcceptByIntervalOptions {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Clone, Debug)]
-pub struct SetRefOpts<'a> {
+pub struct SetRefOpts {
     /// Ensure new value points to a valid block
     pub validate_block_present: bool,
-
-    /// Validate that old reference still points to the specified block
-    /// (compare-and-swap)
-    pub check_ref_is: Option<Option<&'a Multihash>>,
 }
 
-impl Default for SetRefOpts<'_> {
+impl Default for SetRefOpts {
     fn default() -> Self {
         Self {
             validate_block_present: true,
-            check_ref_is: None,
         }
     }
 }
@@ -813,16 +810,9 @@ pub struct AppendOpts<'a> {
     /// Validations to perform on the newly appended block
     pub validation: AppendValidation,
 
-    /// Update specified reference to the block after appending
+    /// Moves the specified reference from `block.prev_block_hash` to the
+    /// appended block (compare-and-swap)
     pub update_ref: Option<&'a BlockRef>,
-
-    /// Validate that `update_ref` points to the same block as
-    /// `block.prev_block_hash` (compare-and-swap)
-    pub check_ref_is_prev_block: bool,
-
-    /// Validate that `update_ref` points to the specified block
-    /// (compare-and-swap)
-    pub check_ref_is: Option<Option<&'a Multihash>>,
 
     /// Append block using the provided hash computed elsewhere.
     ///
@@ -847,8 +837,6 @@ impl Default for AppendOpts<'_> {
         Self {
             validation: AppendValidation::Full,
             update_ref: Some(&BlockRef::Head),
-            check_ref_is_prev_block: true,
-            check_ref_is: None,
             precomputed_hash: None,
             expected_hash: None,
             block_data: None,

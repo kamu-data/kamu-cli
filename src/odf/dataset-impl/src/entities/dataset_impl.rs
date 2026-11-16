@@ -267,7 +267,6 @@ where
         let append_opts = if !opts.update_block_ref {
             AppendOpts {
                 update_ref: None,
-                check_ref_is_prev_block: false,
                 ..AppendOpts::default()
             }
         } else {

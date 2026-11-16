@@ -56,10 +56,10 @@ pub async fn test_store_dataset<
         .as_metadata_chain()
         .set_ref(
             &odf::BlockRef::Head,
+            None,
             &store_result.seed,
             SetRefOpts {
                 validate_block_present: true,
-                check_ref_is: Some(None),
             },
         )
         .await
@@ -217,10 +217,10 @@ async fn set_initial_head(stored: &odf::dataset::StoreDatasetResult) {
         .as_metadata_chain()
         .set_ref(
             &odf::BlockRef::Head,
+            None,
             &stored.seed,
             SetRefOpts {
                 validate_block_present: true,
-                check_ref_is: Some(None),
             },
         )
         .await

@@ -67,21 +67,6 @@ async fn test_set_ref_without_conditional_writes_checks_before_writing() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[tokio::test]
-async fn test_set_ref_without_check_overwrites() {
-    let harness = RefRepoHarness::new();
-
-    harness.set_head(None, &harness.hash_a).await.unwrap();
-    harness
-        .ref_repo
-        .set_ref(&BlockRef::Head, &harness.hash_b, None)
-        .await
-        .unwrap();
-
-    assert_eq!(harness.head().await, harness.hash_b);
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Harness
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -130,9 +115,7 @@ impl RefRepoHarness {
         expected: Option<&Multihash>,
         hash: &Multihash,
     ) -> Result<(), SetChainRefError> {
-        self.ref_repo
-            .set_ref(&BlockRef::Head, hash, Some(expected))
-            .await
+        self.ref_repo.set_ref(&BlockRef::Head, expected, hash).await
     }
 
     async fn head(&self) -> Multihash {

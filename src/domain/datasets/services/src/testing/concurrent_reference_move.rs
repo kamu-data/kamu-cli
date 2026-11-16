@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use database_common::{DatabaseTransactionManager, DatabaseTransactionRunner};
-use internal_error::{InternalError, ResultIntoInternal};
+use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_datasets::{DatasetReferenceRepository, DatasetRegistry};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -87,19 +87,28 @@ impl ConcurrentReferenceMove {
                 .int_err();
         };
 
-        catalog
+        let dataset = catalog
             .get_one::<dyn DatasetRegistry>()
             .int_err()?
             .get_dataset_by_handle(dataset_handle)
-            .await
-            .as_metadata_chain()
+            .await;
+        let chain = dataset.as_metadata_chain();
+        // A concurrent writer moves the reference from where it reads it
+        let current_block_hash = match chain.resolve_ref(block_ref).await {
+            Ok(block_hash) => Some(block_hash),
+            Err(odf::storage::GetRefError::NotFound(_)) => None,
+            Err(
+                e @ (odf::storage::GetRefError::Access(_) | odf::storage::GetRefError::Internal(_)),
+            ) => {
+                return Err(e.int_err());
+            }
+        };
+        chain
             .set_ref(
                 block_ref,
+                current_block_hash.as_ref(),
                 concurrent_block_hash,
-                odf::dataset::SetRefOpts {
-                    validate_block_present: true,
-                    check_ref_is: None,
-                },
+                odf::dataset::SetRefOpts::default(),
             )
             .await
             .int_err()

@@ -241,10 +241,10 @@ impl ResetTestHarness {
             .as_metadata_chain()
             .set_ref(
                 &odf::BlockRef::Head,
+                None,
                 &stored.seed,
                 odf::dataset::SetRefOpts {
                     validate_block_present: true,
-                    check_ref_is: Some(None),
                 },
             )
             .await

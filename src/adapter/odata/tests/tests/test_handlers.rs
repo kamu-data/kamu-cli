@@ -634,10 +634,10 @@ impl TestHarness {
                 .as_metadata_chain()
                 .set_ref(
                     &odf::BlockRef::Head,
+                    Some(old_head),
                     new_head,
                     odf::dataset::SetRefOpts {
                         validate_block_present: true,
-                        check_ref_is: Some(Some(old_head)),
                     },
                 )
                 .await

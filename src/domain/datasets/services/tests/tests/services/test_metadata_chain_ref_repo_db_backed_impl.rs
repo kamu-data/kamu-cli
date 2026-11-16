@@ -80,41 +80,6 @@ async fn test_set_ref_clears_the_cached_head() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[tokio::test]
-async fn test_set_ref_without_check_moves_from_the_current_head() {
-    let harness = DbBackedRefRepoHarness::new().await;
-    harness.move_head_in_service(&harness.hash_a);
-
-    harness.set_head_unchecked(&harness.hash_b).await.unwrap();
-
-    pretty_assertions::assert_eq!(harness.service_head(), Some(harness.hash_b.clone()));
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-/// A write without a check still expects the head the repository last saw, so
-/// it never overwrites a head moved since then
-#[tokio::test]
-async fn test_set_ref_without_check_fails_on_a_head_moved_since_it_was_read() {
-    let harness = DbBackedRefRepoHarness::new().await;
-    harness.move_head_in_service(&harness.hash_a);
-    pretty_assertions::assert_eq!(harness.head().await, harness.hash_a);
-
-    harness.move_head_in_service(&harness.hash_b);
-
-    assert_matches!(
-        harness.set_head_unchecked(&harness.hash_c).await,
-        Err(odf::dataset::SetChainRefError::CASFailed(odf::dataset::RefCASError {
-            expected,
-            actual,
-            ..
-        })) if expected == Some(harness.hash_a.clone()) && actual == Some(harness.hash_b.clone())
-    );
-    pretty_assertions::assert_eq!(harness.service_head(), Some(harness.hash_b.clone()));
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[tokio::test]
 async fn test_get_ref_detached_from_transaction_reads_storage() {
     let storage_head = odf::Multihash::from_digest_sha3_256(b"storage");
     let harness = DbBackedRefRepoHarness::with_storage_head(&storage_head).await;
@@ -198,17 +163,7 @@ impl DbBackedRefRepoHarness {
         head: &odf::Multihash,
     ) -> Result<(), odf::dataset::SetChainRefError> {
         self.ref_repo
-            .set_ref(&odf::BlockRef::Head, head, Some(expected))
-            .await
-    }
-
-    /// Moves `HEAD` without naming the expected head
-    async fn set_head_unchecked(
-        &self,
-        head: &odf::Multihash,
-    ) -> Result<(), odf::dataset::SetChainRefError> {
-        self.ref_repo
-            .set_ref(&odf::BlockRef::Head, head, None)
+            .set_ref(&odf::BlockRef::Head, expected, head)
             .await
     }
 }

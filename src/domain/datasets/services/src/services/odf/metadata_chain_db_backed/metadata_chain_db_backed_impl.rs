@@ -687,13 +687,14 @@ where
         self.metadata_chain.resolve_ref(r).await
     }
 
-    async fn set_ref<'a>(
-        &'a self,
+    async fn set_ref(
+        &self,
         r: &odf::BlockRef,
+        expected: Option<&odf::Multihash>,
         hash: &odf::Multihash,
-        opts: odf::dataset::SetRefOpts<'a>,
+        opts: odf::dataset::SetRefOpts,
     ) -> Result<(), odf::dataset::SetChainRefError> {
-        self.metadata_chain.set_ref(r, hash, opts).await
+        self.metadata_chain.set_ref(r, expected, hash, opts).await
     }
 
     async fn get_preceding_block_with_hint(

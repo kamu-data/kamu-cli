@@ -108,7 +108,7 @@ async fn test_check_remotes_status_remote_ahead() {
     let head = &local_ds.head;
     let schema_block = RemoteStatusTestHarness::schema_block(head);
     let local_chain = local_ds.dataset.as_metadata_chain();
-    let _ = local_chain
+    let schema_hash = local_chain
         .append(schema_block, odf::dataset::AppendOpts::default())
         .await
         .unwrap();
@@ -118,11 +118,9 @@ async fn test_check_remotes_status_remote_ahead() {
     local_chain
         .set_ref(
             &odf::BlockRef::Head,
+            Some(&schema_hash),
             head,
-            odf::dataset::SetRefOpts {
-                validate_block_present: true,
-                check_ref_is: None,
-            },
+            odf::dataset::SetRefOpts::default(),
         )
         .await
         .unwrap();
@@ -154,7 +152,7 @@ async fn test_check_remotes_status_remote_diverge() {
     let head = &local_ds.head;
     let schema_block = RemoteStatusTestHarness::schema_block(head);
     let local_chain = local_ds.dataset.as_metadata_chain();
-    let _ = local_chain
+    let schema_hash = local_chain
         .append(schema_block, odf::dataset::AppendOpts::default())
         .await
         .unwrap();
@@ -164,11 +162,9 @@ async fn test_check_remotes_status_remote_diverge() {
     local_chain
         .set_ref(
             &odf::BlockRef::Head,
+            Some(&schema_hash),
             head,
-            odf::dataset::SetRefOpts {
-                validate_block_present: true,
-                check_ref_is: None,
-            },
+            odf::dataset::SetRefOpts::default(),
         )
         .await
         .unwrap();

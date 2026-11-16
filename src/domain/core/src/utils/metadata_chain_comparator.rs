@@ -536,13 +536,14 @@ impl odf::MetadataChain for MetadataChainWithStats<'_> {
             .iter_blocks_bytes_interval(head_boundary, tail_boundary, ignore_missing_tail)
     }
 
-    async fn set_ref<'b>(
-        &'b self,
+    async fn set_ref(
+        &self,
         r: &odf::BlockRef,
+        expected: Option<&odf::Multihash>,
         hash: &odf::Multihash,
-        opts: odf::dataset::SetRefOpts<'b>,
+        opts: odf::dataset::SetRefOpts,
     ) -> Result<(), odf::dataset::SetChainRefError> {
-        self.chain.set_ref(r, hash, opts).await
+        self.chain.set_ref(r, expected, hash, opts).await
     }
 
     async fn append<'b>(

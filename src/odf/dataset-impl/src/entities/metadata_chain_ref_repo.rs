@@ -24,13 +24,13 @@ pub trait MetadataChainReferenceRepository: Send + Sync {
     /// Accesses current value of the reference
     async fn get_ref(&self, r: &BlockRef) -> Result<Multihash, GetRefError>;
 
-    /// Updates the value of the reference with optional check of what current
-    /// value is supposed to be equal to
-    async fn set_ref<'a>(
-        &'a self,
+    /// Moves the reference from `expected` to `hash` (compare-and-swap);
+    /// `expected = None` means the reference must not exist yet
+    async fn set_ref(
+        &self,
         r: &BlockRef,
+        expected: Option<&Multihash>,
         hash: &Multihash,
-        check_ref_is: Option<Option<&'a Multihash>>,
     ) -> Result<(), SetChainRefError>;
 
     /// Returns storage-level reference repository without any caching involved
@@ -86,17 +86,12 @@ where
         self.ref_repo.get(r.as_str()).await
     }
 
-    async fn set_ref<'a>(
-        &'a self,
+    async fn set_ref(
+        &self,
         r: &BlockRef,
+        expected: Option<&Multihash>,
         hash: &Multihash,
-        check_ref_is: Option<Option<&'a Multihash>>,
     ) -> Result<(), SetChainRefError> {
-        let Some(expected) = check_ref_is else {
-            self.ref_repo.set(r.as_str(), hash).await?;
-            return Ok(());
-        };
-
         match self
             .ref_repo
             .compare_and_set(r.as_str(), expected, hash)

@@ -2005,10 +2005,10 @@ impl DataQueryHarness {
             .as_metadata_chain()
             .set_ref(
                 &odf::BlockRef::Head,
+                Some(&write_result.old_head),
                 &write_result.new_head,
                 odf::dataset::SetRefOpts {
                     validate_block_present: true,
-                    check_ref_is: Some(Some(&write_result.old_head)),
                 },
             )
             .await

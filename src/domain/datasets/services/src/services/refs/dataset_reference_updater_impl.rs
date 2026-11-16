@@ -33,10 +33,10 @@ impl DatasetReferenceUpdater for DatasetReferenceUpdaterImpl {
             .as_metadata_chain()
             .set_ref(
                 block_ref,
+                expected_block_hash,
                 new_block_hash,
                 odf::dataset::SetRefOpts {
                     validate_block_present: true,
-                    check_ref_is: Some(expected_block_hash),
                 },
             )
             .await
