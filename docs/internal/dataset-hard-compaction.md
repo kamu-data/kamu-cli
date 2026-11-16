@@ -115,7 +115,7 @@ open during the merge:
 | --- | --- | --- |
 | Plan | a short one | authorizes `Compaction` (or `ResetToMetadata` with `keep_metadata_only`) through [`DatasetOperationGuard`](../../src/domain/datasets/domain/src/services/dataset_operation_guard.rs), which needs Maintain; resolves the dataset, plans, detaches the dataset from the transaction |
 | Execute | none | `CompactionExecutor::execute`, which writes only blocks and files that no reference points to yet |
-| Commit | a new short one | on `Success`, re-resolves the dataset and moves `HEAD` from `old_head` through `DatasetHeadCommitter` |
+| Commit | a new short one | on `Success`, re-resolves the dataset and moves `HEAD` from `old_head` through `DatasetReferenceUpdater` |
 
 A `HEAD` moved by another writer during the merge fails the commit ([§6](#6-execution)).
 `execute_multi` calls `execute` per dataset and returns one `CompactionResponse`

@@ -21,7 +21,7 @@ use kamu_datasets::{
     MockDatasetPermissionChecker,
 };
 use kamu_datasets_services::CommitDatasetEventUseCaseImpl;
-use kamu_datasets_services::testing::RacingDatasetHeadCommitter;
+use kamu_datasets_services::testing::RacingDatasetReferenceUpdater;
 use odf::metadata::testing::MetadataFactory;
 use pretty_assertions::assert_eq;
 use time_source::{SystemTimeSourceProvider, SystemTimeSourceStub};
@@ -374,7 +374,7 @@ async fn test_commit_event_with_inaccessible_input_is_rejected() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[tokio::test]
-async fn test_commit_dataset_event_head_moved_concurrently() {
+async fn test_commit_dataset_event_ref_moved_concurrently() {
     let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
     let (_, dataset_id_foo) = odf::DatasetID::new_generated_ed25519();
 
@@ -393,7 +393,7 @@ async fn test_commit_dataset_event_head_moved_concurrently() {
     let concurrent_head = harness
         .append_unreferenced_block(&foo, &foo.head, "concurrent")
         .await;
-    harness.move_head_before_next_commit(concurrent_head.clone());
+    harness.move_reference_before_next_update(concurrent_head.clone());
     harness.reset_collected_outbox_messages();
 
     assert_matches!(
@@ -448,7 +448,7 @@ async fn test_commit_dataset_event_head_moved_concurrently() {
 struct CommitDatasetEventUseCaseHarness {
     dataset_base_use_case_harness: DatasetBaseUseCaseHarness,
     use_case: Arc<dyn CommitDatasetEventUseCase>,
-    racing_committer: Arc<RacingDatasetHeadCommitter>,
+    racing_reference_updater: Arc<RacingDatasetReferenceUpdater>,
     dataset_ref_repo: Arc<dyn DatasetReferenceRepository>,
     catalog: dill::Catalog,
 }
@@ -467,7 +467,7 @@ impl CommitDatasetEventUseCaseHarness {
                 ),
                 maybe_mock_dataset_permission_checker: Some(mock_dataset_permission_checker),
                 maybe_mock_did_generator: Some(mock_did_generator),
-                racing_head_committer: true,
+                racing_reference_updater: true,
                 ..DatasetBaseUseCaseHarnessOpts::default()
             })
             .await;
@@ -480,15 +480,15 @@ impl CommitDatasetEventUseCaseHarness {
         Self {
             dataset_base_use_case_harness,
             use_case: catalog.get_one().unwrap(),
-            racing_committer: catalog.get_one().unwrap(),
+            racing_reference_updater: catalog.get_one().unwrap(),
             dataset_ref_repo: catalog.get_one().unwrap(),
             catalog,
         }
     }
 
-    fn move_head_before_next_commit(&self, concurrent_head: odf::Multihash) {
-        self.racing_committer
-            .move_head_before_next_commit(&self.catalog, concurrent_head);
+    fn move_reference_before_next_update(&self, concurrent_head: odf::Multihash) {
+        self.racing_reference_updater
+            .move_reference_before_next_update(&self.catalog, concurrent_head);
     }
 
     async fn stored_head(&self, dataset: &CreateDatasetResult) -> odf::Multihash {

@@ -46,7 +46,7 @@ use kamu::{
     TransformPlannerImpl,
 };
 use kamu_adapter_task_dataset::{
-    DatasetHeadMovedError,
+    DatasetRefMovedError,
     DatasetUpdateJob,
     InputDatasetCompactedError,
     TaskDefinitionDatasetUpdate,
@@ -64,12 +64,12 @@ use kamu_datasets::{
     DatasetEnvVar,
     DatasetEnvVarResolver,
     DatasetEnvVarValue,
-    DatasetHeadCommitter,
+    DatasetReferenceUpdater,
     GetDatasetEnvVarError,
     SecretsEncryptionConfig,
 };
 use kamu_datasets_services::DatasetKeyValueServiceSysEnv;
-use kamu_datasets_services::testing::RacingDatasetHeadCommitter;
+use kamu_datasets_services::testing::RacingDatasetReferenceUpdater;
 use kamu_task_system::{TaskDefinition, TaskError, TaskOutcome, TaskRunner};
 use odf::metadata::testing::MetadataFactory;
 use pretty_assertions::assert_eq;
@@ -78,7 +78,7 @@ use url::Url;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[tokio::test]
-async fn test_ingest_head_moved_concurrently_fails_recoverably() {
+async fn test_ingest_ref_moved_concurrently_fails_recoverably() {
     let (harness, foo, _) = UpdateDatasetTaskRunnerHarness::new_ingesting_new_root(
         &UpdateDatasetTaskRunnerHarness::alias("foo"),
     )
@@ -90,10 +90,11 @@ async fn test_ingest_head_moved_concurrently_fails_recoverably() {
 
     assert_eq!(
         TaskOutcome::Failed(
-            TaskErrorDatasetCommit::HeadMoved(DatasetHeadMovedError {
+            TaskErrorDatasetCommit::RefMoved(DatasetRefMovedError {
                 dataset_id: foo.dataset_handle.id.clone(),
-                expected_head: Some(foo.head.clone()),
-                actual_head: Some(concurrent_head.clone()),
+                block_ref: odf::BlockRef::Head,
+                expected_block_hash: Some(foo.head.clone()),
+                actual_block_hash: Some(concurrent_head.clone()),
             })
             .into_task_error()
         ),
@@ -621,22 +622,23 @@ async fn test_sync_with_real_service_from_repo_in_sync_is_up_to_date() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[tokio::test]
-async fn test_sync_head_moved_concurrently_fails_recoverably() {
+async fn test_sync_ref_moved_concurrently_fails_recoverably() {
     let (harness, foo, _) = UpdateDatasetTaskRunnerHarness::new_syncing_new_root(
         &UpdateDatasetTaskRunnerHarness::alias("foo"),
     )
     .await;
     let concurrent_head = harness.append_unreferenced_block(&foo, "concurrent").await;
-    harness.move_head_before_next_commit(concurrent_head.clone());
+    harness.move_reference_before_next_update(concurrent_head.clone());
 
     let outcome = harness.run_sync_update(&foo).await;
 
     assert_eq!(
         TaskOutcome::Failed(
-            TaskErrorDatasetCommit::HeadMoved(DatasetHeadMovedError {
+            TaskErrorDatasetCommit::RefMoved(DatasetRefMovedError {
                 dataset_id: foo.dataset_handle.id.clone(),
-                expected_head: Some(foo.head.clone()),
-                actual_head: Some(concurrent_head.clone()),
+                block_ref: odf::BlockRef::Head,
+                expected_block_hash: Some(foo.head.clone()),
+                actual_block_hash: Some(concurrent_head.clone()),
             })
             .into_task_error()
         ),
@@ -654,7 +656,7 @@ async fn test_sync_commit_not_allowed_fails_unrecoverably() {
         &UpdateDatasetTaskRunnerHarness::alias("foo"),
     )
     .await;
-    harness.deny_next_commit();
+    harness.deny_next_update();
 
     let outcome = harness.run_sync_update(&foo).await;
 
@@ -673,7 +675,7 @@ async fn test_ingest_commit_not_allowed_fails_unrecoverably() {
         &UpdateDatasetTaskRunnerHarness::alias("foo"),
     )
     .await;
-    harness.deny_next_commit();
+    harness.deny_next_update();
 
     let outcome = harness.run_ingest_update(&foo).await;
 
@@ -687,9 +689,9 @@ async fn test_ingest_commit_not_allowed_fails_unrecoverably() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[tokio::test]
-async fn test_sync_head_moved_without_heads_fails_recoverably() {
+async fn test_sync_ref_moved_without_block_hashes_fails_recoverably() {
     let outcome = UpdateDatasetTaskRunnerHarness::run_sync_failing_with(|| {
-        SyncError::HeadMoved(SyncHeadMovedError::unreported())
+        SyncError::RefMoved(SyncRefMovedError::unreported(odf::BlockRef::Head))
     })
     .await;
 
@@ -698,9 +700,10 @@ async fn test_sync_head_moved_without_heads_fails_recoverably() {
     };
     assert_matches!(
         TaskErrorDatasetCommit::from_task_error(task_error).unwrap(),
-        TaskErrorDatasetCommit::HeadMoved(DatasetHeadMovedError {
-            expected_head: None,
-            actual_head: None,
+        TaskErrorDatasetCommit::RefMoved(DatasetRefMovedError {
+            block_ref: odf::BlockRef::Head,
+            expected_block_hash: None,
+            actual_block_hash: None,
             ..
         })
     );
@@ -842,7 +845,7 @@ async fn test_ingest_of_dataset_deleted_before_commit_fails_unrecoverably() {
         &UpdateDatasetTaskRunnerHarness::alias("foo"),
     )
     .await;
-    harness.delete_dataset_before_next_commit();
+    harness.delete_dataset_before_next_update();
 
     let outcome = harness.run_ingest_update(&foo).await;
 
@@ -859,7 +862,7 @@ struct UpdateDatasetTaskRunnerHarness {
     base_use_case_harness: BaseUseCaseHarness,
     catalog: dill::Catalog,
     runner: Arc<dyn TaskRunner>,
-    racing_committer: Arc<RacingDatasetHeadCommitter>,
+    racing_reference_updater: Arc<RacingDatasetReferenceUpdater>,
     racing_update_steps: Arc<RacingDatasetUpdateSteps>,
 }
 
@@ -1003,8 +1006,8 @@ impl UpdateDatasetTaskRunnerHarness {
         b.add::<UpdateDatasetTaskRunner>()
             .add::<PollingIngestPlannerImpl>()
             .add::<IngestEnvVarsResolver>()
-            .add_value(RacingDatasetHeadCommitter::default())
-            .bind::<dyn DatasetHeadCommitter, RacingDatasetHeadCommitter>();
+            .add_value(RacingDatasetReferenceUpdater::default())
+            .bind::<dyn DatasetReferenceUpdater, RacingDatasetReferenceUpdater>();
         register_operations(&mut b, base_use_case_harness.temp_dir_path());
 
         database_common::NoOpDatabasePlugin::init_database_components(&mut b);
@@ -1014,7 +1017,7 @@ impl UpdateDatasetTaskRunnerHarness {
         Self {
             base_use_case_harness,
             runner: catalog.get_one::<UpdateDatasetTaskRunner>().unwrap(),
-            racing_committer: catalog.get_one().unwrap(),
+            racing_reference_updater: catalog.get_one().unwrap(),
             racing_update_steps: catalog.get_one().unwrap(),
             catalog,
         }
@@ -1217,17 +1220,17 @@ impl UpdateDatasetTaskRunnerHarness {
             .await
     }
 
-    fn move_head_before_next_commit(&self, concurrent_head: odf::Multihash) {
-        self.racing_committer
-            .move_head_before_next_commit(&self.catalog, concurrent_head);
+    fn move_reference_before_next_update(&self, concurrent_head: odf::Multihash) {
+        self.racing_reference_updater
+            .move_reference_before_next_update(&self.catalog, concurrent_head);
     }
 
-    fn deny_next_commit(&self) {
-        self.racing_committer.deny_next_commit();
+    fn deny_next_update(&self) {
+        self.racing_reference_updater.deny_next_update();
     }
 
-    fn delete_dataset_before_next_commit(&self) {
-        self.racing_update_steps.delete_dataset_before_next_commit();
+    fn delete_dataset_before_next_update(&self) {
+        self.racing_update_steps.delete_dataset_before_next_update();
     }
 
     /// Writes the file a polling source reads, in the harness's directory

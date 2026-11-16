@@ -14,11 +14,11 @@ use kamu_datasets::{
     AppendDatasetMetadataBatchUseCase,
     AppendDatasetMetadataBatchUseCaseError,
     AppendDatasetMetadataBatchUseCaseOptions,
-    DatasetHeadCommitter,
+    DatasetReferenceUpdater,
     ResolvedDataset,
 };
 
-use super::ConcurrentHeadMove;
+use super::ConcurrentReferenceMove;
 use crate::AppendDatasetMetadataBatchUseCaseImpl;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -26,20 +26,20 @@ use crate::AppendDatasetMetadataBatchUseCaseImpl;
 /// Appends like `AppendDatasetMetadataBatchUseCaseImpl`, but when armed first
 /// moves `HEAD` the way a concurrent writer would before the batch arrives, so
 /// the move lands before the commit decides which head it expects.
-/// `RacingDatasetHeadCommitter` moves it later, after that decision
+/// `RacingDatasetReferenceUpdater` moves it later, after that decision
 pub struct RacingAppendDatasetMetadataBatchUseCase {
     inner: AppendDatasetMetadataBatchUseCaseImpl,
-    concurrent_head_move: Mutex<Option<ConcurrentHeadMove>>,
+    concurrent_reference_move: Mutex<Option<ConcurrentReferenceMove>>,
 }
 
 #[component(pub)]
 #[interface(dyn AppendDatasetMetadataBatchUseCase)]
 #[scope(dill::Singleton)]
 impl RacingAppendDatasetMetadataBatchUseCase {
-    pub fn new(dataset_head_committer: Arc<dyn DatasetHeadCommitter>) -> Self {
+    pub fn new(dataset_reference_updater: Arc<dyn DatasetReferenceUpdater>) -> Self {
         Self {
-            inner: AppendDatasetMetadataBatchUseCaseImpl::new(dataset_head_committer),
-            concurrent_head_move: Mutex::new(None),
+            inner: AppendDatasetMetadataBatchUseCaseImpl::new(dataset_reference_updater),
+            concurrent_reference_move: Mutex::new(None),
         }
     }
 
@@ -50,8 +50,8 @@ impl RacingAppendDatasetMetadataBatchUseCase {
         catalog: &dill::Catalog,
         concurrent_head: odf::Multihash,
     ) {
-        *self.concurrent_head_move.lock().unwrap() =
-            Some(ConcurrentHeadMove::new(catalog, concurrent_head));
+        *self.concurrent_reference_move.lock().unwrap() =
+            Some(ConcurrentReferenceMove::new(catalog, concurrent_head));
     }
 }
 
@@ -65,9 +65,11 @@ impl AppendDatasetMetadataBatchUseCase for RacingAppendDatasetMetadataBatchUseCa
         >,
         options: AppendDatasetMetadataBatchUseCaseOptions,
     ) -> Result<Option<odf::Multihash>, AppendDatasetMetadataBatchUseCaseError> {
-        let concurrent_head_move = self.concurrent_head_move.lock().unwrap().take();
-        if let Some(concurrent_head_move) = concurrent_head_move {
-            concurrent_head_move.apply(target.get_handle()).await;
+        let concurrent_reference_move = self.concurrent_reference_move.lock().unwrap().take();
+        if let Some(concurrent_reference_move) = concurrent_reference_move {
+            concurrent_reference_move
+                .apply(target.get_handle(), &odf::BlockRef::Head)
+                .await;
         }
 
         self.inner

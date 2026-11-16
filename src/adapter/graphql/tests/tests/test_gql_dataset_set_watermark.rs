@@ -28,7 +28,7 @@ use kamu_datasets::{
     DatasetReferenceRepository,
 };
 use kamu_datasets_services::DatasetOperationGuardImpl;
-use kamu_datasets_services::testing::RacingDatasetHeadCommitter;
+use kamu_datasets_services::testing::RacingDatasetReferenceUpdater;
 use messaging_outbox::OutboxProvider;
 use odf::metadata::testing::MetadataFactory;
 use pretty_assertions::{assert_eq, assert_ne};
@@ -65,13 +65,13 @@ async fn test_set_watermark_updated() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_set_watermark_head_moved_concurrently() {
+async fn test_set_watermark_ref_moved_concurrently() {
     let harness = SetWatermarkHarness::new().await;
     let foo = harness.create_root_dataset().await;
     let planned_head = harness.stored_head(&foo).await;
 
     let concurrent_head = harness.append_unreferenced_block(&foo, &planned_head).await;
-    harness.move_head_before_next_commit(concurrent_head.clone());
+    harness.move_reference_before_next_update(concurrent_head.clone());
 
     let res = harness.set_watermark(&foo).await;
 
@@ -102,7 +102,7 @@ async fn test_set_watermark_head_removed_concurrently() {
     let foo = harness.create_root_dataset().await;
     let planned_head = harness.stored_head(&foo).await;
 
-    harness.remove_head_before_next_commit();
+    harness.remove_reference_before_next_update();
 
     let res = harness.set_watermark(&foo).await;
 
@@ -130,7 +130,7 @@ async fn test_set_watermark_head_removed_concurrently() {
 struct SetWatermarkHarness {
     base_gql_harness: BaseGQLDatasetHarness,
     catalog_authorized: dill::Catalog,
-    racing_committer: Arc<RacingDatasetHeadCommitter>,
+    racing_reference_updater: Arc<RacingDatasetReferenceUpdater>,
     dataset_ref_repo: Arc<dyn DatasetReferenceRepository>,
 }
 
@@ -141,7 +141,7 @@ impl SetWatermarkHarness {
             .outbox_provider(OutboxProvider::Immediate {
                 force_immediate: true,
             })
-            .racing_head_committer(true)
+            .racing_reference_updater(true)
             .build();
 
         let base_catalog = dill::CatalogBuilder::new_chained(base_gql_harness.catalog())
@@ -164,7 +164,7 @@ impl SetWatermarkHarness {
 
         Self {
             base_gql_harness,
-            racing_committer: catalog_authorized.get_one().unwrap(),
+            racing_reference_updater: catalog_authorized.get_one().unwrap(),
             dataset_ref_repo: catalog_authorized.get_one().unwrap(),
             catalog_authorized,
         }
@@ -215,14 +215,14 @@ impl SetWatermarkHarness {
             .unwrap()
     }
 
-    fn move_head_before_next_commit(&self, concurrent_head: odf::Multihash) {
-        self.racing_committer
-            .move_head_before_next_commit(&self.catalog_authorized, concurrent_head);
+    fn move_reference_before_next_update(&self, concurrent_head: odf::Multihash) {
+        self.racing_reference_updater
+            .move_reference_before_next_update(&self.catalog_authorized, concurrent_head);
     }
 
-    fn remove_head_before_next_commit(&self) {
-        self.racing_committer
-            .remove_head_before_next_commit(&self.catalog_authorized);
+    fn remove_reference_before_next_update(&self) {
+        self.racing_reference_updater
+            .remove_reference_before_next_update(&self.catalog_authorized);
     }
 
     async fn stored_head(&self, created: &CreateDatasetResult) -> odf::Multihash {

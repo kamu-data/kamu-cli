@@ -88,7 +88,7 @@ the repository model and both protocols. This page does not restate them; read t
 | Smart protocol client trait | `kamu` — [`smart_transfer_protocol.rs`](../../src/infra/core/src/utils/smart_transfer_protocol.rs) | `SmartTransferProtocolClient`, `TransferOptions` |
 | Smart protocol client and server | `kamu-adapter-http` — [`src/adapter/http/src/smart_protocol/`](../../src/adapter/http/src/smart_protocol) | `WsSmartTransferProtocolClient`, `AxumServerPullProtocolInstance`, `AxumServerPushProtocolInstance`, messages, `protocol_dataset_helper` |
 | Server HTTP endpoints | `kamu-adapter-http` — [`simple_protocol/handlers.rs`](../../src/adapter/http/src/simple_protocol/handlers.rs), [`http_server_dataset_router.rs`](../../src/adapter/http/src/http_server_dataset_router.rs) | `refs`, `blocks`, `data`, `checkpoints` (GET and PUT), `pull` and `push` WebSocket upgrades |
-| Committing a pull | `kamu` — [`dataset_update_steps_impl.rs`](../../src/infra/core/src/services/dataset_update_steps_impl.rs), [`local_sync_writes/`](../../src/infra/core/src/utils/local_sync_writes/) | `DatasetUpdateSteps::commit_sync`, in a transaction of its own: `HEAD` CAS through `DatasetHeadCommitter`, or creation through `CreateDatasetUseCase`; the `Seed` store and block append both protocols share |
+| Committing a pull | `kamu` — [`dataset_update_steps_impl.rs`](../../src/infra/core/src/services/dataset_update_steps_impl.rs), [`local_sync_writes/`](../../src/infra/core/src/utils/local_sync_writes/) | `DatasetUpdateSteps::commit_sync`, in a transaction of its own: `HEAD` CAS through `DatasetReferenceUpdater`, or creation through `CreateDatasetUseCase`; the `Seed` store and block append both protocols share |
 | Appending incoming blocks | `kamu-datasets-services` — `AppendDatasetMetadataBatchUseCaseImpl`; `odf` — `MetadataChainExt::append_batch` | block validation, `HEAD` update on the smart push server |
 | Push | `kamu` — [`push_dataset_use_case_impl.rs`](../../src/infra/core/src/use_cases/push_dataset_use_case_impl.rs), [`push_request_planner_impl.rs`](../../src/infra/core/src/services/push_request_planner_impl.rs); CLI [`push_command.rs`](../../src/app/cli/src/commands/push_command.rs) | `kamu push` |
 | Remotes | `kamu` — [`src/infra/core/src/services/remote/`](../../src/infra/core/src/services/remote) | `RemoteRepositoryRegistryImpl`, `RemoteAliasesRegistryImpl`, `RemoteDatasetUrlResolverImpl`, `RemoteAliasResolverImpl`, `DatasetPullSourceResolverImpl` |
@@ -127,7 +127,7 @@ the reference carries an alias.
 | --- | --- | --- |
 | Target | the caller's | `PullLocalTarget::resolve_sync_target`: read `expected_head`; no remote is contacted |
 | Transfer | none held across it | `sync_from`: resolve and open the source, compare the chains, store the `Seed` of a new dataset, copy objects, append blocks; no reference moves. Returns `SyncFromTransfer::UpToDate` or `Transferred(SyncFromTransferred)` |
-| Commit | its own | `DatasetUpdateSteps::commit_sync`: for an existing dataset, `DatasetHeadCommitter` moves `HEAD` from `expected_head` to the new head; for a new one, `CreateDatasetUseCase` creates the entry with `HEAD` already at the new head (`CreateDatasetUseCaseOptions::initial_head`) |
+| Commit | its own | `DatasetUpdateSteps::commit_sync`: for an existing dataset, `DatasetReferenceUpdater` moves `HEAD` from `expected_head` to the new head; for a new one, `CreateDatasetUseCase` creates the entry with `HEAD` already at the new head (`CreateDatasetUseCaseOptions::initial_head`) |
 
 Opening the source fails with `RepositoryNotFound` for an unknown repository,
 `RemoteByIdUnsupported` for a remote named only by ID, and `DatasetNotFound` for a source without
@@ -247,7 +247,7 @@ sequenceDiagram
    S3; on the local file system, a `head.lock` file created exclusively, then renamed over `head`
    (a lock left by an interrupted writer fails later pushes until it is removed). Storage without
    conditional writes re-reads the head just before an unconditional write, so a change landing in
-   between is lost. A destination that moved since step 1 fails with `HeadMoved`, also with
+   between is lost. A destination that moved since step 1 fails with `RefMoved`, also with
    `force`.
 
 Objects land before the blocks that reference them, so a failure leaves at most unreferenced
@@ -524,8 +524,8 @@ either the old or the new head. A local destination's `HEAD` is set by `DatasetU
 dataset of this node posts `DatasetReferenceMessage`; the smart push server also posts
 `DatasetExternallyChangedMessage`.
 
-The variants are in `SyncError` (`sync_service.rs`). A lost `HEAD` CAS is `HeadMoved` on every
-destination, with a `SyncHeadMovedError` that carries the expected and actual heads when they are
+The variants are in `SyncError` (`sync_service.rs`). A lost `HEAD` CAS is `RefMoved` on every
+destination, with a `SyncRefMovedError` that carries the expected and actual heads when they are
 known: always for a local destination and the Simple protocol. The Smart push server reports the
 heads in `InvalidHead` when `HEAD` moved before the push began, and none in
 `DatasetPushCompleteResponse` when it moved during the commit. A Smart-protocol push whose
@@ -544,7 +544,7 @@ fails the transfer with an error; so does a batch that unpacks to more than
 download answered with an error status is `Internal`, so it is recoverable.
 
 `SyncError::is_recoverable` says whether running the same sync again could succeed. A lost CAS
-(`HeadMoved`) and `Internal`, which also covers network failures, are
+(`RefMoved`) and `Internal`, which also covers network failures, are
 recoverable; conflicts between the chains, a corrupted source, denied access and errors in the
 request, such as an `InvalidDestination`, are not. `CreateDatasetFailed`
 is recoverable for a lost CAS, an internal failure and a `RefCollision`, where a concurrent first
@@ -560,7 +560,7 @@ into the recoverability of the failed task.
 - Sync service tests: `src/infra/core/tests/tests/test_sync_service_impl.rs`; the transfer and
   commit split, first pull, forced pull and a `HEAD` moved during the transfer, on local FS and
   S3: `test_sync_service_local_commit.rs`; a remote head moved during a push:
-  `test_sync_service_remote_head_moved.rs`; IPNS: `test_sync_service_ipns_push.rs`.
+  `test_sync_service_remote_ref_moved.rs`; IPNS: `test_sync_service_ipns_push.rs`.
   `LocalSyncHelper` in `src/infra/core/tests/utils/` pulls the way the use case does.
 - Smart protocol tests, client against an in-process server, single- and multi-tenant, local and
   S3 storage: `src/adapter/http/tests/tests/test_protocol_dataset_helpers.rs` and the
@@ -579,7 +579,7 @@ into the recoverability of the failed task.
 | Plain `http(s)://` URLs | Read-only through the Simple protocol; a push to a *registered* `http(s)` repository is rewritten to `odf+http(s)` by `resolve_push_target` and uses the Smart protocol |
 | Created destination | Created by the commit, with its `HEAD` at the last transferred block; for a pull that fails before it, see [§4](#4-sync-requests) |
 | Unreferenced objects | A failed or concurrent sync can leave uploaded objects that no block references |
-| `force` | Replaces the destination's history from the source, but only from the destination head the sync observed: a head moved meanwhile fails with `HeadMoved`. The Smart protocol refuses a different `Seed` (`OverwriteSeedBlock`, `SeedBlockOverwriteRestricted`); the Simple protocol refuses only a `Seed` of another dataset ID (`DatasetIdMismatch`) |
+| `force` | Replaces the destination's history from the source, but only from the destination head the sync observed: a head moved meanwhile fails with `RefMoved`. The Smart protocol refuses a different `Seed` (`OverwriteSeedBlock`, `SeedBlockOverwriteRestricted`); the Simple protocol refuses only a `Seed` of another dataset ID (`DatasetIdMismatch`) |
 | Trusted local source | A push from a local dataset skips validation and hash recomputation |
 
 ---

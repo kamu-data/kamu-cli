@@ -14,7 +14,7 @@ use kamu_core::{CompactionExecutor, CompactionPlan, CompactionResult, DatasetUpd
 use kamu_datasets::ResolvedDataset;
 use kamu_task_system::*;
 
-use super::task_head_commit::HeadCommitTaskOutcome as _;
+use super::task_reference_update::ReferenceUpdateTaskOutcome as _;
 use super::task_span_outcome::TaskSpanOutcome;
 use crate::{
     TaskDefinitionDatasetHardCompact,
@@ -87,7 +87,12 @@ impl CompactionDatasetTaskRunner {
         } = &compaction_result
             && let Some(failed) = self
                 .update_steps
-                .commit_head(target.get_handle(), old_head, new_head)
+                .update_reference(
+                    target.get_handle(),
+                    &odf::BlockRef::Head,
+                    old_head,
+                    new_head,
+                )
                 .await?
                 .into_failed_task_outcome(target.get_handle())
         {

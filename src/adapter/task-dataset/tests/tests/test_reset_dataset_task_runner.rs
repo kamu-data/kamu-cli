@@ -12,21 +12,21 @@ use std::sync::Arc;
 use kamu::ResetExecutorImpl;
 use kamu::testing::{BaseUseCaseHarness, BaseUseCaseHarnessOptions};
 use kamu_adapter_task_dataset::{
-    DatasetHeadMovedError,
+    DatasetRefMovedError,
     ResetDatasetTaskRunner,
     TaskDefinitionDatasetReset,
     TaskErrorDatasetCommit,
 };
 use kamu_core::ResetPlan;
-use kamu_datasets::{CreateDatasetResult, DatasetHeadCommitter};
-use kamu_datasets_services::testing::RacingDatasetHeadCommitter;
+use kamu_datasets::{CreateDatasetResult, DatasetReferenceUpdater};
+use kamu_datasets_services::testing::RacingDatasetReferenceUpdater;
 use kamu_task_system::{TaskDefinition, TaskError, TaskOutcome, TaskRunner};
 use pretty_assertions::assert_eq;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[tokio::test]
-async fn test_reset_head_moved_after_planning_fails_recoverably() {
+async fn test_reset_ref_moved_after_planning_fails_recoverably() {
     let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
 
     let harness = ResetDatasetTaskRunnerHarness::new();
@@ -42,10 +42,11 @@ async fn test_reset_head_moved_after_planning_fails_recoverably() {
 
     assert_eq!(
         TaskOutcome::Failed(
-            TaskErrorDatasetCommit::HeadMoved(DatasetHeadMovedError {
+            TaskErrorDatasetCommit::RefMoved(DatasetRefMovedError {
                 dataset_id: foo.dataset_handle.id.clone(),
-                expected_head: Some(foo.head.clone()),
-                actual_head: Some(concurrent_head.clone()),
+                block_ref: odf::BlockRef::Head,
+                expected_block_hash: Some(foo.head.clone()),
+                actual_block_hash: Some(concurrent_head.clone()),
             })
             .into_task_error()
         ),
@@ -67,7 +68,7 @@ async fn test_reset_not_allowed_fails_unrecoverably() {
         old_head: Some(foo.head.clone()),
         new_head: reset_head,
     };
-    harness.deny_next_commit();
+    harness.deny_next_update();
 
     let outcome = harness.run_reset(&foo, reset_plan).await;
 
@@ -84,7 +85,7 @@ async fn test_reset_not_allowed_fails_unrecoverably() {
 struct ResetDatasetTaskRunnerHarness {
     base_use_case_harness: BaseUseCaseHarness,
     runner: Arc<dyn TaskRunner>,
-    racing_committer: Arc<RacingDatasetHeadCommitter>,
+    racing_reference_updater: Arc<RacingDatasetReferenceUpdater>,
 }
 
 impl ResetDatasetTaskRunnerHarness {
@@ -94,8 +95,8 @@ impl ResetDatasetTaskRunnerHarness {
         let mut b = dill::CatalogBuilder::new_chained(base_use_case_harness.catalog());
         b.add::<ResetDatasetTaskRunner>()
             .add::<ResetExecutorImpl>()
-            .add_value(RacingDatasetHeadCommitter::default())
-            .bind::<dyn DatasetHeadCommitter, RacingDatasetHeadCommitter>();
+            .add_value(RacingDatasetReferenceUpdater::default())
+            .bind::<dyn DatasetReferenceUpdater, RacingDatasetReferenceUpdater>();
 
         database_common::NoOpDatabasePlugin::init_database_components(&mut b);
 
@@ -104,12 +105,12 @@ impl ResetDatasetTaskRunnerHarness {
         Self {
             base_use_case_harness,
             runner: catalog.get_one::<ResetDatasetTaskRunner>().unwrap(),
-            racing_committer: catalog.get_one().unwrap(),
+            racing_reference_updater: catalog.get_one().unwrap(),
         }
     }
 
-    fn deny_next_commit(&self) {
-        self.racing_committer.deny_next_commit();
+    fn deny_next_update(&self) {
+        self.racing_reference_updater.deny_next_update();
     }
 
     async fn run_reset(&self, created: &CreateDatasetResult, reset_plan: ResetPlan) -> TaskOutcome {

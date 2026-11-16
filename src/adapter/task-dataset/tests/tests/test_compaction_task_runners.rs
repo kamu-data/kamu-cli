@@ -14,7 +14,7 @@ use internal_error::ErrorIntoInternal;
 use kamu::testing::{BaseUseCaseHarness, BaseUseCaseHarnessOptions, RacingDatasetUpdateSteps};
 use kamu_adapter_task_dataset::{
     CompactionDatasetTaskRunner,
-    DatasetHeadMovedError,
+    DatasetRefMovedError,
     TaskDefinitionDatasetHardCompact,
     TaskDefinitionDatasetResetToMetadata,
     TaskErrorDatasetCommit,
@@ -24,7 +24,7 @@ use kamu_adapter_task_dataset::{
 use kamu_core::testing::ReportedHeads;
 use kamu_core::*;
 use kamu_datasets::{CreateDatasetResult, ResolvedDataset};
-use kamu_datasets_services::DatasetHeadCommitterImpl;
+use kamu_datasets_services::DatasetReferenceUpdaterImpl;
 use kamu_task_system::{
     TaskDefinition,
     TaskError,
@@ -89,7 +89,7 @@ async fn test_compaction_commits_head_and_reports_result_of_its_task_type() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[tokio::test]
-async fn test_hard_compact_head_moved_concurrently_fails_recoverably() {
+async fn test_hard_compact_ref_moved_concurrently_fails_recoverably() {
     let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
     let reported_heads = ReportedHeads::default();
 
@@ -107,10 +107,11 @@ async fn test_hard_compact_head_moved_concurrently_fails_recoverably() {
 
     assert_eq!(
         TaskOutcome::Failed(
-            TaskErrorDatasetCommit::HeadMoved(DatasetHeadMovedError {
+            TaskErrorDatasetCommit::RefMoved(DatasetRefMovedError {
                 dataset_id: foo.dataset_handle.id.clone(),
-                expected_head: Some(foo.head.clone()),
-                actual_head: Some(concurrent_head.clone()),
+                block_ref: odf::BlockRef::Head,
+                expected_block_hash: Some(foo.head.clone()),
+                actual_block_hash: Some(concurrent_head.clone()),
             })
             .into_task_error()
         ),
@@ -133,7 +134,7 @@ async fn test_hard_compact_of_dataset_deleted_before_commit_fails_unrecoverably(
     let foo = harness.create_root_dataset(&alias_foo).await;
     let compacted_head = harness.append_unreferenced_block(&foo, "compacted").await;
     reported_heads.set(&foo.head, &compacted_head);
-    harness.delete_dataset_before_next_commit();
+    harness.delete_dataset_before_next_update();
 
     let outcome = harness.run_hard_compact(&foo).await;
 
@@ -200,7 +201,7 @@ impl CompactionTaskRunnersHarness {
         let mut b = dill::CatalogBuilder::new_chained(base_use_case_harness.catalog());
         RacingDatasetUpdateSteps::register(&mut b);
         b.add::<CompactionDatasetTaskRunner>()
-            .add::<DatasetHeadCommitterImpl>()
+            .add::<DatasetReferenceUpdaterImpl>()
             .add_value(mock_compaction_executor)
             .bind::<dyn CompactionExecutor, MockCompactionExecutor>();
 
@@ -224,11 +225,11 @@ impl CompactionTaskRunnersHarness {
         mock_compaction_executor
     }
 
-    fn delete_dataset_before_next_commit(&self) {
+    fn delete_dataset_before_next_update(&self) {
         self.catalog
             .get_one::<RacingDatasetUpdateSteps>()
             .unwrap()
-            .delete_dataset_before_next_commit();
+            .delete_dataset_before_next_update();
     }
 
     /// Implementations registered for the task type, looked up the way the

@@ -16,9 +16,9 @@ use kamu_core::TenancyConfig;
 use kamu_datasets::{
     CreateDatasetError,
     CreateDatasetFromSnapshotError,
-    DatasetHeadCommitter,
     DatasetLifecycleMessage,
     DatasetReferenceCASError,
+    DatasetReferenceUpdater,
     MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
     NameCollisionError,
     ResolvedDataset,
@@ -37,7 +37,7 @@ pub struct CreateDatasetUseCaseHelper {
     tenancy_config: Arc<TenancyConfig>,
     dataset_entry_writer: Arc<dyn DatasetEntryWriter>,
     dataset_storage_unit_writer: Arc<dyn odf::DatasetStorageUnitWriter>,
-    dataset_head_committer: Arc<dyn DatasetHeadCommitter>,
+    dataset_reference_updater: Arc<dyn DatasetReferenceUpdater>,
     time_source: Arc<dyn SystemTimeSource>,
     outbox: Arc<dyn Outbox>,
 }
@@ -232,8 +232,8 @@ impl CreateDatasetUseCaseHelper {
         dataset: ResolvedDataset,
         initial_head: &odf::Multihash,
     ) -> Result<(), CreateDatasetError> {
-        self.dataset_head_committer
-            .commit_head(&dataset, None, initial_head)
+        self.dataset_reference_updater
+            .update_reference(&dataset, &odf::BlockRef::Head, None, initial_head)
             .await
             .map_err(|e| match e {
                 odf::dataset::SetChainRefError::CASFailed(e) => {

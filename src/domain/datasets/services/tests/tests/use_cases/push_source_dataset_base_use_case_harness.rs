@@ -48,7 +48,7 @@ use kamu_datasets::{
 };
 use kamu_datasets_services::{
     AccountQuotaCheckerStorageImpl,
-    DatasetHeadCommitterImpl,
+    DatasetReferenceUpdaterImpl,
     DatasetStatisticsServiceImpl,
 };
 use messaging_outbox::DummyOutboxImpl;
@@ -84,7 +84,7 @@ impl PushSourceDatasetBaseUseCaseHarness {
 
         let catalog = b
             .add::<PushIngestDataUseCaseImpl>()
-            .add::<DatasetHeadCommitterImpl>()
+            .add::<DatasetReferenceUpdaterImpl>()
             .add::<PushIngestExecutorImpl>()
             .add::<PushIngestPlannerImpl>()
             .add::<DataFormatRegistryImpl>()

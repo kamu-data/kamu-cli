@@ -240,7 +240,7 @@ impl SimpleTransferProtocol {
 
     /// The `HEAD` of a remote repository is not a dataset reference of this
     /// node, so the chain moves it by its own compare-and-swap rather than
-    /// through `DatasetHeadCommitter`
+    /// through `DatasetReferenceUpdater`
     async fn append_to_remote(
         dst: &dyn odf::Dataset,
         blocks_desc_ordered: Vec<odf::dataset::HashedMetadataBlockBytesDecoded>,

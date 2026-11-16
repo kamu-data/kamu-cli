@@ -696,7 +696,7 @@ impl DependencyGraphHarness {
         .add::<DeleteDatasetUseCaseImpl>()
         .add::<FakeConnectingDatasetEntryWriter>()
         .add::<CreateDatasetUseCaseHelper>()
-        .add::<DatasetHeadCommitterImpl>()
+        .add::<DatasetReferenceUpdaterImpl>()
         .add::<DatasetReferenceServiceImpl>()
         .add::<DatasetBlockUpdateHandler>();
 

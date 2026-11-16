@@ -35,7 +35,7 @@ use kamu_core::{
     TenancyConfig,
 };
 use kamu_datasets::ResolvedDataset;
-use kamu_datasets_services::DatasetHeadCommitterImpl;
+use kamu_datasets_services::DatasetReferenceUpdaterImpl;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -282,7 +282,7 @@ async fn test_set_watermark_rejects_on_dataset_pulled_from_remote() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[tokio::test]
-async fn test_set_watermark_head_moved_after_planning() {
+async fn test_set_watermark_ref_moved_after_planning() {
     let harness = WatermarkTestHarness::new(TenancyConfig::SingleTenant);
 
     let foo = harness
@@ -349,7 +349,7 @@ impl WatermarkTestHarness {
             .add::<odf::dataset::DummyOdfServerAccessTokenResolver>()
             .add::<SetWatermarkPlannerImpl>()
             .add::<SetWatermarkExecutorImpl>()
-            .add::<DatasetHeadCommitterImpl>()
+            .add::<DatasetReferenceUpdaterImpl>()
             .add::<MetadataQueryServiceImpl>()
             .build();
 

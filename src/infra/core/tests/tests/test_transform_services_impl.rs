@@ -35,8 +35,8 @@ use kamu_datasets::{
 };
 use kamu_datasets_services::{
     AccountQuotaCheckerStorageImpl,
-    DatasetHeadCommitterImpl,
     DatasetOperationGuardImpl,
+    DatasetReferenceUpdaterImpl,
     DatasetStatisticsServiceImpl,
     QuotaDefaultsConfig,
 };
@@ -137,7 +137,7 @@ impl TransformTestHarness {
             .add::<PushIngestPlannerImpl>()
             .add::<PushIngestDataUseCaseImpl>()
             .add::<DatasetOperationGuardImpl>()
-            .add::<DatasetHeadCommitterImpl>()
+            .add::<DatasetReferenceUpdaterImpl>()
             .add::<DummyOutboxImpl>()
             .add_value(engine_provisioner)
             .bind::<dyn EngineProvisioner, TEngineProvisioner>()
@@ -1049,7 +1049,7 @@ async fn test_transform_rebuild_detects_mismatch() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_transform_rebuild_after_head_moved() {
+async fn test_transform_rebuild_after_ref_moved() {
     let harness =
         TransformTestHarness::new_custom(MockEngineProvisioner::new().always_provision_engine());
     let foo_alias = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));

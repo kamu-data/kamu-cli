@@ -4561,7 +4561,7 @@ async fn test_trigger_flow_automatically_via_schedule() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_flows_failed_with_head_moved_are_recoverable() {
+async fn test_flows_failed_with_ref_moved_are_recoverable() {
     let harness = FlowRunsHarness::with_overrides(FlowRunsHarnessOverrides::default()).await;
     let foo = harness.create_foo_dataset().await;
     let foo_id = &foo.dataset_handle.id;
@@ -4593,7 +4593,7 @@ async fn test_flows_failed_with_head_moved_are_recoverable() {
             .run_triggered_flow(
                 trigger,
                 trigger_method,
-                ts::TaskOutcome::Failed(harness.head_moved_error(foo_id)),
+                ts::TaskOutcome::Failed(harness.ref_moved_error(foo_id)),
             )
             .await;
 
@@ -4601,7 +4601,7 @@ async fn test_flows_failed_with_head_moved_are_recoverable() {
             harness.get_flow(foo_id, &flow_id).await["outcome"],
             serde_json::json!({
                 "reason": {
-                    "message": "Dataset head was moved by a concurrent update",
+                    "message": "Dataset reference was moved by a concurrent update",
                     "recoverable": true,
                 }
             }),
@@ -4806,11 +4806,12 @@ impl FlowRunsHarness {
             .unwrap()
     }
 
-    fn head_moved_error(&self, dataset_id: &odf::DatasetID) -> TaskError {
-        TaskErrorDatasetCommit::HeadMoved(DatasetHeadMovedError {
+    fn ref_moved_error(&self, dataset_id: &odf::DatasetID) -> TaskError {
+        TaskErrorDatasetCommit::RefMoved(DatasetRefMovedError {
             dataset_id: dataset_id.clone(),
-            expected_head: Some(odf::Multihash::from_digest_sha3_256(b"expected_head")),
-            actual_head: Some(odf::Multihash::from_digest_sha3_256(b"actual_head")),
+            block_ref: odf::BlockRef::Head,
+            expected_block_hash: Some(odf::Multihash::from_digest_sha3_256(b"expected")),
+            actual_block_hash: Some(odf::Multihash::from_digest_sha3_256(b"actual")),
         })
         .into_task_error()
     }

@@ -18,7 +18,7 @@ use kamu_accounts_services::AccountServiceImpl;
 use kamu_auth_rebac_services::RebacDatasetRegistryFacadeImpl;
 use kamu_core::*;
 use kamu_datasets::*;
-use kamu_datasets_services::testing::{RacingDatasetHeadCommitter, TestDatasetOutboxListener};
+use kamu_datasets_services::testing::{RacingDatasetReferenceUpdater, TestDatasetOutboxListener};
 use kamu_datasets_services::utils::CreateDatasetUseCaseHelper;
 use kamu_datasets_services::*;
 use messaging_outbox::*;
@@ -84,11 +84,11 @@ impl DatasetBaseUseCaseHarness {
                 b.add::<AlwaysHappyDatasetPermissionChecker>();
             }
 
-            if opts.racing_head_committer {
-                b.add_value(RacingDatasetHeadCommitter::default())
-                    .bind::<dyn DatasetHeadCommitter, RacingDatasetHeadCommitter>();
+            if opts.racing_reference_updater {
+                b.add_value(RacingDatasetReferenceUpdater::default())
+                    .bind::<dyn DatasetReferenceUpdater, RacingDatasetReferenceUpdater>();
             } else {
-                b.add::<DatasetHeadCommitterImpl>();
+                b.add::<DatasetReferenceUpdaterImpl>();
             }
 
             if let Some(mock_did_generator) = opts.maybe_mock_did_generator {
@@ -397,9 +397,9 @@ pub struct DatasetBaseUseCaseHarnessOpts<'a> {
     pub maybe_mock_did_generator: Option<MockDidGenerator>,
     pub outbox_provider: OutboxProvider,
     pub system_time_source_provider: SystemTimeSourceProvider,
-    /// Registers `RacingDatasetHeadCommitter` in place of
-    /// `DatasetHeadCommitterImpl`
-    pub racing_head_committer: bool,
+    /// Registers `RacingDatasetReferenceUpdater` in place of
+    /// `DatasetReferenceUpdaterImpl`
+    pub racing_reference_updater: bool,
 }
 
 impl Default for DatasetBaseUseCaseHarnessOpts<'_> {
@@ -414,7 +414,7 @@ impl Default for DatasetBaseUseCaseHarnessOpts<'_> {
                 force_immediate: true,
             },
             system_time_source_provider: SystemTimeSourceProvider::Default,
-            racing_head_committer: false,
+            racing_reference_updater: false,
         }
     }
 }

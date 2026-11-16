@@ -717,7 +717,7 @@ async fn test_data_push_ingest_without_write_access_fails_without_committing() {
 
 #[test_group::group(engine, ingest, datafusion)]
 #[test_log::test(tokio::test)]
-async fn test_data_push_ingest_head_moved_concurrently_is_conflict() {
+async fn test_data_push_ingest_ref_moved_concurrently_is_conflict() {
     let harness = DataIngestHarness::new().await;
     let create_result = harness.create_population_dataset(true).await;
     let dataset_id = create_result.dataset_handle.id.clone();
@@ -728,7 +728,7 @@ async fn test_data_push_ingest_head_moved_concurrently_is_conflict() {
         .await;
     harness
         .server_harness
-        .move_head_before_next_commit(concurrent_head.clone());
+        .move_reference_before_next_update(concurrent_head.clone());
     let stored_heads = harness.server_harness.stored_heads();
 
     let client = async move {

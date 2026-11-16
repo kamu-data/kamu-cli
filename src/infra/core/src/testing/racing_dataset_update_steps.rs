@@ -18,12 +18,12 @@ use crate::DatasetUpdateStepsImpl;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// Runs the steps of `DatasetUpdateStepsImpl`, but when armed first deletes
-/// the dataset before the next `commit_head`, as if it was deleted while the
+/// the dataset before the next `update_reference`, as if it was deleted while the
 /// update ran. [`Self::register`] adds it with the steps it wraps.
 pub struct RacingDatasetUpdateSteps {
     steps: Arc<DatasetUpdateStepsImpl>,
     dataset_storage_unit_writer: Arc<dyn odf::DatasetStorageUnitWriter>,
-    delete_before_next_commit: Mutex<bool>,
+    delete_before_next_update: Mutex<bool>,
 }
 
 #[dill::component(pub)]
@@ -37,7 +37,7 @@ impl RacingDatasetUpdateSteps {
         Self {
             steps,
             dataset_storage_unit_writer,
-            delete_before_next_commit: Mutex::new(false),
+            delete_before_next_update: Mutex::new(false),
         }
     }
 }
@@ -50,10 +50,10 @@ impl RacingDatasetUpdateSteps {
             .add::<Self>();
     }
 
-    /// Arms the next `commit_head`, or `transfer_and_commit_sync` into an
+    /// Arms the next `update_reference`, or `transfer_and_commit_sync` into an
     /// existing dataset, to delete that dataset first
-    pub fn delete_dataset_before_next_commit(&self) {
-        *self.delete_before_next_commit.lock().unwrap() = true;
+    pub fn delete_dataset_before_next_update(&self) {
+        *self.delete_before_next_update.lock().unwrap() = true;
     }
 }
 
@@ -80,20 +80,23 @@ impl DatasetUpdateSteps for RacingDatasetUpdateSteps {
         self.steps.resolve_sync_target(target).await
     }
 
-    async fn commit_head(
+    async fn update_reference(
         &self,
         target: &odf::DatasetHandle,
-        old_head: &odf::Multihash,
-        new_head: &odf::Multihash,
-    ) -> Result<HeadCommit, InternalError> {
-        if std::mem::take(&mut *self.delete_before_next_commit.lock().unwrap()) {
+        block_ref: &odf::BlockRef,
+        expected_block_hash: &odf::Multihash,
+        new_block_hash: &odf::Multihash,
+    ) -> Result<ReferenceUpdate, InternalError> {
+        if std::mem::take(&mut *self.delete_before_next_update.lock().unwrap()) {
             self.dataset_storage_unit_writer
                 .delete_dataset(&target.id)
                 .await
                 .unwrap();
         }
 
-        self.steps.commit_head(target, old_head, new_head).await
+        self.steps
+            .update_reference(target, block_ref, expected_block_hash, new_block_hash)
+            .await
     }
 
     async fn commit_sync(
@@ -111,7 +114,7 @@ impl DatasetUpdateSteps for RacingDatasetUpdateSteps {
         listener: Option<Arc<dyn SyncListener>>,
         maybe_pull_alias: Option<&odf::DatasetRefRemote>,
     ) -> Result<Option<SyncResult>, SyncError> {
-        if std::mem::take(&mut *self.delete_before_next_commit.lock().unwrap())
+        if std::mem::take(&mut *self.delete_before_next_update.lock().unwrap())
             && let SyncFromTarget::Existing { dataset, .. } = &request.dst
         {
             self.dataset_storage_unit_writer

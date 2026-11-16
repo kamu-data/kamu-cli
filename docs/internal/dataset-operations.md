@@ -22,9 +22,9 @@ page describes only what is specific to it:
 
 - **Blocks first, `HEAD` last.** An operation appends its blocks and data files without moving
   `HEAD`. Until `HEAD` moves, no reader sees them.
-- **One way to move `HEAD`.** `DatasetHeadCommitter::commit_head` moves it from an expected head to
-  a new one inside the caller's transaction, and fails when another writer moved it first. There is
-  no unconditional move.
+- **One way to move a reference.** `DatasetReferenceUpdater::update_reference` moves a dataset's
+  reference (today only `HEAD`) from an expected block to a new one inside the caller's
+  transaction, and fails when another writer moved it first. There is no unconditional move.
 - **No transaction around slow work.** Fetching, engines and transfers run for minutes; they run
   between two short transactions, never inside one.
 - **A lost race leaves garbage, not corruption.** The loser's blocks stay in storage unreferenced;
@@ -52,7 +52,7 @@ flowchart LR
     STEPS["DatasetUpdateSteps<br/>short transactions"]
     PLAN["Planners<br/>ingest · transform · compaction · reset"]
     EXEC["Executors, no transaction<br/>ingest · transform · sync · compaction"]
-    COMMIT["DatasetHeadCommitter<br/>CAS on HEAD"]
+    COMMIT["DatasetReferenceUpdater<br/>CAS on HEAD"]
     OUTBOX[("Outbox:<br/>DatasetReferenceMessage")]
 
     CLI --> UC
@@ -92,7 +92,7 @@ sequenceDiagram
     participant S as DatasetUpdateSteps
     participant P as PollingIngestPlanner
     participant I as PollingIngestService
-    participant C as DatasetHeadCommitter
+    participant C as DatasetReferenceUpdater
 
     rect rgba(100, 150, 255, 0.15)
     J->>S: plan_ingest(handle)
@@ -102,9 +102,9 @@ sequenceDiagram
     J->>I: ingest: fetch, read, stage, append blocks
     I-->>J: Updated { old_head, new_head }
     rect rgba(100, 150, 255, 0.15)
-    J->>S: commit_head(old_head, new_head)
+    J->>S: update_reference(HEAD, old_head, new_head)
     S->>C: CAS HEAD old_head → new_head
-    S-->>J: HeadCommit
+    S-->>J: ReferenceUpdate
     end
 ```
 
@@ -121,10 +121,10 @@ How each operation fills in the steps:
 
 | Operation | Plan | Execute (writes blocks) | Commit |
 | --- | --- | --- | --- |
-| Polling ingest | `plan_ingest` | `PollingIngestService::ingest`, one iteration | `commit_head` |
-| Transform | `elaborate_transform` | `TransformExecutor` | `commit_head` |
+| Polling ingest | `plan_ingest` | `PollingIngestService::ingest`, one iteration | `update_reference` |
+| Transform | `elaborate_transform` | `TransformExecutor` | `update_reference` |
 | Sync into a local dataset | `resolve_sync_target` reads the head | `SyncService::sync_from` | `transfer_and_commit_sync` through `commit_sync`, which also creates a new dataset |
-| Hard compaction, reset to metadata | `CompactionPlanner`, in a short transaction of the use case or of the task planner | `CompactionExecutor` | the use case through `DatasetHeadCommitter`; the task runner through `commit_head` |
+| Hard compaction, reset to metadata | `CompactionPlanner`, in a short transaction of the use case or of the task planner | `CompactionExecutor` | the use case through `DatasetReferenceUpdater`; the task runner through `update_reference` |
 | Reset to a block | `ResetPlanner` | — (the block already exists) | `ResetExecutor`, in the same transaction as the plan |
 | Push ingest | `PushIngestPlanner` | the push ingest executor | in the same transaction as the plan: the request's or the command's |
 
@@ -135,13 +135,18 @@ table, with the outcome of each commit, is in [task-system.md](task-system.md#wh
 
 ## 3. Committing `HEAD`
 
-`DatasetHeadCommitter::commit_head(target, expected_head, new_head)` is the single way to move a
-dataset's `HEAD`; the `reference_writes` lint in `kamu-repo-tools` rejects direct reference writes
-elsewhere. It runs in the caller's transaction, and:
+`DatasetReferenceUpdater::update_reference(target, block_ref, expected_block_hash, new_block_hash)`
+is the single way to move a dataset's reference; the `reference_writes` lint in `kamu-repo-tools`
+rejects direct reference writes elsewhere. It runs in the caller's transaction, and:
 
-- fails with `CASFailed` when `HEAD` no longer points at `expected_head`, committing nothing;
-- fails with `BlockNotFound` when `new_head` is not in the dataset's block store;
-- with `expected_head = None`, requires the dataset to have no `HEAD` yet.
+- fails with `CASFailed` when `block_ref` no longer points at `expected_block_hash`, committing
+  nothing;
+- fails with `BlockNotFound` when `new_block_hash` is not in the dataset's block store;
+- with `expected_block_hash = None`, requires the reference not to exist yet.
+
+Every layer below the operation takes `block_ref`; the operation picks it. Today every operation
+moves `HEAD`, the only reference ODF defines, and passes `odf::BlockRef::Head` where it calls the
+update. Errors and task outcomes for a lost race (`RefMoved`) carry the reference that moved.
 
 On a database-backed dataset the move goes through `DatasetReferenceServiceImpl::set_reference`,
 which writes the reference row and posts `DatasetReferenceMessage::Updated` in the same
@@ -150,12 +155,12 @@ dependency graph), and update statistics and search ([outbox.md](outbox.md)). Pu
 smart push server also post `DatasetExternallyChangedMessage`, which flows use to tell user pushes
 from their own updates.
 
-`DatasetUpdateSteps::commit_head` returns the outcome as a `HeadCommit`:
+`DatasetUpdateSteps::update_reference` returns the outcome as a `ReferenceUpdate`:
 
-| `HeadCommit` | Meaning | `kamu pull` reports | A task ends |
+| `ReferenceUpdate` | Meaning | `kamu pull` reports | A task ends |
 | --- | --- | --- | --- |
 | `Committed` | `HEAD` moved | the job's result | with its result |
-| `HeadMoved` | another writer moved `HEAD` since planning | `PullError::HeadMoved` | failed, recoverable |
+| `RefMoved` | another writer moved `HEAD` since planning | `PullError::RefMoved` | failed, recoverable |
 | `DatasetDeleted` | the dataset is gone | `NotFound` | failed, unrecoverable |
 | `NotAllowed` | the principal may not move `HEAD` | `Access` | failed, unrecoverable |
 
@@ -179,7 +184,7 @@ sequenceDiagram
     A->>A: append a2 (parent h1)
     B->>B: append b2 (parent h1)
     A->>D: CAS h1 → a2 ✓
-    B->>D: CAS h1 → b2 ✗ HeadMoved
+    B->>D: CAS h1 → b2 ✗ RefMoved
     Note over B: b2 stays in storage, unreferenced
 ```
 

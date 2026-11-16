@@ -25,7 +25,7 @@ use crate::utils::SyncWorkspaceCatalog;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test(flavor = "multi_thread"))]
-async fn test_forced_push_to_local_fs_with_remote_head_moved() {
+async fn test_forced_push_to_local_fs_with_remote_ref_moved() {
     let tmp_repo_dir = tempfile::tempdir().unwrap();
     let repo_url = Url::from_directory_path(tmp_repo_dir.path()).unwrap();
 
@@ -38,7 +38,7 @@ async fn test_forced_push_to_local_fs_with_remote_head_moved() {
 
 #[test_group::group(containerized)]
 #[test_log::test(tokio::test(flavor = "multi_thread"))]
-async fn test_forced_push_to_s3_with_remote_head_moved() {
+async fn test_forced_push_to_s3_with_remote_ref_moved() {
     let s3 = LocalS3Server::new().await;
     s3.set_credentials_env_vars();
 
@@ -86,7 +86,7 @@ impl RemotePushHarness {
 
         assert_matches!(
             self.push(&repo_url, Some(listener)).await,
-            Err(SyncError::HeadMoved(SyncHeadMovedError { heads: Some(e) }))
+            Err(SyncError::RefMoved(SyncRefMovedError { reported: Some(e), .. }))
                 if e.actual.as_ref() == Some(&concurrent_head)
         );
         assert_eq!(self.remote_head(&repo_url).await, concurrent_head);

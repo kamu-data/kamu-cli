@@ -12,29 +12,37 @@
 kamu_task_system::task_error_enum! {
     /// The task's dataset change could not be committed; a retry plans it again
     pub enum TaskErrorDatasetCommit {
-        HeadMoved(DatasetHeadMovedError),
+        RefMoved(DatasetRefMovedError),
     }
     => "DatasetCommitError", recoverable: true
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// `HEAD` was no longer at the head the task had planned from
+/// The dataset's reference was no longer where the task had planned from
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-pub struct DatasetHeadMovedError {
+pub struct DatasetRefMovedError {
     pub dataset_id: odf::DatasetID,
-    pub expected_head: Option<odf::Multihash>,
-    pub actual_head: Option<odf::Multihash>,
+    pub block_ref: odf::BlockRef,
+    pub expected_block_hash: Option<odf::Multihash>,
+    pub actual_block_hash: Option<odf::Multihash>,
 }
 
-impl DatasetHeadMovedError {
-    /// `heads` are `None` when the destination did not report them
-    pub fn new(dataset_id: odf::DatasetID, heads: Option<odf::dataset::RefCASError>) -> Self {
-        let (expected_head, actual_head) = heads.map_or((None, None), |e| (e.expected, e.actual));
+impl DatasetRefMovedError {
+    /// `reported` is `None` when the destination did not report where
+    /// `block_ref` was expected and found
+    pub fn new(
+        dataset_id: odf::DatasetID,
+        block_ref: odf::BlockRef,
+        reported: Option<odf::dataset::RefCASError>,
+    ) -> Self {
+        let (expected_block_hash, actual_block_hash) =
+            reported.map_or((None, None), |e| (e.expected, e.actual));
         Self {
             dataset_id,
-            expected_head,
-            actual_head,
+            block_ref,
+            expected_block_hash,
+            actual_block_hash,
         }
     }
 }
@@ -49,14 +57,15 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_head_moved_task_error_is_recoverable_and_stable() {
+    fn test_ref_moved_task_error_is_recoverable_and_stable() {
         let dataset_id = odf::DatasetID::new_seeded_ed25519(b"foo");
-        let expected_head = odf::Multihash::from_digest_sha3_256(b"expected");
+        let expected_block_hash = odf::Multihash::from_digest_sha3_256(b"expected");
 
-        let task_error = TaskErrorDatasetCommit::HeadMoved(DatasetHeadMovedError {
+        let task_error = TaskErrorDatasetCommit::RefMoved(DatasetRefMovedError {
             dataset_id: dataset_id.clone(),
-            expected_head: Some(expected_head.clone()),
-            actual_head: None,
+            block_ref: odf::BlockRef::Head,
+            expected_block_hash: Some(expected_block_hash.clone()),
+            actual_block_hash: None,
         })
         .into_task_error();
 
@@ -64,10 +73,11 @@ mod tests {
         assert_eq!(
             json!({
                 "DatasetCommitError": {
-                    "HeadMoved": {
+                    "RefMoved": {
                         "dataset_id": dataset_id.to_string(),
-                        "expected_head": expected_head.to_string(),
-                        "actual_head": null,
+                        "block_ref": "Head",
+                        "expected_block_hash": expected_block_hash.to_string(),
+                        "actual_block_hash": null,
                     }
                 },
                 "recoverable": true,

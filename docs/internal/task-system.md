@@ -336,15 +336,15 @@ before touching them.
 Every dataset task follows the plan, execute, commit shape of
 [dataset-operations.md](dataset-operations.md#2-plan-execute-commit): the core service writes blocks
 with no transaction open, and the runner moves `HEAD` in a short transaction with a CAS through
-`DatasetUpdateSteps::commit_head`, the step `kamu pull` also uses. Reset is the exception: the
+`DatasetUpdateSteps::update_reference`, the step `kamu pull` also uses. Reset is the exception: the
 reset runner moves `HEAD` through `ResetExecutor`, in one transaction for the whole reset.
 
-`runners/task_head_commit.rs` turns a commit that did not happen into the task's outcome, for every
+`runners/task_reference_update.rs` turns a commit that did not happen into the task's outcome, for every
 dataset runner:
 
 | Commit | Task outcome |
 | --- | --- |
-| `HEAD` moved by another writer | recoverable `TaskErrorDatasetCommit::HeadMoved`, with the expected and actual heads |
+| `HEAD` moved by another writer | recoverable `TaskErrorDatasetCommit::RefMoved`, with the expected and actual heads |
 | Dataset deleted | unrecoverable, empty |
 | Moving `HEAD` not allowed | unrecoverable, empty |
 
@@ -373,7 +373,7 @@ fails the task with an empty error whose recoverability is `PullError::is_recove
 - **Ingest** — `plan_ingest` plans the ingest from the target's current `HEAD` and resolves its
   environment variables in one transaction
   ([polling-ingest.md](polling-ingest.md#4-call-sequence)). Then
-  `PollingIngestService::ingest` runs one iteration with no transaction open, and `commit_head`
+  `PollingIngestService::ingest` runs one iteration with no transaction open, and `update_reference`
   moves `HEAD`. `Updated { has_more }` means the source has more to fetch: the task does not loop,
   and the ingest flow controller schedules the next iteration if its config sets
   `fetch_next_iteration`.
@@ -382,7 +382,7 @@ fails the task with an empty error whose recoverability is `PullError::is_recove
   ([derived-dataset-transform.md](derived-dataset-transform.md#44-transactions)). An up-to-date
   elaboration ends the task with an `UpToDate` result, as does an executor run that appends
   nothing. Otherwise `TransformExecutor::execute_transform` runs with no transaction open, and
-  `commit_head` moves `HEAD`. The runner never resets the derivative: a diverged input fails the
+  `update_reference` moves `HEAD`. The runner never resets the derivative: a diverged input fails the
   task unrecoverably, and the transform flow controller decides what to do about it.
 - **Sync** — `resolve_sync_target` reads the destination's `HEAD` in one transaction; then
   `transfer_and_commit_sync` copies blocks and objects from the remote with
@@ -403,7 +403,7 @@ itself:
 
 | Error | Outcome |
 | --- | --- |
-| Ingest, transform or sync: `HEAD` moved after planning (the CAS fails when moving it) | recoverable, typed `TaskErrorDatasetCommit::HeadMoved` with the expected and actual heads |
+| Ingest, transform or sync: `HEAD` moved after planning (the CAS fails when moving it) | recoverable, typed `TaskErrorDatasetCommit::RefMoved` with the expected and actual heads |
 | Transform elaboration: `InvalidInputInterval` | unrecoverable, typed `TaskErrorDatasetUpdate::InputDatasetCompacted` |
 | Transform elaboration: `InputNotPulled` | not an error: the task ends with an `UpToDate` result |
 | The dataset was deleted after the task was scheduled | unrecoverable, empty |
@@ -426,7 +426,7 @@ compacted) and `Access` unrecoverably, an internal error recoverably.
 
 **Running**: one runner, `CompactionDatasetTaskRunner`, is registered for both task types and
 picks the definition and the result type by `task_type`. `CompactionExecutor::execute` runs outside
-any transaction. On `Success` the runner moves `HEAD` by CAS (`DatasetUpdateSteps::commit_head`)
+any transaction. On `Success` the runner moves `HEAD` by CAS (`DatasetUpdateSteps::update_reference`)
 and returns `TaskResultDatasetHardCompact` / `TaskResultDatasetResetToMetadata` carrying the
 `CompactionResult`. Any executor error is a recoverable empty failure; a failed commit becomes an
 outcome as in [Who moves `HEAD`](#who-moves-head).
@@ -454,7 +454,7 @@ so a `HEAD` change between planning and running fails the task.
 | --- | --- |
 | `SetReferenceFailed(BlockNotFound)` — the target block is not in the dataset's block store | typed `TaskErrorDatasetReset::ResetHeadNotFound`, unrecoverable |
 | The dataset was deleted after planning | empty, unrecoverable |
-| `SetReferenceFailed(CASFailed)` — `HEAD` moved after planning | typed `TaskErrorDatasetCommit::HeadMoved`, recoverable |
+| `SetReferenceFailed(CASFailed)` — `HEAD` moved after planning | typed `TaskErrorDatasetCommit::RefMoved`, recoverable |
 | `SetReferenceFailed(Access)` — moving `HEAD` is not allowed | empty, unrecoverable |
 | `SetReferenceFailed(Internal)`, `Internal` | empty, recoverable |
 

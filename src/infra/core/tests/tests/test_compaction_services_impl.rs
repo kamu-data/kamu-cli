@@ -31,8 +31,8 @@ use kamu_auth_rebac_services::{
 use kamu_datasets::*;
 use kamu_datasets_services::{
     AccountQuotaCheckerStorageImpl,
-    DatasetHeadCommitterImpl,
     DatasetOperationGuardImpl,
+    DatasetReferenceUpdaterImpl,
     DatasetStatisticsServiceImpl,
     QuotaDefaultsConfig,
 };
@@ -1868,7 +1868,7 @@ impl CompactTestHarness {
             .add_value(QuotaDefaultsConfig::default())
             .add::<PushIngestDataUseCaseImpl>()
             .add::<DatasetOperationGuardImpl>()
-            .add::<DatasetHeadCommitterImpl>()
+            .add::<DatasetReferenceUpdaterImpl>()
             .add::<DummyOutboxImpl>()
             .add::<TransformPlannerImpl>()
             .add::<TransformExecutorImpl>()
@@ -1928,7 +1928,7 @@ impl CompactTestHarness {
             .add::<PushIngestPlannerImpl>()
             .add::<PushIngestDataUseCaseImpl>()
             .add::<DatasetOperationGuardImpl>()
-            .add::<DatasetHeadCommitterImpl>()
+            .add::<DatasetReferenceUpdaterImpl>()
             .add::<AccountServiceImpl>()
             .add::<InMemoryAccountRepository>()
             .add::<InMemoryAccountQuotaEventStore>()

@@ -20,7 +20,7 @@ use kamu_adapter_graphql::data_loader::{account_entity_data_loader, dataset_hand
 use kamu_auth_rebac_services::RebacDatasetRegistryFacadeImpl;
 use kamu_core::{DidGeneratorDefault, RunInfoDir, TenancyConfig};
 use kamu_datasets::*;
-use kamu_datasets_services::testing::RacingDatasetHeadCommitter;
+use kamu_datasets_services::testing::RacingDatasetReferenceUpdater;
 use kamu_datasets_services::utils::CreateDatasetUseCaseHelper;
 use kamu_datasets_services::{AccountQuotaCheckerStorageImpl, DatasetStatisticsServiceImpl, *};
 use messaging_outbox::*;
@@ -44,10 +44,10 @@ impl BaseGQLDatasetHarness {
         base_catalog: Option<&dill::Catalog>,
         outbox_provider: Option<OutboxProvider>,
         system_time_source_provider: Option<SystemTimeSourceProvider>,
-        /// Registers `RacingDatasetHeadCommitter` in place of
-        /// `DatasetHeadCommitterImpl`
+        /// Registers `RacingDatasetReferenceUpdater` in place of
+        /// `DatasetReferenceUpdaterImpl`
         #[builder(default)]
-        racing_head_committer: bool,
+        racing_reference_updater: bool,
     ) -> Self {
         let tempdir = tempfile::tempdir().unwrap();
 
@@ -94,11 +94,11 @@ impl BaseGQLDatasetHarness {
                 .add_value(QuotaDefaultsConfig::default())
                 .add_value(RunInfoDir::new(run_info_dir));
 
-            if racing_head_committer {
-                b.add_value(RacingDatasetHeadCommitter::default())
-                    .bind::<dyn DatasetHeadCommitter, RacingDatasetHeadCommitter>();
+            if racing_reference_updater {
+                b.add_value(RacingDatasetReferenceUpdater::default())
+                    .bind::<dyn DatasetReferenceUpdater, RacingDatasetReferenceUpdater>();
             } else {
-                b.add::<DatasetHeadCommitterImpl>();
+                b.add::<DatasetReferenceUpdaterImpl>();
             }
 
             let outbox_provider = outbox_provider.unwrap_or_default();

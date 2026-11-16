@@ -14,7 +14,7 @@ use kamu_datasets::{
     AppendDatasetMetadataBatchUseCase,
     AppendDatasetMetadataBatchUseCaseError,
     AppendDatasetMetadataBatchUseCaseOptions,
-    DatasetHeadCommitter,
+    DatasetReferenceUpdater,
     ResolvedDataset,
 };
 use odf::dataset::MetadataChainExt as _;
@@ -22,15 +22,15 @@ use odf::dataset::MetadataChainExt as _;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct AppendDatasetMetadataBatchUseCaseImpl {
-    dataset_head_committer: Arc<dyn DatasetHeadCommitter>,
+    dataset_reference_updater: Arc<dyn DatasetReferenceUpdater>,
 }
 
 #[component(pub)]
 #[interface(dyn AppendDatasetMetadataBatchUseCase)]
 impl AppendDatasetMetadataBatchUseCaseImpl {
-    pub fn new(dataset_head_committer: Arc<dyn DatasetHeadCommitter>) -> Self {
+    pub fn new(dataset_reference_updater: Arc<dyn DatasetReferenceUpdater>) -> Self {
         Self {
-            dataset_head_committer,
+            dataset_reference_updater,
         }
     }
 }
@@ -64,8 +64,13 @@ impl AppendDatasetMetadataBatchUseCase for AppendDatasetMetadataBatchUseCaseImpl
             .set_ref_check_ref_mode
             .expected_head(appended.base_head);
 
-        self.dataset_head_committer
-            .commit_head(target, expected_head.as_ref(), &appended.new_head)
+        self.dataset_reference_updater
+            .update_reference(
+                target,
+                &odf::BlockRef::Head,
+                expected_head.as_ref(),
+                &appended.new_head,
+            )
             .await?;
 
         Ok(Some(appended.new_head))

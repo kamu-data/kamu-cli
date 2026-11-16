@@ -358,7 +358,7 @@ async fn test_append_dataset_metadata_batch_empty_is_noop() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[tokio::test]
-async fn test_append_dataset_metadata_batch_head_moved_concurrently() {
+async fn test_append_dataset_metadata_batch_ref_moved_concurrently() {
     let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
     let predefined_foo_id = odf::DatasetID::new_seeded_ed25519(b"foo");
 

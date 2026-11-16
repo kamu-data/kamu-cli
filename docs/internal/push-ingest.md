@@ -84,7 +84,7 @@ sequenceDiagram
     participant G as DatasetOperationGuard
     participant P as PushIngestPlanner
     participant E as PushIngestExecutor
-    participant C as DatasetHeadCommitter
+    participant C as DatasetReferenceUpdater
 
     rect rgba(100, 150, 255, 0.15)
     U->>G: authorize PushIngest (Write)
@@ -126,7 +126,7 @@ Then:
    `stage`, check the account storage quota on the staged file size unless `skip_quota_check`
    (always skipped in single-tenant workspaces), then `commit`. Event time missing from the input
    is the caller's event time, otherwise system time.
-4. **Finalize** — move `HEAD` from `old_head` to `new_head` through `DatasetHeadCommitter` and post
+4. **Finalize** — move `HEAD` from `old_head` to `new_head` through `DatasetReferenceUpdater` and post
    `DatasetExternallyChangedMessage::ingest_http`.
 
 The executor reports `begin` and progress to the listener; the use case reports `success` or `error`

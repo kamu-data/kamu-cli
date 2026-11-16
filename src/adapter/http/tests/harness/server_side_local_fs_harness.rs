@@ -45,7 +45,7 @@ use kamu_datasets::*;
 use kamu_datasets_services::testing::{
     FailingDatasetChangeListener,
     RacingAppendDatasetMetadataBatchUseCase,
-    RacingDatasetHeadCommitter,
+    RacingDatasetReferenceUpdater,
 };
 use kamu_datasets_services::utils::CreateDatasetUseCaseHelper;
 use kamu_datasets_services::*;
@@ -93,11 +93,11 @@ impl ServerSideLocalFsHarness {
 
     /// Arms the next `HEAD` commit on the server to first move `HEAD` to
     /// `concurrent_head`, the way a concurrent writer would
-    pub fn move_head_before_next_commit(&self, concurrent_head: odf::Multihash) {
+    pub fn move_reference_before_next_update(&self, concurrent_head: odf::Multihash) {
         self.base_catalog
-            .get_one::<RacingDatasetHeadCommitter>()
+            .get_one::<RacingDatasetReferenceUpdater>()
             .unwrap()
-            .move_head_before_next_commit(
+            .move_reference_before_next_update(
                 &create_cli_user_catalog(&self.base_catalog, self.options.tenancy_config),
                 concurrent_head,
             );
@@ -201,8 +201,8 @@ impl ServerSideLocalFsHarness {
                 .add::<ObjectStoreBuilderLocalFs>()
                 .add::<RemoteRepositoryRegistryImpl>()
                 .add::<RacingAppendDatasetMetadataBatchUseCase>()
-                .add_value(RacingDatasetHeadCommitter::default())
-                .bind::<dyn DatasetHeadCommitter, RacingDatasetHeadCommitter>()
+                .add_value(RacingDatasetReferenceUpdater::default())
+                .bind::<dyn DatasetReferenceUpdater, RacingDatasetReferenceUpdater>()
                 .add::<CreateDatasetUseCaseImpl>()
                 .add::<CreateDatasetFromSnapshotUseCaseImpl>()
                 .add::<CommitDatasetEventUseCaseImpl>()

@@ -155,9 +155,10 @@ impl TaskFailureReason {
             TaskErrorDatasetCommit::TYPE_ID => {
                 let commit_error = TaskErrorDatasetCommit::from_task_error(e)?;
                 match commit_error {
-                    TaskErrorDatasetCommit::HeadMoved(_) => {
+                    TaskErrorDatasetCommit::RefMoved(_) => {
                         TaskFailureReason::General(TaskFailureReasonGeneral {
-                            message: "Dataset head was moved by a concurrent update".to_owned(),
+                            message: "Dataset reference was moved by a concurrent update"
+                                .to_owned(),
                             recoverable: e.recoverable,
                         })
                     }

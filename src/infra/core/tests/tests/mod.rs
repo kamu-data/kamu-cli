@@ -29,7 +29,7 @@ mod test_setup;
 mod test_sync_service_impl;
 mod test_sync_service_ipns_push;
 mod test_sync_service_local_commit;
-mod test_sync_service_remote_head_moved;
+mod test_sync_service_remote_ref_moved;
 mod test_transform_services_impl;
 mod test_verification_service_impl;
 mod test_watermark_services_impl;

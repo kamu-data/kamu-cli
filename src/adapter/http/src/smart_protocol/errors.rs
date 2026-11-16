@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use internal_error::{BoxedError, ErrorIntoInternal, InternalError};
-use kamu_core::{OverwriteSeedBlockError, SyncError, SyncHeadMovedError};
+use kamu_core::{OverwriteSeedBlockError, SyncError, SyncRefMovedError};
 use kamu_datasets::NameCollisionError;
 use reqwest::StatusCode;
 use thiserror::Error;
@@ -221,9 +221,9 @@ impl From<PushClientError> for SyncError {
             PushClientError::OverwriteSeedBlock(e) => Self::OverwriteSeedBlock(e),
             PushClientError::RefCollision(e) => Self::RefCollision(e),
             PushClientError::NameCollision(e) => Self::NameCollision(e),
-            PushClientError::InvalidHead(e) => Self::HeadMoved(e.into()),
+            PushClientError::InvalidHead(e) => Self::RefMoved(e.into()),
             PushClientError::UpdatedConcurrently(_) => {
-                Self::HeadMoved(SyncHeadMovedError::unreported())
+                Self::RefMoved(SyncRefMovedError::unreported(odf::BlockRef::Head))
             }
             e @ (PushClientError::ReadFailed(_)
             | PushClientError::WriteFailed(_)
@@ -359,7 +359,7 @@ where
 mod tests {
     use std::assert_matches;
 
-    use kamu_core::{SyncError, SyncHeadMovedError};
+    use kamu_core::{SyncError, SyncRefMovedError};
 
     use super::{DestinationUpdatedConcurrentlyError, PushClientError};
 
@@ -374,7 +374,7 @@ mod tests {
         assert!(sync_error.is_recoverable());
         assert_matches!(
             sync_error,
-            SyncError::HeadMoved(SyncHeadMovedError { heads: Some(heads) })
+            SyncError::RefMoved(SyncRefMovedError { reported: Some(heads), .. })
                 if heads == fixtures.stale_head_error()
         );
     }
@@ -382,7 +382,7 @@ mod tests {
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
     #[test]
-    fn test_head_moved_during_push_commit_is_a_recoverable_head_move_without_heads() {
+    fn test_ref_moved_during_push_commit_is_recoverable_without_block_hashes() {
         let sync_error = SyncError::from(PushClientError::UpdatedConcurrently(
             DestinationUpdatedConcurrentlyError,
         ));
@@ -390,7 +390,7 @@ mod tests {
         assert!(sync_error.is_recoverable());
         assert_matches!(
             sync_error,
-            SyncError::HeadMoved(SyncHeadMovedError { heads: None })
+            SyncError::RefMoved(SyncRefMovedError { reported: None, .. })
         );
     }
 

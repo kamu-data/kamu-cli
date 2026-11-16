@@ -33,7 +33,7 @@ use kamu_core::*;
 use kamu_datasets::CreateDatasetResult;
 use kamu_datasets_services::{
     AppendDatasetMetadataBatchUseCaseImpl,
-    DatasetHeadCommitterImpl,
+    DatasetReferenceUpdaterImpl,
     DependencyGraphServiceImpl,
 };
 use odf::dataset::{DatasetFactoryImpl, IpfsGateway};
@@ -270,7 +270,7 @@ impl RemoteStatusTestHarness {
             .add::<SimpleTransferProtocol>()
             .add::<PulledSeedStore>()
             .add::<AppendDatasetMetadataBatchUseCaseImpl>()
-            .add::<DatasetHeadCommitterImpl>()
+            .add::<DatasetReferenceUpdaterImpl>()
             .add::<DependencyGraphServiceImpl>();
 
         database_common::NoOpDatabasePlugin::init_database_components(&mut b);

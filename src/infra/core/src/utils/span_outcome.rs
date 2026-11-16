@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use internal_error::InternalError;
-use kamu_core::{HeadCommit, PullError, PullResponse, PullResult, SyncError};
+use kamu_core::{PullError, PullResponse, PullResult, ReferenceUpdate, SyncError};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -20,7 +20,7 @@ pub(crate) enum SpanOutcome {
     Updated,
     UpToDate,
     DatasetDeleted,
-    HeadMoved,
+    RefMoved,
     NotAllowed,
     Failed,
     Planned,
@@ -53,7 +53,7 @@ impl SpanOutcome {
 impl From<&SyncError> for SpanOutcome {
     fn from(error: &SyncError) -> Self {
         match error {
-            SyncError::HeadMoved(_) => Self::HeadMoved,
+            SyncError::RefMoved(_) => Self::RefMoved,
             SyncError::Access(_) => Self::NotAllowed,
             SyncError::DatasetNotFound(_)
             | SyncError::RefCollision(_)
@@ -79,7 +79,7 @@ impl From<&PullError> for SpanOutcome {
         match error {
             // A job reads its dataset by ID, so a missing one was deleted
             PullError::NotFound(_) => Self::DatasetDeleted,
-            PullError::HeadMoved(_) => Self::HeadMoved,
+            PullError::RefMoved(_) => Self::RefMoved,
             PullError::Access(_) => Self::NotAllowed,
             PullError::SyncError(e) => e.into(),
             PullError::AmbiguousSource(_)
@@ -96,13 +96,13 @@ impl From<&PullError> for SpanOutcome {
     }
 }
 
-impl From<&HeadCommit> for SpanOutcome {
-    fn from(head_commit: &HeadCommit) -> Self {
-        match head_commit {
-            HeadCommit::Committed => Self::Committed,
-            HeadCommit::HeadMoved(_) => Self::HeadMoved,
-            HeadCommit::DatasetDeleted => Self::DatasetDeleted,
-            HeadCommit::NotAllowed(_) => Self::NotAllowed,
+impl From<&ReferenceUpdate> for SpanOutcome {
+    fn from(reference_update: &ReferenceUpdate) -> Self {
+        match reference_update {
+            ReferenceUpdate::Committed => Self::Committed,
+            ReferenceUpdate::RefMoved(_) => Self::RefMoved,
+            ReferenceUpdate::DatasetDeleted => Self::DatasetDeleted,
+            ReferenceUpdate::NotAllowed(_) => Self::NotAllowed,
         }
     }
 }
@@ -121,7 +121,7 @@ mod tests {
             (SpanOutcome::Updated, "updated"),
             (SpanOutcome::UpToDate, "up_to_date"),
             (SpanOutcome::DatasetDeleted, "dataset_deleted"),
-            (SpanOutcome::HeadMoved, "head_moved"),
+            (SpanOutcome::RefMoved, "ref_moved"),
             (SpanOutcome::NotAllowed, "not_allowed"),
             (SpanOutcome::Failed, "failed"),
             (SpanOutcome::Planned, "planned"),

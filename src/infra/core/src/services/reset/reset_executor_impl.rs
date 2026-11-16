@@ -11,14 +11,14 @@ use std::sync::Arc;
 
 use dill::*;
 use kamu_core::*;
-use kamu_datasets::{DatasetHeadCommitter, ResolvedDataset};
+use kamu_datasets::{DatasetReferenceUpdater, ResolvedDataset};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[component(pub)]
 #[interface(dyn ResetExecutor)]
 pub struct ResetExecutorImpl {
-    dataset_head_committer: Arc<dyn DatasetHeadCommitter>,
+    dataset_reference_updater: Arc<dyn DatasetReferenceUpdater>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -32,8 +32,13 @@ impl ResetExecutor for ResetExecutorImpl {
         target: ResolvedDataset,
         plan: ResetPlan,
     ) -> Result<ResetResult, ResetExecutionError> {
-        self.dataset_head_committer
-            .commit_head(&target, plan.old_head.as_ref(), &plan.new_head)
+        self.dataset_reference_updater
+            .update_reference(
+                &target,
+                &odf::BlockRef::Head,
+                plan.old_head.as_ref(),
+                &plan.new_head,
+            )
             .await?;
 
         Ok(ResetResult {

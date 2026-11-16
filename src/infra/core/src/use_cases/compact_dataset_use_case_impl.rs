@@ -28,11 +28,11 @@ use kamu_core::{
     NullCompactionMultiListener,
 };
 use kamu_datasets::{
-    DatasetHeadCommitter,
     DatasetOperation,
     DatasetOperationGuard,
     DatasetOperationRequest,
     DatasetPermissionError,
+    DatasetReferenceUpdater,
     DatasetRegistry,
     ResolvedDataset,
 };
@@ -113,7 +113,7 @@ impl CompactDatasetUseCaseImpl {
                 old_head, new_head, ..
             } => {
                 tracing::debug!(%dataset_handle, %new_head, "Setting new compacted head");
-                self.commit_head_transactionally(dataset_handle, old_head, new_head)
+                self.update_reference_transactionally(dataset_handle, old_head, new_head)
                     .await?;
             }
         }
@@ -121,8 +121,8 @@ impl CompactDatasetUseCaseImpl {
         Ok(compaction_result)
     }
 
-    #[transactional_method2(dataset_registry: Arc<dyn DatasetRegistry>, dataset_head_committer: Arc<dyn DatasetHeadCommitter>)]
-    async fn commit_head_transactionally(
+    #[transactional_method2(dataset_registry: Arc<dyn DatasetRegistry>, dataset_reference_updater: Arc<dyn DatasetReferenceUpdater>)]
+    async fn update_reference_transactionally(
         &self,
         dataset_handle: &odf::DatasetHandle,
         old_head: &odf::Multihash,
@@ -130,8 +130,8 @@ impl CompactDatasetUseCaseImpl {
     ) -> Result<(), odf::dataset::SetChainRefError> {
         let target = dataset_registry.get_dataset_by_handle(dataset_handle).await;
 
-        dataset_head_committer
-            .commit_head(&target, Some(old_head), new_head)
+        dataset_reference_updater
+            .update_reference(&target, &odf::BlockRef::Head, Some(old_head), new_head)
             .await
     }
 }

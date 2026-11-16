@@ -943,7 +943,7 @@ async fn test_manual_ingest_with_retry_policy_success_at_last_attempt() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_manual_ingest_with_retry_policy_retries_head_moved_commit() {
+async fn test_manual_ingest_with_retry_policy_retries_ref_moved_commit() {
     let harness = FlowHarness::new();
 
     let foo_id = harness
@@ -973,10 +973,11 @@ async fn test_manual_ingest_with_retry_policy_retries_head_moved_commit() {
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
 
     // A concurrent change moved HEAD while the task ran
-    let head_moved = TaskErrorDatasetCommit::HeadMoved(DatasetHeadMovedError {
+    let ref_moved = TaskErrorDatasetCommit::RefMoved(DatasetRefMovedError {
         dataset_id: foo_id.clone(),
-        expected_head: Some(odf::Multihash::from_digest_sha3_256(b"planned")),
-        actual_head: Some(odf::Multihash::from_digest_sha3_256(b"concurrent")),
+        block_ref: odf::BlockRef::Head,
+        expected_block_hash: Some(odf::Multihash::from_digest_sha3_256(b"planned")),
+        actual_block_hash: Some(odf::Multihash::from_digest_sha3_256(b"concurrent")),
     })
     .into_task_error();
 
@@ -998,7 +999,7 @@ async fn test_manual_ingest_with_retry_policy_retries_head_moved_commit() {
                 task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),
                 dataset_id: Some(foo_id.clone()),
                 run_since_start: Duration::milliseconds(30),
-                finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Failed(head_moved))),
+                finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Failed(ref_moved))),
                 expected_logical_plan: LogicalPlanDatasetUpdate {
                     dataset_id: foo_id.clone(),
                     fetch_uncacheable: false,

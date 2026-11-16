@@ -353,8 +353,8 @@ async fn test_smart_pull_metadata_ends_at_planned_head() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_smart_pull_head_moved_concurrently() {
-    HeadMovedConcurrentlyCase { force: false }
+async fn test_smart_pull_ref_moved_concurrently() {
+    RefMovedConcurrentlyCase { force: false }
         .assert_pull_fails()
         .await;
 }
@@ -362,8 +362,8 @@ async fn test_smart_pull_head_moved_concurrently() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_smart_pull_forced_head_moved_concurrently() {
-    HeadMovedConcurrentlyCase { force: true }
+async fn test_smart_pull_forced_ref_moved_concurrently() {
+    RefMovedConcurrentlyCase { force: true }
         .assert_pull_fails()
         .await;
 }
@@ -372,11 +372,11 @@ async fn test_smart_pull_forced_head_moved_concurrently() {
 
 /// `HEAD` moves after the pull read it: the commit fails and keeps the
 /// concurrent head, with or without `force`
-struct HeadMovedConcurrentlyCase {
+struct RefMovedConcurrentlyCase {
     force: bool,
 }
 
-impl HeadMovedConcurrentlyCase {
+impl RefMovedConcurrentlyCase {
     async fn assert_pull_fails(self) {
         let (client_harness, server_harness) = LocalFsTransferOptions {
             client_tenancy: TenancyConfig::SingleTenant,
@@ -399,7 +399,7 @@ impl HeadMovedConcurrentlyCase {
                 .await;
             scenario
                 .client_harness
-                .move_head_before_next_commit(concurrent_head.clone());
+                .move_reference_before_next_update(concurrent_head.clone());
 
             let pull_responses = scenario
                 .client_harness
@@ -412,7 +412,7 @@ impl HeadMovedConcurrentlyCase {
             pretty_assertions::assert_eq!(pull_responses.len(), 1);
             assert_matches!(
                 &pull_responses[0].result,
-                Err(PullError::HeadMoved(e))
+                Err(PullError::RefMoved(e))
                     if e.actual.as_ref() == Some(&concurrent_head)
             );
             pretty_assertions::assert_eq!(

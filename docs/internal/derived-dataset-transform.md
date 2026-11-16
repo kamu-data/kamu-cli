@@ -32,7 +32,7 @@ sequenceDiagram
     participant P as TransformPlanner
     participant X as TransformExecutor
     participant E as Engine container
-    participant C as DatasetHeadCommitter
+    participant C as DatasetReferenceUpdater
 
     rect rgba(100, 150, 255, 0.15)
     J->>P: elaborate at current heads
@@ -234,14 +234,14 @@ consumed, and a `SetDataSchema` before the first data.
 ### 4.4 Transactions
 
 Both callers that commit a transform, `kamu pull` and the update task, follow one rule through
-`DatasetUpdateSteps::{elaborate_transform, commit_head}`, each of which re-resolves the target by
+`DatasetUpdateSteps::{elaborate_transform, update_reference}`, each of which re-resolves the target by
 ID in its own transaction:
 
 | Step | Transaction | Why |
 | --- | --- | --- |
 | `elaborate_transform` | one, with the target and inputs resolved through `DatasetRegistry` inside it | the expected head and every input head come from one database snapshot |
 | Execute | none; the target and the plan's datasets are detached first | the engine runs for minutes |
-| Commit | a new one, through `DatasetHeadCommitter` with `old_head` (the request's `head`) as the expected head | the CAS fails if another writer moved `HEAD` since elaboration |
+| Commit | a new one, through `DatasetReferenceUpdater` with `old_head` (the request's `head`) as the expected head | the CAS fails if another writer moved `HEAD` since elaboration |
 
 `kamu pull` and the update task both plan when the job runs, not when the pull or the task was
 planned ([§6](#6-entry-points)).
@@ -374,7 +374,7 @@ Walking back from the new `HEAD` never reaches `o2`, so elaboration fails with
 
 | Path | Detection | What happens |
 | --- | --- | --- |
-| `kamu pull` | elaboration fails with `InvalidInputIntervalError` | error, unless `--reset-derivatives-on-diverged-input`: then `PullTransformJob` resets the derivative to metadata ([dataset-reset.md](dataset-reset.md#6-reset-to-metadata)), moves `HEAD` to the reset head through `DatasetHeadCommitter` (CAS), re-plans and elaborates once more. The pull reports one update from the head before the reset to the final head |
+| `kamu pull` | elaboration fails with `InvalidInputIntervalError` | error, unless `--reset-derivatives-on-diverged-input`: then `PullTransformJob` resets the derivative to metadata ([dataset-reset.md](dataset-reset.md#6-reset-to-metadata)), moves `HEAD` to the reset head through `DatasetReferenceUpdater` (CAS), re-plans and elaborates once more. The pull reports one update from the head before the reset to the final head |
 | Transform task | elaboration fails with `InvalidInputIntervalError` | the task fails unrecoverably ([task-system.md](task-system.md#71-update-dataset)) |
 | Flow sensor | `evaluate_transform_status` returns `InputBreakingChange` (checked before new data); or an upstream flow reports a `Breaking` change | with the `Recover` rule, a reset-to-metadata flow; with `NoAction`, a warning ([flow-system.md](flow-system.md#8-sensors-and-propagation)) |
 

@@ -16,7 +16,7 @@ use kamu_core::*;
 use kamu_datasets::{
     CreateDatasetUseCase,
     CreateDatasetUseCaseOptions,
-    DatasetHeadCommitter,
+    DatasetReferenceUpdater,
     DatasetRegistry,
     DatasetRegistryExt,
     ResolvedDataset,
@@ -38,7 +38,7 @@ pub struct DatasetUpdateStepsImpl {
 impl DatasetUpdateStepsImpl {
     /// Moves `HEAD` of an existing dataset from the head the transfer started
     /// from
-    #[transactional_method2(dataset_registry: Arc<dyn DatasetRegistry>, dataset_head_committer: Arc<dyn DatasetHeadCommitter>)]
+    #[transactional_method2(dataset_registry: Arc<dyn DatasetRegistry>, dataset_reference_updater: Arc<dyn DatasetReferenceUpdater>)]
     async fn commit_sync_into_existing(
         &self,
         dataset: &ResolvedDataset,
@@ -48,8 +48,8 @@ impl DatasetUpdateStepsImpl {
         // The transfer ran detached; the commit needs this transaction, and
         // the dataset may have been deleted meanwhile
         let dataset = dataset_registry.get_dataset_by_id(dataset.get_id()).await?;
-        dataset_head_committer
-            .commit_head(&dataset, expected_head, new_head)
+        dataset_reference_updater
+            .update_reference(&dataset, &odf::BlockRef::Head, expected_head, new_head)
             .await?;
         Ok(())
     }
@@ -143,27 +143,33 @@ impl DatasetUpdateStepsImpl {
         Ok(sync_target)
     }
 
-    #[transactional_method2(dataset_registry: Arc<dyn DatasetRegistry>, dataset_head_committer: Arc<dyn DatasetHeadCommitter>)]
-    async fn commit_head_transactionally(
+    #[transactional_method2(dataset_registry: Arc<dyn DatasetRegistry>, dataset_reference_updater: Arc<dyn DatasetReferenceUpdater>)]
+    async fn update_reference_transactionally(
         &self,
         target: &odf::DatasetHandle,
-        old_head: &odf::Multihash,
-        new_head: &odf::Multihash,
-    ) -> Result<HeadCommit, InternalError> {
+        block_ref: &odf::BlockRef,
+        expected_block_hash: &odf::Multihash,
+        new_block_hash: &odf::Multihash,
+    ) -> Result<ReferenceUpdate, InternalError> {
         let Some(dataset) = dataset_registry
             .try_get_dataset_by_ref(&target.id.as_local_ref())
             .await?
         else {
-            return Ok(HeadCommit::DatasetDeleted);
+            return Ok(ReferenceUpdate::DatasetDeleted);
         };
 
-        match dataset_head_committer
-            .commit_head(&dataset, Some(old_head), new_head)
+        match dataset_reference_updater
+            .update_reference(
+                &dataset,
+                block_ref,
+                Some(expected_block_hash),
+                new_block_hash,
+            )
             .await
         {
-            Ok(()) => Ok(HeadCommit::Committed),
-            Err(odf::dataset::SetChainRefError::CASFailed(e)) => Ok(HeadCommit::HeadMoved(e)),
-            Err(odf::dataset::SetChainRefError::Access(e)) => Ok(HeadCommit::NotAllowed(e)),
+            Ok(()) => Ok(ReferenceUpdate::Committed),
+            Err(odf::dataset::SetChainRefError::CASFailed(e)) => Ok(ReferenceUpdate::RefMoved(e)),
+            Err(odf::dataset::SetChainRefError::Access(e)) => Ok(ReferenceUpdate::NotAllowed(e)),
             Err(
                 e @ (odf::dataset::SetChainRefError::BlockNotFound(_)
                 | odf::dataset::SetChainRefError::Internal(_)),
@@ -232,18 +238,24 @@ impl DatasetUpdateSteps for DatasetUpdateStepsImpl {
         result
     }
 
-    #[tracing::instrument(level = "info", name = DatasetUpdateStepsImpl_commit_head, skip_all, fields(%target, %new_head, outcome))]
-    async fn commit_head(
+    #[tracing::instrument(level = "info", name = DatasetUpdateStepsImpl_update_reference, skip_all, fields(%target, %block_ref, %new_block_hash, outcome))]
+    async fn update_reference(
         &self,
         target: &odf::DatasetHandle,
-        old_head: &odf::Multihash,
-        new_head: &odf::Multihash,
-    ) -> Result<HeadCommit, InternalError> {
+        block_ref: &odf::BlockRef,
+        expected_block_hash: &odf::Multihash,
+        new_block_hash: &odf::Multihash,
+    ) -> Result<ReferenceUpdate, InternalError> {
         let result = self
-            .commit_head_transactionally(target, old_head, new_head)
+            .update_reference_transactionally(
+                target,
+                block_ref,
+                expected_block_hash,
+                new_block_hash,
+            )
             .await;
         match &result {
-            Ok(head_commit) => SpanOutcome::from(head_commit),
+            Ok(reference_update) => SpanOutcome::from(reference_update),
             Err(_) => SpanOutcome::Failed,
         }
         .record();
@@ -313,7 +325,7 @@ impl DatasetUpdateSteps for DatasetUpdateStepsImpl {
                 | SyncError::DestinationAhead(_)
                 | SyncError::OverwriteSeedBlock(_)
                 | SyncError::Corrupted(_)
-                | SyncError::HeadMoved(_)
+                | SyncError::RefMoved(_)
                 | SyncError::Access(_)
                 | SyncError::Internal(_)),
             ) => Err(e),

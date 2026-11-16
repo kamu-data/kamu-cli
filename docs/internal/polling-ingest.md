@@ -96,7 +96,7 @@ A polling ingest has three steps, the same for every caller:
 | --- | --- | --- |
 | **Plan** | `PollingIngestPlanner::plan_ingest(target)` builds the writer state at the current head into a `PollingIngestPlan`; `IngestEnvVarsResolver::resolve(dataset_id)` resolves the dataset's environment variables | one of its own, then the target is detached; `kamu pull` and the update task both plan through `DatasetUpdateSteps::plan_ingest` |
 | **Execute** | `PollingIngestService::ingest(target, plan, options, env_vars, operation_id, listener)` runs one iteration and appends blocks without moving `HEAD` | none |
-| **Commit** | the caller moves `HEAD` through `DatasetHeadCommitter` ([§9](#9-committing-and-concurrency)) | a new one |
+| **Commit** | the caller moves `HEAD` through `DatasetReferenceUpdater` ([§9](#9-committing-and-concurrency)) | a new one |
 
 Planning fails with `SourceNotDefined` when the dataset has no `SetPollingSource`.
 `PollingIngestPlanPayload` is the plan's stored form, for a caller that stores a plan before

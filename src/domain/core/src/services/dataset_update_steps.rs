@@ -42,19 +42,21 @@ pub trait DatasetUpdateSteps: Send + Sync {
         target: &PullLocalTarget,
     ) -> Result<Option<SyncFromTarget>, SyncError>;
 
-    /// Moves `HEAD` from `old_head` to `new_head` if it is still `old_head`
-    async fn commit_head(
+    /// Moves `block_ref` from `expected_block_hash` to `new_block_hash` if it
+    /// still points at `expected_block_hash`
+    async fn update_reference(
         &self,
         target: &odf::DatasetHandle,
-        old_head: &odf::Multihash,
-        new_head: &odf::Multihash,
-    ) -> Result<HeadCommit, InternalError>;
+        block_ref: &odf::BlockRef,
+        expected_block_hash: &odf::Multihash,
+        new_block_hash: &odf::Multihash,
+    ) -> Result<ReferenceUpdate, InternalError>;
 
     /// Commits what [`crate::SyncService::sync_from`] wrote, in a transaction
     /// of its own: a compare-and-swap of `HEAD` from the head the transfer
     /// started from, or the creation of a new dataset with `HEAD` at the
     /// transferred head. `None` when the existing target was deleted
-    /// meanwhile; [`SyncError::HeadMoved`] when its `HEAD` moved. A dataset
+    /// meanwhile; [`SyncError::RefMoved`] when its reference moved. A dataset
     /// the commit creates gets `maybe_pull_alias` in the same transaction
     async fn commit_sync(
         &self,
@@ -96,18 +98,18 @@ pub struct ElaboratedTransform {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// How moving `HEAD` ended
+/// How moving a dataset's reference ended
 #[derive(Debug)]
-pub enum HeadCommit {
+pub enum ReferenceUpdate {
     Committed,
-    /// Another writer moved `HEAD` first
-    HeadMoved(odf::dataset::RefCASError),
+    /// Another writer moved the reference first
+    RefMoved(odf::dataset::RefCASError),
     DatasetDeleted,
-    /// The current account may not move `HEAD`
+    /// The current account may not move the reference
     NotAllowed(odf::AccessError),
 }
 
-impl HeadCommit {
+impl ReferenceUpdate {
     /// The outcome as a pull result: a commit that did not happen is the
     /// error of the pull of `target`
     pub fn into_pull_result(
@@ -116,7 +118,7 @@ impl HeadCommit {
     ) -> Result<(), PullError> {
         match result? {
             Self::Committed => Ok(()),
-            Self::HeadMoved(e) => Err(PullError::HeadMoved(e)),
+            Self::RefMoved(e) => Err(PullError::RefMoved(e)),
             Self::NotAllowed(e) => Err(PullError::Access(e)),
             Self::DatasetDeleted => Err(PullError::NotFound(odf::DatasetNotFoundError::new(
                 target.as_local_ref(),

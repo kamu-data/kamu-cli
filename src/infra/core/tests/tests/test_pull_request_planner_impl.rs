@@ -31,8 +31,8 @@ use kamu_datasets_services::{
     AppendDatasetMetadataBatchUseCaseImpl,
     CreateDatasetUseCaseImpl,
     DatasetEntryWriter,
-    DatasetHeadCommitterImpl,
     DatasetReferenceServiceImpl,
+    DatasetReferenceUpdaterImpl,
     DependencyGraphIndexer,
     DependencyGraphServiceImpl,
     MockDatasetEntryWriter,
@@ -1151,7 +1151,7 @@ impl PullTestHarness {
             .add::<CreateDatasetUseCaseImpl>()
             .add::<CreateDatasetUseCaseHelper>()
             .add::<AppendDatasetMetadataBatchUseCaseImpl>()
-            .add::<DatasetHeadCommitterImpl>()
+            .add::<DatasetReferenceUpdaterImpl>()
             .add_builder(OutboxImmediateImpl::builder(ConsumerFilter::AllConsumers))
             .bind::<dyn Outbox, OutboxImmediateImpl>()
             .add_value(IpfsClient::default())

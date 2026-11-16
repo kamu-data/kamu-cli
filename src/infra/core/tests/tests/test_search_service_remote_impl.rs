@@ -19,7 +19,7 @@ use kamu_datasets::{AlwaysHappyDatasetPermissionChecker, DatasetRegistry};
 use kamu_datasets_services::{
     AppendDatasetMetadataBatchUseCaseImpl,
     CreateDatasetUseCaseImpl,
-    DatasetHeadCommitterImpl,
+    DatasetReferenceUpdaterImpl,
     DependencyGraphServiceImpl,
 };
 use messaging_outbox::DummyOutboxImpl;
@@ -72,7 +72,7 @@ async fn do_test_search(tmp_workspace_dir: &Path, repo_url: Url) {
         .add::<CreateDatasetUseCaseImpl>()
         .add::<DummyOutboxImpl>()
         .add::<AppendDatasetMetadataBatchUseCaseImpl>()
-        .add::<DatasetHeadCommitterImpl>()
+        .add::<DatasetReferenceUpdaterImpl>()
         .add::<DependencyGraphServiceImpl>();
 
     database_common::NoOpDatabasePlugin::init_database_components(&mut b);

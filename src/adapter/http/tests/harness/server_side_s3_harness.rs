@@ -129,7 +129,7 @@ impl ServerSideS3Harness {
                     Some(s3.secret_key.clone()),
                 ))
                 .add::<AppendDatasetMetadataBatchUseCaseImpl>()
-                .add::<DatasetHeadCommitterImpl>()
+                .add::<DatasetReferenceUpdaterImpl>()
                 .add::<CreateDatasetUseCaseImpl>()
                 .add::<CreateDatasetFromSnapshotUseCaseImpl>()
                 .add::<CommitDatasetEventUseCaseImpl>()

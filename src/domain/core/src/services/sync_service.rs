@@ -345,10 +345,10 @@ pub enum SyncError {
     OverwriteSeedBlock(#[from] OverwriteSeedBlockError),
     #[error(transparent)]
     Corrupted(#[from] CorruptedSourceError),
-    /// The destination moved its `HEAD` after the sync read it, so nothing
+    /// The destination moved its reference after the sync read it, so nothing
     /// was committed
     #[error(transparent)]
-    HeadMoved(#[from] SyncHeadMovedError),
+    RefMoved(#[from] SyncRefMovedError),
     #[error(transparent)]
     Access(
         #[from]
@@ -394,7 +394,7 @@ impl SyncError {
             | Self::Corrupted(_)
             | Self::Access(_) => false,
 
-            Self::HeadMoved(_) | Self::Internal(_) => true,
+            Self::RefMoved(_) | Self::Internal(_) => true,
         }
     }
 }
@@ -402,7 +402,7 @@ impl SyncError {
 impl From<odf::dataset::SetChainRefError> for SyncError {
     fn from(v: odf::dataset::SetChainRefError) -> Self {
         match v {
-            odf::dataset::SetChainRefError::CASFailed(e) => Self::HeadMoved(e.into()),
+            odf::dataset::SetChainRefError::CASFailed(e) => Self::RefMoved(e.into()),
             odf::dataset::SetChainRefError::Access(e) => Self::Access(e),
             odf::dataset::SetChainRefError::Internal(e) => Self::Internal(e),
             odf::dataset::SetChainRefError::BlockNotFound(_) => Self::Internal(v.int_err()),
@@ -497,34 +497,46 @@ pub struct DatasetIdMismatchError {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// The destination's `HEAD` was not where the sync expected it when the sync
-/// committed
+/// The destination's reference was not where the sync expected it when the
+/// sync committed
 #[derive(Error, Eq, PartialEq, Debug)]
-pub struct SyncHeadMovedError {
-    /// The expected and actual heads; known for a local destination, a Simple
-    /// protocol push and a stale Smart push, but not reported by a Smart push
-    /// server whose `HEAD` moved while it committed
-    pub heads: Option<odf::dataset::RefCASError>,
+pub struct SyncRefMovedError {
+    pub block_ref: odf::BlockRef,
+    /// Where the reference was expected and where it was found; known for a
+    /// local destination, a Simple protocol push and a stale Smart push, but
+    /// not reported by a Smart push server whose reference moved while it
+    /// committed
+    pub reported: Option<odf::dataset::RefCASError>,
 }
 
-impl SyncHeadMovedError {
-    /// A move the destination did not report heads for
-    pub fn unreported() -> Self {
-        Self { heads: None }
+impl SyncRefMovedError {
+    /// A move of `block_ref` the destination did not report block hashes for
+    pub fn unreported(block_ref: odf::BlockRef) -> Self {
+        Self {
+            block_ref,
+            reported: None,
+        }
     }
 }
 
-impl From<odf::dataset::RefCASError> for SyncHeadMovedError {
-    fn from(heads: odf::dataset::RefCASError) -> Self {
-        Self { heads: Some(heads) }
+impl From<odf::dataset::RefCASError> for SyncRefMovedError {
+    fn from(reported: odf::dataset::RefCASError) -> Self {
+        Self {
+            block_ref: reported.reference.clone(),
+            reported: Some(reported),
+        }
     }
 }
 
-impl std::fmt::Display for SyncHeadMovedError {
+impl std::fmt::Display for SyncRefMovedError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match &self.heads {
-            Some(heads) => write!(f, "Dataset head was moved concurrently: {heads}"),
-            None => write!(f, "Dataset head was moved concurrently"),
+        match &self.reported {
+            Some(reported) => write!(f, "Dataset reference was moved concurrently: {reported}"),
+            None => write!(
+                f,
+                "Dataset reference {} was moved concurrently",
+                self.block_ref
+            ),
         }
     }
 }
@@ -636,7 +648,7 @@ mod tests {
         let cases = [
             (SyncError::Internal("connection reset".int_err()), true),
             (
-                SyncError::HeadMoved(
+                SyncError::RefMoved(
                     odf::dataset::RefCASError {
                         reference: odf::BlockRef::Head,
                         expected: Some(fixtures.head(b"expected")),
@@ -646,7 +658,10 @@ mod tests {
                 ),
                 true,
             ),
-            (SyncError::HeadMoved(SyncHeadMovedError::unreported()), true),
+            (
+                SyncError::RefMoved(SyncRefMovedError::unreported(odf::BlockRef::Head)),
+                true,
+            ),
             (
                 SyncError::DatasetsDiverged(DatasetsDivergedError {
                     src_head: fixtures.head(b"src"),

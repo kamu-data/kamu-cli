@@ -14,10 +14,10 @@ use kamu_core::*;
 use kamu_task_system::*;
 use random_strings::get_random_name;
 
-use super::task_head_commit::{
-    HeadCommitTaskOutcome as _,
+use super::task_reference_update::{
+    ReferenceUpdateTaskOutcome as _,
     dataset_deleted_outcome,
-    head_moved_outcome,
+    ref_moved_outcome,
 };
 use super::task_span_outcome::TaskSpanOutcome;
 use crate::{
@@ -125,9 +125,14 @@ impl UpdateDatasetTaskRunner {
                 TaskResultDatasetUpdate::UpToDate(PullResultUpToDate::Sync).into_task_result(),
             )),
             Ok(None) => Ok(dataset_deleted_outcome(target_handle)),
-            Err(SyncError::HeadMoved(SyncHeadMovedError { heads })) => {
-                Ok(head_moved_outcome(target_handle.id.clone(), heads))
-            }
+            Err(SyncError::RefMoved(SyncRefMovedError {
+                block_ref,
+                reported,
+            })) => Ok(ref_moved_outcome(
+                target_handle.id.clone(),
+                block_ref,
+                reported,
+            )),
             Err(
                 e @ (SyncError::DatasetNotFound(_)
                 | SyncError::RefCollision(_)
@@ -220,7 +225,7 @@ impl UpdateDatasetTaskRunner {
     ) -> Result<TaskOutcome, InternalError> {
         if let Some(failed) = self
             .update_steps
-            .commit_head(target_handle, &old_head, &new_head)
+            .update_reference(target_handle, &odf::BlockRef::Head, &old_head, &new_head)
             .await?
             .into_failed_task_outcome(target_handle)
         {

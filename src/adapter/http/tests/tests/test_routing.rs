@@ -83,7 +83,7 @@ impl RepoFixture {
             .add::<CreateDatasetFromSnapshotUseCaseImpl>()
             .add::<CreateDatasetUseCaseImpl>()
             .add::<CreateDatasetUseCaseHelper>()
-            .add::<DatasetHeadCommitterImpl>()
+            .add::<DatasetReferenceUpdaterImpl>()
             .add::<DatasetReferenceServiceImpl>()
             .add::<DatasetEntryServiceImpl>()
             .add::<AccountServiceImpl>()

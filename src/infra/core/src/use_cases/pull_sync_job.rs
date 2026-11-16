@@ -99,11 +99,14 @@ impl PullSyncJob {
         PullError::NotFound(odf::DatasetNotFoundError::new(local_ref))
     }
 
-    /// A lost commit race is the pull's [`PullError::HeadMoved`], the same as
-    /// for an ingest or a transform. A local commit always knows the heads.
+    /// A lost commit race is the pull's [`PullError::RefMoved`], the same as
+    /// for an ingest or a transform. A local commit always knows the block hashes.
     fn into_pull_error(error: SyncError) -> PullError {
-        if let SyncError::HeadMoved(SyncHeadMovedError { heads: Some(e) }) = error {
-            PullError::HeadMoved(e)
+        if let SyncError::RefMoved(SyncRefMovedError {
+            reported: Some(e), ..
+        }) = error
+        {
+            PullError::RefMoved(e)
         } else {
             error.into()
         }

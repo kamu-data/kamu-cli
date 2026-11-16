@@ -14,8 +14,8 @@ use chrono::{TimeZone, Utc};
 use kamu_core::MockDidGenerator;
 use kamu_datasets::{
     CreateDatasetResult,
-    DatasetHeadCommitter,
     DatasetReferenceRepository,
+    DatasetReferenceUpdater,
     ResolvedDataset,
 };
 use pretty_assertions::assert_eq;
@@ -29,14 +29,16 @@ use crate::tests::use_cases::datasets::dataset_base_use_case_harness::{
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[tokio::test]
-async fn test_commit_head_advances_from_expected_head() {
-    let harness = DatasetHeadCommitterHarness::new().await;
+async fn test_update_reference_advances_from_expected_head() {
+    let harness = DatasetReferenceUpdaterHarness::new().await;
     let foo = harness.create_foo().await;
     let new_head = harness
         .append_unreferenced_block(&foo, &foo.head, "next")
         .await;
 
-    let res = harness.commit_head(&foo, Some(&foo.head), &new_head).await;
+    let res = harness
+        .update_reference(&foo, Some(&foo.head), &new_head)
+        .await;
     assert_matches!(res, Ok(()));
 
     assert_eq!(harness.stored_head(&foo).await, new_head);
@@ -69,8 +71,8 @@ async fn test_commit_head_advances_from_expected_head() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[tokio::test]
-async fn test_commit_head_from_other_than_the_stored_head_is_a_conflict() {
-    let harness = DatasetHeadCommitterHarness::new().await;
+async fn test_update_reference_from_other_than_the_stored_head_is_a_conflict() {
+    let harness = DatasetReferenceUpdaterHarness::new().await;
     let foo = harness.create_foo().await;
     let concurrent_head = harness
         .append_unreferenced_block(&foo, &foo.head, "concurrent")
@@ -81,7 +83,7 @@ async fn test_commit_head_from_other_than_the_stored_head_is_a_conflict() {
 
     // -- expecting no head while a head exists
 
-    let res = harness.commit_head(&foo, None, &new_head).await;
+    let res = harness.update_reference(&foo, None, &new_head).await;
     assert_matches!(
         res,
         Err(odf::dataset::SetChainRefError::CASFailed(e))
@@ -104,12 +106,14 @@ async fn test_commit_head_from_other_than_the_stored_head_is_a_conflict() {
     // -- expecting a head another commit has moved on from
 
     harness
-        .commit_head(&foo, Some(&foo.head), &concurrent_head)
+        .update_reference(&foo, Some(&foo.head), &concurrent_head)
         .await
         .unwrap();
     harness.reset_collected_outbox_messages();
 
-    let res = harness.commit_head(&foo, Some(&foo.head), &new_head).await;
+    let res = harness
+        .update_reference(&foo, Some(&foo.head), &new_head)
+        .await;
     assert_matches!(
         res,
         Err(odf::dataset::SetChainRefError::CASFailed(e))
@@ -133,13 +137,13 @@ async fn test_commit_head_from_other_than_the_stored_head_is_a_conflict() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[tokio::test]
-async fn test_commit_head_to_missing_block_fails() {
-    let harness = DatasetHeadCommitterHarness::new().await;
+async fn test_update_reference_to_missing_block_fails() {
+    let harness = DatasetReferenceUpdaterHarness::new().await;
     let foo = harness.create_foo().await;
     let missing_block_hash = odf::Multihash::from_digest_sha3_256(b"missing");
 
     let res = harness
-        .commit_head(&foo, Some(&foo.head), &missing_block_hash)
+        .update_reference(&foo, Some(&foo.head), &missing_block_hash)
         .await;
     assert_matches!(res, Err(odf::dataset::SetChainRefError::BlockNotFound(_)));
 
@@ -150,14 +154,14 @@ async fn test_commit_head_to_missing_block_fails() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[oop::extend(DatasetBaseUseCaseHarness, dataset_base_use_case_harness)]
-struct DatasetHeadCommitterHarness {
+struct DatasetReferenceUpdaterHarness {
     dataset_base_use_case_harness: DatasetBaseUseCaseHarness,
     catalog: dill::Catalog,
-    committer: Arc<dyn DatasetHeadCommitter>,
+    updater: Arc<dyn DatasetReferenceUpdater>,
     dataset_ref_repo: Arc<dyn DatasetReferenceRepository>,
 }
 
-impl DatasetHeadCommitterHarness {
+impl DatasetReferenceUpdaterHarness {
     async fn new() -> Self {
         let dataset_base_use_case_harness =
             DatasetBaseUseCaseHarness::new(DatasetBaseUseCaseHarnessOpts {
@@ -177,7 +181,7 @@ impl DatasetHeadCommitterHarness {
 
         Self {
             dataset_base_use_case_harness,
-            committer: catalog.get_one().unwrap(),
+            updater: catalog.get_one().unwrap(),
             dataset_ref_repo: catalog.get_one().unwrap(),
             catalog,
         }
@@ -191,15 +195,16 @@ impl DatasetHeadCommitterHarness {
         foo
     }
 
-    async fn commit_head(
+    async fn update_reference(
         &self,
         dataset: &CreateDatasetResult,
         expected_head: Option<&odf::Multihash>,
         new_head: &odf::Multihash,
     ) -> Result<(), odf::dataset::SetChainRefError> {
-        self.committer
-            .commit_head(
+        self.updater
+            .update_reference(
                 &ResolvedDataset::from_created(dataset),
+                &odf::BlockRef::Head,
                 expected_head,
                 new_head,
             )

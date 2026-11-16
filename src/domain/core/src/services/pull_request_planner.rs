@@ -457,10 +457,10 @@ pub enum PullError {
         SyncError,
     ),
 
-    /// Another writer moved `HEAD` while the dataset was updated, so the
-    /// update was not committed
-    #[error("Dataset head was moved concurrently: {0}")]
-    HeadMoved(odf::dataset::RefCASError),
+    /// Another writer moved the dataset's reference while the dataset was
+    /// updated, so the update was not committed
+    #[error("Dataset reference was moved concurrently: {0}")]
+    RefMoved(odf::dataset::RefCASError),
 
     #[error(transparent)]
     Access(
@@ -499,7 +499,7 @@ impl PullError {
             Self::TransformStopped(e) => e.source.is_recoverable(),
             Self::SyncError(e) => e.is_recoverable(),
 
-            Self::HeadMoved(_) | Self::Internal(_) => true,
+            Self::RefMoved(_) | Self::Internal(_) => true,
         }
     }
 }
@@ -644,12 +644,12 @@ mod tests {
                 true,
             ),
             (
-                PullError::SyncError(SyncError::HeadMoved(fixtures.head_moved().into())),
+                PullError::SyncError(SyncError::RefMoved(fixtures.ref_moved().into())),
                 true,
             ),
-            (PullError::HeadMoved(fixtures.head_moved()), true),
+            (PullError::RefMoved(fixtures.ref_moved()), true),
             (
-                fixtures.ingest_stopped_by(PullError::HeadMoved(fixtures.head_moved())),
+                fixtures.ingest_stopped_by(PullError::RefMoved(fixtures.ref_moved())),
                 true,
             ),
             (
@@ -657,7 +657,7 @@ mod tests {
                 false,
             ),
             (
-                fixtures.transform_stopped_by(PullError::HeadMoved(fixtures.head_moved())),
+                fixtures.transform_stopped_by(PullError::RefMoved(fixtures.ref_moved())),
                 true,
             ),
             (PullError::Internal("storage unavailable".int_err()), true),
@@ -673,7 +673,7 @@ mod tests {
     struct PullErrorFixtures;
 
     impl PullErrorFixtures {
-        fn head_moved(&self) -> odf::dataset::RefCASError {
+        fn ref_moved(&self) -> odf::dataset::RefCASError {
             odf::dataset::RefCASError {
                 reference: odf::BlockRef::Head,
                 expected: Some(odf::Multihash::from_digest_sha3_256(b"expected")),

@@ -25,7 +25,7 @@ use kamu_core::*;
 use kamu_datasets::{CreateDatasetResult, DatasetPermission, MockDatasetPermissionChecker};
 use kamu_datasets_services::{
     AppendDatasetMetadataBatchUseCaseImpl,
-    DatasetHeadCommitterImpl,
+    DatasetReferenceUpdaterImpl,
     DependencyGraphServiceImpl,
 };
 use odf::dataset::{DatasetFactoryImpl, IpfsGateway};
@@ -494,7 +494,7 @@ impl PushUseCaseHarness {
             .add_value(IpfsClient::default())
             .add_value(IpfsGateway::default())
             .add::<AppendDatasetMetadataBatchUseCaseImpl>()
-            .add::<DatasetHeadCommitterImpl>()
+            .add::<DatasetReferenceUpdaterImpl>()
             .add::<DependencyGraphServiceImpl>();
 
         match maybe_alias_registry {

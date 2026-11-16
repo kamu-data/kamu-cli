@@ -11,28 +11,31 @@ use crate::ResolvedDataset;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// The single way to move a dataset's `HEAD` reference.
+/// The single way to move a dataset's reference, such as `HEAD`.
 ///
 /// The `reference_writes` lint in `kamu-repo-tools` rejects direct reference
 /// writes elsewhere and lists the allowed exceptions.
 #[async_trait::async_trait]
-pub trait DatasetHeadCommitter: Sync + Send {
-    /// Moves `HEAD` of `target` from `expected_head` to `new_head`, as part of
-    /// the caller's current transaction. `expected_head = None` means the
-    /// dataset must not have a `HEAD` yet. The move is never unconditional.
+pub trait DatasetReferenceUpdater: Sync + Send {
+    /// Moves `block_ref` of `target` from `expected_block_hash` to
+    /// `new_block_hash`, as part of the caller's current transaction.
+    /// `expected_block_hash = None` means the reference must not exist yet.
+    /// The move is never unconditional.
     ///
     /// `target` must be resolved in the current transaction, not detached
     /// from it.
     ///
     /// Errors:
-    /// - `CASFailed`: `HEAD` no longer points at `expected_head`. Nothing is committed. The
-    ///   conflict is recoverable: a retry plans again from the current `HEAD`.
-    /// - `BlockNotFound`: `new_head` is not in the metadata chain.
-    async fn commit_head(
+    /// - `CASFailed`: the reference no longer points at `expected_block_hash`. Nothing is
+    ///   committed. The conflict is recoverable: a retry plans again from where the reference
+    ///   points now.
+    /// - `BlockNotFound`: `new_block_hash` is not in the metadata chain.
+    async fn update_reference(
         &self,
         target: &ResolvedDataset,
-        expected_head: Option<&odf::Multihash>,
-        new_head: &odf::Multihash,
+        block_ref: &odf::BlockRef,
+        expected_block_hash: Option<&odf::Multihash>,
+        new_block_hash: &odf::Multihash,
     ) -> Result<(), odf::dataset::SetChainRefError>;
 }
 

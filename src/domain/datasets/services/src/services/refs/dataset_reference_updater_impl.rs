@@ -8,34 +8,35 @@
 // by the Apache License, Version 2.0.
 
 use dill::{component, interface};
-use kamu_datasets::{DatasetHeadCommitter, ResolvedDataset};
+use kamu_datasets::{DatasetReferenceUpdater, ResolvedDataset};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[component(pub)]
-#[interface(dyn DatasetHeadCommitter)]
-pub struct DatasetHeadCommitterImpl {}
+#[interface(dyn DatasetReferenceUpdater)]
+pub struct DatasetReferenceUpdaterImpl {}
 
 #[common_macros::method_names_consts]
 #[async_trait::async_trait]
-impl DatasetHeadCommitter for DatasetHeadCommitterImpl {
-    #[tracing::instrument(name = DatasetHeadCommitterImpl_commit_head, level = "debug", skip_all, fields(dataset_id = %target.get_id(), ?expected_head, %new_head))]
-    async fn commit_head(
+impl DatasetReferenceUpdater for DatasetReferenceUpdaterImpl {
+    #[tracing::instrument(name = DatasetReferenceUpdaterImpl_update_reference, level = "debug", skip_all, fields(dataset_id = %target.get_id(), %block_ref, ?expected_block_hash, %new_block_hash))]
+    async fn update_reference(
         &self,
         target: &ResolvedDataset,
-        expected_head: Option<&odf::Multihash>,
-        new_head: &odf::Multihash,
+        block_ref: &odf::BlockRef,
+        expected_block_hash: Option<&odf::Multihash>,
+        new_block_hash: &odf::Multihash,
     ) -> Result<(), odf::dataset::SetChainRefError> {
         // Through the metadata chain rather than the reference service, so the
         // chain's reference cache stays coherent and the block is validated
         target
             .as_metadata_chain()
             .set_ref(
-                &odf::BlockRef::Head,
-                new_head,
+                block_ref,
+                new_block_hash,
                 odf::dataset::SetRefOpts {
                     validate_block_present: true,
-                    check_ref_is: Some(expected_head),
+                    check_ref_is: Some(expected_block_hash),
                 },
             )
             .await

@@ -13,7 +13,7 @@ use kamu::testing::{BaseUseCaseHarness, BaseUseCaseHarnessOptions};
 use kamu::*;
 use kamu_core::*;
 use kamu_datasets::{DatasetPermission, MockDatasetPermissionChecker, ResolvedDataset};
-use kamu_datasets_services::DatasetHeadCommitterImpl;
+use kamu_datasets_services::DatasetReferenceUpdaterImpl;
 use odf::metadata::testing::MetadataFactory;
 use pretty_assertions::assert_matches;
 
@@ -141,7 +141,7 @@ impl ResetUseCaseHarness {
             .add::<ResetDatasetUseCaseImpl>()
             .add::<ResetPlannerImpl>()
             .add::<ResetExecutorImpl>()
-            .add::<DatasetHeadCommitterImpl>()
+            .add::<DatasetReferenceUpdaterImpl>()
             .build();
 
         let use_case = catalog.get_one::<dyn ResetDatasetUseCase>().unwrap();

@@ -19,7 +19,7 @@ use regex::Regex;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// Production code that may write a dataset reference directly. Everything
-/// else moves `HEAD` through `DatasetHeadCommitter`
+/// else moves references through `DatasetReferenceUpdater`
 const ALLOWED_REFERENCE_WRITES: &[AllowedReferenceWrite] = &[
     AllowedReferenceWrite {
         path: "src/domain/core/src/utils/metadata_chain_comparator.rs",
@@ -39,9 +39,9 @@ const ALLOWED_REFERENCE_WRITES: &[AllowedReferenceWrite] = &[
         reason: "delegates to its inner chain",
     },
     AllowedReferenceWrite {
-        path: "src/domain/datasets/services/src/services/refs/dataset_head_committer_impl.rs",
+        path: "src/domain/datasets/services/src/services/refs/dataset_reference_updater_impl.rs",
         method: "set_ref",
-        reason: "the HEAD commit primitive",
+        reason: "the reference update primitive",
     },
     AllowedReferenceWrite {
         path: "src/domain/datasets/services/src/services/refs/dataset_reference_indexer.rs",
@@ -79,7 +79,7 @@ static REFERENCE_WRITE_CALL: LazyLock<Regex> = LazyLock::new(|| {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test]
-fn check_reference_writes_go_through_head_committer() {
+fn check_reference_writes_go_through_reference_updater() {
     let violations: Vec<_> = find_all_reference_writes()
         .into_iter()
         .filter(|write| find_allowance(write).is_none())
@@ -102,8 +102,8 @@ fn check_reference_writes_go_through_head_committer() {
         writeln!(stderr).unwrap();
         writeln!(
             stderr,
-            "Move HEAD through `DatasetHeadCommitter::commit_head` instead, see \
-             src/domain/datasets/domain/src/services/dataset_head_committer.rs. Exceptions are \
+            "Move references through `DatasetReferenceUpdater::update_reference` instead, see \
+             src/domain/datasets/domain/src/services/dataset_reference_updater.rs. Exceptions are \
              listed in `ALLOWED_REFERENCE_WRITES` in \
              src/utils/repo-tools/tests/lints/reference_writes.rs"
         )
@@ -190,9 +190,11 @@ fn self_test() {
         ]
     );
 
-    // The committer may call only `set_ref`
+    // The updater may call only `set_ref`
     assert_eq!(
-        violations("src/domain/datasets/services/src/services/refs/dataset_head_committer_impl.rs"),
+        violations(
+            "src/domain/datasets/services/src/services/refs/dataset_reference_updater_impl.rs"
+        ),
         vec!["12: set_reference", "13: set_dataset_reference"]
     );
 

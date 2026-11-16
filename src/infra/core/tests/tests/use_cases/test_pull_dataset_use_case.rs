@@ -26,15 +26,15 @@ use kamu_datasets::{
     DatasetEnvVar,
     DatasetEnvVarResolver,
     DatasetEnvVarValue,
-    DatasetHeadCommitter,
     DatasetPermission,
     DatasetPermissionError,
+    DatasetReferenceUpdater,
     GetDatasetEnvVarError,
     MockDatasetPermissionChecker,
     ResolvedDataset,
     SecretsEncryptionConfig,
 };
-use kamu_datasets_services::testing::RacingDatasetHeadCommitter;
+use kamu_datasets_services::testing::RacingDatasetReferenceUpdater;
 use kamu_datasets_services::utils::CreateDatasetUseCaseHelper;
 use kamu_datasets_services::{
     CreateDatasetUseCaseImpl,
@@ -295,7 +295,7 @@ async fn test_pull_ingest_commits_head() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[tokio::test]
-async fn test_pull_ingest_head_moved_concurrently() {
+async fn test_pull_ingest_ref_moved_concurrently() {
     let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
     let reported_heads = ReportedHeads::default();
 
@@ -312,7 +312,7 @@ async fn test_pull_ingest_head_moved_concurrently() {
 
     assert_matches!(
         pull_response.result,
-        Err(PullError::HeadMoved(e))
+        Err(PullError::RefMoved(e))
         if e.expected == Some(foo.head.clone()) && e.actual == Some(concurrent_head.clone())
     );
     assert_eq!(harness.get_head(&foo).await, concurrent_head);
@@ -495,7 +495,7 @@ async fn test_pull_ingest_without_polling_source_is_up_to_date() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[tokio::test]
-async fn test_pull_ingest_head_moved_after_committed_iterations_reports_progress() {
+async fn test_pull_ingest_ref_moved_after_committed_iterations_reports_progress() {
     let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
     let heads = [(); 2].map(|()| ReportedHeads::default());
 
@@ -526,7 +526,7 @@ async fn test_pull_ingest_head_moved_after_committed_iterations_reports_progress
             old_head,
             new_head,
             increment: odf::dataset::MetadataChainIncrementInterval { num_records: 2, .. },
-            source: PullError::HeadMoved(_),
+            source: PullError::RefMoved(_),
         }
         if old_head == foo.head && new_head == committed_head
     );
@@ -633,7 +633,7 @@ async fn test_pull_transform_commits_head() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[tokio::test]
-async fn test_pull_transform_head_moved_concurrently() {
+async fn test_pull_transform_ref_moved_concurrently() {
     let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
     let alias_bar = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("bar"));
     let reported_heads = ReportedHeads::default();
@@ -655,7 +655,7 @@ async fn test_pull_transform_head_moved_concurrently() {
 
     assert_matches!(
         pull_response.result,
-        Err(PullError::HeadMoved(e))
+        Err(PullError::RefMoved(e))
         if e.expected == Some(bar.head.clone()) && e.actual == Some(concurrent_head.clone())
     );
     assert_eq!(harness.get_head(&bar).await, concurrent_head);
@@ -949,7 +949,7 @@ async fn test_pull_sync_into_existing_commits_from_its_head_and_keeps_pull_alias
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[tokio::test]
-async fn test_pull_sync_head_moved_is_a_conflict() {
+async fn test_pull_sync_ref_moved_is_a_conflict() {
     let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
 
     let remote_ref = PullUseCaseHarness::remote_ref_of(&alias_foo);
@@ -971,7 +971,7 @@ async fn test_pull_sync_head_moved_is_a_conflict() {
     let synced_head = harness.append_unreferenced_block(&foo, "synced").await;
     synced_heads.set(&foo.head, &synced_head);
     let concurrent_head = harness.append_unreferenced_block(&foo, "concurrent").await;
-    harness.move_head_before_next_commit(concurrent_head);
+    harness.move_reference_before_next_update(concurrent_head);
 
     let pull_response = harness
         .pull(
@@ -983,7 +983,7 @@ async fn test_pull_sync_head_moved_is_a_conflict() {
         )
         .await;
 
-    assert_matches!(pull_response.result, Err(PullError::HeadMoved(_)));
+    assert_matches!(pull_response.result, Err(PullError::RefMoved(_)));
 
     let aliases = harness.get_remote_aliases(&foo).await;
     assert!(aliases.is_empty(RemoteAliasKind::Pull));
@@ -992,13 +992,13 @@ async fn test_pull_sync_head_moved_is_a_conflict() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[tokio::test]
-async fn test_pull_sync_head_moved_without_heads_stays_a_sync_error() {
+async fn test_pull_sync_ref_moved_without_block_hashes_stays_a_sync_error() {
     let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
     let remote_ref = PullUseCaseHarness::remote_ref_of(&alias_foo);
 
     let mocks = PullUseCaseHarnessMocks::default()
         .for_sync_into_existing_failing(&alias_foo, || {
-            SyncError::HeadMoved(SyncHeadMovedError::unreported())
+            SyncError::RefMoved(SyncRefMovedError::unreported(odf::BlockRef::Head))
         });
     let harness = PullUseCaseHarness::new(mocks);
     let foo = harness.create_root_dataset(&alias_foo).await;
@@ -1010,8 +1010,8 @@ async fn test_pull_sync_head_moved_without_heads_stays_a_sync_error() {
 
     assert_matches!(
         pull_response.result,
-        Err(PullError::SyncError(SyncError::HeadMoved(
-            SyncHeadMovedError { heads: None }
+        Err(PullError::SyncError(SyncError::RefMoved(
+            SyncRefMovedError { reported: None, .. }
         )))
     );
     assert_eq!(events, vec!["error"]);
@@ -1623,7 +1623,7 @@ async fn test_pull_transform_reset_with_nothing_to_compact_keeps_diverged_error(
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[tokio::test]
-async fn test_pull_transform_reset_head_moved_concurrently() {
+async fn test_pull_transform_reset_ref_moved_concurrently() {
     let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
     let alias_bar = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("bar"));
     let reset_heads = ReportedHeads::default();
@@ -1654,7 +1654,7 @@ async fn test_pull_transform_reset_head_moved_concurrently() {
 
     assert_matches!(
         pull_response.result,
-        Err(PullError::HeadMoved(e))
+        Err(PullError::RefMoved(e))
         if e.expected == Some(bar.head.clone()) && e.actual == Some(concurrent_head.clone())
     );
     assert_eq!(harness.get_head(&bar).await, concurrent_head);
@@ -1690,7 +1690,7 @@ async fn test_pull_ingest_commit_not_allowed_is_access_error() {
 
     let harness = PullUseCaseHarness::new(
         PullUseCaseHarnessMocks::for_ingest_updated(&alias_foo, &reported_heads)
-            .with_head_commits_denied(),
+            .with_reference_updates_denied(),
     );
     let foo = harness.create_root_dataset(&alias_foo).await;
     let ingested_head = harness.append_unreferenced_block(&foo, "ingested").await;
@@ -1721,7 +1721,7 @@ async fn test_pull_sync_into_dataset_deleted_during_sync_is_not_found() {
     let foo = harness.create_root_dataset(&alias_foo).await;
     let synced_head = harness.append_unreferenced_block(&foo, "synced").await;
     synced_heads.set(&foo.head, &synced_head);
-    harness.delete_dataset_before_next_commit();
+    harness.delete_dataset_before_next_update();
 
     let (pull_response, events) = harness.pull_remote_recording(&alias_foo, &remote_ref).await;
 
@@ -1905,11 +1905,11 @@ impl PullUseCaseHarness {
                 .bind::<dyn DatasetEntryWriter, MockDatasetEntryWriter>();
         }
 
-        if mocks.head_commits_denied {
-            b.add::<ReadOnlyDatasetHeadCommitter>();
+        if mocks.reference_updates_denied {
+            b.add::<ReadOnlyDatasetReferenceUpdater>();
         } else {
-            b.add_value(RacingDatasetHeadCommitter::default())
-                .bind::<dyn DatasetHeadCommitter, RacingDatasetHeadCommitter>();
+            b.add_value(RacingDatasetReferenceUpdater::default())
+                .bind::<dyn DatasetReferenceUpdater, RacingDatasetReferenceUpdater>();
         }
 
         match mocks.env_var_resolution {
@@ -1949,15 +1949,15 @@ impl PullUseCaseHarness {
 
     /// Moves `HEAD` of the dataset the next commit targets to
     /// `concurrent_head` just before that commit
-    fn move_head_before_next_commit(&self, concurrent_head: odf::Multihash) {
+    fn move_reference_before_next_update(&self, concurrent_head: odf::Multihash) {
         self.catalog
-            .get_one::<RacingDatasetHeadCommitter>()
+            .get_one::<RacingDatasetReferenceUpdater>()
             .unwrap()
-            .move_head_before_next_commit(&self.catalog, concurrent_head);
+            .move_reference_before_next_update(&self.catalog, concurrent_head);
     }
 
-    fn delete_dataset_before_next_commit(&self) {
-        self.racing_update_steps.delete_dataset_before_next_commit();
+    fn delete_dataset_before_next_update(&self) {
+        self.racing_update_steps.delete_dataset_before_next_update();
     }
 
     /// A root dataset polling a CSV file in the harness directory that holds
@@ -2231,8 +2231,8 @@ struct PullUseCaseHarnessMocks {
     real_transform_watermark: Option<DateTime<Utc>>,
     /// Enables dataset environment variables with this resolver
     env_var_resolution: Option<EnvVarResolution>,
-    /// Registers [`ReadOnlyDatasetHeadCommitter`]
-    head_commits_denied: bool,
+    /// Registers [`ReadOnlyDatasetReferenceUpdater`]
+    reference_updates_denied: bool,
 }
 
 impl PullUseCaseHarnessMocks {
@@ -2472,9 +2472,9 @@ impl PullUseCaseHarnessMocks {
     }
 
     /// Every `HEAD` move is refused, as by a read-only storage
-    fn with_head_commits_denied(self) -> Self {
+    fn with_reference_updates_denied(self) -> Self {
         Self {
-            head_commits_denied: true,
+            reference_updates_denied: true,
             ..self
         }
     }
@@ -2638,25 +2638,26 @@ impl Default for PullUseCaseHarnessMocks {
             real_ingest: false,
             real_transform_watermark: None,
             env_var_resolution: None,
-            head_commits_denied: false,
+            reference_updates_denied: false,
         }
     }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Refuses every `HEAD` move, as a read-only storage does
+/// Refuses every reference move, as a read-only storage does
 #[dill::component]
-#[dill::interface(dyn DatasetHeadCommitter)]
-struct ReadOnlyDatasetHeadCommitter {}
+#[dill::interface(dyn DatasetReferenceUpdater)]
+struct ReadOnlyDatasetReferenceUpdater {}
 
 #[async_trait::async_trait]
-impl DatasetHeadCommitter for ReadOnlyDatasetHeadCommitter {
-    async fn commit_head(
+impl DatasetReferenceUpdater for ReadOnlyDatasetReferenceUpdater {
+    async fn update_reference(
         &self,
         _target: &ResolvedDataset,
-        _expected_head: Option<&odf::Multihash>,
-        _new_head: &odf::Multihash,
+        _block_ref: &odf::BlockRef,
+        _expected_block_hash: Option<&odf::Multihash>,
+        _new_block_hash: &odf::Multihash,
     ) -> Result<(), odf::dataset::SetChainRefError> {
         Err(odf::dataset::SetChainRefError::Access(
             odf::AccessError::ReadOnly(None),

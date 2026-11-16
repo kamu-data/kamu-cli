@@ -285,18 +285,18 @@ async fn test_forced_pull_replaces_diverged_history() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test(flavor = "multi_thread"))]
-async fn test_pull_with_head_moved_during_transfer_local_fs() {
+async fn test_pull_with_ref_moved_during_transfer_local_fs() {
     LocalPullHarness::local_fs()
-        .assert_pull_keeps_head_moved_during_transfer(true)
+        .assert_pull_keeps_ref_moved_during_transfer(true)
         .await;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test(flavor = "multi_thread"))]
-async fn test_unforced_pull_with_head_moved_during_transfer_local_fs() {
+async fn test_unforced_pull_with_ref_moved_during_transfer_local_fs() {
     LocalPullHarness::local_fs()
-        .assert_pull_keeps_head_moved_during_transfer(false)
+        .assert_pull_keeps_ref_moved_during_transfer(false)
         .await;
 }
 
@@ -304,12 +304,12 @@ async fn test_unforced_pull_with_head_moved_during_transfer_local_fs() {
 
 #[test_group::group(containerized)]
 #[test_log::test(tokio::test(flavor = "multi_thread"))]
-async fn test_pull_with_head_moved_during_transfer_s3() {
+async fn test_pull_with_ref_moved_during_transfer_s3() {
     let s3 = LocalS3Server::new().await;
     s3.set_credentials_env_vars();
 
     LocalPullHarness::new(s3.url.clone())
-        .assert_pull_keeps_head_moved_during_transfer(true)
+        .assert_pull_keeps_ref_moved_during_transfer(true)
         .await;
 }
 
@@ -673,7 +673,7 @@ impl LocalPullHarness {
     /// Another writer moves the destination `HEAD` while a pull transfers.
     /// The commit must fail and leave the other writer's `HEAD`, with or
     /// without `force`
-    async fn assert_pull_keeps_head_moved_during_transfer(&self, force: bool) {
+    async fn assert_pull_keeps_ref_moved_during_transfer(&self, force: bool) {
         self.create_source_dataset().await;
         self.push_source().await;
         self.pull(SyncOptions::default(), None).await.unwrap();
@@ -700,7 +700,7 @@ impl LocalPullHarness {
         let concurrent_head = listener.concurrent_head.lock().unwrap().clone().unwrap();
         assert_matches!(
             result,
-            Err(SyncError::HeadMoved(SyncHeadMovedError { heads: Some(e) }))
+            Err(SyncError::RefMoved(SyncRefMovedError { reported: Some(e), .. }))
                 if e.actual.as_ref() == Some(&concurrent_head)
         );
         assert_eq!(self.destination_head().await, Some(concurrent_head));

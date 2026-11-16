@@ -26,12 +26,12 @@ use kamu_auth_rebac_services::{
 use kamu_core::*;
 use kamu_datasets::{
     CreateDatasetResult,
-    DatasetHeadCommitter,
     DatasetPermission,
+    DatasetReferenceUpdater,
     MockDatasetPermissionChecker,
     ResolvedDataset,
 };
-use kamu_datasets_services::testing::RacingDatasetHeadCommitter;
+use kamu_datasets_services::testing::RacingDatasetReferenceUpdater;
 use kamu_datasets_services::{
     AccountQuotaCheckerStorageImpl,
     DatasetStatisticsServiceImpl,
@@ -417,7 +417,7 @@ async fn test_push_ingest_data_into_derivative_rejected() {
 
 #[tokio::test]
 #[test_group::group(engine, ingest, datafusion)]
-async fn test_push_ingest_data_head_moved_concurrently() {
+async fn test_push_ingest_data_ref_moved_concurrently() {
     let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
     let (_, dataset_id_foo) = odf::DatasetID::new_generated_ed25519();
 
@@ -451,7 +451,7 @@ async fn test_push_ingest_data_head_moved_concurrently() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[tokio::test]
-async fn test_push_ingest_data_upload_head_moved_before_push_source_commit() {
+async fn test_push_ingest_data_upload_ref_moved_before_push_source_commit() {
     let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
     let (_, dataset_id_foo) = odf::DatasetID::new_generated_ed25519();
 
@@ -464,7 +464,7 @@ async fn test_push_ingest_data_upload_head_moved_before_push_source_commit() {
     let seed_head = harness.get_head(&foo).await;
 
     let concurrent_head = harness.append_unreferenced_block(&foo, "concurrent").await;
-    harness.move_head_before_next_commit(concurrent_head.clone());
+    harness.move_reference_before_next_update(concurrent_head.clone());
 
     assert_matches!(
         harness.ingest_ndjson(&foo, None, true).await,
@@ -485,7 +485,7 @@ async fn test_push_ingest_data_upload_head_moved_before_push_source_commit() {
 
 #[tokio::test]
 #[test_group::group(engine, ingest, datafusion)]
-async fn test_push_ingest_data_execute_multi_head_moved_concurrently() {
+async fn test_push_ingest_data_execute_multi_ref_moved_concurrently() {
     let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
     let (_, dataset_id_foo) = odf::DatasetID::new_generated_ed25519();
 
@@ -664,7 +664,7 @@ async fn test_push_ingest_data_reports_success_after_commit() {
 
 #[tokio::test]
 #[test_group::group(engine, ingest, datafusion)]
-async fn test_push_ingest_data_head_moved_before_commit_reports_error_not_success() {
+async fn test_push_ingest_data_ref_moved_before_commit_reports_error_not_success() {
     let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
     let (_, dataset_id_foo) = odf::DatasetID::new_generated_ed25519();
 
@@ -677,7 +677,7 @@ async fn test_push_ingest_data_head_moved_before_commit_reports_error_not_succes
         .create_root_dataset_with_push_source(&alias_foo)
         .await;
     let concurrent_head = harness.append_unreferenced_block(&foo, "concurrent").await;
-    harness.move_head_before_next_commit(concurrent_head.clone());
+    harness.move_reference_before_next_update(concurrent_head.clone());
 
     let (result, events) = harness.ingest_ndjson_recording(&foo).await;
 
@@ -721,7 +721,7 @@ async fn test_push_ingest_data_execute_multi_counts_staged_slices_towards_quota(
 struct PushIngestDataUseCaseHarness {
     base_use_case_harness: BaseUseCaseHarness,
     use_case: Arc<dyn PushIngestDataUseCase>,
-    racing_committer: Arc<RacingDatasetHeadCommitter>,
+    racing_reference_updater: Arc<RacingDatasetReferenceUpdater>,
     account_repo: Arc<dyn AccountRepository>,
 }
 
@@ -779,8 +779,8 @@ impl PushIngestDataUseCaseHarness {
 
         kamu_datasets_inmem::register_dependencies(&mut b);
         b.add::<PushIngestDataUseCaseImpl>()
-            .add_value(RacingDatasetHeadCommitter::default())
-            .bind::<dyn DatasetHeadCommitter, RacingDatasetHeadCommitter>()
+            .add_value(RacingDatasetReferenceUpdater::default())
+            .bind::<dyn DatasetReferenceUpdater, RacingDatasetReferenceUpdater>()
             .add::<PushIngestPlannerImpl>()
             .add::<PushIngestExecutorImpl>()
             .add::<DataFormatRegistryImpl>()
@@ -811,14 +811,17 @@ impl PushIngestDataUseCaseHarness {
         Self {
             base_use_case_harness,
             use_case: catalog.get_one().unwrap(),
-            racing_committer: catalog.get_one().unwrap(),
+            racing_reference_updater: catalog.get_one().unwrap(),
             account_repo: catalog.get_one().unwrap(),
         }
     }
 
-    fn move_head_before_next_commit(&self, concurrent_head: odf::Multihash) {
-        self.racing_committer
-            .move_head_before_next_commit(self.base_use_case_harness.catalog(), concurrent_head);
+    fn move_reference_before_next_update(&self, concurrent_head: odf::Multihash) {
+        self.racing_reference_updater
+            .move_reference_before_next_update(
+                self.base_use_case_harness.catalog(),
+                concurrent_head,
+            );
     }
 
     async fn ingest_data(

@@ -14,7 +14,7 @@ use kamu::*;
 use kamu_core::testing::ReportedHeads;
 use kamu_core::*;
 use kamu_datasets::{DatasetPermission, MockDatasetPermissionChecker, ResolvedDataset};
-use kamu_datasets_services::DatasetHeadCommitterImpl;
+use kamu_datasets_services::DatasetReferenceUpdaterImpl;
 use pretty_assertions::assert_matches;
 
 use crate::utils::RecordingListener;
@@ -239,7 +239,7 @@ async fn test_compact_dataset_commits_head() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[tokio::test]
-async fn test_compact_dataset_head_moved_concurrently() {
+async fn test_compact_dataset_ref_moved_concurrently() {
     let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
     let (_, dataset_id_foo) = odf::DatasetID::new_generated_ed25519();
     let reported_heads = ReportedHeads::default();
@@ -324,7 +324,7 @@ impl CompactUseCaseHarness {
             .add::<CompactionPlannerImpl>()
             .add_value(EngineConfigDatafusionEmbeddedCompaction::default())
             .add::<ObjectStoreRegistryImpl>()
-            .add::<DatasetHeadCommitterImpl>();
+            .add::<DatasetReferenceUpdaterImpl>();
         if let Some(mock_compaction_executor) = maybe_mock_compaction_executor {
             b.add_value(mock_compaction_executor)
                 .bind::<dyn CompactionExecutor, MockCompactionExecutor>();

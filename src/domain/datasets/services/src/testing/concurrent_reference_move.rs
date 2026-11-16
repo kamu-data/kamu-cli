@@ -13,52 +13,58 @@ use kamu_datasets::{DatasetReferenceRepository, DatasetRegistry};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Moves a dataset's `HEAD` as a concurrent writer does: in a transaction of
-/// its own, committed before the writer it races with commits
-pub(crate) struct ConcurrentHeadMove {
+/// Moves a dataset's reference as a concurrent writer does: in a transaction
+/// of its own, committed before the writer it races with commits
+pub(crate) struct ConcurrentReferenceMove {
     catalog: dill::Catalog,
-    /// `None` removes `HEAD` instead of moving it
-    concurrent_head: Option<odf::Multihash>,
+    /// `None` removes the reference instead of moving it
+    concurrent_block_hash: Option<odf::Multihash>,
 }
 
-impl ConcurrentHeadMove {
+impl ConcurrentReferenceMove {
     /// `catalog` resolves `DatasetRegistry` once a transaction is added to it
-    pub fn new(catalog: &dill::Catalog, concurrent_head: odf::Multihash) -> Self {
+    pub fn new(catalog: &dill::Catalog, concurrent_block_hash: odf::Multihash) -> Self {
         Self {
             catalog: catalog.clone(),
-            concurrent_head: Some(concurrent_head),
+            concurrent_block_hash: Some(concurrent_block_hash),
         }
     }
 
-    /// Removes `HEAD`; `catalog` resolves `DatasetReferenceRepository` once a
+    /// Removes the reference; `catalog` resolves `DatasetReferenceRepository` once a
     /// transaction is added to it
     pub fn removing(catalog: &dill::Catalog) -> Self {
         Self {
             catalog: catalog.clone(),
-            concurrent_head: None,
+            concurrent_block_hash: None,
         }
     }
 
-    pub async fn apply(self, dataset_handle: &odf::DatasetHandle) {
+    pub async fn apply(self, dataset_handle: &odf::DatasetHandle, block_ref: &odf::BlockRef) {
         // With no transaction manager there are no transactions to race with
         if self
             .catalog
             .get_one::<dyn DatabaseTransactionManager>()
             .is_err()
         {
-            Self::move_head(&self.catalog, dataset_handle, self.concurrent_head.as_ref())
-                .await
-                .unwrap();
+            Self::move_reference(
+                &self.catalog,
+                dataset_handle,
+                block_ref,
+                self.concurrent_block_hash.as_ref(),
+            )
+            .await
+            .unwrap();
             return;
         }
 
-        let concurrent_head = self.concurrent_head;
+        let concurrent_block_hash = self.concurrent_block_hash;
         DatabaseTransactionRunner::new(self.catalog)
             .transactional(|transaction_catalog| async move {
-                Self::move_head(
+                Self::move_reference(
                     &transaction_catalog,
                     dataset_handle,
-                    concurrent_head.as_ref(),
+                    block_ref,
+                    concurrent_block_hash.as_ref(),
                 )
                 .await
             })
@@ -66,16 +72,17 @@ impl ConcurrentHeadMove {
             .unwrap();
     }
 
-    async fn move_head(
+    async fn move_reference(
         catalog: &dill::Catalog,
         dataset_handle: &odf::DatasetHandle,
-        concurrent_head: Option<&odf::Multihash>,
+        block_ref: &odf::BlockRef,
+        concurrent_block_hash: Option<&odf::Multihash>,
     ) -> Result<(), InternalError> {
-        let Some(concurrent_head) = concurrent_head else {
+        let Some(concurrent_block_hash) = concurrent_block_hash else {
             return catalog
                 .get_one::<dyn DatasetReferenceRepository>()
                 .int_err()?
-                .remove_dataset_reference(&dataset_handle.id, &odf::BlockRef::Head)
+                .remove_dataset_reference(&dataset_handle.id, block_ref)
                 .await
                 .int_err();
         };
@@ -87,8 +94,8 @@ impl ConcurrentHeadMove {
             .await
             .as_metadata_chain()
             .set_ref(
-                &odf::BlockRef::Head,
-                concurrent_head,
+                block_ref,
+                concurrent_block_hash,
                 odf::dataset::SetRefOpts {
                     validate_block_present: true,
                     check_ref_is: None,

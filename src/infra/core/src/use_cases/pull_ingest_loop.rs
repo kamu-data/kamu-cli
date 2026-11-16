@@ -155,9 +155,14 @@ impl PullIngestLoop {
                     metadata_state,
                     ..
                 } => {
-                    if let Err(e) = HeadCommit::into_pull_result(
+                    if let Err(e) = ReferenceUpdate::into_pull_result(
                         self.update_steps
-                            .commit_head(target.get_handle(), old_head, new_head)
+                            .update_reference(
+                                target.get_handle(),
+                                &odf::BlockRef::Head,
+                                old_head,
+                                new_head,
+                            )
                             .await,
                         target.get_handle(),
                     ) {

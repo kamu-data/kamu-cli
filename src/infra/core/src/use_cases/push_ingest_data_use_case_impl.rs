@@ -16,11 +16,11 @@ use kamu_accounts::Principal;
 use kamu_core::*;
 use kamu_datasets::{
     DatasetExternallyChangedMessage,
-    DatasetHeadCommitter,
     DatasetOperation,
     DatasetOperationGuard,
     DatasetOperationRequest,
     DatasetPermissionError,
+    DatasetReferenceUpdater,
     MESSAGE_PRODUCER_KAMU_HTTP_ADAPTER,
     ResolvedDataset,
 };
@@ -34,7 +34,7 @@ use time_source::SystemTimeSource;
 pub struct PushIngestDataUseCaseImpl {
     push_ingest_planner: Arc<dyn PushIngestPlanner>,
     push_ingest_executor: Arc<dyn PushIngestExecutor>,
-    dataset_head_committer: Arc<dyn DatasetHeadCommitter>,
+    dataset_reference_updater: Arc<dyn DatasetReferenceUpdater>,
     dataset_operation_guard: Arc<dyn DatasetOperationGuard>,
     principal: Arc<Principal>,
     outbox: Arc<dyn Outbox>,
@@ -206,8 +206,8 @@ impl PushIngestDataUseCaseImpl {
         old_head: &odf::Multihash,
         new_head: &odf::Multihash,
     ) -> Result<(), PushIngestDataError> {
-        self.dataset_head_committer
-            .commit_head(target, Some(old_head), new_head)
+        self.dataset_reference_updater
+            .update_reference(target, &odf::BlockRef::Head, Some(old_head), new_head)
             .await
             .map_err(|e| {
                 PushIngestDataError::Execution(odf::dataset::CommitError::from(e).into())

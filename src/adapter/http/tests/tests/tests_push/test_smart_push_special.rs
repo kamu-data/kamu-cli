@@ -10,7 +10,7 @@
 use std::time::Duration;
 use std::{assert_matches, slice};
 
-use kamu::domain::{PushError, SyncError, SyncHeadMovedError, SyncResult};
+use kamu::domain::{PushError, SyncError, SyncRefMovedError, SyncResult};
 use kamu_adapter_http::smart_protocol::SmartTransferProtocolServerConfig;
 use kamu_adapter_http::smart_protocol::messages::{
     DatasetPushCompleteConfirmed,
@@ -325,7 +325,7 @@ async fn test_smart_push_incompatible_version_err() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_smart_push_head_moved_concurrently() {
+async fn test_smart_push_ref_moved_concurrently() {
     let (client_harness, server_harness) = LocalFsTransferOptions {
         client_tenancy: TenancyConfig::SingleTenant,
         authenticated_remotely: true,
@@ -349,7 +349,7 @@ async fn test_smart_push_head_moved_concurrently() {
         .await;
     scenario
         .server_harness
-        .move_head_before_next_commit(concurrent_head.clone());
+        .move_reference_before_next_update(concurrent_head.clone());
 
     let stored_heads = scenario.server_harness.stored_heads();
     let api_server_handle = scenario.server_harness.api_server_run();
@@ -368,8 +368,8 @@ async fn test_smart_push_head_moved_concurrently() {
         pretty_assertions::assert_eq!(push_responses.len(), 1);
         assert_matches!(
             &push_responses[0].result,
-            Err(PushError::SyncError(SyncError::HeadMoved(
-                SyncHeadMovedError { heads: None }
+            Err(PushError::SyncError(SyncError::RefMoved(
+                SyncRefMovedError { reported: None, .. }
             )))
         );
         pretty_assertions::assert_eq!(
@@ -507,7 +507,7 @@ async fn test_smart_push_from_stale_head_is_rejected_with_both_heads() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_smart_push_forced_head_moved_after_initiation() {
+async fn test_smart_push_forced_ref_moved_after_initiation() {
     let (client_harness, server_harness) = LocalFsTransferOptions {
         client_tenancy: TenancyConfig::SingleTenant,
         authenticated_remotely: true,
@@ -550,8 +550,8 @@ async fn test_smart_push_forced_head_moved_after_initiation() {
         pretty_assertions::assert_eq!(push_responses.len(), 1);
         assert_matches!(
             &push_responses[0].result,
-            Err(PushError::SyncError(SyncError::HeadMoved(
-                SyncHeadMovedError { heads: None }
+            Err(PushError::SyncError(SyncError::RefMoved(
+                SyncRefMovedError { reported: None, .. }
             )))
         );
         pretty_assertions::assert_eq!(
@@ -833,8 +833,8 @@ async fn test_smart_push_reads_the_completion_reply_after_a_stale_progress_reque
         pretty_assertions::assert_eq!(push_responses.len(), 1);
         assert_matches!(
             &push_responses[0].result,
-            Err(PushError::SyncError(SyncError::HeadMoved(
-                SyncHeadMovedError { heads: None }
+            Err(PushError::SyncError(SyncError::RefMoved(
+                SyncRefMovedError { reported: None, .. }
             )))
         );
     };

@@ -12,7 +12,7 @@ use std::sync::Arc;
 use dill::*;
 use internal_error::ErrorIntoInternal;
 use kamu_core::*;
-use kamu_datasets::{DatasetHeadCommitter, ResolvedDataset};
+use kamu_datasets::{DatasetReferenceUpdater, ResolvedDataset};
 use kamu_ingest_datafusion::DataWriterDataFusion;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -20,7 +20,7 @@ use kamu_ingest_datafusion::DataWriterDataFusion;
 #[component(pub)]
 #[interface(dyn SetWatermarkExecutor)]
 pub struct SetWatermarkExecutorImpl {
-    dataset_head_committer: Arc<dyn DatasetHeadCommitter>,
+    dataset_reference_updater: Arc<dyn DatasetReferenceUpdater>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -62,8 +62,13 @@ impl SetWatermarkExecutor for SetWatermarkExecutorImpl {
             .await
         {
             Ok(res) => {
-                self.dataset_head_committer
-                    .commit_head(&target, Some(&res.old_head), &res.new_head)
+                self.dataset_reference_updater
+                    .update_reference(
+                        &target,
+                        &odf::BlockRef::Head,
+                        Some(&res.old_head),
+                        &res.new_head,
+                    )
                     .await?;
 
                 Ok(SetWatermarkResult::Updated {

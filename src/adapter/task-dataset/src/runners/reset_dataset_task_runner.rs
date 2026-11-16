@@ -15,10 +15,10 @@ use kamu_core::{ResetExecutionError, ResetExecutor};
 use kamu_datasets::{DatasetRegistry, DatasetRegistryExt};
 use kamu_task_system::*;
 
-use super::task_head_commit::{
+use super::task_reference_update::{
     dataset_deleted_outcome,
-    head_moved_outcome,
-    head_not_allowed_outcome,
+    ref_moved_outcome,
+    ref_update_not_allowed_outcome,
 };
 use super::task_span_outcome::TaskSpanOutcome;
 use crate::{TaskDefinitionDatasetReset, TaskErrorDatasetReset, TaskResultDatasetReset};
@@ -76,10 +76,14 @@ impl ResetDatasetTaskRunner {
                 )),
                 ResetExecutionError::SetReferenceFailed(
                     odf::dataset::SetChainRefError::CASFailed(e),
-                ) => Ok(head_moved_outcome(task_reset.dataset_handle.id, Some(e))),
+                ) => Ok(ref_moved_outcome(
+                    task_reset.dataset_handle.id,
+                    e.reference.clone(),
+                    Some(e),
+                )),
                 ResetExecutionError::SetReferenceFailed(
                     odf::dataset::SetChainRefError::Access(e),
-                ) => Ok(head_not_allowed_outcome(&e)),
+                ) => Ok(ref_update_not_allowed_outcome(&e)),
                 err @ ResetExecutionError::SetReferenceFailed(
                     odf::dataset::SetChainRefError::Internal(_),
                 ) => {

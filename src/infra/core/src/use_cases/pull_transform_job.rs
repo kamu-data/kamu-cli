@@ -223,22 +223,22 @@ impl PullTransformJob {
             old_head, new_head, ..
         } = &result
         {
-            self.commit_head(target.get_handle(), old_head, new_head)
+            self.update_head(target.get_handle(), old_head, new_head)
                 .await?;
         }
 
         Ok(result)
     }
 
-    async fn commit_head(
+    async fn update_head(
         &self,
         target_handle: &odf::DatasetHandle,
         old_head: &odf::Multihash,
         new_head: &odf::Multihash,
     ) -> Result<(), PullError> {
-        HeadCommit::into_pull_result(
+        ReferenceUpdate::into_pull_result(
             self.update_steps
-                .commit_head(target_handle, old_head, new_head)
+                .update_reference(target_handle, &odf::BlockRef::Head, old_head, new_head)
                 .await,
             target_handle,
         )
@@ -311,7 +311,7 @@ impl PullTransformJob {
             CompactionResult::Success {
                 old_head, new_head, ..
             } => {
-                self.commit_head(target_handle, &old_head, &new_head)
+                self.update_head(target_handle, &old_head, &new_head)
                     .await?;
                 Ok(Some((old_head, new_head)))
             }

@@ -19,7 +19,7 @@ use kamu_datasets::{
     MockDatasetPermissionChecker,
     ResolvedDataset,
 };
-use kamu_datasets_services::DatasetHeadCommitterImpl;
+use kamu_datasets_services::DatasetReferenceUpdaterImpl;
 use pretty_assertions::assert_matches;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -132,7 +132,7 @@ impl SetWatermarkUseCaseHarness {
             .add::<SetWatermarkUseCaseImpl>()
             .add::<SetWatermarkPlannerImpl>()
             .add::<SetWatermarkExecutorImpl>()
-            .add::<DatasetHeadCommitterImpl>()
+            .add::<DatasetReferenceUpdaterImpl>()
             .add::<RemoteAliasesRegistryImpl>()
             .add::<DatasetPullSourceResolverImpl>()
             .add::<RemoteDatasetUrlResolverImpl>()

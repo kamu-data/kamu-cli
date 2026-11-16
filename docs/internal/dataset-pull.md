@@ -293,12 +293,12 @@ committed. It moves `HEAD` through `DatasetUpdateSteps`, the same steps the upda
 - with `add_aliases` on, stores the pull alias of a dataset the sync created in the commit's
   transaction, so the dataset never exists without it.
 
-**How a commit that did not happen is reported.** `HeadCommit::into_pull_result` turns each
+**How a commit that did not happen is reported.** `ReferenceUpdate::into_pull_result` turns each
 outcome of [the shared commit](dataset-operations.md#3-committing-head) into that dataset's error:
 
 | Commit | `PullError` |
 | --- | --- |
-| `HEAD` moved by another writer | `HeadMoved`, with the expected and actual heads; a sync's `SyncError::HeadMoved` becomes the same |
+| `HEAD` moved by another writer | `RefMoved`, with the expected and actual heads; a sync's `SyncError::RefMoved` becomes the same |
 | Dataset deleted | `NotFound`; also for a sync whose target was deleted before the commit |
 | Not allowed | `Access` |
 
@@ -386,7 +386,7 @@ the local and remote refs if resolved, and `Result<PullResult, PullError>`.
 `PullResult` is `UpToDate(kind)` or `Updated { old_head, new_head, has_more }`. `PullError` holds
 the planning errors of [§5.1](#51-resolving-each-request), the errors of each job's own operation
 (`ScanMetadata` among them, from planning an ingest when the job runs), the lost commit race of
-any job (`HeadMoved`), `Access` and `Internal`.
+any job (`RefMoved`), `Access` and `Internal`.
 
 `PullError::is_recoverable()` tells whether pulling again could succeed. The errors of a job's
 operation take the answer from that operation; a lost commit race and `Internal` are recoverable;
