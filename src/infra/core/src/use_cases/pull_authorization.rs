@@ -9,7 +9,6 @@
 
 use std::sync::Arc;
 
-use database_common_macros::transactional_method2;
 use internal_error::InternalError;
 use kamu_accounts::Principal;
 use kamu_core::*;
@@ -17,75 +16,87 @@ use kamu_datasets::DatasetOperationGuard;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Authorizes a pull iteration: each job's operation on its target, with the
-/// inputs a transform reads
+/// Authorizes a pull plan: each job's operation on its target, with the inputs
+/// a transform reads
 pub(crate) struct PullAuthorization {
-    catalog: dill::Catalog,
-}
-
-/// The jobs of an iteration that may run, and the responses of those denied
-pub(crate) struct AuthorizedIteration {
-    pub iteration: PullPlanIteration,
-    pub denied: Vec<PullResponse>,
+    dataset_operation_guard: Arc<dyn DatasetOperationGuard>,
+    principal: Arc<Principal>,
 }
 
 #[common_macros::method_names_consts]
 impl PullAuthorization {
-    pub(crate) fn new(catalog: dill::Catalog) -> Self {
-        Self { catalog }
+    pub(crate) fn new(
+        dataset_operation_guard: Arc<dyn DatasetOperationGuard>,
+        principal: Arc<Principal>,
+    ) -> Self {
+        Self {
+            dataset_operation_guard,
+            principal,
+        }
     }
 
-    /// Denials come in job order. A sync into a dataset that does not exist
+    /// Removes the denied jobs from the plan and appends their responses to
+    /// its errors, in job order. A plan that already has errors will not run
+    /// and is returned unchecked. A sync into a dataset that does not exist
     /// yet is not checked.
-    #[transactional_method2(dataset_operation_guard: Arc<dyn DatasetOperationGuard>, principal: Arc<Principal>)]
-    #[tracing::instrument(level = "debug", name = PullAuthorization_authorize, skip_all, fields(depth = iteration.depth, num_jobs = iteration.jobs.len()))]
-    pub(crate) async fn authorize(
-        &self,
-        iteration: PullPlanIteration,
-    ) -> Result<AuthorizedIteration, InternalError> {
-        let jobs_with_requests: Vec<_> = iteration
-            .jobs
+    #[tracing::instrument(level = "debug", name = PullAuthorization_authorize, skip_all, fields(num_iterations = plan.iterations.len()))]
+    pub(crate) async fn authorize(&self, plan: PullPlan) -> Result<PullPlan, InternalError> {
+        if !plan.errors.is_empty() {
+            return Ok(plan);
+        }
+
+        let PullPlan {
+            iterations,
+            mut errors,
+        } = plan;
+
+        let jobs_with_requests: Vec<_> = iterations
             .into_iter()
-            .map(|job| {
-                let maybe_request = job.as_operation_request();
-                (job, maybe_request)
+            .flat_map(|iteration| {
+                let depth = iteration.depth;
+                iteration.jobs.into_iter().map(move |job| {
+                    let maybe_request = job.as_operation_request();
+                    (depth, job, maybe_request)
+                })
             })
             .collect();
 
         let requests: Vec<_> = jobs_with_requests
             .iter()
-            .filter_map(|(_, maybe_request)| maybe_request.clone())
+            .filter_map(|(_, _, maybe_request)| maybe_request.clone())
             .collect();
-        let mut verdicts = dataset_operation_guard
-            .check_operations(&principal, &requests)
+        let mut verdicts = self
+            .dataset_operation_guard
+            .check_operations(&self.principal, &requests)
             .await?
             .into_iter();
 
-        let mut jobs = Vec::with_capacity(jobs_with_requests.len());
-        let mut denied = Vec::new();
-        for (job, maybe_request) in jobs_with_requests {
-            let Some(request) = maybe_request else {
-                jobs.push(job);
-                continue;
-            };
-
-            match verdicts.next().expect("one verdict per request") {
-                Ok(()) => jobs.push(job),
-                Err(error) => denied.push(PullResponse {
+        let mut allowed_iterations: Vec<PullPlanIteration> = Vec::new();
+        for (depth, job, maybe_request) in jobs_with_requests {
+            if let Some(request) = maybe_request
+                && let Err(error) = verdicts.next().expect("one verdict per request")
+            {
+                errors.push(PullResponse {
                     maybe_local_ref: Some(request.target.as_local_ref()),
                     maybe_remote_ref: None,
                     maybe_original_request: job.into_original_pull_request(),
                     result: Err(error.into()),
+                });
+                continue;
+            }
+
+            match allowed_iterations.last_mut() {
+                Some(iteration) if iteration.depth == depth => iteration.jobs.push(job),
+                Some(_) | None => allowed_iterations.push(PullPlanIteration {
+                    depth,
+                    jobs: vec![job],
                 }),
             }
         }
 
-        Ok(AuthorizedIteration {
-            iteration: PullPlanIteration {
-                depth: iteration.depth,
-                jobs,
-            },
-            denied,
+        Ok(PullPlan {
+            iterations: allowed_iterations,
+            errors,
         })
     }
 }

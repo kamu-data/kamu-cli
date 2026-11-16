@@ -1086,12 +1086,12 @@ async fn test_pull_multi_recursive() {
                 .make_expect_classify_datasets_by_allowance(
                     DatasetPermission::Write,
                     1,
-                    HashSet::from_iter([alias_foo.clone(), alias_bar.clone(), alias_baz.clone()]),
-                )
-                .make_expect_classify_datasets_by_allowance(
-                    DatasetPermission::Write,
-                    1,
-                    HashSet::from_iter([alias_foo_bar.clone()]),
+                    HashSet::from_iter([
+                        alias_foo.clone(),
+                        alias_bar.clone(),
+                        alias_baz.clone(),
+                        alias_foo_bar.clone(),
+                    ]),
                 )
                 .make_expect_classify_datasets_by_allowance(
                     DatasetPermission::Read,
@@ -1233,12 +1233,13 @@ async fn test_pull_all_owned() {
                 .make_expect_classify_datasets_by_allowance(
                     DatasetPermission::Write,
                     1,
-                    HashSet::from_iter([alias_foo.clone(), alias_bar.clone(), alias_baz.clone()]),
-                )
-                .make_expect_classify_datasets_by_allowance(
-                    DatasetPermission::Write,
-                    1,
-                    HashSet::from_iter([alias_foo_bar.clone(), alias_foo_baz.clone()]),
+                    HashSet::from_iter([
+                        alias_foo.clone(),
+                        alias_bar.clone(),
+                        alias_baz.clone(),
+                        alias_foo_bar.clone(),
+                        alias_foo_baz.clone(),
+                    ]),
                 )
                 .make_expect_classify_datasets_by_allowance(
                     DatasetPermission::Read,
@@ -1387,7 +1388,7 @@ async fn test_pull_all_owned() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[tokio::test]
-async fn test_pull_authorization_denial_still_pulls_allowed_datasets() {
+async fn test_pull_authorization_denial_pulls_nothing() {
     let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
     let alias_bar = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("bar"));
     let alias_baz = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("baz"));
@@ -1406,16 +1407,13 @@ async fn test_pull_authorization_denial_still_pulls_allowed_datasets() {
                     HashSet::from_iter([alias_bar.clone()]),
                 ),
         )
-        .with_polling_ingest_mock(
-            MockPollingIngestService::new()
-                .make_expect_ingest(alias_foo.clone())
-                .make_expect_ingest(alias_baz.clone()),
-        );
+        // No ingest is expected: a denial is reported before any job runs
+        .with_polling_ingest_mock(MockPollingIngestService::new());
     let harness = PullUseCaseHarness::new(mocks);
 
-    let foo = harness.create_root_dataset(&alias_foo).await;
+    harness.create_root_dataset(&alias_foo).await;
     let bar = harness.create_root_dataset(&alias_bar).await;
-    let baz = harness.create_root_dataset(&alias_baz).await;
+    harness.create_root_dataset(&alias_baz).await;
 
     harness.index_dataset_dependencies().await;
 
@@ -1432,28 +1430,14 @@ async fn test_pull_authorization_denial_still_pulls_allowed_datasets() {
         )
         .await
         .unwrap();
-    assert_eq!(3, pull_responses.len());
-
-    let response_for = |handle: &odf::DatasetHandle| {
-        pull_responses
-            .iter()
-            .find(|r| r.maybe_local_ref == Some(handle.as_local_ref()))
-            .unwrap()
-    };
-
     assert_matches!(
-        response_for(&bar.dataset_handle),
-        PullResponse {
+        pull_responses.as_slice(),
+        [PullResponse {
+            maybe_local_ref: Some(denied_ref),
             result: Err(PullError::Access(_)),
             ..
-        }
+        }] if *denied_ref == bar.dataset_handle.as_local_ref()
     );
-    for allowed in [&foo, &baz] {
-        assert_matches!(
-            response_for(&allowed.dataset_handle),
-            PullResponse { result: Ok(_), .. }
-        );
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1464,10 +1448,28 @@ async fn test_pull_recursive_stops_after_depth_with_failed_job() {
     let alias_bar = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("bar"));
 
     // No transform of `bar` is expected
-    let harness = PullUseCaseHarness::new(PullUseCaseHarnessMocks::for_ingest_iterations(
-        &alias_foo,
-        vec![MockIngestIteration::Unreachable],
-    ));
+    let harness = PullUseCaseHarness::new(
+        PullUseCaseHarnessMocks::default()
+            .with_permission_checker_mock(
+                MockDatasetPermissionChecker::new()
+                    .make_expect_classify_datasets_by_allowance(
+                        DatasetPermission::Write,
+                        1,
+                        HashSet::from_iter([alias_foo.clone(), alias_bar.clone()]),
+                    )
+                    .make_expect_classify_datasets_by_allowance(
+                        DatasetPermission::Read,
+                        1,
+                        HashSet::from_iter([alias_foo.clone()]),
+                    ),
+            )
+            .with_polling_ingest_mock(
+                MockPollingIngestService::new().make_expect_ingest_iterations(
+                    &alias_foo,
+                    vec![MockIngestIteration::Unreachable],
+                ),
+            ),
+    );
     let foo = harness.create_root_dataset(&alias_foo).await;
     harness
         .create_derived_dataset(&alias_bar, vec![foo.dataset_handle.as_local_ref()])
@@ -1489,18 +1491,18 @@ async fn test_pull_recursive_stops_after_depth_with_failed_job() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[tokio::test]
-async fn test_pull_recursive_stops_after_depth_with_denied_job() {
+async fn test_pull_recursive_with_denied_upstream_runs_no_job() {
     let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
     let alias_bar = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("bar"));
 
-    // Neither an ingest of `foo` nor a transform of `bar` is expected
+    // Neither an ingest of `foo` nor a transform of the allowed `bar` is expected
     let harness = PullUseCaseHarness::new(
         PullUseCaseHarnessMocks::default().with_permission_checker_mock(
             MockDatasetPermissionChecker::new()
                 .make_expect_classify_datasets_by_allowance(
                     DatasetPermission::Write,
                     1,
-                    HashSet::new(),
+                    HashSet::from_iter([alias_bar.clone()]),
                 )
                 .make_expect_classify_datasets_by_allowance(
                     DatasetPermission::Read,

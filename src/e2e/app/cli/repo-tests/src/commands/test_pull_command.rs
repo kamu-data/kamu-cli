@@ -345,16 +345,27 @@ pub async fn test_pull_multiple_datasets_with_mixed_outcomes(mut kamu: KamuCliPu
     .success();
 
     // A dataset the account can read but not update keeps the permission error,
-    // one it cannot read is reported as not found
-    let gone_url_str = gone_url.as_str();
+    // one it cannot read is reported as not found. A denial fails the pull before
+    // any dataset runs.
     kamu.assert_failure_command_execution(
         ["pull", "alice/a", "bob/b", "bob/p", "alice/c"],
         None,
         Some([
-            r#"1 dataset\(s\) updated"#,
-            r#"Failed to update 3 dataset\(s\)"#,
+            r#"Failed to update 2 dataset\(s\)"#,
             regex::escape("User has no 'write' permission in dataset 'bob/b'").as_str(),
             regex::escape("Failed to pull bob/p: Dataset not found: bob/p").as_str(),
+        ]),
+    )
+    .await;
+
+    // Without the denied datasets, a failed sync does not stop the ingest beside it
+    let gone_url_str = gone_url.as_str();
+    kamu.assert_failure_command_execution(
+        ["pull", "alice/a", "alice/c"],
+        None,
+        Some([
+            r#"1 dataset\(s\) updated"#,
+            r#"Failed to update 1 dataset\(s\)"#,
             regex::escape(&format!(
                 "Failed to sync alice/c from {gone_url_str}: Dataset {gone_url_str}/ not found"
             ))

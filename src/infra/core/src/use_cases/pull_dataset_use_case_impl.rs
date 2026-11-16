@@ -9,12 +9,14 @@
 
 use std::sync::Arc;
 
-use database_common_macros::transactional_method1;
+use database_common_macros::transactional_method3;
 use dill::*;
 use internal_error::InternalError;
+use kamu_accounts::Principal;
 use kamu_core::*;
+use kamu_datasets::DatasetOperationGuard;
 
-use super::pull_authorization::{AuthorizedIteration, PullAuthorization};
+use super::pull_authorization::PullAuthorization;
 use super::pull_ingest_loop::PullIngestLoop;
 use super::pull_sync_job::PullSyncJob;
 use super::pull_transform_job::PullTransformJob;
@@ -60,16 +62,6 @@ impl PullDatasetUseCaseImpl {
         // Execute each iteration
         for iteration in plan {
             tracing::info!(depth = %iteration.depth, jobs = ?iteration.jobs, "Running pull iteration");
-
-            let AuthorizedIteration { iteration, denied } =
-                PullAuthorization::new(self.catalog.clone())
-                    .authorize(iteration)
-                    .await?;
-
-            // The allowed jobs still run; later iterations may depend on the denied ones, so the
-            // pull stops after this one, as after a failed job
-            let has_denied = !denied.is_empty();
-            results.extend(denied);
 
             // Run iteration jobs concurrently
             let mut tasks = tokio::task::JoinSet::new();
@@ -136,7 +128,7 @@ impl PullDatasetUseCaseImpl {
                 }
                 results.push(result);
             }
-            if has_errors || has_denied {
+            if has_errors {
                 break;
             }
         }
@@ -144,24 +136,42 @@ impl PullDatasetUseCaseImpl {
         Ok(results)
     }
 
-    #[transactional_method1(pull_request_planner: Arc<dyn PullRequestPlanner>)]
+    /// The plan holds only the jobs the caller may run; the denied ones are
+    /// among its errors
+    #[transactional_method3(
+        pull_request_planner: Arc<dyn PullRequestPlanner>,
+        dataset_operation_guard: Arc<dyn DatasetOperationGuard>,
+        principal: Arc<Principal>
+    )]
     async fn build_plan_for_requests(
         &self,
         requests: &[PullRequest],
         options: &PullOptions,
     ) -> Result<PullPlan, InternalError> {
-        Ok(pull_request_planner
+        let plan = pull_request_planner
             .build_pull_multi_plan(requests, options, *self.tenancy_config)
-            .await)
+            .await;
+        PullAuthorization::new(dataset_operation_guard, principal)
+            .authorize(plan)
+            .await
     }
 
-    #[transactional_method1(pull_request_planner: Arc<dyn PullRequestPlanner>)]
+    /// The plan holds only the jobs the caller may run; the denied ones are
+    /// among its errors
+    #[transactional_method3(
+        pull_request_planner: Arc<dyn PullRequestPlanner>,
+        dataset_operation_guard: Arc<dyn DatasetOperationGuard>,
+        principal: Arc<Principal>
+    )]
     async fn build_plan_for_all_owned_datasets(
         &self,
         options: &PullOptions,
     ) -> Result<PullPlan, InternalError> {
-        pull_request_planner
+        let plan = pull_request_planner
             .build_pull_plan_all_owner_datasets(options, *self.tenancy_config)
+            .await?;
+        PullAuthorization::new(dataset_operation_guard, principal)
+            .authorize(plan)
             .await
     }
 }
