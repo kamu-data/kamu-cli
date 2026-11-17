@@ -99,7 +99,7 @@ async-trait = "0.1"
 aws-credential-types = { version = "1" }
 bytes = "1"
 cfg-if = "1" # Conditional compilation
-cheap-clone = { version = "0.3", default-features = false, features = [
+cheap-clone = { version = "1", default-features = false, features = [
     "alloc",
 ] }
 chrono = { version = "0.4", features = [

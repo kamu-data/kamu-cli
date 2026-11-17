@@ -11,14 +11,7 @@ use std::marker::PhantomData;
 
 use crate::auth::ResourceOwnerRef;
 use crate::formats::Did;
-use crate::resources::{
-    IntoResourceRef,
-    ResourceID,
-    ResourceName,
-    ResourceRef,
-    ResourceType,
-    ResourceTypeMismatchError,
-};
+use crate::resources::{IntoResourceRef, ResourceID, ResourceName, ResourceRef, ResourceType};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -26,17 +19,32 @@ use crate::resources::{
 ///
 /// The typed counterpart of [`ResourceRef`]: the target type is fixed by `Res`
 /// instead of being carried as a value, so it cannot name any other type.
-pub struct ResourceRefT<Res> {
+pub struct ResourceRefT<Res: ResourceType> {
     /// Reference to an account that owns the target resource.
     pub account: Option<ResourceOwnerRef>,
+    /// Type of the target resource, which exists only at compile time.
+    pub r#type: PhantomData<fn() -> Res>,
     /// ID of the resource within a node.
     pub id: Option<ResourceID>,
     /// DID of the resource.
     pub did: Option<Did>,
-    /// Type of the target resource, which exists only at compile time.
-    pub r#type: PhantomData<fn() -> Res>,
     /// Name of a resource.
     pub name: Option<ResourceName>,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl<Res: ResourceType> ResourceRefT<Res> {
+    /// Contructs typed reference without ensuring that the types are the same
+    pub fn new_from_ref_unchecked(r: ResourceRef) -> Self {
+        Self {
+            account: r.account,
+            r#type: PhantomData,
+            id: r.id,
+            did: r.did,
+            name: r.name,
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -44,7 +52,7 @@ pub struct ResourceRefT<Res> {
 // Implemented by hand: derives would require `Res` itself to implement each
 // trait, though no value of `Res` is stored.
 
-impl<Res> Clone for ResourceRefT<Res> {
+impl<Res: ResourceType> Clone for ResourceRefT<Res> {
     fn clone(&self) -> Self {
         Self {
             account: self.account.clone(),
@@ -56,7 +64,7 @@ impl<Res> Clone for ResourceRefT<Res> {
     }
 }
 
-impl<Res> PartialEq for ResourceRefT<Res> {
+impl<Res: ResourceType> PartialEq for ResourceRefT<Res> {
     fn eq(&self, other: &Self) -> bool {
         self.account == other.account
             && self.id == other.id
@@ -65,9 +73,9 @@ impl<Res> PartialEq for ResourceRefT<Res> {
     }
 }
 
-impl<Res> Eq for ResourceRefT<Res> {}
+impl<Res: ResourceType> Eq for ResourceRefT<Res> {}
 
-impl<Res> Default for ResourceRefT<Res> {
+impl<Res: ResourceType> Default for ResourceRefT<Res> {
     fn default() -> Self {
         Self {
             account: None,
@@ -83,9 +91,9 @@ impl<Res: ResourceType> std::fmt::Debug for ResourceRefT<Res> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("ResourceRefT")
             .field("account", &self.account)
+            .field("type", &Res::type_uri_str())
             .field("id", &self.id)
             .field("did", &self.did)
-            .field("type", &Res::type_name())
             .field("name", &self.name)
             .finish()
     }
@@ -106,65 +114,12 @@ impl<Res: ResourceType> From<ResourceRefT<Res>> for ResourceRef {
             account,
             id,
             did,
-            r#type: Some(Res::type_uri().into()),
+            r#type: Some(Res::type_uri().cheap_clone().into()),
             name,
         }
     }
 }
 
 impl<Res: ResourceType> IntoResourceRef for ResourceRefT<Res> {}
-
-/// Fails if the reference names a type other than `Res`. A reference that
-/// names no type is accepted: `Res` then narrows it.
-impl<Res: ResourceType> TryFrom<ResourceRef> for ResourceRefT<Res> {
-    type Error = ResourceTypeMismatchError;
-
-    fn try_from(value: ResourceRef) -> Result<Self, Self::Error> {
-        let ResourceRef {
-            account,
-            id,
-            did,
-            r#type,
-            name,
-        } = value;
-
-        if let Some(r#type) = r#type
-            && !Res::matches_type_ref(&r#type)
-        {
-            return Err(ResourceTypeMismatchError {
-                expected: Res::type_uri(),
-                actual: r#type,
-            });
-        }
-
-        Ok(Self {
-            account,
-            id,
-            did,
-            r#type: PhantomData,
-            name,
-        })
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-impl<Res: ResourceType> ::multiformats::Multiformat for ResourceRefT<Res> {
-    fn format_name() -> &'static str {
-        "ResourceRef"
-    }
-}
-
-/// Parses the short form `Type:[account/]name`, where `Type` must name `Res`.
-impl<Res: ResourceType> std::str::FromStr for ResourceRefT<Res> {
-    type Err = ::multiformats::ParseError<Self>;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let untyped = ResourceRef::from_str(s).map_err(::multiformats::ParseError::convert)?;
-        untyped
-            .try_into()
-            .map_err(|e| ::multiformats::ParseError::new_from(s, e))
-    }
-}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

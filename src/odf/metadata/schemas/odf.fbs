@@ -874,6 +874,8 @@ table AttachmentsEmbedded {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 table ResourceOwnerHandle {
+  // Type URI of the account.
+  type: string;
   // ID of the account resource.
   id: [ubyte];
   // DID of the account.
@@ -928,6 +930,8 @@ table AwsCredentials {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 table ResourceOwnerRef {
+  // Name or URI of the account type.
+  type: string;
   // UUID of the account resource.
   id: [ubyte];
   // DID of the account.
@@ -1116,16 +1120,16 @@ table ResourceAnnotations {
 table ResourceRef {
   // Reference to an account that owns the target resource.
   account: ResourceOwnerRef;
-  // ID of the resource within a node.
-  id: [ubyte];
-  // DID of the resource.
-  did: [ubyte];
   // Short type name or full type URI of the target resource.
   //
   // Examples:
   // - "SecretSet"
   // - "https://opendatafabric.org/schemas/config/v1alpha1/SecretSet"
   type: string;
+  // ID of the resource within a node.
+  id: [ubyte];
+  // DID of the resource.
+  did: [ubyte];
   // Name of a resource.
   name: string;
 }
@@ -1947,7 +1951,7 @@ table PrincipalRef {
   account: ResourceOwnerRef;
   // ID of the principal resource.
   id: [ubyte];
-  // DID of the principal.
+  // DID of the principal account or node.
   did: [ubyte];
   // Name of the principal resource.
   name: string;
@@ -2573,15 +2577,15 @@ table FlowRunSpecInput {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 table PrincipalHandle {
+  // Owner account, if principal is a service account.
+  account: ResourceOwnerHandle;
   // Type URI of the principal.
   type: string;
-  // Account that owns the service account.
-  account: ResourceOwnerHandle;
-  // ID of the principal resource.
+  // ID of the principal account resource.
   id: [ubyte];
-  // DID of the principal, if applicable.
+  // DID of the principal account.
   did: [ubyte];
-  // Name of the principal resource.
+  // Name of the principal account.
   name: string;
 }
 

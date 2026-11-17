@@ -678,10 +678,10 @@ pub mod auth {
     #[serde(deny_unknown_fields)]
     #[serde(rename_all = "camelCase")]
     pub struct PrincipalHandle {
-        pub r#type: odf::resources::TypeUri,
         #[serde(default)]
         #[serde(skip_serializing_if = "Option::is_none")]
         pub account: Option<auth::ResourceOwnerHandle>,
+        pub r#type: odf::resources::TypeUri,
         pub id: odf::resources::ResourceID,
         #[serde(default)]
         #[serde(skip_serializing_if = "Option::is_none")]
@@ -699,8 +699,8 @@ pub mod auth {
     impl From<dtos::auth::PrincipalHandle> for PrincipalHandle {
         fn from(v: dtos::auth::PrincipalHandle) -> Self {
             Self {
-                r#type: v.r#type,
                 account: v.account.map(|v| v.into()),
+                r#type: v.r#type,
                 id: v.id,
                 did: v.did,
                 name: v.name,
@@ -712,11 +712,11 @@ pub mod auth {
         type Error = ValidationError;
         fn try_from(v: PrincipalHandle) -> Result<Self, ValidationError> {
             Ok(Self {
-                r#type: v.r#type,
                 account: v
                     .account
                     .map(|v| dtos::auth::ResourceOwnerHandle::try_from(v))
                     .transpose()?,
+                r#type: v.r#type,
                 id: v.id,
                 did: v.did,
                 name: v.name,
@@ -792,6 +792,7 @@ pub mod auth {
     #[serde(deny_unknown_fields)]
     #[serde(rename_all = "camelCase")]
     pub struct ResourceOwnerHandle {
+        pub r#type: odf::resources::TypeUri,
         pub id: odf::resources::ResourceID,
         pub did: odf::auth::AccountDid,
         pub name: odf::auth::AccountName,
@@ -807,6 +808,7 @@ pub mod auth {
     impl From<dtos::auth::ResourceOwnerHandle> for ResourceOwnerHandle {
         fn from(v: dtos::auth::ResourceOwnerHandle) -> Self {
             Self {
+                r#type: v.r#type,
                 id: v.id,
                 did: v.did,
                 name: v.name,
@@ -818,6 +820,7 @@ pub mod auth {
         type Error = ValidationError;
         fn try_from(v: ResourceOwnerHandle) -> Result<Self, ValidationError> {
             Ok(Self {
+                r#type: v.r#type,
                 id: v.id,
                 did: v.did,
                 name: v.name,
@@ -832,6 +835,9 @@ pub mod auth {
     #[serde(deny_unknown_fields)]
     #[serde(rename_all = "camelCase")]
     pub struct ResourceOwnerRef {
+        #[serde(default)]
+        #[serde(skip_serializing_if = "Option::is_none")]
+        pub r#type: Option<odf::resources::TypeRef>,
         #[serde(default)]
         #[serde(skip_serializing_if = "Option::is_none")]
         pub id: Option<odf::resources::ResourceID>,
@@ -855,6 +861,7 @@ pub mod auth {
     impl From<dtos::auth::ResourceOwnerRef> for ResourceOwnerRef {
         fn from(v: dtos::auth::ResourceOwnerRef) -> Self {
             Self {
+                r#type: v.r#type,
                 id: v.id,
                 did: v.did,
                 name: v.name,
@@ -866,6 +873,7 @@ pub mod auth {
         type Error = ValidationError;
         fn try_from(v: ResourceOwnerRef) -> Result<Self, ValidationError> {
             Ok(Self {
+                r#type: v.r#type,
                 id: v.id,
                 did: v.did,
                 name: v.name,
@@ -3337,9 +3345,7 @@ pub mod datasets {
     #[serde(deny_unknown_fields)]
     #[serde(rename_all = "camelCase")]
     pub struct DatasetHandle {
-        #[serde(default)]
-        #[serde(skip_serializing_if = "Option::is_none")]
-        pub account: Option<auth::ResourceOwnerHandle>,
+        pub account: auth::ResourceOwnerHandle,
         pub id: odf::resources::ResourceID,
         pub did: odf::datasets::DatasetDid,
         pub name: odf::resources::ResourceName,
@@ -3355,7 +3361,7 @@ pub mod datasets {
     impl From<dtos::datasets::DatasetHandle> for DatasetHandle {
         fn from(v: dtos::datasets::DatasetHandle) -> Self {
             Self {
-                account: v.account.map(|v| v.into()),
+                account: v.account.into(),
                 id: v.id,
                 did: v.did,
                 name: v.name,
@@ -3367,10 +3373,7 @@ pub mod datasets {
         type Error = ValidationError;
         fn try_from(v: DatasetHandle) -> Result<Self, ValidationError> {
             Ok(Self {
-                account: v
-                    .account
-                    .map(|v| dtos::auth::ResourceOwnerHandle::try_from(v))
-                    .transpose()?,
+                account: dtos::auth::ResourceOwnerHandle::try_from(v.account)?,
                 id: v.id,
                 did: v.did,
                 name: v.name,
@@ -8047,13 +8050,13 @@ pub mod resources {
         pub account: Option<StructOrString<auth::ResourceOwnerRef>>,
         #[serde(default)]
         #[serde(skip_serializing_if = "Option::is_none")]
+        pub r#type: Option<odf::resources::TypeRef>,
+        #[serde(default)]
+        #[serde(skip_serializing_if = "Option::is_none")]
         pub id: Option<odf::resources::ResourceID>,
         #[serde(default)]
         #[serde(skip_serializing_if = "Option::is_none")]
         pub did: Option<odf::Did>,
-        #[serde(default)]
-        #[serde(skip_serializing_if = "Option::is_none")]
-        pub r#type: Option<odf::resources::TypeRef>,
         #[serde(default)]
         #[serde(skip_serializing_if = "Option::is_none")]
         pub name: Option<odf::resources::ResourceName>,
@@ -8072,9 +8075,9 @@ pub mod resources {
         fn from(v: dtos::resources::ResourceRef) -> Self {
             Self {
                 account: v.account.map(|v| v.into()),
+                r#type: v.r#type,
                 id: v.id,
                 did: v.did,
-                r#type: v.r#type,
                 name: v.name,
             }
         }
@@ -8088,9 +8091,9 @@ pub mod resources {
                     .account
                     .map(|v| dtos::auth::ResourceOwnerRef::try_from(v))
                     .transpose()?,
+                r#type: v.r#type,
                 id: v.id,
                 did: v.did,
-                r#type: v.r#type,
                 name: v.name,
             })
         }

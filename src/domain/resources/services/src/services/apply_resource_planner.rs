@@ -157,7 +157,7 @@ where
                 .generic_resource_query_service
                 .find_resource_id_by_name(
                     Self::resolved_account_id(headers),
-                    R::schema(),
+                    R::type_uri(),
                     &headers.name,
                 )
                 .await
@@ -233,7 +233,7 @@ where
             .generic_resource_query_service
             .resolve_resource_ids_by_names(
                 Self::resolved_account_id(headers),
-                R::schema(),
+                R::type_uri(),
                 std::slice::from_ref(&headers.name),
                 ResourceVisibility::IncludeDeleting,
             )

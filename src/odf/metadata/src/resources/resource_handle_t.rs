@@ -19,7 +19,7 @@ use crate::resources::{
     ResourceRef,
     ResourceRefT,
     ResourceType,
-    ResourceTypeMismatchError,
+    TypeMismatchError,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -29,7 +29,7 @@ use crate::resources::{
 /// The typed counterpart of [`ResourceHandle`]: the target type is fixed by
 /// `Res` instead of being carried as a value, so it cannot name any other
 /// type.
-pub struct ResourceHandleT<Res> {
+pub struct ResourceHandleT<Res: ResourceType> {
     /// Account that owns the target resource.
     pub account: ResourceOwnerHandle,
     /// Type of the target resource, which exists only at compile time.
@@ -47,7 +47,7 @@ pub struct ResourceHandleT<Res> {
 // Implemented by hand: derives would require `Res` itself to implement each
 // trait, though no value of `Res` is stored.
 
-impl<Res> Clone for ResourceHandleT<Res> {
+impl<Res: ResourceType> Clone for ResourceHandleT<Res> {
     fn clone(&self) -> Self {
         Self {
             account: self.account.clone(),
@@ -59,7 +59,7 @@ impl<Res> Clone for ResourceHandleT<Res> {
     }
 }
 
-impl<Res> PartialEq for ResourceHandleT<Res> {
+impl<Res: ResourceType> PartialEq for ResourceHandleT<Res> {
     fn eq(&self, other: &Self) -> bool {
         self.account == other.account
             && self.id == other.id
@@ -68,13 +68,13 @@ impl<Res> PartialEq for ResourceHandleT<Res> {
     }
 }
 
-impl<Res> Eq for ResourceHandleT<Res> {}
+impl<Res: ResourceType> Eq for ResourceHandleT<Res> {}
 
 impl<Res: ResourceType> std::fmt::Debug for ResourceHandleT<Res> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("ResourceHandleT")
             .field("account", &self.account)
-            .field("type", &Res::type_name())
+            .field("type", &Res::type_uri_str())
             .field("id", &self.id)
             .field("did", &self.did)
             .field("name", &self.name)
@@ -95,7 +95,7 @@ impl<Res: ResourceType> From<ResourceHandleT<Res>> for ResourceHandle {
         } = value;
         Self {
             account,
-            r#type: Res::type_uri(),
+            r#type: Res::type_uri().cheap_clone(),
             id,
             did,
             name,
@@ -105,7 +105,7 @@ impl<Res: ResourceType> From<ResourceHandleT<Res>> for ResourceHandle {
 
 /// Fails if the handle points to a type other than `Res`.
 impl<Res: ResourceType> TryFrom<ResourceHandle> for ResourceHandleT<Res> {
-    type Error = ResourceTypeMismatchError;
+    type Error = TypeMismatchError;
 
     fn try_from(value: ResourceHandle) -> Result<Self, Self::Error> {
         let ResourceHandle {
@@ -116,9 +116,9 @@ impl<Res: ResourceType> TryFrom<ResourceHandle> for ResourceHandleT<Res> {
             name,
         } = value;
 
-        if r#type.as_str() != Res::SCHEMA_STR {
-            return Err(ResourceTypeMismatchError {
-                expected: Res::type_uri(),
+        if r#type != *Res::type_uri() {
+            return Err(TypeMismatchError {
+                expected: Res::type_uri().cheap_clone(),
                 actual: r#type.into(),
             });
         }
@@ -135,7 +135,7 @@ impl<Res: ResourceType> TryFrom<ResourceHandle> for ResourceHandleT<Res> {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl<Res> From<ResourceHandleT<Res>> for ResourceRefT<Res> {
+impl<Res: ResourceType> From<ResourceHandleT<Res>> for ResourceRefT<Res> {
     fn from(value: ResourceHandleT<Res>) -> Self {
         let ResourceHandleT {
             account,

@@ -45,6 +45,7 @@ macro_rules! declare_apply_resource_use_case {
             ) -> Result<(), kamu_resources::ApplyResourceUseCaseError<$resource>> {
                 match &params.headers.account {
                     Some(odf::metadata::auth::ResourceOwnerRef {
+                        r#type: Some(_),
                         id: Some(_),
                         did: Some(_),
                         name: Some(_),
@@ -86,7 +87,7 @@ macro_rules! declare_apply_resource_use_case {
                         self.generic_resource_query_service
                             .find_resource_id_by_name(
                                 account_id,
-                                <$resource as kamu_resources::ResourceSchemaProvider>::schema(),
+                                <$resource as kamu_resources::ResourceSchemaProvider>::type_uri(),
                                 &params.headers.name,
                             )
                             .await

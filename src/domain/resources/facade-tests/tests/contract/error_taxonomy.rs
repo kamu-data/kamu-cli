@@ -467,6 +467,7 @@ pub async fn test_account_resolution_taxonomy(h: &impl FacadeContractHarness) {
     let facade = h.facade_for(TestAccount::Alice);
 
     let unknown_account = ResourceOwnerRef {
+        r#type: None,
         id: None,
         did: None,
         name: Some(odf::AccountName::new_unchecked(

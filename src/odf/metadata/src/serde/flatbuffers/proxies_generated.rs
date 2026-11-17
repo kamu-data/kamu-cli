@@ -15743,9 +15743,10 @@ impl<'a> ::flatbuffers::Follow<'a> for ResourceOwnerHandle<'a> {
 }
 
 impl<'a> ResourceOwnerHandle<'a> {
-    pub const VT_ID: ::flatbuffers::VOffsetT = 4;
-    pub const VT_DID: ::flatbuffers::VOffsetT = 6;
-    pub const VT_NAME: ::flatbuffers::VOffsetT = 8;
+    pub const VT_TYPE_: ::flatbuffers::VOffsetT = 4;
+    pub const VT_ID: ::flatbuffers::VOffsetT = 6;
+    pub const VT_DID: ::flatbuffers::VOffsetT = 8;
+    pub const VT_NAME: ::flatbuffers::VOffsetT = 10;
 
     #[inline]
     pub unsafe fn init_from_table(table: ::flatbuffers::Table<'a>) -> Self {
@@ -15771,9 +15772,22 @@ impl<'a> ResourceOwnerHandle<'a> {
         if let Some(x) = args.id {
             builder.add_id(x);
         }
+        if let Some(x) = args.type_ {
+            builder.add_type_(x);
+        }
         builder.finish()
     }
 
+    #[inline]
+    pub fn type_(&self) -> Option<&'a str> {
+        // Safety:
+        // Created from valid Table for this object
+        // which contains a valid value in this slot
+        unsafe {
+            self._tab
+                .get::<::flatbuffers::ForwardsUOffset<&str>>(ResourceOwnerHandle::VT_TYPE_, None)
+        }
+    }
     #[inline]
     pub fn id(&self) -> Option<::flatbuffers::Vector<'a, u8>> {
         // Safety:
@@ -15819,6 +15833,7 @@ impl ::flatbuffers::Verifiable for ResourceOwnerHandle<'_> {
         pos: usize,
     ) -> Result<(), ::flatbuffers::InvalidFlatbuffer> {
         v.visit_table(pos)?
+            .visit_field::<::flatbuffers::ForwardsUOffset<&str>>("type_", Self::VT_TYPE_, false)?
             .visit_field::<::flatbuffers::ForwardsUOffset<::flatbuffers::Vector<'_, u8>>>(
                 "id",
                 Self::VT_ID,
@@ -15835,6 +15850,7 @@ impl ::flatbuffers::Verifiable for ResourceOwnerHandle<'_> {
     }
 }
 pub struct ResourceOwnerHandleArgs<'a> {
+    pub type_: Option<::flatbuffers::WIPOffset<&'a str>>,
     pub id: Option<::flatbuffers::WIPOffset<::flatbuffers::Vector<'a, u8>>>,
     pub did: Option<::flatbuffers::WIPOffset<::flatbuffers::Vector<'a, u8>>>,
     pub name: Option<::flatbuffers::WIPOffset<&'a str>>,
@@ -15843,6 +15859,7 @@ impl<'a> Default for ResourceOwnerHandleArgs<'a> {
     #[inline]
     fn default() -> Self {
         ResourceOwnerHandleArgs {
+            type_: None,
             id: None,
             did: None,
             name: None,
@@ -15855,6 +15872,11 @@ pub struct ResourceOwnerHandleBuilder<'a: 'b, 'b, A: ::flatbuffers::Allocator + 
     start_: ::flatbuffers::WIPOffset<::flatbuffers::TableUnfinishedWIPOffset>,
 }
 impl<'a: 'b, 'b, A: ::flatbuffers::Allocator + 'a> ResourceOwnerHandleBuilder<'a, 'b, A> {
+    #[inline]
+    pub fn add_type_(&mut self, type_: ::flatbuffers::WIPOffset<&'b str>) {
+        self.fbb_
+            .push_slot_always::<::flatbuffers::WIPOffset<_>>(ResourceOwnerHandle::VT_TYPE_, type_);
+    }
     #[inline]
     pub fn add_id(&mut self, id: ::flatbuffers::WIPOffset<::flatbuffers::Vector<'b, u8>>) {
         self.fbb_
@@ -15890,6 +15912,7 @@ impl<'a: 'b, 'b, A: ::flatbuffers::Allocator + 'a> ResourceOwnerHandleBuilder<'a
 impl ::core::fmt::Debug for ResourceOwnerHandle<'_> {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         let mut ds = f.debug_struct("ResourceOwnerHandle");
+        ds.field("type_", &self.type_());
         ds.field("id", &self.id());
         ds.field("did", &self.did());
         ds.field("name", &self.name());
@@ -16291,9 +16314,10 @@ impl<'a> ::flatbuffers::Follow<'a> for ResourceOwnerRef<'a> {
 }
 
 impl<'a> ResourceOwnerRef<'a> {
-    pub const VT_ID: ::flatbuffers::VOffsetT = 4;
-    pub const VT_DID: ::flatbuffers::VOffsetT = 6;
-    pub const VT_NAME: ::flatbuffers::VOffsetT = 8;
+    pub const VT_TYPE_: ::flatbuffers::VOffsetT = 4;
+    pub const VT_ID: ::flatbuffers::VOffsetT = 6;
+    pub const VT_DID: ::flatbuffers::VOffsetT = 8;
+    pub const VT_NAME: ::flatbuffers::VOffsetT = 10;
 
     #[inline]
     pub unsafe fn init_from_table(table: ::flatbuffers::Table<'a>) -> Self {
@@ -16319,9 +16343,22 @@ impl<'a> ResourceOwnerRef<'a> {
         if let Some(x) = args.id {
             builder.add_id(x);
         }
+        if let Some(x) = args.type_ {
+            builder.add_type_(x);
+        }
         builder.finish()
     }
 
+    #[inline]
+    pub fn type_(&self) -> Option<&'a str> {
+        // Safety:
+        // Created from valid Table for this object
+        // which contains a valid value in this slot
+        unsafe {
+            self._tab
+                .get::<::flatbuffers::ForwardsUOffset<&str>>(ResourceOwnerRef::VT_TYPE_, None)
+        }
+    }
     #[inline]
     pub fn id(&self) -> Option<::flatbuffers::Vector<'a, u8>> {
         // Safety:
@@ -16367,6 +16404,7 @@ impl ::flatbuffers::Verifiable for ResourceOwnerRef<'_> {
         pos: usize,
     ) -> Result<(), ::flatbuffers::InvalidFlatbuffer> {
         v.visit_table(pos)?
+            .visit_field::<::flatbuffers::ForwardsUOffset<&str>>("type_", Self::VT_TYPE_, false)?
             .visit_field::<::flatbuffers::ForwardsUOffset<::flatbuffers::Vector<'_, u8>>>(
                 "id",
                 Self::VT_ID,
@@ -16383,6 +16421,7 @@ impl ::flatbuffers::Verifiable for ResourceOwnerRef<'_> {
     }
 }
 pub struct ResourceOwnerRefArgs<'a> {
+    pub type_: Option<::flatbuffers::WIPOffset<&'a str>>,
     pub id: Option<::flatbuffers::WIPOffset<::flatbuffers::Vector<'a, u8>>>,
     pub did: Option<::flatbuffers::WIPOffset<::flatbuffers::Vector<'a, u8>>>,
     pub name: Option<::flatbuffers::WIPOffset<&'a str>>,
@@ -16391,6 +16430,7 @@ impl<'a> Default for ResourceOwnerRefArgs<'a> {
     #[inline]
     fn default() -> Self {
         ResourceOwnerRefArgs {
+            type_: None,
             id: None,
             did: None,
             name: None,
@@ -16403,6 +16443,11 @@ pub struct ResourceOwnerRefBuilder<'a: 'b, 'b, A: ::flatbuffers::Allocator + 'a>
     start_: ::flatbuffers::WIPOffset<::flatbuffers::TableUnfinishedWIPOffset>,
 }
 impl<'a: 'b, 'b, A: ::flatbuffers::Allocator + 'a> ResourceOwnerRefBuilder<'a, 'b, A> {
+    #[inline]
+    pub fn add_type_(&mut self, type_: ::flatbuffers::WIPOffset<&'b str>) {
+        self.fbb_
+            .push_slot_always::<::flatbuffers::WIPOffset<_>>(ResourceOwnerRef::VT_TYPE_, type_);
+    }
     #[inline]
     pub fn add_id(&mut self, id: ::flatbuffers::WIPOffset<::flatbuffers::Vector<'b, u8>>) {
         self.fbb_
@@ -16438,6 +16483,7 @@ impl<'a: 'b, 'b, A: ::flatbuffers::Allocator + 'a> ResourceOwnerRefBuilder<'a, '
 impl ::core::fmt::Debug for ResourceOwnerRef<'_> {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         let mut ds = f.debug_struct("ResourceOwnerRef");
+        ds.field("type_", &self.type_());
         ds.field("id", &self.id());
         ds.field("did", &self.did());
         ds.field("name", &self.name());
@@ -18042,9 +18088,9 @@ impl<'a> ::flatbuffers::Follow<'a> for ResourceRef<'a> {
 
 impl<'a> ResourceRef<'a> {
     pub const VT_ACCOUNT: ::flatbuffers::VOffsetT = 4;
-    pub const VT_ID: ::flatbuffers::VOffsetT = 6;
-    pub const VT_DID: ::flatbuffers::VOffsetT = 8;
-    pub const VT_TYPE_: ::flatbuffers::VOffsetT = 10;
+    pub const VT_TYPE_: ::flatbuffers::VOffsetT = 6;
+    pub const VT_ID: ::flatbuffers::VOffsetT = 8;
+    pub const VT_DID: ::flatbuffers::VOffsetT = 10;
     pub const VT_NAME: ::flatbuffers::VOffsetT = 12;
 
     #[inline]
@@ -18065,14 +18111,14 @@ impl<'a> ResourceRef<'a> {
         if let Some(x) = args.name {
             builder.add_name(x);
         }
-        if let Some(x) = args.type_ {
-            builder.add_type_(x);
-        }
         if let Some(x) = args.did {
             builder.add_did(x);
         }
         if let Some(x) = args.id {
             builder.add_id(x);
+        }
+        if let Some(x) = args.type_ {
+            builder.add_type_(x);
         }
         if let Some(x) = args.account {
             builder.add_account(x);
@@ -18091,6 +18137,16 @@ impl<'a> ResourceRef<'a> {
                     ResourceRef::VT_ACCOUNT,
                     None,
                 )
+        }
+    }
+    #[inline]
+    pub fn type_(&self) -> Option<&'a str> {
+        // Safety:
+        // Created from valid Table for this object
+        // which contains a valid value in this slot
+        unsafe {
+            self._tab
+                .get::<::flatbuffers::ForwardsUOffset<&str>>(ResourceRef::VT_TYPE_, None)
         }
     }
     #[inline]
@@ -18120,16 +18176,6 @@ impl<'a> ResourceRef<'a> {
         }
     }
     #[inline]
-    pub fn type_(&self) -> Option<&'a str> {
-        // Safety:
-        // Created from valid Table for this object
-        // which contains a valid value in this slot
-        unsafe {
-            self._tab
-                .get::<::flatbuffers::ForwardsUOffset<&str>>(ResourceRef::VT_TYPE_, None)
-        }
-    }
-    #[inline]
     pub fn name(&self) -> Option<&'a str> {
         // Safety:
         // Created from valid Table for this object
@@ -18153,6 +18199,7 @@ impl ::flatbuffers::Verifiable for ResourceRef<'_> {
                 Self::VT_ACCOUNT,
                 false,
             )?
+            .visit_field::<::flatbuffers::ForwardsUOffset<&str>>("type_", Self::VT_TYPE_, false)?
             .visit_field::<::flatbuffers::ForwardsUOffset<::flatbuffers::Vector<'_, u8>>>(
                 "id",
                 Self::VT_ID,
@@ -18163,7 +18210,6 @@ impl ::flatbuffers::Verifiable for ResourceRef<'_> {
                 Self::VT_DID,
                 false,
             )?
-            .visit_field::<::flatbuffers::ForwardsUOffset<&str>>("type_", Self::VT_TYPE_, false)?
             .visit_field::<::flatbuffers::ForwardsUOffset<&str>>("name", Self::VT_NAME, false)?
             .finish();
         Ok(())
@@ -18171,9 +18217,9 @@ impl ::flatbuffers::Verifiable for ResourceRef<'_> {
 }
 pub struct ResourceRefArgs<'a> {
     pub account: Option<::flatbuffers::WIPOffset<ResourceOwnerRef<'a>>>,
+    pub type_: Option<::flatbuffers::WIPOffset<&'a str>>,
     pub id: Option<::flatbuffers::WIPOffset<::flatbuffers::Vector<'a, u8>>>,
     pub did: Option<::flatbuffers::WIPOffset<::flatbuffers::Vector<'a, u8>>>,
-    pub type_: Option<::flatbuffers::WIPOffset<&'a str>>,
     pub name: Option<::flatbuffers::WIPOffset<&'a str>>,
 }
 impl<'a> Default for ResourceRefArgs<'a> {
@@ -18181,9 +18227,9 @@ impl<'a> Default for ResourceRefArgs<'a> {
     fn default() -> Self {
         ResourceRefArgs {
             account: None,
+            type_: None,
             id: None,
             did: None,
-            type_: None,
             name: None,
         }
     }
@@ -18203,6 +18249,11 @@ impl<'a: 'b, 'b, A: ::flatbuffers::Allocator + 'a> ResourceRefBuilder<'a, 'b, A>
             );
     }
     #[inline]
+    pub fn add_type_(&mut self, type_: ::flatbuffers::WIPOffset<&'b str>) {
+        self.fbb_
+            .push_slot_always::<::flatbuffers::WIPOffset<_>>(ResourceRef::VT_TYPE_, type_);
+    }
+    #[inline]
     pub fn add_id(&mut self, id: ::flatbuffers::WIPOffset<::flatbuffers::Vector<'b, u8>>) {
         self.fbb_
             .push_slot_always::<::flatbuffers::WIPOffset<_>>(ResourceRef::VT_ID, id);
@@ -18211,11 +18262,6 @@ impl<'a: 'b, 'b, A: ::flatbuffers::Allocator + 'a> ResourceRefBuilder<'a, 'b, A>
     pub fn add_did(&mut self, did: ::flatbuffers::WIPOffset<::flatbuffers::Vector<'b, u8>>) {
         self.fbb_
             .push_slot_always::<::flatbuffers::WIPOffset<_>>(ResourceRef::VT_DID, did);
-    }
-    #[inline]
-    pub fn add_type_(&mut self, type_: ::flatbuffers::WIPOffset<&'b str>) {
-        self.fbb_
-            .push_slot_always::<::flatbuffers::WIPOffset<_>>(ResourceRef::VT_TYPE_, type_);
     }
     #[inline]
     pub fn add_name(&mut self, name: ::flatbuffers::WIPOffset<&'b str>) {
@@ -18243,9 +18289,9 @@ impl ::core::fmt::Debug for ResourceRef<'_> {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         let mut ds = f.debug_struct("ResourceRef");
         ds.field("account", &self.account());
+        ds.field("type_", &self.type_());
         ds.field("id", &self.id());
         ds.field("did", &self.did());
-        ds.field("type_", &self.type_());
         ds.field("name", &self.name());
         ds.finish()
     }
@@ -33704,8 +33750,8 @@ impl<'a> ::flatbuffers::Follow<'a> for PrincipalHandle<'a> {
 }
 
 impl<'a> PrincipalHandle<'a> {
-    pub const VT_TYPE_: ::flatbuffers::VOffsetT = 4;
-    pub const VT_ACCOUNT: ::flatbuffers::VOffsetT = 6;
+    pub const VT_ACCOUNT: ::flatbuffers::VOffsetT = 4;
+    pub const VT_TYPE_: ::flatbuffers::VOffsetT = 6;
     pub const VT_ID: ::flatbuffers::VOffsetT = 8;
     pub const VT_DID: ::flatbuffers::VOffsetT = 10;
     pub const VT_NAME: ::flatbuffers::VOffsetT = 12;
@@ -33734,25 +33780,15 @@ impl<'a> PrincipalHandle<'a> {
         if let Some(x) = args.id {
             builder.add_id(x);
         }
-        if let Some(x) = args.account {
-            builder.add_account(x);
-        }
         if let Some(x) = args.type_ {
             builder.add_type_(x);
+        }
+        if let Some(x) = args.account {
+            builder.add_account(x);
         }
         builder.finish()
     }
 
-    #[inline]
-    pub fn type_(&self) -> Option<&'a str> {
-        // Safety:
-        // Created from valid Table for this object
-        // which contains a valid value in this slot
-        unsafe {
-            self._tab
-                .get::<::flatbuffers::ForwardsUOffset<&str>>(PrincipalHandle::VT_TYPE_, None)
-        }
-    }
     #[inline]
     pub fn account(&self) -> Option<ResourceOwnerHandle<'a>> {
         // Safety:
@@ -33764,6 +33800,16 @@ impl<'a> PrincipalHandle<'a> {
                     PrincipalHandle::VT_ACCOUNT,
                     None,
                 )
+        }
+    }
+    #[inline]
+    pub fn type_(&self) -> Option<&'a str> {
+        // Safety:
+        // Created from valid Table for this object
+        // which contains a valid value in this slot
+        unsafe {
+            self._tab
+                .get::<::flatbuffers::ForwardsUOffset<&str>>(PrincipalHandle::VT_TYPE_, None)
         }
     }
     #[inline]
@@ -33811,12 +33857,12 @@ impl ::flatbuffers::Verifiable for PrincipalHandle<'_> {
         pos: usize,
     ) -> Result<(), ::flatbuffers::InvalidFlatbuffer> {
         v.visit_table(pos)?
-            .visit_field::<::flatbuffers::ForwardsUOffset<&str>>("type_", Self::VT_TYPE_, false)?
             .visit_field::<::flatbuffers::ForwardsUOffset<ResourceOwnerHandle>>(
                 "account",
                 Self::VT_ACCOUNT,
                 false,
             )?
+            .visit_field::<::flatbuffers::ForwardsUOffset<&str>>("type_", Self::VT_TYPE_, false)?
             .visit_field::<::flatbuffers::ForwardsUOffset<::flatbuffers::Vector<'_, u8>>>(
                 "id",
                 Self::VT_ID,
@@ -33833,8 +33879,8 @@ impl ::flatbuffers::Verifiable for PrincipalHandle<'_> {
     }
 }
 pub struct PrincipalHandleArgs<'a> {
-    pub type_: Option<::flatbuffers::WIPOffset<&'a str>>,
     pub account: Option<::flatbuffers::WIPOffset<ResourceOwnerHandle<'a>>>,
+    pub type_: Option<::flatbuffers::WIPOffset<&'a str>>,
     pub id: Option<::flatbuffers::WIPOffset<::flatbuffers::Vector<'a, u8>>>,
     pub did: Option<::flatbuffers::WIPOffset<::flatbuffers::Vector<'a, u8>>>,
     pub name: Option<::flatbuffers::WIPOffset<&'a str>>,
@@ -33843,8 +33889,8 @@ impl<'a> Default for PrincipalHandleArgs<'a> {
     #[inline]
     fn default() -> Self {
         PrincipalHandleArgs {
-            type_: None,
             account: None,
+            type_: None,
             id: None,
             did: None,
             name: None,
@@ -33858,17 +33904,17 @@ pub struct PrincipalHandleBuilder<'a: 'b, 'b, A: ::flatbuffers::Allocator + 'a> 
 }
 impl<'a: 'b, 'b, A: ::flatbuffers::Allocator + 'a> PrincipalHandleBuilder<'a, 'b, A> {
     #[inline]
-    pub fn add_type_(&mut self, type_: ::flatbuffers::WIPOffset<&'b str>) {
-        self.fbb_
-            .push_slot_always::<::flatbuffers::WIPOffset<_>>(PrincipalHandle::VT_TYPE_, type_);
-    }
-    #[inline]
     pub fn add_account(&mut self, account: ::flatbuffers::WIPOffset<ResourceOwnerHandle<'b>>) {
         self.fbb_
             .push_slot_always::<::flatbuffers::WIPOffset<ResourceOwnerHandle>>(
                 PrincipalHandle::VT_ACCOUNT,
                 account,
             );
+    }
+    #[inline]
+    pub fn add_type_(&mut self, type_: ::flatbuffers::WIPOffset<&'b str>) {
+        self.fbb_
+            .push_slot_always::<::flatbuffers::WIPOffset<_>>(PrincipalHandle::VT_TYPE_, type_);
     }
     #[inline]
     pub fn add_id(&mut self, id: ::flatbuffers::WIPOffset<::flatbuffers::Vector<'b, u8>>) {
@@ -33905,8 +33951,8 @@ impl<'a: 'b, 'b, A: ::flatbuffers::Allocator + 'a> PrincipalHandleBuilder<'a, 'b
 impl ::core::fmt::Debug for PrincipalHandle<'_> {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         let mut ds = f.debug_struct("PrincipalHandle");
-        ds.field("type_", &self.type_());
         ds.field("account", &self.account());
+        ds.field("type_", &self.type_());
         ds.field("id", &self.id());
         ds.field("did", &self.did());
         ds.field("name", &self.name());

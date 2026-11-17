@@ -14,9 +14,10 @@ use crate::{ResourceLookupProblem, ResourceNameMismatchError};
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// Builds a handle from a storage row.
+#[expect(clippy::needless_pass_by_value, reason = "consume the row")]
 pub(crate) fn resource_handle_from_row(row: ResourceHandleRow) -> ResourceHandle {
     let account = row.account_handle();
-    let schema = TypeUri::new_unchecked(row.schema);
+    let schema = TypeUri::new_unchecked(&row.schema);
 
     ResourceHandle {
         r#type: schema,

@@ -37,7 +37,12 @@ impl From<&Account> for AccountHandle {
 impl From<AccountHandle> for odf::ResourceOwnerHandle {
     fn from(value: AccountHandle) -> Self {
         let AccountHandle { id, did, name } = value;
-        Self { id, did, name }
+        Self {
+            r#type: odf::metadata::auth::User::type_uri().cheap_clone(),
+            id,
+            did,
+            name,
+        }
     }
 }
 

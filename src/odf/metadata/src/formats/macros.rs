@@ -63,30 +63,32 @@ pub(crate) use impl_try_from_str;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 macro_rules! impl_serde {
-    ($typ:ident, $visitor:ident) => {
-        impl serde::Serialize for $typ {
-            fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-                serializer.collect_str(self)
-            }
-        }
-
-        impl<'de> serde::Deserialize<'de> for $typ {
-            fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-                deserializer.deserialize_string($visitor)
-            }
-        }
-
-        struct $visitor;
-
-        impl<'de> serde::de::Visitor<'de> for $visitor {
-            type Value = $typ;
-
-            fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-                write!(formatter, "a {} string", stringify!($typ))
+    ($typ:ident) => {
+        $crate::__paste::paste! {
+            impl serde::Serialize for $typ {
+                fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+                    serializer.collect_str(self)
+                }
             }
 
-            fn visit_str<E: serde::de::Error>(self, v: &str) -> Result<Self::Value, E> {
-                $typ::try_from(v).map_err(serde::de::Error::custom)
+            impl<'de> serde::Deserialize<'de> for $typ {
+                fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+                    deserializer.deserialize_string([<$typ SerdeVisitor>])
+                }
+            }
+
+            struct [<$typ SerdeVisitor>];
+
+            impl<'de> serde::de::Visitor<'de> for [<$typ SerdeVisitor>] {
+                type Value = $typ;
+
+                fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+                    write!(formatter, "a {} string", stringify!($typ))
+                }
+
+                fn visit_str<E: serde::de::Error>(self, v: &str) -> Result<Self::Value, E> {
+                    $typ::try_from(v).map_err(serde::de::Error::custom)
+                }
             }
         }
     };
@@ -96,10 +98,11 @@ pub(crate) use impl_serde;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-macro_rules! newtype_str {
-    ($typ:ident, $parse:expr, $visitor:ident) => {
-        #[derive(Debug, Clone, Eq)]
+macro_rules! cheap_clone_str {
+    ($typ:ident, $parse:expr, "case-insensitive") => {
+        #[derive(Debug, Clone, ::cheap_clone::CheapClone, Eq)]
         #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+        #[cheap_clone(inherent)]
         pub struct $typ(std::sync::Arc<str>);
 
         impl $typ {
@@ -221,10 +224,10 @@ macro_rules! newtype_str {
 
         impl_try_from_str!($typ);
 
-        impl_serde!($typ, $visitor);
+        impl_serde!($typ);
 
         impl_parse_error!($typ);
     };
 }
 
-pub(crate) use newtype_str;
+pub(crate) use cheap_clone_str;

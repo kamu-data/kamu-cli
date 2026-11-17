@@ -124,7 +124,7 @@ pub trait EventSourcedResource:
     {
         make_typed_resource_snapshot(
             *self.id(),
-            Self::schema(),
+            Self::type_uri(),
             self.headers().clone(),
             self.spec(),
             self.status(),

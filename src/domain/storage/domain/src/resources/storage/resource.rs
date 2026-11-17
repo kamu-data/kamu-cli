@@ -61,7 +61,7 @@ impl StorageResource {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl ResourceSchemaProvider for StorageResource {
-    fn schema() -> &'static TypeUri {
+    fn type_uri() -> &'static TypeUri {
         static STORAGE_SCHEMA: std::sync::LazyLock<TypeUri> =
             std::sync::LazyLock::new(|| TypeUri::new_unchecked(StorageResource::SCHEMA_STR));
         &STORAGE_SCHEMA

@@ -1266,12 +1266,12 @@ impl<'fb> FlatbuffersSerializable<'fb> for odf::datasets::DatasetHandle {
     type OffsetT = WIPOffset<fb::DatasetHandle<'fb>>;
 
     fn serialize(&self, fb: &mut FlatBufferBuilder<'fb>) -> Self::OffsetT {
-        let account_offset = self.account.as_ref().map(|v| v.serialize(fb));
+        let account_offset = { self.account.serialize(fb) };
         let id_offset = { fb.create_vector(&self.id.as_bytes()) };
         let did_offset = { fb.create_vector(&self.did.as_bytes()) };
         let name_offset = { fb.create_string(&self.name.to_string()) };
         let mut builder = fb::DatasetHandleBuilder::new(fb);
-        account_offset.map(|off| builder.add_account(off));
+        builder.add_account(account_offset);
         builder.add_id(id_offset);
         builder.add_did(did_offset);
         builder.add_name(name_offset);
@@ -1284,7 +1284,8 @@ impl<'fb> FlatbuffersDeserializable<fb::DatasetHandle<'fb>> for odf::datasets::D
         odf::datasets::DatasetHandle {
             account: proxy
                 .account()
-                .map(|v| odf::auth::ResourceOwnerHandle::deserialize(v)),
+                .map(|v| odf::auth::ResourceOwnerHandle::deserialize(v))
+                .unwrap(),
             id: proxy
                 .id()
                 .map(|v| odf::resources::ResourceID::from_bytes(v.bytes()).unwrap())
@@ -5311,14 +5312,14 @@ impl<'fb> FlatbuffersSerializable<'fb> for odf::auth::PrincipalHandle {
     type OffsetT = WIPOffset<fb::PrincipalHandle<'fb>>;
 
     fn serialize(&self, fb: &mut FlatBufferBuilder<'fb>) -> Self::OffsetT {
-        let r#type_offset = { fb.create_string(&self.r#type.to_string()) };
         let account_offset = self.account.as_ref().map(|v| v.serialize(fb));
+        let r#type_offset = { fb.create_string(&self.r#type.to_string()) };
         let id_offset = { fb.create_vector(&self.id.as_bytes()) };
         let did_offset = self.did.as_ref().map(|v| fb.create_vector(&v.as_bytes()));
         let name_offset = { fb.create_string(&self.name.to_string()) };
         let mut builder = fb::PrincipalHandleBuilder::new(fb);
-        builder.add_type_(type_offset);
         account_offset.map(|off| builder.add_account(off));
+        builder.add_type_(type_offset);
         builder.add_id(id_offset);
         did_offset.map(|off| builder.add_did(off));
         builder.add_name(name_offset);
@@ -5329,13 +5330,13 @@ impl<'fb> FlatbuffersSerializable<'fb> for odf::auth::PrincipalHandle {
 impl<'fb> FlatbuffersDeserializable<fb::PrincipalHandle<'fb>> for odf::auth::PrincipalHandle {
     fn deserialize(proxy: fb::PrincipalHandle<'fb>) -> Self {
         odf::auth::PrincipalHandle {
+            account: proxy
+                .account()
+                .map(|v| odf::auth::ResourceOwnerHandle::deserialize(v)),
             r#type: proxy
                 .type_()
                 .map(|v| odf::resources::TypeUri::try_from(v).unwrap())
                 .unwrap(),
-            account: proxy
-                .account()
-                .map(|v| odf::auth::ResourceOwnerHandle::deserialize(v)),
             id: proxy
                 .id()
                 .map(|v| odf::resources::ResourceID::from_bytes(v.bytes()).unwrap())
@@ -6519,10 +6520,12 @@ impl<'fb> FlatbuffersSerializable<'fb> for odf::auth::ResourceOwnerHandle {
     type OffsetT = WIPOffset<fb::ResourceOwnerHandle<'fb>>;
 
     fn serialize(&self, fb: &mut FlatBufferBuilder<'fb>) -> Self::OffsetT {
+        let r#type_offset = { fb.create_string(&self.r#type.to_string()) };
         let id_offset = { fb.create_vector(&self.id.as_bytes()) };
         let did_offset = { fb.create_vector(&self.did.as_bytes()) };
         let name_offset = { fb.create_string(&self.name.to_string()) };
         let mut builder = fb::ResourceOwnerHandleBuilder::new(fb);
+        builder.add_type_(type_offset);
         builder.add_id(id_offset);
         builder.add_did(did_offset);
         builder.add_name(name_offset);
@@ -6535,6 +6538,10 @@ impl<'fb> FlatbuffersDeserializable<fb::ResourceOwnerHandle<'fb>>
 {
     fn deserialize(proxy: fb::ResourceOwnerHandle<'fb>) -> Self {
         odf::auth::ResourceOwnerHandle {
+            r#type: proxy
+                .type_()
+                .map(|v| odf::resources::TypeUri::try_from(v).unwrap())
+                .unwrap(),
             id: proxy
                 .id()
                 .map(|v| odf::resources::ResourceID::from_bytes(v.bytes()).unwrap())
@@ -6560,10 +6567,15 @@ impl<'fb> FlatbuffersSerializable<'fb> for odf::auth::ResourceOwnerRef {
     type OffsetT = WIPOffset<fb::ResourceOwnerRef<'fb>>;
 
     fn serialize(&self, fb: &mut FlatBufferBuilder<'fb>) -> Self::OffsetT {
+        let r#type_offset = self
+            .r#type
+            .as_ref()
+            .map(|v| fb.create_string(&v.to_string()));
         let id_offset = self.id.as_ref().map(|v| fb.create_vector(&v.as_bytes()));
         let did_offset = self.did.as_ref().map(|v| fb.create_vector(&v.as_bytes()));
         let name_offset = self.name.as_ref().map(|v| fb.create_string(&v.to_string()));
         let mut builder = fb::ResourceOwnerRefBuilder::new(fb);
+        type_offset.map(|off| builder.add_type_(off));
         id_offset.map(|off| builder.add_id(off));
         did_offset.map(|off| builder.add_did(off));
         name_offset.map(|off| builder.add_name(off));
@@ -6574,6 +6586,9 @@ impl<'fb> FlatbuffersSerializable<'fb> for odf::auth::ResourceOwnerRef {
 impl<'fb> FlatbuffersDeserializable<fb::ResourceOwnerRef<'fb>> for odf::auth::ResourceOwnerRef {
     fn deserialize(proxy: fb::ResourceOwnerRef<'fb>) -> Self {
         odf::auth::ResourceOwnerRef {
+            r#type: proxy
+                .type_()
+                .map(|v| odf::resources::TypeRef::try_from(v).unwrap()),
             id: proxy
                 .id()
                 .map(|v| odf::resources::ResourceID::from_bytes(v.bytes()).unwrap()),
@@ -6631,18 +6646,18 @@ impl<'fb> FlatbuffersSerializable<'fb> for odf::resources::ResourceRef {
 
     fn serialize(&self, fb: &mut FlatBufferBuilder<'fb>) -> Self::OffsetT {
         let account_offset = self.account.as_ref().map(|v| v.serialize(fb));
-        let id_offset = self.id.as_ref().map(|v| fb.create_vector(&v.as_bytes()));
-        let did_offset = self.did.as_ref().map(|v| fb.create_vector(&v.as_bytes()));
         let r#type_offset = self
             .r#type
             .as_ref()
             .map(|v| fb.create_string(&v.to_string()));
+        let id_offset = self.id.as_ref().map(|v| fb.create_vector(&v.as_bytes()));
+        let did_offset = self.did.as_ref().map(|v| fb.create_vector(&v.as_bytes()));
         let name_offset = self.name.as_ref().map(|v| fb.create_string(&v.to_string()));
         let mut builder = fb::ResourceRefBuilder::new(fb);
         account_offset.map(|off| builder.add_account(off));
+        type_offset.map(|off| builder.add_type_(off));
         id_offset.map(|off| builder.add_id(off));
         did_offset.map(|off| builder.add_did(off));
-        type_offset.map(|off| builder.add_type_(off));
         name_offset.map(|off| builder.add_name(off));
         builder.finish()
     }
@@ -6654,15 +6669,15 @@ impl<'fb> FlatbuffersDeserializable<fb::ResourceRef<'fb>> for odf::resources::Re
             account: proxy
                 .account()
                 .map(|v| odf::auth::ResourceOwnerRef::deserialize(v)),
+            r#type: proxy
+                .type_()
+                .map(|v| odf::resources::TypeRef::try_from(v).unwrap()),
             id: proxy
                 .id()
                 .map(|v| odf::resources::ResourceID::from_bytes(v.bytes()).unwrap()),
             did: proxy
                 .did()
                 .map(|v| odf::Did::from_bytes(v.bytes()).unwrap()),
-            r#type: proxy
-                .type_()
-                .map(|v| odf::resources::TypeRef::try_from(v).unwrap()),
             name: proxy
                 .name()
                 .map(|v| odf::resources::ResourceName::try_from(v).unwrap()),

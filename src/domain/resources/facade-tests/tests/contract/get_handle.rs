@@ -77,7 +77,7 @@ pub async fn test_get_by_name(h: &impl FacadeContractHarness) {
             .unwrap(),
     );
 
-    assert_resource_view_fields(&view, VariableSetResource::schema(), "get-name-test");
+    assert_resource_view_fields(&view, VariableSetResource::type_uri(), "get-name-test");
     assert_eq!(view.headers.id, id, "id must match");
     assert!(view.headers.deleted_at.is_none());
 }
@@ -102,7 +102,7 @@ pub async fn test_get_by_uid(h: &impl FacadeContractHarness) {
             .unwrap(),
     );
 
-    assert_resource_view_fields(&view_by_uid, VariableSetResource::schema(), "get-id-test");
+    assert_resource_view_fields(&view_by_uid, VariableSetResource::type_uri(), "get-id-test");
     assert_eq!(view_by_uid.headers.id, id);
 }
 
@@ -127,7 +127,7 @@ pub async fn test_get_handle_by_name(h: &impl FacadeContractHarness) {
 
     assert_handle_fields(
         &handle,
-        VariableSetResource::schema(),
+        VariableSetResource::type_uri(),
         "ident-name-test",
         &id,
     );

@@ -209,11 +209,7 @@ impl BaseResourceServiceHarness {
     ) -> ResourceHeadersInput {
         ResourceHeadersInput {
             id: None,
-            account: Some(odf::metadata::auth::ResourceOwnerRef {
-                id: Some(account.id),
-                did: Some(account.did),
-                name: Some(account.name),
-            }),
+            account: Some(account.into()),
             name: kamu_resources::ResourceName::new_unchecked(name),
             labels: Some(kamu_resources::ResourceLabels {
                 entries: BTreeMap::new(),

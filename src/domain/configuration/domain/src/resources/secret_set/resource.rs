@@ -36,7 +36,7 @@ impl SecretSetResource {
     ///
     /// Used as the const dill-registry key (dill `#[meta]` requires a const);
     /// the typed identity is [`Self::schema`] returning a `TypeUri`.
-    pub const SCHEMA_STR: &'static str = odf::metadata::config::SecretSet::schema_str();
+    pub const SCHEMA_STR: &'static str = odf::metadata::config::SecretSet::type_uri_str();
 
     // "secretset" (lowercase-of-canonical) is deliberately omitted: matching is
     // already case-insensitive, so it would collide with the canonical name.
@@ -46,8 +46,8 @@ impl SecretSetResource {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl ResourceSchemaProvider for SecretSetResource {
-    fn schema() -> &'static TypeUri {
-        odf::metadata::config::SecretSet::schema()
+    fn type_uri() -> &'static TypeUri {
+        odf::metadata::config::SecretSet::type_uri()
     }
 }
 

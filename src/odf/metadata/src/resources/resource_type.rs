@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use crate::resources::{TypeRef, TypeUri};
+use crate::resources::TypeUri;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -17,27 +17,47 @@ use crate::resources::{TypeRef, TypeUri};
 pub trait ResourceType {
     /// Full schema URI of the type, e.g.
     /// `https://opendatafabric.org/schemas/auth/v1alpha1/Group`.
-    const SCHEMA_STR: &'static str;
+    fn type_uri_str() -> &'static str;
 
-    fn type_uri() -> TypeUri {
-        TypeUri::new_unchecked(Self::SCHEMA_STR)
-    }
-
-    /// Short type name: the last path segment of the schema URI, e.g. `Group`.
-    fn type_name() -> &'static str {
-        Self::SCHEMA_STR
-            .rsplit_once('/')
-            .map_or(Self::SCHEMA_STR, |(_, name)| name)
-    }
-
-    /// Whether `r#type` names this type. A URI must match exactly, a short
-    /// name matches ignoring ASCII case, as the short forms accept both.
-    fn matches_type_ref(r#type: &TypeRef) -> bool {
-        match r#type {
-            TypeRef::Uri(uri) => uri.as_str() == Self::SCHEMA_STR,
-            TypeRef::Name(name) => name.as_str().eq_ignore_ascii_case(Self::type_name()),
-        }
-    }
+    /// Full schema URI of the type, e.g.
+    /// `https://opendatafabric.org/schemas/auth/v1alpha1/Group`.
+    fn type_uri() -> &'static TypeUri;
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[macro_export]
+macro_rules! impl_resource_type {
+    ($ty:ident, $uri:literal $(,)?) => {
+        $crate::__paste::paste! {
+            static [<$ty:snake:upper _TYPE_URI_STR>]: &str = $uri;
+
+            static [<$ty:snake:upper _TYPE_URI>]: std::sync::LazyLock<TypeUri> =
+                std::sync::LazyLock::new(|| TypeUri::new_unchecked([<$ty:snake:upper _TYPE_URI_STR>]));
+
+            impl $ty {
+                pub const fn type_uri_str() -> &'static str {
+                    [<$ty:snake:upper _TYPE_URI_STR>]
+                }
+
+                pub fn type_uri() -> &'static TypeUri {
+                    &[<$ty:snake:upper _TYPE_URI>]
+                }
+            }
+
+            impl $crate::resources::ResourceType for $ty {
+                fn type_uri_str() -> &'static str {
+                    [<$ty:snake:upper _TYPE_URI_STR>]
+                }
+
+                fn type_uri() -> &'static TypeUri {
+                    &[<$ty:snake:upper _TYPE_URI>]
+                }
+            }
+        }
+    };
+}
+
+pub use impl_resource_type;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

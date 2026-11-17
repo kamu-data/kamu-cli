@@ -60,10 +60,13 @@ where
             .await?
             .ok_or(ResourceIDNotFoundError(*id))?;
 
-        if snapshot.schema != *R::schema() {
-            return Err(
-                ResourceTypeMismatchError::new(*id, R::schema().clone(), snapshot.schema).into(),
-            );
+        if snapshot.schema != *R::type_uri() {
+            return Err(ResourceTypeMismatchError::new(
+                *id,
+                R::type_uri().cheap_clone(),
+                snapshot.schema,
+            )
+            .into());
         }
 
         Ok(snapshot)
@@ -74,7 +77,7 @@ where
         id: &ResourceID,
     ) -> Result<Option<ResourceSnapshot>, InternalError> {
         let query = ResourceRawEventQuery {
-            schema: R::schema().clone(),
+            schema: R::type_uri().cheap_clone(),
             id: *id,
         };
 
@@ -101,7 +104,7 @@ where
             return Err(ResourceIDNotFoundError(*id).into());
         }
 
-        if resource_snapshot.schema != *R::schema() {
+        if resource_snapshot.schema != *R::type_uri() {
             return Err(Self::type_mismatch(&resource_snapshot));
         }
 
@@ -124,7 +127,7 @@ where
             .collect::<Vec<_>>();
 
         let scope = ResourceScope::Types(vec![ResourceTypeQuery {
-            schema: R::schema().clone(),
+            schema: R::type_uri().cheap_clone(),
             query,
             account_id: None,
             label_pairs,
@@ -141,7 +144,7 @@ where
         while let Some(resource_snapshot) = resource_snapshots_stream.next().await {
             let resource_snapshot = resource_snapshot?;
 
-            if resource_snapshot.schema != *R::schema() {
+            if resource_snapshot.schema != *R::type_uri() {
                 return Err(Self::type_mismatch(&resource_snapshot).int_err());
             }
 
@@ -154,7 +157,7 @@ where
     fn type_mismatch(resource_snapshot: &ResourceSnapshot) -> TypedResourceQueryError {
         ResourceTypeMismatchError::new(
             resource_snapshot.id,
-            R::schema().clone(),
+            R::type_uri().cheap_clone(),
             resource_snapshot.schema.clone(),
         )
         .into()

@@ -55,7 +55,7 @@ time-source = { workspace = true }
 async-stream = "0.3"
 async-trait = "0.1"
 bytes = "1"
-cheap-clone = { version = "0.3", default-features = false, features = [
+cheap-clone = { version = "1", default-features = false, features = [
     "alloc",
 ] }
 chrono = { version = "0.4", default-features = false }

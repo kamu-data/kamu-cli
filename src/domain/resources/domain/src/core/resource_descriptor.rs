@@ -16,7 +16,7 @@ pub trait ResourceSchemaProvider {
     ///
     /// Backed by a `'static` value (typically a `LazyLock<TypeUri>`), so the
     /// returned reference lives for the whole program.
-    fn schema() -> &'static TypeUri;
+    fn type_uri() -> &'static TypeUri;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

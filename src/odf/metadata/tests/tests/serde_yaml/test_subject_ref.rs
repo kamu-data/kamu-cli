@@ -46,6 +46,7 @@ use opendatafabric_metadata::serde::yaml as serde;
     SubjectRef::Principal(PrincipalRef {
         r#type: Some(TypeRef::Name("ServiceAccount".parse().unwrap())),
         account: Some(ResourceOwnerRef {
+            r#type: None,
             id: None,
             did: None,
             name: Some("alice".parse().unwrap()),
@@ -109,6 +110,7 @@ fn test_subject_ref_full_form(#[case] data: &str, #[case] expected: SubjectRef) 
     SubjectRef::Principal(PrincipalRef {
         r#type: Some(TypeRef::Name("ServiceAccount".parse().unwrap())),
         account: Some(ResourceOwnerRef {
+            r#type: None,
             id: None,
             did: None,
             name: Some("alice".parse().unwrap()),

@@ -161,7 +161,7 @@ impl TestResource {
 }
 
 impl ResourceSchemaProvider for TestResource {
-    fn schema() -> &'static kamu_resources::TypeUri {
+    fn type_uri() -> &'static kamu_resources::TypeUri {
         static TEST_RESOURCE_SCHEMA: std::sync::LazyLock<kamu_resources::TypeUri> =
             std::sync::LazyLock::new(|| {
                 kamu_resources::TypeUri::new_unchecked(TestResource::SCHEMA_STR)

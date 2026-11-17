@@ -508,10 +508,12 @@ impl ResourceRepository for SqliteResourceRepository {
 
         Ok(maybe_row.map(|row| ResourceSnapshot {
             id: ResourceID::new(row.id),
-            schema: TypeUri::new_unchecked(row.resource_schema),
+            schema: TypeUri::new_unchecked(&row.resource_schema),
             headers: ResourceHeaders {
                 id: ResourceID::new(row.id),
                 account: odf::ResourceOwnerHandle {
+                    // TODO: Support Org accounts
+                    r#type: odf::metadata::auth::User::type_uri().cheap_clone(),
                     id: ResourceID::new(row.account_resource_id),
                     did: row.account_id,
                     name: odf::AccountName::new_unchecked(&row.account_name),
@@ -719,10 +721,12 @@ impl ResourceRepository for SqliteResourceRepository {
 
         Ok(maybe_row.map(|row| ResourceSnapshot {
             id: ResourceID::new(row.id),
-            schema: TypeUri::new_unchecked(row.resource_schema),
+            schema: TypeUri::new_unchecked(&row.resource_schema),
             headers: ResourceHeaders {
                 id: ResourceID::new(row.id),
                 account: odf::ResourceOwnerHandle {
+                    // TODO: Support Org accounts
+                    r#type: odf::metadata::auth::User::type_uri().cheap_clone(),
                     id: ResourceID::new(row.account_resource_id),
                     did: row.account_id,
                     name: odf::AccountName::new_unchecked(&row.account_name),

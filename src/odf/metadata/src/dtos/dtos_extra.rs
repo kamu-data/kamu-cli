@@ -140,11 +140,15 @@ impl std::str::FromStr for auth::ResourceOwnerRef {
     type Err = ::multiformats::ParseError<Self>;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
+        // TODO: Support more short types:
+        // - {id|name}
+        // - {User|Org}:{id|name}
         let Some((name, "")) = Grammar::match_account_name(s) else {
             return Err(::multiformats::ParseError::<Self>::new(s));
         };
 
         Ok(Self {
+            r#type: None,
             id: None,
             did: None,
             name: Some(auth::AccountName::new_unchecked(name)),
@@ -158,6 +162,7 @@ impl_try_from_str!(auth::ResourceOwnerRef);
 impl From<auth::AccountDid> for auth::ResourceOwnerRef {
     fn from(value: auth::AccountDid) -> Self {
         Self {
+            r#type: None,
             id: None,
             did: Some(value),
             name: None,
@@ -168,6 +173,7 @@ impl From<auth::AccountDid> for auth::ResourceOwnerRef {
 impl From<auth::AccountName> for auth::ResourceOwnerRef {
     fn from(value: AccountName) -> Self {
         Self {
+            r#type: None,
             id: None,
             did: None,
             name: Some(value),
@@ -177,8 +183,14 @@ impl From<auth::AccountName> for auth::ResourceOwnerRef {
 
 impl From<auth::ResourceOwnerHandle> for auth::ResourceOwnerRef {
     fn from(value: auth::ResourceOwnerHandle) -> Self {
-        let auth::ResourceOwnerHandle { id, did, name } = value;
+        let auth::ResourceOwnerHandle {
+            r#type,
+            id,
+            did,
+            name,
+        } = value;
         Self {
+            r#type: Some(r#type.into()),
             id: Some(id),
             did: Some(did),
             name: Some(name),
@@ -186,13 +198,17 @@ impl From<auth::ResourceOwnerHandle> for auth::ResourceOwnerRef {
     }
 }
 
-// The owner can be a `User`, an `Organization` or a `Node`, so the type is left unresolved
 impl From<auth::ResourceOwnerRef> for resources::ResourceRef {
     fn from(value: auth::ResourceOwnerRef) -> Self {
-        let auth::ResourceOwnerRef { id, did, name } = value;
+        let auth::ResourceOwnerRef {
+            r#type,
+            id,
+            did,
+            name,
+        } = value;
         Self {
             account: None,
-            r#type: None,
+            r#type,
             id,
             did: did.map(Into::into),
             name: name.map(Into::into),
@@ -213,6 +229,7 @@ impl From<auth::ResourceOwnerHandle> for resources::ResourceRef {
 impl auth::ResourceOwnerHandle {
     pub fn new_test(account_name_str: &str) -> Self {
         Self {
+            r#type: auth::User::type_uri().cheap_clone(),
             id: crate::resources::ResourceID::new(uuid::Uuid::new_v5(
                 &uuid::Uuid::NAMESPACE_URL,
                 account_name_str.as_bytes(),
@@ -221,14 +238,6 @@ impl auth::ResourceOwnerHandle {
             name: AccountName::new_unchecked(account_name_str),
         }
     }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Group
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-impl resources::ResourceType for auth::Group {
-    const SCHEMA_STR: &'static str = Self::schema_str();
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -252,7 +261,7 @@ impl From<auth::PolicyRef> for resources::ResourceRef {
         let auth::PolicyRef { account, id, name } = value;
         Self {
             account,
-            r#type: Some(auth::Policy::schema().clone().into()),
+            r#type: Some(auth::Policy::type_uri().cheap_clone().into()),
             id,
             did: None,
             name,
@@ -362,7 +371,7 @@ impl From<datasets::DatasetHandle> for datasets::DatasetRef {
             name,
         } = value;
         Self {
-            account: account.map(Into::into),
+            account: Some(account.into()),
             id: Some(id),
             did: Some(did),
             name: Some(name),
@@ -380,7 +389,7 @@ impl From<datasets::DatasetRef> for resources::ResourceRef {
         } = value;
         Self {
             account,
-            r#type: Some(datasets::Dataset::schema().clone().into()),
+            r#type: Some(datasets::Dataset::type_uri().cheap_clone().into()),
             id,
             did: did.map(Into::into),
             name,
@@ -508,7 +517,7 @@ impl From<storage::PersistentVolumeRef> for resources::ResourceRef {
         let storage::PersistentVolumeRef { account, id, name } = value;
         Self {
             account,
-            r#type: Some(storage::PersistentVolume::schema().clone().into()),
+            r#type: Some(storage::PersistentVolume::type_uri().cheap_clone().into()),
             id,
             did: None,
             name,

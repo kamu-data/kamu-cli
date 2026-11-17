@@ -48,7 +48,7 @@ pub async fn test_summary_empty_account(h: &impl FacadeContractHarness) {
     let bob_vs_count = summary
         .resource_counts
         .iter()
-        .find(|r| r.schema == *VariableSetResource::schema())
+        .find(|r| r.schema == *VariableSetResource::type_uri())
         .map(|r| r.total_count)
         .unwrap_or(0);
 
@@ -80,7 +80,7 @@ pub async fn test_summary_counts_resources(h: &impl FacadeContractHarness) {
     let alice_vs_count = alice_summary
         .resource_counts
         .iter()
-        .find(|r| r.schema == *VariableSetResource::schema())
+        .find(|r| r.schema == *VariableSetResource::type_uri())
         .map(|r| r.total_count)
         .expect("VariableSet type must appear in summary");
 
@@ -96,7 +96,7 @@ pub async fn test_summary_counts_resources(h: &impl FacadeContractHarness) {
     let bob_vs_count = bob_summary
         .resource_counts
         .iter()
-        .find(|r| r.schema == *VariableSetResource::schema())
+        .find(|r| r.schema == *VariableSetResource::type_uri())
         .map(|r| r.total_count)
         .unwrap_or(0);
 
@@ -167,7 +167,7 @@ fn vs_phase_counts(summary: &ResourcesSummary) -> ResourcePhaseCounts {
     summary
         .resource_counts
         .iter()
-        .find(|r| r.schema == *VariableSetResource::schema())
+        .find(|r| r.schema == *VariableSetResource::type_uri())
         .map(|r| r.phase_counts.clone())
         .unwrap_or_default()
 }
@@ -196,14 +196,14 @@ pub async fn test_summary_account_scoping(h: &impl FacadeContractHarness) {
     let alice_vs = alice_summary
         .resource_counts
         .iter()
-        .find(|r| r.schema == *VariableSetResource::schema())
+        .find(|r| r.schema == *VariableSetResource::type_uri())
         .map(|r| r.total_count)
         .unwrap_or(0);
 
     let bob_vs = bob_summary
         .resource_counts
         .iter()
-        .find(|r| r.schema == *VariableSetResource::schema())
+        .find(|r| r.schema == *VariableSetResource::type_uri())
         .map(|r| r.total_count)
         .unwrap_or(0);
 
@@ -239,7 +239,7 @@ pub async fn test_summary_counts_resources_being_deleted(h: &impl FacadeContract
         .unwrap();
     assert_eq!(vs_phase_counts(&summary).deleting, 0);
     assert_eq!(
-        total_schema_count(summary, VariableSetResource::schema()),
+        total_schema_count(summary, VariableSetResource::type_uri()),
         0
     );
 }

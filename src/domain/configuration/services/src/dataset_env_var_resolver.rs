@@ -102,7 +102,7 @@ impl DatasetEnvVarResolver for DatasetEnvVarResolverImpl {
 
         // Apply labelled variable sets oldest-first; first one wins per key
         let variable_set_ids = self
-            .find_target_resource_ids(VariableSetResource::schema(), dataset_id)
+            .find_target_resource_ids(VariableSetResource::type_uri(), dataset_id)
             .await?;
 
         for resource_id in &variable_set_ids {
@@ -127,7 +127,7 @@ impl DatasetEnvVarResolver for DatasetEnvVarResolverImpl {
         // Apply labelled secret sets; secrets override all variables on key
         // collision
         let secret_set_ids = self
-            .find_target_resource_ids(SecretSetResource::schema(), dataset_id)
+            .find_target_resource_ids(SecretSetResource::type_uri(), dataset_id)
             .await?;
 
         let mut secret_map: HashMap<String, DatasetEnvVar> = HashMap::new();
@@ -173,7 +173,7 @@ impl DatasetEnvVarResolver for DatasetEnvVarResolverImpl {
         // back plaintext for a key the user believes they have shadowed with a
         // secret.
         let secret_set_ids = self
-            .find_target_resource_ids(SecretSetResource::schema(), dataset_id)
+            .find_target_resource_ids(SecretSetResource::type_uri(), dataset_id)
             .await
             .int_err()?;
 
@@ -197,7 +197,7 @@ impl DatasetEnvVarResolver for DatasetEnvVarResolverImpl {
 
         // Only then variable sets, oldest-first within the kind.
         let variable_set_ids = self
-            .find_target_resource_ids(VariableSetResource::schema(), dataset_id)
+            .find_target_resource_ids(VariableSetResource::type_uri(), dataset_id)
             .await
             .int_err()?;
 

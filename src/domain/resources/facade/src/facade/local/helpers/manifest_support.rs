@@ -49,11 +49,7 @@ pub(crate) fn make_headers_input(
     annotations: Vec<(kamu_resources::TypeRef, serde_json::Value)>,
 ) -> Result<ResourceHeadersInput, ApplyManifestError> {
     ResourceHeadersInputExt::try_new(
-        Some(odf::metadata::auth::ResourceOwnerRef {
-            id: Some(target_account.id),
-            did: Some(target_account.did.clone()),
-            name: Some(target_account.name.clone()),
-        }),
+        Some(target_account.clone().into()),
         name,
         labels,
         annotations,

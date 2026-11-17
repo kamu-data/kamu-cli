@@ -22,6 +22,7 @@ use serde_json::json;
 fn test_serde_resource_selector() {
     let selector = ResourceSelector {
         account: Some(ResourceOwnerRef {
+            r#type: None,
             id: None,
             did: None,
             name: Some("alice".parse().unwrap()),

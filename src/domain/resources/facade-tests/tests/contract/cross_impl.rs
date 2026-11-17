@@ -123,7 +123,7 @@ pub async fn test_local_created_readable_remotely(h: &impl FacadeContractHarness
 
     assert_resource_view_fields(
         &view,
-        VariableSetResource::schema(),
+        VariableSetResource::type_uri(),
         "cross-local-to-remote",
     );
     assert_eq!(view.headers.id, id);
@@ -170,7 +170,7 @@ pub async fn test_remote_created_readable_locally(h: &impl FacadeContractHarness
 
     assert_resource_view_fields(
         &view,
-        VariableSetResource::schema(),
+        VariableSetResource::type_uri(),
         "cross-remote-to-local",
     );
     assert_eq!(view.headers.id, id);

@@ -627,7 +627,7 @@ impl DatasetEnvVarMutationAdapterImpl {
         let Some(resource_id) = self
             .find_legacy_resource_id(
                 owner_id,
-                SecretSetResource::schema(),
+                SecretSetResource::type_uri(),
                 &Self::legacy_secret_set_resource_name(dataset_id),
             )
             .await?
@@ -653,7 +653,7 @@ impl DatasetEnvVarMutationAdapterImpl {
         let Some(resource_id) = self
             .find_legacy_resource_id(
                 owner_id,
-                VariableSetResource::schema(),
+                VariableSetResource::type_uri(),
                 &Self::legacy_variable_set_resource_name(dataset_id),
             )
             .await?
@@ -710,7 +710,7 @@ impl DatasetEnvVarMutationAdapterImpl {
         resource_name: &ResourceName,
     ) -> Result<LoadedEnvVarSet<Variable>, InternalError> {
         let Some(id) = self
-            .find_legacy_resource_id(account_id, VariableSetResource::schema(), resource_name)
+            .find_legacy_resource_id(account_id, VariableSetResource::type_uri(), resource_name)
             .await?
         else {
             return Ok(LoadedEnvVarSet::absent());
@@ -734,7 +734,7 @@ impl DatasetEnvVarMutationAdapterImpl {
         resource_name: &ResourceName,
     ) -> Result<LoadedEnvVarSet<Secret>, InternalError> {
         let Some(id) = self
-            .find_legacy_resource_id(account_id, SecretSetResource::schema(), resource_name)
+            .find_legacy_resource_id(account_id, SecretSetResource::type_uri(), resource_name)
             .await?
         else {
             return Ok(LoadedEnvVarSet::absent());
@@ -834,6 +834,7 @@ impl DatasetEnvVarMutationAdapterImpl {
         Ok(ResourceHeadersInput {
             id: None,
             account: Some(odf::metadata::auth::ResourceOwnerRef {
+                r#type: Some(odf::metadata::auth::User::type_uri().cheap_clone().into()),
                 id: Some(account_resource_id),
                 did: Some(account_did),
                 name: Some(account_name),

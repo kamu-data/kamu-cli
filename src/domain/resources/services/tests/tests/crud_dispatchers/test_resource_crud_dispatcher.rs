@@ -44,7 +44,7 @@ async fn test_apply_rejects_invalid_json_shape() {
         ApplyResourceCrudDispatcherError::InvalidSpec {
             ref schema,
             ..
-        } if schema == TestResource::schema(),
+        } if schema == TestResource::type_uri(),
         "expected InvalidSpec error, got: {err:?}"
     );
 }
@@ -154,7 +154,7 @@ async fn test_apply_creates_resource_and_returns_view() {
     let applied = decision.expect_applied();
 
     assert_eq!(applied.outcome, ApplyResourceOutcome::Created);
-    assert_eq!(applied.resource.schema, *TestResource::schema());
+    assert_eq!(applied.resource.schema, *TestResource::type_uri());
     assert_eq!(
         applied.resource.spec,
         serde_json::json!({ "value": "hello" })

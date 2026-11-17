@@ -13,49 +13,21 @@ use crate::formats::*;
 // TypeName
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-newtype_str!(
+cheap_clone_str!(
     TypeName,
     Grammar::match_resource_type_name,
-    TypeNameSerdeVisitor
+    "case-insensitive"
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // TypeUri
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(
-    Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, serde::Serialize, serde::Deserialize,
-)]
-pub struct TypeUri(String);
-
-impl TypeUri {
-    pub fn new_unchecked(s: impl Into<String>) -> Self {
-        Self(s.into())
-    }
-
-    pub fn as_str(&self) -> &str {
-        &self.0
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-impl std::fmt::Display for TypeUri {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.0)
-    }
-}
-
-impl std::str::FromStr for TypeUri {
-    type Err = ::multiformats::ParseError<Self>;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Ok(Self(s.into()))
-    }
-}
-
-impl_parse_error!(TypeUri);
-impl_try_from_str!(TypeUri);
+cheap_clone_str!(
+    TypeUri,
+    Grammar::match_resource_type_uri,
+    "case-insensitive"
+);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // TypeRef

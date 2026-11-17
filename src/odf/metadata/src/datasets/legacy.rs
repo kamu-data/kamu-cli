@@ -246,7 +246,7 @@ impl fmt::Display for DatasetRef {
     }
 }
 
-impl_serde!(DatasetRef, DatasetRefSerdeVisitor);
+impl_serde!(DatasetRef);
 
 impl From<DatasetDid> for DatasetRef {
     fn from(v: DatasetDid) -> Self {
@@ -411,7 +411,7 @@ impl fmt::Display for DatasetRefRemote {
     }
 }
 
-impl_serde!(DatasetRefRemote, DatasetRefRemoteSerdeVisitor);
+impl_serde!(DatasetRefRemote);
 
 impl From<DatasetDid> for DatasetRefRemote {
     fn from(v: DatasetDid) -> Self {
@@ -658,7 +658,7 @@ impl_try_from_str!(DatasetRefAny);
 
 impl_parse_error!(DatasetRefAny);
 
-impl_serde!(DatasetRefAny, DatasetRefAnySerdeVisitor);
+impl_serde!(DatasetRefAny);
 
 impl From<DatasetDid> for DatasetRefAny {
     fn from(v: DatasetDid) -> Self {
@@ -1122,11 +1122,7 @@ impl_parse_error!(DatasetPushTarget);
 // Names, Aliases, Patterns
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-newtype_str!(
-    DatasetName,
-    Grammar::match_dataset_name,
-    DatasetNameSerdeVisitor
-);
+cheap_clone_str!(DatasetName, Grammar::match_dataset_name, "case-insensitive");
 
 impl DatasetName {
     // TODO: This limit currently exists only on database layer and needs to be
@@ -1144,10 +1140,10 @@ impl DatasetName {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-newtype_str!(
+cheap_clone_str!(
     DatasetNamePattern,
     Grammar::match_dataset_name_pattern,
-    DatasetNamePatternSerdeVisitor
+    "case-insensitive"
 );
 
 impl DatasetNamePattern {
@@ -1284,7 +1280,7 @@ impl_try_from_str!(DatasetAlias);
 
 impl_parse_error!(DatasetAlias);
 
-impl_serde!(DatasetAlias, DatasetAliasSerdeVisitor);
+impl_serde!(DatasetAlias);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -1362,11 +1358,9 @@ impl std::fmt::Display for DatasetAliasRemote {
 }
 
 impl_try_from_str!(DatasetAliasRemote);
-
 impl_parse_error!(DatasetAliasRemote);
 impl_parse_error!(DatasetAliasPattern);
-
-impl_serde!(DatasetAliasRemote, DatasetAliasRemoteSerdeVisitor);
+impl_serde!(DatasetAliasRemote);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

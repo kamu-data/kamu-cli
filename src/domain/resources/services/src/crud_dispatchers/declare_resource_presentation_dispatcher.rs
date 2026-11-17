@@ -31,7 +31,7 @@ macro_rules! declare_resource_presentation_dispatcher {
                 kamu_resources::ResourceSchemaProvider + kamu_resources::ResourcePresentation,
         {
             fn schema(&self) -> &'static kamu_resources::TypeUri {
-                <$resource as kamu_resources::ResourceSchemaProvider>::schema()
+                <$resource as kamu_resources::ResourceSchemaProvider>::type_uri()
             }
 
             fn presentation(&self) -> kamu_resources::ResourcePresentationDefinition {
@@ -52,7 +52,7 @@ macro_rules! declare_resource_presentation_dispatcher {
                 // deserialization failure — or, for two types with
                 // structurally compatible specs, as silently wrong columns.
                 let expected =
-                    <$resource as kamu_resources::ResourceSchemaProvider>::schema();
+                    <$resource as kamu_resources::ResourceSchemaProvider>::type_uri();
                 if snapshot.schema != *expected {
                     return Err(format!(
                         "Presentation dispatcher for '{expected}' received a snapshot of type \

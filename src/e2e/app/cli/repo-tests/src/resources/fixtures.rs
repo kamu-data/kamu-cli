@@ -11,8 +11,8 @@
 // Canonical schemas
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub const VARIABLE_SET_SCHEMA: &str = odf::metadata::config::VariableSet::schema_str();
-pub const SECRET_SET_SCHEMA: &str = odf::metadata::config::SecretSet::schema_str();
+pub const VARIABLE_SET_SCHEMA: &str = odf::metadata::config::VariableSet::type_uri_str();
+pub const SECRET_SET_SCHEMA: &str = odf::metadata::config::SecretSet::type_uri_str();
 
 /// Short CRD-style type name used in `list`/`summary` output.
 pub const VARIABLE_SET_SHORT_NAME: &str = "VariableSet";

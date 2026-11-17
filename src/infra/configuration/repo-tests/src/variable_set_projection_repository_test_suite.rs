@@ -53,7 +53,7 @@ async fn make_variable_set_resource(catalog: &Catalog) -> ResourceID {
 
     repo.create_resource(&ResourceSnapshot {
         id: variable_set_id,
-        schema: VariableSetResource::schema().clone(),
+        schema: VariableSetResource::type_uri().cheap_clone(),
         headers: ResourceHeaders::simple(
             Utc::now(),
             variable_set_id,

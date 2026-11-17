@@ -92,7 +92,7 @@ mod tests {
         ResourceTypeDescriptor {
             canonical_selector: ResourceSelectorName::new("variablesets").unwrap(),
             selector_aliases: vec![ResourceSelectorName::new("vs").unwrap()],
-            schema: odf::metadata::config::VariableSet::schema().clone(),
+            schema: odf::metadata::config::VariableSet::type_uri().cheap_clone(),
             list_columns: Vec::new(),
         }
     }
@@ -140,7 +140,7 @@ mod tests {
         let descriptor = variable_set_descriptor();
 
         assert!(!descriptor.matches_selector(ResourceTypeSelectorRaw::new("SecretSet").unwrap()));
-        assert!(!descriptor.matches_selector(odf::metadata::config::SecretSet::schema().as_str()));
+        assert!(!descriptor.matches_selector(odf::metadata::config::SecretSet::type_uri_str()));
     }
 
     #[test]
@@ -148,7 +148,7 @@ mod tests {
         let descriptor = ResourceTypeDescriptor {
             canonical_selector: ResourceSelectorName::new("secretsets").unwrap(),
             selector_aliases: vec![ResourceSelectorName::new("ss").unwrap()],
-            schema: odf::metadata::config::SecretSet::schema().clone(),
+            schema: odf::metadata::config::SecretSet::type_uri().cheap_clone(),
             list_columns: Vec::new(),
         };
 

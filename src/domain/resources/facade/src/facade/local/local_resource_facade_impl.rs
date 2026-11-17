@@ -53,7 +53,7 @@ impl ResourceFacade for LocalResourceFacadeImpl {
             .await?
             .into_iter()
             .map(|row| {
-                let schema = TypeUri::new_unchecked(row.schema);
+                let schema = TypeUri::new_unchecked(&row.schema);
                 let type_name = resource_type_name(&schema)?;
 
                 Ok(ResourceTypeCountSummary {
@@ -632,7 +632,7 @@ impl LocalResourceFacadeImpl {
             .await?;
 
         Ok(match rows.into_iter().next() {
-            Some(row) => Ok(TypeUri::new_unchecked(row.schema)),
+            Some(row) => Ok(TypeUri::new_unchecked(&row.schema)),
             None => Err(id_not_found(id)),
         })
     }

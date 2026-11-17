@@ -142,11 +142,7 @@ impl ResourceHeadersExt for ResourceHeaders {
     fn into_input(self) -> ResourceHeadersInput {
         ResourceHeadersInput {
             id: Some(self.id),
-            account: Some(auth::ResourceOwnerRef {
-                id: Some(self.account.id),
-                did: Some(self.account.did),
-                name: Some(self.account.name),
-            }),
+            account: Some(self.account.into()),
             name: self.name,
             labels: Some(self.labels),
             annotations: Some(self.annotations),
@@ -208,10 +204,12 @@ impl ResourceHeadersExt for ResourceHeaders {
 fn account_handle_from_input(input: Option<&auth::ResourceOwnerRef>) -> auth::ResourceOwnerHandle {
     match input {
         Some(auth::ResourceOwnerRef {
+            r#type: Some(odf::metadata::resources::TypeRef::Uri(r#type)),
             id: Some(id),
             did: Some(did),
             name: Some(name),
         }) => auth::ResourceOwnerHandle {
+            r#type: r#type.clone(),
             id: *id,
             did: did.clone(),
             name: name.clone(),

@@ -47,17 +47,17 @@ where
 {
     fn make_raw_query(id: &ResourceID) -> ResourceRawEventQuery {
         ResourceRawEventQuery {
-            schema: TResource::schema().clone(),
+            schema: TResource::type_uri().cheap_clone(),
             id: *id,
         }
     }
 
     fn decode_raw_event(raw: ResourceRawEvent) -> Result<(EventID, TEvent), InternalError> {
-        if raw.query.schema != *TResource::schema() {
+        if raw.query.schema != *TResource::type_uri() {
             return InternalError::bail(format!(
                 "Unexpected resource schema in resource event store bridge: expected='{}', \
                  actual='{}'",
-                TResource::schema(),
+                TResource::type_uri(),
                 raw.query.schema
             ));
         }
@@ -104,7 +104,7 @@ where
         raw_event_store: &dyn ResourceRawEventStore,
     ) -> Result<usize, InternalError> {
         raw_event_store
-            .total_events_stored_by_schema(TResource::schema().as_str())
+            .total_events_stored_by_schema(TResource::type_uri().as_str())
             .await
     }
 
@@ -114,7 +114,7 @@ where
     ) -> EventStream<'_, TEvent> {
         Box::pin(
             raw_event_store
-                .get_all_events_by_schema(TResource::schema().as_str(), opts)
+                .get_all_events_by_schema(TResource::type_uri().as_str(), opts)
                 .map(|result| {
                     result.and_then(|(_, raw_event)| {
                         Self::decode_raw_event(raw_event).map_err(GetEventsError::Internal)

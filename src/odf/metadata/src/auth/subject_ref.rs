@@ -11,7 +11,7 @@ use flatbuffers::{FlatBufferBuilder, UnionWIPOffset, WIPOffset};
 use multiformats::ParseError;
 
 use crate::auth::*;
-use crate::resources::ResourceRefT;
+use crate::resources::*;
 use crate::serde::flatbuffers::{
     FlatbuffersEnumDeserializable,
     FlatbuffersEnumSerializable,
@@ -53,9 +53,10 @@ impl std::str::FromStr for SubjectRef {
             ("Authenticated" | "authenticated", "*") => Ok(Self::Authenticated),
             ("Anonymous" | "anonymous", "*") => Ok(Self::Anonymous),
             ("Everyone" | "everyone", "*") => Ok(Self::Everyone),
-            ("Group" | "group", _) => Ok(Self::Group(
-                ResourceRefT::from_str(s).map_err(ParseError::convert)?,
-            )),
+            ("Group" | "group", _) => {
+                let r = ResourceRef::from_str(s).map_err(ParseError::convert)?;
+                Ok(Self::Group(ResourceRefT::new_from_ref_unchecked(r)))
+            }
             _ => Ok(PrincipalRef::from_str(s)
                 .map_err(ParseError::convert)?
                 .into()),

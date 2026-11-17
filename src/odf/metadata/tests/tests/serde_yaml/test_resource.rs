@@ -46,7 +46,7 @@ fn test_serde_resource_input_generics() {
     pretty_assertions::assert_eq!(
         val,
         ResourceInput {
-            schema: SecretSet::schema().clone(),
+            schema: SecretSet::type_uri().cheap_clone(),
             headers: ResourceHeadersInput {
                 id: None,
                 name: "my-secret".parse().unwrap(),
@@ -70,7 +70,7 @@ fn test_serde_resource_input_generics() {
     pretty_assertions::assert_eq!(
         val,
         ResourceInput {
-            schema: SecretSet::schema().clone(),
+            schema: SecretSet::type_uri().cheap_clone(),
             headers: ResourceHeadersInput {
                 id: None,
                 name: "my-secret".parse().unwrap(),
@@ -110,7 +110,7 @@ fn test_serde_resource_input_generics() {
     pretty_assertions::assert_eq!(
         val,
         ResourceInput {
-            schema: SecretSet::schema().clone(),
+            schema: SecretSet::type_uri().cheap_clone(),
             headers: ResourceHeadersInput {
                 id: None,
                 name: "my-secret".parse().unwrap(),
@@ -265,7 +265,7 @@ fn test_serde_resource_input_refs() {
     pretty_assertions::assert_eq!(
         val,
         ResourceInput {
-            schema: PolicyBinding::schema().clone(),
+            schema: PolicyBinding::type_uri().cheap_clone(),
             headers: ResourceHeadersInput {
                 id: None,
                 name: "alice-bob".parse().unwrap(),
@@ -289,6 +289,7 @@ fn test_serde_resource_input_refs() {
                 }),
                 object: ResourceRef {
                     account: Some(ResourceOwnerRef {
+                        r#type: None,
                         id: None,
                         did: None,
                         name: Some("bob".parse().unwrap()),
@@ -341,6 +342,7 @@ fn test_serde_resource_canonical() {
           id: 7149c2f9-41f2-4cbb-be8f-7d7747525f9a
           name: my-secret
           account:
+            type: https://opendatafabric.org/schemas/auth/v1alpha1/User
             id: c27331ce-ce88-4ff9-8c5a-4ce8107cc03f
             did: did:odf:fed01816ef0a9abe93aba816ef0a9abe93aba90e6065747170300c0d3d30c2cd8d7a4
             name: sergiimk
@@ -393,11 +395,12 @@ fn test_serde_resource_canonical() {
     pretty_assertions::assert_eq!(
         val,
         Resource {
-            schema: SecretSet::schema().clone(),
+            schema: SecretSet::type_uri().cheap_clone(),
             headers: ResourceHeaders {
                 id: "7149c2f9-41f2-4cbb-be8f-7d7747525f9a".parse().unwrap(),
                 name: "my-secret".parse().unwrap(),
                 account: ResourceOwnerHandle {
+                    r#type: User::type_uri().cheap_clone(),
                     id: "c27331ce-ce88-4ff9-8c5a-4ce8107cc03f".parse().unwrap(),
                     did: AccountDid::from_did_str("did:odf:fed01816ef0a9abe93aba816ef0a9abe93aba90e6065747170300c0d3d30c2cd8d7a4").unwrap(),
                     name: "sergiimk".parse().unwrap(),
@@ -486,6 +489,7 @@ fn test_serde_resource_canonical() {
               id: 7149c2f9-41f2-4cbb-be8f-7d7747525f9a
               name: my-secret
               account:
+                type: https://opendatafabric.org/schemas/auth/v1alpha1/User
                 id: c27331ce-ce88-4ff9-8c5a-4ce8107cc03f
                 did: did:odf:fed01816ef0a9abe93aba816ef0a9abe93aba90e6065747170300c0d3d30c2cd8d7a4
                 name: sergiimk
@@ -521,6 +525,7 @@ fn test_serde_resource_owner_ref() {
             .into_dto()
             .unwrap(),
         ResourceOwnerRef {
+            r#type: None,
             id: None,
             did: Some(did.clone()),
             name: None,
@@ -533,6 +538,7 @@ fn test_serde_resource_owner_ref() {
             .into_dto()
             .unwrap(),
         ResourceOwnerRef {
+            r#type: None,
             id: None,
             did: None,
             name: Some("alice".parse().unwrap()),
@@ -547,6 +553,7 @@ fn test_serde_resource_owner_ref() {
         .into_dto()
         .unwrap(),
         ResourceOwnerRef {
+            r#type: None,
             id: Some(resource_id),
             did: Some(did.clone()),
             name: Some("alice".parse().unwrap()),
@@ -561,6 +568,7 @@ fn test_serde_resource_owner_ref() {
             .into_dto()
             .unwrap(),
         ResourceOwnerRef {
+            r#type: None,
             id: None,
             did: None,
             name: None,
@@ -568,6 +576,7 @@ fn test_serde_resource_owner_ref() {
     );
 
     let both = ResourceOwnerRef {
+        r#type: None,
         id: Some(resource_id),
         did: Some(did),
         name: Some("alice".parse().unwrap()),
@@ -632,6 +641,7 @@ fn test_serde_principal_ref_short_form() {
         PrincipalRef {
             r#type: Some(TypeRef::Name("ServiceAccount".parse().unwrap())),
             account: Some(ResourceOwnerRef {
+                r#type: None,
                 id: None,
                 did: None,
                 name: Some("acme".parse().unwrap()),

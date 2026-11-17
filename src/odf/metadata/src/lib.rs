@@ -135,6 +135,10 @@ pub use legacy::{
     Manifest,
     SetPollingSource,
 };
+// paste is re-exported so crates using the `impl_resource_type!` macro don't need it as a
+// dependency
+#[doc(hidden)]
+pub use paste as __paste;
 pub use sources::{
     CompressionFormat,
     EnvVar,

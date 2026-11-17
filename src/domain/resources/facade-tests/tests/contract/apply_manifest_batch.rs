@@ -181,7 +181,7 @@ fn assert_created_apply_item(decision: &ApplyManifestApplicationDecision, expect
     assert_eq!(result.outcome, ApplyResourceOutcome::Created);
     assert_resource_view_fields(
         &result.resource,
-        VariableSetResource::schema(),
+        VariableSetResource::type_uri(),
         expected_name,
     );
 }
@@ -308,7 +308,11 @@ pub async fn test_batch_apply_all_successes_preserves_order(h: &impl FacadeContr
             .await
             .unwrap(),
     );
-    assert_resource_view_fields(&fetched, VariableSetResource::schema(), "batch-contract-b");
+    assert_resource_view_fields(
+        &fetched,
+        VariableSetResource::type_uri(),
+        "batch-contract-b",
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

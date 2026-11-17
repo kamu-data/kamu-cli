@@ -51,7 +51,7 @@ async fn make_secret_set_resource(catalog: &Catalog) -> ResourceID {
 
     repo.create_resource(&ResourceSnapshot {
         id: secret_set_id,
-        schema: SecretSetResource::schema().clone(),
+        schema: SecretSetResource::type_uri().cheap_clone(),
         headers: ResourceHeaders::simple(
             Utc::now(),
             secret_set_id,

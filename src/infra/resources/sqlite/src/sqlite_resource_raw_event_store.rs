@@ -246,7 +246,7 @@ impl SqliteResourceRawEventStore {
             .map(|row| {
                 (
                     ResourceRawEventQuery {
-                        schema: TypeUri::new_unchecked(row.schema),
+                        schema: TypeUri::new_unchecked(&row.schema),
                         id: ResourceID::new(row.id),
                     },
                     EventID::new(row.event_id),
@@ -310,7 +310,7 @@ impl EventStore<ResourceRawEventProjection> for SqliteResourceRawEventStore {
                 yield Ok((event_id, ResourceRawEvent {
                     event_id,
                     query: ResourceRawEventQuery {
-                        schema: TypeUri::new_unchecked(row.schema),
+                        schema: TypeUri::new_unchecked(&row.schema),
                         id: ResourceID::new(row.id),
                     },
                     event_time: row.event_time,
@@ -366,7 +366,7 @@ impl EventStore<ResourceRawEventProjection> for SqliteResourceRawEventStore {
                 yield Ok((event_id, ResourceRawEvent {
                     event_id,
                     query: ResourceRawEventQuery {
-                        schema: TypeUri::new_unchecked(row.schema),
+                        schema: TypeUri::new_unchecked(&row.schema),
                         id: ResourceID::new(row.id),
                     },
                     event_time: row.event_time,
@@ -429,7 +429,7 @@ impl EventStore<ResourceRawEventProjection> for SqliteResourceRawEventStore {
             while let Some(row) = rows.try_next().await? {
                 let event_id = EventID::new(row.event_id);
                 let query = ResourceRawEventQuery {
-                    schema: TypeUri::new_unchecked(row.schema),
+                    schema: TypeUri::new_unchecked(&row.schema),
                     id: ResourceID::new(row.id),
                 };
                 yield Ok((query.clone(), event_id, ResourceRawEvent {
@@ -570,7 +570,7 @@ impl ResourceRawEventStore for SqliteResourceRawEventStore {
                 yield Ok((event_id, ResourceRawEvent {
                     event_id,
                     query: ResourceRawEventQuery {
-                        schema: TypeUri::new_unchecked(row.schema),
+                        schema: TypeUri::new_unchecked(&row.schema),
                         id: ResourceID::new(row.id),
                     },
                     event_time: row.event_time,
