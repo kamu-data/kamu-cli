@@ -57,7 +57,11 @@ pub mod schema {
     pub use odf_metadata::schema::*;
 }
 
+// Deprecated - use `meta` instead
 pub mod metadata {
+    pub use odf_metadata::*;
+}
+pub mod meta {
     pub use odf_metadata::*;
 }
 
