@@ -25,12 +25,12 @@ pub(crate) struct CasFailedHeads {
     pub actual_head: Option<Multihash<'static>>,
 }
 
-impl CasFailedHeads {
-    /// Fails when the swap expected no head: these mutations always commit on
-    /// top of an existing one
-    pub(crate) fn try_from_ref_cas_error(
-        e: odf::dataset::RefCASError,
-    ) -> Result<Self, InternalError> {
+/// Fails when the swap expected no head: these mutations always commit on top
+/// of an existing one
+impl TryFrom<odf::dataset::RefCASError> for CasFailedHeads {
+    type Error = InternalError;
+
+    fn try_from(e: odf::dataset::RefCASError) -> Result<Self, InternalError> {
         let Some(expected_head) = e.expected.clone() else {
             return Err(e.int_err());
         };

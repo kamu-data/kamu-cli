@@ -46,15 +46,17 @@ b.add::<WakeupListenerMetrics>();
 
 Qualify a name only to resolve a clash. Two exceptions:
 
-- **App wiring** (`src/app/cli/src/app.rs`, `database.rs`) integrates every crate, so it qualifies
-  components explicitly to show where each comes from.
+- **App wiring** (`src/app/cli/src/app.rs`, `database.rs`, `outbox.rs`) integrates every crate, so
+  it qualifies components explicitly to show where each comes from.
 - **Open Data Fabric types are always written with the `odf::` prefix, never imported:**
   `odf::DatasetID`, `odf::metadata::MetadataEvent`, `odf::dataset::MetadataChain`. The prefix marks
   a protocol-level type at every use and keeps it apart from same-named Kamu types. Reach ODF
   through the `odf` facade crate, not the `odf-*` sub-crates (code inside `src/odf/` aside).
   Import from `odf` only what cannot be used qualified — extension traits needed for method
   syntax (`use odf::utils::data::DataFrameExt;`) — and test helpers such as
-  `odf::metadata::testing::MetadataFactory`.
+  `odf::metadata::testing::MetadataFactory`. Inside one function, a `use` that shortens a match
+  or a case table is fine: `use odf::dataset::SetChainRefError as E;`,
+  `use odf::DatasetVisibility::{Private, Public};`.
 
 ```rust
 // No

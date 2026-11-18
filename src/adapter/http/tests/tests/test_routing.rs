@@ -37,8 +37,7 @@ use kamu_auth_rebac_services::{
 use kamu_datasets::*;
 use kamu_datasets_services::utils::CreateDatasetUseCaseHelper;
 use kamu_datasets_services::*;
-use messaging_outbox::{Outbox, OutboxImmediateImpl, register_message_dispatcher};
-use odf::dataset::{DatasetFactoryImpl, IpfsGateway};
+use messaging_outbox::{ConsumerFilter, Outbox, OutboxImmediateImpl, register_message_dispatcher};
 use odf::metadata::testing::MetadataFactory;
 use time_source::SystemTimeSourceDefault;
 use tokio_tungstenite::connect_async;
@@ -66,9 +65,7 @@ impl RepoFixture {
         kamu_datasets_inmem::register_dependencies(&mut b);
         b.add::<SystemTimeSourceDefault>()
             .add::<DidGeneratorDefault>()
-            .add_builder(messaging_outbox::OutboxImmediateImpl::builder(
-                messaging_outbox::ConsumerFilter::AllConsumers,
-            ))
+            .add_builder(OutboxImmediateImpl::builder(ConsumerFilter::AllConsumers))
             .bind::<dyn Outbox, OutboxImmediateImpl>()
             .add::<DatabaseTransactionRunner>()
             .add::<DependencyGraphServiceImpl>()
@@ -225,10 +222,14 @@ async fn setup_client(dataset_url: url::Url, head_expected: odf::Multihash) {
         .build();
 
     use odf::dataset::DatasetFactory as _;
-    let dataset = DatasetFactoryImpl::new(IpfsGateway::default(), catalog.get_one().unwrap(), None)
-        .get_dataset(&dataset_url, false)
-        .await
-        .unwrap();
+    let dataset = odf::dataset::DatasetFactoryImpl::new(
+        odf::dataset::IpfsGateway::default(),
+        catalog.get_one().unwrap(),
+        None,
+    )
+    .get_dataset(&dataset_url, false)
+    .await
+    .unwrap();
 
     let head_actual = dataset
         .as_metadata_chain()

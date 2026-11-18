@@ -15,7 +15,7 @@ use internal_error::{InternalError, ResultIntoInternal};
 use kamu_core::*;
 use url::Url;
 
-use crate::utils::url_ext::UrlExt;
+use crate::utils::url_utils::{is_odf_protocol, odf_to_transport_protocol, to_odf_protocol};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -133,8 +133,8 @@ impl RemoteAliasResolver for RemoteAliasResolverImpl {
         };
 
         let remote_repo = self.remote_repo_reg.get_repository(&repo_name)?;
-        let transfer_url = if remote_repo.url.is_odf_protocol() {
-            remote_repo.url.odf_to_transport_protocol()?
+        let transfer_url = if is_odf_protocol(&remote_repo.url) {
+            odf_to_transport_protocol(&remote_repo.url)?
         } else {
             remote_repo.url
         };
@@ -186,7 +186,7 @@ impl RemoteAliasResolverApiHelper {
         account_name_maybe: Option<&odf::AccountName>,
         dataset_name: &odf::DatasetName,
     ) -> Result<Url, InternalError> {
-        let mut res_url = repo_url.as_odf_protocol()?;
+        let mut res_url = to_odf_protocol(repo_url)?;
 
         if let Some(account_name) = account_name_maybe {
             res_url = res_url.join(format!("{account_name}/").as_str()).unwrap();

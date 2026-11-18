@@ -1003,6 +1003,22 @@ impl DatasetApi<'_> {
             .await;
     }
 
+    /// Ingests data without asserting the outcome and returns the response
+    /// status and body
+    pub async fn ingest_data_status(
+        &self,
+        dataset_alias: &odf::DatasetAlias,
+        data: RequestBody,
+    ) -> (StatusCode, String) {
+        let response = self
+            .client
+            .rest_api_call(Method::POST, &format!("{dataset_alias}/ingest"), Some(data))
+            .await;
+        let status = response.status();
+
+        (status, response.text().await.unwrap())
+    }
+
     /// Ingests the file of an upload and returns the response status
     pub async fn ingest_upload(
         &self,
@@ -2438,6 +2454,12 @@ pub struct OdfTransferApi<'a> {
 }
 
 impl OdfTransferApi<'_> {
+    pub async fn head(&self, dataset_alias: &odf::DatasetAlias) -> odf::Multihash {
+        self.metadata_block_hash_by_ref(dataset_alias, odf::BlockRef::Head)
+            .await
+            .unwrap()
+    }
+
     pub async fn metadata_block_hash_by_ref(
         &self,
         dataset_alias: &odf::DatasetAlias,

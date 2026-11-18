@@ -79,10 +79,7 @@ impl VerificationPlan {
                         request.target.clone(),
                         request.block_range.clone(),
                     )
-                    .await
-                    .map_err(|e| {
-                        VerificationError::VerifyTransform(VerifyTransformError::Plan(e))
-                    })?,
+                    .await?,
             )
         } else {
             None
@@ -338,6 +335,12 @@ impl From<odf::GetBlockError> for VerificationError {
             odf::GetBlockError::Access(e) => Self::Internal(e.int_err()),
             odf::GetBlockError::Internal(e) => Self::Internal(e),
         }
+    }
+}
+
+impl From<VerifyTransformPlanError> for VerificationError {
+    fn from(v: VerifyTransformPlanError) -> Self {
+        Self::VerifyTransform(VerifyTransformError::Plan(v))
     }
 }
 

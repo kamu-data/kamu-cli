@@ -9,8 +9,13 @@
 
 use database_common::PaginationOpts;
 use kamu::utils::datasets_filtering::filter_dataset_handle_stream;
-use kamu_accounts::{AccountService, Principal, SearchAccountsByNamePatternFilters};
-use kamu_auth_rebac::RebacServiceExt;
+use kamu_accounts::{
+    AccountService,
+    Principal,
+    SearchAccountsByNamePatternFilters,
+    make_search_security_context,
+};
+use kamu_auth_rebac::{RebacService, RebacServiceExt};
 use kamu_datasets::{DatasetPermission, DatasetPermissionChecker, DatasetPermissionCheckerExt};
 
 use crate::prelude::*;
@@ -391,8 +396,7 @@ impl Search {
         &self,
         ctx: &Context<'a>,
     ) -> Result<kamu_search::SearchContext<'a>> {
-        let (principal, rebac_service) =
-            from_catalog_n!(ctx, Principal, dyn kamu_auth_rebac::RebacService);
+        let (principal, rebac_service) = from_catalog_n!(ctx, Principal, dyn RebacService);
 
         let catalog = ctx.data::<dill::Catalog>().unwrap();
 
@@ -406,7 +410,7 @@ impl Search {
 
         Ok(kamu_search::SearchContext {
             catalog,
-            security: kamu_accounts::make_search_security_context(principal.as_ref(), is_admin),
+            security: make_search_security_context(principal.as_ref(), is_admin),
         })
     }
 }

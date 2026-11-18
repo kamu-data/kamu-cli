@@ -13,7 +13,16 @@ use kamu_datasets::NameCollisionError;
 use reqwest::StatusCode;
 use thiserror::Error;
 
-use super::messages::{ObjectFileReference, TransferInternalError};
+use super::messages::{
+    DatasetPushCompleteError,
+    DatasetPushMetadataError,
+    DatasetPushObjectsNotUploadedError,
+    DatasetPushObjectsTransferError,
+    DatasetPushRequestError,
+    DatasetPushUpdatedConcurrentlyError,
+    ObjectFileReference,
+    TransferInternalError,
+};
 use super::phases::*;
 use crate::ws_common::{ReadMessageError, WriteMessageError};
 
@@ -195,6 +204,61 @@ impl From<PushClientError> for SyncError {
             | PushClientError::WriteFailed(_)
             | PushClientError::ObjectsNotUploaded(_)
             | PushClientError::Internal(_)) => Self::Internal(e.int_err()),
+        }
+    }
+}
+
+impl From<DatasetPushRequestError> for PushClientError {
+    fn from(e: DatasetPushRequestError) -> Self {
+        match e {
+            DatasetPushRequestError::Internal(e) => {
+                Self::Internal(ClientInternalError::from(e).int_err())
+            }
+            DatasetPushRequestError::InvalidHead(e) => Self::InvalidHead(e.into()),
+        }
+    }
+}
+
+impl From<DatasetPushMetadataError> for PushClientError {
+    fn from(e: DatasetPushMetadataError) -> Self {
+        match e {
+            DatasetPushMetadataError::SeedBlockOverwriteRestricted(_) => {
+                Self::OverwriteSeedBlock(OverwriteSeedBlockError {})
+            }
+        }
+    }
+}
+
+impl From<DatasetPushObjectsTransferError> for PushClientError {
+    fn from(e: DatasetPushObjectsTransferError) -> Self {
+        match e {
+            DatasetPushObjectsTransferError::RefCollision(e) => {
+                Self::RefCollision(odf::dataset::RefCollisionError { id: e.dataset_id })
+            }
+            DatasetPushObjectsTransferError::NameCollision(e) => {
+                Self::NameCollision(NameCollisionError {
+                    alias: e.dataset_alias,
+                })
+            }
+            DatasetPushObjectsTransferError::Internal(e) => {
+                Self::Internal(ClientInternalError::from(e).int_err())
+            }
+        }
+    }
+}
+
+impl From<DatasetPushCompleteError> for PushClientError {
+    fn from(e: DatasetPushCompleteError) -> Self {
+        match e {
+            DatasetPushCompleteError::Internal(e) => {
+                Self::Internal(ClientInternalError::from(e).int_err())
+            }
+            DatasetPushCompleteError::UpdatedConcurrently(
+                DatasetPushUpdatedConcurrentlyError {},
+            ) => Self::UpdatedConcurrently(DestinationUpdatedConcurrentlyError),
+            DatasetPushCompleteError::ObjectsNotUploaded(DatasetPushObjectsNotUploadedError {
+                num_objects,
+            }) => Self::ObjectsNotUploaded(DestinationMissingObjectsError { num_objects }),
         }
     }
 }

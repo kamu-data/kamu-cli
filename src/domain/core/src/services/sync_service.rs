@@ -410,6 +410,15 @@ impl From<odf::dataset::RefCASError> for SyncError {
     }
 }
 
+impl From<odf::storage::ContainsBlockError> for SyncError {
+    fn from(v: odf::storage::ContainsBlockError) -> Self {
+        match v {
+            odf::storage::ContainsBlockError::Access(e) => Self::Access(e),
+            odf::storage::ContainsBlockError::Internal(e) => Self::Internal(e),
+        }
+    }
+}
+
 impl From<odf::dataset::StoreDatasetError> for SyncError {
     fn from(v: odf::dataset::StoreDatasetError) -> Self {
         match v {

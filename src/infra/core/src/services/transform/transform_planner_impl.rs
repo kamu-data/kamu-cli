@@ -21,7 +21,6 @@ use time_source::SystemTimeSource;
 use super::{
     BuildPreliminaryTransformRequestError,
     CollectUnprocessedInputBlocksError,
-    GetTransformQueryInputError,
     TransformPreliminaryPlan,
     TransformPreliminaryRequestExt,
     build_preliminary_request_ext,
@@ -355,10 +354,7 @@ impl TransformPlanner for TransformPlannerImpl {
                     None,
                     &plan.datasets_map,
                 )
-                .await
-                .map_err(|e| match e {
-                    GetTransformQueryInputError::Internal(e) => TransformStatusError::Internal(e),
-                })?,
+                .await?,
             );
         }
         let breaking_inputs =

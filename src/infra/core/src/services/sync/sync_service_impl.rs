@@ -26,7 +26,7 @@ use crate::utils::smart_transfer_protocol::{
     TransferOptions as SmartTransferOptions,
 };
 use crate::utils::sync_increment::sync_increment;
-use crate::utils::url_ext::UrlExt;
+use crate::utils::url_utils::{ensure_trailing_slash, is_odf_protocol, odf_to_transport_protocol};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -144,7 +144,7 @@ impl SyncServiceImpl {
         dst: &SyncFromTarget,
         opts: SyncOptions,
     ) -> Result<SyncFromTransfer, SyncError> {
-        let http_src_url = src_url.odf_to_transport_protocol()?;
+        let http_src_url = odf_to_transport_protocol(src_url)?;
 
         tracing::info!("Starting transfer using Smart Transfer Protocol (Pull flow)");
 
@@ -160,7 +160,7 @@ impl SyncServiceImpl {
         dst_url: &Url,
         opts: SyncOptions,
     ) -> Result<SyncResult, SyncError> {
-        let http_dst_url = dst_url.odf_to_transport_protocol()?;
+        let http_dst_url = odf_to_transport_protocol(dst_url)?;
 
         // TODO: move head check into the protocol
         let http_dst_dataset_view = self
@@ -227,7 +227,7 @@ impl SyncServiceImpl {
                 Some(old_cid) => {
                     tracing::info!(%old_cid, "Attempting to read remote head");
                     let mut dst_http_url = dst_url.clone();
-                    dst_http_url.ensure_trailing_slash();
+                    ensure_trailing_slash(&mut dst_http_url);
                     let dst_dataset = self
                         .dataset_factory
                         .get_dataset(&dst_http_url, false)
@@ -399,7 +399,7 @@ impl SyncServiceImpl {
                 }
                 .into()),
             },
-            _ if dst.url.is_odf_protocol() => {
+            _ if is_odf_protocol(&dst.url) => {
                 let dst_url = dst.url.clone();
                 self.sync_smart_push_transfer_protocol(src, dst_url.as_ref(), opts)
                     .await
@@ -432,7 +432,7 @@ impl SyncServiceImpl {
     ) -> Result<SyncFromTransfer, SyncError> {
         let src = self.open_remote_source(src_ref).await?;
 
-        if src.url.is_odf_protocol() {
+        if is_odf_protocol(&src.url) {
             // The Simple protocol fails on a missing source `HEAD` itself; the smart one does not
             if try_resolve_head(src.dataset.as_metadata_chain())
                 .await?

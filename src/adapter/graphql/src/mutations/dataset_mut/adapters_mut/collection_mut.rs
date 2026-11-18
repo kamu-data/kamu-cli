@@ -93,7 +93,7 @@ impl<'a> CollectionMut<'a> {
                 let CasFailedHeads {
                     expected_head,
                     actual_head,
-                } = CasFailedHeads::try_from_ref_cas_error(err)?;
+                } = CasFailedHeads::try_from(err)?;
                 Ok(CollectionUpdateResult::CasFailed(
                     CollectionUpdateErrorCasFailed {
                         expected_head,

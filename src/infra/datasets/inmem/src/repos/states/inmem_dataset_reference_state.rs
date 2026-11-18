@@ -17,12 +17,12 @@ use dill::*;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// The references every `InMemoryDatasetReferenceRepository` reads and writes
-pub struct InMemoryDatasetReferenceState {
+pub(crate) struct InMemoryDatasetReferenceState {
     pub(crate) references:
         InMemoryTransactionalMap<(odf::DatasetID, odf::BlockRef), odf::Multihash>,
 }
 
-#[component(pub)]
+#[component(pub(crate))]
 #[interface(dyn InMemoryTransactionParticipant)]
 #[scope(Singleton)]
 impl InMemoryDatasetReferenceState {

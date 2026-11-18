@@ -210,8 +210,7 @@ impl WsSmartTransferProtocolClient {
         for stage_object_files in object_files_transfer_plan {
             stage_index += 1;
             tracing::debug!(
-                "Stage #{}: querying {} data objects",
-                stage_index,
+                "Stage #{stage_index}: querying {} data objects",
                 stage_object_files.len()
             );
 

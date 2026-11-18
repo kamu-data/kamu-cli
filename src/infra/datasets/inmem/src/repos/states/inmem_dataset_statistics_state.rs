@@ -18,12 +18,12 @@ use kamu_datasets::DatasetStatistics;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// The statistics every `InMemoryDatasetStatisticsRepository` reads and writes
-pub struct InMemoryDatasetStatisticsState {
+pub(crate) struct InMemoryDatasetStatisticsState {
     pub(crate) statistics:
         InMemoryTransactionalMap<(odf::DatasetID, odf::BlockRef), DatasetStatistics>,
 }
 
-#[component(pub)]
+#[component(pub(crate))]
 #[interface(dyn InMemoryTransactionParticipant)]
 #[scope(Singleton)]
 impl InMemoryDatasetStatisticsState {

@@ -26,6 +26,7 @@ use kamu_datasets_services::DatasetKeyValueServiceSysEnv;
 use kamu_ingest_datafusion::DataWriterDataFusion;
 use odf::dataset::testing::create_test_dataset_from_snapshot;
 use odf::metadata::testing::MetadataFactory;
+use random_strings::get_random_name;
 use tempfile::TempDir;
 use test_utils::HttpFileServer;
 use time_source::{SystemTimeSource, SystemTimeSourceStub};
@@ -1898,7 +1899,7 @@ impl IngestTestHarness {
                 PollingIngestPlan::new(target.get_handle(), Box::new(metadata_state)).unwrap(),
                 options,
                 &IngestEnvVars::default(),
-                &random_strings::get_random_name(None, 10),
+                &get_random_name(None, 10),
                 None,
             )
             .await;

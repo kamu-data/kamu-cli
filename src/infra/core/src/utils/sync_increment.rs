@@ -25,7 +25,7 @@ pub async fn sync_increment(
 
     // After a forced sync over a divergence the chain may not hold the old head
     let old_head = match old_head {
-        Some(old_head) if contains_block(chain, old_head).await? => Some(old_head),
+        Some(old_head) if chain.contains_block(old_head).await? => Some(old_head),
         Some(_) | None => None,
     };
 
@@ -40,20 +40,6 @@ pub async fn sync_increment(
         }
         Err(e @ (E::BlockNotFound(_) | E::Internal(_))) => Err(SyncError::Internal(e.int_err())),
     }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-async fn contains_block(
-    chain: &dyn odf::MetadataChain,
-    hash: &odf::Multihash,
-) -> Result<bool, SyncError> {
-    use odf::storage::ContainsBlockError as E;
-
-    chain.contains_block(hash).await.map_err(|e| match e {
-        E::Access(e) => SyncError::Access(e),
-        E::Internal(e) => SyncError::Internal(e),
-    })
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

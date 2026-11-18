@@ -16,11 +16,16 @@ use syn::visit_mut::{self, VisitMut};
 use syn::{
     Attribute,
     Expr,
+    ExprAsync,
     ExprBlock,
     ExprClosure,
+    ExprReturn,
     Ident,
+    Item,
     ItemFn,
+    Macro,
     Pat,
+    PatIdent,
     ReturnType,
     Token,
     Type,
@@ -182,7 +187,7 @@ impl TransactionBlock {
         })
     }
 
-    pub(crate) fn expand(&self) -> proc_macro2::TokenStream {
+    pub(crate) fn expand(&self) -> TokenStream {
         let Self {
             maybe_catalog,
             maybe_when,
@@ -279,7 +284,7 @@ impl Binding {
         ))
     }
 
-    fn plain_name(pat_ident: &syn::PatIdent) -> syn::Result<Ident> {
+    fn plain_name(pat_ident: &PatIdent) -> syn::Result<Ident> {
         if pat_ident.by_ref.is_some()
             || pat_ident.mutability.is_some()
             || pat_ident.subpat.is_some()
@@ -296,7 +301,7 @@ impl Binding {
         )
     }
 
-    fn expand(&self, scope: &Ident) -> proc_macro2::TokenStream {
+    fn expand(&self, scope: &Ident) -> TokenStream {
         match self {
             Self::Catalog(name) => quote! { let #name = #scope.catalog().clone(); },
             Self::Component(name, component_type) => {
@@ -355,17 +360,17 @@ impl ReturnFinder {
 }
 
 impl<'ast> Visit<'ast> for ReturnFinder {
-    fn visit_expr_return(&mut self, expr: &'ast syn::ExprReturn) {
+    fn visit_expr_return(&mut self, expr: &'ast ExprReturn) {
         self.maybe_found.get_or_insert(expr.return_token.span);
     }
 
     fn visit_expr_closure(&mut self, _: &'ast ExprClosure) {}
 
-    fn visit_expr_async(&mut self, _: &'ast syn::ExprAsync) {}
+    fn visit_expr_async(&mut self, _: &'ast ExprAsync) {}
 
-    fn visit_item(&mut self, _: &'ast syn::Item) {}
+    fn visit_item(&mut self, _: &'ast Item) {}
 
-    fn visit_macro(&mut self, mac: &'ast syn::Macro) {
+    fn visit_macro(&mut self, mac: &'ast Macro) {
         if self.maybe_found.is_none() {
             self.maybe_found = Self::find_return_token(mac.tokens.clone());
         }

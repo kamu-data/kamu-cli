@@ -18,11 +18,11 @@ use dill::*;
 
 /// The dependency edges every `InMemoryDatasetDependencyRepository` reads and
 /// writes, keyed by (downstream, upstream) dataset IDs
-pub struct InMemoryDatasetDependencyState {
+pub(crate) struct InMemoryDatasetDependencyState {
     pub(crate) edges: InMemoryTransactionalMap<(odf::DatasetID, odf::DatasetID), ()>,
 }
 
-#[component(pub)]
+#[component(pub(crate))]
 #[interface(dyn InMemoryTransactionParticipant)]
 #[scope(Singleton)]
 impl InMemoryDatasetDependencyState {

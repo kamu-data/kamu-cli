@@ -18,12 +18,12 @@ use super::InMemoryDatasetKeyBlockState;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct InMemoryDatasetKeyBlockRepository {
+pub(crate) struct InMemoryDatasetKeyBlockRepository {
     state: Arc<InMemoryDatasetKeyBlockState>,
     transaction_id: Option<TransactionId>,
 }
 
-#[component(pub)]
+#[component(pub(crate))]
 #[interface(dyn DatasetKeyBlockRepository)]
 #[interface(dyn DatasetEntryRemovalListener)]
 impl InMemoryDatasetKeyBlockRepository {

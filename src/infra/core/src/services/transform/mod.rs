@@ -10,7 +10,9 @@
 mod transform_executor_impl;
 mod transform_helpers;
 mod transform_planner_impl;
+mod transform_preliminary_plan;
 
 pub use transform_executor_impl::*;
 pub(crate) use transform_helpers::*;
 pub use transform_planner_impl::*;
+pub(crate) use transform_preliminary_plan::*;

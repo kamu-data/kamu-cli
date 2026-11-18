@@ -13,7 +13,7 @@ use internal_error::InternalError;
 use kamu_core::*;
 use kamu_task_system::*;
 
-use super::task_reference_update::{
+use super::task_failure_outcomes::{
     dataset_deleted_outcome,
     failed_outcome,
     operation_not_allowed_outcome,

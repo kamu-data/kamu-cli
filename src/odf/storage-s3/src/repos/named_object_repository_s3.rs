@@ -31,7 +31,7 @@ impl NamedObjectRepositoryS3 {
         self.s3_context.get_key(name)
     }
 
-    async fn get_with_e_tag(&self, key: &str) -> Result<Option<(Vec<u8>, String)>, InternalError> {
+    async fn find_with_e_tag(&self, key: &str) -> Result<Option<(Vec<u8>, String)>, InternalError> {
         let resp = match self.s3_context.get_object(key.to_owned()).await {
             Ok(resp) => resp,
             Err(err) => {
@@ -132,7 +132,7 @@ impl NamedObjectRepository for NamedObjectRepositoryS3 {
         let condition = match expected {
             None => PutObjectCondition::IfNoneMatch,
             Some(expected) => {
-                let Some((actual, e_tag)) = self.get_with_e_tag(&key).await? else {
+                let Some((actual, e_tag)) = self.find_with_e_tag(&key).await? else {
                     return Err(mismatch());
                 };
                 if actual != expected {

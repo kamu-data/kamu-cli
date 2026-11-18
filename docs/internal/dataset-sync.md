@@ -595,7 +595,7 @@ into the recoverability of the failed task.
 | Sync jobs, committing a pull into a local dataset | [`sync_from_job_impl.rs`](../../src/infra/core/src/dataset_jobs/sync_from_job_impl.rs), [`sync_to_job_impl.rs`](../../src/infra/core/src/dataset_jobs/sync_to_job_impl.rs) |
 | `Seed` store and block append shared by both protocols | [`local_sync_writes/`](../../src/infra/core/src/utils/local_sync_writes/) |
 | Protocol dispatch, push to IPNS | [`sync_service_impl.rs`](../../src/infra/core/src/services/sync/sync_service_impl.rs) |
-| `odf+` URL helpers | [`url_ext.rs`](../../src/infra/core/src/utils/url_ext.rs) |
+| `odf+` URL helpers | [`url_utils.rs`](../../src/infra/core/src/utils/url_utils.rs) |
 | Local IPFS node | [`ipfs_service.rs`](../../src/domain/core/src/services/ipfs_service.rs), [`ipfs_service_impl.rs`](../../src/infra/core/src/services/ipfs_service_impl.rs) |
 | Sync ref resolution | [`sync_request_builder.rs`](../../src/infra/core/src/services/sync/sync_request_builder.rs) |
 | Chain comparison | [`metadata_chain_comparator.rs`](../../src/domain/core/src/utils/metadata_chain_comparator.rs) |

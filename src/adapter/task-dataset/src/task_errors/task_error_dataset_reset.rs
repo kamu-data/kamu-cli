@@ -7,6 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use kamu_core::ResetOldHeadMismatchError;
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 kamu_task_system::task_error_enum! {
@@ -26,6 +28,15 @@ kamu_task_system::task_error_enum! {
 pub struct DatasetResetOldHeadMismatch {
     pub expected_head: odf::Multihash,
     pub actual_head: odf::Multihash,
+}
+
+impl From<ResetOldHeadMismatchError> for DatasetResetOldHeadMismatch {
+    fn from(e: ResetOldHeadMismatchError) -> Self {
+        Self {
+            expected_head: e.old_head,
+            actual_head: e.current_head,
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -27,12 +27,12 @@ use super::InMemoryDatasetStatisticsState;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct InMemoryDatasetStatisticsRepository {
+pub(crate) struct InMemoryDatasetStatisticsRepository {
     state: Arc<InMemoryDatasetStatisticsState>,
     transaction_id: Option<TransactionId>,
 }
 
-#[component(pub)]
+#[component(pub(crate))]
 #[interface(dyn DatasetStatisticsRepository)]
 #[interface(dyn DatasetEntryRemovalListener)]
 impl InMemoryDatasetStatisticsRepository {

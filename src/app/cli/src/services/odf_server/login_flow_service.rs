@@ -11,7 +11,7 @@ use std::sync::Arc;
 
 use console::style as s;
 use kamu::domain::{AddRepoError, RemoteRepositoryRegistry};
-use kamu::utils::url_ext::UrlExt;
+use kamu::utils::url_utils::to_odf_protocol;
 use kamu_accounts::{AccountProvider, CurrentAccountSubject};
 use url::Url;
 
@@ -485,7 +485,7 @@ impl LoginFlowService {
     ) -> Result<(), CLIError> {
         match self.remote_repo_reg.add_repository(
             repo_name,
-            backend_url.as_odf_protocol().map_err(CLIError::failure)?,
+            to_odf_protocol(backend_url).map_err(CLIError::failure)?,
         ) {
             Ok(_) | Err(AddRepoError::AlreadyExists(_)) => Ok(()),
             Err(e) => Err(CLIError::failure(e)),

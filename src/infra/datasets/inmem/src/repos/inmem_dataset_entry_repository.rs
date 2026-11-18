@@ -22,13 +22,13 @@ use super::InMemoryDatasetEntryState;
 type Rows<'a> = InMemoryMapView<'a, odf::DatasetID, DatasetEntry>;
 type NameClaims<'a> = InMemoryMapView<'a, (odf::AccountID, odf::DatasetName), odf::DatasetID>;
 
-pub struct InMemoryDatasetEntryRepository {
+pub(crate) struct InMemoryDatasetEntryRepository {
     state: Arc<InMemoryDatasetEntryState>,
     transaction_id: Option<TransactionId>,
     removal_listeners: Vec<Arc<dyn DatasetEntryRemovalListener>>,
 }
 
-#[component(pub)]
+#[component(pub(crate))]
 #[interface(dyn DatasetEntryRepository)]
 impl InMemoryDatasetEntryRepository {
     pub fn new(

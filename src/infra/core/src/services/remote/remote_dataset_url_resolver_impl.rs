@@ -15,7 +15,7 @@ use kamu_core::*;
 use url::Url;
 
 use crate::RemoteAliasResolverApiHelper;
-use crate::utils::url_ext::UrlExt;
+use crate::utils::url_utils::{ensure_trailing_slash, is_odf_protocol, odf_to_transport_protocol};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -51,7 +51,7 @@ impl RemoteDatasetUrlResolverImpl {
             account_name.as_ref(),
             &alias.dataset_name,
         )?;
-        remote_url.ensure_trailing_slash();
+        ensure_trailing_slash(&mut remote_url);
 
         Ok(remote_url)
     }
@@ -73,14 +73,14 @@ impl RemoteDatasetUrlResolver for RemoteDatasetUrlResolverImpl {
             .into()),
             odf::DatasetRefRemote::Url(url) => {
                 let mut dataset_url = url.as_ref().clone();
-                dataset_url.ensure_trailing_slash();
+                ensure_trailing_slash(&mut dataset_url);
                 Ok(dataset_url)
             }
             odf::DatasetRefRemote::Alias(alias)
             | odf::DatasetRefRemote::Handle(odf::metadata::DatasetHandleRemote { alias, .. }) => {
                 let remote_repo = self.remote_repo_reg.get_repository(&alias.repo_name)?;
-                if remote_repo.url.is_odf_protocol() {
-                    let transfer_url = remote_repo.url.clone().odf_to_transport_protocol()?;
+                if is_odf_protocol(&remote_repo.url) {
+                    let transfer_url = odf_to_transport_protocol(&remote_repo.url)?;
                     self.resolve_url_from_odf_transfer_url(alias, &transfer_url)
                         .await
                 } else {

@@ -27,12 +27,12 @@ use super::InMemoryDatasetReferenceState;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct InMemoryDatasetReferenceRepository {
+pub(crate) struct InMemoryDatasetReferenceRepository {
     state: Arc<InMemoryDatasetReferenceState>,
     transaction_id: Option<TransactionId>,
 }
 
-#[component(pub)]
+#[component(pub(crate))]
 #[interface(dyn DatasetReferenceRepository)]
 #[interface(dyn DatasetEntryRemovalListener)]
 impl InMemoryDatasetReferenceRepository {

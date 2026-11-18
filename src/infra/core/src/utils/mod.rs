@@ -16,4 +16,4 @@ pub mod simple_transfer_protocol;
 pub mod smart_transfer_protocol;
 pub(crate) mod span_outcome;
 pub mod sync_increment;
-pub mod url_ext;
+pub mod url_utils;

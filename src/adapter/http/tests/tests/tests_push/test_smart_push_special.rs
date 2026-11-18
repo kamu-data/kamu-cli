@@ -719,10 +719,10 @@ impl ExistingDatasetDeniedCase {
                 .await;
 
             let dataset_result = &push_result.first().unwrap().result;
-            match dataset_result {
-                Ok(_) => panic!(),
-                Err(e) => assert_matches!(e, PushError::SyncError(SyncError::DatasetNotFound(_))),
-            }
+            assert_matches!(
+                dataset_result,
+                Err(PushError::SyncError(SyncError::DatasetNotFound(_)))
+            );
         };
 
         await_client_server_flow!(api_server_handle, client_handle);

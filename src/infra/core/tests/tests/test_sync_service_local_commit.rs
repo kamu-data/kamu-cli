@@ -11,6 +11,7 @@ use std::assert_matches;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 
+use chrono::TimeDelta;
 use kamu::domain::*;
 use kamu::testing::*;
 use kamu::utils::simple_transfer_protocol::SimpleTransferProtocolConfig;
@@ -647,7 +648,7 @@ impl LocalPullHarness {
                 continue;
             }
 
-            block.system_time += chrono::TimeDelta::seconds(1);
+            block.system_time += TimeDelta::seconds(1);
             std::fs::write(
                 &path,
                 odf::storage::serialize_metadata_block(&block)

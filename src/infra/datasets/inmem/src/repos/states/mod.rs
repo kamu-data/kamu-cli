@@ -16,9 +16,9 @@ mod inmem_dataset_reference_state;
 mod inmem_dataset_statistics_state;
 
 pub(crate) use dataset_blocks_map::*;
-pub use inmem_dataset_data_block_state::*;
-pub use inmem_dataset_dependency_state::*;
-pub use inmem_dataset_entry_state::*;
-pub use inmem_dataset_key_block_state::*;
-pub use inmem_dataset_reference_state::*;
-pub use inmem_dataset_statistics_state::*;
+pub(crate) use inmem_dataset_data_block_state::*;
+pub(crate) use inmem_dataset_dependency_state::*;
+pub(crate) use inmem_dataset_entry_state::*;
+pub(crate) use inmem_dataset_key_block_state::*;
+pub(crate) use inmem_dataset_reference_state::*;
+pub(crate) use inmem_dataset_statistics_state::*;

@@ -10,7 +10,7 @@
 use std::assert_matches;
 use std::sync::Arc;
 
-use chrono::{DateTime, TimeZone, Utc};
+use chrono::{DateTime, Duration, TimeZone, Utc};
 use datafusion::execution::config::SessionConfig;
 use datafusion::execution::context::SessionContext;
 use domain::{CompactionError, CompactionOptions, CompactionResult};
@@ -2184,7 +2184,7 @@ impl CompactTestHarness {
                 )
                 .unwrap();
 
-                event_time += chrono::Duration::minutes(1);
+                event_time += Duration::minutes(1);
             }
             self.ingest_data(String::from_utf8(data).unwrap(), target.clone())
                 .await;
@@ -2248,7 +2248,7 @@ impl CompactTestHarness {
         prev_offset: u64,
         new_source_state: Option<odf::metadata::SourceState>,
     ) -> DateTime<Utc> {
-        let new_watermark = self.current_date_time + chrono::Duration::days(1);
+        let new_watermark = self.current_date_time + Duration::days(1);
         target
             .commit_add_data(
                 odf::dataset::AddDataParams {

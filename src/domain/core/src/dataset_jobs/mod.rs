@@ -19,7 +19,7 @@ mod verify_job;
 pub use compaction_job::*;
 pub use polling_ingest_job::*;
 pub use reset_job::*;
-pub use set_chain_ref_error::*;
+pub(crate) use set_chain_ref_error::*;
 pub use sync_from_job::*;
 pub use sync_to_job::*;
 pub use transform_job::*;

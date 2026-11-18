@@ -13,7 +13,7 @@ use internal_error::{ErrorIntoInternal, InternalError};
 
 /// Maps a failed `HEAD` update onto an operation error: a lost compare-and-swap
 /// keeps its own variant, a missing block is internal.
-pub fn map_set_chain_ref_error<E>(e: odf::dataset::SetChainRefError) -> E
+pub(crate) fn map_set_chain_ref_error<E>(e: odf::dataset::SetChainRefError) -> E
 where
     E: From<odf::dataset::RefCASError> + From<odf::AccessError> + From<InternalError>,
 {

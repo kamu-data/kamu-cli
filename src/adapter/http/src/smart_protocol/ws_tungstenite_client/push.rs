@@ -11,11 +11,10 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicI32, Ordering};
 
 use futures::stream::{StreamExt, TryStreamExt};
-use internal_error::{ErrorIntoInternal, ResultIntoInternal};
+use internal_error::ResultIntoInternal;
 use kamu::utils::smart_transfer_protocol::TransferOptions;
 use kamu::utils::sync_increment::sync_increment;
 use kamu_core::*;
-use kamu_datasets::NameCollisionError;
 use url::Url;
 
 use super::WsSmartTransferProtocolClient;
@@ -69,18 +68,9 @@ impl WsSmartTransferProtocolClient {
         let dataset_push_response =
             read_phase_payload::<DatasetPushResponse>(socket, PushPhase::InitialRequest).await?;
 
-        match dataset_push_response {
-            Ok(success) => {
-                tracing::debug!("Push response accepted");
-                Ok(success)
-            }
-            Err(DatasetPushRequestError::Internal(e)) => Err(PushClientError::Internal(
-                ClientInternalError::from(e).int_err(),
-            )),
-            Err(DatasetPushRequestError::InvalidHead(e)) => {
-                Err(PushClientError::InvalidHead(e.into()))
-            }
-        }
+        let success = dataset_push_response?;
+        tracing::debug!("Push response accepted");
+        Ok(success)
     }
 
     #[tracing::instrument(
@@ -129,12 +119,7 @@ impl WsSmartTransferProtocolClient {
 
         let dataset_metadata_push_response =
             read_phase_payload::<DatasetPushMetadataResponse>(socket, PushPhase::MetadataRequest)
-                .await?
-                .map_err(|e| match e {
-                    DatasetPushMetadataError::SeedBlockOverwriteRestricted(_) => {
-                        PushClientError::OverwriteSeedBlock(OverwriteSeedBlockError {})
-                    }
-                })?;
+                .await??;
 
         Ok(dataset_metadata_push_response)
     }
@@ -197,22 +182,7 @@ impl WsSmartTransferProtocolClient {
                 socket,
                 PushPhase::ObjectsRequest,
             )
-            .await?
-            .map_err(|e| match e {
-                DatasetPushObjectsTransferError::RefCollision(err) => {
-                    PushClientError::RefCollision(odf::dataset::RefCollisionError {
-                        id: err.dataset_id,
-                    })
-                }
-                DatasetPushObjectsTransferError::NameCollision(err) => {
-                    PushClientError::NameCollision(NameCollisionError {
-                        alias: err.dataset_alias,
-                    })
-                }
-                DatasetPushObjectsTransferError::Internal(err) => {
-                    PushClientError::Internal(ClientInternalError::from(err).int_err())
-                }
-            })?;
+            .await??;
 
         tracing::debug!(
             objects_count = % dataset_objects_push_response
@@ -368,25 +338,7 @@ impl WsSmartTransferProtocolClient {
                 }
                 DatasetPushCompleteReply::Response(Ok(DatasetPushCompleteConfirmed {}))
                 | DatasetPushCompleteReply::Legacy(DatasetPushCompleteLegacyConfirmed {}) => Ok(()),
-                DatasetPushCompleteReply::Response(Err(DatasetPushCompleteError::Internal(e))) => {
-                    Err(PushClientError::Internal(
-                        ClientInternalError::from(e).int_err(),
-                    ))
-                }
-                DatasetPushCompleteReply::Response(Err(
-                    DatasetPushCompleteError::UpdatedConcurrently(
-                        DatasetPushUpdatedConcurrentlyError {},
-                    ),
-                )) => Err(PushClientError::UpdatedConcurrently(
-                    DestinationUpdatedConcurrentlyError,
-                )),
-                DatasetPushCompleteReply::Response(Err(
-                    DatasetPushCompleteError::ObjectsNotUploaded(
-                        DatasetPushObjectsNotUploadedError { num_objects },
-                    ),
-                )) => Err(PushClientError::ObjectsNotUploaded(
-                    DestinationMissingObjectsError { num_objects },
-                )),
+                DatasetPushCompleteReply::Response(Err(e)) => Err(e.into()),
             };
         }
     }

@@ -14,4 +14,4 @@ mod dependencies;
 mod repos;
 
 pub use dependencies::*;
-pub use repos::*;
+use repos::*;

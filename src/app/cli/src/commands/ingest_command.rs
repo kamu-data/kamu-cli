@@ -70,8 +70,7 @@ impl IngestCommand {
         if self
             .pull_source_resolver
             .has_pull_source(dataset_handle)
-            .await
-            .map_err(CLIError::failure)?
+            .await?
         {
             return Err(CLIError::usage_error(
                 "Ingesting data into a dataset that is pulled from a remote will cause histories \

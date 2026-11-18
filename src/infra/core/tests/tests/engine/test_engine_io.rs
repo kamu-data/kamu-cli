@@ -20,6 +20,7 @@ use kamu_datasets::{AlwaysHappyDatasetPermissionChecker, ResolvedDataset};
 use kamu_datasets_services::DatasetKeyValueServiceSysEnv;
 use odf::dataset::testing::create_test_dataset_from_snapshot;
 use odf::metadata::testing::MetadataFactory;
+use random_strings::get_random_name;
 use test_utils::LocalS3Server;
 use time_source::{SystemTimeSource, SystemTimeSourceDefault};
 
@@ -381,7 +382,7 @@ async fn ingest(
             PollingIngestPlan::new(target.get_handle(), metadata_state).unwrap(),
             PollingIngestOptions::default(),
             &IngestEnvVars::default(),
-            &random_strings::get_random_name(None, 10),
+            &get_random_name(None, 10),
             None,
         )
         .await

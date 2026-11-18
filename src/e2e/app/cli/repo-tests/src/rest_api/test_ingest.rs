@@ -9,6 +9,7 @@
 
 use std::assert_matches;
 
+use futures::future::join_all;
 use kamu_cli_e2e_common::{
     CreateDatasetResponse,
     DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_1,
@@ -16,7 +17,7 @@ use kamu_cli_e2e_common::{
     KamuApiServerClientExt,
     RequestBody,
 };
-use reqwest::{Method, StatusCode};
+use reqwest::StatusCode;
 
 use crate::utils::generate_password;
 
@@ -226,17 +227,15 @@ pub async fn test_ingest_respects_account_quota(mut kamu_api_server_client: Kamu
         .await
         .dataset_alias;
 
-    let low_quota_response = kamu_api_server_client
-        .rest_api_call(
-            reqwest::Method::POST,
-            &format!("{low_quota_dataset}/ingest"),
-            Some(RequestBody::NdJson(
-                DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_1.into(),
-            )),
+    let (low_quota_status, _) = kamu_api_server_client
+        .dataset()
+        .ingest_data_status(
+            &low_quota_dataset,
+            RequestBody::NdJson(DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_1.into()),
         )
         .await;
 
-    pretty_assertions::assert_eq!(StatusCode::FORBIDDEN, low_quota_response.status());
+    pretty_assertions::assert_eq!(StatusCode::FORBIDDEN, low_quota_status);
 
     kamu_api_server_client.auth().logout();
     kamu_api_server_client
@@ -357,24 +356,15 @@ pub async fn test_concurrent_ingests_commit_or_conflict(
         .create_player_scores_dataset()
         .await;
 
-    let endpoint = format!("{dataset_alias}/ingest");
-    let responses = futures::future::join_all((0..CONCURRENT_INGESTS).map(|match_id| {
+    let dataset_api = kamu_api_server_client.dataset();
+    let outcomes = join_all((0..CONCURRENT_INGESTS).map(|match_id| {
         let row = format!(
             r#"{{"match_time": "2000-01-01T00:00:00Z", "match_id": {match_id}, "player_id": "Alice", "score": 100}}"#
         );
-        kamu_api_server_client.rest_api_call(
-            Method::POST,
-            &endpoint,
-            Some(RequestBody::NdJson(row)),
-        )
+        dataset_api.ingest_data_status(&dataset_alias, RequestBody::NdJson(row))
     }))
     .await;
 
-    let mut outcomes = Vec::with_capacity(responses.len());
-    for response in responses {
-        let status = response.status();
-        outcomes.push((status, response.text().await.unwrap()));
-    }
     assert!(
         outcomes
             .iter()

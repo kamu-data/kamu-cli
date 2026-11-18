@@ -18,12 +18,12 @@ use super::InMemoryDatasetDataBlockState;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct InMemoryDatasetDataBlockRepository {
+pub(crate) struct InMemoryDatasetDataBlockRepository {
     state: Arc<InMemoryDatasetDataBlockState>,
     transaction_id: Option<TransactionId>,
 }
 
-#[component(pub)]
+#[component(pub(crate))]
 #[interface(dyn DatasetDataBlockRepository)]
 #[interface(dyn DatasetEntryRemovalListener)]
 impl InMemoryDatasetDataBlockRepository {

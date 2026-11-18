@@ -19,12 +19,12 @@ use super::InMemoryDatasetDependencyState;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct InMemoryDatasetDependencyRepository {
+pub(crate) struct InMemoryDatasetDependencyRepository {
     state: Arc<InMemoryDatasetDependencyState>,
     transaction_id: Option<TransactionId>,
 }
 
-#[component(pub)]
+#[component(pub(crate))]
 #[interface(dyn DatasetDependencyRepository)]
 #[interface(dyn DatasetEntryRemovalListener)]
 impl InMemoryDatasetDependencyRepository {

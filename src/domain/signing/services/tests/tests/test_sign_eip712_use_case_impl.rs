@@ -12,6 +12,7 @@ use std::sync::Arc;
 use crypto_eip712_utils::{Eip712TypedData, Secp256k1Signer};
 use database_common::NoOpDatabasePlugin;
 use kamu_accounts::{
+    Account,
     AccountConfig,
     AccountPropertyName,
     CurrentAccountSubject,
@@ -485,7 +486,7 @@ impl SignEip712UseCaseHarness {
 impl SignEip712UseCaseHarness {
     fn logged_subject(account_name: &str, account_id: odf::AccountID) -> CurrentAccountSubject {
         CurrentAccountSubject::logged(
-            kamu_accounts::Account::seed_resource_id_from_name(account_name),
+            Account::seed_resource_id_from_name(account_name),
             account_id,
             odf::AccountName::new_unchecked(account_name),
         )

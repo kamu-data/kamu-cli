@@ -15,11 +15,11 @@ use super::DatasetBlocksMap;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// The data blocks every `InMemoryDatasetDataBlockRepository` reads and writes
-pub struct InMemoryDatasetDataBlockState {
+pub(crate) struct InMemoryDatasetDataBlockState {
     pub(crate) data_blocks: DatasetBlocksMap,
 }
 
-#[component(pub)]
+#[component(pub(crate))]
 #[interface(dyn InMemoryTransactionParticipant)]
 #[scope(Singleton)]
 impl InMemoryDatasetDataBlockState {

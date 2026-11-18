@@ -13,19 +13,14 @@ use internal_error::InternalError;
 use kamu_core::{ResetError, ResetExecutionError, ResetJob, ResetPlanningError};
 use kamu_task_system::*;
 
-use super::task_reference_update::{
+use super::task_failure_outcomes::{
     dataset_deleted_outcome,
     failed_outcome,
     operation_not_allowed_outcome,
     ref_cas_failed_outcome,
 };
 use super::task_span_outcome::TaskSpanOutcome;
-use crate::{
-    DatasetResetOldHeadMismatch,
-    TaskDefinitionDatasetReset,
-    TaskErrorDatasetReset,
-    TaskResultDatasetReset,
-};
+use crate::{TaskDefinitionDatasetReset, TaskErrorDatasetReset, TaskResultDatasetReset};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -75,11 +70,7 @@ impl ResetDatasetTaskRunner {
             ResetError::Planning(ResetPlanningError::OldHeadMismatch(e)) => {
                 tracing::warn!(error = ?e, error_msg = %e, "The dataset is not at the expected old head");
                 Ok(TaskOutcome::Failed(
-                    TaskErrorDatasetReset::OldHeadMismatch(DatasetResetOldHeadMismatch {
-                        expected_head: e.old_head,
-                        actual_head: e.current_head,
-                    })
-                    .into_task_error(),
+                    TaskErrorDatasetReset::OldHeadMismatch(e.into()).into_task_error(),
                 ))
             }
             ResetError::Execution(ResetExecutionError::SetReferenceFailed(E::BlockNotFound(_))) => {

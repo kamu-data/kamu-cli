@@ -38,6 +38,7 @@ use kamu_datasets_services::{
 };
 use odf::dataset::testing::create_test_dataset_from_snapshot;
 use odf::metadata::testing::MetadataFactory;
+use random_strings::get_random_name;
 use time_source::{SystemTimeSource, SystemTimeSourceStub};
 
 use crate::TransformTestHelper;
@@ -451,7 +452,7 @@ impl TestHarness {
                 PollingIngestPlan::new(target.get_handle(), metadata_state).unwrap(),
                 PollingIngestOptions::default(),
                 &IngestEnvVars::default(),
-                &random_strings::get_random_name(None, 10),
+                &get_random_name(None, 10),
                 None,
             )
             .await

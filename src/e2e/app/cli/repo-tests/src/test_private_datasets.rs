@@ -1874,7 +1874,7 @@ pub async fn test_a_private_dataset_is_found_by_id_and_ingested_into_only_by_aut
         );
     }
 
-    let mut last_head = owner_head(&owner, &dataset_alias).await;
+    let mut last_head = owner.odf_transfer().head(&dataset_alias).await;
 
     for (tag, client, data, expected_status) in [
         (
@@ -1917,7 +1917,7 @@ pub async fn test_a_private_dataset_is_found_by_id_and_ingested_into_only_by_aut
             .await;
         pretty_assertions::assert_eq!(expected_status, response.status(), "Tag: {tag}");
 
-        let head = owner_head(&owner, &dataset_alias).await;
+        let head = owner.odf_transfer().head(&dataset_alias).await;
         pretty_assertions::assert_eq!(
             expected_status == StatusCode::OK,
             head != last_head,
@@ -1930,17 +1930,6 @@ pub async fn test_a_private_dataset_is_found_by_id_and_ingested_into_only_by_aut
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Helpers
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-async fn owner_head(
-    owner: &KamuApiServerClient,
-    dataset_alias: &odf::DatasetAlias,
-) -> odf::Multihash {
-    owner
-        .odf_transfer()
-        .metadata_block_hash_by_ref(dataset_alias, odf::BlockRef::Head)
-        .await
-        .unwrap()
-}
 
 async fn authorize_users_by_roles(
     owner: &KamuApiServerClient,

@@ -9,41 +9,31 @@
 
 use std::sync::Arc;
 
-use internal_error::{InternalError, ResultIntoInternal};
+use database_common::NoOpDatabasePlugin;
+use internal_error::InternalError;
 use kamu::*;
-use kamu_accounts::Account;
 use kamu_accounts_services::ModifyAccountPasswordUseCaseImpl;
-use kamu_core::TenancyConfig;
 use kamu_datasets_services::{
     AppendDatasetMetadataBatchUseCaseImpl,
     DatasetReferenceUpdaterImpl,
     DatasetS3BuilderDatabaseBackedImpl,
 };
 use test_utils::LocalS3Server;
-use time_source::SystemTimeSourceStub;
 
 use super::{
+    BaseServerSideHarness,
     S3DatasetFixture,
     ServerSideDatasetFixture,
     ServerSideHarness,
     ServerSideHarnessOptions,
-    TestAPIServer,
-    bind_api_listener,
-    make_server_account,
-    register_common_server_components,
-    start_api_server,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub(crate) struct ServerSideS3Harness {
+    base: BaseServerSideHarness,
     s3: LocalS3Server,
-    base_catalog: dill::Catalog,
-    api_server: TestAPIServer,
-    options: ServerSideHarnessOptions,
-    time_source: SystemTimeSourceStub,
     _temp_dir: tempfile::TempDir,
-    account: Account,
 }
 
 impl ServerSideS3Harness {
@@ -55,22 +45,7 @@ impl ServerSideS3Harness {
         let s3 = LocalS3Server::new().await;
         s3.set_credentials_env_vars();
 
-        let account = make_server_account(options.tenancy_config);
-        let time_source = SystemTimeSourceStub::new();
-        let (listener, base_url_rest) = bind_api_listener().await;
-
-        let base_catalog = {
-            let mut b = dill::CatalogBuilder::new();
-
-            register_common_server_components(
-                &mut b,
-                &options,
-                &account,
-                &time_source,
-                run_info_dir,
-                &base_url_rest,
-            );
-
+        let base = BaseServerSideHarness::new(options, run_info_dir, |b| {
             b.add_builder(odf::dataset::DatasetStorageUnitS3::builder(s3.ctx.clone()))
                 .add::<DatasetS3BuilderDatabaseBackedImpl>()
                 .add_builder(ObjectStoreBuilderS3::builder(
@@ -83,21 +58,14 @@ impl ServerSideS3Harness {
                 .add::<DatasetReferenceUpdaterImpl>()
                 .add::<ModifyAccountPasswordUseCaseImpl>();
 
-            database_common::NoOpDatabasePlugin::init_database_components(&mut b);
-
-            b.build()
-        };
-
-        let api_server = start_api_server(&base_catalog, listener, &options).await;
+            NoOpDatabasePlugin::init_database_components(b);
+        })
+        .await;
 
         Self {
+            base,
             s3,
-            base_catalog,
-            api_server,
-            options,
-            time_source,
             _temp_dir: temp_dir,
-            account,
         }
     }
 
@@ -110,24 +78,8 @@ impl ServerSideS3Harness {
 
 #[async_trait::async_trait(?Send)]
 impl ServerSideHarness for ServerSideS3Harness {
-    fn base_catalog(&self) -> &dill::Catalog {
-        &self.base_catalog
-    }
-
-    fn tenancy_config(&self) -> TenancyConfig {
-        self.options.tenancy_config
-    }
-
-    fn api_server(&self) -> &TestAPIServer {
-        &self.api_server
-    }
-
-    fn server_account(&self) -> &Account {
-        &self.account
-    }
-
-    fn system_time_source(&self) -> &SystemTimeSourceStub {
-        &self.time_source
+    fn base(&self) -> &BaseServerSideHarness {
+        &self.base
     }
 
     fn dataset_fixture(&self) -> Arc<dyn ServerSideDatasetFixture> {
@@ -135,7 +87,7 @@ impl ServerSideHarness for ServerSideS3Harness {
     }
 
     async fn api_server_run(self) -> Result<(), InternalError> {
-        self.api_server.run().await.int_err()
+        self.base.api_server_run().await
     }
 }
 

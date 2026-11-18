@@ -338,7 +338,7 @@ run, and follows the plan, execute, commit shape of
 with no transaction open, and the job moves `HEAD` in a short transaction with a CAS. Reset is the
 exception: `ResetJob` plans and moves `HEAD` through `ResetExecutor` in one transaction.
 
-`runners/task_reference_update.rs` turns a commit that did not happen into the task's outcome, for every
+`runners/task_failure_outcomes.rs` turns a commit that did not happen into the task's outcome, for every
 dataset runner:
 
 | Commit | Task outcome |

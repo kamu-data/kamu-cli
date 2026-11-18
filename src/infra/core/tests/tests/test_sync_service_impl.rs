@@ -17,7 +17,6 @@ use kamu::utils::ipfs_wrapper::IpfsClient;
 use kamu::*;
 use kamu_datasets::*;
 use kamu_datasets_services::*;
-use odf::dataset::IpfsGateway;
 use odf::dataset::testing::create_test_dataset_from_snapshot;
 use odf::metadata::testing::MetadataFactory;
 use test_utils::{HttpFileServer, LocalS3Server};
@@ -49,7 +48,7 @@ async fn do_test_sync(
     tmp_workspace_dir_bar: &Path,
     push_ref: &odf::DatasetRefRemote,
     pull_ref: &odf::DatasetRefRemote,
-    ipfs: Option<(IpfsGateway, IpfsClient)>,
+    ipfs: Option<(odf::dataset::IpfsGateway, IpfsClient)>,
 ) {
     // Tests sync between "foo" -> remote -> "bar"
     let dataset_alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
@@ -672,7 +671,7 @@ async fn test_sync_to_from_ipfs() {
         &odf::DatasetRefRemote::from(&ipns_url),
         &odf::DatasetRefRemote::from(&ipns_url),
         Some((
-            IpfsGateway {
+            odf::dataset::IpfsGateway {
                 url: Url::parse(&format!("http://127.0.0.1:{}", ipfs_daemon.http_port())).unwrap(),
                 pre_resolve_dnslink: true,
             },

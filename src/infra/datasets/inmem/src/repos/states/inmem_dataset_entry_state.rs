@@ -18,7 +18,7 @@ use kamu_datasets::DatasetEntry;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// The entries every `InMemoryDatasetEntryRepository` reads and writes
-pub struct InMemoryDatasetEntryState {
+pub(crate) struct InMemoryDatasetEntryState {
     /// The dataset that claimed each (owner, name), so two transactions taking
     /// the same name conflict as with a unique index. A claim whose dataset is
     /// gone or has another name in `rows` is stale and holds nothing. Locked
@@ -27,7 +27,7 @@ pub struct InMemoryDatasetEntryState {
     pub(crate) rows: InMemoryTransactionalMap<odf::DatasetID, DatasetEntry>,
 }
 
-#[component(pub)]
+#[component(pub(crate))]
 #[interface(dyn InMemoryTransactionParticipant)]
 #[scope(Singleton)]
 impl InMemoryDatasetEntryState {

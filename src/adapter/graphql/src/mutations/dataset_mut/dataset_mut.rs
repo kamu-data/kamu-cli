@@ -205,7 +205,7 @@ impl DatasetMut {
                 let CasFailedHeads {
                     expected_head,
                     actual_head,
-                } = CasFailedHeads::try_from_ref_cas_error(e)?;
+                } = CasFailedHeads::try_from(e)?;
                 Ok(SetWatermarkResult::CasFailed(SetWatermarkCasFailed {
                     expected_head,
                     actual_head,

@@ -22,7 +22,6 @@ use kamu_core::{
     VerificationResult,
     VerificationService,
     VerifyJob,
-    VerifyTransformError,
 };
 use kamu_datasets::{
     DatasetOperation,
@@ -64,8 +63,7 @@ impl VerifyJobImpl {
         {
             let replayed_inputs = transform_planner
                 .get_verification_inputs(target.clone(), request.block_range.clone())
-                .await
-                .map_err(|e| VerificationError::VerifyTransform(VerifyTransformError::Plan(e)))?;
+                .await?;
             self.authorize(dataset_operation_guard, &request.target, replayed_inputs)
                 .await?;
         }

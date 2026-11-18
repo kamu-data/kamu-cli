@@ -131,7 +131,7 @@ where
             let param1 = match request.extract_parts::<Extractor>().await {
                 Ok(p) => p,
                 Err(err) => {
-                    tracing::warn!("Could not extract params: {:?}", err);
+                    tracing::warn!("Could not extract params: {err:?}");
                     return Ok(bad_request_response::<axum::body::Body>(None));
                 }
             };
@@ -158,11 +158,11 @@ where
                                 resolved_dataset.get_handle().clone(),
                             )),
                             Err(odf::DatasetRefUnresolvedError::NotFound(err)) => {
-                                tracing::warn!("Dataset not found: {:?}", err);
+                                tracing::warn!("Dataset not found: {err:?}");
                                 Ok(CheckResult::ErrorResponse(not_found_response()))
                             }
                             Err(err) => {
-                                tracing::error!("Could not get dataset: {:?}", err);
+                                tracing::error!("Could not get dataset: {err:?}");
                                 Ok(CheckResult::ErrorResponse(internal_server_error_response()))
                             }
                         }

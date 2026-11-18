@@ -19,7 +19,7 @@ use internal_error::{InternalError, ResultIntoInternal};
 use kamu::domain::*;
 use kamu::utils::local_sync_writes::PulledSeedStore;
 use kamu::utils::simple_transfer_protocol::SimpleTransferProtocol;
-use kamu::utils::url_ext::UrlExt;
+use kamu::utils::url_utils::{ensure_trailing_slash, odf_to_transport_protocol};
 use kamu::*;
 use kamu_accounts::*;
 use kamu_accounts_inmem::{
@@ -51,8 +51,8 @@ use kamu_datasets::*;
 use kamu_datasets_services::testing::RacingDatasetReferenceUpdater;
 use kamu_datasets_services::utils::CreateDatasetUseCaseHelper;
 use kamu_datasets_services::*;
-use messaging_outbox::{Outbox, OutboxImmediateImpl, register_message_dispatcher};
-use odf::dataset::{DatasetFactoryImpl, DatasetLayout, IpfsGateway, MetadataChainExt};
+use messaging_outbox::{ConsumerFilter, Outbox, OutboxImmediateImpl, register_message_dispatcher};
+use odf::dataset::MetadataChainExt;
 use odf::metadata::testing::MetadataFactory;
 use tempfile::TempDir;
 use time_source::SystemTimeSourceDefault;
@@ -113,10 +113,8 @@ impl ClientSideHarness {
         b.add_value(CacheDir::new(cache_dir));
         b.add_value(RemoteReposDir::new(repos_dir));
 
-        b.add_builder(messaging_outbox::OutboxImmediateImpl::builder(
-            messaging_outbox::ConsumerFilter::AllConsumers,
-        ))
-        .bind::<dyn Outbox, OutboxImmediateImpl>();
+        b.add_builder(OutboxImmediateImpl::builder(ConsumerFilter::AllConsumers))
+            .bind::<dyn Outbox, OutboxImmediateImpl>();
 
         b.add::<DependencyGraphServiceImpl>();
         kamu_datasets_inmem::register_dependencies(&mut b);
@@ -184,7 +182,7 @@ impl ClientSideHarness {
         b.add::<IngestEnvVarsResolver>();
         b.add::<PollingIngestServiceImpl>();
 
-        b.add::<DatasetFactoryImpl>();
+        b.add::<odf::dataset::DatasetFactoryImpl>();
 
         b.add::<SmartTransferProtocolClientWs>();
         b.add::<SimpleTransferProtocol>();
@@ -248,7 +246,7 @@ impl ClientSideHarness {
 
         b.add_value(ContainerRuntime::default());
         b.add_value(kamu::utils::ipfs_wrapper::IpfsClient::default());
-        b.add_value(IpfsGateway::default());
+        b.add_value(odf::dataset::IpfsGateway::default());
 
         b.add::<OAuthDeviceCodeServiceImpl>();
         b.add::<OAuthDeviceCodeGeneratorDefault>();
@@ -376,11 +374,11 @@ impl ClientSideHarness {
     }
 
     // TODO: accept alias or handle
-    pub fn dataset_layout(&self, dataset_id: &odf::DatasetID) -> DatasetLayout {
+    pub fn dataset_layout(&self, dataset_id: &odf::DatasetID) -> odf::dataset::DatasetLayout {
         let root_path = self
             .internal_datasets_folder_path()
             .join(dataset_id.as_multibase().to_stack_string());
-        DatasetLayout::new(root_path.as_path())
+        odf::dataset::DatasetLayout::new(root_path.as_path())
     }
 
     pub async fn pull_datasets(
@@ -743,8 +741,8 @@ impl ClientSideHarness {
         method: &str,
         protocol_version: i32,
     ) -> http::Request<()> {
-        let mut ws_url = url.odf_to_transport_protocol().unwrap();
-        ws_url.ensure_trailing_slash();
+        let mut ws_url = odf_to_transport_protocol(url).unwrap();
+        ensure_trailing_slash(&mut ws_url);
         let maybe_access_token = self
             .access_token_resolver
             .resolve_odf_dataset_access_token(&ws_url);
