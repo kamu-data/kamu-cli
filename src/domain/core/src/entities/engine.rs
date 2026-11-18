@@ -333,10 +333,6 @@ impl EngineError {
         })
     }
 
-    pub fn process_error(exit_code: Option<i32>, log_files: Vec<PathBuf>) -> Self {
-        Self::ProcessError(ProcessError::new(exit_code, log_files))
-    }
-
     pub fn contract_error(reason: &str, log_files: Vec<PathBuf>) -> Self {
         Self::ContractError(ContractError {
             reason: reason.to_owned(),

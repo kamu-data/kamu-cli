@@ -115,13 +115,6 @@ impl Default for PushMultiOptions {
 
 #[derive(Debug, Error)]
 pub enum PushError {
-    #[error(transparent)]
-    SourceNotFound(
-        #[from]
-        #[backtrace]
-        odf::DatasetNotFoundError,
-    ),
-
     #[error("Destination is not specified and there is no associated push alias")]
     NoTarget,
 

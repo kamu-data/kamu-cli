@@ -117,16 +117,11 @@ impl SyncFromTarget {
 pub struct SyncRefRemote {
     pub url: Arc<Url>,
     pub dataset: Arc<dyn odf::Dataset>,
-    pub original_remote_ref: odf::DatasetRefRemote,
 }
 
 impl SyncRefRemote {
     pub fn as_internal_any_ref(&self) -> odf::DatasetRefAny {
         odf::DatasetRefAny::Url(self.url.clone())
-    }
-
-    pub fn as_user_friendly_any_ref(&self) -> odf::DatasetRefAny {
-        self.original_remote_ref.as_any_ref()
     }
 }
 
@@ -134,7 +129,6 @@ impl std::fmt::Debug for SyncRefRemote {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("SyncRefRemote")
             .field("url", &self.url)
-            .field("original_remote_ref", &self.original_remote_ref)
             .finish_non_exhaustive()
     }
 }

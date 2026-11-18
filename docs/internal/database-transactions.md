@@ -50,7 +50,6 @@ dataset are detached from it first (`detach_from_transaction`), as the
 |---|---|---|
 | `transaction!(\|a: Arc<dyn A>\| { .. })` | a block inside a method | each step of a method that orders several transactions, or one transaction among other work |
 | `#[transactional_method1..4(a: Arc<dyn A>, ..)]` | the whole method, from `self.catalog` | a method that is itself one transactional step |
-| `#[transactional_static_method*]` | the whole function, from its `catalog` argument | the same, without `self` |
 | `#[transactional_handler]` | the whole axum handler, from its `Extension(catalog)` | HTTP handlers |
 | `DatabaseTransactionRunner::transactional(\|catalog\| ..)` | a callback | test helpers and generated code; production code uses a macro |
 

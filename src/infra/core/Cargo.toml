@@ -72,7 +72,6 @@ testing = [
 common-macros = { workspace = true }
 container-runtime = { workspace = true }
 database-common = { workspace = true }
-database-common-macros = { workspace = true }
 file-utils = { workspace = true }
 init-on-startup = { workspace = true }
 internal-error = { workspace = true }
@@ -116,7 +115,6 @@ glob = "0.3" # Used for glob fetch
 hex = "0.4"
 http = "1"
 indoc = { version = "2" }
-itertools = "0.15"
 object_store = { version = "0.13", features = [
     "aws",
 ] }

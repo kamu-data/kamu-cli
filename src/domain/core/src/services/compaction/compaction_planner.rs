@@ -65,13 +65,6 @@ pub struct CompactionPlan {
     pub data_slice_batches: Vec<CompactionDataSliceBatch>,
 }
 
-impl CompactionPlan {
-    pub fn has_no_effect(&self) -> bool {
-        // slices amount +1(seed block) eq to amount of blocks we should not compact
-        self.data_slice_batches.len() + 1 == self.old_num_blocks
-    }
-}
-
 #[derive(Debug)]
 pub enum CompactionDataSliceBatch {
     CompactedBatch(CompactionDataSliceBatchInfo),

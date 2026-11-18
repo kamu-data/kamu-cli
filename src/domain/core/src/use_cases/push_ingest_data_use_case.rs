@@ -14,7 +14,6 @@ use file_utils::MediaType;
 use internal_error::InternalError;
 use kamu_datasets::ResolvedDataset;
 use thiserror::Error;
-use tokio::io::AsyncRead;
 
 use crate::{
     DataSource,
@@ -54,13 +53,6 @@ pub struct PushIngestDataUseCaseOptions {
     pub media_type: Option<MediaType>,
     pub expected_head: Option<odf::Multihash>,
     pub skip_quota_check: bool,
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub enum PushIngestDataUseCaseDataSource {
-    Stream(Box<dyn AsyncRead + Send + Unpin>),
-    Url(url::Url),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -420,11 +420,7 @@ impl SyncServiceImpl {
         );
         let dataset = self.dataset_factory.get_dataset(&url, false).await?;
 
-        Ok(SyncRefRemote {
-            url,
-            dataset,
-            original_remote_ref: remote_ref,
-        })
+        Ok(SyncRefRemote { url, dataset })
     }
 
     async fn sync_from_impl(

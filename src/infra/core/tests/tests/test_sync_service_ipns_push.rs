@@ -356,9 +356,8 @@ impl IpnsPushHarness {
         let request = SyncToRequest {
             src: ResolvedDataset::from_created(created),
             dst: SyncRefRemote {
-                url: Arc::new(url.clone()),
+                url: Arc::new(url),
                 dataset,
-                original_remote_ref: odf::DatasetRefRemote::Url(Arc::new(url)),
             },
         };
         self.sync_service.sync_to(request, options, None).await

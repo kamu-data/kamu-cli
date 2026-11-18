@@ -359,7 +359,7 @@ impl MockDatasetPermissionChecker {
     /// Expects the `Read` classification of a dataset denied another
     /// permission, answering that it is readable, so the denial stays a missing
     /// permission rather than not found
-    pub fn expect_readable(self, expected_dataset_id: &odf::DatasetID, times: usize) -> Self {
+    fn expect_readable(self, expected_dataset_id: &odf::DatasetID, times: usize) -> Self {
         self.expect_authorize_for(DatasetPermission::Read, expected_dataset_id, times, true)
     }
 

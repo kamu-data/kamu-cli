@@ -145,13 +145,6 @@ pub enum TransformStatusError {
 #[derive(Debug, Error)]
 pub enum VerifyTransformPlanError {
     #[error(transparent)]
-    DatasetNotFound(
-        #[from]
-        #[backtrace]
-        odf::DatasetNotFoundError,
-    ),
-
-    #[error(transparent)]
     RefNotFound(
         #[from]
         #[backtrace]

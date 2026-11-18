@@ -264,12 +264,6 @@ pub enum VerificationError {
         #[backtrace]
         DataDoesNotMatchMetadata,
     ),
-    #[error("Data is not reproducible")]
-    DataNotReproducible(
-        #[from]
-        #[backtrace]
-        DataNotReproducible,
-    ),
     #[error("Checkpoint doesn't match metadata")]
     CheckpointDoesNotMatchMetadata(
         #[from]

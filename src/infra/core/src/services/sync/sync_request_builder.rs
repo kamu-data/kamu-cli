@@ -73,7 +73,6 @@ impl SyncRequestBuilder {
         Ok(SyncRefRemote {
             url: Arc::new(remote_dataset_url),
             dataset,
-            original_remote_ref: remote_ref,
         })
     }
 
