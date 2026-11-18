@@ -246,7 +246,7 @@ unchanged, the Smart protocol accepts a forced push of the compacted chain.
 | --- | --- |
 | Planner and executor: batching, limits, watermark-only blocks, offsets, schema changes, S3, metadata-only | [`test_compaction_services_impl.rs`](../../src/infra/core/tests/tests/test_compaction_services_impl.rs) |
 | Use case: authorization, several datasets | [`test_compact_dataset_use_case.rs`](../../src/infra/core/tests/tests/use_cases/test_compact_dataset_use_case.rs) |
-| Derivatives after compaction | `test_transform_services_impl.rs` (`test_transform_with_compaction_retry`, `test_transform_status_input_hard_compacted`) |
+| Derivatives after compaction | `test_transform_services_impl.rs` (`test_transform_fails_on_diverged_input`, `test_transform_status_input_hard_compacted`), `test_pull_dataset_use_case.rs` (`test_pull_transform_diverged_input_resets_and_retransforms`) |
 | Flow controller and flow agent | `test_flow_controller_compact.rs`, `test_flow_agent_impl.rs` |
 | GraphQL configs and runs | `test_gql_dataset_flow_configs.rs`, `test_gql_dataset_flow_runs.rs` |
 | CLI end to end; push after compaction | `src/e2e/app/cli/repo-tests/src/commands/test_compact_command.rs`, `test_smart_transfer_protocol.rs` |

@@ -59,10 +59,11 @@ A user may write **only**: `$schema`, `headers.{id?, account?, name, labels, ann
 > downstream carries the plain `TypeUri`. Both serialize byte-identically, so there's no wire/storage
 > difference.
 
-> **`ResourceOwnerRef`** is ODF's generated `auth::ResourceOwnerRef` struct — `{ id: Option<ResourceID>,
-> did: Option<AccountID>, name: Option<AccountName> }`, all fields optional — shared by the manifest
-> `account` field and every facade selector's `account`. See [§7](resources-framework.md#7-account-resolution--authorization)
-> for how a selector resolves to an account and how an empty one (`{}`) is rejected.
+> **`ResourceOwnerRef`** is ODF's generated `auth::ResourceOwnerRef` struct —
+> `{ r#type: Option<TypeRef>, id: Option<ResourceID>, did: Option<AccountDid>, name: Option<AccountName> }`,
+> all fields optional — shared by the manifest `account` field and every facade selector's `account`.
+> See [§7](resources-framework.md#7-account-resolution--authorization) for how a selector resolves to an
+> account and how an empty one (`{}`) is rejected.
 
 The `id` is **not** something the user assigns — a new resource's UID is always allocated by the
 server. It may only be *supplied* on a manifest to point at an already-existing resource for an
@@ -154,7 +155,7 @@ The behaviorally-significant consequences of adopting these shapes:
 
 - **`headers.account` is a mandatory `auth::ResourceOwnerHandle`** carrying the RFC-18 shape — the account
   *resource* id (`id: ResourceID`, an artificial UUID stored on `accounts.resource_id`), the account
-  DID (`did: AccountID`), and the account `name`. The `resources` table stores only `account_id` (the
+  DID (`did: AccountDid`), and the account `name`. The `resources` table stores only `account_id` (the
   DID), so repositories resolve **both the name and the account resource id** on every read
   (Postgres/SQLite via `JOIN accounts`, selecting `accounts.resource_id`; in-memory via a batched
   `AccountRepository` lookup — no N+1). Neither is persisted on the resource row, so an account rename

@@ -329,7 +329,7 @@ and an aggregate. This is the bound that all generic use cases require.
 
 **Presentation & descriptor traits:**
 
-- **`ResourceSchemaProvider`** — exposes `fn schema() -> &'static TypeUri`, the canonical schema URL
+- **`ResourceSchemaProvider`** — exposes `fn type_uri() -> &'static TypeUri`, the canonical schema URL
   (as a `TypeUri`) for the resource, backed by a `'static` value (a `LazyLock<TypeUri>` from the ODF
   codegen) ([`core/resource_descriptor.rs`](/src/domain/resources/domain/src/core/resource_descriptor.rs)).
 - **`ResourcePresentation`** — exposes a `ResourcePresentationDefinition` with `canonical_selector:
@@ -1578,7 +1578,7 @@ headers:
 | --- | --- |
 | Canonical URI | `https://kamu.dev/schemas/config/v1alpha1/labels/LegacyConfigTargetDataset` |
 | Short name | `legacy-config-target-dataset` |
-| Value | A full `did:odf:…` DID, validated with `odf::DatasetID::from_did_str` |
+| Value | A full `did:odf:…` DID, validated with `odf::metadata::datasets::DatasetDid::from_did_str` |
 | Scope | `ResourceExtensionScopeMeta::ResourceContext` over the ODF `config` context — `VariableSet` and `SecretSet` only |
 | Registered by | **`kamu-configuration-services`**, not `kamu-resources-services` |
 
@@ -1761,13 +1761,13 @@ impl VariableSetResource {
     // the schema `TypeName`; aliases cover the old lowercase-plural form and the short code (the
     // singular "variableset" is not a separate alias — it already resolves case-insensitively
     // against the canonical "VariableSet").
-    pub const SCHEMA_STR: &'static str = odf::metadata::config::VariableSet::schema_str();
+    pub const SCHEMA_STR: &'static str = odf::metadata::config::VariableSet::type_uri_str();
     kamu_resources::declare_resource_selector_constants!("VariableSet", ["variablesets", "vs"]);
 }
 // Typed schema identity is a TypeUri accessor (not a const); it and SCHEMA_STR share one
 // generated static, so they cannot drift.
 impl ResourceSchemaProvider for VariableSetResource {
-    fn schema() -> &'static TypeUri { odf::metadata::config::VariableSet::schema() }
+    fn type_uri() -> &'static TypeUri { odf::metadata::config::VariableSet::type_uri() }
 }
 impl DeclarativeResource for VariableSetResource { /* … */ }
 impl ResourcePresentation for VariableSetResource { /* selector name/aliases + list columns */ }
@@ -1794,7 +1794,7 @@ pub fn register_variable_set_resource_crud_dispatcher(catalog_builder: &mut dill
    (`#[serde(deny_unknown_fields)]`, with validation + lint), `state.rs`, `event.rs`,
    and `resource.rs` implementing `ResourceSchemaProvider`, `DeclarativeResource`,
    `ManagedResource`/`EventSourcedResource`, and `ResourcePresentation`
-   (implement `schema() -> &'static TypeUri`, and set `SCHEMA_STR` plus the selector consts via
+   (implement `type_uri() -> &'static TypeUri`, and set `SCHEMA_STR` plus the selector consts via
    `kamu_resources::declare_resource_selector_constants!("TypeName", ["alias1", "alias2", ...])` —
    canonical should be the schema `TypeName`; include at least the singular and plural lowercase
    forms and a short code as aliases). No `status.rs` is needed — status is inherited automatically

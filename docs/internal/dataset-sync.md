@@ -162,7 +162,7 @@ new chain.
 
 ## 5. Choosing a protocol
 
-`SyncServiceImpl` dispatches on the remote URL: `sync_impl` on a push's destination,
+`SyncServiceImpl` dispatches on the remote URL: `sync_to_impl` on a push's destination,
 `sync_from_impl` on a pull's source:
 
 ```mermaid
