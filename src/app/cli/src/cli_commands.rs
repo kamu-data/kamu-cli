@@ -618,9 +618,11 @@ pub fn command_needs_transaction(args: &cli::Cli) -> bool {
         cli::Command::Context(c) => {
             matches!(&c.subcommand, Some(cli::ContextSubCommand::ApiResources(_)))
         }
-        // Run dataset jobs, which open short transactions of their own
-        cli::Command::Reset(_) | cli::Command::Verify(_) => false,
-        cli::Command::Apply(_)
+        // Reset and verify run dataset jobs, which open short transactions of
+        // their own
+        cli::Command::Reset(_)
+        | cli::Command::Verify(_)
+        | cli::Command::Apply(_)
         | cli::Command::Ui(_)
         | cli::Command::Login(_)
         | cli::Command::Push(_) => false,

@@ -10,15 +10,15 @@
 use std::sync::Arc;
 
 use database_common::transaction;
-use kamu::LocalSyncCommitterImpl;
+use kamu::SyncFromJobImpl;
 use kamu_core::*;
-use kamu_datasets::{DatasetRegistry, DatasetRegistryExt};
+use kamu_datasets::{AlwaysHappyDatasetPermissionChecker, DatasetRegistry, DatasetRegistryExt};
+use kamu_datasets_services::DatasetOperationGuardImpl;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Pulls into a local dataset in the steps `SyncFromJob` runs: the target is
-/// resolved in a transaction, the transfer runs with none open, and the commit
-/// runs in a transaction of its own
+/// Pulls into a local dataset with `SyncFromJob`, which every dataset
+/// operation is allowed to the acting principal of the catalog
 pub struct LocalSyncHelper {
     catalog: dill::Catalog,
 }
@@ -27,23 +27,62 @@ impl LocalSyncHelper {
     pub fn new(catalog: &dill::Catalog) -> Self {
         Self {
             catalog: dill::CatalogBuilder::new_chained(catalog)
-                .add::<LocalSyncCommitterImpl>()
+                .add::<SyncFromJobImpl>()
+                .add::<DatasetOperationGuardImpl>()
+                .add::<AlwaysHappyDatasetPermissionChecker>()
                 .build(),
         }
     }
 
+    /// Pulls into a destination that exists until the commit
     pub async fn pull(
         &self,
         src_ref: odf::DatasetRefRemote,
         dst_ref: odf::DatasetRef,
         options: SyncOptions,
     ) -> Result<SyncResult, SyncError> {
-        let request = self
-            .build_request(src_ref, dst_ref, options.create_if_not_exists)
-            .await?;
-        self.transfer_and_commit(request, options, None).await
+        self.pull_with_listener(src_ref, dst_ref, options, None)
+            .await
     }
 
+    /// Pulls into a destination that exists until the commit
+    pub async fn pull_with_listener(
+        &self,
+        src_ref: odf::DatasetRefRemote,
+        dst_ref: odf::DatasetRef,
+        options: SyncOptions,
+        maybe_listener: Option<Arc<dyn SyncListener>>,
+    ) -> Result<SyncResult, SyncError> {
+        match self
+            .run_job(src_ref, dst_ref, options, maybe_listener)
+            .await
+        {
+            Ok(sync_result) => Ok(sync_result),
+            Err(SyncFromJobError::Sync(e)) => Err(e),
+            Err(SyncFromJobError::TargetDeleted(e)) => {
+                panic!("The sync target must not be deleted: {e}")
+            }
+        }
+    }
+
+    pub async fn run_job(
+        &self,
+        src_ref: odf::DatasetRefRemote,
+        dst_ref: odf::DatasetRef,
+        options: SyncOptions,
+        maybe_listener: Option<Arc<dyn SyncListener>>,
+    ) -> Result<SyncResult, SyncFromJobError> {
+        let target = self
+            .pull_local_target(dst_ref, options.create_if_not_exists)
+            .await?;
+        self.catalog
+            .get_one::<dyn SyncFromJob>()
+            .unwrap()
+            .run(&target, &src_ref, options, maybe_listener)
+            .await
+    }
+
+    /// The request a pull would transfer, for tests of the transfer alone
     pub async fn build_request(
         &self,
         src_ref: odf::DatasetRefRemote,
@@ -64,35 +103,6 @@ impl LocalSyncHelper {
         });
 
         Ok(SyncFromRequest { src: src_ref, dst })
-    }
-
-    pub async fn transfer_and_commit(
-        &self,
-        request: SyncFromRequest,
-        options: SyncOptions,
-        listener: Option<Arc<dyn SyncListener>>,
-    ) -> Result<SyncResult, SyncError> {
-        let sync_service = self.catalog.get_one::<dyn SyncService>().unwrap();
-        match sync_service.sync_from(request, options, listener).await? {
-            SyncFromTransfer::UpToDate => Ok(SyncResult::UpToDate),
-            SyncFromTransfer::Transferred(transferred) => Ok(self
-                .commit(transferred)
-                .await?
-                .expect("The sync target must not be deleted")),
-        }
-    }
-
-    /// Commits a transfer in a transaction of its own; `None` when the
-    /// existing target was deleted meanwhile
-    pub async fn commit(
-        &self,
-        transferred: SyncFromTransferred,
-    ) -> Result<Option<SyncResult>, SyncError> {
-        transaction!(
-            |committer: Arc<dyn LocalSyncCommitter>| -> Result<_, SyncError> {
-                committer.commit(transferred).await
-            }
-        )
     }
 
     /// Resolves `dst_ref` to a pull target the way the pull planner does

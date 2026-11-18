@@ -31,8 +31,8 @@ use crate::*;
 pub trait SyncService: Send + Sync {
     /// Syncs into a destination that is not a dataset of this node: a push to
     /// a remote repository or to IPFS. A pull into a local dataset is
-    /// [`SyncService::sync_from`] followed by
-    /// [`crate::LocalSyncCommitter::commit`]
+    /// [`SyncService::sync_from`] followed by a commit, which
+    /// [`crate::SyncFromJob`] runs
     async fn sync_to(
         &self,
         request: SyncToRequest,
@@ -42,9 +42,9 @@ pub trait SyncService: Send + Sync {
 
     /// Resolves and opens the remote source and writes the blocks, data and
     /// checkpoints the local dataset lacks as unreferenced objects, with no
-    /// transaction held. Commit with [`crate::LocalSyncCommitter::commit`];
-    /// the listener gets `begin` and progress, and the caller reports the
-    /// outcome.
+    /// transaction held, for the caller to commit: [`crate::SyncFromJob`]
+    /// moves `HEAD` or creates the dataset. The listener gets `begin` and
+    /// progress, and the caller reports the outcome.
     async fn sync_from(
         &self,
         request: SyncFromRequest,

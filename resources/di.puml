@@ -28,8 +28,8 @@ interface "AuthenticationProvider" <<i>>
 interface "AuthenticationService" <<i>>
 interface "BackgroundAgent" <<i>>
 interface "CommitDatasetEventUseCase" <<i>>
-interface "CompactDatasetUseCase" <<i>>
 interface "CompactionExecutor" <<i>>
+interface "CompactionJob" <<i>>
 interface "CompactionPlanner" <<i>>
 interface "CompleteResourceDeletionUseCase" <<i>>
 interface "CreateAccountUseCase" <<i>>
@@ -68,7 +68,6 @@ interface "DatasetStatisticsService" <<i>>
 interface "DatasetStorageUnit" <<i>>
 interface "DatasetStorageUnitWriter" <<i>>
 interface "DatasetUpdateKindResolver" <<i>>
-interface "DatasetUpdateSteps" <<i>>
 interface "DeleteAccountUseCase" <<i>>
 interface "DeleteDatasetRebacPropertiesUseCase" <<i>>
 interface "DeleteDatasetUseCase" <<i>>
@@ -113,6 +112,7 @@ interface "OdfServerAccessTokenResolver" <<i>>
 interface "OutboxAgent" <<i>>
 interface "OutboxMessageBridge" <<i>>
 interface "PasswordHashRepository" <<i>>
+interface "PollingIngestJob" <<i>>
 interface "PollingIngestPlanner" <<i>>
 interface "PollingIngestService" <<i>>
 interface "ProvenanceService" <<i>>
@@ -137,8 +137,8 @@ interface "RemoteStatusService" <<i>>
 interface "RenameDatasetUseCase" <<i>>
 interface "RequestAccountResourcesDeletionUseCase" <<i>>
 interface "RequestResourcesDeletionUseCase" <<i>>
-interface "ResetDatasetUseCase" <<i>>
 interface "ResetExecutor" <<i>>
+interface "ResetJob" <<i>>
 interface "ResetPlanner" <<i>>
 interface "ResourceAccountResolver" <<i>>
 interface "ResourceAggregateLoader" <<i>>
@@ -179,11 +179,14 @@ interface "SetWatermarkUseCase" <<i>>
 interface "SignEip712UseCase" <<i>>
 interface "SmartTransferProtocolClient" <<i>>
 interface "StorageEventStore" <<i>>
+interface "SyncFromJob" <<i>>
 interface "SyncService" <<i>>
+interface "SyncToJob" <<i>>
 interface "SystemTimeSource" <<i>>
 interface "TaskEventStore" <<i>>
 interface "TaskQueueWakeupSource" <<i>>
 interface "TransformExecutor" <<i>>
+interface "TransformJob" <<i>>
 interface "TransformPlanner" <<i>>
 interface "TypedResourceQueryService" <<i>>
 interface "UnsetDatasetAccountsRelationsUseCase" <<i>>
@@ -193,7 +196,7 @@ interface "UpdateVersionedFileUseCase" <<i>>
 interface "VariableSetEventStore" <<i>>
 interface "VariableSetProjectionRepository" <<i>>
 interface "VerificationService" <<i>>
-interface "VerifyDatasetUseCase" <<i>>
+interface "VerifyJob" <<i>>
 interface "ViewCollectionEntriesUseCase" <<i>>
 interface "ViewVersionedFileHistoryUseCase" <<i>>
 interface "Web3AuthEip4361NonceRepository" <<i>>
@@ -220,8 +223,8 @@ class "CLIAccessTokenStore"
 class "CLIResourceContextStore"
 class "CacheDir" <<singleton>>
 class "CommitDatasetEventUseCaseImpl"
-class "CompactDatasetUseCaseImpl"
 class "CompactionExecutorImpl"
+class "CompactionJobImpl"
 class "CompactionPlannerImpl"
 class "ConfigService"
 class "ConfigurationDatasetLifecycleMessageConsumer"
@@ -268,7 +271,6 @@ class "DatasetStatisticsServiceImpl"
 class "DatasetStatisticsUpdateHandler"
 class "DatasetStorageUnitLocalFs"
 class "DatasetUpdateKindResolverImpl"
-class "DatasetUpdateStepsImpl"
 class "DeleteAccountUseCaseImpl"
 class "DeleteDatasetRebacPropertiesUseCaseImpl"
 class "DeleteDatasetUseCaseImpl"
@@ -353,6 +355,7 @@ class "OutboxTransactionalImpl"
 class "OutputConfig" <<singleton>>
 class "PasswordHashingMode" <<singleton>>
 class "PasswordPolicyConfig" <<singleton>>
+class "PollingIngestJobImpl"
 class "PollingIngestPlannerImpl"
 class "PollingIngestServiceImpl"
 class "Pool" <<singleton>>
@@ -385,8 +388,8 @@ class "RemoteRepositoryRegistryImpl"
 class "RemoteStatusServiceImpl"
 class "RenameDatasetUseCaseImpl"
 class "RequestAccountResourcesDeletionUseCaseImpl"
-class "ResetDatasetUseCaseImpl"
 class "ResetExecutorImpl"
+class "ResetJobImpl"
 class "ResetPlannerImpl"
 class "ResourceAccountResolverImpl"
 class "ResourceContextRegistryService"
@@ -491,13 +494,16 @@ class "StorageResourceLifecycleDispatcher"
 class "StorageResourcePersistenceServiceImpl"
 class "StorageResourcePresentationDispatcher"
 class "StorageTypedResourceQueryServiceImpl"
+class "SyncFromJobImpl"
 class "SyncRequestBuilder"
 class "SyncServiceImpl"
+class "SyncToJobImpl"
 class "SystemTimeSourceDefault" <<agnostic>>
 class "TenancyConfig" <<singleton>>
 class "TransactionRef" <<singleton>>
 class "TransactionRefT" <<singleton>>
 class "TransformExecutorImpl"
+class "TransformJobImpl"
 class "TransformPlannerImpl"
 class "UnsetDatasetAccountsRelationsUseCaseImpl"
 class "UpdateAccountUseCaseImpl"
@@ -516,7 +522,7 @@ class "VariableSetResourcePersistenceServiceImpl"
 class "VariableSetResourcePresentationDispatcher"
 class "VariableSetTypedResourceQueryServiceImpl"
 class "VerificationServiceImpl"
-class "VerifyDatasetUseCaseImpl"
+class "VerifyJobImpl"
 class "VersionedFilesConfig" <<singleton>>
 class "ViewCollectionEntriesUseCaseImpl"
 class "ViewVersionedFileHistoryUseCaseImpl"
@@ -532,6 +538,33 @@ class "WsSmartTransferProtocolClient"
 "DatabaseTransactionRunner"  --> "Catalog"
 "DatabaseTransactionManager" <|-- "SqliteTransactionManager"
 "SqliteTransactionManager"  --> "Pool"
+"CompactionJob" <|-- "CompactionJobImpl"
+"CompactionJobImpl"  --> "Catalog"
+"CompactionJobImpl"  --> "CompactionExecutor"
+"CompactionJobImpl"  --> "Principal"
+"PollingIngestJob" <|-- "PollingIngestJobImpl"
+"PollingIngestJobImpl"  --> "Catalog"
+"PollingIngestJobImpl"  --> "PollingIngestService"
+"PollingIngestJobImpl"  --> "Principal"
+"ResetJob" <|-- "ResetJobImpl"
+"ResetJobImpl"  --> "Catalog"
+"ResetJobImpl"  --> "Principal"
+"SyncFromJob" <|-- "SyncFromJobImpl"
+"SyncFromJobImpl"  --> "Catalog"
+"SyncFromJobImpl"  --> "SyncService"
+"SyncFromJobImpl"  --> "Principal"
+"SyncToJob" <|-- "SyncToJobImpl"
+"SyncToJobImpl"  --> "Catalog"
+"SyncToJobImpl"  --> "SyncService"
+"SyncToJobImpl"  --> "Principal"
+"TransformJob" <|-- "TransformJobImpl"
+"TransformJobImpl"  --> "Catalog"
+"TransformJobImpl"  --> "TransformExecutor"
+"TransformJobImpl"  --> "Principal"
+"VerifyJob" <|-- "VerifyJobImpl"
+"VerifyJobImpl"  --> "Catalog"
+"VerifyJobImpl"  --> "VerificationService"
+"VerifyJobImpl"  --> "Principal"
 "EngineProvisioner" <|-- "EngineProvisionerLocal"
 "EngineProvisionerLocal"  --> "ContainerRuntime"
 "EngineProvisionerLocal"  --> "EngineProvisionerLocalConfig"
@@ -544,9 +577,6 @@ class "WsSmartTransferProtocolClient"
 "CompactionPlanner" <|-- "CompactionPlannerImpl"
 "DatasetUpdateKindResolver" <|-- "DatasetUpdateKindResolverImpl"
 "DatasetUpdateKindResolverImpl"  --> "DatasetPullSourceResolver"
-"DatasetUpdateSteps" <|-- "DatasetUpdateStepsImpl"
-"DatasetUpdateStepsImpl"  --> "Catalog"
-"DatasetUpdateStepsImpl" "lazy" --> "SyncService"
 "ExportService" <|-- "ExportServiceImpl"
 "DataFormatRegistry" <|-- "DataFormatRegistryImpl"
 "FetchService"  --> "ContainerRuntime"
@@ -653,27 +683,21 @@ class "WsSmartTransferProtocolClient"
 "TransformPlannerImpl"  --> "SystemTimeSource"
 "VerificationService" <|-- "VerificationServiceImpl"
 "VerificationServiceImpl"  --> "TransformExecutor"
-"VerificationServiceImpl"  --> "TransformPlanner"
 "SetWatermarkExecutor" <|-- "SetWatermarkExecutorImpl"
 "SetWatermarkExecutorImpl"  --> "DatasetReferenceUpdater"
 "SetWatermarkPlanner" <|-- "SetWatermarkPlannerImpl"
 "SetWatermarkPlannerImpl"  --> "DatasetPullSourceResolver"
 "SetWatermarkPlannerImpl"  --> "SystemTimeSource"
-"CompactDatasetUseCase" <|-- "CompactDatasetUseCaseImpl"
-"CompactDatasetUseCaseImpl"  --> "Catalog"
-"CompactDatasetUseCaseImpl"  --> "CompactionExecutor"
-"CompactDatasetUseCaseImpl"  --> "Principal"
 "PullDatasetUseCase" <|-- "PullDatasetUseCaseImpl"
 "PullDatasetUseCaseImpl"  --> "Catalog"
-"PullDatasetUseCaseImpl"  --> "CompactionExecutor"
-"PullDatasetUseCaseImpl"  --> "CompactionPlanner"
-"PullDatasetUseCaseImpl"  --> "DatasetUpdateSteps"
-"PullDatasetUseCaseImpl"  --> "PollingIngestService"
-"PullDatasetUseCaseImpl"  --> "TransformExecutor"
+"PullDatasetUseCaseImpl"  --> "CompactionJob"
+"PullDatasetUseCaseImpl"  --> "PollingIngestJob"
+"PullDatasetUseCaseImpl"  --> "SyncFromJob"
+"PullDatasetUseCaseImpl"  --> "TransformJob"
 "PullDatasetUseCaseImpl"  --> "TenancyConfig"
 "PushDatasetUseCase" <|-- "PushDatasetUseCaseImpl"
 "PushDatasetUseCaseImpl"  --> "Catalog"
-"PushDatasetUseCaseImpl"  --> "SyncService"
+"PushDatasetUseCaseImpl"  --> "SyncToJob"
 "PushIngestDataUseCase" <|-- "PushIngestDataUseCaseImpl"
 "PushIngestDataUseCaseImpl"  --> "PushIngestExecutor"
 "PushIngestDataUseCaseImpl"  --> "PushIngestPlanner"
@@ -689,24 +713,12 @@ class "WsSmartTransferProtocolClient"
 "QueryDatasetDataUseCaseImpl"  --> "RebacDatasetRegistryFacade"
 "QueryDatasetDataUseCaseImpl"  --> "QueryService"
 "QueryDatasetDataUseCaseImpl"  --> "DatasetRegistry"
-"ResetDatasetUseCase" <|-- "ResetDatasetUseCaseImpl"
-"ResetDatasetUseCaseImpl"  --> "ResetExecutor"
-"ResetDatasetUseCaseImpl"  --> "ResetPlanner"
-"ResetDatasetUseCaseImpl"  --> "DatasetOperationGuard"
-"ResetDatasetUseCaseImpl"  --> "DatasetRegistry"
-"ResetDatasetUseCaseImpl"  --> "Principal"
 "SetWatermarkUseCase" <|-- "SetWatermarkUseCaseImpl"
 "SetWatermarkUseCaseImpl"  --> "SetWatermarkExecutor"
 "SetWatermarkUseCaseImpl"  --> "SetWatermarkPlanner"
 "SetWatermarkUseCaseImpl"  --> "DatasetOperationGuard"
 "SetWatermarkUseCaseImpl"  --> "DatasetRegistry"
 "SetWatermarkUseCaseImpl"  --> "Principal"
-"VerifyDatasetUseCase" <|-- "VerifyDatasetUseCaseImpl"
-"VerifyDatasetUseCaseImpl"  --> "TransformPlanner"
-"VerifyDatasetUseCaseImpl"  --> "VerificationService"
-"VerifyDatasetUseCaseImpl"  --> "DatasetOperationGuard"
-"VerifyDatasetUseCaseImpl"  --> "DatasetRegistry"
-"VerifyDatasetUseCaseImpl"  --> "Principal"
 "PulledSeedStore"  --> "Catalog"
 "SimpleTransferProtocol"  --> "PulledSeedStore"
 "SearchEntitySchemaProvider" <|-- "AccountSearchSchemaProvider"

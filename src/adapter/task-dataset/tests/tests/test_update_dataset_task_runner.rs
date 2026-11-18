@@ -32,7 +32,6 @@ use kamu::{
     FetchService,
     IngestEnvVarsResolver,
     IpfsServiceImpl,
-    LocalSyncCommitterImpl,
     ObjectStoreBuilderLocalFs,
     ObjectStoreRegistryImpl,
     PollingIngestJobImpl,
@@ -1016,7 +1015,6 @@ impl UpdateDatasetTaskRunnerHarness {
             .add::<PollingIngestJobImpl>()
             .add::<TransformJobImpl>()
             .add::<SyncFromJobImpl>()
-            .add::<LocalSyncCommitterImpl>()
             .add::<PollingIngestPlannerImpl>()
             .add::<IngestEnvVarsResolver>()
             .add_value(RacingDatasetReferenceUpdater::default())

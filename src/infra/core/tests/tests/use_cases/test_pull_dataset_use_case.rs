@@ -1877,7 +1877,6 @@ impl PullUseCaseHarness {
             .add::<TransformJobImpl>()
             .add::<CompactionJobImpl>()
             .add::<SyncFromJobImpl>()
-            .add::<LocalSyncCommitterImpl>()
             .add::<PullRequestPlannerImpl>()
             .add::<DatasetUpdateKindResolverImpl>()
             .add::<DatasetPullSourceResolverImpl>()
