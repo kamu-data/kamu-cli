@@ -7,9 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::sync::Arc;
-
-use internal_error::{InternalError, ResultIntoInternal};
+use internal_error::InternalError;
 
 use crate::{TransactionRef, TransactionScope};
 
@@ -63,99 +61,6 @@ impl DatabaseTransactionRunner {
             .await;
 
         transaction.finish(result).await
-    }
-
-    pub async fn transactional_with<Iface, H, HFut, HFutResultT, HFutResultE>(
-        &self,
-        callback: H,
-    ) -> Result<HFutResultT, HFutResultE>
-    where
-        Iface: 'static + ?Sized + Send + Sync,
-        H: FnOnce(Arc<Iface>) -> HFut,
-        HFut: std::future::Future<Output = Result<HFutResultT, HFutResultE>>,
-        HFutResultE: From<InternalError>,
-    {
-        self.transactional(|transaction_catalog| async move {
-            let catalog_item = transaction_catalog.get_one().int_err()?;
-
-            callback(catalog_item).await
-        })
-        .await
-    }
-
-    pub async fn transactional_with2<Iface1, Iface2, H, HFut, HFutResultT, HFutResultE>(
-        &self,
-        callback: H,
-    ) -> Result<HFutResultT, HFutResultE>
-    where
-        Iface1: 'static + ?Sized + Send + Sync,
-        Iface2: 'static + ?Sized + Send + Sync,
-        H: FnOnce(Arc<Iface1>, Arc<Iface2>) -> HFut,
-        HFut: std::future::Future<Output = Result<HFutResultT, HFutResultE>>,
-        HFutResultE: From<InternalError>,
-    {
-        self.transactional(|transaction_catalog| async move {
-            let catalog_item1 = transaction_catalog.get_one().int_err()?;
-            let catalog_item2 = transaction_catalog.get_one().int_err()?;
-
-            callback(catalog_item1, catalog_item2).await
-        })
-        .await
-    }
-
-    pub async fn transactional_with3<Iface1, Iface2, Iface3, H, HFut, HFutResultT, HFutResultE>(
-        &self,
-        callback: H,
-    ) -> Result<HFutResultT, HFutResultE>
-    where
-        Iface1: 'static + ?Sized + Send + Sync,
-        Iface2: 'static + ?Sized + Send + Sync,
-        Iface3: 'static + ?Sized + Send + Sync,
-        H: FnOnce(Arc<Iface1>, Arc<Iface2>, Arc<Iface3>) -> HFut,
-        HFut: std::future::Future<Output = Result<HFutResultT, HFutResultE>>,
-        HFutResultE: From<InternalError>,
-    {
-        self.transactional(|transaction_catalog| async move {
-            let catalog_item1 = transaction_catalog.get_one().int_err()?;
-            let catalog_item2 = transaction_catalog.get_one().int_err()?;
-            let catalog_item3 = transaction_catalog.get_one().int_err()?;
-
-            callback(catalog_item1, catalog_item2, catalog_item3).await
-        })
-        .await
-    }
-
-    pub async fn transactional_with4<
-        Iface1,
-        Iface2,
-        Iface3,
-        Iface4,
-        H,
-        HFut,
-        HFutResultT,
-        HFutResultE,
-    >(
-        &self,
-        callback: H,
-    ) -> Result<HFutResultT, HFutResultE>
-    where
-        Iface1: 'static + ?Sized + Send + Sync,
-        Iface2: 'static + ?Sized + Send + Sync,
-        Iface3: 'static + ?Sized + Send + Sync,
-        Iface4: 'static + ?Sized + Send + Sync,
-        H: FnOnce(Arc<Iface1>, Arc<Iface2>, Arc<Iface3>, Arc<Iface4>) -> HFut,
-        HFut: std::future::Future<Output = Result<HFutResultT, HFutResultE>>,
-        HFutResultE: From<InternalError>,
-    {
-        self.transactional(|transaction_catalog| async move {
-            let catalog_item1 = transaction_catalog.get_one().int_err()?;
-            let catalog_item2 = transaction_catalog.get_one().int_err()?;
-            let catalog_item3 = transaction_catalog.get_one().int_err()?;
-            let catalog_item4 = transaction_catalog.get_one().int_err()?;
-
-            callback(catalog_item1, catalog_item2, catalog_item3, catalog_item4).await
-        })
-        .await
     }
 }
 

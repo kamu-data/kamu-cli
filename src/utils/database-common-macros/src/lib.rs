@@ -8,8 +8,10 @@
 // by the Apache License, Version 2.0.
 
 use proc_macro::TokenStream;
+use proc_macro2::Span;
 use quote::{format_ident, quote};
 use syn::parse::{Parse, ParseStream};
+use syn::punctuated::Punctuated;
 use syn::{
     ExprArray,
     FnArg,
@@ -25,12 +27,13 @@ use syn::{
     Type,
     TypePath,
     parse_macro_input,
+    parse_quote,
     parse_str,
 };
 
 mod transaction_block;
 
-use transaction_block::TransactionBlock;
+use transaction_block::{Binding, TransactionBlock};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -50,23 +53,14 @@ pub fn transactional_handler(_attr: TokenStream, item: TokenStream) -> TokenStre
         panic!("{function_name}(): the expected argument \"{CATALOG_ARGUMENT}\" was not found!");
     }
 
-    let function_signature = &input.sig;
-    let function_body = &input.block;
-    let function_visibility = &input.vis;
-
-    let updated_function = quote! {
-        #function_visibility #function_signature {
-            use tracing::Instrument;
-            ::database_common::DatabaseTransactionRunner::from(catalog)
-                .transactional(|catalog: ::dill::Catalog| async move {
-                    #function_body
-                })
-                .instrument(tracing::debug_span!(stringify!(#function_name)))
-                .await
-        }
-    };
-
-    TokenStream::from(updated_function)
+    // The transaction catalog shadows the request catalog in the body
+    TransactionBlock::wrap_function(
+        parse_quote!(catalog),
+        vec![Binding::transaction_catalog("catalog")],
+        input,
+    )
+    .unwrap_or_else(syn::Error::into_compile_error)
+    .into()
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -183,158 +177,6 @@ fn is_catalog_type(type_path: &TypePath) -> bool {
 // Transactional methods
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-struct CatalogItem1 {
-    item_name: Ident,
-    item_type: Type,
-}
-
-impl Parse for CatalogItem1 {
-    fn parse(input: ParseStream) -> syn::Result<Self> {
-        let item_name: Ident = input.parse()?;
-
-        input.parse::<Token![:]>()?;
-
-        let item_type: Type = input.parse()?;
-
-        Ok(Self {
-            item_name,
-            item_type,
-        })
-    }
-}
-
-struct CatalogItem2 {
-    item1_name: Ident,
-    item1_type: Type,
-    item2_name: Ident,
-    item2_type: Type,
-}
-
-impl Parse for CatalogItem2 {
-    fn parse(input: ParseStream) -> syn::Result<Self> {
-        let item1_name: Ident = input.parse()?;
-
-        input.parse::<Token![:]>()?;
-
-        let item1_type: Type = input.parse()?;
-
-        input.parse::<Token![,]>()?;
-
-        let item2_name: Ident = input.parse()?;
-
-        input.parse::<Token![:]>()?;
-
-        let item2_type: Type = input.parse()?;
-
-        Ok(Self {
-            item1_name,
-            item1_type,
-            item2_name,
-            item2_type,
-        })
-    }
-}
-
-struct CatalogItem3 {
-    item1_name: Ident,
-    item1_type: Type,
-    item2_name: Ident,
-    item2_type: Type,
-    item3_name: Ident,
-    item3_type: Type,
-}
-
-impl Parse for CatalogItem3 {
-    fn parse(input: ParseStream) -> syn::Result<Self> {
-        let item1_name: Ident = input.parse()?;
-
-        input.parse::<Token![:]>()?;
-
-        let item1_type: Type = input.parse()?;
-
-        input.parse::<Token![,]>()?;
-
-        let item2_name: Ident = input.parse()?;
-
-        input.parse::<Token![:]>()?;
-
-        let item2_type: Type = input.parse()?;
-
-        input.parse::<Token![,]>()?;
-
-        let item3_name: Ident = input.parse()?;
-
-        input.parse::<Token![:]>()?;
-
-        let item3_type: Type = input.parse()?;
-
-        Ok(Self {
-            item1_name,
-            item1_type,
-            item2_name,
-            item2_type,
-            item3_name,
-            item3_type,
-        })
-    }
-}
-
-struct CatalogItem4 {
-    item1_name: Ident,
-    item1_type: Type,
-    item2_name: Ident,
-    item2_type: Type,
-    item3_name: Ident,
-    item3_type: Type,
-    item4_name: Ident,
-    item4_type: Type,
-}
-
-impl Parse for CatalogItem4 {
-    fn parse(input: ParseStream) -> syn::Result<Self> {
-        let item1_name: Ident = input.parse()?;
-
-        input.parse::<Token![:]>()?;
-
-        let item1_type: Type = input.parse()?;
-
-        input.parse::<Token![,]>()?;
-
-        let item2_name: Ident = input.parse()?;
-
-        input.parse::<Token![:]>()?;
-
-        let item2_type: Type = input.parse()?;
-
-        input.parse::<Token![,]>()?;
-
-        let item3_name: Ident = input.parse()?;
-
-        input.parse::<Token![:]>()?;
-
-        let item3_type: Type = input.parse()?;
-
-        input.parse::<Token![,]>()?;
-
-        let item4_name: Ident = input.parse()?;
-
-        input.parse::<Token![:]>()?;
-
-        let item4_type: Type = input.parse()?;
-
-        Ok(Self {
-            item1_name,
-            item1_type,
-            item2_name,
-            item2_type,
-            item3_name,
-            item3_type,
-            item4_name,
-            item4_type,
-        })
-    }
-}
-
 #[proc_macro_attribute]
 /// Encrusting the method with a transactional Catalog.
 /// The structure must contain the Catalog as a field
@@ -349,24 +191,13 @@ impl Parse for CatalogItem4 {
 pub fn transactional_method(_attr: TokenStream, item: TokenStream) -> TokenStream {
     let input = parse_macro_input!(item as ItemFn);
 
-    let method_signature = &input.sig;
-    let method_name = &method_signature.ident;
-    let method_body = &input.block;
-    let method_visibility = &input.vis;
-
-    let updated_method = quote! {
-        #method_visibility #method_signature {
-            use tracing::Instrument;
-            ::database_common::DatabaseTransactionRunner::from(self.catalog.clone())
-                .transactional(|transaction_catalog: ::dill::Catalog| async move {
-                    #method_body
-                })
-                .instrument(tracing::debug_span!(stringify!(#method_name)))
-                .await
-        }
-    };
-
-    TokenStream::from(updated_method)
+    TransactionBlock::wrap_function(
+        parse_quote!(self.catalog),
+        vec![Binding::transaction_catalog("transaction_catalog")],
+        input,
+    )
+    .unwrap_or_else(syn::Error::into_compile_error)
+    .into()
 }
 
 #[proc_macro_attribute]
@@ -382,30 +213,7 @@ pub fn transactional_method(_attr: TokenStream, item: TokenStream) -> TokenStrea
 /// }
 /// ```
 pub fn transactional_method1(attr: TokenStream, item: TokenStream) -> TokenStream {
-    let CatalogItem1 {
-        item_name: catalog_item_name,
-        item_type: catalog_item_type,
-    } = parse_macro_input!(attr as CatalogItem1);
-    let input = parse_macro_input!(item as ItemFn);
-
-    let method_signature = &input.sig;
-    let method_name = &method_signature.ident;
-    let method_body = &input.block;
-    let method_visibility = &input.vis;
-
-    let updated_method = quote! {
-        #method_visibility #method_signature {
-            use tracing::Instrument;
-            ::database_common::DatabaseTransactionRunner::from(self.catalog.clone())
-                .transactional_with(|#catalog_item_name: #catalog_item_type| async move {
-                    #method_body
-                })
-                .instrument(tracing::debug_span!(stringify!(#method_name)))
-                .await
-        }
-    };
-
-    TokenStream::from(updated_method)
+    transactional_method_with(1, attr, item)
 }
 
 #[proc_macro_attribute]
@@ -421,32 +229,7 @@ pub fn transactional_method1(attr: TokenStream, item: TokenStream) -> TokenStrea
 /// }
 /// ```
 pub fn transactional_method2(attr: TokenStream, item: TokenStream) -> TokenStream {
-    let CatalogItem2 {
-        item1_name: catalog_item1_name,
-        item1_type: catalog_item1_type,
-        item2_name: catalog_item2_name,
-        item2_type: catalog_item2_type,
-    } = parse_macro_input!(attr as CatalogItem2);
-    let input = parse_macro_input!(item as ItemFn);
-
-    let method_signature = &input.sig;
-    let method_name = &method_signature.ident;
-    let method_body = &input.block;
-    let method_visibility = &input.vis;
-
-    let updated_method = quote! {
-        #method_visibility #method_signature {
-            use tracing::Instrument;
-            ::database_common::DatabaseTransactionRunner::from(self.catalog.clone())
-                .transactional_with2(|#catalog_item1_name: #catalog_item1_type, #catalog_item2_name: #catalog_item2_type| async move {
-                    #method_body
-                })
-                .instrument(tracing::debug_span!(stringify!(#method_name)))
-                .await
-        }
-    };
-
-    TokenStream::from(updated_method)
+    transactional_method_with(2, attr, item)
 }
 
 #[proc_macro_attribute]
@@ -462,34 +245,7 @@ pub fn transactional_method2(attr: TokenStream, item: TokenStream) -> TokenStrea
 /// }
 /// ```
 pub fn transactional_method3(attr: TokenStream, item: TokenStream) -> TokenStream {
-    let CatalogItem3 {
-        item1_name: catalog_item1_name,
-        item1_type: catalog_item1_type,
-        item2_name: catalog_item2_name,
-        item2_type: catalog_item2_type,
-        item3_name: catalog_item3_name,
-        item3_type: catalog_item3_type,
-    } = parse_macro_input!(attr as CatalogItem3);
-    let input = parse_macro_input!(item as ItemFn);
-
-    let method_signature = &input.sig;
-    let method_name = &method_signature.ident;
-    let method_body = &input.block;
-    let method_visibility = &input.vis;
-
-    let updated_method = quote! {
-        #method_visibility #method_signature {
-            use tracing::Instrument;
-            ::database_common::DatabaseTransactionRunner::from(self.catalog.clone())
-                .transactional_with3(|#catalog_item1_name: #catalog_item1_type, #catalog_item2_name: #catalog_item2_type, #catalog_item3_name: #catalog_item3_type| async move {
-                    #method_body
-                })
-                .instrument(tracing::debug_span!(stringify!(#method_name)))
-                .await
-        }
-    };
-
-    TokenStream::from(updated_method)
+    transactional_method_with(3, attr, item)
 }
 
 #[proc_macro_attribute]
@@ -505,36 +261,32 @@ pub fn transactional_method3(attr: TokenStream, item: TokenStream) -> TokenStrea
 /// }
 /// ```
 pub fn transactional_method4(attr: TokenStream, item: TokenStream) -> TokenStream {
-    let CatalogItem4 {
-        item1_name: catalog_item1_name,
-        item1_type: catalog_item1_type,
-        item2_name: catalog_item2_name,
-        item2_type: catalog_item2_type,
-        item3_name: catalog_item3_name,
-        item3_type: catalog_item3_type,
-        item4_name: catalog_item4_name,
-        item4_type: catalog_item4_type,
-    } = parse_macro_input!(attr as CatalogItem4);
+    transactional_method_with(4, attr, item)
+}
+
+fn transactional_method_with(arity: usize, attr: TokenStream, item: TokenStream) -> TokenStream {
+    let bindings = parse_macro_input!(attr with Punctuated::<Binding, Token![,]>::parse_terminated);
     let input = parse_macro_input!(item as ItemFn);
 
-    let method_signature = &input.sig;
-    let method_name = &method_signature.ident;
-    let method_body = &input.block;
-    let method_visibility = &input.vis;
+    if bindings.len() != arity {
+        return syn::Error::new(
+            Span::call_site(),
+            format!(
+                "expected {arity} `name: Type` bindings, found {}",
+                bindings.len()
+            ),
+        )
+        .into_compile_error()
+        .into();
+    }
 
-    let updated_method = quote! {
-        #method_visibility #method_signature {
-            use tracing::Instrument;
-            ::database_common::DatabaseTransactionRunner::from(self.catalog.clone())
-                .transactional_with4(|#catalog_item1_name: #catalog_item1_type, #catalog_item2_name: #catalog_item2_type, #catalog_item3_name: #catalog_item3_type, #catalog_item4_name: #catalog_item4_type| async move {
-                    #method_body
-                })
-                .instrument(tracing::debug_span!(stringify!(#method_name)))
-                .await
-        }
-    };
-
-    TokenStream::from(updated_method)
+    TransactionBlock::wrap_function(
+        parse_quote!(self.catalog),
+        bindings.into_iter().collect(),
+        input,
+    )
+    .unwrap_or_else(syn::Error::into_compile_error)
+    .into()
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

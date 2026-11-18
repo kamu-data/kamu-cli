@@ -30,6 +30,7 @@ syn = { version = "3", default-features = false, features = [
     "printing",
     "proc-macro",
     "visit",
+    "visit-mut",
 ] }
 
 

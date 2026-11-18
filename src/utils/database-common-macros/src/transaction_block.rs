@@ -12,7 +12,20 @@ use quote::{ToTokens, quote};
 use syn::parse::{Parse, ParseStream};
 use syn::spanned::Spanned;
 use syn::visit::Visit;
-use syn::{Attribute, Expr, ExprClosure, Ident, Pat, ReturnType, Type};
+use syn::visit_mut::{self, VisitMut};
+use syn::{
+    Attribute,
+    Expr,
+    ExprBlock,
+    ExprClosure,
+    Ident,
+    ItemFn,
+    Pat,
+    ReturnType,
+    Token,
+    Type,
+    parse_quote,
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -26,7 +39,7 @@ pub(crate) struct TransactionBlock {
     body: Expr,
 }
 
-enum Binding {
+pub(crate) enum Binding {
     /// `name`: the transaction catalog
     Catalog(Ident),
     /// `name: Type`: a component resolved from the transaction catalog
@@ -76,7 +89,7 @@ impl TransactionBlock {
         let bindings = closure
             .inputs
             .iter()
-            .map(Binding::parse)
+            .map(Binding::from_pat)
             .collect::<syn::Result<Vec<_>>>()?;
 
         let maybe_result_type = match closure.output {
@@ -122,6 +135,51 @@ impl TransactionBlock {
             "expected `#[catalog(<dill::Catalog>)]`, `#[when(<bool>)]` or \
              `#[span(<tracing::Span>)]`",
         )
+    }
+
+    /// Wraps the body of an `async fn` returning `Result<T, E>` in a transaction
+    /// opened from `catalog`, inside a debug span named after the function
+    pub(crate) fn wrap_function(
+        catalog: Expr,
+        bindings: Vec<Binding>,
+        function: ItemFn,
+    ) -> syn::Result<TokenStream> {
+        let ItemFn {
+            vis, sig, block, ..
+        } = function;
+
+        let ReturnType::Type(_, result_type) = &sig.output else {
+            return Err(syn::Error::new(
+                sig.span(),
+                "expected a function returning `Result<T, E>`",
+            ));
+        };
+        // `impl Trait` cannot name the type of a local; the body infers it
+        let mut result_type = (**result_type).clone();
+        ImplTraitInferrer.visit_type_mut(&mut result_type);
+
+        let name = &sig.ident;
+        let transaction_block = Self {
+            maybe_catalog: Some(catalog),
+            maybe_when: None,
+            maybe_span: Some(parse_quote! {
+                ::database_common::__tracing::debug_span!(stringify!(#name))
+            }),
+            bindings,
+            maybe_result_type: Some(result_type),
+            body: Expr::Block(ExprBlock {
+                attrs: Vec::new(),
+                label: None,
+                block: *block,
+            }),
+        }
+        .expand();
+
+        Ok(quote! {
+            #vis #sig {
+                #transaction_block
+            }
+        })
     }
 
     pub(crate) fn expand(&self) -> proc_macro2::TokenStream {
@@ -189,8 +247,23 @@ impl TransactionBlock {
     }
 }
 
+/// `name` or `name: Type`, as an attribute lists them
+impl Parse for Binding {
+    fn parse(input: ParseStream) -> syn::Result<Self> {
+        let name: Ident = input.parse()?;
+        if input.parse::<Option<Token![:]>>()?.is_none() {
+            return Ok(Self::Catalog(name));
+        }
+        Ok(Self::Component(name, input.parse()?))
+    }
+}
+
 impl Binding {
-    fn parse(input: &Pat) -> syn::Result<Self> {
+    pub(crate) fn transaction_catalog(name: &str) -> Self {
+        Self::Catalog(Ident::new(name, Span::call_site()))
+    }
+
+    fn from_pat(input: &Pat) -> syn::Result<Self> {
         if let Pat::Ident(pat_ident) = input {
             return Ok(Self::Catalog(Self::plain_name(pat_ident)?));
         }
@@ -229,6 +302,21 @@ impl Binding {
             Self::Component(name, component_type) => {
                 quote! { let #name: #component_type = #scope.resolve()?; }
             }
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Replaces each `impl Trait` in a type with `_`
+struct ImplTraitInferrer;
+
+impl VisitMut for ImplTraitInferrer {
+    fn visit_type_mut(&mut self, ty: &mut Type) {
+        if matches!(ty, Type::ImplTrait(_)) {
+            *ty = parse_quote!(_);
+        } else {
+            visit_mut::visit_type_mut(self, ty);
         }
     }
 }
