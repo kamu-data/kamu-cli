@@ -40,13 +40,7 @@ impl MockTransformPlanner {
                         dataset_handle: target.get_handle().clone(),
                         block_ref: odf::BlockRef::Head,
                         head: odf::Multihash::from_digest_sha3_256(b"elaborated-head"),
-                        transform: odf::metadata::Transform::Sql(odf::metadata::TransformSql {
-                            engine: "mock".to_string(),
-                            version: None,
-                            query: None,
-                            queries: Some(Vec::new()),
-                            temporal_tables: None,
-                        }),
+                        transform: Self::mock_transform(),
                         transform_block: odf::Multihash::from_digest_sha3_256(b"set-transform"),
                         system_time: Utc::now(),
                         schema: None,
@@ -98,6 +92,16 @@ impl MockTransformPlanner {
             .times(1)
             .returning(move |_| Err(make_error()));
         self
+    }
+
+    fn mock_transform() -> odf::metadata::Transform {
+        odf::metadata::Transform::Sql(odf::metadata::TransformSql {
+            engine: "mock".to_string(),
+            version: None,
+            query: None,
+            queries: Some(Vec::new()),
+            temporal_tables: None,
+        })
     }
 
     fn unchanged_input(handle: &odf::DatasetHandle) -> TransformRequestInputExt {

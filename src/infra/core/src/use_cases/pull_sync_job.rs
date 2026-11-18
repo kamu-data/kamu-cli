@@ -18,18 +18,18 @@ use crate::utils::span_outcome::SpanOutcome;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Runs one sync job of `kamu pull`: reads the target, transfers and commits,
-/// then records the pull alias of a dataset the sync created
+/// Runs one sync job of `kamu pull`: the sync, then the pull alias of a
+/// dataset the sync created
 pub(crate) struct PullSyncJob {
-    update_steps: Arc<dyn DatasetUpdateSteps>,
+    sync_from_job: Arc<dyn SyncFromJob>,
     catalog: dill::Catalog,
 }
 
 #[common_macros::method_names_consts]
 impl PullSyncJob {
-    pub(crate) fn new(update_steps: Arc<dyn DatasetUpdateSteps>, catalog: dill::Catalog) -> Self {
+    pub(crate) fn new(sync_from_job: Arc<dyn SyncFromJob>, catalog: dill::Catalog) -> Self {
         Self {
-            update_steps,
+            sync_from_job,
             catalog,
         }
     }
@@ -52,27 +52,15 @@ impl PullSyncJob {
         options: PullOptions,
         listener: Option<Arc<dyn SyncListener>>,
     ) -> Result<PullResponse, InternalError> {
-        let result = match self
-            .update_steps
-            .resolve_sync_target(&psi.local_target)
-            .await
-        {
-            Ok(Some(dst)) => match self
-                .transfer_and_commit(&psi, dst, &options, listener.clone())
-                .await
-            {
-                Ok(Some(sync_result)) => {
-                    Self::notify(listener.as_deref(), Ok(&sync_result));
-                    Ok(sync_result.into())
-                }
-                Ok(None) => Err(Self::dataset_deleted(&psi, listener.as_deref())),
-                Err(e) => {
-                    Self::notify(listener.as_deref(), Err(&e));
-                    Err(Self::into_pull_error(e))
-                }
-            },
-            Ok(None) => Err(Self::dataset_deleted(&psi, listener.as_deref())),
-            Err(e) => {
+        let result = match self.sync_and_alias(&psi, &options, listener.clone()).await {
+            Ok(sync_result) => {
+                Self::notify(listener.as_deref(), Ok(&sync_result));
+                Ok(sync_result.into())
+            }
+            Err(SyncFromJobError::TargetDeleted(_)) => {
+                Err(Self::dataset_deleted(&psi, listener.as_deref()))
+            }
+            Err(SyncFromJobError::Sync(e)) => {
                 Self::notify(listener.as_deref(), Err(&e));
                 Err(Self::into_pull_error(e))
             }
@@ -119,27 +107,24 @@ impl PullSyncJob {
         }
     }
 
-    async fn transfer_and_commit(
+    async fn sync_and_alias(
         &self,
         psi: &PullSyncItem,
-        dst: SyncFromTarget,
         options: &PullOptions,
         listener: Option<Arc<dyn SyncListener>>,
-    ) -> Result<Option<SyncResult>, SyncError> {
+    ) -> Result<SyncResult, SyncFromJobError> {
         let sync_result = self
-            .update_steps
-            .transfer_and_commit_sync(
-                SyncFromRequest {
-                    src: psi.remote_ref.clone(),
-                    dst,
-                },
+            .sync_from_job
+            .run(
+                &psi.local_target,
+                &psi.remote_ref,
                 options.sync_options,
                 listener,
             )
             .await?;
 
         if options.add_aliases
-            && let Some(SyncResult::Updated { old_head: None, .. }) = &sync_result
+            && let SyncResult::Updated { old_head: None, .. } = &sync_result
         {
             transaction!(
                 |dataset_registry: Arc<dyn DatasetRegistry>,

@@ -1809,6 +1809,7 @@ struct CompactTestHarness {
     query_svc: Arc<dyn QueryService>,
     transform_helper: TransformTestHelper,
     verification_svc: Arc<dyn VerificationService>,
+    transform_planner: Arc<dyn TransformPlanner>,
     current_date_time: DateTime<Utc>,
     ctx: SessionContext,
 }
@@ -1891,6 +1892,7 @@ impl CompactTestHarness {
             ingest_data_use_case: catalog.get_one().unwrap(),
             query_svc: catalog.get_one().unwrap(),
             verification_svc: catalog.get_one().unwrap(),
+            transform_planner: catalog.get_one().unwrap(),
             transform_helper,
             current_date_time,
             ctx: SessionContext::new_with_config(SessionConfig::new().with_target_partitions(1)),
@@ -1970,6 +1972,7 @@ impl CompactTestHarness {
             query_svc: catalog.get_one().unwrap(),
             transform_helper,
             verification_svc: catalog.get_one().unwrap(),
+            transform_planner: catalog.get_one().unwrap(),
             current_date_time,
             ctx: SessionContext::new_with_config(SessionConfig::new().with_target_partitions(1)),
         }
@@ -2463,19 +2466,20 @@ impl CompactTestHarness {
     }
 
     async fn verify_dataset(&self, target: ResolvedDataset) -> bool {
-        let result = self
-            .verification_svc
-            .verify(
-                VerificationRequest {
-                    target,
-                    block_range: (None, None),
-                    options: VerificationOptions::default(),
-                },
-                None,
-            )
-            .await;
-
-        result.outcome.is_ok()
+        let request = VerificationRequest {
+            target,
+            block_range: (None, None),
+            options: VerificationOptions::default(),
+        };
+        match VerificationPlan::build(request, self.transform_planner.as_ref()).await {
+            Ok(plan) => self
+                .verification_svc
+                .verify(plan, None)
+                .await
+                .outcome
+                .is_ok(),
+            Err(_) => false,
+        }
     }
 
     async fn compact_dataset(

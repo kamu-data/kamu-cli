@@ -15,8 +15,11 @@ rules (plan, execute, commit) are in [dataset-operations.md](dataset-operations.
   is rolled back by the database and logged as `Transaction DROPPED`.
 - **No slow work inside.** Fetching, engines, transfers, HTTP calls and waits run between short
   transactions, never inside one ([dataset operations](dataset-operations.md#at-a-glance)).
+- **Three levels own transactions:** the request or command boundary, the job of one dataset
+  operation, and the agents. Orchestration and domain services never open one around an operation
+  ([§3.1](#31-who-owns-a-transaction)).
 - **The method that orders the work shows the boundaries.** An algorithm with several
-  transactions reads as a sequence of `transaction!` blocks ([§3](#3-where-a-transaction-opens)).
+  transactions reads as a sequence of `transaction!` blocks ([§3.2](#32-inside-a-level)).
 
 ## 1. Machinery
 
@@ -56,10 +59,34 @@ implement `From<InternalError>`, the error of opening or ending a transaction.
 
 ## 3. Where a transaction opens
 
+### 3.1 Who owns a transaction
+
+Transactions are opened at three levels only. Everything else runs in the caller's transaction.
+
+| Level | Opens | Never |
+|---|---|---|
+| **Boundary**: HTTP and GraphQL middleware, a transactional CLI command | one transaction for request-sized work | slow work: engines, fetching, transfers |
+| **Operation job**: one per dataset operation (`CompactionJob`, `TransformJob`, …) | the short plan and commit transactions of one operation on one dataset | a transaction held across the execution |
+| **Agent**: task, flow, outbox, webhooks | bookkeeping transactions around its own state | — |
+
+- **Orchestration** opens no transaction around an operation; it calls jobs. This covers dependency
+  traversal, repeated ingest iterations, recovery policies, and work over several datasets. It opens a
+  block only for its own planning reads, such as the pull plan.
+- **Domain services** (planners, executors, `DatasetReferenceUpdater`, repositories) always run in the
+  caller's transaction.
+
+A job is the same code for the CLI and for flows: legacy task runners only map a task definition to
+a job and the job's result to a task outcome. Long-running work is headed for the task system. Task
+workers will take the jobs' place for flows, and CLI commands will submit tasks and wait for them
+rather than call jobs, which makes them work the same against a remote node
+([IaC task system](https://github.com/kamu-data/kamu-node/issues/348)).
+
+### 3.2 Inside a level
+
 | Shape | Write | Precedent |
 |---|---|---|
-| A method running several transactions in sequence, or slow work next to one | One `transaction!` block per transaction in that method; each block stays short and calls step methods | `CompactDatasetUseCaseImpl::compact_and_commit`, `WebhookDeliveryWorkerImpl::deliver_webhook` |
-| A method that is itself one transactional step | `#[transactional_methodN]` on it | the `DatasetUpdateStepsImpl` steps, the task planners |
+| A method running several transactions in sequence, or slow work next to one | One `transaction!` block per transaction in that method; each block stays short and calls step methods | `CompactionJob`'s run, `WebhookDeliveryWorkerImpl::deliver_webhook` |
+| A method that is itself one transactional step | `#[transactional_methodN]` on it | the task planners, `PushCommand::get_filtered_datasets` |
 | A private method annotated only so that its caller gets a transaction | Neither: the caller opens the block, and the method takes the components as parameters | `PushDatasetUseCaseImpl::make_authorization_checks` |
 | A transaction only in some configurations | `#[when(<bool>)]` on the block | `run_startup_jobs`, the command run in `app.rs` |
 
@@ -119,3 +146,4 @@ its generic type across lines: name bindings short enough to fit.
 | A `macro_rules!` macro | It cannot reject `return` in a block without a return type, where `return Ok(..)` would silently commit and continue instead of leaving the function |
 | Rolling back by dropping the scope, so the body can be plain inline code | Relies on the driver's deferred rollback, skips the in-memory manager's rollback until the next transaction, and logs every rollback as `Transaction DROPPED` |
 | An `async move` body | Forces a clone of every local used after the block, as the `DatabaseTransactionRunner` callbacks do |
+| A step service that holds one phase of every operation (plan an ingest, elaborate a transform, commit a head, each in its own transaction) | Each operation is then composed twice, once by the CLI use case and once by the task runner, and its transactions spread over the steps, the use case, the task planner and the runner. A job per operation owns them in one place ([§3.1](#31-who-owns-a-transaction)) |

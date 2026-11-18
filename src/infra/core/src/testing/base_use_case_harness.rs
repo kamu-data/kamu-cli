@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use dill::Catalog;
-use kamu_accounts::CurrentAccountSubject;
+use kamu_accounts::{CurrentAccountSubject, Principal};
 use kamu_auth_rebac_services::RebacDatasetRegistryFacadeImpl;
 use kamu_core::{MockDidGenerator, TenancyConfig};
 use kamu_datasets::{DatasetPermissionChecker, MockDatasetPermissionChecker};
@@ -27,6 +27,7 @@ pub struct BaseUseCaseHarnessOptions {
     maybe_mock_did_generator: Option<MockDidGenerator>,
     maybe_system_time_source_stub: Option<SystemTimeSourceStub>,
     current_account_subject: CurrentAccountSubject,
+    maybe_principal: Option<Principal>,
 }
 
 impl BaseUseCaseHarnessOptions {
@@ -73,6 +74,13 @@ impl BaseUseCaseHarnessOptions {
         self
     }
 
+    /// Acts as `principal` instead of the subject, e.g. as the node that runs
+    /// tasks
+    pub fn with_principal(mut self, principal: Principal) -> Self {
+        self.maybe_principal = Some(principal);
+        self
+    }
+
     pub fn with_system_time_source_stub(
         mut self,
         system_time_source_stub: SystemTimeSourceStub,
@@ -91,6 +99,7 @@ impl Default for BaseUseCaseHarnessOptions {
             maybe_mock_did_generator: None,
             maybe_system_time_source_stub: None,
             current_account_subject: CurrentAccountSubject::new_test(),
+            maybe_principal: None,
         }
     }
 }
@@ -109,6 +118,7 @@ impl BaseUseCaseHarness {
             .tenancy_config(options.tenancy_config)
             .maybe_mock_did_generator(options.maybe_mock_did_generator)
             .current_account_subject(options.current_account_subject)
+            .maybe_principal(options.maybe_principal)
             .maybe_system_time_source_stub(options.maybe_system_time_source_stub);
 
         let base_repo_harness = base_repo_harness_builder.build();

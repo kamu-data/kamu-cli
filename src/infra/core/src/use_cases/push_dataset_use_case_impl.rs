@@ -27,29 +27,17 @@ use kamu_core::{
     SyncMultiListener,
     SyncOptions,
     SyncResult,
-    SyncService,
-    SyncToRequest,
+    SyncToJob,
 };
-use kamu_datasets::{
-    DatasetOperation,
-    DatasetOperationGuard,
-    DatasetOperationRequest,
-    DatasetPermissionError,
-};
-
-use crate::SyncRequestBuilder;
+use kamu_datasets::{DatasetOperation, DatasetOperationGuard, DatasetOperationRequest};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-/// Sync requests, each with the index of its plan item, and the responses of
-/// the items no request could be built for
-type SyncRequestsOutcome = (Vec<(usize, SyncToRequest)>, Vec<PushResponse>);
 
 #[component]
 #[interface(dyn PushDatasetUseCase)]
 pub struct PushDatasetUseCaseImpl {
     catalog: dill::Catalog,
-    sync_service: Arc<dyn SyncService>,
+    sync_to_job: Arc<dyn SyncToJob>,
 }
 
 #[common_macros::method_names_consts]
@@ -77,15 +65,7 @@ impl PushDatasetUseCaseImpl {
                 Err(error) => unauthorized_responses.push(PushResponse {
                     local_handle: Some(request.target),
                     target: push_target.cloned(),
-                    result: Err(PushError::SyncError({
-                        use DatasetPermissionError as E;
-
-                        match error {
-                            E::NotFound(e) => SyncError::DatasetNotFound(e.into()),
-                            E::Access(e) => SyncError::Access(e),
-                            E::Internal(e) => SyncError::Internal(e),
-                        }
-                    })),
+                    result: Err(PushError::SyncError(error.into())),
                 }),
             }
         }
@@ -93,55 +73,22 @@ impl PushDatasetUseCaseImpl {
         Ok((authorized_handles, unauthorized_responses))
     }
 
-    /// Pairs each sync request with the index of its plan item
-    #[tracing::instrument(
-        level = "debug",
-        name = PushDatasetUseCaseImpl_build_sync_requests,
-        skip_all,
-        fields(num_items = plan.len(), ?sync_options, ?push_target)
-    )]
-    async fn build_sync_requests(
-        sync_request_builder: &SyncRequestBuilder,
-        plan: &[PushItem],
-        sync_options: SyncOptions,
-        push_target: Option<&odf::DatasetPushTarget>,
-    ) -> Result<SyncRequestsOutcome, InternalError> {
-        let mut sync_requests = Vec::new();
-        let mut errors = Vec::new();
-
-        for (index, pi) in plan.iter().enumerate() {
-            let src_ref = pi.local_handle.as_local_ref();
-            let dst_ref = (&pi.remote_target.url).into();
-            match sync_request_builder
-                .build_sync_request(src_ref, dst_ref, sync_options.create_if_not_exists)
-                .await
-            {
-                Ok(sync_request) => {
-                    sync_request.src.detach_from_transaction();
-                    sync_requests.push((index, sync_request));
-                }
-                Err(e) => errors.push(PushResponse {
-                    local_handle: Some(pi.local_handle.clone()),
-                    target: push_target.cloned(),
-                    result: Err(e.into()),
-                }),
-            }
-        }
-
-        Ok((sync_requests, errors))
-    }
-
     /// Syncs, then reports the result to the listener: a push to a remote
     /// commits there, so the result is final when the sync returns
     async fn sync_and_report(
         &self,
-        sync_request: SyncToRequest,
+        push_item: &PushItem,
         sync_options: SyncOptions,
         listener: Option<Arc<dyn SyncListener>>,
     ) -> Result<SyncResult, SyncError> {
         let result = self
-            .sync_service
-            .sync_to(sync_request, sync_options, listener.clone())
+            .sync_to_job
+            .run(
+                &push_item.local_handle,
+                (&push_item.remote_target.url).into(),
+                sync_options,
+                listener.clone(),
+            )
             .await;
         if let Some(listener) = &listener {
             match &result {
@@ -203,40 +150,24 @@ impl PushDatasetUseCase for PushDatasetUseCaseImpl {
 
         tracing::debug!(?plan, "Obtained push plan");
 
-        // Create sync requests
-        let (sync_requests, errors) =
-            transaction!(|sync_request_builder: Arc<SyncRequestBuilder>| {
-                Self::build_sync_requests(
-                    &sync_request_builder,
-                    &plan,
-                    options.sync_options,
-                    options.remote_target.as_ref(),
-                )
-                .await?
-            });
-        responses.extend(errors);
-
-        // Run sync process
-        let (plan_indices, sync_requests): (Vec<_>, Vec<_>) = sync_requests.into_iter().unzip();
-        let futures: Vec<_> = sync_requests
-            .into_iter()
-            .map(|sync_request| {
+        // Run sync process; each push opens a short transaction of its own
+        let futures: Vec<_> = plan
+            .iter()
+            .map(|push_item| {
                 let listener = sync_listener.as_ref().and_then(|l| {
                     l.begin_sync(
-                        &sync_request.src.get_handle().as_any_ref(),
-                        &sync_request.dst.as_user_friendly_any_ref(),
+                        &push_item.local_handle.as_any_ref(),
+                        &odf::DatasetRefRemote::from(&push_item.remote_target.url).as_any_ref(),
                     )
                 });
-                self.sync_and_report(sync_request, options.sync_options, listener)
+                self.sync_and_report(push_item, options.sync_options, listener)
             })
             .collect();
         // TODO: PERF: use tokio-tasks?
         let sync_results = futures::future::join_all(futures).await;
 
         // Convert results, adding a push alias for each dataset pushed
-        assert_eq!(plan_indices.len(), sync_results.len());
-        for (index, sync_result) in std::iter::zip(plan_indices, sync_results) {
-            let push_item = &plan[index];
+        for (push_item, sync_result) in std::iter::zip(&plan, sync_results) {
             let sync_result = match sync_result {
                 Ok(sync_result) if options.add_aliases => transaction!(
                     |remote_alias_registry: Arc<dyn RemoteAliasesRegistry>|

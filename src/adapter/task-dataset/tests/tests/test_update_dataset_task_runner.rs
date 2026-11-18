@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use std::assert_matches;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
@@ -21,7 +21,6 @@ use kamu::testing::{
     BaseUseCaseHarnessOptions,
     DatasetTestHelper,
     DummySmartTransferProtocolClient,
-    RacingDatasetUpdateSteps,
 };
 use kamu::utils::ipfs_wrapper::IpfsClient;
 use kamu::utils::local_sync_writes::PulledSeedStore;
@@ -33,18 +32,23 @@ use kamu::{
     FetchService,
     IngestEnvVarsResolver,
     IpfsServiceImpl,
+    LocalSyncCommitterImpl,
     ObjectStoreBuilderLocalFs,
     ObjectStoreRegistryImpl,
+    PollingIngestJobImpl,
     PollingIngestPlannerImpl,
     PollingIngestServiceImpl,
     RemoteDatasetUrlResolverImpl,
     RemoteReposDir,
     RemoteRepositoryRegistryImpl,
+    SyncFromJobImpl,
     SyncRequestBuilder,
     SyncServiceImpl,
     TransformExecutorImpl,
+    TransformJobImpl,
     TransformPlannerImpl,
 };
+use kamu_accounts::Principal;
 use kamu_adapter_task_dataset::{
     DatasetRefMovedError,
     DatasetUpdateJob,
@@ -66,6 +70,7 @@ use kamu_datasets::{
     DatasetEnvVarValue,
     DatasetReferenceUpdater,
     GetDatasetEnvVarError,
+    MockDatasetPermissionChecker,
     SecretsEncryptionConfig,
 };
 use kamu_datasets_services::DatasetKeyValueServiceSysEnv;
@@ -841,11 +846,10 @@ async fn test_ingest_planning_failure_fails_recoverably() {
 
 #[tokio::test]
 async fn test_ingest_of_dataset_deleted_before_commit_fails_unrecoverably() {
-    let (harness, foo, _) = UpdateDatasetTaskRunnerHarness::new_ingesting_new_root(
+    let (harness, foo) = UpdateDatasetTaskRunnerHarness::new_ingesting_root_deleted_meanwhile(
         &UpdateDatasetTaskRunnerHarness::alias("foo"),
     )
     .await;
-    harness.delete_dataset_before_next_update();
 
     let outcome = harness.run_ingest_update(&foo).await;
 
@@ -863,7 +867,6 @@ struct UpdateDatasetTaskRunnerHarness {
     catalog: dill::Catalog,
     runner: Arc<dyn TaskRunner>,
     racing_reference_updater: Arc<RacingDatasetReferenceUpdater>,
-    racing_update_steps: Arc<RacingDatasetUpdateSteps>,
 }
 
 impl UpdateDatasetTaskRunnerHarness {
@@ -997,13 +1000,23 @@ impl UpdateDatasetTaskRunnerHarness {
     }
 
     /// `register_operations` registers the sync, ingest and transform
-    /// services; it gets the harness's temporary directory
+    /// services; it gets the harness's temporary directory. Tasks run as the
+    /// node, which may run every operation
     fn build(register_operations: impl FnOnce(&mut dill::CatalogBuilder, &Path)) -> Self {
-        let base_use_case_harness = BaseUseCaseHarness::new(BaseUseCaseHarnessOptions::new());
+        let base_use_case_harness = BaseUseCaseHarness::new(
+            BaseUseCaseHarnessOptions::new()
+                .with_maybe_permission_checker(Some(MockDatasetPermissionChecker::denying_ids(
+                    HashSet::new(),
+                )))
+                .with_principal(Principal::Node),
+        );
 
         let mut b = dill::CatalogBuilder::new_chained(base_use_case_harness.catalog());
-        RacingDatasetUpdateSteps::register(&mut b);
         b.add::<UpdateDatasetTaskRunner>()
+            .add::<PollingIngestJobImpl>()
+            .add::<TransformJobImpl>()
+            .add::<SyncFromJobImpl>()
+            .add::<LocalSyncCommitterImpl>()
             .add::<PollingIngestPlannerImpl>()
             .add::<IngestEnvVarsResolver>()
             .add_value(RacingDatasetReferenceUpdater::default())
@@ -1018,7 +1031,6 @@ impl UpdateDatasetTaskRunnerHarness {
             base_use_case_harness,
             runner: catalog.get_one::<UpdateDatasetTaskRunner>().unwrap(),
             racing_reference_updater: catalog.get_one().unwrap(),
-            racing_update_steps: catalog.get_one().unwrap(),
             catalog,
         }
     }
@@ -1199,6 +1211,59 @@ impl UpdateDatasetTaskRunnerHarness {
         (harness, created, ingested_head)
     }
 
+    /// Creates root `alias` and expects one ingest of it reporting a new head,
+    /// during which another writer deletes the dataset
+    async fn new_ingesting_root_deleted_meanwhile(
+        alias: &odf::DatasetAlias,
+    ) -> (Self, CreateDatasetResult) {
+        let reported_heads = ReportedHeads::default();
+        let harness = Self::new(UpdateDatasetTaskRunnerMocks {
+            mock_polling_ingest_service: Self::ingest_deleting_target(alias, &reported_heads),
+            ..UpdateDatasetTaskRunnerMocks::default()
+        });
+        let created = harness.create_root_dataset(alias).await;
+        let ingested_head = harness
+            .append_unreferenced_block(&created, "ingested")
+            .await;
+        reported_heads.set(&created.head, &ingested_head);
+        (harness, created)
+    }
+
+    /// Expects one ingest of `alias` that deletes the dataset's storage
+    /// before it reports `heads`, as another writer deleting the dataset
+    /// would
+    fn ingest_deleting_target(
+        alias: &odf::DatasetAlias,
+        heads: &ReportedHeads,
+    ) -> MockPollingIngestService {
+        let alias = alias.clone();
+        let heads = heads.clone();
+        let mut mock_polling_ingest_service = MockPollingIngestService::new();
+        mock_polling_ingest_service
+            .expect_ingest()
+            .withf(move |target, _, _, _, _, _| target.get_alias() == &alias)
+            .times(1)
+            .returning(move |target, plan, _, _, _, _| {
+                std::fs::remove_dir_all(target.get_storage_internal_url().to_file_path().unwrap())
+                    .unwrap();
+                let (old_head, new_head) = heads.get();
+                Ok(PollingIngestResult::Updated {
+                    old_head,
+                    new_head,
+                    has_more: false,
+                    uncacheable: false,
+                    increment: odf::dataset::MetadataChainIncrementInterval {
+                        num_blocks: 1,
+                        num_records: 0,
+                        updated_watermark: None,
+                    },
+                    new_source_state: None,
+                    metadata_state: plan.into_metadata_state(),
+                })
+            });
+        mock_polling_ingest_service
+    }
+
     /// Creates root `alias` and expects one sync of it from its remote
     /// reporting a new head, appended unreferenced; returns the dataset and
     /// that head
@@ -1227,10 +1292,6 @@ impl UpdateDatasetTaskRunnerHarness {
 
     fn deny_next_update(&self) {
         self.racing_reference_updater.deny_next_update();
-    }
-
-    fn delete_dataset_before_next_update(&self) {
-        self.racing_update_steps.delete_dataset_before_next_update();
     }
 
     /// Writes the file a polling source reads, in the harness's directory

@@ -216,8 +216,13 @@ impl ClientSideHarness {
         b.add::<CreateDatasetUseCaseImpl>();
         b.add::<PullDatasetUseCaseImpl>();
         b.add::<DatasetOperationGuardImpl>();
-        b.add::<DatasetUpdateStepsImpl>();
+        b.add::<CompactionJobImpl>();
+        b.add::<PollingIngestJobImpl>();
+        b.add::<TransformJobImpl>();
+        b.add::<SyncFromJobImpl>();
+        b.add::<LocalSyncCommitterImpl>();
         b.add::<PushDatasetUseCaseImpl>();
+        b.add::<SyncToJobImpl>();
 
         b.add::<DatasetReferenceServiceImpl>();
         b.add_value(RacingDatasetReferenceUpdater::default())
@@ -418,29 +423,24 @@ impl ClientSideHarness {
             .clone()
     }
 
-    /// Pulls into an existing dataset through the update steps the pull use
-    /// case runs, returning the sync result with the increment the use case
-    /// does not report
+    /// Pulls into an existing dataset through the job the pull use case runs,
+    /// returning the sync result with the increment the use case does not
+    /// report
     pub async fn sync_into_existing(
         &self,
         src_ref: odf::DatasetRefRemote,
         dataset_handle: &odf::DatasetHandle,
     ) -> SyncResult {
-        let update_steps = self.catalog.get_one::<dyn DatasetUpdateSteps>().unwrap();
-        let dst = update_steps
-            .resolve_sync_target(&PullLocalTarget::existing(dataset_handle.clone()))
-            .await
+        self.catalog
+            .get_one::<dyn SyncFromJob>()
             .unwrap()
-            .unwrap();
-
-        update_steps
-            .transfer_and_commit_sync(
-                SyncFromRequest { src: src_ref, dst },
+            .run(
+                &PullLocalTarget::existing(dataset_handle.clone()),
+                &src_ref,
                 SyncOptions::default(),
                 None,
             )
             .await
-            .unwrap()
             .unwrap()
     }
 

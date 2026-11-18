@@ -15,11 +15,17 @@ use std::sync::Arc;
 
 use console::style;
 use container_runtime::{ContainerRuntime, RunArgs};
+use database_common::transaction;
 use file_utils::OwnedFile;
 use futures::TryStreamExt;
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu::domain::engine::normalize_logs;
-use kamu::domain::{VerificationOptions, VerificationRequest, VerifyDatasetUseCase};
+use kamu::domain::{
+    VerificationMultiListener,
+    VerificationOptions,
+    VerificationRequest,
+    VerifyJob,
+};
 use kamu::utils::docker_images::BUSYBOX;
 use kamu_datasets::DatasetRegistry;
 use random_strings::get_random_name;
@@ -38,8 +44,8 @@ const FAILED_MESSAGE: &str = "failed";
 #[dill::component]
 #[dill::interface(dyn Command)]
 pub struct SystemDiagnoseCommand {
-    dataset_registry: Arc<dyn DatasetRegistry>,
-    verify_dataset_use_case: Arc<dyn VerifyDatasetUseCase>,
+    catalog: dill::Catalog,
+    verify_job: Arc<dyn VerifyJob>,
     container_runtime: Arc<ContainerRuntime>,
     workspace_svc: Arc<WorkspaceService>,
 }
@@ -78,8 +84,8 @@ impl Command for SystemDiagnoseCommand {
         // Add checks which required workspace initialization
         if self.workspace_svc.is_in_workspace() {
             diagnostic_checks.push(Box::new(CheckWorkspaceConsistent {
-                dataset_registry: self.dataset_registry.clone(),
-                verify_dataset_use_case: self.verify_dataset_use_case.clone(),
+                catalog: self.catalog.clone(),
+                verify_job: self.verify_job.clone(),
             }));
         }
         let mut is_err = false;
@@ -320,8 +326,8 @@ impl DiagnosticCheck for CheckContainerRuntimeVolumeMount {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 struct CheckWorkspaceConsistent {
-    dataset_registry: Arc<dyn DatasetRegistry>,
-    verify_dataset_use_case: Arc<dyn VerifyDatasetUseCase>,
+    catalog: dill::Catalog,
+    verify_job: Arc<dyn VerifyJob>,
 }
 
 #[async_trait::async_trait]
@@ -342,15 +348,14 @@ impl DiagnosticCheck for CheckWorkspaceConsistent {
             progress_cloned.draw();
         });
 
-        let dataset_handles: Vec<_> = self
-            .dataset_registry
-            .all_dataset_handles()
-            .try_collect()
-            .await?;
+        let dataset_handles: Vec<_> = transaction!(|dataset_registry: Arc<dyn DatasetRegistry>| {
+            dataset_registry.all_dataset_handles().try_collect().await?
+        });
 
-        let mut verification_tasks = Vec::new();
+        let mut results = Vec::with_capacity(dataset_handles.len());
         for dataset_handle in dataset_handles {
-            verification_tasks.push(VerificationRequest {
+            let listener = progress.begin_verify(&dataset_handle);
+            let request = VerificationRequest {
                 target: dataset_handle,
                 block_range: (None, None),
                 options: VerificationOptions {
@@ -358,17 +363,12 @@ impl DiagnosticCheck for CheckWorkspaceConsistent {
                     check_logical_hashes: false,
                     replay_transformations: false,
                 },
-            });
+            };
+            results.push(self.verify_job.run(request, listener).await);
         }
-
-        let results = self
-            .verify_dataset_use_case
-            .execute_multi(verification_tasks, Some(progress.clone()))
-            .await;
 
         for result in results {
             // TODO: This will currently not show which dataset validation failed for
-            // We need to improve `verify_multi` signature.
             result.outcome.int_err()?;
         }
 

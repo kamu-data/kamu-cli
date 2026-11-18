@@ -9,50 +9,30 @@
 
 use std::sync::Arc;
 
-use database_common::transaction;
 use internal_error::{ErrorIntoInternal, InternalError};
-use kamu_accounts::Principal;
 use kamu_core::*;
-use kamu_datasets::{
-    DatasetOperation,
-    DatasetOperationGuard,
-    DatasetOperationRequest,
-    DatasetRegistry,
-    DatasetRegistryExt,
-    ResolvedDataset,
-};
-use random_strings::get_random_name;
 
 use crate::utils::span_outcome::SpanOutcome;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Runs one transform job of `kamu pull`: elaborates, resets the derivative
-/// to metadata on a diverged input when asked, authorizes inputs the plan did
-/// not include, then executes and commits
+/// Runs one transform job of `kamu pull`: the transform, and, when asked, a
+/// reset of the derivative to metadata on a diverged input followed by the
+/// transform once more
 pub(crate) struct PullTransformJob {
-    update_steps: Arc<dyn DatasetUpdateSteps>,
-    transform_executor: Arc<dyn TransformExecutor>,
-    compaction_planner: Arc<dyn CompactionPlanner>,
-    compaction_executor: Arc<dyn CompactionExecutor>,
-    catalog: dill::Catalog,
+    transform_job: Arc<dyn TransformJob>,
+    compaction_job: Arc<dyn CompactionJob>,
 }
 
 #[common_macros::method_names_consts]
 impl PullTransformJob {
     pub(crate) fn new(
-        update_steps: Arc<dyn DatasetUpdateSteps>,
-        transform_executor: Arc<dyn TransformExecutor>,
-        compaction_planner: Arc<dyn CompactionPlanner>,
-        compaction_executor: Arc<dyn CompactionExecutor>,
-        catalog: dill::Catalog,
+        transform_job: Arc<dyn TransformJob>,
+        compaction_job: Arc<dyn CompactionJob>,
     ) -> Self {
         Self {
-            update_steps,
-            transform_executor,
-            compaction_planner,
-            compaction_executor,
-            catalog,
+            transform_job,
+            compaction_job,
         }
     }
 
@@ -74,12 +54,10 @@ impl PullTransformJob {
         transform_options: TransformOptions,
         maybe_listener: Option<Arc<dyn TransformListener>>,
     ) -> Result<PullResponse, InternalError> {
-        let maybe_original_request = pti.maybe_original_request.clone();
-        let target_handle = pti.target.clone();
         let listener = maybe_listener.unwrap_or_else(|| Arc::new(NullTransformListener));
 
         let transform_result = self
-            .elaborate_and_execute(pti, transform_options, listener.clone())
+            .transform(&pti.target, transform_options, listener.clone())
             .await;
 
         match &transform_result {
@@ -88,255 +66,97 @@ impl PullTransformJob {
         }
 
         Ok(PullResponse {
-            maybe_original_request,
-            maybe_local_ref: Some(target_handle.as_local_ref()),
+            maybe_original_request: pti.maybe_original_request,
+            maybe_local_ref: Some(pti.target.as_local_ref()),
             maybe_remote_ref: None,
             result: transform_result.map(Into::into),
         })
     }
 
-    async fn elaborate_and_execute(
+    async fn transform(
         &self,
-        pti: PullTransformItem,
+        target_handle: &odf::DatasetHandle,
         transform_options: TransformOptions,
         listener: Arc<dyn TransformListener>,
     ) -> Result<TransformResult, PullError> {
-        let target_handle = &pti.target;
-        let mut maybe_reset_heads = None;
-
-        let elaboration = match self.update_steps.elaborate_transform(target_handle).await {
-            Err(TransformElaborateError::InvalidInputInterval(e))
+        match self
+            .transform_job
+            .run(target_handle, Some(listener.clone()))
+            .await
+        {
+            Err(TransformJobError::Elaborate(TransformElaborateError::InvalidInputInterval(e)))
                 if transform_options.reset_derivatives_on_diverged_input =>
             {
                 tracing::warn!(error = %e, "Input diverged, resetting the derivative to metadata");
 
-                match self.reset_to_metadata(target_handle).await? {
-                    Some(reset_heads) => {
-                        maybe_reset_heads = Some(reset_heads);
-                        self.update_steps.elaborate_transform(target_handle).await
-                    }
-                    None => Err(TransformElaborateError::InvalidInputInterval(e)),
+                let Some((old_head, new_head)) = self.reset_to_metadata(target_handle).await?
+                else {
+                    return Err(Self::into_pull_error(TransformJobError::Elaborate(
+                        TransformElaborateError::InvalidInputInterval(e),
+                    )));
+                };
+
+                match self.transform_job.run(target_handle, Some(listener)).await {
+                    Ok(transform_result) => Ok(Self::combine_with_reset(
+                        old_head,
+                        new_head,
+                        transform_result,
+                    )),
+                    Err(source) => Err(PullError::TransformStopped(Box::new(
+                        TransformStoppedError {
+                            old_head,
+                            new_head,
+                            source: Self::into_pull_error(source),
+                        },
+                    ))),
                 }
             }
-            result => result,
-        };
-
-        let result = self
-            .execute_elaborated(elaboration, target_handle, &pti.input_handles, listener)
-            .await;
-
-        match (maybe_reset_heads, result) {
-            (maybe_reset_heads, Ok(transform_result)) => Ok(Self::combine_with_reset(
-                maybe_reset_heads,
-                transform_result,
-            )),
-            (Some((old_head, new_head)), Err(source)) => Err(PullError::TransformStopped(
-                Box::new(TransformStoppedError {
-                    old_head,
-                    new_head,
-                    source,
-                }),
-            )),
-            (None, Err(e)) => Err(e),
+            result => result.map_err(Self::into_pull_error),
         }
-    }
-
-    /// Authorizes, executes and commits an elaborated transform
-    async fn execute_elaborated(
-        &self,
-        elaboration: Result<Option<ElaboratedTransform>, TransformElaborateError>,
-        target_handle: &odf::DatasetHandle,
-        planned_inputs: &[odf::DatasetHandle],
-        listener: Arc<dyn TransformListener>,
-    ) -> Result<TransformResult, PullError> {
-        match elaboration {
-            Ok(Some(ElaboratedTransform {
-                target,
-                elaboration: TransformElaboration::Elaborated(plan),
-            })) => {
-                let unplanned_inputs = Self::unplanned_inputs(&plan, planned_inputs);
-                if !unplanned_inputs.is_empty() {
-                    transaction!(|dataset_operation_guard: Arc<dyn DatasetOperationGuard>,
-                                  principal: Arc<Principal>| {
-                        Self::authorize_unplanned_inputs(
-                            dataset_operation_guard.as_ref(),
-                            &principal,
-                            &plan,
-                            unplanned_inputs,
-                        )
-                        .await?;
-                    });
-                }
-                self.execute_and_commit(target, plan, listener).await
-            }
-            Ok(Some(ElaboratedTransform {
-                elaboration: TransformElaboration::UpToDate,
-                ..
-            })) => Ok(TransformResult::UpToDate),
-            Ok(None) => Err(PullError::NotFound(odf::DatasetNotFoundError::new(
-                target_handle.as_local_ref(),
-            ))),
-            Err(e) => Err(TransformError::from(e).into()),
-        }
-    }
-
-    /// The pull authorized reading the inputs of the transform it planned.
-    /// Another writer may change the transform before the job elaborates it,
-    /// so inputs the pull did not plan are authorized before any is read
-    fn unplanned_inputs(
-        plan: &TransformExecutionPlan,
-        planned_inputs: &[odf::DatasetHandle],
-    ) -> Vec<odf::DatasetHandle> {
-        plan.request
-            .inputs
-            .iter()
-            .map(|input| &input.dataset_handle)
-            .filter(|handle| !planned_inputs.iter().any(|planned| planned.id == handle.id))
-            .cloned()
-            .collect()
-    }
-
-    async fn authorize_unplanned_inputs(
-        dataset_operation_guard: &dyn DatasetOperationGuard,
-        principal: &Principal,
-        plan: &TransformExecutionPlan,
-        unplanned_inputs: Vec<odf::DatasetHandle>,
-    ) -> Result<(), PullError> {
-        // The target is checked again along with the inputs; the iteration
-        // already granted it, unless its permissions changed since
-        dataset_operation_guard
-            .check_operation(
-                principal,
-                &DatasetOperationRequest::new(
-                    plan.request.dataset_handle.clone(),
-                    DatasetOperation::Transform {
-                        inputs: unplanned_inputs,
-                    },
-                ),
-            )
-            .await?;
-
-        Ok(())
-    }
-
-    async fn execute_and_commit(
-        &self,
-        target: ResolvedDataset,
-        plan: TransformExecutionPlan,
-        listener: Arc<dyn TransformListener>,
-    ) -> Result<TransformResult, PullError> {
-        let (target, result) = self
-            .transform_executor
-            .execute_transform(target, plan, &get_random_name(None, 10), Some(listener))
-            .await;
-
-        let result = result.map_err(TransformError::from)?;
-        if let TransformResult::Updated {
-            old_head, new_head, ..
-        } = &result
-        {
-            self.update_head(target.get_handle(), old_head, new_head)
-                .await?;
-        }
-
-        Ok(result)
-    }
-
-    async fn update_head(
-        &self,
-        target_handle: &odf::DatasetHandle,
-        old_head: &odf::Multihash,
-        new_head: &odf::Multihash,
-    ) -> Result<(), PullError> {
-        ReferenceUpdate::into_pull_result(
-            self.update_steps
-                .update_reference(target_handle, &odf::BlockRef::Head, old_head, new_head)
-                .await,
-            target_handle,
-        )
-    }
-
-    /// Resetting drops the derivative's data, so it needs the right to
-    /// maintain the dataset, beyond the write the pull was granted
-    async fn plan_reset_to_metadata(
-        &self,
-        dataset_registry: &dyn DatasetRegistry,
-        dataset_operation_guard: &dyn DatasetOperationGuard,
-        principal: &Principal,
-        target_handle: &odf::DatasetHandle,
-    ) -> Result<(ResolvedDataset, CompactionPlan), PullError> {
-        dataset_operation_guard
-            .check_operation(
-                principal,
-                &DatasetOperationRequest::new(
-                    target_handle.clone(),
-                    DatasetOperation::ResetToMetadata,
-                ),
-            )
-            .await?;
-
-        let target = dataset_registry
-            .try_get_dataset_by_ref(&target_handle.as_local_ref())
-            .await?
-            .ok_or_else(|| {
-                PullError::NotFound(odf::DatasetNotFoundError::new(target_handle.as_local_ref()))
-            })?;
-        let plan = self
-            .compaction_planner
-            .plan_compaction(
-                target.clone(),
-                CompactionOptions {
-                    keep_metadata_only: true,
-                    ..Default::default()
-                },
-                None,
-            )
-            .await
-            .map_err(|e| match e {
-                CompactionPlanningError::Access(e) => PullError::Access(e),
-                e @ (CompactionPlanningError::InvalidDatasetKind(_)
-                | CompactionPlanningError::Internal(_)) => PullError::Internal(e.int_err()),
-            })?;
-
-        target.detach_from_transaction();
-        Ok((target, plan))
     }
 
     /// Resets the derivative to metadata, returning the heads before and
-    /// after, or `None` when there was nothing to reset.
+    /// after, or `None` when there was nothing to reset. Resetting drops the
+    /// derivative's data, so the job checks the right to maintain the
+    /// dataset, beyond the write the pull needs
     async fn reset_to_metadata(
         &self,
         target_handle: &odf::DatasetHandle,
     ) -> Result<Option<(odf::Multihash, odf::Multihash)>, PullError> {
-        let (target, plan) =
-            transaction!(|dataset_registry: Arc<dyn DatasetRegistry>,
-                          dataset_operation_guard: Arc<dyn DatasetOperationGuard>,
-                          principal: Arc<Principal>| {
-                self.plan_reset_to_metadata(
-                    dataset_registry.as_ref(),
-                    dataset_operation_guard.as_ref(),
-                    &principal,
-                    target_handle,
-                )
-                .await?
-            });
-
-        // Merged with no transaction open, then committed in a transaction of its own
-        match self
-            .compaction_executor
-            .execute(target, plan, None)
-            .await
-            .map_err(|e| match e {
-                CompactionExecutionError::Internal(e) => PullError::Internal(e),
-            })? {
-            CompactionResult::NothingToDo => Ok(None),
-            CompactionResult::Success {
+        let options = CompactionOptions {
+            keep_metadata_only: true,
+            ..Default::default()
+        };
+        match self.compaction_job.run(target_handle, options, None).await {
+            Ok(CompactionResult::NothingToDo) => Ok(None),
+            Ok(CompactionResult::Success {
                 old_head, new_head, ..
-            } => {
-                self.update_head(target_handle, &old_head, &new_head)
-                    .await?;
-                Ok(Some((old_head, new_head)))
-            }
+            }) => Ok(Some((old_head, new_head))),
+            Err(CompactionError::NotFound(e)) => Err(PullError::NotFound(e)),
+            Err(
+                CompactionError::Access(e)
+                | CompactionError::Planning(CompactionPlanningError::Access(e)),
+            ) => Err(PullError::Access(e)),
+            Err(CompactionError::RefCASFailed(e)) => Err(PullError::RefMoved(e)),
+            Err(CompactionError::Internal(e)) => Err(PullError::Internal(e)),
+            Err(
+                e @ (CompactionError::Planning(
+                    CompactionPlanningError::InvalidDatasetKind(_)
+                    | CompactionPlanningError::Internal(_),
+                )
+                | CompactionError::Execution(_)),
+            ) => Err(PullError::Internal(e.int_err())),
+        }
+    }
+
+    fn into_pull_error(error: TransformJobError) -> PullError {
+        match error {
+            TransformJobError::NotFound(e) => PullError::NotFound(e),
+            TransformJobError::Access(e) => PullError::Access(e),
+            TransformJobError::RefMoved(e) => PullError::RefMoved(e),
+            TransformJobError::Elaborate(e) => TransformError::from(e).into(),
+            TransformJobError::Execute(e) => TransformError::from(e).into(),
+            TransformJobError::Internal(e) => PullError::Internal(e),
         }
     }
 
@@ -344,31 +164,28 @@ impl PullTransformJob {
     /// offsets and the increment stay the transform's own: the reset rewrote
     /// history, so no interval spans both
     fn combine_with_reset(
-        maybe_reset_heads: Option<(odf::Multihash, odf::Multihash)>,
+        old_head: odf::Multihash,
+        reset_head: odf::Multihash,
         transform_result: TransformResult,
     ) -> TransformResult {
-        match (maybe_reset_heads, transform_result) {
-            (
-                Some((old_head, _)),
-                TransformResult::Updated {
-                    new_head,
-                    new_offset_interval,
-                    increment,
-                    ..
-                },
-            ) => TransformResult::Updated {
+        match transform_result {
+            TransformResult::Updated {
+                new_head,
+                new_offset_interval,
+                increment,
+                ..
+            } => TransformResult::Updated {
                 old_head,
                 new_head,
                 new_offset_interval,
                 increment,
             },
-            (Some((old_head, new_head)), TransformResult::UpToDate) => TransformResult::Updated {
+            TransformResult::UpToDate => TransformResult::Updated {
                 old_head,
-                new_head,
+                new_head: reset_head,
                 new_offset_interval: None,
                 increment: odf::dataset::MetadataChainIncrementInterval::default(),
             },
-            (None, transform_result) => transform_result,
         }
     }
 }

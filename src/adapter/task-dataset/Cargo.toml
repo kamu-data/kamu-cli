@@ -57,7 +57,11 @@ container-runtime = { workspace = true }
 kamu = { workspace = true, features = [
     "testing",
 ] }
+kamu-accounts = { workspace = true }
 kamu-core = { workspace = true, features = [
+    "testing",
+] }
+kamu-datasets = { workspace = true, features = [
     "testing",
 ] }
 kamu-datasets-inmem = { workspace = true }

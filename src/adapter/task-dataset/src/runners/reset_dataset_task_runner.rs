@@ -9,10 +9,8 @@
 
 use std::sync::Arc;
 
-use database_common_macros::transactional_method1;
 use internal_error::InternalError;
-use kamu_core::{ResetExecutionError, ResetExecutor};
-use kamu_datasets::{DatasetRegistry, DatasetRegistryExt};
+use kamu_core::{ResetError, ResetExecutionError, ResetJob, ResetPlanningError};
 use kamu_task_system::*;
 
 use super::task_reference_update::{
@@ -21,7 +19,12 @@ use super::task_reference_update::{
     ref_update_not_allowed_outcome,
 };
 use super::task_span_outcome::TaskSpanOutcome;
-use crate::{TaskDefinitionDatasetReset, TaskErrorDatasetReset, TaskResultDatasetReset};
+use crate::{
+    DatasetResetOldHeadMismatch,
+    TaskDefinitionDatasetReset,
+    TaskErrorDatasetReset,
+    TaskResultDatasetReset,
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -31,8 +34,7 @@ use crate::{TaskDefinitionDatasetReset, TaskErrorDatasetReset, TaskResultDataset
     task_type: TaskDefinitionDatasetReset::TASK_TYPE,
 })]
 pub struct ResetDatasetTaskRunner {
-    catalog: dill::Catalog,
-    reset_executor: Arc<dyn ResetExecutor>,
+    reset_job: Arc<dyn ResetJob>,
 }
 
 #[common_macros::method_names_consts]
@@ -42,60 +44,61 @@ impl ResetDatasetTaskRunner {
         &self,
         task_reset: TaskDefinitionDatasetReset,
     ) -> Result<TaskOutcome, InternalError> {
-        let outcome = self.run_reset_job(task_reset).await;
+        let target = &task_reset.dataset_handle;
+        let outcome = match self
+            .reset_job
+            .run(
+                target,
+                task_reset.new_head_hash.as_ref(),
+                task_reset.old_head_hash.as_ref(),
+            )
+            .await
+        {
+            Ok(reset_result) => Ok(TaskOutcome::Success(
+                TaskResultDatasetReset { reset_result }.into_task_result(),
+            )),
+            Err(e) => Self::failed_outcome(target, e),
+        };
         TaskSpanOutcome::record(&outcome);
         outcome
     }
 
-    #[transactional_method1(dataset_registry: Arc<dyn DatasetRegistry>)]
-    async fn run_reset_job(
-        &self,
-        task_reset: TaskDefinitionDatasetReset,
+    fn failed_outcome(
+        target: &odf::DatasetHandle,
+        error: ResetError,
     ) -> Result<TaskOutcome, InternalError> {
-        let Some(target) = dataset_registry
-            .try_get_dataset_by_ref(&task_reset.dataset_handle.as_local_ref())
-            .await?
-        else {
-            return Ok(dataset_deleted_outcome(&task_reset.dataset_handle));
-        };
+        use odf::dataset::SetChainRefError as E;
 
-        let reset_result_maybe = self
-            .reset_executor
-            .execute(target, task_reset.reset_plan)
-            .await;
-
-        match reset_result_maybe {
-            Ok(reset_result) => Ok(TaskOutcome::Success(
-                TaskResultDatasetReset { reset_result }.into_task_result(),
-            )),
-            Err(err) => match err {
-                ResetExecutionError::SetReferenceFailed(
-                    odf::dataset::SetChainRefError::BlockNotFound(_),
-                ) => Ok(TaskOutcome::Failed(
+        match error {
+            ResetError::NotFound(_) => Ok(dataset_deleted_outcome(target)),
+            ResetError::Planning(ResetPlanningError::OldHeadMismatch(e)) => {
+                tracing::warn!(error = ?e, error_msg = %e, "The dataset is not at the expected old head");
+                Ok(TaskOutcome::Failed(
+                    TaskErrorDatasetReset::OldHeadMismatch(DatasetResetOldHeadMismatch {
+                        expected_head: e.old_head,
+                        actual_head: e.current_head,
+                    })
+                    .into_task_error(),
+                ))
+            }
+            ResetError::Execution(ResetExecutionError::SetReferenceFailed(E::BlockNotFound(_))) => {
+                Ok(TaskOutcome::Failed(
                     TaskErrorDatasetReset::ResetHeadNotFound.into_task_error(),
-                )),
-                ResetExecutionError::SetReferenceFailed(
-                    odf::dataset::SetChainRefError::CASFailed(e),
-                ) => Ok(ref_moved_outcome(
-                    task_reset.dataset_handle.id,
-                    e.reference.clone(),
-                    Some(e),
-                )),
-                ResetExecutionError::SetReferenceFailed(
-                    odf::dataset::SetChainRefError::Access(e),
-                ) => Ok(ref_update_not_allowed_outcome(&e)),
-                err @ ResetExecutionError::SetReferenceFailed(
-                    odf::dataset::SetChainRefError::Internal(_),
-                ) => {
-                    tracing::error!(
-                        error = ?err,
-                        error_msg = %err,
-                        "Reset failed",
-                    );
-
-                    Ok(TaskOutcome::Failed(TaskError::empty_recoverable()))
-                }
-            },
+                ))
+            }
+            ResetError::Execution(ResetExecutionError::SetReferenceFailed(E::CASFailed(e))) => Ok(
+                ref_moved_outcome(target.id.clone(), e.reference.clone(), Some(e)),
+            ),
+            ResetError::Access(e)
+            | ResetError::Execution(ResetExecutionError::SetReferenceFailed(E::Access(e))) => {
+                Ok(ref_update_not_allowed_outcome(&e))
+            }
+            e @ (ResetError::Planning(ResetPlanningError::Internal(_))
+            | ResetError::Execution(ResetExecutionError::SetReferenceFailed(E::Internal(_)))) => {
+                tracing::error!(error = ?e, error_msg = %e, "Reset failed");
+                Ok(TaskOutcome::Failed(TaskError::empty_recoverable()))
+            }
+            ResetError::Internal(e) => Err(e),
         }
     }
 }

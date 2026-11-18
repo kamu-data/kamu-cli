@@ -51,7 +51,6 @@ async fn test_verify_data_consistency() {
 
     assert_matches!(
         harness
-            .verification_svc
             .verify(
                 VerificationRequest {
                     target: ResolvedDataset::from_created(&bar),
@@ -123,7 +122,6 @@ async fn test_verify_data_consistency() {
     // Check verification succeeds
     assert_matches!(
         harness
-            .verification_svc
             .verify(
                 VerificationRequest {
                     target: ResolvedDataset::from_created(&bar),
@@ -160,7 +158,7 @@ async fn test_verify_data_consistency() {
 
     // Check verification fails
     assert_matches!(
-        harness.verification_svc.verify(
+        harness.verify(
             VerificationRequest {
                 target: ResolvedDataset::from_created(&bar),
                 block_range: (None, None),
@@ -231,6 +229,7 @@ async fn test_verify_checkpoint_of_block_without_data() {
 struct VerifyHarness {
     base_repo_harness: BaseRepoHarness,
     verification_svc: Arc<dyn VerificationService>,
+    transform_planner: Arc<dyn TransformPlanner>,
 }
 
 impl VerifyHarness {
@@ -249,24 +248,37 @@ impl VerifyHarness {
         Self {
             base_repo_harness,
             verification_svc: catalog.get_one().unwrap(),
+            transform_planner: catalog.get_one().unwrap(),
+        }
+    }
+
+    /// Plans and runs the verification, as `VerifyJob` does
+    async fn verify(
+        &self,
+        request: VerificationRequest<ResolvedDataset>,
+        maybe_listener: Option<Arc<dyn VerificationListener>>,
+    ) -> VerificationResult {
+        let target = request.target.get_handle().clone();
+        match VerificationPlan::build(request, self.transform_planner.as_ref()).await {
+            Ok(plan) => self.verification_svc.verify(plan, maybe_listener).await,
+            Err(e) => VerificationResult::err(target, e),
         }
     }
 
     async fn verify_integrity(&self, target: ResolvedDataset) -> VerificationResult {
-        self.verification_svc
-            .verify(
-                VerificationRequest {
-                    target,
-                    block_range: (None, None),
-                    options: VerificationOptions {
-                        check_integrity: true,
-                        check_logical_hashes: true,
-                        replay_transformations: false,
-                    },
+        self.verify(
+            VerificationRequest {
+                target,
+                block_range: (None, None),
+                options: VerificationOptions {
+                    check_integrity: true,
+                    check_logical_hashes: true,
+                    replay_transformations: false,
                 },
-                None,
-            )
-            .await
+            },
+            None,
+        )
+        .await
     }
 
     /// Commits an `AddData` block that carries only a checkpoint with

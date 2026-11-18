@@ -12,12 +12,13 @@ use std::sync::Arc;
 use database_common::transaction;
 use futures::TryStreamExt as _;
 use kamu::domain::{
-    CompactDatasetUseCase,
+    CompactionJob,
+    CompactionMultiListener,
     CompactionOptions,
     VerificationMultiListener,
     VerificationOptions,
     VerificationRequest,
-    VerifyDatasetUseCase,
+    VerifyJob,
 };
 use kamu::utils::datasets_filtering::filter_datasets_by_local_pattern;
 use kamu_datasets::DatasetRegistry;
@@ -38,7 +39,8 @@ use crate::{
 pub struct CompactCommand {
     interact: Arc<Interact>,
     catalog: dill::Catalog,
-    compact_dataset_use_case: Arc<dyn CompactDatasetUseCase>,
+    compaction_job: Arc<dyn CompactionJob>,
+    verify_job: Arc<dyn VerifyJob>,
 
     #[dill::component(explicit)]
     dataset_ref_patterns: Vec<odf::DatasetRefPattern>,
@@ -60,18 +62,16 @@ pub struct CompactCommand {
 }
 
 impl CompactCommand {
-    async fn verify_dataset(
-        verify_dataset_use_case: &dyn VerifyDatasetUseCase,
-        dataset_handle: &odf::DatasetHandle,
-    ) -> Result<(), CLIError> {
+    async fn verify_dataset(&self, dataset_handle: &odf::DatasetHandle) -> Result<(), CLIError> {
         let progress = VerificationMultiProgress::new();
         let listener = Arc::new(progress.clone());
         let draw_thread = std::thread::spawn(move || {
             progress.draw();
         });
 
-        let result = verify_dataset_use_case
-            .execute(
+        let result = self
+            .verify_job
+            .run(
                 VerificationRequest {
                     target: dataset_handle.clone(),
                     block_range: (None, None),
@@ -122,12 +122,7 @@ impl Command for CompactCommand {
 
         if self.is_verify {
             for hdl in &dataset_handles {
-                let verification = transaction!(
-                    |verifier: Arc<dyn VerifyDatasetUseCase>| -> Result<_, CLIError> {
-                        Self::verify_dataset(verifier.as_ref(), hdl).await
-                    }
-                );
-                if let Err(err) = verification {
+                if let Err(err) = self.verify_dataset(hdl).await {
                     eprintln!(
                         "{}",
                         console::style("Cannot perform compaction, dataset is invalid".to_string())
@@ -145,31 +140,27 @@ impl Command for CompactCommand {
             progress.draw();
         });
 
-        let compaction_results = self
-            .compact_dataset_use_case
-            .execute_multi(
-                dataset_handles,
-                CompactionOptions {
-                    max_slice_size: Some(self.max_slice_size),
-                    max_slice_records: Some(self.max_slice_records),
-                    keep_metadata_only: self.keep_metadata_only,
-                },
-                Some(listener.clone()),
-            )
-            .await;
+        let options = CompactionOptions {
+            max_slice_size: Some(self.max_slice_size),
+            max_slice_records: Some(self.max_slice_records),
+            keep_metadata_only: self.keep_metadata_only,
+        };
 
-        let total_results = compaction_results.len();
+        // Each dataset is committed as soon as it is compacted
+        let mut errors = Vec::new();
+        for hdl in &dataset_handles {
+            if let Err(e) = self
+                .compaction_job
+                .run(hdl, options.clone(), listener.begin_compact(hdl))
+                .await
+            {
+                errors.push((e, format!("Failed to compact {}", hdl.as_local_ref())));
+            }
+        }
+        let total_results = dataset_handles.len();
 
         listener.finish();
         draw_thread.join().unwrap();
-
-        let errors: Vec<_> = compaction_results
-            .into_iter()
-            .filter_map(|response| match response.result {
-                Ok(_) => None,
-                Err(e) => Some((e, format!("Failed to compact {}", response.dataset_ref))),
-            })
-            .collect();
 
         if errors.is_empty() {
             eprintln!(

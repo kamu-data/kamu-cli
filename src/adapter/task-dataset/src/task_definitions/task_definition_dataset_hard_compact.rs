@@ -7,15 +7,14 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_core::CompactionPlan;
-use kamu_datasets::ResolvedDataset;
+use kamu_core::CompactionOptions;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 kamu_task_system::task_definition_struct! {
     pub struct TaskDefinitionDatasetHardCompact {
-        pub target: ResolvedDataset,
-        pub compaction_plan: CompactionPlan,
+        pub target: odf::DatasetHandle,
+        pub options: CompactionOptions,
     }
     => "dev.kamu.tasks.dataset.hard_compact"
 }

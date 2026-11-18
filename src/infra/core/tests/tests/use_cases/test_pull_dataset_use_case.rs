@@ -14,7 +14,7 @@ use std::sync::Arc;
 use chrono::{DateTime, TimeZone, Utc};
 use container_runtime::{ContainerRuntime, ContainerRuntimeConfig};
 use internal_error::{ErrorIntoInternal, InternalError};
-use kamu::testing::{BaseUseCaseHarness, BaseUseCaseHarnessOptions, RacingDatasetUpdateSteps};
+use kamu::testing::{BaseUseCaseHarness, BaseUseCaseHarnessOptions};
 use kamu::*;
 use kamu_core::engine::TransformResponseExt;
 use kamu_core::testing::{MockIngestIteration, ReportedHeads};
@@ -64,7 +64,7 @@ async fn test_pull_ingest_up_to_date_keeps_pull_aliases() {
         .with_permission_checker_mock(
             MockDatasetPermissionChecker::new().make_expect_classify_datasets_by_allowance(
                 DatasetPermission::Write,
-                1,
+                CHECKED_BY_PLAN_AND_JOB,
                 HashSet::from_iter([alias_foo.clone()]),
             ),
         )
@@ -111,7 +111,7 @@ async fn test_pull_transform_up_to_date_keeps_pull_aliases() {
             MockDatasetPermissionChecker::new()
                 .make_expect_classify_datasets_by_allowance(
                     DatasetPermission::Write,
-                    1,
+                    CHECKED_BY_PLAN_AND_JOB,
                     HashSet::from_iter([alias_bar.clone()]),
                 )
                 .make_expect_classify_datasets_by_allowance(
@@ -230,12 +230,12 @@ async fn test_pull_transform_with_real_planner_and_executor_commits_head() {
             MockDatasetPermissionChecker::new()
                 .make_expect_classify_datasets_by_allowance(
                     DatasetPermission::Write,
-                    1,
+                    CHECKED_BY_PLAN_AND_JOB,
                     HashSet::from_iter([alias_bar.clone()]),
                 )
                 .make_expect_classify_datasets_by_allowance(
                     DatasetPermission::Read,
-                    1,
+                    CHECKED_BY_PLAN_AND_JOB,
                     HashSet::from_iter([alias_foo.clone()]),
                 ),
         )
@@ -449,7 +449,7 @@ async fn test_pull_ingest_unparsable_source_fails_unrecoverably() {
             .with_permission_checker_mock(
                 MockDatasetPermissionChecker::new().make_expect_classify_datasets_by_allowance(
                     DatasetPermission::Write,
-                    1,
+                    CHECKED_BY_PLAN_AND_JOB,
                     HashSet::from_iter([alias_foo.clone()]),
                 ),
             )
@@ -671,7 +671,7 @@ async fn test_pull_transform_failing_after_reset_reports_reset_heads() {
     let reset_heads = ReportedHeads::default();
 
     let harness = PullUseCaseHarness::new(
-        PullUseCaseHarnessMocks::for_transform_resetting(&alias_foo, &alias_bar, true)
+        PullUseCaseHarnessMocks::for_transform_resetting(&alias_foo, &alias_bar, true, 2)
             .with_transform_elaboration_mock(
                 MockTransformPlanner::new()
                     .make_expect_elaborate_transform_diverged(alias_bar.clone())
@@ -750,7 +750,7 @@ async fn test_pull_transform_diverged_input_without_maintain_right_is_not_reset(
     let alias_bar = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("bar"));
 
     let harness = PullUseCaseHarness::new(
-        PullUseCaseHarnessMocks::for_transform_resetting(&alias_foo, &alias_bar, false)
+        PullUseCaseHarnessMocks::for_transform_resetting(&alias_foo, &alias_bar, false, 1)
             .with_transform_elaboration_mock(
                 MockTransformPlanner::new()
                     .make_expect_elaborate_transform_diverged(alias_bar.clone()),
@@ -779,7 +779,7 @@ async fn test_pull_transform_diverged_input_resets_and_retransforms() {
     let transform_heads = ReportedHeads::default();
 
     let harness = PullUseCaseHarness::new(
-        PullUseCaseHarnessMocks::for_transform_resetting(&alias_foo, &alias_bar, true)
+        PullUseCaseHarnessMocks::for_transform_resetting(&alias_foo, &alias_bar, true, 2)
             .with_transform_elaboration_mock(
                 MockTransformPlanner::new()
                     .make_expect_elaborate_transform_diverged(alias_bar.clone())
@@ -824,7 +824,7 @@ async fn test_pull_transform_reset_then_up_to_date_reports_updated() {
     let reset_heads = ReportedHeads::default();
 
     let harness = PullUseCaseHarness::new(
-        PullUseCaseHarnessMocks::for_transform_resetting(&alias_foo, &alias_bar, true)
+        PullUseCaseHarnessMocks::for_transform_resetting(&alias_foo, &alias_bar, true, 2)
             .with_transform_elaboration_mock(
                 MockTransformPlanner::new()
                     .make_expect_elaborate_transform_diverged(alias_bar.clone())
@@ -1029,7 +1029,7 @@ async fn test_pull_sync_transfer_failure_is_reported_and_commits_nothing() {
         .with_permission_checker_mock(
             MockDatasetPermissionChecker::new().make_expect_classify_datasets_by_allowance(
                 DatasetPermission::Write,
-                1,
+                CHECKED_BY_PLAN_AND_JOB,
                 HashSet::from_iter([alias_foo.clone()]),
             ),
         )
@@ -1085,7 +1085,8 @@ async fn test_pull_multi_recursive() {
             MockDatasetPermissionChecker::new()
                 .make_expect_classify_datasets_by_allowance(
                     DatasetPermission::Write,
-                    1,
+                    // One batch for the plan, then one check per job
+                    1 + 4,
                     HashSet::from_iter([
                         alias_foo.clone(),
                         alias_bar.clone(),
@@ -1232,7 +1233,8 @@ async fn test_pull_all_owned() {
             MockDatasetPermissionChecker::new()
                 .make_expect_classify_datasets_by_allowance(
                     DatasetPermission::Write,
-                    1,
+                    // One batch for the plan, then one check per job
+                    1 + 5,
                     HashSet::from_iter([
                         alias_foo.clone(),
                         alias_bar.clone(),
@@ -1454,7 +1456,8 @@ async fn test_pull_recursive_stops_after_depth_with_failed_job() {
                 MockDatasetPermissionChecker::new()
                     .make_expect_classify_datasets_by_allowance(
                         DatasetPermission::Write,
-                        1,
+                        // The plan, then the job of `foo` only
+                        CHECKED_BY_PLAN_AND_JOB,
                         HashSet::from_iter([alias_foo.clone(), alias_bar.clone()]),
                     )
                     .make_expect_classify_datasets_by_allowance(
@@ -1643,7 +1646,7 @@ async fn test_pull_transform_reset_with_nothing_to_compact_keeps_diverged_error(
     let alias_bar = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("bar"));
 
     let harness = PullUseCaseHarness::new(
-        PullUseCaseHarnessMocks::for_transform_resetting(&alias_foo, &alias_bar, true)
+        PullUseCaseHarnessMocks::for_transform_resetting(&alias_foo, &alias_bar, true, 1)
             .with_transform_elaboration_mock(
                 MockTransformPlanner::new()
                     .make_expect_elaborate_transform_diverged(alias_bar.clone()),
@@ -1681,7 +1684,7 @@ async fn test_pull_transform_reset_ref_moved_concurrently() {
 
     // The transform is not elaborated again after the lost reset
     let harness = PullUseCaseHarness::new(
-        PullUseCaseHarnessMocks::for_transform_resetting(&alias_foo, &alias_bar, true)
+        PullUseCaseHarnessMocks::for_transform_resetting(&alias_foo, &alias_bar, true, 1)
             .with_transform_elaboration_mock(
                 MockTransformPlanner::new()
                     .make_expect_elaborate_transform_diverged(alias_bar.clone()),
@@ -1763,16 +1766,16 @@ async fn test_pull_sync_into_dataset_deleted_during_sync_is_not_found() {
 
     let synced_heads = ReportedHeads::default();
 
-    let harness =
-        PullUseCaseHarness::new(PullUseCaseHarnessMocks::default().for_sync_into_existing(
+    let harness = PullUseCaseHarness::new(
+        PullUseCaseHarnessMocks::default().for_sync_into_existing_deleted_meanwhile(
             &alias_foo,
             &remote_ref,
             &synced_heads,
-        ));
+        ),
+    );
     let foo = harness.create_root_dataset(&alias_foo).await;
     let synced_head = harness.append_unreferenced_block(&foo, "synced").await;
     synced_heads.set(&foo.head, &synced_head);
-    harness.delete_dataset_before_next_update();
 
     let (pull_response, events) = harness.pull_remote_recording(&alias_foo, &remote_ref).await;
 
@@ -1848,7 +1851,6 @@ struct PullUseCaseHarness {
     catalog: dill::Catalog,
     use_case: Arc<dyn PullDatasetUseCase>,
     dependency_graph_indexer: Arc<DependencyGraphIndexer>,
-    racing_update_steps: Arc<RacingDatasetUpdateSteps>,
     remote_tmp_dir: TempDir,
 }
 
@@ -1870,8 +1872,12 @@ impl PullUseCaseHarness {
 
         let mut b = dill::CatalogBuilder::new_chained(base_use_case_harness.catalog());
         kamu_datasets_inmem::register_dependencies(&mut b);
-        RacingDatasetUpdateSteps::register(&mut b);
         b.add::<PullDatasetUseCaseImpl>()
+            .add::<PollingIngestJobImpl>()
+            .add::<TransformJobImpl>()
+            .add::<CompactionJobImpl>()
+            .add::<SyncFromJobImpl>()
+            .add::<LocalSyncCommitterImpl>()
             .add::<PullRequestPlannerImpl>()
             .add::<DatasetUpdateKindResolverImpl>()
             .add::<DatasetPullSourceResolverImpl>()
@@ -1992,7 +1998,6 @@ impl PullUseCaseHarness {
             base_use_case_harness,
             use_case: catalog.get_one().unwrap(),
             dependency_graph_indexer: catalog.get_one().unwrap(),
-            racing_update_steps: catalog.get_one().unwrap(),
             catalog,
             remote_tmp_dir,
         }
@@ -2005,10 +2010,6 @@ impl PullUseCaseHarness {
             .get_one::<RacingDatasetReferenceUpdater>()
             .unwrap()
             .move_reference_before_next_update(&self.catalog, concurrent_head);
-    }
-
-    fn delete_dataset_before_next_update(&self) {
-        self.racing_update_steps.delete_dataset_before_next_update();
     }
 
     /// A root dataset polling a CSV file in the harness directory that holds
@@ -2283,6 +2284,10 @@ impl TransformPlanner for TransformPlannerWithMockedElaboration {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Permission checks of a dataset whose job runs: the pull checks it when it
+/// plans, and the job again when it runs
+const CHECKED_BY_PLAN_AND_JOB: usize = 2;
+
 struct PullUseCaseHarnessMocks {
     mock_dataset_permission_checker: MockDatasetPermissionChecker,
     mock_polling_ingest_service: MockPollingIngestService,
@@ -2404,11 +2409,13 @@ impl PullUseCaseHarnessMocks {
         alias_foo: &odf::DatasetAlias,
         iterations: Vec<MockIngestIteration>,
     ) -> Self {
+        // The pull checks `foo` when it plans, and each iteration's job again
+        let checks_of_foo = 1 + iterations.len().max(1);
         Self::default()
             .with_permission_checker_mock(
                 MockDatasetPermissionChecker::new().make_expect_classify_datasets_by_allowance(
                     DatasetPermission::Write,
-                    1,
+                    checks_of_foo,
                     HashSet::from_iter([alias_foo.clone()]),
                 ),
             )
@@ -2424,7 +2431,7 @@ impl PullUseCaseHarnessMocks {
             .with_permission_checker_mock(
                 MockDatasetPermissionChecker::new().make_expect_classify_datasets_by_allowance(
                     DatasetPermission::Write,
-                    1,
+                    CHECKED_BY_PLAN_AND_JOB,
                     HashSet::from_iter([alias_foo.clone()]),
                 ),
             )
@@ -2451,13 +2458,14 @@ impl PullUseCaseHarnessMocks {
             )
     }
 
-    /// Expects one pull of `bar` derived from `foo`, authorized
+    /// Expects one pull of `bar` derived from `foo`, authorized. The mocked
+    /// elaboration reads no inputs, so only the pull checks `foo`
     fn for_transform(alias_foo: &odf::DatasetAlias, alias_bar: &odf::DatasetAlias) -> Self {
         Self::default().with_permission_checker_mock(
             MockDatasetPermissionChecker::new()
                 .make_expect_classify_datasets_by_allowance(
                     DatasetPermission::Write,
-                    1,
+                    CHECKED_BY_PLAN_AND_JOB,
                     HashSet::from_iter([alias_bar.clone()]),
                 )
                 .make_expect_classify_datasets_by_allowance(
@@ -2469,11 +2477,13 @@ impl PullUseCaseHarnessMocks {
     }
 
     /// Like [`Self::for_transform`], for a pull that resets `bar` to metadata,
-    /// with the right to maintain `bar` granted or not
+    /// with the right to maintain `bar` granted or not, and runs the transform
+    /// job `transform_runs` times
     fn for_transform_resetting(
         alias_foo: &odf::DatasetAlias,
         alias_bar: &odf::DatasetAlias,
         maintain_granted: bool,
+        transform_runs: usize,
     ) -> Self {
         let maintainable = if maintain_granted {
             HashSet::from_iter([alias_bar.clone()])
@@ -2486,7 +2496,7 @@ impl PullUseCaseHarnessMocks {
             MockDatasetPermissionChecker::new()
                 .make_expect_classify_datasets_by_allowance(
                     DatasetPermission::Write,
-                    1,
+                    1 + transform_runs,
                     HashSet::from_iter([alias_bar.clone()]),
                 )
                 .make_expect_classify_datasets_by_allowance(
@@ -2671,6 +2681,54 @@ impl PullUseCaseHarnessMocks {
     }
 
     /// Expects one authorized pull of the existing `foo` from `remote_ref`,
+    /// whose transfer deletes `foo`'s storage, as another writer deleting the
+    /// dataset would
+    fn for_sync_into_existing_deleted_meanwhile(
+        self,
+        alias_foo: &odf::DatasetAlias,
+        remote_ref: &odf::DatasetRefRemote,
+        synced_heads: &ReportedHeads,
+    ) -> Self {
+        let alias = alias_foo.clone();
+        let src = remote_ref.clone();
+        let synced_heads = synced_heads.clone();
+        let mut mock_sync_service = MockSyncService::new();
+        mock_sync_service
+            .expect_sync_from()
+            .withf(move |request, _, _| {
+                request.src == src
+                    && matches!(
+                        &request.dst,
+                        SyncFromTarget::Existing { dataset, .. } if dataset.get_alias() == &alias
+                    )
+            })
+            .times(1)
+            .returning(move |request, _, _| {
+                let SyncFromTarget::Existing {
+                    dataset,
+                    expected_head,
+                } = request.dst
+                else {
+                    unreachable!()
+                };
+                std::fs::remove_dir_all(dataset.get_storage_internal_url().to_file_path().unwrap())
+                    .unwrap();
+                Ok(SyncFromTransfer::Transferred(SyncFromTransferred {
+                    target: SyncFromTransferredTarget::Existing {
+                        dataset,
+                        expected_head,
+                    },
+                    new_head: synced_heads.get().1,
+                    num_blocks: 1,
+                    increment: odf::dataset::MetadataChainIncrementInterval::default(),
+                }))
+            });
+
+        self.with_write_permission_on(alias_foo)
+            .with_sync_mock(mock_sync_service)
+    }
+
+    /// Expects one authorized pull of the existing `foo` from `remote_ref`,
     /// whose transfer fails with `make_error()`
     fn for_sync_into_existing_failing(
         self,
@@ -2686,7 +2744,7 @@ impl PullUseCaseHarnessMocks {
         self.with_permission_checker_mock(
             MockDatasetPermissionChecker::new().make_expect_classify_datasets_by_allowance(
                 DatasetPermission::Write,
-                1,
+                CHECKED_BY_PLAN_AND_JOB,
                 HashSet::from_iter([alias_foo.clone()]),
             ),
         )

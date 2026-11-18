@@ -7,8 +7,10 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+mod local_sync_committer_impl;
 mod sync_request_builder;
 mod sync_service_impl;
 
+pub use local_sync_committer_impl::*;
 pub use sync_request_builder::*;
 pub use sync_service_impl::*;

@@ -10,15 +10,15 @@
 use std::sync::Arc;
 
 use database_common::transaction;
-use kamu::DatasetUpdateStepsImpl;
+use kamu::LocalSyncCommitterImpl;
 use kamu_core::*;
 use kamu_datasets::{DatasetRegistry, DatasetRegistryExt};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Pulls into a local dataset through the update steps the pull use case
-/// runs: the target is resolved in a transaction, the transfer runs with none
-/// open, and the commit runs in a transaction of its own
+/// Pulls into a local dataset in the steps `SyncFromJob` runs: the target is
+/// resolved in a transaction, the transfer runs with none open, and the commit
+/// runs in a transaction of its own
 pub struct LocalSyncHelper {
     catalog: dill::Catalog,
 }
@@ -27,7 +27,7 @@ impl LocalSyncHelper {
     pub fn new(catalog: &dill::Catalog) -> Self {
         Self {
             catalog: dill::CatalogBuilder::new_chained(catalog)
-                .add::<DatasetUpdateStepsImpl>()
+                .add::<LocalSyncCommitterImpl>()
                 .build(),
         }
     }
@@ -54,11 +54,14 @@ impl LocalSyncHelper {
             .pull_local_target(dst_ref.clone(), create_if_not_exists)
             .await?;
 
-        let dst = self
-            .update_steps()
-            .resolve_sync_target(&target)
-            .await?
-            .ok_or_else(|| DatasetAnyRefUnresolvedError::new(dst_ref))?;
+        let dst = transaction!(|dataset_registry: Arc<dyn DatasetRegistry>| {
+            let dst = target
+                .resolve_sync_target(dataset_registry.as_ref())
+                .await?
+                .ok_or_else(|| DatasetAnyRefUnresolvedError::new(dst_ref))?;
+            dst.detach_from_transaction();
+            dst
+        });
 
         Ok(SyncFromRequest { src: src_ref, dst })
     }
@@ -69,10 +72,14 @@ impl LocalSyncHelper {
         options: SyncOptions,
         listener: Option<Arc<dyn SyncListener>>,
     ) -> Result<SyncResult, SyncError> {
-        self.update_steps()
-            .transfer_and_commit_sync(request, options, listener)
-            .await
-            .map(|maybe_result| maybe_result.expect("The sync target must not be deleted"))
+        let sync_service = self.catalog.get_one::<dyn SyncService>().unwrap();
+        match sync_service.sync_from(request, options, listener).await? {
+            SyncFromTransfer::UpToDate => Ok(SyncResult::UpToDate),
+            SyncFromTransfer::Transferred(transferred) => Ok(self
+                .commit(transferred)
+                .await?
+                .expect("The sync target must not be deleted")),
+        }
     }
 
     /// Commits a transfer in a transaction of its own; `None` when the
@@ -81,7 +88,11 @@ impl LocalSyncHelper {
         &self,
         transferred: SyncFromTransferred,
     ) -> Result<Option<SyncResult>, SyncError> {
-        self.update_steps().commit_sync(transferred).await
+        transaction!(
+            |committer: Arc<dyn LocalSyncCommitter>| -> Result<_, SyncError> {
+                committer.commit(transferred).await
+            }
+        )
     }
 
     /// Resolves `dst_ref` to a pull target the way the pull planner does
@@ -103,10 +114,6 @@ impl LocalSyncHelper {
             }
             (None, _) => Err(DatasetAnyRefUnresolvedError::new(dst_ref).into()),
         }
-    }
-
-    fn update_steps(&self) -> Arc<dyn DatasetUpdateSteps> {
-        self.catalog.get_one().unwrap()
     }
 }
 

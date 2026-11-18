@@ -43,7 +43,8 @@ async fn test_push_success() {
     let mock_permission_checker = MockDatasetPermissionChecker::new()
         .make_expect_classify_datasets_by_allowance(
             DatasetPermission::Read,
-            2,
+            // Two pushes, each checked by its plan and its job
+            2 * (1 + 1),
             HashSet::from_iter([alias_foo.clone()]),
         );
 
@@ -123,7 +124,8 @@ async fn test_push_success_without_saving_alias() {
     let mock_permission_checker = MockDatasetPermissionChecker::new()
         .make_expect_classify_datasets_by_allowance(
             DatasetPermission::Read,
-            1,
+            // The plan's check, then the job's
+            1 + 1,
             HashSet::from_iter([alias_foo.clone()]),
         );
 
@@ -170,7 +172,8 @@ async fn test_push_multiple_success() {
     let mock_permission_checker = MockDatasetPermissionChecker::new()
         .make_expect_classify_datasets_by_allowance(
             DatasetPermission::Read,
-            1,
+            // The plan's batch, then each pushed dataset's job
+            1 + 2,
             HashSet::from_iter([alias_foo.clone(), alias_bar.clone()]),
         );
 
@@ -245,7 +248,8 @@ async fn test_push_multiple_mixed_authorization_pushes_readable_datasets() {
     let mock_permission_checker = MockDatasetPermissionChecker::new()
         .make_expect_classify_datasets_by_allowance(
             DatasetPermission::Read,
-            1,
+            // The plan's batch, then the job of `bar`, the only dataset pushed
+            1 + 1,
             HashSet::from_iter([alias_bar.clone()]), // 1 of 3 is authorized
         );
 
@@ -322,7 +326,8 @@ async fn test_push_multiple_mixed_target_failures_pushes_resolved_datasets() {
     let mock_permission_checker = MockDatasetPermissionChecker::new()
         .make_expect_classify_datasets_by_allowance(
             DatasetPermission::Read,
-            1,
+            // The plan's batch, then the jobs of `foo` and `baz`; `bar` has no target
+            1 + 2,
             HashSet::from_iter([alias_foo.clone(), alias_bar.clone(), alias_baz.clone()]),
         );
 
@@ -377,7 +382,8 @@ async fn test_push_reports_unsaved_alias_as_the_dataset_error() {
     let mock_permission_checker = MockDatasetPermissionChecker::new()
         .make_expect_classify_datasets_by_allowance(
             DatasetPermission::Read,
-            1,
+            // The plan's check, then the job's
+            1 + 1,
             HashSet::from_iter([alias_foo.clone()]),
         );
 
@@ -416,7 +422,8 @@ async fn test_push_reports_success_to_the_listener_once() {
     let mock_permission_checker = MockDatasetPermissionChecker::new()
         .make_expect_classify_datasets_by_allowance(
             DatasetPermission::Read,
-            1,
+            // The plan's check, then the job's
+            1 + 1,
             HashSet::from_iter([alias_foo.clone()]),
         );
 
@@ -478,6 +485,7 @@ impl PushUseCaseHarness {
         let mut b = dill::CatalogBuilder::new_chained(base_use_case_harness.catalog());
 
         b.add::<PushDatasetUseCaseImpl>()
+            .add::<SyncToJobImpl>()
             .add::<PushRequestPlannerImpl>()
             .add::<SyncServiceImpl>()
             .add::<IpfsServiceImpl>()
