@@ -9,7 +9,7 @@
 
 use std::sync::Arc;
 
-use database_common_macros::transactional_method1;
+use database_common::transaction;
 use futures::TryStreamExt as _;
 use kamu::domain::{
     CompactDatasetUseCase,
@@ -60,20 +60,10 @@ pub struct CompactCommand {
 }
 
 impl CompactCommand {
-    #[transactional_method1(dataset_registry: Arc<dyn DatasetRegistry>)]
-    async fn get_dataset_handles(&self) -> Result<Vec<odf::DatasetHandle>, CLIError> {
-        let dataset_handles = filter_datasets_by_local_pattern(
-            dataset_registry.as_ref(),
-            self.dataset_ref_patterns.clone(),
-        )
-        .try_collect()
-        .await?;
-
-        Ok(dataset_handles)
-    }
-
-    #[transactional_method1(verify_dataset_use_case: Arc<dyn VerifyDatasetUseCase>)]
-    async fn verify_dataset(&self, dataset_handle: &odf::DatasetHandle) -> Result<(), CLIError> {
+    async fn verify_dataset(
+        verify_dataset_use_case: &dyn VerifyDatasetUseCase,
+        dataset_handle: &odf::DatasetHandle,
+    ) -> Result<(), CLIError> {
         let progress = VerificationMultiProgress::new();
         let listener = Arc::new(progress.clone());
         let draw_thread = std::thread::spawn(move || {
@@ -111,7 +101,14 @@ impl Command for CompactCommand {
             ));
         }
 
-        let dataset_handles = self.get_dataset_handles().await?;
+        let dataset_handles = transaction!(|dataset_registry: Arc<dyn DatasetRegistry>| {
+            filter_datasets_by_local_pattern(
+                dataset_registry.as_ref(),
+                self.dataset_ref_patterns.clone(),
+            )
+            .try_collect::<Vec<_>>()
+            .await?
+        });
 
         self.interact.require_confirmation(format!(
             "{}\n  {}\n{}",
@@ -125,7 +122,12 @@ impl Command for CompactCommand {
 
         if self.is_verify {
             for hdl in &dataset_handles {
-                if let Err(err) = self.verify_dataset(hdl).await {
+                let verification = transaction!(
+                    |verifier: Arc<dyn VerifyDatasetUseCase>| -> Result<_, CLIError> {
+                        Self::verify_dataset(verifier.as_ref(), hdl).await
+                    }
+                );
+                if let Err(err) = verification {
                     eprintln!(
                         "{}",
                         console::style("Cannot perform compaction, dataset is invalid".to_string())

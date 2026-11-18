@@ -9,7 +9,7 @@
 
 use std::sync::Arc;
 
-use database_common::DatabaseTransactionRunner;
+use database_common::transaction;
 use kamu::DatasetUpdateStepsImpl;
 use kamu_core::*;
 use kamu_datasets::{DatasetRegistry, DatasetRegistryExt};
@@ -90,16 +90,11 @@ impl LocalSyncHelper {
         dst_ref: odf::DatasetRef,
         create_if_not_exists: bool,
     ) -> Result<PullLocalTarget, SyncError> {
-        let maybe_handle = DatabaseTransactionRunner::new(self.catalog.clone())
-            .transactional_with(|dataset_registry: Arc<dyn DatasetRegistry>| {
-                let dst_ref = dst_ref.clone();
-                async move {
-                    dataset_registry
-                        .try_resolve_dataset_handle_by_ref(&dst_ref)
-                        .await
-                }
-            })
-            .await?;
+        let maybe_handle = transaction!(|dataset_registry: Arc<dyn DatasetRegistry>| {
+            dataset_registry
+                .try_resolve_dataset_handle_by_ref(&dst_ref)
+                .await?
+        });
 
         match (maybe_handle, dst_ref.alias()) {
             (Some(handle), _) => Ok(PullLocalTarget::existing(handle)),

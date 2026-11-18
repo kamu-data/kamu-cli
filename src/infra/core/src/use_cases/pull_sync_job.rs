@@ -9,7 +9,7 @@
 
 use std::sync::Arc;
 
-use database_common_macros::transactional_method2;
+use database_common::transaction;
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu_core::*;
 use kamu_datasets::DatasetRegistry;
@@ -141,17 +141,27 @@ impl PullSyncJob {
         if options.add_aliases
             && let Some(SyncResult::Updated { old_head: None, .. }) = &sync_result
         {
-            self.store_pull_alias(&psi.local_target.as_local_ref(), &psi.remote_ref)
-                .await?;
+            transaction!(
+                |dataset_registry: Arc<dyn DatasetRegistry>,
+                 remote_alias_registry: Arc<dyn RemoteAliasesRegistry>| {
+                    Self::store_pull_alias(
+                        dataset_registry.as_ref(),
+                        remote_alias_registry.as_ref(),
+                        &psi.local_target.as_local_ref(),
+                        &psi.remote_ref,
+                    )
+                    .await?;
+                }
+            );
         }
 
         Ok(sync_result)
     }
 
     /// Records `remote_ref` as the pull alias of the dataset the sync created
-    #[transactional_method2(dataset_registry: Arc<dyn DatasetRegistry>, remote_alias_registry: Arc<dyn RemoteAliasesRegistry>)]
     async fn store_pull_alias(
-        &self,
+        dataset_registry: &dyn DatasetRegistry,
+        remote_alias_registry: &dyn RemoteAliasesRegistry,
         local_ref: &odf::DatasetRef,
         remote_ref: &odf::DatasetRefRemote,
     ) -> Result<(), SyncError> {

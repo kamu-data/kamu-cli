@@ -9,9 +9,9 @@
 
 use std::sync::Arc;
 
-use database_common::DatabaseTransactionRunner;
+use database_common::transaction;
 use dill::Catalog;
-use internal_error::ResultIntoInternal;
+use internal_error::{InternalError, ResultIntoInternal};
 use kamu_datasets::DatasetRegistry;
 use url::Url;
 
@@ -137,19 +137,16 @@ impl AxumServerPullProtocolInstance {
             pull_request.force_update_if_diverged,
         );
 
-        let dataset_handle = self.dataset_handle.clone();
-        let stop_at = pull_request.stop_at.clone();
-        let begin_faster = pull_request.begin_after.clone();
-
-        let transfer_plan_result = DatabaseTransactionRunner::new(self.catalog.clone())
-            .transactional_with(|dataset_registry: Arc<dyn DatasetRegistry>| async move {
+        let transfer_plan_result = transaction!(
+            |dataset_registry: Arc<dyn DatasetRegistry>|
+             -> Result<_, PrepareDatasetTransferEstimateError> {
                 let resolved_dataset = dataset_registry
-                    .get_dataset_by_handle(&dataset_handle)
+                    .get_dataset_by_handle(&self.dataset_handle)
                     .await;
 
                 let metadata_chain = resolved_dataset.as_metadata_chain();
-                let stop_at = match stop_at {
-                    Some(stop_at) => stop_at,
+                let stop_at = match &pull_request.stop_at {
+                    Some(stop_at) => stop_at.clone(),
                     None => metadata_chain
                         .resolve_ref(&odf::BlockRef::Head)
                         .await
@@ -159,17 +156,17 @@ impl AxumServerPullProtocolInstance {
                 let transfer_plan = prepare_dataset_transfer_plan(
                     metadata_chain,
                     &stop_at,
-                    begin_faster.as_ref(),
+                    pull_request.begin_after.as_ref(),
                     pull_request.force_update_if_diverged,
                 )
                 .await?;
 
-                Ok::<_, PrepareDatasetTransferEstimateError>(PlannedTransfer {
+                Ok(PlannedTransfer {
                     stop_at,
                     transfer_plan,
                 })
-            })
-            .await;
+            }
+        );
 
         let planned_stop_at = transfer_plan_result
             .as_ref()
@@ -248,7 +245,6 @@ impl AxumServerPullProtocolInstance {
     ) -> Result<(), PullServerError> {
         tracing::debug!("Pull client sent a pull metadata request");
 
-        let dataset_handle = self.dataset_handle.clone();
         let PlannedPull { request, stop_at } = planned_pull;
         // The batch ends at the head the plan was made from, so it matches the
         // plan even if `HEAD` has moved since
@@ -257,10 +253,10 @@ impl AxumServerPullProtocolInstance {
                 .protocol_int_err(PullPhase::MetadataRequest)
         })?;
 
-        let metadata_batch = DatabaseTransactionRunner::new(self.catalog.clone())
-            .transactional_with(|dataset_registry: Arc<dyn DatasetRegistry>| async move {
+        let metadata_batch = transaction!(
+            |dataset_registry: Arc<dyn DatasetRegistry>| -> Result<_, InternalError> {
                 let resolved_dataset = dataset_registry
-                    .get_dataset_by_handle(&dataset_handle)
+                    .get_dataset_by_handle(&self.dataset_handle)
                     .await;
 
                 prepare_dataset_metadata_batch(
@@ -270,9 +266,9 @@ impl AxumServerPullProtocolInstance {
                     request.force_update_if_diverged,
                 )
                 .await
-            })
-            .await
-            .protocol_int_err(PullPhase::MetadataRequest)?;
+            }
+        )
+        .protocol_int_err(PullPhase::MetadataRequest)?;
 
         tracing::Span::current().record("num_blocks", metadata_batch.num_blocks);
 

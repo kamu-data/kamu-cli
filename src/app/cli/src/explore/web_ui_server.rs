@@ -13,7 +13,7 @@ use std::pin::Pin;
 use std::sync::Arc;
 
 use axum::response::{IntoResponse, Response};
-use database_common::DatabaseTransactionRunner;
+use database_common::transaction;
 use dill::{Catalog, CatalogBuilder};
 use http::Uri;
 use internal_error::*;
@@ -267,11 +267,10 @@ impl WebUIServer {
         catalog: Catalog,
         login_instructions: &WebUILoginInstructions,
     ) -> Result<String, InternalError> {
-        let transaction_runner = DatabaseTransactionRunner::new(catalog);
-
-        transaction_runner
-            .transactional_with(|auth_svc: Arc<dyn AuthenticationService>| async move {
-                Ok(auth_svc
+        let access_token = transaction!(
+            #[catalog(catalog)]
+            |auth_svc: Arc<dyn AuthenticationService>| {
+                auth_svc
                     .login(
                         &login_instructions.login_method,
                         login_instructions.login_credentials_json.clone(),
@@ -279,9 +278,10 @@ impl WebUIServer {
                     )
                     .await
                     .unwrap()
-                    .access_token)
-            })
-            .await
+                    .access_token
+            }
+        );
+        Ok(access_token)
     }
 
     pub fn local_addr(&self) -> &SocketAddr {

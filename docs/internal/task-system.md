@@ -236,7 +236,7 @@ sequenceDiagram
 
     loop until a task is taken
         rect rgba(128, 128, 128, 0.12)
-            note over A,O: transaction: take_task_non_blocking
+            note over A,O: transaction: take_next_task
             A->>S: try_take()
             S->>ES: try_get_queued_task() — earliest Queued by task_id
             S->>ES: load Task, not Queued → ConcurrentModification
@@ -257,7 +257,7 @@ sequenceDiagram
     R-->>A: TaskOutcome (Err → Failed(empty_recoverable))
 
     rect rgba(128, 128, 128, 0.12)
-        note over A,O: transaction: process_task_outcome
+        note over A,O: transaction: finish_task
         A->>ES: task.update() — picks up a cancellation that arrived mid-run
         A->>ES: task.finish(now, outcome), save
         A->>O: TaskProgressMessage::Finished
@@ -281,7 +281,7 @@ Notes on the loop:
   `TaskRunning` against the same `last_event_id`; one save fails with a concurrent modification,
   its transaction rolls back, and it moves on to the next queued task.
 - **Cancellation is cooperative only for queued tasks.** A running task always runs to completion;
-  `process_task_outcome` records the runner's outcome, not `Cancelled`.
+  `finish_task` records the runner's outcome, not `Cancelled`.
 - **`run_single_task`** (`TaskAgent` trait) runs exactly one iteration; tests use it to drive the
   agent deterministically.
 
@@ -295,10 +295,10 @@ heavy work runs between them. This keeps long ingests from holding a database tr
 | Step | Transaction | Opened by |
 | --- | --- | --- |
 | Recover running tasks | one for the whole recovery | `transactional_method2` on `recover_running_tasks` |
-| Take a task + post `Running` | one per attempt | `transactional_method2` on `take_task_non_blocking` |
+| Take a task + post `Running` | one per attempt | a `transaction!` block in `take_task`, around `take_next_task` |
 | Plan the task | the planner's choice — dataset planners open their own | a `transactional_method*` macro in each dataset planner |
 | Run the task | the runner's choice — see [§7](#7-task-types) | runner |
-| Record outcome + post `Finished` | one | `transactional_method2` on `process_task_outcome` |
+| Record outcome + post `Finished` | one | a `transaction!` block in `run_task_iteration`, around `finish_task` |
 
 Since the progress messages are posted in the same transaction as the event that causes them, a
 task is `Running` if and only if its `Running` message exists, and likewise for `Finished`
@@ -724,7 +724,7 @@ changes and failure reasons in flow histories, with the harness in
   agent as fatal. The task stays `Running`, so after restart recovery requeues it and it fails
   again. Register planners and runners in every binary that runs the agent.
 - **Storage errors also stop the agent.** There is no retry around `take_task` or
-  `process_task_outcome`.
+  `finish_task`.
 - **Cancelling a running task does not stop it.** It only guarantees the run is not retried after
   a restart.
 - **An internal planner error loses its cause.** `PrepareTaskDefinitionError::Internal` is logged

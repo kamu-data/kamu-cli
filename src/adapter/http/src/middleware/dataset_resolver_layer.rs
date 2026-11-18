@@ -10,13 +10,14 @@
 use std::future::Future;
 use std::marker::PhantomData;
 use std::pin::Pin;
+use std::sync::Arc;
 use std::task::{Context, Poll};
 
 use axum::RequestExt;
 use axum::body::Body;
 use axum::extract::FromRequestParts;
 use axum::response::Response;
-use database_common::DatabaseTransactionRunner;
+use database_common::transaction;
 use internal_error::InternalError;
 use kamu_datasets::{DatasetRegistry, DatasetRegistryExt};
 use tower::{Layer, Service};
@@ -149,27 +150,24 @@ where
 
                 let dataset_ref = dataset_ref.clone();
 
-                let check_result: Result<CheckResult, InternalError> =
-                    DatabaseTransactionRunner::new(catalog.clone())
-                        .transactional(|transaction_catalog| async move {
-                            let dataset_registry = transaction_catalog
-                                .get_one::<dyn DatasetRegistry>()
-                                .unwrap();
-                            match dataset_registry.get_dataset_by_ref(&dataset_ref).await {
-                                Ok(resolved_dataset) => Ok(CheckResult::CheckedDataset(
-                                    resolved_dataset.get_handle().clone(),
-                                )),
-                                Err(odf::DatasetRefUnresolvedError::NotFound(err)) => {
-                                    tracing::warn!("Dataset not found: {:?}", err);
-                                    Ok(CheckResult::ErrorResponse(not_found_response()))
-                                }
-                                Err(err) => {
-                                    tracing::error!("Could not get dataset: {:?}", err);
-                                    Ok(CheckResult::ErrorResponse(internal_server_error_response()))
-                                }
+                let check_result = transaction!(
+                    #[catalog(catalog)]
+                    |dataset_registry: Arc<dyn DatasetRegistry>| -> Result<_, InternalError> {
+                        match dataset_registry.get_dataset_by_ref(&dataset_ref).await {
+                            Ok(resolved_dataset) => Ok(CheckResult::CheckedDataset(
+                                resolved_dataset.get_handle().clone(),
+                            )),
+                            Err(odf::DatasetRefUnresolvedError::NotFound(err)) => {
+                                tracing::warn!("Dataset not found: {:?}", err);
+                                Ok(CheckResult::ErrorResponse(not_found_response()))
                             }
-                        })
-                        .await;
+                            Err(err) => {
+                                tracing::error!("Could not get dataset: {:?}", err);
+                                Ok(CheckResult::ErrorResponse(internal_server_error_response()))
+                            }
+                        }
+                    }
+                );
 
                 match check_result {
                     Ok(CheckResult::CheckedDataset(hdl)) => {

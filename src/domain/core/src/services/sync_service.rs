@@ -410,6 +410,15 @@ impl From<odf::dataset::SetChainRefError> for SyncError {
     }
 }
 
+impl From<odf::dataset::StoreDatasetError> for SyncError {
+    fn from(v: odf::dataset::StoreDatasetError) -> Self {
+        match v {
+            odf::dataset::StoreDatasetError::RefCollision(e) => Self::RefCollision(e),
+            odf::dataset::StoreDatasetError::Internal(e) => Self::Internal(e),
+        }
+    }
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 // TODO: Remove this error in favor of `odf::DatasetNotFoundError`

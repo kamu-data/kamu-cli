@@ -9,7 +9,7 @@
 
 use std::sync::Arc;
 
-use database_common::{DatabaseTransactionRunner, PostgresTransactionManager};
+use database_common::{PostgresTransactionManager, transaction};
 use dill::{Catalog, CatalogBuilder};
 use internal_error::InternalError;
 use kamu_datasets_postgres::{PostgresDatasetEntryRepository, PostgresDatasetReferenceRepository};
@@ -68,17 +68,11 @@ impl WebhookWatermarksBackfillHarness {
         }
     }
 
-    fn transaction_runner(&self) -> DatabaseTransactionRunner {
-        DatabaseTransactionRunner::new(self.catalog.clone())
-    }
-
     async fn write_scenario(&self) -> WebhookWatermarksBackfillScenario {
-        self.transaction_runner()
-            .transactional(|catalog| async move {
-                Ok::<_, InternalError>(WebhookWatermarksBackfillScenario::write(&catalog).await)
-            })
-            .await
-            .unwrap()
+        transaction!(|catalog| -> Result<_, InternalError> {
+            Ok(WebhookWatermarksBackfillScenario::write(&catalog).await)
+        })
+        .unwrap()
     }
 
     async fn run_backfill(&self) {
@@ -92,19 +86,17 @@ impl WebhookWatermarksBackfillHarness {
         &self,
         subscription_id: WebhookSubscriptionID,
     ) -> Option<WebhookWatermark> {
-        self.transaction_runner()
-            .transactional_with(
-                |watermark_repo: Arc<dyn WebhookWatermarkRepository>| async move {
-                    watermark_repo
-                        .find_watermark(
-                            subscription_id,
-                            &WebhookEventTypeCatalog::dataset_ref_updated(),
-                        )
-                        .await
-                },
-            )
-            .await
-            .unwrap()
+        transaction!(
+            |watermark_repo: Arc<dyn WebhookWatermarkRepository>| -> Result<_, InternalError> {
+                watermark_repo
+                    .find_watermark(
+                        subscription_id,
+                        &WebhookEventTypeCatalog::dataset_ref_updated(),
+                    )
+                    .await
+            }
+        )
+        .unwrap()
     }
 }
 

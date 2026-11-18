@@ -9,7 +9,7 @@
 
 use std::collections::{HashMap, HashSet};
 
-use database_common::DatabaseTransactionRunner;
+use database_common::transaction;
 use dill::{Builder, BuilderExt, Catalog, TypecastBuilder};
 use internal_error::InternalError;
 use petgraph::algo::toposort;
@@ -159,17 +159,14 @@ pub async fn run_startup_jobs_ex(
             .get(job_name)
             .expect("Job builder must be present");
 
-        if job_metadata.requires_transaction {
-            DatabaseTransactionRunner::new(catalog.clone())
-                .transactional(|transaction_catalog| async move {
-                    let job = job_builder.get(&transaction_catalog).unwrap();
-                    job.run_initialization().await
-                })
-                .await?;
-        } else {
-            let job = job_builder.get(catalog).unwrap();
-            job.run_initialization().await?;
-        }
+        transaction!(
+            #[catalog(catalog)]
+            #[when(job_metadata.requires_transaction)]
+            |job_catalog| {
+                let job = job_builder.get(&job_catalog).unwrap();
+                job.run_initialization().await?;
+            }
+        );
     }
 
     Ok(())

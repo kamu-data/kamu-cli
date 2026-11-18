@@ -14,7 +14,7 @@ use std::sync::Arc;
 use chrono::{DateTime, Duration, Utc};
 use container_runtime::{ContainerRuntime, ContainerRuntimeConfig};
 use crypto_utils::AesGcmEncryptor;
-use database_common::DatabaseTransactionRunner;
+use database_common::{DatabaseTransactionRunner, transaction};
 use init_on_startup::{JobSelector, RunStartupJobsOptions};
 use internal_error::*;
 use kamu::domain::*;
@@ -216,17 +216,15 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
         ))
         .await?;
 
-        let current_account_indication = current_account.clone();
-        let cli_account_subject = DatabaseTransactionRunner::new(base_catalog.clone())
-            .transactional_with(
-                |account_service: Arc<dyn kamu_accounts::AccountService>| async move {
-                    current_account_indication
-                        .to_current_account_subject(workspace_status, account_service)
-                        .await
-                        .map_err(CLIError::from)
-                },
-            )
-            .await?;
+        let cli_account_subject = transaction!(
+            #[catalog(base_catalog)]
+            |account_service: Arc<dyn kamu_accounts::AccountService>| {
+                current_account
+                    .clone()
+                    .to_current_account_subject(workspace_status, account_service)
+                    .await?
+            }
+        );
 
         let process_catalog =
             configure_process_catalog(&base_catalog, &cli_account_subject).build();
@@ -305,40 +303,37 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
         let is_outbox_processing_required = maybe_db_connection_settings.is_some()
             && cli_commands::command_needs_outbox_processing(&args);
 
-        let tx_runner = DatabaseTransactionRunner::new(cli_catalog.clone());
+        let command_run_result = transaction!(
+            #[catalog(cli_catalog)]
+            #[when(is_transactional)]
+            #[span(tracing::debug_span!("app::run_command"))]
+            |maybe_transactional_cli_catalog| -> Result<_, CLIError> {
+                let command_builder = cli_commands::get_command(
+                    cli_base_catalog,
+                    &maybe_transactional_cli_catalog,
+                    background_catalog,
+                    args,
+                    current_account,
+                )?;
 
-        let command_run_result = tx_runner
-            .maybe_transactional(
-                is_transactional,
-                |maybe_transactional_cli_catalog: dill::Catalog| async move {
-                    let command_builder = cli_commands::get_command(
-                        cli_base_catalog,
-                        &maybe_transactional_cli_catalog,
-                        background_catalog,
-                        args,
-                        current_account,
-                    )?;
+                let command = command_builder
+                    .get(&maybe_transactional_cli_catalog)
+                    .int_err()?;
 
-                    let command = command_builder
-                        .get(&maybe_transactional_cli_catalog)
-                        .int_err()?;
+                command.validate_args().await?;
 
-                    command.validate_args().await?;
+                let command_name = command.name();
 
-                    let command_name = command.name();
-
-                    command
-                        .run()
-                        .instrument(tracing::info_span!(
-                            "Running command",
-                            %is_transactional,
-                            %command_name,
-                        ))
-                        .await
-                },
-            )
-            .instrument(tracing::debug_span!("app::run_command"))
-            .await;
+                command
+                    .run()
+                    .instrument(tracing::info_span!(
+                        "Running command",
+                        %is_transactional,
+                        %command_name,
+                    ))
+                    .await
+            }
+        );
 
         // A failed command may still have committed some of its work in
         // transactions of its own, so the Outbox is processed either way
@@ -350,9 +345,13 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
 
         let post_command_actions = cli_catalog.get_one::<PostCommandActions>().int_err()?;
         for action in post_command_actions.take() {
-            tx_runner
-                .maybe_transactional(is_transactional, |catalog| action.run(catalog))
-                .await?;
+            transaction!(
+                #[catalog(cli_catalog)]
+                #[when(is_transactional)]
+                |catalog| {
+                    action.run(catalog).await?;
+                }
+            );
         }
 
         if let Some(temp_database_path) = maybe_temp_database_path {

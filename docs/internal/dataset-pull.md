@@ -130,8 +130,8 @@ dataset the account can read, are shown as they are.
 ## 5. Planning
 
 `PullRequestPlannerImpl::build_pull_multi_plan(requests, options, tenancy)` runs in one
-transaction (`PullDatasetUseCaseImpl::build_plan_for_requests`, or
-`build_plan_for_all_owned_datasets` for `--all`); its items keep dataset handles only, which
+transaction (a `transaction!` block in `PullDatasetUseCaseImpl::execute_multi`, or in
+`execute_all_owned` for `--all`); its items keep dataset handles only, which
 later transactions resolve again. Planning contacts no remote repository: a
 sync job's source is resolved by its transfer, so the transaction never waits
 on the network.

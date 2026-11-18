@@ -14,7 +14,7 @@ use std::task::{Context, Poll};
 use axum::RequestExt;
 use axum::body::Body;
 use axum::response::Response;
-use database_common::DatabaseTransactionRunner;
+use database_common::transaction;
 use futures::Future;
 use kamu_accounts::{
     AccessTokenError,
@@ -59,21 +59,17 @@ impl<Svc> AuthenticationMiddleware<Svc> {
         base_catalog: &dill::Catalog,
         maybe_access_token: Option<AccessToken>,
     ) -> Result<CurrentAccountSubject, Response> {
-        use tracing::Instrument;
-
         if let Some(access_token) = maybe_access_token {
-            let account_res = DatabaseTransactionRunner::new(base_catalog.clone())
-                .transactional_with(
-                    |authentication_service: Arc<dyn AuthenticationService>| async move {
-                        authentication_service
-                            .account_by_token(access_token.token)
-                            .await
-                    },
-                )
-                .instrument(tracing::debug_span!(
-                    "AuthenticationMiddleware::current_account_subject"
-                ))
-                .await;
+            let account_res = transaction!(
+                #[catalog(base_catalog)]
+                #[span(tracing::debug_span!("AuthenticationMiddleware::current_account_subject"))]
+                |authentication_service: Arc<dyn AuthenticationService>|
+                 -> Result<_, GetAccountInfoError> {
+                    authentication_service
+                        .account_by_token(access_token.token)
+                        .await
+                }
+            );
 
             // TODO: PERF: Getting the full account info here is expensive while all we need
             // is the caller identity
