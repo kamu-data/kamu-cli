@@ -10,7 +10,7 @@
 use std::assert_matches;
 use std::sync::Arc;
 
-use kamu::testing::{BaseUseCaseHarness, BaseUseCaseHarnessOptions};
+use kamu::testing::{BaseRepoHarness, BaseUseCaseHarness, BaseUseCaseHarnessOptions};
 use kamu::*;
 use kamu_core::*;
 use kamu_datasets::{
@@ -25,7 +25,7 @@ use odf::metadata::testing::MetadataFactory;
 
 #[tokio::test]
 async fn test_verify_success() {
-    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let alias_foo = BaseRepoHarness::alias("foo");
     let (_, dataset_id_foo) = odf::DatasetID::new_generated_ed25519();
 
     let harness = VerifyJobHarness::new(
@@ -52,8 +52,8 @@ async fn test_verify_success() {
 
 #[tokio::test]
 async fn test_verify_replay_with_unreadable_input_replays_nothing() {
-    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
-    let alias_bar = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("bar"));
+    let alias_foo = BaseRepoHarness::alias("foo");
+    let alias_bar = BaseRepoHarness::alias("bar");
     let (_, dataset_id_foo) = odf::DatasetID::new_generated_ed25519();
     let (_, dataset_id_bar) = odf::DatasetID::new_generated_ed25519();
 
@@ -86,7 +86,7 @@ async fn test_verify_replay_with_unreadable_input_replays_nothing() {
 
 #[tokio::test]
 async fn test_verify_unreadable_is_not_found() {
-    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let alias_foo = BaseRepoHarness::alias("foo");
     let (_, dataset_id_foo) = odf::DatasetID::new_generated_ed25519();
 
     let harness = VerifyJobHarness::new(
@@ -134,7 +134,6 @@ impl VerifyJobHarness {
             .add::<TransformPlannerImpl>()
             .add::<TransformExecutorImpl>()
             .add::<EngineProvisionerNull>();
-        database_common::NoOpDatabasePlugin::init_database_components(&mut b);
         let catalog = b.build();
 
         let job = catalog.get_one().unwrap();

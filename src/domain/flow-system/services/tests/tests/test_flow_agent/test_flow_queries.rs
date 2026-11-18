@@ -16,7 +16,6 @@ use kamu_core::TransformStatus;
 use kamu_datasets::DatasetEntryServiceExt;
 use kamu_flow_system::*;
 use kamu_task_system::*;
-use odf::dataset::MetadataChainIncrementInterval;
 
 use crate::tests::{FlowHarness, FlowHarnessOverrides, ManualFlowActivationArgs, TaskDriverArgs};
 
@@ -558,19 +557,7 @@ async fn test_flow_duration_starts_at_activation_before_batching_deadline() {
                 run_since_start: Duration::milliseconds(10),
                 finish_in_with: Some((
                     Duration::milliseconds(10),
-                    TaskOutcome::Success(
-                        TaskResultDatasetUpdate::Updated {
-                            old_head: Some(odf::Multihash::from_digest_sha3_256(b"foo-old-slice")),
-                            new_head: odf::Multihash::from_digest_sha3_256(b"foo-new-slice"),
-                            has_more: false,
-                            increment: MetadataChainIncrementInterval {
-                                num_blocks: 1,
-                                num_records: 5,
-                                updated_watermark: None,
-                            },
-                        }
-                        .into_task_result(),
-                    ),
+                    FlowHarness::dataset_updated(b"foo-old-slice", b"foo-new-slice", 1, 5),
                 )),
                 expected_logical_plan: LogicalPlanDatasetUpdate {
                     dataset_id: foo_id.clone(),
@@ -588,19 +575,7 @@ async fn test_flow_duration_starts_at_activation_before_batching_deadline() {
                 run_since_start: Duration::milliseconds(80),
                 finish_in_with: Some((
                     Duration::milliseconds(10),
-                    TaskOutcome::Success(
-                        TaskResultDatasetUpdate::Updated {
-                            old_head: Some(odf::Multihash::from_digest_sha3_256(b"foo-new-slice")),
-                            new_head: odf::Multihash::from_digest_sha3_256(b"foo-new-slice-2"),
-                            has_more: false,
-                            increment: MetadataChainIncrementInterval {
-                                num_blocks: 1,
-                                num_records: 7,
-                                updated_watermark: None,
-                            },
-                        }
-                        .into_task_result(),
-                    ),
+                    FlowHarness::dataset_updated(b"foo-new-slice", b"foo-new-slice-2", 1, 7),
                 )),
                 expected_logical_plan: LogicalPlanDatasetUpdate {
                     dataset_id: foo_id.clone(),
@@ -618,19 +593,7 @@ async fn test_flow_duration_starts_at_activation_before_batching_deadline() {
                 run_since_start: Duration::milliseconds(100),
                 finish_in_with: Some((
                     Duration::milliseconds(10),
-                    TaskOutcome::Success(
-                        TaskResultDatasetUpdate::Updated {
-                            old_head: Some(odf::Multihash::from_digest_sha3_256(b"bar-old-slice")),
-                            new_head: odf::Multihash::from_digest_sha3_256(b"bar-new-slice"),
-                            has_more: false,
-                            increment: MetadataChainIncrementInterval {
-                                num_blocks: 1,
-                                num_records: 12,
-                                updated_watermark: None,
-                            },
-                        }
-                        .into_task_result(),
-                    ),
+                    FlowHarness::dataset_updated(b"bar-old-slice", b"bar-new-slice", 1, 12),
                 )),
                 expected_logical_plan: LogicalPlanDatasetUpdate {
                     dataset_id: bar_id.clone(),

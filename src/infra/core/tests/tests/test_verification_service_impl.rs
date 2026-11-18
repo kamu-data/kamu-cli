@@ -26,8 +26,8 @@ use odf::metadata::testing::MetadataFactory;
 async fn test_verify_data_consistency() {
     let harness = VerifyHarness::new();
 
-    let foo_alias = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
-    let bar_alias = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("bar"));
+    let foo_alias = BaseRepoHarness::alias("foo");
+    let bar_alias = BaseRepoHarness::alias("bar");
 
     let foo = harness.create_root_dataset(&foo_alias).await;
     foo.dataset
@@ -188,7 +188,7 @@ async fn test_verify_data_consistency() {
 async fn test_verify_checkpoint_of_block_without_data() {
     let harness = VerifyHarness::new();
 
-    let foo_alias = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let foo_alias = BaseRepoHarness::alias("foo");
     let foo = harness.create_root_dataset(&foo_alias).await;
 
     let (head, checkpoint_hash) = harness

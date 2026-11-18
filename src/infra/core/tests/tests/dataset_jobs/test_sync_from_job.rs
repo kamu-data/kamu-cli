@@ -9,7 +9,7 @@
 
 use std::sync::Arc;
 
-use kamu::testing::{BaseUseCaseHarness, BaseUseCaseHarnessOptions};
+use kamu::testing::{BaseRepoHarness, BaseUseCaseHarness, BaseUseCaseHarnessOptions};
 use kamu::*;
 use kamu_core::*;
 use kamu_datasets::{DatasetPermission, MockDatasetPermissionChecker};
@@ -79,13 +79,12 @@ impl SyncFromJobHarness {
         b.add::<SyncFromJobImpl>()
             .add_value(MockSyncService::new())
             .bind::<dyn SyncService, MockSyncService>();
-        database_common::NoOpDatabasePlugin::init_database_components(&mut b);
         let catalog = b.build();
 
         Self {
             base_use_case_harness,
             job: catalog.get_one().unwrap(),
-            alias_foo: odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo")),
+            alias_foo: BaseRepoHarness::alias("foo"),
         }
     }
 

@@ -22,7 +22,7 @@ use url::Url;
 async fn test_push_repo_target() {
     let harness = PushTestHarness::new(TenancyConfig::SingleTenant, true);
 
-    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let alias_foo = BaseRepoHarness::alias("foo");
     let foo = harness.create_root_dataset(&alias_foo).await;
 
     let remote_repo_data = harness.maybe_remote_repo_data.unwrap();
@@ -65,7 +65,7 @@ async fn test_push_repo_target() {
 async fn test_push_url_target() {
     let harness = PushTestHarness::new(TenancyConfig::SingleTenant, false);
 
-    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let alias_foo = BaseRepoHarness::alias("foo");
     let foo = harness.create_root_dataset(&alias_foo).await;
 
     let push_url = Url::parse("http://example.com/foo").unwrap();
@@ -101,7 +101,7 @@ async fn test_push_url_target() {
 async fn test_push_remote_alias_target() {
     let harness = PushTestHarness::new(TenancyConfig::SingleTenant, true);
 
-    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let alias_foo = BaseRepoHarness::alias("foo");
     let foo = harness.create_root_dataset(&alias_foo).await;
 
     let remote_repo_data = harness.maybe_remote_repo_data.unwrap();
@@ -143,7 +143,7 @@ async fn test_push_remote_alias_target() {
 async fn test_push_remote_no_target_presaved_push_alias() {
     let harness = PushTestHarness::new(TenancyConfig::SingleTenant, true);
 
-    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let alias_foo = BaseRepoHarness::alias("foo");
     let foo = harness.create_root_dataset(&alias_foo).await;
 
     let remote_repo_url = harness
@@ -188,7 +188,7 @@ async fn test_push_remote_no_target_presaved_push_alias() {
 async fn test_push_remote_no_target_several_push_aliases_is_ambiguous() {
     let harness = PushTestHarness::new(TenancyConfig::SingleTenant, false);
 
-    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let alias_foo = BaseRepoHarness::alias("foo");
     let foo = harness.create_root_dataset(&alias_foo).await;
 
     for url in ["http://example.com/a", "http://example.com/b"] {
@@ -220,7 +220,7 @@ async fn test_push_remote_no_target_several_push_aliases_is_ambiguous() {
 async fn test_push_remote_no_target_no_alias() {
     let harness = PushTestHarness::new(TenancyConfig::SingleTenant, true);
 
-    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let alias_foo = BaseRepoHarness::alias("foo");
     let foo = harness.create_root_dataset(&alias_foo).await;
 
     let remote_repo_data = harness.maybe_remote_repo_data.unwrap();
@@ -264,7 +264,7 @@ async fn test_push_remote_no_target_no_alias_multiple_repos_exist() {
         .add_repository(&extra_remote_repo_name, extra_remote_repo_url)
         .unwrap();
 
-    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let alias_foo = BaseRepoHarness::alias("foo");
     let foo = harness.create_root_dataset(&alias_foo).await;
 
     let (items, errors) = harness
@@ -290,7 +290,7 @@ async fn test_push_remote_no_target_no_alias_multiple_repos_exist() {
 async fn test_push_remote_no_target_no_alias_no_repositories() {
     let harness = PushTestHarness::new(TenancyConfig::SingleTenant, false);
 
-    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let alias_foo = BaseRepoHarness::alias("foo");
     let foo = harness.create_root_dataset(&alias_foo).await;
 
     let (items, errors) = harness

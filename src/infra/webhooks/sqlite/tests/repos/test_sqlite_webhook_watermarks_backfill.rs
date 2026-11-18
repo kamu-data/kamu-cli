@@ -7,13 +7,9 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::sync::Arc;
-
-use database_common::{SqliteTransactionManager, transaction};
+use database_common::SqliteTransactionManager;
 use dill::{Catalog, CatalogBuilder};
-use internal_error::InternalError;
 use kamu_datasets_sqlite::{SqliteDatasetEntryRepository, SqliteDatasetReferenceRepository};
-use kamu_webhooks::*;
 use kamu_webhooks_repo_tests::WebhookWatermarksBackfillScenario;
 use kamu_webhooks_sqlite::*;
 use sqlx::SqlitePool;
@@ -31,17 +27,11 @@ const BACKFILL_MIGRATION: &str = include_str!(
 async fn test_backfill_starts_watermarks_of_existing_subscriptions(sqlite_pool: SqlitePool) {
     let harness = WebhookWatermarksBackfillHarness::new(sqlite_pool);
 
-    let scenario = harness.write_scenario().await;
+    let scenario = WebhookWatermarksBackfillScenario::write_committed(&harness.catalog).await;
 
     harness.run_backfill().await;
 
-    for (subscription_id, expected_watermark) in scenario.expected_watermarks {
-        assert_eq!(
-            harness.find_watermark(subscription_id).await,
-            expected_watermark,
-            "watermark of subscription {subscription_id}"
-        );
-    }
+    scenario.assert_watermarks(&harness.catalog).await;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -68,35 +58,11 @@ impl WebhookWatermarksBackfillHarness {
         }
     }
 
-    async fn write_scenario(&self) -> WebhookWatermarksBackfillScenario {
-        transaction!(|catalog| -> Result<_, InternalError> {
-            Ok(WebhookWatermarksBackfillScenario::write(&catalog).await)
-        })
-        .unwrap()
-    }
-
     async fn run_backfill(&self) {
         sqlx::raw_sql(BACKFILL_MIGRATION)
             .execute(&self.sqlite_pool)
             .await
             .unwrap();
-    }
-
-    async fn find_watermark(
-        &self,
-        subscription_id: WebhookSubscriptionID,
-    ) -> Option<WebhookWatermark> {
-        transaction!(
-            |watermark_repo: Arc<dyn WebhookWatermarkRepository>| -> Result<_, InternalError> {
-                watermark_repo
-                    .find_watermark(
-                        subscription_id,
-                        &WebhookEventTypeCatalog::dataset_ref_updated(),
-                    )
-                    .await
-            }
-        )
-        .unwrap()
     }
 }
 

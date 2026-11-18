@@ -13,6 +13,7 @@ use std::sync::Arc;
 
 use internal_error::InternalError;
 use kamu::testing::{
+    BaseRepoHarness,
     BaseUseCaseHarness,
     BaseUseCaseHarnessOptions,
     DummySmartTransferProtocolClient,
@@ -38,7 +39,7 @@ use crate::utils::RecordingListener;
 
 #[tokio::test]
 async fn test_push_success() {
-    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let alias_foo = BaseRepoHarness::alias("foo");
 
     let mock_permission_checker = MockDatasetPermissionChecker::new()
         .make_expect_classify_datasets_by_allowance(
@@ -119,7 +120,7 @@ async fn test_push_success() {
 
 #[tokio::test]
 async fn test_push_success_without_saving_alias() {
-    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let alias_foo = BaseRepoHarness::alias("foo");
 
     let mock_permission_checker = MockDatasetPermissionChecker::new()
         .make_expect_classify_datasets_by_allowance(
@@ -166,8 +167,8 @@ async fn test_push_success_without_saving_alias() {
 
 #[tokio::test]
 async fn test_push_multiple_success() {
-    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
-    let alias_bar = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("bar"));
+    let alias_foo = BaseRepoHarness::alias("foo");
+    let alias_bar = BaseRepoHarness::alias("bar");
 
     let mock_permission_checker = MockDatasetPermissionChecker::new()
         .make_expect_classify_datasets_by_allowance(
@@ -241,9 +242,9 @@ async fn test_push_multiple_success() {
 
 #[tokio::test]
 async fn test_push_multiple_mixed_authorization_pushes_readable_datasets() {
-    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
-    let alias_bar = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("bar"));
-    let alias_baz = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("baz"));
+    let alias_foo = BaseRepoHarness::alias("foo");
+    let alias_bar = BaseRepoHarness::alias("bar");
+    let alias_baz = BaseRepoHarness::alias("baz");
 
     let mock_permission_checker = MockDatasetPermissionChecker::new()
         .make_expect_classify_datasets_by_allowance(
@@ -319,9 +320,9 @@ async fn test_push_multiple_mixed_authorization_pushes_readable_datasets() {
 
 #[tokio::test]
 async fn test_push_multiple_mixed_target_failures_pushes_resolved_datasets() {
-    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
-    let alias_bar = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("bar"));
-    let alias_baz = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("baz"));
+    let alias_foo = BaseRepoHarness::alias("foo");
+    let alias_bar = BaseRepoHarness::alias("bar");
+    let alias_baz = BaseRepoHarness::alias("baz");
 
     let mock_permission_checker = MockDatasetPermissionChecker::new()
         .make_expect_classify_datasets_by_allowance(
@@ -377,7 +378,7 @@ async fn test_push_multiple_mixed_target_failures_pushes_resolved_datasets() {
 
 #[tokio::test]
 async fn test_push_reports_unsaved_alias_as_the_dataset_error() {
-    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let alias_foo = BaseRepoHarness::alias("foo");
 
     let mock_permission_checker = MockDatasetPermissionChecker::new()
         .make_expect_classify_datasets_by_allowance(
@@ -417,7 +418,7 @@ async fn test_push_reports_unsaved_alias_as_the_dataset_error() {
 
 #[tokio::test]
 async fn test_push_reports_success_to_the_listener_once() {
-    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let alias_foo = BaseRepoHarness::alias("foo");
 
     let mock_permission_checker = MockDatasetPermissionChecker::new()
         .make_expect_classify_datasets_by_allowance(
@@ -514,8 +515,6 @@ impl PushUseCaseHarness {
                 b.add::<RemoteAliasesRegistryImpl>();
             }
         }
-
-        database_common::NoOpDatabasePlugin::init_database_components(&mut b);
 
         let catalog = b.build();
 

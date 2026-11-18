@@ -136,6 +136,23 @@ impl CurrentAccountSubject {
         catalog_builder.add_value(Principal::from(&self));
         catalog_builder.add_value(self);
     }
+
+    /// Registers the caller like [`Self::register`], but with `principal` as
+    /// the authenticated [`Principal`] when given
+    #[cfg(any(feature = "testing", test))]
+    pub fn register_acting_as(
+        self,
+        principal: Option<Principal>,
+        catalog_builder: &mut dill::CatalogBuilder,
+    ) {
+        match principal {
+            Some(principal) => {
+                catalog_builder.add_value(principal);
+                catalog_builder.add_value(self);
+            }
+            None => self.register(catalog_builder),
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

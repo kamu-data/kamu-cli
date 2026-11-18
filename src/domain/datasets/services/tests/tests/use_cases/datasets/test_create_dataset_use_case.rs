@@ -17,7 +17,6 @@ use kamu_datasets::{
     CreateDatasetResult,
     CreateDatasetUseCase,
     CreateDatasetUseCaseOptions,
-    DatasetReferenceRepository,
     ResolvedDataset,
 };
 use kamu_datasets_services::CreateDatasetUseCaseImpl;
@@ -58,12 +57,7 @@ async fn test_create_root_dataset() {
 
     assert_matches!(harness.check_dataset_exists(&alias_foo).await, Ok(_));
 
-    assert_eq!(
-        harness
-            .get_dataset_reference(&predefined_foo_id, &odf::BlockRef::Head)
-            .await,
-        foo_created.head,
-    );
+    assert_eq!(harness.stored_head(&foo_created).await, foo_created.head);
 
     // Note: the stability of these identifiers is ensured via
     //  predefined dataset ID and stubbed system time
@@ -118,12 +112,7 @@ async fn test_create_dataset_head_already_set() {
             if e.expected_prev_block_hash.is_none()
                 && e.actual_prev_block_hash == Some(foo.head.clone())
     );
-    assert_eq!(
-        harness
-            .get_dataset_reference(&predefined_foo_id, &odf::BlockRef::Head)
-            .await,
-        foo.head,
-    );
+    assert_eq!(harness.stored_head(&foo).await, foo.head);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -152,12 +141,7 @@ async fn test_create_dataset_at_initial_head() {
         .unwrap();
 
     assert_eq!(foo_created.head, stored_head);
-    assert_eq!(
-        harness
-            .get_dataset_reference(&predefined_foo_id, &odf::BlockRef::Head)
-            .await,
-        stored_head,
-    );
+    assert_eq!(harness.stored_head(&foo_created).await, stored_head);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -167,7 +151,6 @@ struct CreateUseCaseHarness {
     dataset_base_use_case_harness: DatasetBaseUseCaseHarness,
     use_case: Arc<dyn CreateDatasetUseCase>,
     create_helper: Arc<CreateDatasetUseCaseHelper>,
-    dataset_reference_repo: Arc<dyn DatasetReferenceRepository>,
     dataset_storage_unit_writer: Arc<dyn odf::DatasetStorageUnitWriter>,
 }
 
@@ -199,7 +182,6 @@ impl CreateUseCaseHarness {
             dataset_base_use_case_harness,
             use_case: catalog.get_one().unwrap(),
             create_helper: catalog.get_one().unwrap(),
-            dataset_reference_repo: catalog.get_one().unwrap(),
             dataset_storage_unit_writer: catalog.get_one().unwrap(),
         }
     }
@@ -272,17 +254,6 @@ impl CreateUseCaseHarness {
         self.create_helper
             .set_created_head(ResolvedDataset::from_created(dataset), &dataset.head)
             .await
-    }
-
-    async fn get_dataset_reference(
-        &self,
-        dataset_id: &odf::DatasetID,
-        block_ref: &odf::BlockRef,
-    ) -> odf::Multihash {
-        self.dataset_reference_repo
-            .get_dataset_reference(dataset_id, block_ref)
-            .await
-            .unwrap()
     }
 }
 

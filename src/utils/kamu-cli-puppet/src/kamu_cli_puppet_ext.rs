@@ -702,15 +702,19 @@ impl KamuCliPuppetExt for KamuCliPuppet {
             !output.status.success(),
             "Case '{case}': the command succeeded\n{stderr}"
         );
-        let mut end_of_matches = 0;
-        for expected in expected_stderr {
-            let Some(found_at) = stderr[end_of_matches..].find(expected) else {
+        let patterns = expected_stderr
+            .iter()
+            .map(|expected| Regex::new(&regex::escape(expected)).unwrap())
+            .collect::<Vec<_>>();
+        let end_of_matches = match find_in_order(&stderr, &patterns) {
+            Ok(end_of_matches) => end_of_matches,
+            Err(unmatched) => {
+                let expected = expected_stderr[unmatched];
                 panic!(
                     "Case '{case}': stderr has no '{expected}' after the earlier matches\n{stderr}"
                 );
-            };
-            end_of_matches += found_at + expected.len();
-        }
+            }
+        };
 
         OrderedStderr {
             stderr,
@@ -848,22 +852,31 @@ fn assert_execute_command_result<'a>(
     if let Some(expected_stderr_items) = maybe_expected_stderr {
         let stderr = std::str::from_utf8(&command_result.get_output().stderr).unwrap();
 
-        let mut stderr_search_index = 0;
-        for expected_stderr_item_re in expected_stderr_items {
-            let re = Regex::new(expected_stderr_item_re).unwrap();
-
-            if let Some(mat) = re.find(&stderr[stderr_search_index..]) {
-                stderr_search_index += mat.end();
-            } else {
-                assert!(
-                    re.is_match(stderr),
-                    "Expected found regex match:\n'{re}'\nUnexpected output:\n{stderr}",
-                );
-
-                panic!("Expected found regex match:\n'{re}'\nUnexpected output:\n{stderr}");
-            }
+        let patterns = expected_stderr_items
+            .into_iter()
+            .map(|expected_stderr_item_re| Regex::new(expected_stderr_item_re).unwrap())
+            .collect::<Vec<_>>();
+        if let Err(unmatched) = find_in_order(stderr, &patterns) {
+            let re = &patterns[unmatched];
+            panic!("Expected found regex match:\n'{re}'\nUnexpected output:\n{stderr}");
         }
     }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Matches `patterns` in `haystack` one after another, each after the end of
+/// the previous match. Returns the offset past the last match, or the index of
+/// the first pattern that has no match
+fn find_in_order(haystack: &str, patterns: &[Regex]) -> Result<usize, usize> {
+    let mut end_of_matches = 0;
+    for (index, re) in patterns.iter().enumerate() {
+        let Some(mat) = re.find(&haystack[end_of_matches..]) else {
+            return Err(index);
+        };
+        end_of_matches += mat.end();
+    }
+    Ok(end_of_matches)
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -7,12 +7,10 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::collections::HashSet;
 use std::sync::Arc;
 
-use kamu::testing::{BaseUseCaseHarness, BaseUseCaseHarnessOptions};
+use kamu::testing::{BaseRepoHarness, BaseUseCaseHarness, BaseUseCaseHarnessOptions};
 use kamu::{ResetExecutorImpl, ResetJobImpl, ResetPlannerImpl};
-use kamu_accounts::Principal;
 use kamu_adapter_task_dataset::{
     DatasetRefMovedError,
     DatasetResetOldHeadMismatch,
@@ -21,7 +19,7 @@ use kamu_adapter_task_dataset::{
     TaskErrorDatasetCommit,
     TaskErrorDatasetReset,
 };
-use kamu_datasets::{CreateDatasetResult, DatasetReferenceUpdater, MockDatasetPermissionChecker};
+use kamu_datasets::{CreateDatasetResult, DatasetReferenceUpdater};
 use kamu_datasets_services::testing::RacingDatasetReferenceUpdater;
 use kamu_task_system::{TaskDefinition, TaskError, TaskOutcome, TaskRunner};
 use pretty_assertions::assert_eq;
@@ -30,7 +28,7 @@ use pretty_assertions::assert_eq;
 
 #[tokio::test]
 async fn test_reset_ref_moved_after_planning_fails_recoverably() {
-    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let alias_foo = BaseRepoHarness::alias("foo");
 
     let harness = ResetDatasetTaskRunnerHarness::new();
     let foo = harness.create_root_dataset(&alias_foo).await;
@@ -58,7 +56,7 @@ async fn test_reset_ref_moved_after_planning_fails_recoverably() {
 
 #[tokio::test]
 async fn test_reset_with_mismatching_old_head_fails_unrecoverably() {
-    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let alias_foo = BaseRepoHarness::alias("foo");
 
     let harness = ResetDatasetTaskRunnerHarness::new();
     let foo = harness.create_root_dataset(&alias_foo).await;
@@ -85,7 +83,7 @@ async fn test_reset_with_mismatching_old_head_fails_unrecoverably() {
 
 #[tokio::test]
 async fn test_reset_not_allowed_fails_unrecoverably() {
-    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let alias_foo = BaseRepoHarness::alias("foo");
 
     let harness = ResetDatasetTaskRunnerHarness::new();
     let foo = harness.create_root_dataset(&alias_foo).await;
@@ -113,13 +111,8 @@ struct ResetDatasetTaskRunnerHarness {
 impl ResetDatasetTaskRunnerHarness {
     /// Tasks run as the node, which may run every operation
     fn new() -> Self {
-        let base_use_case_harness = BaseUseCaseHarness::new(
-            BaseUseCaseHarnessOptions::new()
-                .with_maybe_permission_checker(Some(MockDatasetPermissionChecker::denying_ids(
-                    HashSet::new(),
-                )))
-                .with_principal(Principal::Node),
-        );
+        let base_use_case_harness =
+            BaseUseCaseHarness::new(BaseUseCaseHarnessOptions::new().as_task_node());
 
         let mut b = dill::CatalogBuilder::new_chained(base_use_case_harness.catalog());
         b.add::<ResetDatasetTaskRunner>()
@@ -128,8 +121,6 @@ impl ResetDatasetTaskRunnerHarness {
             .add::<ResetExecutorImpl>()
             .add_value(RacingDatasetReferenceUpdater::default())
             .bind::<dyn DatasetReferenceUpdater, RacingDatasetReferenceUpdater>();
-
-        database_common::NoOpDatabasePlugin::init_database_components(&mut b);
 
         let catalog = b.build();
 

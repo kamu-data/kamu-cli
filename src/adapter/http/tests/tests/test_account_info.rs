@@ -44,7 +44,7 @@ async fn test_get_account_info_with_wrong_token() {
 #[test_log::test(tokio::test)]
 async fn test_get_account_info() {
     let harness = AccountInfoHarness::new(TenancyConfig::SingleTenant).await;
-    let expected_account = harness.server_harness.api_server_account();
+    let expected_account = harness.server_harness.server_account().clone();
 
     let client = async move {
         let cl = reqwest::Client::new();

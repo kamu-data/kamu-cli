@@ -97,7 +97,7 @@ async fn test_node_delete_other_account() {
 
     let harness = DeleteAccountUseCaseImplHarness::new_with_principal(
         CurrentAccountSubject::anonymous(AnonymousAccountReason::NoAuthenticationProvided),
-        Principal::Node,
+        Some(Principal::Node),
         outbox,
     )
     .await;
@@ -163,13 +163,12 @@ struct DeleteAccountUseCaseImplHarness {
 
 impl DeleteAccountUseCaseImplHarness {
     async fn new(current_account_subject: CurrentAccountSubject, outbox: MockOutbox) -> Self {
-        let principal = Principal::from(&current_account_subject);
-        Self::new_with_principal(current_account_subject, principal, outbox).await
+        Self::new_with_principal(current_account_subject, None, outbox).await
     }
 
     async fn new_with_principal(
         current_account_subject: CurrentAccountSubject,
-        principal: Principal,
+        principal: Option<Principal>,
         mut outbox: MockOutbox,
     ) -> Self {
         let predefined_account_config = {
@@ -187,6 +186,8 @@ impl DeleteAccountUseCaseImplHarness {
 
         let account_base_harness = AccountBaseUseCaseHarness::new(AccountBaseUseCaseHarnessOpts {
             maybe_predefined_accounts_config: Some(predefined_account_config),
+            current_account_subject: Some(current_account_subject),
+            principal,
             ..Default::default()
         });
 
@@ -194,8 +195,6 @@ impl DeleteAccountUseCaseImplHarness {
 
         b.add_value(outbox);
         b.bind::<dyn Outbox, MockOutbox>();
-        b.add_value(current_account_subject);
-        b.add_value(principal);
 
         database_common::NoOpDatabasePlugin::init_database_components(&mut b);
 

@@ -7,64 +7,37 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::net::SocketAddr;
-use std::str::FromStr;
 use std::sync::Arc;
 
 use database_common::InMemoryTransactionManager;
 use internal_error::{InternalError, ResultIntoInternal};
-use kamu::domain::{CacheDir, RunInfoDir, ServerUrlConfig};
-use kamu::*;
-use kamu_accounts::{
-    Account,
-    AccountConfig,
-    AuthConfig,
-    DEFAULT_ACCOUNT_NAME,
-    DidSecretEncryptionConfig,
-    JwtAuthenticationConfig,
-    PredefinedAccountsConfig,
-    TEST_ACCOUNT_ID,
-};
-use kamu_accounts_inmem::{
-    InMemoryAccessTokenRepository,
-    InMemoryAccountQuotaEventStore,
-    InMemoryAccountRepository,
-    InMemoryDidSecretKeyRepository,
-    InMemoryOAuthDeviceCodeRepository,
-};
-use kamu_accounts_services::*;
-use kamu_auth_rebac_inmem::InMemoryRebacRepository;
-use kamu_auth_rebac_services::{
-    DefaultAccountProperties,
-    DefaultDatasetProperties,
-    RebacDatasetRegistryFacadeImpl,
-    RebacServiceImpl,
-};
-use kamu_core::{CompactionExecutor, CompactionPlanner, DidGeneratorDefault, TenancyConfig};
+use kamu::domain::CacheDir;
+use kamu_accounts::Account;
+use kamu_accounts_inmem::InMemoryAccountQuotaEventStore;
+use kamu_accounts_services::AccountQuotaServiceImpl;
+use kamu_core::TenancyConfig;
 use kamu_datasets::*;
 use kamu_datasets_services::testing::{
     FailingDatasetChangeListener,
     RacingAppendDatasetMetadataBatchUseCase,
     RacingDatasetReferenceUpdater,
 };
-use kamu_datasets_services::utils::CreateDatasetUseCaseHelper;
 use kamu_datasets_services::*;
-use messaging_outbox::{Outbox, OutboxImmediateImpl, register_message_dispatcher};
+use messaging_outbox::register_message_dispatcher;
 use tempfile::TempDir;
-use time_source::{SystemTimeSource, SystemTimeSourceStub};
-use url::Url;
+use time_source::SystemTimeSourceStub;
 
 use super::{
     LocalFsDatasetFixture,
-    SERVER_ACCOUNT_NAME,
     ServerSideDatasetFixture,
     ServerSideHarness,
     ServerSideHarnessOptions,
     TestAPIServer,
     UnreferencedBlocks,
-    create_cli_user_catalog,
-    create_web_user_catalog,
+    bind_api_listener,
     make_server_account,
+    register_common_server_components,
+    start_api_server,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -79,16 +52,79 @@ pub(crate) struct ServerSideLocalFsHarness {
 }
 
 impl ServerSideLocalFsHarness {
+    pub async fn new(options: ServerSideHarnessOptions) -> Self {
+        let tempdir = tempfile::tempdir().unwrap();
+
+        let datasets_dir = tempdir.path().join("datasets");
+        std::fs::create_dir(&datasets_dir).unwrap();
+
+        let run_info_dir = tempdir.path().join("run");
+        std::fs::create_dir(&run_info_dir).unwrap();
+
+        let cache_dir = tempdir.path().join("cache");
+        std::fs::create_dir(&cache_dir).unwrap();
+
+        let account = make_server_account(options.tenancy_config);
+        let time_source = SystemTimeSourceStub::new();
+        let (listener, base_url_rest) = bind_api_listener().await;
+
+        let base_catalog = {
+            let mut b = match &options.base_catalog {
+                None => dill::CatalogBuilder::new(),
+                Some(c) => dill::CatalogBuilder::new_chained(c),
+            };
+
+            register_common_server_components(
+                &mut b,
+                &options,
+                &account,
+                &time_source,
+                run_info_dir,
+                &base_url_rest,
+            );
+
+            b.add_value(CacheDir::new(cache_dir))
+                .add_builder(odf::dataset::DatasetStorageUnitLocalFs::builder(
+                    datasets_dir,
+                ))
+                .add::<DatasetLfsBuilderDatabaseBackedImpl>()
+                .add::<RacingAppendDatasetMetadataBatchUseCase>()
+                .add_value(RacingDatasetReferenceUpdater::default())
+                .bind::<dyn DatasetReferenceUpdater, RacingDatasetReferenceUpdater>()
+                .add::<InMemoryAccountQuotaEventStore>()
+                .add::<AccountQuotaServiceImpl>()
+                .add::<DatasetStatisticsServiceImpl>()
+                .add::<AccountQuotaCheckerStorageImpl>()
+                .add_value(QuotaDefaultsConfig::default());
+
+            // A failed transaction rolls back the dataset repositories every read goes
+            // through; storage files stay, such as `refs/head` written by an immediate
+            // consumer
+            b.add::<InMemoryTransactionManager>();
+            b.add::<FailingDatasetChangeListener>();
+
+            register_message_dispatcher::<DatasetExternallyChangedMessage>(
+                &mut b,
+                MESSAGE_PRODUCER_KAMU_HTTP_ADAPTER,
+            );
+
+            b.build()
+        };
+
+        let api_server = start_api_server(&base_catalog, listener, &options).await;
+
+        Self {
+            tempdir,
+            base_catalog,
+            api_server,
+            options,
+            time_source,
+            account,
+        }
+    }
+
     fn internal_datasets_folder_path(&self) -> std::path::PathBuf {
         self.tempdir.path().join("datasets")
-    }
-
-    pub fn base_catalog(&self) -> &dill::Catalog {
-        &self.base_catalog
-    }
-
-    pub fn server_account(&self) -> &Account {
-        &self.account
     }
 
     /// Arms the next `HEAD` commit on the server to first move `HEAD` to
@@ -97,10 +133,7 @@ impl ServerSideLocalFsHarness {
         self.base_catalog
             .get_one::<RacingDatasetReferenceUpdater>()
             .unwrap()
-            .move_reference_before_next_update(
-                &create_cli_user_catalog(&self.base_catalog, self.options.tenancy_config),
-                concurrent_head,
-            );
+            .move_reference_before_next_update(&self.cli_catalog(), concurrent_head);
     }
 
     /// Arms the next metadata batch append on the server to first move `HEAD`
@@ -109,10 +142,7 @@ impl ServerSideLocalFsHarness {
         self.base_catalog
             .get_one::<RacingAppendDatasetMetadataBatchUseCase>()
             .unwrap()
-            .move_head_before_next_append(
-                &create_cli_user_catalog(&self.base_catalog, self.options.tenancy_config),
-                concurrent_head,
-            );
+            .move_head_before_next_append(&self.cli_catalog(), concurrent_head);
     }
 
     /// The server's dataset change listener, which a test arms to fail. Taken
@@ -129,261 +159,24 @@ impl ServerSideLocalFsHarness {
             .append(dataset_handle)
             .await
     }
-    pub async fn new(options: ServerSideHarnessOptions) -> Self {
-        let tempdir = tempfile::tempdir().unwrap();
-
-        let datasets_dir = tempdir.path().join("datasets");
-        std::fs::create_dir(&datasets_dir).unwrap();
-
-        let run_info_dir = tempdir.path().join("run");
-        std::fs::create_dir(&run_info_dir).unwrap();
-
-        let cache_dir = tempdir.path().join("cache");
-        std::fs::create_dir(&cache_dir).unwrap();
-
-        let account = make_server_account(options.tenancy_config);
-
-        let time_source = SystemTimeSourceStub::new();
-        let (base_catalog, listener) = {
-            let mut b = match &options.base_catalog {
-                None => dill::CatalogBuilder::new(),
-                Some(c) => dill::CatalogBuilder::new_chained(c),
-            };
-
-            let addr = SocketAddr::from(([127, 0, 0, 1], 0));
-            let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
-            let base_url_rest = format!("http://{}", listener.local_addr().unwrap());
-
-            let predefined_accounts_config = match options.tenancy_config {
-                TenancyConfig::SingleTenant => {
-                    PredefinedAccountsConfig::test_single_tenant_with_id()
-                }
-                TenancyConfig::MultiTenant => {
-                    let mut predefined_accounts_config = PredefinedAccountsConfig::new();
-                    predefined_accounts_config.predefined.push(
-                        AccountConfig::test_config_from_name_with_id(
-                            odf::AccountName::new_unchecked(SERVER_ACCOUNT_NAME),
-                        ),
-                    );
-                    predefined_accounts_config
-                }
-            };
-
-            let jwt_authentication_config = JwtAuthenticationConfig {
-                jwt_secret: "dummy".to_string(),
-                maybe_dummy_token_account: Some(account.clone()),
-            };
-
-            kamu_datasets_inmem::register_dependencies(&mut b);
-            b.add_value(RunInfoDir::new(run_info_dir))
-                .add::<DidGeneratorDefault>()
-                .add_value(CacheDir::new(cache_dir))
-                .add_builder(messaging_outbox::OutboxImmediateImpl::builder(
-                    messaging_outbox::ConsumerFilter::AllConsumers,
-                ))
-                .bind::<dyn Outbox, OutboxImmediateImpl>()
-                .add_value(time_source.clone())
-                .add_value(AuthConfig::sample())
-                .bind::<dyn SystemTimeSource, SystemTimeSourceStub>()
-                .add::<DependencyGraphServiceImpl>()
-                .add_value(options.tenancy_config)
-                .add_builder(odf::dataset::DatasetStorageUnitLocalFs::builder(
-                    datasets_dir,
-                ))
-                .add::<DatasetLfsBuilderDatabaseBackedImpl>()
-                .add_value(MetadataChainDbBackedConfig::default())
-                .add_value(ServerUrlConfig::new_test(Some(&base_url_rest)))
-                .add_value(options.smart_transfer_protocol_config.clone())
-                .add_value(EngineConfigDatafusionEmbeddedCompaction::default())
-                .add::<CompactionPlannerImpl>()
-                .add::<CompactionExecutorImpl>()
-                .add::<ObjectStoreRegistryImpl>()
-                .add::<ObjectStoreBuilderLocalFs>()
-                .add::<RemoteRepositoryRegistryImpl>()
-                .add::<RacingAppendDatasetMetadataBatchUseCase>()
-                .add_value(RacingDatasetReferenceUpdater::default())
-                .bind::<dyn DatasetReferenceUpdater, RacingDatasetReferenceUpdater>()
-                .add::<CreateDatasetUseCaseImpl>()
-                .add::<CreateDatasetFromSnapshotUseCaseImpl>()
-                .add::<CommitDatasetEventUseCaseImpl>()
-                .add::<CreateDatasetUseCaseHelper>()
-                .add::<DatasetEntryServiceImpl>()
-                .add::<DatasetReferenceServiceImpl>()
-                .add::<AuthenticationServiceImpl>()
-                .add::<AccountServiceImpl>()
-                .add::<InMemoryAccountRepository>()
-                .add::<InMemoryDidSecretKeyRepository>()
-                .add_value(DidSecretEncryptionConfig::sample())
-                .add::<AccessTokenServiceImpl>()
-                .add::<InMemoryAccessTokenRepository>()
-                .add_value(jwt_authentication_config)
-                .add::<LoginPasswordAuthProvider>()
-                .add::<PredefinedAccountsRegistrator>()
-                .add::<RebacServiceImpl>()
-                .add::<UpdateAccountUseCaseImpl>()
-                .add::<CreateAccountUseCaseImpl>()
-                .add::<InMemoryAccountQuotaEventStore>()
-                .add::<AccountQuotaServiceImpl>()
-                .add::<DatasetStatisticsServiceImpl>()
-                .add::<AccountQuotaCheckerStorageImpl>()
-                .add::<InMemoryRebacRepository>()
-                .add_value(DefaultAccountProperties::default())
-                .add_value(QuotaDefaultsConfig::default())
-                .add_value(DefaultDatasetProperties::default())
-                .add::<RebacDatasetRegistryFacadeImpl>()
-                .add_value(predefined_accounts_config)
-                .add::<OAuthDeviceCodeServiceImpl>()
-                .add::<OAuthDeviceCodeGeneratorDefault>()
-                .add::<InMemoryOAuthDeviceCodeRepository>();
-
-            // A failed transaction rolls back the dataset repositories every read goes
-            // through; storage files stay, such as `refs/head` written by an immediate
-            // consumer
-            b.add::<InMemoryTransactionManager>();
-            b.add::<FailingDatasetChangeListener>();
-
-            register_message_dispatcher::<DatasetLifecycleMessage>(
-                &mut b,
-                MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
-            );
-
-            register_message_dispatcher::<DatasetReferenceMessage>(
-                &mut b,
-                MESSAGE_PRODUCER_KAMU_DATASET_REFERENCE_SERVICE,
-            );
-
-            register_message_dispatcher::<DatasetExternallyChangedMessage>(
-                &mut b,
-                MESSAGE_PRODUCER_KAMU_HTTP_ADAPTER,
-            );
-
-            (b.build(), listener)
-        };
-
-        init_on_startup::run_startup_jobs(&base_catalog)
-            .await
-            .unwrap();
-
-        let api_server = TestAPIServer::new(
-            create_web_user_catalog(&base_catalog, &options),
-            listener,
-            options.tenancy_config,
-        );
-
-        Self {
-            tempdir,
-            base_catalog,
-            api_server,
-            options,
-            time_source,
-            account,
-        }
-    }
 }
 
 #[async_trait::async_trait(?Send)]
 impl ServerSideHarness for ServerSideLocalFsHarness {
-    fn server_account_id(&self) -> odf::AccountID {
-        match self.options.tenancy_config {
-            TenancyConfig::MultiTenant => odf::metadata::testing::account_id(&SERVER_ACCOUNT_NAME),
-            TenancyConfig::SingleTenant => TEST_ACCOUNT_ID.clone(),
-        }
+    fn base_catalog(&self) -> &dill::Catalog {
+        &self.base_catalog
     }
 
-    fn server_account_name(&self) -> odf::AccountName {
-        match self.options.tenancy_config {
-            TenancyConfig::MultiTenant => odf::AccountName::new_unchecked(SERVER_ACCOUNT_NAME),
-            TenancyConfig::SingleTenant => DEFAULT_ACCOUNT_NAME.clone(),
-        }
+    fn tenancy_config(&self) -> TenancyConfig {
+        self.options.tenancy_config
     }
 
-    fn operating_account_name(&self) -> Option<odf::AccountName> {
-        match self.options.tenancy_config {
-            TenancyConfig::MultiTenant => {
-                Some(odf::AccountName::new_unchecked(SERVER_ACCOUNT_NAME))
-            }
-            TenancyConfig::SingleTenant => None,
-        }
+    fn api_server(&self) -> &TestAPIServer {
+        &self.api_server
     }
 
-    fn cli_dataset_registry(&self) -> Arc<dyn DatasetRegistry> {
-        let cli_catalog = create_cli_user_catalog(&self.base_catalog, self.options.tenancy_config);
-        cli_catalog.get_one().unwrap()
-    }
-
-    fn cli_create_dataset_use_case(&self) -> Arc<dyn CreateDatasetUseCase> {
-        let cli_catalog = create_cli_user_catalog(&self.base_catalog, self.options.tenancy_config);
-        cli_catalog.get_one().unwrap()
-    }
-
-    fn cli_create_dataset_from_snapshot_use_case(
-        &self,
-    ) -> Arc<dyn CreateDatasetFromSnapshotUseCase> {
-        let cli_catalog = create_cli_user_catalog(&self.base_catalog, self.options.tenancy_config);
-        cli_catalog.get_one().unwrap()
-    }
-
-    fn cli_commit_dataset_event_use_case(&self) -> Arc<dyn CommitDatasetEventUseCase> {
-        let cli_catalog = create_cli_user_catalog(&self.base_catalog, self.options.tenancy_config);
-        cli_catalog.get_one().unwrap()
-    }
-
-    fn cli_compaction_planner(&self) -> Arc<dyn CompactionPlanner> {
-        let cli_catalog = create_cli_user_catalog(&self.base_catalog, self.options.tenancy_config);
-        cli_catalog.get_one().unwrap()
-    }
-
-    fn cli_compaction_executor(&self) -> Arc<dyn CompactionExecutor> {
-        let cli_catalog = create_cli_user_catalog(&self.base_catalog, self.options.tenancy_config);
-        cli_catalog.get_one().unwrap()
-    }
-
-    fn cli_dataset_entry_writer(&self) -> Arc<dyn DatasetEntryWriter> {
-        let cli_catalog = create_cli_user_catalog(&self.base_catalog, self.options.tenancy_config);
-        cli_catalog.get_one().unwrap()
-    }
-
-    fn cli_dataset_reference_service(&self) -> Arc<dyn DatasetReferenceService> {
-        let cli_catalog = create_cli_user_catalog(&self.base_catalog, self.options.tenancy_config);
-        cli_catalog.get_one().unwrap()
-    }
-
-    fn cli_create_dataset_use_case_helper(&self) -> Arc<CreateDatasetUseCaseHelper> {
-        let cli_catalog = create_cli_user_catalog(&self.base_catalog, self.options.tenancy_config);
-        cli_catalog.get_one().unwrap()
-    }
-
-    fn api_server_addr(&self) -> String {
-        self.api_server.local_addr().to_string()
-    }
-
-    fn api_server_account(&self) -> Account {
-        self.account.clone()
-    }
-
-    fn dataset_url_with_scheme(&self, dataset_alias: &odf::DatasetAlias, scheme: &str) -> Url {
-        let api_server_address = self.api_server_addr();
-        Url::from_str(
-            match self.options.tenancy_config {
-                TenancyConfig::MultiTenant => format!(
-                    "{}://{}/{}/{}",
-                    scheme,
-                    api_server_address,
-                    if let Some(account_name) = &dataset_alias.account_name {
-                        account_name.to_string()
-                    } else {
-                        panic!("Account name not specified in alias");
-                    },
-                    dataset_alias.dataset_name
-                ),
-                TenancyConfig::SingleTenant => format!(
-                    "{}://{}/{}",
-                    scheme, api_server_address, dataset_alias.dataset_name
-                ),
-            }
-            .as_str(),
-        )
-        .unwrap()
+    fn server_account(&self) -> &Account {
+        &self.account
     }
 
     fn system_time_source(&self) -> &SystemTimeSourceStub {

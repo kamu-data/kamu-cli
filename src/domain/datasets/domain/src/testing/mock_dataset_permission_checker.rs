@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::borrow::Cow;
 use std::collections::HashSet;
 
 use mockall::Predicate;
@@ -42,34 +43,15 @@ impl MockDatasetPermissionChecker {
         mock_dataset_permission_checker
             .expect_classify_dataset_ids_by_allowance()
             .returning(move |_, ids, permission| {
-                Ok(ClassifyByAllowanceIdsResponse {
-                    authorized_ids: Vec::new(),
-                    unauthorized_ids_with_errors: ids
-                        .iter()
-                        .map(|id| {
-                            if missing_ids_clone.contains(id.as_ref()) {
-                                (
-                                    id.as_ref().clone(),
-                                    odf::DatasetNotFoundError::new(id.as_local_ref()).into(),
-                                )
-                            } else {
-                                (
-                                    id.as_ref().clone(),
-                                    ClassifyByAllowanceDatasetPermissionError::not_enough_permissions(
-                                        id.as_local_ref(),
-                                        permission,
-                                    ),
-                                )
-                            }
-                        })
-                        .collect(),
-                })
+                Ok(Self::classify_ids(ids, |id| {
+                    Some(Self::denial(&missing_ids_clone, id, permission))
+                }))
             });
         mock_dataset_permission_checker
             .expect_classify_dataset_handles_by_allowance()
             .returning(move |_, handles, permission| {
                 Ok(Self::classify_handles(handles, |hdl| {
-                    Some(Self::denial(&missing_ids, hdl, permission))
+                    Some(Self::denial(&missing_ids, &hdl.id, permission))
                 }))
             });
         mock_dataset_permission_checker
@@ -97,26 +79,14 @@ impl MockDatasetPermissionChecker {
         mock_dataset_permission_checker
             .expect_classify_dataset_ids_by_allowance()
             .returning(move |_, ids, permission| {
-                let (unauthorized, authorized): (Vec<_>, Vec<_>) =
-                    ids.iter().partition(|id| denied.contains(id.as_ref()));
-                Ok(ClassifyByAllowanceIdsResponse {
-                    authorized_ids: authorized
-                        .into_iter()
-                        .map(|id| id.as_ref().clone())
-                        .collect(),
-                    unauthorized_ids_with_errors: unauthorized
-                        .into_iter()
-                        .map(|id| {
-                            (
-                                id.as_ref().clone(),
-                                ClassifyByAllowanceDatasetPermissionError::not_enough_permissions(
-                                    id.as_local_ref(),
-                                    permission,
-                                ),
-                            )
-                        })
-                        .collect(),
-                })
+                Ok(Self::classify_ids(ids, |id| {
+                    denied.contains(id).then(|| {
+                        ClassifyByAllowanceDatasetPermissionError::not_enough_permissions(
+                            id.as_local_ref(),
+                            permission,
+                        )
+                    })
+                }))
             });
 
         let denied = denied_ids.clone();
@@ -152,12 +122,7 @@ impl MockDatasetPermissionChecker {
             .returning(|_, _, _| Ok(()));
         mock_dataset_permission_checker
             .expect_classify_dataset_ids_by_allowance()
-            .returning(|_, ids, _| {
-                Ok(ClassifyByAllowanceIdsResponse {
-                    authorized_ids: ids.iter().map(|id| id.as_ref().clone()).collect(),
-                    unauthorized_ids_with_errors: Vec::new(),
-                })
-            });
+            .returning(|_, ids, _| Ok(Self::classify_ids(ids, |_| None)));
         mock_dataset_permission_checker
             .expect_classify_dataset_handles_by_allowance()
             .returning(|_, handles, _| Ok(Self::classify_handles(handles, |_| None)));
@@ -310,27 +275,14 @@ impl MockDatasetPermissionChecker {
             .with(always(), always(), eq(permission))
             .times(times)
             .returning(move |_, dataset_ids, permission| {
-                let res = dataset_ids.iter().fold(
-                    ClassifyByAllowanceIdsResponse {
-                        authorized_ids: Vec::new(),
-                        unauthorized_ids_with_errors: Vec::new(),
-                    },
-                    |mut acc, dataset_id| {
-                        if authorized.contains(dataset_id) {
-                            acc.authorized_ids.push(dataset_id.as_ref().clone());
-                        } else {
-                            let error =
-                                ClassifyByAllowanceDatasetPermissionError::not_enough_permissions(
-                                    dataset_id.as_local_ref(),
-                                    permission,
-                                );
-                            acc.unauthorized_ids_with_errors
-                                .push((dataset_id.as_ref().clone(), error));
-                        }
-                        acc
-                    },
-                );
-                Ok(res)
+                Ok(Self::classify_ids(dataset_ids, |dataset_id| {
+                    (!authorized.contains(dataset_id)).then(|| {
+                        ClassifyByAllowanceDatasetPermissionError::not_enough_permissions(
+                            dataset_id.as_local_ref(),
+                            permission,
+                        )
+                    })
+                }))
             });
 
         self
@@ -426,7 +378,9 @@ impl MockDatasetPermissionChecker {
         self
     }
 
-    fn classify_handles(
+    /// Classifies each handle as unauthorized with the error `error_for`
+    /// returns, or as authorized when it returns none
+    pub fn classify_handles(
         handles: Vec<odf::DatasetHandle>,
         error_for: impl Fn(&odf::DatasetHandle) -> Option<ClassifyByAllowanceDatasetPermissionError>,
     ) -> ClassifyByAllowanceResponse {
@@ -443,17 +397,38 @@ impl MockDatasetPermissionChecker {
         response
     }
 
+    /// Like [`Self::classify_handles`], for dataset IDs
+    pub fn classify_ids(
+        ids: &[Cow<'_, odf::DatasetID>],
+        error_for: impl Fn(&odf::DatasetID) -> Option<ClassifyByAllowanceDatasetPermissionError>,
+    ) -> ClassifyByAllowanceIdsResponse {
+        let mut response = ClassifyByAllowanceIdsResponse {
+            authorized_ids: Vec::new(),
+            unauthorized_ids_with_errors: Vec::new(),
+        };
+        for id in ids {
+            let id = id.as_ref();
+            match error_for(id) {
+                Some(error) => response
+                    .unauthorized_ids_with_errors
+                    .push((id.clone(), error)),
+                None => response.authorized_ids.push(id.clone()),
+            }
+        }
+        response
+    }
+
     /// Not found for the missing datasets, a missing permission for the rest
     fn denial(
         missing_ids: &HashSet<odf::DatasetID>,
-        hdl: &odf::DatasetHandle,
+        id: &odf::DatasetID,
         permission: DatasetPermission,
     ) -> ClassifyByAllowanceDatasetPermissionError {
-        if missing_ids.contains(&hdl.id) {
-            odf::DatasetNotFoundError::new(hdl.id.as_local_ref()).into()
+        if missing_ids.contains(id) {
+            odf::DatasetNotFoundError::new(id.as_local_ref()).into()
         } else {
             ClassifyByAllowanceDatasetPermissionError::not_enough_permissions(
-                hdl.id.as_local_ref(),
+                id.as_local_ref(),
                 permission,
             )
         }

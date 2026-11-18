@@ -34,6 +34,8 @@ pub struct DatasetBaseUseCaseHarness {
     _did_generator: Arc<dyn DidGenerator>,
     system_time_source: Arc<dyn SystemTimeSource>,
     dataset_registry: Arc<dyn DatasetRegistry>,
+    dataset_ref_repo: Arc<dyn DatasetReferenceRepository>,
+    racing_reference_updater: Option<Arc<RacingDatasetReferenceUpdater>>,
     test_dataset_outbox_listener: Arc<TestDatasetOutboxListener>,
 }
 
@@ -141,6 +143,10 @@ impl DatasetBaseUseCaseHarness {
             _did_generator: intermediate_catalog.get_one().unwrap(),
             system_time_source: intermediate_catalog.get_one().unwrap(),
             dataset_registry: intermediate_catalog.get_one().unwrap(),
+            dataset_ref_repo: intermediate_catalog.get_one().unwrap(),
+            racing_reference_updater: opts
+                .racing_reference_updater
+                .then(|| intermediate_catalog.get_one().unwrap()),
             test_dataset_outbox_listener: intermediate_catalog.get_one().unwrap(),
             no_subject_catalog,
             intermediate_catalog,
@@ -356,27 +362,51 @@ impl DatasetBaseUseCaseHarness {
         prev_block_hash: &odf::Multihash,
         description: &str,
     ) -> odf::Multihash {
-        let chain = dataset.dataset.as_metadata_chain();
-        let prev_block = chain.get_block(prev_block_hash).await.unwrap();
-
-        use odf::metadata::testing::MetadataFactory;
-        let block = MetadataFactory::metadata_block(
-            MetadataFactory::set_info().description(description).build(),
+        BaseRepoHarness::append_unreferenced_set_info(
+            dataset.dataset.as_metadata_chain(),
+            prev_block_hash,
+            description,
+            Some(self.system_time_source.now()),
         )
-        .prev(prev_block_hash, prev_block.sequence_number)
-        .system_time(self.system_time_source().now())
-        .build();
+        .await
+    }
 
-        chain
-            .append(
-                block,
-                odf::dataset::AppendOpts {
-                    update_ref: None,
-                    ..odf::dataset::AppendOpts::default()
-                },
-            )
+    /// A `SetInfo` block on top of the dataset's initial `HEAD`, not appended
+    pub async fn set_info_block_on_initial_head(
+        &self,
+        dataset: &CreateDatasetResult,
+        description: &str,
+    ) -> odf::MetadataBlock {
+        let head_block = dataset
+            .dataset
+            .as_metadata_chain()
+            .get_block(&dataset.head)
+            .await
+            .unwrap();
+
+        BaseRepoHarness::set_info_block(
+            &dataset.head,
+            head_block.sequence_number,
+            description,
+            self.system_time_source.now(),
+        )
+    }
+
+    /// The `HEAD` the repository stores for the dataset
+    pub async fn stored_head(&self, dataset: &CreateDatasetResult) -> odf::Multihash {
+        self.dataset_ref_repo
+            .get_dataset_reference(&dataset.dataset_handle.id, &odf::BlockRef::Head)
             .await
             .unwrap()
+    }
+
+    /// Arms the racing reference updater to move `HEAD` to `concurrent_head`
+    /// before the next update; needs `racing_reference_updater` in the options
+    pub fn move_reference_before_next_update(&self, concurrent_head: odf::Multihash) {
+        self.racing_reference_updater
+            .as_ref()
+            .expect("Harness built without racing_reference_updater")
+            .move_reference_before_next_update(&self.intermediate_catalog, concurrent_head);
     }
 
     pub fn collected_outbox_messages(&self) -> String {

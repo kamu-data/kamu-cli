@@ -109,19 +109,7 @@ async fn test_derived_dataset_triggered_after_input_change() {
                 // Send some update result with records to bypass batching condition
                 finish_in_with: Some((
                     Duration::milliseconds(10),
-                    TaskOutcome::Success(
-                        TaskResultDatasetUpdate::Updated {
-                            old_head: Some(odf::Multihash::from_digest_sha3_256(b"new-slice")),
-                            new_head: odf::Multihash::from_digest_sha3_256(b"newest-slice"),
-                            has_more: false,
-                            increment: MetadataChainIncrementInterval {
-                                num_blocks: 1,
-                                num_records: 3,
-                                updated_watermark: None,
-                            },
-                        }
-                        .into_task_result(),
-                    ),
+                    FlowHarness::dataset_updated(b"new-slice", b"newest-slice", 1, 3),
                 )),
                 expected_logical_plan: LogicalPlanDatasetUpdate {
                     dataset_id: foo_id.clone(),
@@ -393,19 +381,7 @@ async fn test_derived_dataset_trigger_at_startup_with_external_change_detected()
                 // Send some update result with records to bypass batching condition
                 finish_in_with: Some((
                     Duration::milliseconds(10),
-                    TaskOutcome::Success(
-                        TaskResultDatasetUpdate::Updated {
-                            old_head: Some(odf::Multihash::from_digest_sha3_256(b"new-slice")),
-                            new_head: odf::Multihash::from_digest_sha3_256(b"newest-slice"),
-                            has_more: false,
-                            increment: MetadataChainIncrementInterval {
-                                num_blocks: 1,
-                                num_records: 3,
-                                updated_watermark: None,
-                            },
-                        }
-                        .into_task_result(),
-                    ),
+                    FlowHarness::dataset_updated(b"new-slice", b"newest-slice", 1, 3),
                 )),
                 expected_logical_plan: LogicalPlanDatasetUpdate {
                     dataset_id: foo_id.clone(),
@@ -691,19 +667,7 @@ async fn test_throttling_derived_dataset_with_2_parents() {
                 run_since_start: Duration::milliseconds(10),
                 finish_in_with: Some((
                     Duration::milliseconds(10),
-                    TaskOutcome::Success(
-                        TaskResultDatasetUpdate::Updated {
-                            old_head: Some(odf::Multihash::from_digest_sha3_256(b"foo-old-slice")),
-                            new_head: odf::Multihash::from_digest_sha3_256(b"foo-new-slice"),
-                            has_more: false,
-                            increment: MetadataChainIncrementInterval {
-                                num_blocks: 2,
-                                num_records: 7,
-                                updated_watermark: None,
-                            },
-                        }
-                        .into_task_result(),
-                    ),
+                    FlowHarness::dataset_updated(b"foo-old-slice", b"foo-new-slice", 2, 7),
                 )),
                 expected_logical_plan: LogicalPlanDatasetUpdate {
                     dataset_id: foo_id.clone(),
@@ -721,19 +685,7 @@ async fn test_throttling_derived_dataset_with_2_parents() {
                 run_since_start: Duration::milliseconds(40),
                 finish_in_with: Some((
                     Duration::milliseconds(10),
-                    TaskOutcome::Success(
-                        TaskResultDatasetUpdate::Updated {
-                            old_head: Some(odf::Multihash::from_digest_sha3_256(b"bar-old-slice")),
-                            new_head: odf::Multihash::from_digest_sha3_256(b"fbar-new-slice"),
-                            has_more: false,
-                            increment: MetadataChainIncrementInterval {
-                                num_blocks: 2,
-                                num_records: 7,
-                                updated_watermark: None,
-                            },
-                        }
-                        .into_task_result(),
-                    ),
+                    FlowHarness::dataset_updated(b"bar-old-slice", b"fbar-new-slice", 2, 7),
                 )),
                 expected_logical_plan: LogicalPlanDatasetUpdate {
                     dataset_id: bar_id.clone(),
@@ -769,19 +721,7 @@ async fn test_throttling_derived_dataset_with_2_parents() {
                 run_since_start: Duration::milliseconds(130),
                 finish_in_with: Some((
                     Duration::milliseconds(10),
-                    TaskOutcome::Success(
-                        TaskResultDatasetUpdate::Updated {
-                            old_head: Some(odf::Multihash::from_digest_sha3_256(b"foo-new-slice")),
-                            new_head: odf::Multihash::from_digest_sha3_256(b"foo-newest-slice"),
-                            has_more: false,
-                            increment: MetadataChainIncrementInterval {
-                                num_blocks: 2,
-                                num_records: 7,
-                                updated_watermark: None,
-                            },
-                        }
-                        .into_task_result(),
-                    ),
+                    FlowHarness::dataset_updated(b"foo-new-slice", b"foo-newest-slice", 2, 7),
                 )),
                 expected_logical_plan: LogicalPlanDatasetUpdate {
                     dataset_id: foo_id.clone(),
@@ -817,19 +757,7 @@ async fn test_throttling_derived_dataset_with_2_parents() {
                 run_since_start: Duration::milliseconds(250),
                 finish_in_with: Some((
                     Duration::milliseconds(10),
-                    TaskOutcome::Success(
-                        TaskResultDatasetUpdate::Updated {
-                            old_head: Some(odf::Multihash::from_digest_sha3_256(b"bar-new-slice")),
-                            new_head: odf::Multihash::from_digest_sha3_256(b"bar-newest-slice"),
-                            has_more: false,
-                            increment: MetadataChainIncrementInterval {
-                                num_blocks: 2,
-                                num_records: 7,
-                                updated_watermark: None,
-                            },
-                        }
-                        .into_task_result(),
-                    ),
+                    FlowHarness::dataset_updated(b"bar-new-slice", b"bar-newest-slice", 2, 7),
                 )),
                 expected_logical_plan: LogicalPlanDatasetUpdate {
                     dataset_id: bar_id.clone(),
@@ -1271,19 +1199,7 @@ async fn test_batching_condition_records_reached() {
                 run_since_start: Duration::milliseconds(10),
                 finish_in_with: Some((
                     Duration::milliseconds(10),
-                    TaskOutcome::Success(
-                        TaskResultDatasetUpdate::Updated {
-                            old_head: Some(odf::Multihash::from_digest_sha3_256(b"foo-old-slice")),
-                            new_head: odf::Multihash::from_digest_sha3_256(b"foo-new-slice"),
-                            has_more: false,
-                            increment: MetadataChainIncrementInterval {
-                                num_blocks: 1,
-                                num_records: 5,
-                                updated_watermark: None,
-                            },
-                        }
-                        .into_task_result(),
-                    ),
+                    FlowHarness::dataset_updated(b"foo-old-slice", b"foo-new-slice", 1, 5),
                 )),
                 expected_logical_plan: LogicalPlanDatasetUpdate {
                     dataset_id: foo_id.clone(),
@@ -1301,19 +1217,7 @@ async fn test_batching_condition_records_reached() {
                 run_since_start: Duration::milliseconds(80),
                 finish_in_with: Some((
                     Duration::milliseconds(10),
-                    TaskOutcome::Success(
-                        TaskResultDatasetUpdate::Updated {
-                            old_head: Some(odf::Multihash::from_digest_sha3_256(b"foo-new-slice")),
-                            new_head: odf::Multihash::from_digest_sha3_256(b"foo-new-slice-2"),
-                            has_more: false,
-                            increment: MetadataChainIncrementInterval {
-                                num_blocks: 1,
-                                num_records: 7,
-                                updated_watermark: None,
-                            },
-                        }
-                        .into_task_result(),
-                    ),
+                    FlowHarness::dataset_updated(b"foo-new-slice", b"foo-new-slice-2", 1, 7),
                 )),
                 expected_logical_plan: LogicalPlanDatasetUpdate {
                     dataset_id: foo_id.clone(),
@@ -1331,19 +1235,7 @@ async fn test_batching_condition_records_reached() {
                 run_since_start: Duration::milliseconds(100),
                 finish_in_with: Some((
                     Duration::milliseconds(10),
-                    TaskOutcome::Success(
-                        TaskResultDatasetUpdate::Updated {
-                            old_head: Some(odf::Multihash::from_digest_sha3_256(b"bar-old-slice")),
-                            new_head: odf::Multihash::from_digest_sha3_256(b"bar-new-slice"),
-                            has_more: false,
-                            increment: MetadataChainIncrementInterval {
-                                num_blocks: 2,
-                                num_records: 12,
-                                updated_watermark: None,
-                            },
-                        }
-                        .into_task_result(),
-                    ),
+                    FlowHarness::dataset_updated(b"bar-old-slice", b"bar-new-slice", 2, 12),
                 )),
                 expected_logical_plan: LogicalPlanDatasetUpdate {
                     dataset_id: bar_id.clone(),
@@ -1361,21 +1253,7 @@ async fn test_batching_condition_records_reached() {
                 run_since_start: Duration::milliseconds(150),
                 finish_in_with: Some((
                     Duration::milliseconds(10),
-                    TaskOutcome::Success(
-                        TaskResultDatasetUpdate::Updated {
-                            old_head: Some(odf::Multihash::from_digest_sha3_256(
-                                b"foo-new-slice-2",
-                            )),
-                            new_head: odf::Multihash::from_digest_sha3_256(b"foo-new-slice-3"),
-                            has_more: false,
-                            increment: MetadataChainIncrementInterval {
-                                num_blocks: 1,
-                                num_records: 5,
-                                updated_watermark: None,
-                            },
-                        }
-                        .into_task_result(),
-                    ),
+                    FlowHarness::dataset_updated(b"foo-new-slice-2", b"foo-new-slice-3", 1, 5),
                 )),
                 expected_logical_plan: LogicalPlanDatasetUpdate {
                     dataset_id: foo_id.clone(),
@@ -1393,21 +1271,7 @@ async fn test_batching_condition_records_reached() {
                 run_since_start: Duration::milliseconds(210),
                 finish_in_with: Some((
                     Duration::milliseconds(10),
-                    TaskOutcome::Success(
-                        TaskResultDatasetUpdate::Updated {
-                            old_head: Some(odf::Multihash::from_digest_sha3_256(
-                                b"foo-new-slice-2",
-                            )),
-                            new_head: odf::Multihash::from_digest_sha3_256(b"foo-new-slice-3"),
-                            has_more: false,
-                            increment: MetadataChainIncrementInterval {
-                                num_blocks: 1,
-                                num_records: 5,
-                                updated_watermark: None,
-                            },
-                        }
-                        .into_task_result(),
-                    ),
+                    FlowHarness::dataset_updated(b"foo-new-slice-2", b"foo-new-slice-3", 1, 5),
                 )),
                 expected_logical_plan: LogicalPlanDatasetUpdate {
                     dataset_id: foo_id.clone(),
@@ -1425,19 +1289,7 @@ async fn test_batching_condition_records_reached() {
                 run_since_start: Duration::milliseconds(230),
                 finish_in_with: Some((
                     Duration::milliseconds(10),
-                    TaskOutcome::Success(
-                        TaskResultDatasetUpdate::Updated {
-                            old_head: Some(odf::Multihash::from_digest_sha3_256(b"bar-new-slice")),
-                            new_head: odf::Multihash::from_digest_sha3_256(b"bar-new-slice-2"),
-                            has_more: false,
-                            increment: MetadataChainIncrementInterval {
-                                num_blocks: 2,
-                                num_records: 10,
-                                updated_watermark: None,
-                            },
-                        }
-                        .into_task_result(),
-                    ),
+                    FlowHarness::dataset_updated(b"bar-new-slice", b"bar-new-slice-2", 2, 10),
                 )),
                 expected_logical_plan: LogicalPlanDatasetUpdate {
                     dataset_id: bar_id.clone(),
@@ -1807,19 +1659,7 @@ async fn test_batching_condition_timeout() {
                 run_since_start: Duration::milliseconds(10),
                 finish_in_with: Some((
                     Duration::milliseconds(10),
-                    TaskOutcome::Success(
-                        TaskResultDatasetUpdate::Updated {
-                            old_head: Some(odf::Multihash::from_digest_sha3_256(b"foo-old-slice")),
-                            new_head: odf::Multihash::from_digest_sha3_256(b"foo-new-slice"),
-                            has_more: false,
-                            increment: MetadataChainIncrementInterval {
-                                num_blocks: 1,
-                                num_records: 5,
-                                updated_watermark: None,
-                            },
-                        }
-                        .into_task_result(),
-                    ),
+                    FlowHarness::dataset_updated(b"foo-old-slice", b"foo-new-slice", 1, 5),
                 )),
                 expected_logical_plan: LogicalPlanDatasetUpdate {
                     dataset_id: foo_id.clone(),
@@ -1837,19 +1677,7 @@ async fn test_batching_condition_timeout() {
                 run_since_start: Duration::milliseconds(80),
                 finish_in_with: Some((
                     Duration::milliseconds(10),
-                    TaskOutcome::Success(
-                        TaskResultDatasetUpdate::Updated {
-                            old_head: Some(odf::Multihash::from_digest_sha3_256(b"foo-new-slice")),
-                            new_head: odf::Multihash::from_digest_sha3_256(b"foo-new-slice-2"),
-                            has_more: false,
-                            increment: MetadataChainIncrementInterval {
-                                num_blocks: 1,
-                                num_records: 3,
-                                updated_watermark: None,
-                            },
-                        }
-                        .into_task_result(),
-                    ),
+                    FlowHarness::dataset_updated(b"foo-new-slice", b"foo-new-slice-2", 1, 3),
                 )),
                 expected_logical_plan: LogicalPlanDatasetUpdate {
                     dataset_id: foo_id.clone(),
@@ -1869,19 +1697,7 @@ async fn test_batching_condition_timeout() {
                 run_since_start: Duration::milliseconds(180),
                 finish_in_with: Some((
                     Duration::milliseconds(10),
-                    TaskOutcome::Success(
-                        TaskResultDatasetUpdate::Updated {
-                            old_head: Some(odf::Multihash::from_digest_sha3_256(b"bar-new-slice")),
-                            new_head: odf::Multihash::from_digest_sha3_256(b"bar-new-slice-2"),
-                            has_more: false,
-                            increment: MetadataChainIncrementInterval {
-                                num_blocks: 2,
-                                num_records: 8,
-                                updated_watermark: None,
-                            },
-                        }
-                        .into_task_result(),
-                    ),
+                    FlowHarness::dataset_updated(b"bar-new-slice", b"bar-new-slice-2", 2, 8),
                 )),
                 expected_logical_plan: LogicalPlanDatasetUpdate {
                     dataset_id: bar_id.clone(),
@@ -2095,19 +1911,7 @@ async fn test_batching_condition_watermark() {
                 run_since_start: Duration::milliseconds(10),
                 finish_in_with: Some((
                     Duration::milliseconds(10),
-                    TaskOutcome::Success(
-                        TaskResultDatasetUpdate::Updated {
-                            old_head: Some(odf::Multihash::from_digest_sha3_256(b"foo-old-slice")),
-                            new_head: odf::Multihash::from_digest_sha3_256(b"foo-new-slice"),
-                            has_more: false,
-                            increment: MetadataChainIncrementInterval {
-                                num_blocks: 1,
-                                num_records: 0,
-                                updated_watermark: None,
-                            },
-                        }
-                        .into_task_result(),
-                    ),
+                    FlowHarness::dataset_updated(b"foo-old-slice", b"foo-new-slice", 1, 0),
                 )),
                 expected_logical_plan: LogicalPlanDatasetUpdate {
                     dataset_id: foo_id.clone(),
@@ -2125,18 +1929,12 @@ async fn test_batching_condition_watermark() {
                 run_since_start: Duration::milliseconds(70),
                 finish_in_with: Some((
                     Duration::milliseconds(10),
-                    TaskOutcome::Success(
-                        TaskResultDatasetUpdate::Updated {
-                            old_head: Some(odf::Multihash::from_digest_sha3_256(b"foo-new-slice")),
-                            new_head: odf::Multihash::from_digest_sha3_256(b"foo-new-slice-2"),
-                            has_more: false,
-                            increment: MetadataChainIncrementInterval {
-                                num_blocks: 1,
-                                num_records: 0,
-                                updated_watermark: Some(Utc::now()),
-                            },
-                        }
-                        .into_task_result(),
+                    FlowHarness::dataset_updated_with_watermark(
+                        b"foo-new-slice",
+                        b"foo-new-slice-2",
+                        1,
+                        0,
+                        Utc::now(),
                     ),
                 )),
                 expected_logical_plan: LogicalPlanDatasetUpdate {
@@ -2157,18 +1955,12 @@ async fn test_batching_condition_watermark() {
                 run_since_start: Duration::milliseconds(230),
                 finish_in_with: Some((
                     Duration::milliseconds(10),
-                    TaskOutcome::Success(
-                        TaskResultDatasetUpdate::Updated {
-                            old_head: Some(odf::Multihash::from_digest_sha3_256(b"bar-new-slice")),
-                            new_head: odf::Multihash::from_digest_sha3_256(b"bar-new-slice-2"),
-                            has_more: false,
-                            increment: MetadataChainIncrementInterval {
-                                num_blocks: 1,
-                                num_records: 0,
-                                updated_watermark: Some(Utc::now()),
-                            },
-                        }
-                        .into_task_result(),
+                    FlowHarness::dataset_updated_with_watermark(
+                        b"bar-new-slice",
+                        b"bar-new-slice-2",
+                        1,
+                        0,
+                        Utc::now(),
                     ),
                 )),
                 expected_logical_plan: LogicalPlanDatasetUpdate {
@@ -2400,19 +2192,7 @@ async fn test_batching_condition_with_2_inputs() {
                 run_since_start: Duration::milliseconds(10),
                 finish_in_with: Some((
                     Duration::milliseconds(10),
-                    TaskOutcome::Success(
-                        TaskResultDatasetUpdate::Updated {
-                            old_head: Some(odf::Multihash::from_digest_sha3_256(b"foo-old-slice")),
-                            new_head: odf::Multihash::from_digest_sha3_256(b"foo-new-slice"),
-                            has_more: false,
-                            increment: MetadataChainIncrementInterval {
-                                num_blocks: 1,
-                                num_records: 5,
-                                updated_watermark: None,
-                            },
-                        }
-                        .into_task_result(),
-                    ),
+                    FlowHarness::dataset_updated(b"foo-old-slice", b"foo-new-slice", 1, 5),
                 )),
                 expected_logical_plan: LogicalPlanDatasetUpdate {
                     dataset_id: foo_id.clone(),
@@ -2430,19 +2210,7 @@ async fn test_batching_condition_with_2_inputs() {
                 run_since_start: Duration::milliseconds(20),
                 finish_in_with: Some((
                     Duration::milliseconds(10),
-                    TaskOutcome::Success(
-                        TaskResultDatasetUpdate::Updated {
-                            old_head: Some(odf::Multihash::from_digest_sha3_256(b"bar-old-slice")),
-                            new_head: odf::Multihash::from_digest_sha3_256(b"bar-new-slice"),
-                            has_more: false,
-                            increment: MetadataChainIncrementInterval {
-                                num_blocks: 1,
-                                num_records: 5,
-                                updated_watermark: None,
-                            },
-                        }
-                        .into_task_result(),
-                    ),
+                    FlowHarness::dataset_updated(b"bar-old-slice", b"bar-new-slice", 1, 5),
                 )),
                 expected_logical_plan: LogicalPlanDatasetUpdate {
                     dataset_id: bar_id.clone(),
@@ -2460,19 +2228,7 @@ async fn test_batching_condition_with_2_inputs() {
                 run_since_start: Duration::milliseconds(110),
                 finish_in_with: Some((
                     Duration::milliseconds(10),
-                    TaskOutcome::Success(
-                        TaskResultDatasetUpdate::Updated {
-                            old_head: Some(odf::Multihash::from_digest_sha3_256(b"foo-new-slice")),
-                            new_head: odf::Multihash::from_digest_sha3_256(b"foo-new-slice-2"),
-                            has_more: false,
-                            increment: MetadataChainIncrementInterval {
-                                num_blocks: 1,
-                                num_records: 7,
-                                updated_watermark: None,
-                            },
-                        }
-                        .into_task_result(),
-                    ),
+                    FlowHarness::dataset_updated(b"foo-new-slice", b"foo-new-slice-2", 1, 7),
                 )),
                 expected_logical_plan: LogicalPlanDatasetUpdate {
                     dataset_id: foo_id.clone(),
@@ -2490,19 +2246,7 @@ async fn test_batching_condition_with_2_inputs() {
                 run_since_start: Duration::milliseconds(160),
                 finish_in_with: Some((
                     Duration::milliseconds(10),
-                    TaskOutcome::Success(
-                        TaskResultDatasetUpdate::Updated {
-                            old_head: Some(odf::Multihash::from_digest_sha3_256(b"bar-new-slice")),
-                            new_head: odf::Multihash::from_digest_sha3_256(b"bar-new-slice-2"),
-                            has_more: false,
-                            increment: MetadataChainIncrementInterval {
-                                num_blocks: 2,
-                                num_records: 8,
-                                updated_watermark: None,
-                            },
-                        }
-                        .into_task_result(),
-                    ),
+                    FlowHarness::dataset_updated(b"bar-new-slice", b"bar-new-slice-2", 2, 8),
                 )),
                 expected_logical_plan: LogicalPlanDatasetUpdate {
                     dataset_id: bar_id.clone(),
@@ -2520,19 +2264,7 @@ async fn test_batching_condition_with_2_inputs() {
                 run_since_start: Duration::milliseconds(210),
                 finish_in_with: Some((
                     Duration::milliseconds(10),
-                    TaskOutcome::Success(
-                        TaskResultDatasetUpdate::Updated {
-                            old_head: Some(odf::Multihash::from_digest_sha3_256(b"foo-new-slice")),
-                            new_head: odf::Multihash::from_digest_sha3_256(b"foo-new-slice-2"),
-                            has_more: false,
-                            increment: MetadataChainIncrementInterval {
-                                num_blocks: 1,
-                                num_records: 7,
-                                updated_watermark: None,
-                            },
-                        }
-                        .into_task_result(),
-                    ),
+                    FlowHarness::dataset_updated(b"foo-new-slice", b"foo-new-slice-2", 1, 7),
                 )),
                 expected_logical_plan: LogicalPlanDatasetUpdate {
                     dataset_id: foo_id.clone(),
@@ -2550,19 +2282,7 @@ async fn test_batching_condition_with_2_inputs() {
                 run_since_start: Duration::milliseconds(230),
                 finish_in_with: Some((
                     Duration::milliseconds(10),
-                    TaskOutcome::Success(
-                        TaskResultDatasetUpdate::Updated {
-                            old_head: Some(odf::Multihash::from_digest_sha3_256(b"baz-new-slice")),
-                            new_head: odf::Multihash::from_digest_sha3_256(b"baz-new-slice-2"),
-                            has_more: false,
-                            increment: MetadataChainIncrementInterval {
-                                num_blocks: 1,
-                                num_records: 32,
-                                updated_watermark: None,
-                            },
-                        }
-                        .into_task_result(),
-                    ),
+                    FlowHarness::dataset_updated(b"baz-new-slice", b"baz-new-slice-2", 1, 32),
                 )),
                 expected_logical_plan: LogicalPlanDatasetUpdate {
                     dataset_id: baz_id.clone(),
@@ -3055,19 +2775,7 @@ async fn test_respect_last_success_time_for_derived_dataset_when_activate_config
                 run_since_start: Duration::milliseconds(10),
                 finish_in_with: Some((
                     Duration::milliseconds(10),
-                    TaskOutcome::Success(
-                        TaskResultDatasetUpdate::Updated {
-                            old_head: Some(odf::Multihash::from_digest_sha3_256(b"foo-old-slice")),
-                            new_head: odf::Multihash::from_digest_sha3_256(b"foo-new-slice"),
-                            has_more: false,
-                            increment: MetadataChainIncrementInterval {
-                                num_blocks: 1,
-                                num_records: 5,
-                                updated_watermark: None,
-                            },
-                        }
-                        .into_task_result(),
-                    ),
+                    FlowHarness::dataset_updated(b"foo-old-slice", b"foo-new-slice", 1, 5),
                 )),
                 expected_logical_plan: LogicalPlanDatasetUpdate {
                     dataset_id: foo_id.clone(),
@@ -3103,19 +2811,7 @@ async fn test_respect_last_success_time_for_derived_dataset_when_activate_config
                 run_since_start: Duration::milliseconds(110),
                 finish_in_with: Some((
                     Duration::milliseconds(10),
-                    TaskOutcome::Success(
-                        TaskResultDatasetUpdate::Updated {
-                            old_head: Some(odf::Multihash::from_digest_sha3_256(b"foo-new-slice")),
-                            new_head: odf::Multihash::from_digest_sha3_256(b"foo-newest-slice"),
-                            has_more: false,
-                            increment: MetadataChainIncrementInterval {
-                                num_blocks: 1,
-                                num_records: 5,
-                                updated_watermark: None,
-                            },
-                        }
-                        .into_task_result(),
-                    ),
+                    FlowHarness::dataset_updated(b"foo-new-slice", b"foo-newest-slice", 1, 5),
                 )),
                 expected_logical_plan: LogicalPlanDatasetUpdate {
                     dataset_id: foo_id.clone(),
@@ -3445,19 +3141,7 @@ async fn test_restart_batching_condition_deadline_on_each_reactivation() {
                 run_since_start: Duration::milliseconds(10),
                 finish_in_with: Some((
                     Duration::milliseconds(10),
-                    TaskOutcome::Success(
-                        TaskResultDatasetUpdate::Updated {
-                            old_head: Some(odf::Multihash::from_digest_sha3_256(b"foo-old-slice")),
-                            new_head: odf::Multihash::from_digest_sha3_256(b"foo-new-slice"),
-                            has_more: false,
-                            increment: MetadataChainIncrementInterval {
-                                num_blocks: 1,
-                                num_records: 5,
-                                updated_watermark: None,
-                            },
-                        }
-                        .into_task_result(),
-                    ),
+                    FlowHarness::dataset_updated(b"foo-old-slice", b"foo-new-slice", 1, 5),
                 )),
                 expected_logical_plan: LogicalPlanDatasetUpdate {
                     dataset_id: foo_id.clone(),
@@ -3475,19 +3159,7 @@ async fn test_restart_batching_condition_deadline_on_each_reactivation() {
                 run_since_start: Duration::milliseconds(180),
                 finish_in_with: Some((
                     Duration::milliseconds(10),
-                    TaskOutcome::Success(
-                        TaskResultDatasetUpdate::Updated {
-                            old_head: Some(odf::Multihash::from_digest_sha3_256(b"bar-old-slice")),
-                            new_head: odf::Multihash::from_digest_sha3_256(b"bar-new-slice"),
-                            has_more: false,
-                            increment: MetadataChainIncrementInterval {
-                                num_blocks: 1,
-                                num_records: 5,
-                                updated_watermark: None,
-                            },
-                        }
-                        .into_task_result(),
-                    ),
+                    FlowHarness::dataset_updated(b"bar-old-slice", b"bar-new-slice", 1, 5),
                 )),
                 expected_logical_plan: LogicalPlanDatasetUpdate {
                     dataset_id: bar_id.clone(),
@@ -4071,19 +3743,7 @@ async fn test_dependencies_flow_trigger_instantly_with_zero_batching_rule() {
                 // Send some update result with records to bypass batching condition
                 finish_in_with: Some((
                     Duration::milliseconds(10),
-                    TaskOutcome::Success(
-                        TaskResultDatasetUpdate::Updated {
-                            old_head: Some(odf::Multihash::from_digest_sha3_256(b"new-slice")),
-                            new_head: odf::Multihash::from_digest_sha3_256(b"newest-slice"),
-                            has_more: false,
-                            increment: MetadataChainIncrementInterval {
-                                num_blocks: 1,
-                                num_records: 0,
-                                updated_watermark: None,
-                            },
-                        }
-                        .into_task_result(),
-                    ),
+                    FlowHarness::dataset_updated(b"new-slice", b"newest-slice", 1, 0),
                 )),
                 expected_logical_plan: LogicalPlanDatasetUpdate {
                     dataset_id: foo_id.clone(),
@@ -4344,19 +4004,7 @@ async fn test_reactive_trigger_with_pending_flow_reacts_after_restart() {
                 run_since_start: Duration::milliseconds(110),
                 finish_in_with: Some((
                     Duration::milliseconds(10),
-                    TaskOutcome::Success(
-                        TaskResultDatasetUpdate::Updated {
-                            old_head: Some(odf::Multihash::from_digest_sha3_256(b"new-slice")),
-                            new_head: odf::Multihash::from_digest_sha3_256(b"newest-slice"),
-                            has_more: false,
-                            increment: MetadataChainIncrementInterval {
-                                num_blocks: 1,
-                                num_records: 3,
-                                updated_watermark: None,
-                            },
-                        }
-                        .into_task_result(),
-                    ),
+                    FlowHarness::dataset_updated(b"new-slice", b"newest-slice", 1, 3),
                 )),
                 expected_logical_plan: LogicalPlanDatasetUpdate {
                     dataset_id: foo_id.clone(),

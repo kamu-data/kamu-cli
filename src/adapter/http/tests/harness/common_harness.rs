@@ -14,7 +14,7 @@ use std::sync::Arc;
 use datafusion::arrow::array::{Array, RecordBatch, UInt64Array};
 use datafusion::arrow::datatypes::{DataType, Field, Schema};
 use file_utils::OwnedFile;
-use kamu::testing::ParquetWriterHelper;
+use kamu::testing::{BaseRepoHarness, ParquetWriterHelper};
 use kamu_datasets::{
     CommitDatasetEventUseCase,
     DatasetReferenceService,
@@ -87,8 +87,7 @@ impl UnreferencedBlocks {
     }
 
     /// Appends a `SetInfo` block after the current `HEAD` without moving any
-    /// reference. The block takes the `HEAD` block's system time, which keeps
-    /// the chain monotonic whatever time the server's clock is set to.
+    /// reference, at the `HEAD` block's system time
     pub async fn append(&self, dataset_handle: &odf::DatasetHandle) -> odf::Multihash {
         let resolved_dataset = self
             .dataset_registry
@@ -97,27 +96,8 @@ impl UnreferencedBlocks {
         let chain = resolved_dataset.as_metadata_chain();
 
         let head = chain.resolve_ref(&odf::BlockRef::Head).await.unwrap();
-        let head_block = chain.get_block(&head).await.unwrap();
 
-        let block = MetadataFactory::metadata_block(
-            MetadataFactory::set_info()
-                .description("concurrent")
-                .build(),
-        )
-        .prev(&head, head_block.sequence_number)
-        .system_time(head_block.system_time)
-        .build();
-
-        chain
-            .append(
-                block,
-                odf::dataset::AppendOpts {
-                    update_ref: None,
-                    ..odf::dataset::AppendOpts::default()
-                },
-            )
-            .await
-            .unwrap()
+        BaseRepoHarness::append_unreferenced_set_info(chain, &head, "concurrent", None).await
     }
 }
 

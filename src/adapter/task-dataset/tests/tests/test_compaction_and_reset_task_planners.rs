@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu::testing::{BaseUseCaseHarness, BaseUseCaseHarnessOptions};
+use kamu::testing::{BaseRepoHarness, BaseUseCaseHarness, BaseUseCaseHarnessOptions};
 use kamu_adapter_task_dataset::{
     CompactionDatasetTaskPlanner,
     LogicalPlanDatasetHardCompact,
@@ -33,7 +33,7 @@ use pretty_assertions::assert_eq;
 
 #[tokio::test]
 async fn test_hard_compaction_targets_the_dataset_with_its_slice_limits() {
-    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let alias_foo = BaseRepoHarness::alias("foo");
     let harness = CompactionAndResetTaskPlannersHarness::new();
     let foo = harness.create_root_dataset(&alias_foo).await;
 
@@ -65,7 +65,7 @@ async fn test_planning_for_deleted_dataset_fails_unrecoverably() {
         PlannedTask::Reset,
         PlannedTask::ResetToMetadata,
     ] {
-        let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+        let alias_foo = BaseRepoHarness::alias("foo");
         let harness = CompactionAndResetTaskPlannersHarness::new();
         let foo = harness.create_root_dataset(&alias_foo).await;
         harness.delete_dataset(&foo).await;
@@ -84,8 +84,8 @@ async fn test_planning_for_deleted_dataset_fails_unrecoverably() {
 
 #[tokio::test]
 async fn test_reset_to_metadata_of_derived_dataset_targets_the_dataset() {
-    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
-    let alias_bar = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("bar"));
+    let alias_foo = BaseRepoHarness::alias("foo");
+    let alias_bar = BaseRepoHarness::alias("bar");
     let harness = CompactionAndResetTaskPlannersHarness::new();
     let foo = harness.create_root_dataset(&alias_foo).await;
     let bar = harness
@@ -124,8 +124,6 @@ impl CompactionAndResetTaskPlannersHarness {
         let mut b = dill::CatalogBuilder::new_chained(base_use_case_harness.catalog());
         b.add::<CompactionDatasetTaskPlanner>()
             .add::<ResetDatasetTaskPlanner>();
-
-        database_common::NoOpDatabasePlugin::init_database_components(&mut b);
 
         Self {
             base_use_case_harness,

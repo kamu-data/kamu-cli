@@ -10,6 +10,7 @@
 use kamu_cli_e2e_common::{
     DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_1,
     DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR,
+    add_named_dataset,
 };
 use kamu_cli_puppet::KamuCliPuppet;
 use kamu_cli_puppet::extensions::KamuCliPuppetExt;
@@ -20,20 +21,17 @@ pub async fn test_read_commands_deny_other_accounts_private_dataset(mut kamu: Ka
     let [alice, bob] = kamu.create_accounts(["alice", "bob"]).await;
 
     kamu.set_account(Some(bob));
-    for (dataset_name, visibility) in [("bob-private", "private"), ("bob-public", "public")] {
-        kamu.execute_with_input(
-            [
-                "add",
-                "--stdin",
-                "--name",
-                dataset_name,
-                "--visibility",
-                visibility,
-            ],
+    for (dataset_name, visibility) in [
+        ("bob-private", odf::DatasetVisibility::Private),
+        ("bob-public", odf::DatasetVisibility::Public),
+    ] {
+        add_named_dataset(
+            &kamu,
+            dataset_name,
+            visibility,
             DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR,
         )
-        .await
-        .success();
+        .await;
         kamu.ingest_data(
             &odf::DatasetName::new_unchecked(dataset_name),
             DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_1,
@@ -43,16 +41,15 @@ pub async fn test_read_commands_deny_other_accounts_private_dataset(mut kamu: Ka
 
     kamu.set_account(Some(alice));
 
-    for (public_cmd, private_cmd, public_stdout_part, private_stderr) in [
+    // Each command runs against both datasets, `<dataset>` stands for the alias
+    for (command, public_stdout_part, private_stderr) in [
         (
-            vec!["log", "bob/bob-public"],
-            vec!["log", "bob/bob-private"],
+            vec!["log", "<dataset>"],
             "AddData",
             "User has no 'read' permission in dataset",
         ),
         (
-            vec!["inspect", "query", "bob/bob-public"],
-            vec!["inspect", "query", "bob/bob-private"],
+            vec!["inspect", "query", "<dataset>"],
             "",
             "User has no 'read' permission in dataset",
         ),
@@ -62,14 +59,7 @@ pub async fn test_read_commands_deny_other_accounts_private_dataset(mut kamu: Ka
                 "--output-format",
                 "csv",
                 "-c",
-                r#"select count(*) as cnt from "bob/bob-public""#,
-            ],
-            vec![
-                "sql",
-                "--output-format",
-                "csv",
-                "-c",
-                r#"select count(*) as cnt from "bob/bob-private""#,
+                r#"select count(*) as cnt from "<dataset>""#,
             ],
             "cnt\n2",
             r"table 'kamu\.kamu\.bob/bob-private' not found",
@@ -78,14 +68,7 @@ pub async fn test_read_commands_deny_other_accounts_private_dataset(mut kamu: Ka
             vec![
                 "inspect",
                 "lineage",
-                "bob/bob-public",
-                "--output-format",
-                "shell",
-            ],
-            vec![
-                "inspect",
-                "lineage",
-                "bob/bob-private",
+                "<dataset>",
                 "--output-format",
                 "shell",
             ],
@@ -93,6 +76,15 @@ pub async fn test_read_commands_deny_other_accounts_private_dataset(mut kamu: Ka
             "User has no 'read' permission in dataset",
         ),
     ] {
+        let command_for = |dataset: &str| {
+            command
+                .iter()
+                .map(|arg| arg.replace("<dataset>", dataset))
+                .collect::<Vec<_>>()
+        };
+        let public_cmd = command_for("bob/bob-public");
+        let private_cmd = command_for("bob/bob-private");
+
         let public_result = kamu.execute(&public_cmd).await.success();
         let public_stdout = String::from_utf8_lossy(&public_result.get_output().stdout);
         assert!(

@@ -142,439 +142,78 @@ async fn test_not_configured() {
 
 #[test_log::test(tokio::test)]
 async fn test_execute_matrix() {
-    for (subject, mock_dataset_permission_checker, test_cases) in [
-        // 1. Admin has access to all datasets / accounts
+    for (subject, readable_datasets, accessible_accounts) in [
+        // Admin has access to all datasets / accounts
         (
-            CurrentAccountSubject::logged(
-                kamu_accounts::Account::seed_resource_id_from_name(ADMIN),
-                Harness::admin_account_id(),
-                odf::AccountName::new_unchecked(ADMIN),
-            ),
-            Harness::mock_dataset_permission_checker()
-                .expect_check_read_dataset(&Harness::molecule_dataset_id(), 1, true)
-                .expect_check_read_dataset(&Harness::molecule_project_dataset_id(), 1, true)
-                .expect_check_read_dataset(&Harness::molecule_dev_dataset_id(), 1, true)
-                .expect_check_read_dataset(&Harness::molecule_dev_project_dataset_id(), 1, true)
-                .expect_check_read_dataset(&Harness::user_dataset_id(), 1, true)
-                .expect_check_read_dataset(&Harness::not_found_dataset_id(), 1, false),
-            [
-                // Datasets
-                (
-                    "1) Test 1",
-                    odf::metadata::DidOdf::from(Harness::molecule_dataset_id()),
-                    Ok(Harness::expected_ok_response_for_molecule_dataset_id()),
-                ),
-                (
-                    "1) Test 2",
-                    Harness::molecule_project_dataset_id().into(),
-                    Ok(Harness::expected_ok_response_for_molecule_project_dataset_id()),
-                ),
-                (
-                    "1) Test 3",
-                    Harness::molecule_dev_dataset_id().into(),
-                    Ok(Harness::expected_ok_response_for_molecule_dev_dataset_id()),
-                ),
-                (
-                    "1) Test 4",
-                    Harness::molecule_dev_project_dataset_id().into(),
-                    Ok(Harness::expected_ok_response_for_molecule_dev_project_dataset_id()),
-                ),
-                (
-                    "1) Test 5",
-                    Harness::user_dataset_id().into(),
-                    Ok(Harness::expected_ok_response_for_user_dataset_id()),
-                ),
-                (
-                    "1) Test 6",
-                    Harness::not_found_dataset_id().into(),
-                    Harness::expected_not_found(Harness::not_found_dataset_id().into()),
-                ),
-                // Accounts
-                (
-                    "1) Test 7",
-                    Harness::to_odf_did(&Harness::molecule_account_id()),
-                    Ok(Harness::expected_ok_response_for_molecule_account_id()),
-                ),
-                // TODO: Uncomment after sku/molecule merging
-                // (
-                //     "1) Test 8",
-                //     Harness::to_odf_did(&Harness::molecule_project_account_id()),
-                //     Ok(Harness::expected_ok_response_for_molecule_project_account_id()),
-                // ),
-                (
-                    "1) Test 9",
-                    Harness::to_odf_did(&Harness::molecule_dev_account_id()),
-                    Ok(Harness::expected_ok_response_for_molecule_dev_account_id()),
-                ),
-                // TODO: Uncomment after sku/molecule merging
-                // (
-                //     "1) Test 10",
-                //     Harness::to_odf_did(&Harness::molecule_dev_project_account_id()),
-                //     Ok(Harness::expected_ok_response_for_molecule_dev_project_account_id()),
-                // ),
-                (
-                    "1) Test 11",
-                    Harness::to_odf_did(&Harness::user_account_id()),
-                    Ok(Harness::expected_ok_response_for_user_account_id()),
-                ),
-                (
-                    "1) Test 12",
-                    Harness::to_odf_did(&Harness::not_found_account_id()),
-                    Harness::expected_not_found(Harness::to_odf_did(
-                        &Harness::not_found_account_id(),
-                    )),
-                ),
+            Harness::logged_subject(ADMIN, Harness::admin_account_id()),
+            vec![
+                Harness::molecule_dataset_id(),
+                Harness::molecule_project_dataset_id(),
+                Harness::molecule_dev_dataset_id(),
+                Harness::molecule_dev_project_dataset_id(),
+                Harness::user_dataset_id(),
             ],
-        ),
-        // 2. Molecule has access to own/project datasets / accounts
-        (
-            CurrentAccountSubject::logged(
-                kamu_accounts::Account::seed_resource_id_from_name(MOLECULE),
+            vec![
                 Harness::molecule_account_id(),
-                odf::AccountName::new_unchecked(MOLECULE),
-            ),
-            Harness::mock_dataset_permission_checker()
-                .expect_check_read_dataset(&Harness::molecule_dataset_id(), 1, true)
-                .expect_check_read_dataset(&Harness::molecule_project_dataset_id(), 1, true)
-                .expect_check_read_dataset(&Harness::molecule_dev_dataset_id(), 1, false)
-                .expect_check_read_dataset(&Harness::molecule_dev_project_dataset_id(), 1, false)
-                .expect_check_read_dataset(&Harness::user_dataset_id(), 1, false)
-                .expect_check_read_dataset(&Harness::not_found_dataset_id(), 1, false),
-            [
-                // Datasets
-                (
-                    "2) Test 1",
-                    odf::metadata::DidOdf::from(Harness::molecule_dataset_id()),
-                    Ok(Harness::expected_ok_response_for_molecule_dataset_id()),
-                ),
-                (
-                    "2) Test 2",
-                    Harness::molecule_project_dataset_id().into(),
-                    Ok(Harness::expected_ok_response_for_molecule_project_dataset_id()),
-                ),
-                (
-                    "2) Test 3",
-                    Harness::molecule_dev_dataset_id().into(),
-                    Harness::expected_not_found(Harness::molecule_dev_dataset_id().into()),
-                ),
-                (
-                    "2) Test 4",
-                    Harness::molecule_dev_project_dataset_id().into(),
-                    Harness::expected_not_found(Harness::molecule_dev_project_dataset_id().into()),
-                ),
-                (
-                    "2) Test 5",
-                    Harness::user_dataset_id().into(),
-                    Harness::expected_not_found(Harness::user_dataset_id().into()),
-                ),
-                (
-                    "2) Test 6",
-                    Harness::not_found_dataset_id().into(),
-                    Harness::expected_not_found(Harness::not_found_dataset_id().into()),
-                ),
-                // Accounts
-                (
-                    "2) Test 7",
-                    Harness::to_odf_did(&Harness::molecule_account_id()),
-                    Ok(Harness::expected_ok_response_for_molecule_account_id()),
-                ),
                 // TODO: Uncomment after sku/molecule merging
-                // (
-                //     "2) Test 8",
-                //     Harness::to_odf_did(&Harness::molecule_project_account_id()),
-                //     Ok(Harness::expected_ok_response_for_molecule_project_account_id()),
-                // ),
-                (
-                    "2) Test 9",
-                    Harness::to_odf_did(&Harness::molecule_dev_account_id()),
-                    Harness::expected_not_found(Harness::to_odf_did(
-                        &Harness::molecule_dev_account_id(),
-                    )),
-                ),
-                // TODO: Uncomment after sku/molecule merging
-                // (
-                //     "2) Test 10",
-                //     Harness::to_odf_did(&Harness::molecule_dev_project_account_id()),
-                //     Harness::expected_not_found(Harness::to_odf_did(&
-                // Harness::molecule_dev_project_account_id())), ),
-                (
-                    "2) Test 11",
-                    Harness::to_odf_did(&Harness::user_account_id()),
-                    Harness::expected_not_found(Harness::to_odf_did(&Harness::user_account_id())),
-                ),
-                (
-                    "2) Test 12",
-                    Harness::to_odf_did(&Harness::not_found_account_id()),
-                    Harness::expected_not_found(Harness::to_odf_did(
-                        &Harness::not_found_account_id(),
-                    )),
-                ),
-            ],
-        ),
-        // 3. Molecule.dev has access to own/project datasets / accounts
-        (
-            CurrentAccountSubject::logged(
-                kamu_accounts::Account::seed_resource_id_from_name(MOLECULE_DEV),
+                // Harness::molecule_project_account_id(),
                 Harness::molecule_dev_account_id(),
-                odf::AccountName::new_unchecked(MOLECULE_DEV),
-            ),
-            Harness::mock_dataset_permission_checker()
-                .expect_check_read_dataset(&Harness::molecule_dataset_id(), 1, false)
-                .expect_check_read_dataset(&Harness::molecule_project_dataset_id(), 1, false)
-                .expect_check_read_dataset(&Harness::molecule_dev_dataset_id(), 1, true)
-                .expect_check_read_dataset(&Harness::molecule_dev_project_dataset_id(), 1, true)
-                .expect_check_read_dataset(&Harness::user_dataset_id(), 1, false)
-                .expect_check_read_dataset(&Harness::not_found_dataset_id(), 1, false),
-            [
-                // Datasets
-                (
-                    "3) Test 1",
-                    odf::metadata::DidOdf::from(Harness::molecule_dataset_id()),
-                    Harness::expected_not_found(Harness::molecule_dataset_id().into()),
-                ),
-                (
-                    "3) Test 2",
-                    Harness::molecule_project_dataset_id().into(),
-                    Harness::expected_not_found(Harness::molecule_project_dataset_id().into()),
-                ),
-                (
-                    "3) Test 3",
-                    Harness::molecule_dev_dataset_id().into(),
-                    Ok(Harness::expected_ok_response_for_molecule_dev_dataset_id()),
-                ),
-                (
-                    "3) Test 4",
-                    Harness::molecule_dev_project_dataset_id().into(),
-                    Ok(Harness::expected_ok_response_for_molecule_dev_project_dataset_id()),
-                ),
-                (
-                    "3) Test 5",
-                    Harness::user_dataset_id().into(),
-                    Harness::expected_not_found(Harness::user_dataset_id().into()),
-                ),
-                (
-                    "3) Test 6",
-                    Harness::not_found_dataset_id().into(),
-                    Harness::expected_not_found(Harness::not_found_dataset_id().into()),
-                ),
-                // Accounts
-                (
-                    "3) Test 7",
-                    Harness::to_odf_did(&Harness::molecule_account_id()),
-                    Harness::expected_not_found(Harness::to_odf_did(
-                        &Harness::molecule_account_id(),
-                    )),
-                ),
                 // TODO: Uncomment after sku/molecule merging
-                // (
-                //     "3) Test 8",
-                //     Harness::to_odf_did(&Harness::molecule_project_account_id()),
-                //     Harness::expected_not_found(Harness::to_odf_did(&
-                // Harness::molecule_project_account_id())), ),
-                (
-                    "3) Test 9",
-                    Harness::to_odf_did(&Harness::molecule_dev_account_id()),
-                    Ok(Harness::expected_ok_response_for_molecule_dev_account_id()),
-                ),
-                // TODO: Uncomment after sku/molecule merging
-                // (
-                //     "3) Test 10",
-                //     Harness::to_odf_did(&Harness::molecule_dev_project_account_id()),
-                //     Ok(Harness::expected_ok_response_for_molecule_dev_project_account_id()),
-                // ),
-                (
-                    "3) Test 11",
-                    Harness::to_odf_did(&Harness::user_account_id()),
-                    Harness::expected_not_found(Harness::to_odf_did(&Harness::user_account_id())),
-                ),
-                (
-                    "3) Test 12",
-                    Harness::to_odf_did(&Harness::not_found_account_id()),
-                    Harness::expected_not_found(Harness::to_odf_did(
-                        &Harness::not_found_account_id(),
-                    )),
-                ),
-            ],
-        ),
-        // 4. User has access to their own datasets / accounts
-        (
-            CurrentAccountSubject::logged(
-                kamu_accounts::Account::seed_resource_id_from_name(USER),
+                // Harness::molecule_dev_project_account_id(),
                 Harness::user_account_id(),
-                odf::AccountName::new_unchecked(USER),
-            ),
-            Harness::mock_dataset_permission_checker()
-                .expect_check_read_dataset(&Harness::molecule_dataset_id(), 1, false)
-                .expect_check_read_dataset(&Harness::molecule_project_dataset_id(), 1, false)
-                .expect_check_read_dataset(&Harness::molecule_dev_dataset_id(), 1, false)
-                .expect_check_read_dataset(&Harness::molecule_dev_project_dataset_id(), 1, false)
-                .expect_check_read_dataset(&Harness::user_dataset_id(), 1, true)
-                .expect_check_read_dataset(&Harness::not_found_dataset_id(), 1, false),
-            [
-                // Datasets
-                (
-                    "4) Test 1",
-                    odf::metadata::DidOdf::from(Harness::molecule_dataset_id()),
-                    Harness::expected_not_found(Harness::molecule_dataset_id().into()),
-                ),
-                (
-                    "4) Test 2",
-                    Harness::molecule_project_dataset_id().into(),
-                    Harness::expected_not_found(Harness::molecule_project_dataset_id().into()),
-                ),
-                (
-                    "4) Test 3",
-                    Harness::molecule_dev_dataset_id().into(),
-                    Harness::expected_not_found(Harness::molecule_dev_dataset_id().into()),
-                ),
-                (
-                    "4) Test 4",
-                    Harness::molecule_dev_project_dataset_id().into(),
-                    Harness::expected_not_found(Harness::molecule_dev_project_dataset_id().into()),
-                ),
-                (
-                    "4) Test 5",
-                    Harness::user_dataset_id().into(),
-                    Ok(Harness::expected_ok_response_for_user_dataset_id()),
-                ),
-                (
-                    "4) Test 6",
-                    Harness::not_found_dataset_id().into(),
-                    Harness::expected_not_found(Harness::not_found_dataset_id().into()),
-                ),
-                // Accounts
-                (
-                    "4) Test 7",
-                    Harness::to_odf_did(&Harness::molecule_account_id()),
-                    Harness::expected_not_found(Harness::to_odf_did(
-                        &Harness::molecule_account_id(),
-                    )),
-                ),
-                // TODO: Uncomment after sku/molecule merging
-                // (
-                //     "4) Test 8",
-                //     Harness::to_odf_did(&Harness::molecule_project_account_id()),
-                //     Harness::expected_not_found(Harness::to_odf_did(&
-                // Harness::molecule_project_account_id())), ),
-                (
-                    "4) Test 9",
-                    Harness::to_odf_did(&Harness::molecule_dev_account_id()),
-                    Harness::expected_not_found(Harness::to_odf_did(
-                        &Harness::molecule_dev_account_id(),
-                    )),
-                ),
-                // TODO: Uncomment after sku/molecule merging
-                // (
-                //     "4) Test 10",
-                //     Harness::to_odf_did(&Harness::molecule_dev_project_account_id()),
-                //     Harness::expected_not_found(Harness::to_odf_did(&
-                // Harness::molecule_dev_project_account_id())), ),
-                (
-                    "4) Test 11",
-                    Harness::to_odf_did(&Harness::user_account_id()),
-                    Ok(Harness::expected_ok_response_for_user_account_id()),
-                ),
-                (
-                    "4) Test 12",
-                    Harness::to_odf_did(&Harness::not_found_account_id()),
-                    Harness::expected_not_found(Harness::to_odf_did(
-                        &Harness::not_found_account_id(),
-                    )),
-                ),
             ],
         ),
-        // 5. Anonymous has no access to any datasets / accounts
+        // Molecule has access to own/project datasets / accounts
+        (
+            Harness::logged_subject(MOLECULE, Harness::molecule_account_id()),
+            vec![
+                Harness::molecule_dataset_id(),
+                Harness::molecule_project_dataset_id(),
+            ],
+            vec![
+                Harness::molecule_account_id(),
+                // TODO: Uncomment after sku/molecule merging
+                // Harness::molecule_project_account_id(),
+            ],
+        ),
+        // Molecule.dev has access to own/project datasets / accounts
+        (
+            Harness::logged_subject(MOLECULE_DEV, Harness::molecule_dev_account_id()),
+            vec![
+                Harness::molecule_dev_dataset_id(),
+                Harness::molecule_dev_project_dataset_id(),
+            ],
+            vec![
+                Harness::molecule_dev_account_id(),
+                // TODO: Uncomment after sku/molecule merging
+                // Harness::molecule_dev_project_account_id(),
+            ],
+        ),
+        // User has access to their own datasets / accounts
+        (
+            Harness::logged_subject(USER, Harness::user_account_id()),
+            vec![Harness::user_dataset_id()],
+            vec![Harness::user_account_id()],
+        ),
+        // Anonymous has no access to any datasets / accounts
         (
             CurrentAccountSubject::anonymous_no_authentication_provided(),
-            Harness::mock_dataset_permission_checker()
-                .expect_check_read_dataset(&Harness::molecule_dataset_id(), 1, false)
-                .expect_check_read_dataset(&Harness::molecule_project_dataset_id(), 1, false)
-                .expect_check_read_dataset(&Harness::molecule_dev_dataset_id(), 1, false)
-                .expect_check_read_dataset(&Harness::molecule_dev_project_dataset_id(), 1, false)
-                .expect_check_read_dataset(&Harness::user_dataset_id(), 1, false)
-                .expect_check_read_dataset(&Harness::not_found_dataset_id(), 1, false),
-            [
-                // Datasets
-                (
-                    "5) Test 1",
-                    odf::metadata::DidOdf::from(Harness::molecule_dataset_id()),
-                    Harness::expected_not_found(Harness::molecule_dataset_id().into()),
-                ),
-                (
-                    "5) Test 2",
-                    Harness::molecule_project_dataset_id().into(),
-                    Harness::expected_not_found(Harness::molecule_project_dataset_id().into()),
-                ),
-                (
-                    "5) Test 3",
-                    Harness::molecule_dev_dataset_id().into(),
-                    Harness::expected_not_found(Harness::molecule_dev_dataset_id().into()),
-                ),
-                (
-                    "5) Test 4",
-                    Harness::molecule_dev_project_dataset_id().into(),
-                    Harness::expected_not_found(Harness::molecule_dev_project_dataset_id().into()),
-                ),
-                (
-                    "5) Test 5",
-                    Harness::user_dataset_id().into(),
-                    Harness::expected_not_found(Harness::user_dataset_id().into()),
-                ),
-                (
-                    "5) Test 6",
-                    Harness::not_found_dataset_id().into(),
-                    Harness::expected_not_found(Harness::not_found_dataset_id().into()),
-                ),
-                // Accounts
-                (
-                    "5) Test 7",
-                    Harness::to_odf_did(&Harness::molecule_account_id()),
-                    Harness::expected_not_found(Harness::to_odf_did(
-                        &Harness::molecule_account_id(),
-                    )),
-                ),
-                // TODO: Uncomment after sku/molecule merging
-                // (
-                //     "5) Test 8",
-                //     Harness::to_odf_did(&Harness::molecule_project_account_id()),
-                //     Harness::expected_not_found(Harness::to_odf_did(&
-                // Harness::molecule_project_account_id())), ),
-                (
-                    "5) Test 9",
-                    Harness::to_odf_did(&Harness::molecule_dev_account_id()),
-                    Harness::expected_not_found(Harness::to_odf_did(
-                        &Harness::molecule_dev_account_id(),
-                    )),
-                ),
-                // TODO: Uncomment after sku/molecule merging
-                // (
-                //     "5) Test 10",
-                //     Harness::to_odf_did(&Harness::molecule_dev_project_account_id()),
-                //     Harness::expected_not_found(Harness::to_odf_did(&
-                // Harness::molecule_dev_project_account_id())), ),
-                (
-                    "5) Test 11",
-                    Harness::to_odf_did(&Harness::user_account_id()),
-                    Harness::expected_not_found(Harness::to_odf_did(&Harness::user_account_id())),
-                ),
-                (
-                    "5) Test 12",
-                    Harness::to_odf_did(&Harness::not_found_account_id()),
-                    Harness::expected_not_found(Harness::to_odf_did(
-                        &Harness::not_found_account_id(),
-                    )),
-                ),
-            ],
+            vec![],
+            vec![],
         ),
     ] {
         let harness = SignEip712UseCaseHarness::builder()
             .current_account_subject(subject.clone())
-            .maybe_mock_dataset_permission_checker(mock_dataset_permission_checker)
+            .maybe_mock_dataset_permission_checker(Harness::mock_dataset_permission_checker(
+                &readable_datasets,
+            ))
             .has_identity_config(true)
             .build()
             .await;
 
-        for (tag, did_odf, expected_response) in test_cases {
+        for (did_odf, expected_response) in
+            Harness::expected_responses(&readable_datasets, &accessible_accounts)
+        {
             assert_eq!(
                 expected_response,
                 harness
@@ -586,9 +225,7 @@ async fn test_execute_matrix() {
                         },
                     )
                     .await,
-                "Subject: {:?}, Tag: {}",
-                subject,
-                tag
+                "Subject: {subject:?}, DID: {did_odf:?}",
             );
         }
     }
@@ -718,14 +355,7 @@ impl SignEip712UseCaseHarness {
             b.add_value(identity_config);
         }
 
-        match maybe_principal {
-            Some(principal) => {
-                b.add_value(current_account_subject).add_value(principal);
-            }
-            None => {
-                current_account_subject.register(&mut b);
-            }
-        }
+        current_account_subject.register_acting_as(maybe_principal, &mut b);
 
         if let Some(mock_dataset_permission_checker) = maybe_mock_dataset_permission_checker {
             b.add_value(mock_dataset_permission_checker)
@@ -794,28 +424,57 @@ impl SignEip712UseCaseHarness {
             .map_err(|e| e.to_string())
     }
 
-    fn mock_dataset_permission_checker() -> MockDatasetPermissionChecker {
-        MockDatasetPermissionChecker::new()
-            // NOTE: At the time of the request, we don't know what the DID is, so we can check it
-            //       for the account as well
-            .expect_check_read_dataset(&Self::to_dataset_id(&Self::molecule_account_id()), 1, false)
-            // TODO: Uncomment after sku/molecule merging
-            // .expect_check_read_dataset(&Self::to_dataset_id(&
-            // Self::molecule_project_account_id()), 1, false)
-            .expect_check_read_dataset(
-                &Self::to_dataset_id(&Self::molecule_dev_account_id()),
-                1,
-                false,
-            )
-            // TODO: Uncomment after sku/molecule merging
-            // .expect_check_read_dataset(&Self::to_dataset_id(&
-            // Self::molecule_dev_project_account_id()), 1, false)
-            .expect_check_read_dataset(&Self::to_dataset_id(&Self::user_account_id()), 1, false)
-            .expect_check_read_dataset(
-                &Self::to_dataset_id(&Self::not_found_account_id()),
-                1,
-                false,
-            )
+    fn mock_dataset_permission_checker(
+        readable_datasets: &[odf::DatasetID],
+    ) -> MockDatasetPermissionChecker {
+        let mut mock = MockDatasetPermissionChecker::new();
+
+        for (dataset_id, _) in Self::datasets() {
+            let is_readable = readable_datasets.contains(&dataset_id);
+            mock = mock.expect_check_read_dataset(&dataset_id, 1, is_readable);
+        }
+
+        // NOTE: At the time of the request, we don't know what the DID is, so we can check it
+        //       for the account as well
+        for (account_id, _) in Self::accounts() {
+            mock = mock.expect_check_read_dataset(&Self::to_dataset_id(&account_id), 1, false);
+        }
+
+        mock
+    }
+
+    /// Every DID of [`Self::datasets`] and [`Self::accounts`] with the response expected for a
+    /// subject that can read `readable_datasets` and access `accessible_accounts`
+    fn expected_responses(
+        readable_datasets: &[odf::DatasetID],
+        accessible_accounts: &[odf::AccountID],
+    ) -> Vec<(odf::metadata::DidOdf, Result<serde_json::Value, String>)> {
+        let datasets = Self::datasets()
+            .into_iter()
+            .map(|(dataset_id, ok_response)| {
+                let is_granted = readable_datasets.contains(&dataset_id);
+                (
+                    odf::metadata::DidOdf::from(dataset_id),
+                    is_granted,
+                    ok_response,
+                )
+            });
+        let accounts = Self::accounts()
+            .into_iter()
+            .map(|(account_id, ok_response)| {
+                let is_granted = accessible_accounts.contains(&account_id);
+                (Self::to_odf_did(&account_id), is_granted, ok_response)
+            });
+
+        datasets
+            .chain(accounts)
+            .map(|(did_odf, is_granted, ok_response)| {
+                let expected_response = ok_response
+                    .filter(|_| is_granted)
+                    .map_or_else(|| Self::expected_not_found(did_odf), Ok);
+                (did_odf, expected_response)
+            })
+            .collect()
     }
 }
 
@@ -824,6 +483,72 @@ impl SignEip712UseCaseHarness {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl SignEip712UseCaseHarness {
+    fn logged_subject(account_name: &str, account_id: odf::AccountID) -> CurrentAccountSubject {
+        CurrentAccountSubject::logged(
+            kamu_accounts::Account::seed_resource_id_from_name(account_name),
+            account_id,
+            odf::AccountName::new_unchecked(account_name),
+        )
+    }
+
+    /// Accounts the matrix signs for, each with its response when access is granted; `None`
+    /// means the account has no key
+    fn accounts() -> Vec<(odf::AccountID, Option<serde_json::Value>)> {
+        vec![
+            (
+                Self::molecule_account_id(),
+                Some(Self::expected_ok_response_for_molecule_account_id()),
+            ),
+            // TODO: Uncomment after sku/molecule merging
+            // (
+            //     Self::molecule_project_account_id(),
+            //     Some(Self::expected_ok_response_for_molecule_project_account_id()),
+            // ),
+            (
+                Self::molecule_dev_account_id(),
+                Some(Self::expected_ok_response_for_molecule_dev_account_id()),
+            ),
+            // TODO: Uncomment after sku/molecule merging
+            // (
+            //     Self::molecule_dev_project_account_id(),
+            //     Some(Self::expected_ok_response_for_molecule_dev_project_account_id()),
+            // ),
+            (
+                Self::user_account_id(),
+                Some(Self::expected_ok_response_for_user_account_id()),
+            ),
+            (Self::not_found_account_id(), None),
+        ]
+    }
+
+    /// Datasets the matrix signs for, each with its response when access is granted; `None`
+    /// means the dataset has no key
+    fn datasets() -> Vec<(odf::DatasetID, Option<serde_json::Value>)> {
+        vec![
+            (
+                Self::molecule_dataset_id(),
+                Some(Self::expected_ok_response_for_molecule_dataset_id()),
+            ),
+            (
+                Self::molecule_project_dataset_id(),
+                Some(Self::expected_ok_response_for_molecule_project_dataset_id()),
+            ),
+            (
+                Self::molecule_dev_dataset_id(),
+                Some(Self::expected_ok_response_for_molecule_dev_dataset_id()),
+            ),
+            (
+                Self::molecule_dev_project_dataset_id(),
+                Some(Self::expected_ok_response_for_molecule_dev_project_dataset_id()),
+            ),
+            (
+                Self::user_dataset_id(),
+                Some(Self::expected_ok_response_for_user_dataset_id()),
+            ),
+            (Self::not_found_dataset_id(), None),
+        ]
+    }
+
     // Account IDs
     fn molecule_account_id() -> odf::AccountID {
         odf::AccountID::from_signing_key(&odf::metadata::PrivateKey::from_bytes(&MOLECULE_KEY))

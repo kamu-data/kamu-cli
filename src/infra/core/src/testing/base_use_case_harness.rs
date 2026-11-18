@@ -7,6 +7,9 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::collections::HashSet;
+
+use database_common::NoOpDatabasePlugin;
 use dill::Catalog;
 use kamu_accounts::{CurrentAccountSubject, Principal};
 use kamu_auth_rebac_services::RebacDatasetRegistryFacadeImpl;
@@ -81,6 +84,15 @@ impl BaseUseCaseHarnessOptions {
         self
     }
 
+    /// Acts as the node that runs tasks, with every dataset operation
+    /// permitted
+    pub fn as_task_node(self) -> Self {
+        self.with_maybe_permission_checker(Some(MockDatasetPermissionChecker::denying_ids(
+            HashSet::new(),
+        )))
+        .with_principal(Principal::Node)
+    }
+
     pub fn with_system_time_source_stub(
         mut self,
         system_time_source_stub: SystemTimeSourceStub,
@@ -128,6 +140,7 @@ impl BaseUseCaseHarness {
 
             b.add::<RebacDatasetRegistryFacadeImpl>();
             b.add::<DatasetOperationGuardImpl>();
+            NoOpDatabasePlugin::init_database_components(&mut b);
 
             if let Some(mock_outbox) = options.mock_outbox {
                 b.add_value(mock_outbox).bind::<dyn Outbox, MockOutbox>();

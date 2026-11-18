@@ -54,4 +54,27 @@ pub async fn add_city_population_files_dataset(kamu: &KamuCliPuppet, dataset_nam
         .success();
 }
 
+/// Adds a dataset from `snapshot` under `name` with the given visibility
+pub async fn add_named_dataset(
+    kamu: &KamuCliPuppet,
+    name: &str,
+    visibility: odf::DatasetVisibility,
+    snapshot: &str,
+) {
+    let visibility = visibility.to_string();
+    kamu.execute_with_input(
+        [
+            "add",
+            "--stdin",
+            "--name",
+            name,
+            "--visibility",
+            &visibility,
+        ],
+        snapshot,
+    )
+    .await
+    .success();
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

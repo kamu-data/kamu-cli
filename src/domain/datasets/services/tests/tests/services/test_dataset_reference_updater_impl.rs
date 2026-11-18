@@ -12,12 +12,7 @@ use std::sync::Arc;
 
 use chrono::{TimeZone, Utc};
 use kamu_core::MockDidGenerator;
-use kamu_datasets::{
-    CreateDatasetResult,
-    DatasetReferenceRepository,
-    DatasetReferenceUpdater,
-    ResolvedDataset,
-};
+use kamu_datasets::{CreateDatasetResult, DatasetReferenceUpdater, ResolvedDataset};
 use pretty_assertions::assert_eq;
 use time_source::{SystemTimeSourceProvider, SystemTimeSourceStub};
 
@@ -158,7 +153,6 @@ struct DatasetReferenceUpdaterHarness {
     dataset_base_use_case_harness: DatasetBaseUseCaseHarness,
     catalog: dill::Catalog,
     updater: Arc<dyn DatasetReferenceUpdater>,
-    dataset_ref_repo: Arc<dyn DatasetReferenceRepository>,
 }
 
 impl DatasetReferenceUpdaterHarness {
@@ -182,7 +176,6 @@ impl DatasetReferenceUpdaterHarness {
         Self {
             dataset_base_use_case_harness,
             updater: catalog.get_one().unwrap(),
-            dataset_ref_repo: catalog.get_one().unwrap(),
             catalog,
         }
     }
@@ -209,13 +202,6 @@ impl DatasetReferenceUpdaterHarness {
                 new_head,
             )
             .await
-    }
-
-    async fn stored_head(&self, dataset: &CreateDatasetResult) -> odf::Multihash {
-        self.dataset_ref_repo
-            .get_dataset_reference(&dataset.dataset_handle.id, &odf::BlockRef::Head)
-            .await
-            .unwrap()
     }
 }
 

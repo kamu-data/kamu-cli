@@ -19,6 +19,7 @@ use kamu_cli_e2e_common::{
     DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_2,
     DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR,
     add_city_population_files_dataset,
+    add_named_dataset,
     add_player_scores_with_derivative,
     city_population_root_snapshot,
     leaderboard_set_transform_event,
@@ -312,26 +313,16 @@ pub async fn test_pull_multiple_datasets_with_mixed_outcomes(mut kamu: KamuCliPu
         "${{ env.data_dir || env.workspace_dir }}",
         &kamu.workspace_path().display().to_string(),
     );
-    let add_dataset_with_visibility =
-        async |kamu: &KamuCliPuppet, name: &str, snapshot: &str, visibility: &str| {
-            kamu.execute_with_input(
-                ["add", "--stdin", "--name", name, "--visibility", visibility],
-                snapshot,
-            )
-            .await
-            .success();
-        };
-    let add_dataset = async |kamu: &KamuCliPuppet, name: &str, snapshot: &str| {
-        add_dataset_with_visibility(kamu, name, snapshot, "public").await;
-    };
+    let public = odf::DatasetVisibility::Public;
+    let private = odf::DatasetVisibility::Private;
 
     kamu.set_account(Some(bob));
-    add_dataset(&kamu, "b", &file_source_snapshot).await;
-    add_dataset_with_visibility(&kamu, "p", &file_source_snapshot, "private").await;
+    add_named_dataset(&kamu, "b", public, &file_source_snapshot).await;
+    add_named_dataset(&kamu, "p", private, &file_source_snapshot).await;
 
     kamu.set_account(Some(alice));
-    add_dataset(&kamu, "a", &file_source_snapshot).await;
-    add_dataset(&kamu, "c", DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR).await;
+    add_named_dataset(&kamu, "a", public, &file_source_snapshot).await;
+    add_named_dataset(&kamu, "c", public, DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR).await;
     let gone_url = kamu.workspace_dataset_url("gone", "c");
     kamu.execute([
         "repo",

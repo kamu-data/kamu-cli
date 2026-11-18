@@ -13,15 +13,8 @@ use std::sync::Arc;
 
 use chrono::{TimeZone, Utc};
 use kamu_core::MockDidGenerator;
-use kamu_datasets::{
-    CommitDatasetEventUseCase,
-    CreateDatasetResult,
-    DatasetPermission,
-    DatasetReferenceRepository,
-    MockDatasetPermissionChecker,
-};
+use kamu_datasets::{CommitDatasetEventUseCase, DatasetPermission, MockDatasetPermissionChecker};
 use kamu_datasets_services::CommitDatasetEventUseCaseImpl;
-use kamu_datasets_services::testing::RacingDatasetReferenceUpdater;
 use odf::metadata::testing::MetadataFactory;
 use pretty_assertions::assert_eq;
 use time_source::{SystemTimeSourceProvider, SystemTimeSourceStub};
@@ -448,8 +441,6 @@ async fn test_commit_dataset_event_ref_moved_concurrently() {
 struct CommitDatasetEventUseCaseHarness {
     dataset_base_use_case_harness: DatasetBaseUseCaseHarness,
     use_case: Arc<dyn CommitDatasetEventUseCase>,
-    racing_reference_updater: Arc<RacingDatasetReferenceUpdater>,
-    dataset_ref_repo: Arc<dyn DatasetReferenceRepository>,
     catalog: dill::Catalog,
 }
 
@@ -480,22 +471,8 @@ impl CommitDatasetEventUseCaseHarness {
         Self {
             dataset_base_use_case_harness,
             use_case: catalog.get_one().unwrap(),
-            racing_reference_updater: catalog.get_one().unwrap(),
-            dataset_ref_repo: catalog.get_one().unwrap(),
             catalog,
         }
-    }
-
-    fn move_reference_before_next_update(&self, concurrent_head: odf::Multihash) {
-        self.racing_reference_updater
-            .move_reference_before_next_update(&self.catalog, concurrent_head);
-    }
-
-    async fn stored_head(&self, dataset: &CreateDatasetResult) -> odf::Multihash {
-        self.dataset_ref_repo
-            .get_dataset_reference(&dataset.dataset_handle.id, &odf::BlockRef::Head)
-            .await
-            .unwrap()
     }
 }
 

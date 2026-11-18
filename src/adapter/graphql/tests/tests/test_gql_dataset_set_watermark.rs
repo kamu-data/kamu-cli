@@ -10,6 +10,7 @@
 use std::sync::Arc;
 
 use indoc::indoc;
+use kamu::testing::BaseRepoHarness;
 use kamu::{
     DatasetPullSourceResolverImpl,
     RemoteAliasesRegistryImpl,
@@ -192,27 +193,13 @@ impl SetWatermarkHarness {
         created: &CreateDatasetResult,
         head: &odf::Multihash,
     ) -> odf::Multihash {
-        let chain = created.dataset.as_metadata_chain();
-        let head_block = chain.get_block(head).await.unwrap();
-
-        let block = MetadataFactory::metadata_block(
-            MetadataFactory::set_info()
-                .description("concurrent")
-                .build(),
+        BaseRepoHarness::append_unreferenced_set_info(
+            created.dataset.as_metadata_chain(),
+            head,
+            "concurrent",
+            None,
         )
-        .prev(head, head_block.sequence_number)
-        .build();
-
-        chain
-            .append(
-                block,
-                odf::dataset::AppendOpts {
-                    update_ref: None,
-                    ..odf::dataset::AppendOpts::default()
-                },
-            )
-            .await
-            .unwrap()
+        .await
     }
 
     fn move_reference_before_next_update(&self, concurrent_head: odf::Multihash) {

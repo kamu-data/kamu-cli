@@ -19,6 +19,7 @@ use kamu_accounts::{
     DeleteAccountUseCase,
     DidSecretEncryptionConfig,
     PredefinedAccountsConfig,
+    Principal,
     TEST_PASSWORD,
     UpdateAccountUseCase,
 };
@@ -75,6 +76,16 @@ impl AccountBaseUseCaseHarness {
                 .embed_into_catalog(&mut b);
 
             opts.system_time_source_provider.embed_into_catalog(&mut b);
+
+            match (opts.current_account_subject, opts.principal) {
+                (Some(current_account_subject), principal) => {
+                    current_account_subject.register_acting_as(principal, &mut b);
+                }
+                (None, Some(principal)) => {
+                    b.add_value(principal);
+                }
+                (None, None) => {}
+            }
 
             b.build()
         };
@@ -214,6 +225,11 @@ pub struct AccountBaseUseCaseHarnessOpts<'a> {
     pub system_time_source_provider: SystemTimeSourceProvider,
     pub account_authorization_helper_provider: AccountAuthorizationHelperTestProvider,
     pub maybe_predefined_accounts_config: Option<PredefinedAccountsConfig>,
+    /// The caller; leave unset when the harness calls use cases on behalf of
+    /// each account itself
+    pub current_account_subject: Option<CurrentAccountSubject>,
+    /// The authenticated principal, when it differs from the caller's own
+    pub principal: Option<Principal>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

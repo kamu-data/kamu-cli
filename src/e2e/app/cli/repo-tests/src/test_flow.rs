@@ -851,17 +851,9 @@ pub async fn test_trigger_flow_ingest(mut kamu_api_server_client: KamuApiServerC
     )
     .unwrap();
 
-    assert_matches!(
-        kamu_api_server_client
-            .flow()
-            .trigger_ingest(&root_dataset_id)
-            .await,
-        FlowTriggerResponse::Success(_)
-    );
-
     kamu_api_server_client
         .flow()
-        .wait(&root_dataset_id, 1)
+        .run_ingest(&root_dataset_id)
         .await;
 
     assert_matches!(
@@ -895,17 +887,9 @@ pub async fn test_trigger_flow_ingest(mut kamu_api_server_client: KamuApiServerC
     )
     .unwrap();
 
-    assert_matches!(
-        kamu_api_server_client
-            .flow()
-            .trigger_ingest(&root_dataset_id)
-            .await,
-        FlowTriggerResponse::Success(_)
-    );
-
     kamu_api_server_client
         .flow()
-        .wait(&root_dataset_id, 2)
+        .run_ingest(&root_dataset_id)
         .await;
 
     assert_matches!(
@@ -1112,30 +1096,7 @@ pub async fn test_trigger_flow_ingest_with_env_var_from_variable_set(
         .await;
     ctx.wait_until_variable_set_ready("ingest-vars").await;
 
-    assert_matches!(
-        kamu_api_server_client
-            .flow()
-            .trigger_ingest(&dataset_id)
-            .await,
-        FlowTriggerResponse::Success(_)
-    );
-    kamu_api_server_client.flow().wait(&dataset_id, 1).await;
-
-    let flows = kamu_api_server_client.flow().list_flows(&dataset_id).await;
-    pretty_assertions::assert_eq!(
-        vec![Some("FlowSuccessResult")],
-        flows
-            .iter()
-            .map(|f| f.outcome.as_deref())
-            .collect::<Vec<_>>()
-    );
-    pretty_assertions::assert_eq!(
-        vec!["A", "B"],
-        kamu_api_server_client
-            .odf_query()
-            .query_rows(QUERY_CITIES)
-            .await
-    );
+    assert_city_population_ingest_succeeds(&kamu_api_server_client, &dataset_id).await;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1172,14 +1133,7 @@ pub async fn test_trigger_flow_ingest_of_invalid_fetch_step_or_data_fails_withou
             .set_ingest_config(&dataset_id, false, false, 3)
             .await;
 
-        assert_matches!(
-            kamu_api_server_client
-                .flow()
-                .trigger_ingest(&dataset_id)
-                .await,
-            FlowTriggerResponse::Success(_)
-        );
-        kamu_api_server_client.flow().wait(&dataset_id, 1).await;
+        kamu_api_server_client.flow().run_ingest(&dataset_id).await;
 
         let flows = kamu_api_server_client.flow().list_flows(&dataset_id).await;
         pretty_assertions::assert_eq!(1, flows.len(), "{dataset_name}");
@@ -1206,30 +1160,7 @@ pub async fn test_trigger_flow_ingest_of_invalid_fetch_step_or_data_fails_withou
         ))
         .await;
 
-    assert_matches!(
-        kamu_api_server_client
-            .flow()
-            .trigger_ingest(&dataset_id)
-            .await,
-        FlowTriggerResponse::Success(_)
-    );
-    kamu_api_server_client.flow().wait(&dataset_id, 1).await;
-
-    let flows = kamu_api_server_client.flow().list_flows(&dataset_id).await;
-    pretty_assertions::assert_eq!(
-        vec![Some("FlowSuccessResult")],
-        flows
-            .iter()
-            .map(|f| f.outcome.as_deref())
-            .collect::<Vec<_>>()
-    );
-    pretty_assertions::assert_eq!(
-        vec!["A", "B"],
-        kamu_api_server_client
-            .odf_query()
-            .query_rows(QUERY_CITIES)
-            .await
-    );
+    assert_city_population_ingest_succeeds(&kamu_api_server_client, &dataset_id).await;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1338,14 +1269,7 @@ pub async fn test_trigger_flow_ingest_fetching_uncacheable(
         .create_dataset(&city_population_snapshot("Url", "url", &source.url()))
         .await;
 
-    assert_matches!(
-        kamu_api_server_client
-            .flow()
-            .trigger_ingest(&dataset_id)
-            .await,
-        FlowTriggerResponse::Success(_)
-    );
-    kamu_api_server_client.flow().wait(&dataset_id, 1).await;
+    kamu_api_server_client.flow().run_ingest(&dataset_id).await;
 
     source.replace("city,population\nB,2000\n").await;
 
@@ -1354,14 +1278,7 @@ pub async fn test_trigger_flow_ingest_fetching_uncacheable(
         .e2e()
         .advance_frozen_system_time(1)
         .await;
-    assert_matches!(
-        kamu_api_server_client
-            .flow()
-            .trigger_ingest(&dataset_id)
-            .await,
-        FlowTriggerResponse::Success(_)
-    );
-    kamu_api_server_client.flow().wait(&dataset_id, 2).await;
+    kamu_api_server_client.flow().run_ingest(&dataset_id).await;
     pretty_assertions::assert_eq!(
         vec!["A"],
         kamu_api_server_client
@@ -1374,14 +1291,10 @@ pub async fn test_trigger_flow_ingest_fetching_uncacheable(
         .e2e()
         .advance_frozen_system_time(2)
         .await;
-    assert_matches!(
-        kamu_api_server_client
-            .flow()
-            .trigger_ingest_fetching_uncacheable(&dataset_id)
-            .await,
-        FlowTriggerResponse::Success(_)
-    );
-    kamu_api_server_client.flow().wait(&dataset_id, 3).await;
+    kamu_api_server_client
+        .flow()
+        .run_ingest_fetching_uncacheable(&dataset_id)
+        .await;
 
     let flows = kamu_api_server_client.flow().list_flows(&dataset_id).await;
     // Newest first; only the forced trigger carries an ingest configuration
@@ -1421,6 +1334,31 @@ fn city_population_snapshot_with_fetch(dataset_name: &str, fetch: &str) -> Strin
     city_population_root_snapshot(dataset_name, fetch)
         .escape_default()
         .to_string()
+}
+
+/// Ingests `CITY_POPULATION_CSV` into `city-population` as its only flow, which
+/// succeeds
+async fn assert_city_population_ingest_succeeds(
+    kamu_api_server_client: &KamuApiServerClient,
+    dataset_id: &odf::DatasetID,
+) {
+    kamu_api_server_client.flow().run_ingest(dataset_id).await;
+
+    let flows = kamu_api_server_client.flow().list_flows(dataset_id).await;
+    pretty_assertions::assert_eq!(
+        vec![Some("FlowSuccessResult")],
+        flows
+            .iter()
+            .map(|f| f.outcome.as_deref())
+            .collect::<Vec<_>>()
+    );
+    pretty_assertions::assert_eq!(
+        vec!["A", "B"],
+        kamu_api_server_client
+            .odf_query()
+            .query_rows(QUERY_CITIES)
+            .await
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1652,17 +1590,9 @@ pub async fn test_trigger_flow_hard_compaction(mut kamu_api_server_client: KamuA
             .collect::<Vec<_>>()
     );
 
-    assert_matches!(
-        kamu_api_server_client
-            .flow()
-            .trigger_compaction(&root_dataset_id)
-            .await,
-        FlowTriggerResponse::Success(_)
-    );
-
     kamu_api_server_client
         .flow()
-        .wait(&root_dataset_id, 1)
+        .run_compaction(&root_dataset_id)
         .await;
 
     pretty_assertions::assert_eq!(
@@ -1732,17 +1662,9 @@ pub async fn test_trigger_flow_reset(mut kamu_api_server_client: KamuApiServerCl
             .collect::<Vec<_>>()
     );
 
-    assert_matches!(
-        kamu_api_server_client
-            .flow()
-            .trigger_reset(&root_dataset_id)
-            .await,
-        FlowTriggerResponse::Success(_)
-    );
-
     kamu_api_server_client
         .flow()
-        .wait(&root_dataset_id, 1)
+        .run_reset(&root_dataset_id)
         .await;
 
     pretty_assertions::assert_eq!(
@@ -1826,17 +1748,9 @@ pub async fn test_trigger_flow_reset_metadata_only(
             .collect::<Vec<_>>()
     );
 
-    assert_matches!(
-        kamu_api_server_client
-            .flow()
-            .trigger_reset_to_metadata_only(&root_dataset_id)
-            .await,
-        FlowTriggerResponse::Success(_)
-    );
-
     kamu_api_server_client
         .flow()
-        .wait(&root_dataset_id, 1)
+        .run_reset_to_metadata_only(&root_dataset_id)
         .await;
 
     pretty_assertions::assert_eq!(
@@ -1872,45 +1786,8 @@ pub async fn test_trigger_flow_reset_metadata_only(
 pub async fn test_transform_trigger_recovers_from_input_reset_to_metadata(
     mut kamu_api_server_client: KamuApiServerClient,
 ) {
-    kamu_api_server_client.auth().login_as_kamu().await;
-
-    let CreateDatasetResponse {
-        dataset_id: root_dataset_id,
-        ..
-    } = kamu_api_server_client
-        .dataset()
-        .create_player_scores_dataset_with_data()
-        .await;
-    let CreateDatasetResponse {
-        dataset_id: derivative_dataset_id,
-        ..
-    } = kamu_api_server_client.dataset().create_leaderboard().await;
-
-    // Derived dataset is in sync with the root, no trigger is set yet
-    assert_matches!(
-        kamu_api_server_client
-            .flow()
-            .trigger_transform(&derivative_dataset_id)
-            .await,
-        FlowTriggerResponse::Success(_)
-    );
-    kamu_api_server_client
-        .flow()
-        .wait(&derivative_dataset_id, 1)
-        .await;
-
-    // Root history is rewritten while the derived dataset is not watching
-    assert_matches!(
-        kamu_api_server_client
-            .flow()
-            .trigger_reset_to_metadata_only(&root_dataset_id)
-            .await,
-        FlowTriggerResponse::Success(_)
-    );
-    kamu_api_server_client
-        .flow()
-        .wait(&root_dataset_id, 1)
-        .await;
+    let derivative_dataset_id =
+        reset_root_to_metadata_behind_in_sync_leaderboard(&mut kamu_api_server_client).await;
 
     kamu_api_server_client
         .flow()
@@ -1949,50 +1826,14 @@ pub async fn test_transform_trigger_recovers_from_input_reset_to_metadata(
 pub async fn test_transform_trigger_recovers_from_input_reset_with_new_data(
     mut kamu_api_server_client: KamuApiServerClient,
 ) {
-    kamu_api_server_client.auth().login_as_kamu().await;
+    let derivative_dataset_id =
+        reset_root_to_metadata_behind_in_sync_leaderboard(&mut kamu_api_server_client).await;
 
-    let CreateDatasetResponse {
-        dataset_id: root_dataset_id,
-        ..
-    } = kamu_api_server_client
-        .dataset()
-        .create_player_scores_dataset_with_data()
-        .await;
-    let root_dataset_alias = odf::DatasetAlias::new(None, DATASET_ROOT_PLAYER_NAME.clone());
-    let CreateDatasetResponse {
-        dataset_id: derivative_dataset_id,
-        ..
-    } = kamu_api_server_client.dataset().create_leaderboard().await;
-
-    // Derived dataset is in sync with the root, no trigger is set yet
-    assert_matches!(
-        kamu_api_server_client
-            .flow()
-            .trigger_transform(&derivative_dataset_id)
-            .await,
-        FlowTriggerResponse::Success(_)
-    );
-    kamu_api_server_client
-        .flow()
-        .wait(&derivative_dataset_id, 1)
-        .await;
-
-    // Root history is rewritten with different records reaching the same offset
-    assert_matches!(
-        kamu_api_server_client
-            .flow()
-            .trigger_reset_to_metadata_only(&root_dataset_id)
-            .await,
-        FlowTriggerResponse::Success(_)
-    );
-    kamu_api_server_client
-        .flow()
-        .wait(&root_dataset_id, 1)
-        .await;
+    // The new root records reach the same offset as the reset ones
     kamu_api_server_client
         .dataset()
         .ingest_data(
-            &root_dataset_alias,
+            &odf::DatasetAlias::new(None, DATASET_ROOT_PLAYER_NAME.clone()),
             RequestBody::NdJson(DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_2.into()),
         )
         .await;
@@ -2043,6 +1884,40 @@ pub async fn test_transform_trigger_recovers_from_input_reset_with_new_data(
                 2000-01-02T00:00:00Z,2,2,Alice,70"#
             )
     );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Creates `player-scores` with data and a `leaderboard` transformed from it,
+/// then resets the root to metadata while the leaderboard has no trigger to
+/// notice it. Returns the leaderboard's ID
+async fn reset_root_to_metadata_behind_in_sync_leaderboard(
+    kamu_api_server_client: &mut KamuApiServerClient,
+) -> odf::DatasetID {
+    kamu_api_server_client.auth().login_as_kamu().await;
+
+    let CreateDatasetResponse {
+        dataset_id: root_dataset_id,
+        ..
+    } = kamu_api_server_client
+        .dataset()
+        .create_player_scores_dataset_with_data()
+        .await;
+    let CreateDatasetResponse {
+        dataset_id: derivative_dataset_id,
+        ..
+    } = kamu_api_server_client.dataset().create_leaderboard().await;
+
+    kamu_api_server_client
+        .flow()
+        .run_transform(&derivative_dataset_id)
+        .await;
+    kamu_api_server_client
+        .flow()
+        .run_reset_to_metadata_only(&root_dataset_id)
+        .await;
+
+    derivative_dataset_id
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -2106,15 +1981,7 @@ pub async fn test_flow_planning_failure(mut kamu_api_server_client: KamuApiServe
     .await
     .success();
 
-    assert_matches!(
-        kamu_api_server_client
-            .flow()
-            .trigger_ingest(&dataset_id)
-            .await,
-        FlowTriggerResponse::Success(_)
-    );
-
-    kamu_api_server_client.flow().wait(&dataset_id, 1).await;
+    kamu_api_server_client.flow().run_ingest(&dataset_id).await;
 
     kamu_api_server_client
         .graphql_api_call_assert(
@@ -2903,16 +2770,9 @@ pub async fn test_batching_rule_change_reaches_waiting_flow(
     )
     .unwrap();
 
-    let FlowTriggerResponse::Success(_) = kamu_api_server_client
-        .flow()
-        .trigger_ingest(&root_dataset_id)
-        .await
-    else {
-        panic!("ingest flow must be triggered");
-    };
     kamu_api_server_client
         .flow()
-        .wait(&root_dataset_id, 1)
+        .run_ingest(&root_dataset_id)
         .await;
 
     // 1 record so far: the transform keeps batching

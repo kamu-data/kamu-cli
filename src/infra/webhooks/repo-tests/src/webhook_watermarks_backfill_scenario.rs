@@ -10,6 +10,7 @@
 use std::sync::Arc;
 
 use chrono::{DateTime, Duration, SubsecRound, Utc};
+use database_common::testing::in_committed_transaction;
 use dill::Catalog;
 use kamu_datasets::{DatasetEntry, DatasetEntryRepository, DatasetReferenceRepository};
 use kamu_webhooks::*;
@@ -25,7 +26,46 @@ pub struct WebhookWatermarksBackfillScenario {
 }
 
 impl WebhookWatermarksBackfillScenario {
-    pub async fn write(catalog: &Catalog) -> Self {
+    /// Writes the scenario and commits it, so that a backfill run on its own
+    /// connection sees it
+    pub async fn write_committed(catalog: &Catalog) -> Self {
+        in_committed_transaction(
+            catalog,
+            |catalog| async move { Self::write(&catalog).await },
+        )
+        .await
+    }
+
+    /// Checks that every subscription has the expected watermark committed
+    pub async fn assert_watermarks(&self, catalog: &Catalog) {
+        for (subscription_id, expected_watermark) in &self.expected_watermarks {
+            assert_eq!(
+                &Self::committed_watermark(catalog, *subscription_id).await,
+                expected_watermark,
+                "watermark of subscription {subscription_id}"
+            );
+        }
+    }
+
+    async fn committed_watermark(
+        catalog: &Catalog,
+        subscription_id: WebhookSubscriptionID,
+    ) -> Option<WebhookWatermark> {
+        in_committed_transaction(catalog, |catalog| async move {
+            catalog
+                .get_one::<dyn WebhookWatermarkRepository>()
+                .unwrap()
+                .find_watermark(
+                    subscription_id,
+                    &WebhookEventTypeCatalog::dataset_ref_updated(),
+                )
+                .await
+                .unwrap()
+        })
+        .await
+    }
+
+    async fn write(catalog: &Catalog) -> Self {
         let writer = ScenarioWriter::new(catalog);
 
         let foo_head = odf::Multihash::from_digest_sha3_256(b"foo-head");

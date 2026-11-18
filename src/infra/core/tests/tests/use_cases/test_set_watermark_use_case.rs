@@ -10,7 +10,7 @@
 use std::sync::Arc;
 
 use chrono::{DateTime, TimeDelta, Utc};
-use kamu::testing::{BaseUseCaseHarness, BaseUseCaseHarnessOptions};
+use kamu::testing::{BaseRepoHarness, BaseUseCaseHarness, BaseUseCaseHarnessOptions};
 use kamu::*;
 use kamu_core::*;
 use kamu_datasets::{
@@ -26,7 +26,7 @@ use pretty_assertions::assert_matches;
 
 #[tokio::test]
 async fn test_set_watermark_success() {
-    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let alias_foo = BaseRepoHarness::alias("foo");
     let (_, dataset_id_foo) = odf::DatasetID::new_generated_ed25519();
 
     let harness = SetWatermarkUseCaseHarness::new(
@@ -84,7 +84,7 @@ async fn test_try_set_watermark_for_not_found_dataset() {
 
 #[tokio::test]
 async fn test_set_watermark_unauthorized() {
-    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let alias_foo = BaseRepoHarness::alias("foo");
     let (_, dataset_id_foo) = odf::DatasetID::new_generated_ed25519();
 
     let harness = SetWatermarkUseCaseHarness::new(

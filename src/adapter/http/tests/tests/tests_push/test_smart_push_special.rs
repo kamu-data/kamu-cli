@@ -129,76 +129,22 @@ async fn test_smart_push_new_dataset_wrong_user() {
 
 #[test_log::test(tokio::test)]
 async fn test_smart_push_existing_dataset_unauthenticated() {
-    let (client_harness, server_harness) = LocalFsTransferOptions {
-        client_tenancy: TenancyConfig::SingleTenant,
+    ExistingDatasetDeniedCase {
         authenticated_remotely: false,
-        server_tenancy: TenancyConfig::MultiTenant,
-        authorized_writes: false,
     }
-    .build()
+    .assert_push_finds_no_dataset()
     .await;
-    let scenario =
-        SmartPushExistingEvolvedDatasetScenario::prepare(client_harness, server_harness).await;
-
-    let api_server_handle = scenario.server_harness.api_server_run();
-
-    let client_handle = async {
-        let push_result = scenario
-            .client_harness
-            .push_dataset(
-                scenario.client_dataset_ref,
-                scenario.server_dataset_ref.try_into().unwrap(),
-                false,
-                odf::DatasetVisibility::Private,
-            )
-            .await;
-
-        let dataset_result = &push_result.first().unwrap().result;
-        match dataset_result {
-            Ok(_) => panic!(),
-            Err(e) => assert_matches!(e, PushError::SyncError(SyncError::DatasetNotFound(_))),
-        }
-    };
-
-    await_client_server_flow!(api_server_handle, client_handle);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
 async fn test_smart_push_existing_dataset_unauthorized() {
-    let (client_harness, server_harness) = LocalFsTransferOptions {
-        client_tenancy: TenancyConfig::SingleTenant,
+    ExistingDatasetDeniedCase {
         authenticated_remotely: true,
-        server_tenancy: TenancyConfig::MultiTenant,
-        authorized_writes: false,
     }
-    .build()
+    .assert_push_finds_no_dataset()
     .await;
-    let scenario =
-        SmartPushExistingEvolvedDatasetScenario::prepare(client_harness, server_harness).await;
-
-    let api_server_handle = scenario.server_harness.api_server_run();
-
-    let client_handle = async {
-        let push_result = scenario
-            .client_harness
-            .push_dataset(
-                scenario.client_dataset_ref,
-                scenario.server_dataset_ref.try_into().unwrap(),
-                false,
-                odf::DatasetVisibility::Private,
-            )
-            .await;
-
-        let dataset_result = &push_result.first().unwrap().result;
-        match dataset_result {
-            Ok(_) => panic!(),
-            Err(e) => assert_matches!(e, PushError::SyncError(SyncError::DatasetNotFound(_))),
-        }
-    };
-
-    await_client_server_flow!(api_server_handle, client_handle);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -326,59 +272,7 @@ async fn test_smart_push_incompatible_version_err() {
 
 #[test_log::test(tokio::test)]
 async fn test_smart_push_ref_moved_concurrently() {
-    let (client_harness, server_harness) = LocalFsTransferOptions {
-        client_tenancy: TenancyConfig::SingleTenant,
-        authenticated_remotely: true,
-        server_tenancy: TenancyConfig::MultiTenant,
-        authorized_writes: true,
-    }
-    .build()
-    .await;
-    let scenario =
-        SmartPushExistingEvolvedDatasetScenario::prepare(client_harness, server_harness).await;
-
-    let server_dataset_handle = scenario
-        .server_harness
-        .cli_dataset_registry()
-        .resolve_dataset_handle_by_ref(&scenario.client_create_result.dataset_handle.as_local_ref())
-        .await
-        .unwrap();
-    let concurrent_head = scenario
-        .server_harness
-        .append_unreferenced_block(&server_dataset_handle)
-        .await;
-    scenario
-        .server_harness
-        .move_reference_before_next_update(concurrent_head.clone());
-
-    let stored_heads = scenario.server_harness.stored_heads();
-    let api_server_handle = scenario.server_harness.api_server_run();
-
-    let client_handle = async {
-        let push_responses = scenario
-            .client_harness
-            .push_dataset(
-                scenario.client_dataset_ref,
-                scenario.server_dataset_ref.try_into().unwrap(),
-                false,
-                odf::DatasetVisibility::Private,
-            )
-            .await;
-
-        pretty_assertions::assert_eq!(push_responses.len(), 1);
-        assert_matches!(
-            &push_responses[0].result,
-            Err(PushError::SyncError(SyncError::RefMoved(
-                SyncRefMovedError { reported: None, .. }
-            )))
-        );
-        pretty_assertions::assert_eq!(
-            stored_heads.get(&server_dataset_handle.id).await,
-            concurrent_head
-        );
-    };
-
-    await_client_server_flow!(api_server_handle, client_handle);
+    PushRefMovedCase { forced: false }.assert_push_fails().await;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -508,59 +402,7 @@ async fn test_smart_push_from_stale_head_is_rejected_with_both_heads() {
 
 #[test_log::test(tokio::test)]
 async fn test_smart_push_forced_ref_moved_after_initiation() {
-    let (client_harness, server_harness) = LocalFsTransferOptions {
-        client_tenancy: TenancyConfig::SingleTenant,
-        authenticated_remotely: true,
-        server_tenancy: TenancyConfig::MultiTenant,
-        authorized_writes: true,
-    }
-    .build()
-    .await;
-    let scenario =
-        SmartPushExistingDivergedDatasetScenario::prepare(client_harness, server_harness).await;
-
-    let server_dataset_handle = scenario
-        .server_harness
-        .cli_dataset_registry()
-        .resolve_dataset_handle_by_ref(&scenario.client_dataset_handle.as_local_ref())
-        .await
-        .unwrap();
-    let concurrent_head = scenario
-        .server_harness
-        .append_unreferenced_block(&server_dataset_handle)
-        .await;
-    scenario
-        .server_harness
-        .move_head_before_next_append(concurrent_head.clone());
-
-    let stored_heads = scenario.server_harness.stored_heads();
-    let api_server_handle = scenario.server_harness.api_server_run();
-
-    let client_handle = async {
-        let push_responses = scenario
-            .client_harness
-            .push_dataset(
-                scenario.client_dataset_ref,
-                scenario.server_dataset_ref.try_into().unwrap(),
-                true, /* diverged! */
-                odf::DatasetVisibility::Private,
-            )
-            .await;
-
-        pretty_assertions::assert_eq!(push_responses.len(), 1);
-        assert_matches!(
-            &push_responses[0].result,
-            Err(PushError::SyncError(SyncError::RefMoved(
-                SyncRefMovedError { reported: None, .. }
-            )))
-        );
-        pretty_assertions::assert_eq!(
-            stored_heads.get(&server_dataset_handle.id).await,
-            concurrent_head
-        );
-    };
-
-    await_client_server_flow!(api_server_handle, client_handle);
+    PushRefMovedCase { forced: true }.assert_push_fails().await;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -840,6 +682,143 @@ async fn test_smart_push_reads_the_completion_reply_after_a_stale_progress_reque
     };
 
     await_client_server_flow!(server_handle, client_handle);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// A push into an existing dataset the client may not write, which the server
+/// reports as missing whether or not the client is authenticated
+struct ExistingDatasetDeniedCase {
+    authenticated_remotely: bool,
+}
+
+impl ExistingDatasetDeniedCase {
+    async fn assert_push_finds_no_dataset(self) {
+        let (client_harness, server_harness) = LocalFsTransferOptions {
+            client_tenancy: TenancyConfig::SingleTenant,
+            authenticated_remotely: self.authenticated_remotely,
+            server_tenancy: TenancyConfig::MultiTenant,
+            authorized_writes: false,
+        }
+        .build()
+        .await;
+        let scenario =
+            SmartPushExistingEvolvedDatasetScenario::prepare(client_harness, server_harness).await;
+
+        let api_server_handle = scenario.server_harness.api_server_run();
+
+        let client_handle = async {
+            let push_result = scenario
+                .client_harness
+                .push_dataset(
+                    scenario.client_dataset_ref,
+                    scenario.server_dataset_ref.try_into().unwrap(),
+                    false,
+                    odf::DatasetVisibility::Private,
+                )
+                .await;
+
+            let dataset_result = &push_result.first().unwrap().result;
+            match dataset_result {
+                Ok(_) => panic!(),
+                Err(e) => assert_matches!(e, PushError::SyncError(SyncError::DatasetNotFound(_))),
+            }
+        };
+
+        await_client_server_flow!(api_server_handle, client_handle);
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// `HEAD` moves on the server while a push commits: the commit fails and keeps
+/// the concurrent head. A plain push of an evolved chain races the reference
+/// update; a forced push of a diverged chain races the metadata append, before
+/// it decides which head it expects
+struct PushRefMovedCase {
+    forced: bool,
+}
+
+impl PushRefMovedCase {
+    async fn assert_push_fails(self) {
+        let (client_harness, server_harness) = LocalFsTransferOptions {
+            client_tenancy: TenancyConfig::SingleTenant,
+            authenticated_remotely: true,
+            server_tenancy: TenancyConfig::MultiTenant,
+            authorized_writes: true,
+        }
+        .build()
+        .await;
+        let (
+            client_harness,
+            server_harness,
+            client_dataset_handle,
+            client_dataset_ref,
+            server_dataset_ref,
+        ) = if self.forced {
+            let scenario =
+                SmartPushExistingDivergedDatasetScenario::prepare(client_harness, server_harness)
+                    .await;
+            (
+                scenario.client_harness,
+                scenario.server_harness,
+                scenario.client_dataset_handle,
+                scenario.client_dataset_ref,
+                scenario.server_dataset_ref,
+            )
+        } else {
+            let scenario =
+                SmartPushExistingEvolvedDatasetScenario::prepare(client_harness, server_harness)
+                    .await;
+            (
+                scenario.client_harness,
+                scenario.server_harness,
+                scenario.client_create_result.dataset_handle,
+                scenario.client_dataset_ref,
+                scenario.server_dataset_ref,
+            )
+        };
+
+        let server_dataset_handle = server_harness
+            .server_dataset_handle(&client_dataset_handle)
+            .await;
+        let concurrent_head = server_harness
+            .append_unreferenced_block(&server_dataset_handle)
+            .await;
+        if self.forced {
+            server_harness.move_head_before_next_append(concurrent_head.clone());
+        } else {
+            server_harness.move_reference_before_next_update(concurrent_head.clone());
+        }
+
+        let stored_heads = server_harness.stored_heads();
+        let api_server_handle = server_harness.api_server_run();
+
+        let client_handle = async {
+            let push_responses = client_harness
+                .push_dataset(
+                    client_dataset_ref,
+                    server_dataset_ref.try_into().unwrap(),
+                    self.forced,
+                    odf::DatasetVisibility::Private,
+                )
+                .await;
+
+            pretty_assertions::assert_eq!(push_responses.len(), 1);
+            assert_matches!(
+                &push_responses[0].result,
+                Err(PushError::SyncError(SyncError::RefMoved(
+                    SyncRefMovedError { reported: None, .. }
+                )))
+            );
+            pretty_assertions::assert_eq!(
+                stored_heads.get(&server_dataset_handle.id).await,
+                concurrent_head
+            );
+        };
+
+        await_client_server_flow!(api_server_handle, client_handle);
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

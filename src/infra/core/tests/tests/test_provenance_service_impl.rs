@@ -12,7 +12,7 @@ use std::sync::Arc;
 
 use internal_error::InternalError;
 use kamu::ProvenanceServiceImpl;
-use kamu::testing::{BaseUseCaseHarness, BaseUseCaseHarnessOptions};
+use kamu::testing::{BaseRepoHarness, BaseUseCaseHarness, BaseUseCaseHarnessOptions};
 use kamu_core::{
     GetLineageError,
     LineageOptions,
@@ -28,8 +28,8 @@ use kamu_datasets_services::{DependencyGraphIndexer, DependencyGraphServiceImpl}
 
 #[tokio::test]
 async fn test_lineage_over_unreadable_upstream_is_access_error() {
-    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
-    let alias_bar = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("bar"));
+    let alias_foo = BaseRepoHarness::alias("foo");
+    let alias_bar = BaseRepoHarness::alias("bar");
     let id_foo = odf::DatasetID::new_seeded_ed25519(b"foo");
     let id_bar = odf::DatasetID::new_seeded_ed25519(b"bar");
 
@@ -82,7 +82,6 @@ impl ProvenanceHarness {
         b.add::<ProvenanceServiceImpl>()
             .add::<DependencyGraphServiceImpl>()
             .add::<DependencyGraphIndexer>();
-        database_common::NoOpDatabasePlugin::init_database_components(&mut b);
         let catalog = b.build();
 
         Self {

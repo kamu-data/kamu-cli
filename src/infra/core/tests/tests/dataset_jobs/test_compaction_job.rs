@@ -9,11 +9,16 @@
 
 use std::sync::Arc;
 
-use kamu::testing::{BaseUseCaseHarness, BaseUseCaseHarnessOptions};
+use kamu::testing::{BaseRepoHarness, BaseUseCaseHarness, BaseUseCaseHarnessOptions};
 use kamu::*;
 use kamu_core::testing::ReportedHeads;
 use kamu_core::*;
-use kamu_datasets::{DatasetPermission, MockDatasetPermissionChecker, ResolvedDataset};
+use kamu_datasets::{
+    CreateDatasetResult,
+    DatasetPermission,
+    MockDatasetPermissionChecker,
+    ResolvedDataset,
+};
 use kamu_datasets_services::DatasetReferenceUpdaterImpl;
 use pretty_assertions::assert_matches;
 
@@ -23,7 +28,7 @@ use crate::utils::RecordingListener;
 
 #[tokio::test]
 async fn test_compact_dataset_success() {
-    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let alias_foo = BaseRepoHarness::alias("foo");
     let (_, dataset_id_foo) = odf::DatasetID::new_generated_ed25519();
 
     let harness = CompactionJobHarness::new(
@@ -81,7 +86,7 @@ async fn test_try_compact_not_found_dataset() {
 #[tokio::test]
 async fn test_compact_dataset_unauthorized() {
     for (operation, options) in CompactionJobHarness::compact_and_reset_to_metadata() {
-        let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+        let alias_foo = BaseRepoHarness::alias("foo");
         let (_, dataset_id_foo) = odf::DatasetID::new_generated_ed25519();
 
         let harness = CompactionJobHarness::new(
@@ -110,24 +115,8 @@ async fn test_compact_dataset_unauthorized() {
 #[tokio::test]
 async fn test_compact_dataset_commits_head() {
     for (operation, options) in CompactionJobHarness::compact_and_reset_to_metadata() {
-        let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
-        let (_, dataset_id_foo) = odf::DatasetID::new_generated_ed25519();
-        let reported_heads = ReportedHeads::default();
-
-        let harness = CompactionJobHarness::with_compaction_executor(
-            MockDatasetPermissionChecker::new().expect_authorize_for(
-                DatasetPermission::Maintain,
-                &dataset_id_foo,
-                1,
-                true,
-            ),
-            MockDidGenerator::predefined_dataset_ids(vec![dataset_id_foo]),
-            MockCompactionExecutor::new()
-                .make_expect_compaction_success(alias_foo.clone(), reported_heads.clone()),
-        );
-        let foo = harness.create_root_dataset(&alias_foo).await;
-        let compacted_head = harness.append_unreferenced_block(&foo, "compacted").await;
-        reported_heads.set(&foo.head, &compacted_head);
+        let (harness, foo, compacted_head) =
+            CompactionJobHarness::new_compacting_new_root(&BaseRepoHarness::alias("foo")).await;
 
         let (result, events) = harness
             .compact_dataset_recording(ResolvedDataset::from_created(&foo), options)
@@ -150,24 +139,8 @@ async fn test_compact_dataset_commits_head() {
 
 #[tokio::test]
 async fn test_compact_dataset_ref_moved_concurrently() {
-    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
-    let (_, dataset_id_foo) = odf::DatasetID::new_generated_ed25519();
-    let reported_heads = ReportedHeads::default();
-
-    let harness = CompactionJobHarness::with_compaction_executor(
-        MockDatasetPermissionChecker::new().expect_authorize_for(
-            DatasetPermission::Maintain,
-            &dataset_id_foo,
-            1,
-            true,
-        ),
-        MockDidGenerator::predefined_dataset_ids(vec![dataset_id_foo]),
-        MockCompactionExecutor::new()
-            .make_expect_compaction_success(alias_foo.clone(), reported_heads.clone()),
-    );
-    let foo = harness.create_root_dataset(&alias_foo).await;
-    let compacted_head = harness.append_unreferenced_block(&foo, "compacted").await;
-    reported_heads.set(&foo.head, &compacted_head);
+    let (harness, foo, _) =
+        CompactionJobHarness::new_compacting_new_root(&BaseRepoHarness::alias("foo")).await;
     let concurrent_head = harness.move_head_concurrently(&foo).await;
 
     let (result, events) = harness
@@ -218,6 +191,33 @@ impl CompactionJobHarness {
         )
     }
 
+    /// Creates root `alias`, permitted to maintain, and expects one
+    /// compaction of it reporting a new head, appended unreferenced; returns
+    /// the dataset and that head
+    async fn new_compacting_new_root(
+        alias: &odf::DatasetAlias,
+    ) -> (Self, CreateDatasetResult, odf::Multihash) {
+        let (_, dataset_id) = odf::DatasetID::new_generated_ed25519();
+        let reported_heads = ReportedHeads::default();
+        let harness = Self::with_compaction_executor(
+            MockDatasetPermissionChecker::new().expect_authorize_for(
+                DatasetPermission::Maintain,
+                &dataset_id,
+                1,
+                true,
+            ),
+            MockDidGenerator::predefined_dataset_ids(vec![dataset_id]),
+            MockCompactionExecutor::new()
+                .make_expect_compaction_success(alias.clone(), reported_heads.clone()),
+        );
+        let created = harness.create_root_dataset(alias).await;
+        let compacted_head = harness
+            .append_unreferenced_block(&created, "compacted")
+            .await;
+        reported_heads.set(&created.head, &compacted_head);
+        (harness, created, compacted_head)
+    }
+
     fn build(
         mock_dataset_permission_checker: MockDatasetPermissionChecker,
         mock_did_generator: MockDidGenerator,
@@ -241,7 +241,6 @@ impl CompactionJobHarness {
         } else {
             b.add::<CompactionExecutorImpl>();
         }
-        database_common::NoOpDatabasePlugin::init_database_components(&mut b);
         let catalog = b.build();
 
         let job = catalog.get_one::<dyn CompactionJob>().unwrap();

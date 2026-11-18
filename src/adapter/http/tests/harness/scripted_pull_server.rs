@@ -29,67 +29,7 @@ pub(crate) struct ScriptedPullServer {
 }
 
 impl ScriptedPullServer {
-    pub async fn omitting_objects(
-        dataset_registry: &dyn DatasetRegistry,
-        dataset_handle: &odf::DatasetHandle,
-    ) -> Self {
-        Self::new(
-            dataset_registry,
-            dataset_handle,
-            PullScript::Objects(ObjectsScript::Omit),
-        )
-        .await
-    }
-
-    pub async fn mislabeling_objects(
-        dataset_registry: &dyn DatasetRegistry,
-        dataset_handle: &odf::DatasetHandle,
-    ) -> Self {
-        Self::new(
-            dataset_registry,
-            dataset_handle,
-            PullScript::Objects(ObjectsScript::Mislabel),
-        )
-        .await
-    }
-
-    pub async fn corrupting_objects(
-        dataset_registry: &dyn DatasetRegistry,
-        dataset_handle: &odf::DatasetHandle,
-    ) -> Self {
-        Self::new(
-            dataset_registry,
-            dataset_handle,
-            PullScript::Objects(ObjectsScript::Corrupt),
-        )
-        .await
-    }
-
-    pub async fn sending_undecodable_metadata(
-        dataset_registry: &dyn DatasetRegistry,
-        dataset_handle: &odf::DatasetHandle,
-    ) -> Self {
-        Self::new(
-            dataset_registry,
-            dataset_handle,
-            PullScript::Metadata(MetadataScript::Undecodable),
-        )
-        .await
-    }
-
-    pub async fn sending_no_blocks(
-        dataset_registry: &dyn DatasetRegistry,
-        dataset_handle: &odf::DatasetHandle,
-    ) -> Self {
-        Self::new(
-            dataset_registry,
-            dataset_handle,
-            PullScript::Metadata(MetadataScript::NoBlocks),
-        )
-        .await
-    }
-
-    async fn new(
+    pub async fn new(
         dataset_registry: &dyn DatasetRegistry,
         dataset_handle: &odf::DatasetHandle,
         script: PullScript,
@@ -182,7 +122,7 @@ impl ScriptedPullServer {
 
 /// Where the server breaks the transfer
 #[derive(Clone, Copy)]
-enum PullScript {
+pub(crate) enum PullScript {
     /// Sends the whole chain, then answers the request for objects wrongly
     Objects(ObjectsScript),
 
@@ -193,7 +133,7 @@ enum PullScript {
 
 /// How the server answers the request for objects
 #[derive(Clone, Copy)]
-enum ObjectsScript {
+pub(crate) enum ObjectsScript {
     /// Offers none of them
     Omit,
 
@@ -208,7 +148,7 @@ enum ObjectsScript {
 
 /// Which metadata batch the server sends in place of the planned one
 #[derive(Clone, Copy)]
-enum MetadataScript {
+pub(crate) enum MetadataScript {
     /// A payload that is not an archive
     Undecodable,
 

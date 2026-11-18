@@ -22,6 +22,9 @@ use kamu_core::TenancyConfig;
 
 use crate::harness::{
     LocalFsTransferOptions,
+    MetadataScript,
+    ObjectsScript,
+    PullScript,
     ScriptedPullServer,
     ServerSideHarness,
     await_client_server_flow,
@@ -121,7 +124,13 @@ async fn test_smart_pull_of_missing_dataset_fails() {
     .await;
     let scenario = SmartPullNewDatasetScenario::prepare(client_harness, server_harness).await;
     let missing_dataset_url = scenario.server_harness.dataset_url(&odf::DatasetAlias::new(
-        Some(scenario.server_harness.api_server_account().account_name),
+        Some(
+            scenario
+                .server_harness
+                .server_account()
+                .account_name
+                .clone(),
+        ),
         odf::DatasetName::new_unchecked("missing"),
     ));
 
@@ -147,9 +156,12 @@ async fn test_smart_pull_of_missing_dataset_fails() {
 #[test_log::test(tokio::test)]
 async fn test_smart_pull_without_referenced_objects_is_not_committed() {
     // The new data block references a data file and a checkpoint, and neither is sent
-    MissingObjectsCase { mislabeled: false }
-        .assert_pull_fails()
-        .await;
+    ScriptedPullCase {
+        script: PullScript::Objects(ObjectsScript::Omit),
+        expected_message: "Server did not send 2 file(s)",
+    }
+    .assert_pull_fails()
+    .await;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -158,36 +170,48 @@ async fn test_smart_pull_without_referenced_objects_is_not_committed() {
 /// as the other type does not count as sent
 #[test_log::test(tokio::test)]
 async fn test_smart_pull_with_mislabeled_objects_is_not_committed() {
-    MissingObjectsCase { mislabeled: true }
-        .assert_pull_fails()
-        .await;
+    ScriptedPullCase {
+        script: PullScript::Objects(ObjectsScript::Mislabel),
+        expected_message: "Server did not send 2 file(s)",
+    }
+    .assert_pull_fails()
+    .await;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
 async fn test_smart_pull_with_corrupted_objects_is_not_committed() {
-    CorruptedSourceCase::CorruptingObjects
-        .assert_pull_fails("file hash didn't match the computed")
-        .await;
+    ScriptedPullCase {
+        script: PullScript::Objects(ObjectsScript::Corrupt),
+        expected_message: "file hash didn't match the computed",
+    }
+    .assert_pull_fails()
+    .await;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
 async fn test_smart_pull_with_undecodable_metadata_is_not_committed() {
-    CorruptedSourceCase::SendingUndecodableMetadata
-        .assert_pull_fails("Server sent a metadata batch that cannot be read")
-        .await;
+    ScriptedPullCase {
+        script: PullScript::Metadata(MetadataScript::Undecodable),
+        expected_message: "Server sent a metadata batch that cannot be read",
+    }
+    .assert_pull_fails()
+    .await;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
 async fn test_smart_pull_without_planned_blocks_is_not_committed() {
-    CorruptedSourceCase::SendingNoBlocks
-        .assert_pull_fails("Server sent no blocks for a non-empty transfer plan")
-        .await;
+    ScriptedPullCase {
+        script: PullScript::Metadata(MetadataScript::NoBlocks),
+        expected_message: "Server sent no blocks for a non-empty transfer plan",
+    }
+    .assert_pull_fails()
+    .await;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -430,13 +454,14 @@ impl RefMovedConcurrentlyCase {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// A server that sends the blocks of a new dataset, but none of the files
-/// they reference under the type the client asked for
-struct MissingObjectsCase {
-    mislabeled: bool,
+/// A server whose transfer of a new dataset breaks the way the script says,
+/// the same way on every retry
+struct ScriptedPullCase {
+    script: PullScript,
+    expected_message: &'static str,
 }
 
-impl MissingObjectsCase {
+impl ScriptedPullCase {
     async fn assert_pull_fails(self) {
         let (client_harness, server_harness) = LocalFsTransferOptions {
             client_tenancy: TenancyConfig::SingleTenant,
@@ -447,88 +472,12 @@ impl MissingObjectsCase {
         .build()
         .await;
         let scenario = SmartPullNewDatasetScenario::prepare(client_harness, server_harness).await;
-        let dataset_registry = scenario.server_harness.cli_dataset_registry();
-        let server = if self.mislabeled {
-            ScriptedPullServer::mislabeling_objects(
-                dataset_registry.as_ref(),
-                &scenario.server_dataset_handle,
-            )
-            .await
-        } else {
-            ScriptedPullServer::omitting_objects(
-                dataset_registry.as_ref(),
-                &scenario.server_dataset_handle,
-            )
-            .await
-        };
-        let server_dataset_url = server.dataset_url("foo");
-
-        let server_handle = server.run();
-
-        let client_handle = async {
-            let pull_responses = scenario
-                .client_harness
-                .pull_datasets(odf::DatasetRefAny::from(server_dataset_url), false)
-                .await;
-
-            assert_matches!(
-                &pull_responses[0].result,
-                Err(PullError::SyncError(SyncError::Corrupted(CorruptedSourceError { message, .. })))
-                    if message.starts_with("Server did not send 2 file(s)")
-            );
-            pretty_assertions::assert_eq!(
-                scenario
-                    .client_harness
-                    .find_stored_head(&scenario.server_dataset_handle.id)
-                    .await,
-                None
-            );
-        };
-
-        await_client_server_flow!(server_handle, client_handle);
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-/// A server whose transfer of a new dataset breaks the same way on every
-/// retry
-enum CorruptedSourceCase {
-    CorruptingObjects,
-    SendingUndecodableMetadata,
-    SendingNoBlocks,
-}
-
-impl CorruptedSourceCase {
-    async fn assert_pull_fails(self, expected_message: &str) {
-        let (client_harness, server_harness) = LocalFsTransferOptions {
-            client_tenancy: TenancyConfig::SingleTenant,
-            authenticated_remotely: false,
-            server_tenancy: TenancyConfig::SingleTenant,
-            authorized_writes: true,
-        }
-        .build()
+        let server = ScriptedPullServer::new(
+            scenario.server_harness.cli_dataset_registry().as_ref(),
+            &scenario.server_dataset_handle,
+            self.script,
+        )
         .await;
-        let scenario = SmartPullNewDatasetScenario::prepare(client_harness, server_harness).await;
-        let dataset_registry = scenario.server_harness.cli_dataset_registry();
-        let dataset_handle = &scenario.server_dataset_handle;
-        let server = match self {
-            Self::CorruptingObjects => {
-                ScriptedPullServer::corrupting_objects(dataset_registry.as_ref(), dataset_handle)
-                    .await
-            }
-            Self::SendingUndecodableMetadata => {
-                ScriptedPullServer::sending_undecodable_metadata(
-                    dataset_registry.as_ref(),
-                    dataset_handle,
-                )
-                .await
-            }
-            Self::SendingNoBlocks => {
-                ScriptedPullServer::sending_no_blocks(dataset_registry.as_ref(), dataset_handle)
-                    .await
-            }
-        };
         let server_dataset_url = server.dataset_url("foo");
 
         let server_handle = server.run();
@@ -542,7 +491,7 @@ impl CorruptedSourceCase {
             assert_matches!(
                 &pull_responses[0].result,
                 Err(PullError::SyncError(e @ SyncError::Corrupted(CorruptedSourceError { message, .. })))
-                    if message.contains(expected_message) && !e.is_recoverable()
+                    if message.contains(self.expected_message) && !e.is_recoverable()
             );
             pretty_assertions::assert_eq!(
                 scenario

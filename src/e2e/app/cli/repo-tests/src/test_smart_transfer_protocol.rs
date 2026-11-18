@@ -12,7 +12,7 @@ use std::str::FromStr;
 
 use chrono::DateTime;
 use kamu_cli_e2e_common::*;
-use kamu_cli_puppet::extensions::{DatasetListOptions, DatasetRecord, KamuCliPuppetExt, RepoAlias};
+use kamu_cli_puppet::extensions::{DatasetListOptions, KamuCliPuppetExt, RepoAlias};
 use kamu_cli_puppet::{ExecuteCommandResult, KamuCliPuppet, NewWorkspaceOptions};
 use odf::metadata::testing::MetadataFactory;
 use serde_json::json;
@@ -49,10 +49,6 @@ test_smart_transfer_protocol_permutations!(test_smart_push_smart_pull_sequence);
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 test_smart_transfer_protocol_permutations!(test_smart_push_smart_pull_force_overwrite_seed_block);
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-test_smart_transfer_protocol_permutations!(test_smart_push_force_smart_pull_force);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -160,8 +156,18 @@ struct LocalDataset {
     head: odf::Multihash,
 }
 
-impl From<DatasetRecord> for LocalDataset {
-    fn from(record: DatasetRecord) -> Self {
+impl LocalDataset {
+    /// Only a listing of all accounts names the owner, so a multi-tenant workspace passes
+    /// `all_accounts`
+    async fn read(kamu: &KamuCliPuppet, name: &odf::DatasetName, all_accounts: bool) -> Self {
+        let record = kamu
+            .get_dataset_record(
+                name,
+                DatasetListOptions::builder()
+                    .all_accounts(all_accounts)
+                    .build(),
+            )
+            .await;
         Self {
             alias: odf::DatasetAlias::new(record.owner, record.name),
             id: record.id,
@@ -202,13 +208,13 @@ pub async fn test_smart_push_several_datasets_pushes_the_ones_it_can(
         .await;
 
     kamu_in_push_workspace.set_account(Some(bob));
-    kamu_in_push_workspace
-        .execute_with_input(
-            ["add", "--stdin", "--name", "d", "--visibility", "private"],
-            DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR,
-        )
-        .await
-        .success();
+    add_named_dataset(
+        &kamu_in_push_workspace,
+        "d",
+        odf::DatasetVisibility::Private,
+        DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR,
+    )
+    .await;
 
     kamu_in_push_workspace.set_account(Some(alice));
     for dataset_name in [pushed_name.as_str(), conflicting_name.as_str(), "c"] {
@@ -242,18 +248,9 @@ pub async fn test_smart_push_several_datasets_pushes_the_ones_it_can(
         .await
         .success();
 
-    // Only a listing of all accounts names the owner
-    let all_accounts = || DatasetListOptions::builder().all_accounts(true).build();
-    let local_pushed = LocalDataset::from(
-        kamu_in_push_workspace
-            .get_dataset_record(&pushed_name, all_accounts())
-            .await,
-    );
-    let local_conflicting = LocalDataset::from(
-        kamu_in_push_workspace
-            .get_dataset_record(&conflicting_name, all_accounts())
-            .await,
-    );
+    let local_pushed = LocalDataset::read(&kamu_in_push_workspace, &pushed_name, true).await;
+    let local_conflicting =
+        LocalDataset::read(&kamu_in_push_workspace, &conflicting_name, true).await;
 
     // The summaries come in this order, each failure is detailed after them
     let push_stderr = kamu_in_push_workspace
@@ -482,16 +479,12 @@ async fn test_smart_push_smart_pull_sequence(
             )
             .await;
 
-        let pushed = LocalDataset::from(
-            kamu_in_push_workspace
-                .get_dataset_record(
-                    &dataset_alias.dataset_name,
-                    DatasetListOptions::builder()
-                        .all_accounts(is_push_workspace_multi_tenant)
-                        .build(),
-                )
-                .await,
-        );
+        let pushed = LocalDataset::read(
+            &kamu_in_push_workspace,
+            &dataset_alias.dataset_name,
+            is_push_workspace_multi_tenant,
+        )
+        .await;
 
         // Hard compact dataset
         kamu_in_push_workspace
@@ -506,16 +499,12 @@ async fn test_smart_push_smart_pull_sequence(
             .await
             .success();
 
-        let compacted = LocalDataset::from(
-            kamu_in_push_workspace
-                .get_dataset_record(
-                    &dataset_alias.dataset_name,
-                    DatasetListOptions::builder()
-                        .all_accounts(is_push_workspace_multi_tenant)
-                        .build(),
-                )
-                .await,
-        );
+        let compacted = LocalDataset::read(
+            &kamu_in_push_workspace,
+            &dataset_alias.dataset_name,
+            is_push_workspace_multi_tenant,
+        )
+        .await;
 
         // Should fail without force flag
         kamu_in_push_workspace
@@ -554,6 +543,17 @@ async fn test_smart_push_smart_pull_sequence(
                 Some([r#"1 dataset\(s\) pushed"#]),
             )
             .await;
+
+        // The server now holds exactly the compacted chain
+        pretty_assertions::assert_eq!(
+            kamu_in_push_workspace
+                .list_block_hashes(&dataset_alias.dataset_name)
+                .await,
+            kamu_api_server_client
+                .dataset()
+                .block_hashes(&compacted.id)
+                .await
+        );
 
         // A push fails once the local head is reset behind the server's
         let local_blocks = kamu_in_push_workspace
@@ -610,16 +610,12 @@ async fn test_smart_push_smart_pull_sequence(
             )
             .await;
 
-        let pulled = LocalDataset::from(
-            kamu_in_pull_workspace
-                .get_dataset_record(
-                    &dataset_alias.dataset_name,
-                    DatasetListOptions::builder()
-                        .all_accounts(is_pull_workspace_multi_tenant)
-                        .build(),
-                )
-                .await,
-        );
+        let pulled = LocalDataset::read(
+            &kamu_in_pull_workspace,
+            &dataset_alias.dataset_name,
+            is_pull_workspace_multi_tenant,
+        )
+        .await;
 
         // Ingest data in pulled dataset
 
@@ -630,238 +626,12 @@ async fn test_smart_push_smart_pull_sequence(
             )
             .await;
 
-        let ingested = LocalDataset::from(
-            kamu_in_pull_workspace
-                .get_dataset_record(
-                    &dataset_alias.dataset_name,
-                    DatasetListOptions::builder()
-                        .all_accounts(is_pull_workspace_multi_tenant)
-                        .build(),
-                )
-                .await,
-        );
-
-        // Should fail without force flag
-        kamu_in_pull_workspace
-            .assert_failure_command_execution(
-                ["pull", kamu_api_server_dataset_endpoint.as_str()],
-                None,
-                Some([
-                    r#"Failed to update 1 dataset\(s\)"#,
-                    regex::escape(&format!(
-                        "Failed to sync {} from {kamu_api_server_dataset_endpoint}: Destination \
-                         head {} is ahead of source head {} by 1 blocks",
-                        ingested.alias, ingested.head, pulled.head,
-                    ))
-                    .as_str(),
-                ]),
-            )
-            .await;
-
-        // Should successfully pull with force flag
-        kamu_in_pull_workspace
-            .assert_success_command_execution(
-                ["pull", kamu_api_server_dataset_endpoint.as_str(), "--force"],
-                None,
-                Some([r#"1 dataset\(s\) updated"#]),
-            )
-            .await;
-
-        if is_pull_workspace_multi_tenant {
-            pretty_assertions::assert_eq!(
-                [(
-                    dataset_alias.dataset_name,
-                    Some(odf::DatasetVisibility::Private)
-                )],
-                *kamu_in_pull_workspace
-                    .list_datasets()
-                    .await
-                    .into_iter()
-                    .map(|d| (d.name, d.visibility))
-                    .collect::<Vec<_>>()
-            );
-        }
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-async fn test_smart_push_force_smart_pull_force(
-    mut kamu_api_server_client: KamuApiServerClient,
-    is_push_workspace_multi_tenant: bool,
-    is_pull_workspace_multi_tenant: bool,
-) {
-    let dataset_alias = odf::DatasetAlias::new(
-        Some(E2E_USER_ACCOUNT_NAME.clone()),
-        DATASET_ROOT_PLAYER_NAME.clone(),
-    );
-    let kamu_api_server_dataset_endpoint = kamu_api_server_client
-        .dataset()
-        .get_odf_endpoint(&dataset_alias);
-
-    // 1. Grub a token
-    let token = kamu_api_server_client.auth().login_as_e2e_user().await;
-
-    // 2. Pushing the dataset to the API server
-    {
-        let kamu_in_push_workspace =
-            KamuCliPuppet::new_workspace_tmp(is_push_workspace_multi_tenant).await;
-
-        // 2.1. Add the dataset
-        kamu_in_push_workspace
-            .execute_with_input(["add", "--stdin"], DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR)
-            .await
-            .success();
-
-        // 2.1. Ingest data to the dataset
-        kamu_in_push_workspace
-            .ingest_data(
-                &dataset_alias.dataset_name,
-                DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_1,
-            )
-            .await;
-
-        // 2.2. Login to the API server
-        kamu_in_push_workspace
-            .execute([
-                "login",
-                kamu_api_server_client.get_base_url().as_str(),
-                "--access-token",
-                token.as_str(),
-            ])
-            .await
-            .success();
-
-        // Initial dataset push
-        kamu_in_push_workspace
-            .assert_success_command_execution(
-                [
-                    "push",
-                    dataset_alias.dataset_name.as_str(),
-                    "--to",
-                    kamu_api_server_dataset_endpoint.as_str(),
-                    "--visibility",
-                    "public",
-                ],
-                None,
-                Some([r#"1 dataset\(s\) pushed"#]),
-            )
-            .await;
-
-        // Hard compact dataset
-        kamu_in_push_workspace
-            .execute([
-                "--yes",
-                "system",
-                "compact",
-                dataset_alias.dataset_name.as_str(),
-                "--hard",
-                "--keep-metadata-only",
-            ])
-            .await
-            .success();
-
-        // Should fail without force flag
-        kamu_in_push_workspace
-            .assert_failure_command_execution(
-                [
-                    "push",
-                    dataset_alias.dataset_name.as_str(),
-                    "--to",
-                    kamu_api_server_dataset_endpoint.as_str(),
-                ],
-                None,
-                Some([
-                    r#"Failed to push 1 dataset\(s\)"#,
-                    r#"Source and destination datasets have diverged"#,
-                ]),
-            )
-            .await;
-
-        // Should successfully push with force flag
-        kamu_in_push_workspace
-            .assert_success_command_execution(
-                [
-                    "push",
-                    dataset_alias.dataset_name.as_str(),
-                    "--to",
-                    kamu_api_server_dataset_endpoint.as_str(),
-                    "--force",
-                ],
-                None,
-                Some([r#"1 dataset\(s\) pushed"#]),
-            )
-            .await;
-
-        // The server now holds exactly the compacted chain
-        let compacted = LocalDataset::from(
-            kamu_in_push_workspace
-                .get_dataset_record(
-                    &dataset_alias.dataset_name,
-                    DatasetListOptions::builder()
-                        .all_accounts(is_push_workspace_multi_tenant)
-                        .build(),
-                )
-                .await,
-        );
-        pretty_assertions::assert_eq!(
-            kamu_in_push_workspace
-                .list_block_hashes(&dataset_alias.dataset_name)
-                .await,
-            kamu_api_server_client
-                .dataset()
-                .block_hashes(&compacted.id)
-                .await
-        );
-    }
-
-    // 3. Pulling the dataset from the API server
-    {
-        let kamu_in_pull_workspace =
-            KamuCliPuppet::new_workspace_tmp(is_pull_workspace_multi_tenant).await;
-
-        // Call with no-alias flag to avoid remote ingest checking in next step
-        kamu_in_pull_workspace
-            .assert_success_command_execution(
-                [
-                    "pull",
-                    kamu_api_server_dataset_endpoint.as_str(),
-                    "--no-alias",
-                ],
-                None,
-                Some([r#"1 dataset\(s\) updated"#]),
-            )
-            .await;
-
-        let pulled = LocalDataset::from(
-            kamu_in_pull_workspace
-                .get_dataset_record(
-                    &dataset_alias.dataset_name,
-                    DatasetListOptions::builder()
-                        .all_accounts(is_pull_workspace_multi_tenant)
-                        .build(),
-                )
-                .await,
-        );
-
-        // Ingest data in pulled dataset
-        kamu_in_pull_workspace
-            .ingest_data(
-                &dataset_alias.dataset_name,
-                DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_2,
-            )
-            .await;
-
-        let ingested = LocalDataset::from(
-            kamu_in_pull_workspace
-                .get_dataset_record(
-                    &dataset_alias.dataset_name,
-                    DatasetListOptions::builder()
-                        .all_accounts(is_pull_workspace_multi_tenant)
-                        .build(),
-                )
-                .await,
-        );
+        let ingested = LocalDataset::read(
+            &kamu_in_pull_workspace,
+            &dataset_alias.dataset_name,
+            is_pull_workspace_multi_tenant,
+        )
+        .await;
 
         // Should fail without force flag
         kamu_in_pull_workspace
@@ -2405,26 +2175,18 @@ async fn test_smart_push_smart_pull_force_overwrite_seed_block(
             )
             .await;
 
-        let pushed_root = LocalDataset::from(
-            kamu_in_push_workspace
-                .get_dataset_record(
-                    &dataset_alias.dataset_name,
-                    DatasetListOptions::builder()
-                        .all_accounts(is_push_workspace_multi_tenant)
-                        .build(),
-                )
-                .await,
-        );
-        let derivative = LocalDataset::from(
-            kamu_in_push_workspace
-                .get_dataset_record(
-                    &dataset_derivative_alias.dataset_name,
-                    DatasetListOptions::builder()
-                        .all_accounts(is_push_workspace_multi_tenant)
-                        .build(),
-                )
-                .await,
-        );
+        let pushed_root = LocalDataset::read(
+            &kamu_in_push_workspace,
+            &dataset_alias.dataset_name,
+            is_push_workspace_multi_tenant,
+        )
+        .await;
+        let derivative = LocalDataset::read(
+            &kamu_in_push_workspace,
+            &dataset_derivative_alias.dataset_name,
+            is_push_workspace_multi_tenant,
+        )
+        .await;
         let push_id_mismatch_error = regex::escape(&format!(
             "Failed to push {} to {kamu_api_server_dataset_endpoint}: Source and destination are \
              different datasets, source ID is {}, destination ID is {}",
@@ -2480,16 +2242,12 @@ async fn test_smart_push_smart_pull_force_overwrite_seed_block(
             .await
             .success();
 
-        let existing = LocalDataset::from(
-            kamu_in_pull_workspace
-                .get_dataset_record(
-                    &dataset_alias.dataset_name,
-                    DatasetListOptions::builder()
-                        .all_accounts(is_pull_workspace_multi_tenant)
-                        .build(),
-                )
-                .await,
-        );
+        let existing = LocalDataset::read(
+            &kamu_in_pull_workspace,
+            &dataset_alias.dataset_name,
+            is_pull_workspace_multi_tenant,
+        )
+        .await;
         let pull_id_mismatch_error = regex::escape(&format!(
             "Failed to sync {} from {kamu_api_server_dataset_endpoint}: Source and destination \
              are different datasets, source ID is {server_dataset_id}, destination ID is {}",

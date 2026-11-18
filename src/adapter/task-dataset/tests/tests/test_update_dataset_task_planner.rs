@@ -10,7 +10,7 @@
 use std::assert_matches;
 use std::sync::Arc;
 
-use kamu::testing::{BaseUseCaseHarness, BaseUseCaseHarnessOptions};
+use kamu::testing::{BaseRepoHarness, BaseUseCaseHarness, BaseUseCaseHarnessOptions};
 use kamu::{
     DatasetPullSourceResolverImpl,
     DatasetUpdateKindResolverImpl,
@@ -38,7 +38,7 @@ use pretty_assertions::assert_eq;
 
 #[tokio::test]
 async fn test_root_dataset_plans_an_ingest() {
-    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let alias_foo = BaseRepoHarness::alias("foo");
     let harness = UpdateDatasetTaskPlannerHarness::new();
     let foo = harness.create_root_dataset(&alias_foo).await;
 
@@ -51,8 +51,8 @@ async fn test_root_dataset_plans_an_ingest() {
 
 #[tokio::test]
 async fn test_derived_dataset_plans_a_transform() {
-    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
-    let alias_bar = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("bar"));
+    let alias_foo = BaseRepoHarness::alias("foo");
+    let alias_bar = BaseRepoHarness::alias("bar");
     let harness = UpdateDatasetTaskPlannerHarness::new();
     let foo = harness.create_root_dataset(&alias_foo).await;
     let bar = harness
@@ -68,7 +68,7 @@ async fn test_derived_dataset_plans_a_transform() {
 
 #[tokio::test]
 async fn test_dataset_with_one_pull_alias_plans_a_sync() {
-    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let alias_foo = BaseRepoHarness::alias("foo");
     let harness = UpdateDatasetTaskPlannerHarness::new();
     let foo = harness.create_root_dataset(&alias_foo).await;
     harness
@@ -92,7 +92,7 @@ async fn test_dataset_with_one_pull_alias_plans_a_sync() {
 
 #[tokio::test]
 async fn test_deleted_dataset_fails_unrecoverably() {
-    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let alias_foo = BaseRepoHarness::alias("foo");
     let harness = UpdateDatasetTaskPlannerHarness::new();
     let foo = harness.create_root_dataset(&alias_foo).await;
     harness.delete_dataset(&foo).await;
@@ -106,7 +106,7 @@ async fn test_deleted_dataset_fails_unrecoverably() {
 
 #[tokio::test]
 async fn test_dataset_with_several_pull_aliases_fails_unrecoverably() {
-    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let alias_foo = BaseRepoHarness::alias("foo");
     let harness = UpdateDatasetTaskPlannerHarness::new();
     let foo = harness.create_root_dataset(&alias_foo).await;
     harness
@@ -133,7 +133,7 @@ async fn test_dataset_with_several_pull_aliases_fails_unrecoverably() {
 
 #[tokio::test]
 async fn test_fetch_uncacheable_is_planned_into_the_ingest_options() {
-    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let alias_foo = BaseRepoHarness::alias("foo");
     let harness = UpdateDatasetTaskPlannerHarness::new();
     let foo = harness.create_root_dataset(&alias_foo).await;
 
@@ -180,8 +180,6 @@ impl UpdateDatasetTaskPlannerHarness {
             .add::<odf::dataset::DummyOdfServerAccessTokenResolver>()
             .add_value(odf::dataset::IpfsGateway::default())
             .add::<DependencyGraphServiceImpl>();
-
-        database_common::NoOpDatabasePlugin::init_database_components(&mut b);
 
         let catalog = b.build();
 

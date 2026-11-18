@@ -474,19 +474,9 @@ impl AppendDatasetMetadataBatchUseCaseHarness {
         odf::Multihash,
         VecDeque<odf::dataset::HashedMetadataBlockBytesDecoded>,
     ) {
-        let head_block = created
-            .dataset
-            .as_metadata_chain()
-            .get_block(&created.head)
-            .await
-            .unwrap();
-
-        let block = MetadataFactory::metadata_block(
-            MetadataFactory::set_info().description(description).build(),
-        )
-        .prev(&created.head, head_block.sequence_number)
-        .system_time(self.system_time_source().now())
-        .build();
+        let block = self
+            .set_info_block_on_initial_head(created, description)
+            .await;
         let (hash, bytes) = BaseRepoHarness::serialize_block(&block);
 
         (hash.clone(), VecDeque::from([(hash, block, bytes)]))

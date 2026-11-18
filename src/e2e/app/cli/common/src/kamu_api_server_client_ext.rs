@@ -1861,6 +1861,13 @@ impl FlowApi<'_> {
         self.trigger_flow(dataset_id, "triggerIngestFlow").await
     }
 
+    /// Triggers an ingest flow and waits for it to finish
+    pub async fn run_ingest(&self, dataset_id: &odf::DatasetID) -> FlowSummary {
+        let trigger_response = self.trigger_ingest(dataset_id).await;
+        self.wait_for_triggered_flow(dataset_id, trigger_response)
+            .await
+    }
+
     /// Triggers an ingest that fetches even a source without source state
     pub async fn trigger_ingest_fetching_uncacheable(
         &self,
@@ -1874,29 +1881,48 @@ impl FlowApi<'_> {
         .await
     }
 
+    /// Triggers an ingest that fetches even a source without source state, and
+    /// waits for it to finish
+    pub async fn run_ingest_fetching_uncacheable(
+        &self,
+        dataset_id: &odf::DatasetID,
+    ) -> FlowSummary {
+        let trigger_response = self.trigger_ingest_fetching_uncacheable(dataset_id).await;
+        self.wait_for_triggered_flow(dataset_id, trigger_response)
+            .await
+    }
+
     pub async fn trigger_transform(&self, dataset_id: &odf::DatasetID) -> FlowTriggerResponse {
         self.trigger_flow(dataset_id, "triggerTransformFlow").await
     }
 
     /// Triggers a transform flow and waits for it to finish
     pub async fn run_transform(&self, dataset_id: &odf::DatasetID) -> FlowSummary {
-        let FlowTriggerResponse::Success(flow_id) = self.trigger_transform(dataset_id).await else {
-            panic!("Transform flow was not triggered");
-        };
-        let flow_id = flow_id.to_string();
-
-        self.wait_for_flow(dataset_id, |flow| {
-            flow.flow_id == flow_id && flow.status == "FINISHED"
-        })
-        .await
+        let trigger_response = self.trigger_transform(dataset_id).await;
+        self.wait_for_triggered_flow(dataset_id, trigger_response)
+            .await
     }
 
     pub async fn trigger_compaction(&self, dataset_id: &odf::DatasetID) -> FlowTriggerResponse {
         self.trigger_flow(dataset_id, "triggerCompactionFlow").await
     }
 
+    /// Triggers a compaction flow and waits for it to finish
+    pub async fn run_compaction(&self, dataset_id: &odf::DatasetID) -> FlowSummary {
+        let trigger_response = self.trigger_compaction(dataset_id).await;
+        self.wait_for_triggered_flow(dataset_id, trigger_response)
+            .await
+    }
+
     pub async fn trigger_reset(&self, dataset_id: &odf::DatasetID) -> FlowTriggerResponse {
         self.trigger_flow(dataset_id, "triggerResetFlow").await
+    }
+
+    /// Triggers a reset flow and waits for it to finish
+    pub async fn run_reset(&self, dataset_id: &odf::DatasetID) -> FlowSummary {
+        let trigger_response = self.trigger_reset(dataset_id).await;
+        self.wait_for_triggered_flow(dataset_id, trigger_response)
+            .await
     }
 
     pub async fn trigger_reset_to_metadata_only(
@@ -1905,6 +1931,30 @@ impl FlowApi<'_> {
     ) -> FlowTriggerResponse {
         self.trigger_flow(dataset_id, "triggerResetToMetadataFlow")
             .await
+    }
+
+    /// Triggers a reset to metadata only and waits for it to finish
+    pub async fn run_reset_to_metadata_only(&self, dataset_id: &odf::DatasetID) -> FlowSummary {
+        let trigger_response = self.trigger_reset_to_metadata_only(dataset_id).await;
+        self.wait_for_triggered_flow(dataset_id, trigger_response)
+            .await
+    }
+
+    /// Waits for the flow a trigger started to finish, whatever its outcome
+    async fn wait_for_triggered_flow(
+        &self,
+        dataset_id: &odf::DatasetID,
+        trigger_response: FlowTriggerResponse,
+    ) -> FlowSummary {
+        let flow_id = match trigger_response {
+            FlowTriggerResponse::Success(flow_id) => flow_id.to_string(),
+            FlowTriggerResponse::Error(message) => panic!("Flow was not triggered: {message}"),
+        };
+
+        self.wait_for_flow(dataset_id, |flow| {
+            flow.flow_id == flow_id && flow.status == "FINISHED"
+        })
+        .await
     }
 
     pub async fn set_reactive_transform_trigger(

@@ -357,23 +357,16 @@ impl UpdateAccountUseCaseImplHarness {
         let account_base_harness = AccountBaseUseCaseHarness::new(AccountBaseUseCaseHarnessOpts {
             account_authorization_helper_provider,
             maybe_predefined_accounts_config,
+            // Tests without a caller rely on the mocked authorization helper
+            current_account_subject: Some(
+                current_account_subject.unwrap_or_else(CurrentAccountSubject::new_test),
+            ),
+            principal,
             ..Default::default()
         });
 
         let mut b = dill::CatalogBuilder::new_chained(account_base_harness.intermediate_catalog());
         b.add_value(mock_outbox).bind::<dyn Outbox, MockOutbox>();
-
-        if let Some(principal) = principal {
-            b.add_value(principal);
-            if let Some(current_account_subject) = current_account_subject {
-                b.add_value(current_account_subject);
-            }
-        } else if let Some(current_account_subject) = current_account_subject {
-            current_account_subject.register(&mut b);
-        } else {
-            // The mocked authorization helper decides, whoever the principal is
-            b.add_value(Principal::new_test());
-        }
 
         NoOpDatabasePlugin::init_database_components(&mut b);
 

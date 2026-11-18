@@ -9,7 +9,7 @@
 
 use std::sync::Arc;
 
-use kamu::testing::{BaseUseCaseHarness, BaseUseCaseHarnessOptions};
+use kamu::testing::{BaseRepoHarness, BaseUseCaseHarness, BaseUseCaseHarnessOptions};
 use kamu::*;
 use kamu_core::*;
 use kamu_datasets::{DatasetPermission, MockDatasetPermissionChecker, ResolvedDataset};
@@ -21,7 +21,7 @@ use pretty_assertions::assert_matches;
 
 #[tokio::test]
 async fn test_reset_success() {
-    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let alias_foo = BaseRepoHarness::alias("foo");
     let (_, dataset_id_foo) = odf::DatasetID::new_generated_ed25519();
 
     let harness = ResetJobHarness::new(
@@ -95,7 +95,7 @@ async fn test_try_reset_not_found_dataset() {
 
 #[tokio::test]
 async fn test_reset_dataset_unauthorized() {
-    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let alias_foo = BaseRepoHarness::alias("foo");
     let (_, dataset_id_foo) = odf::DatasetID::new_generated_ed25519();
 
     let harness = ResetJobHarness::new(
@@ -142,7 +142,6 @@ impl ResetJobHarness {
             .add::<ResetPlannerImpl>()
             .add::<ResetExecutorImpl>()
             .add::<DatasetReferenceUpdaterImpl>();
-        database_common::NoOpDatabasePlugin::init_database_components(&mut b);
         let catalog = b.build();
 
         let job = catalog.get_one::<dyn ResetJob>().unwrap();

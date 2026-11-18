@@ -16,6 +16,7 @@ use kamu_cli_e2e_common::{
     DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_2,
     DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_3,
     DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR,
+    add_named_dataset,
 };
 use kamu_cli_puppet::KamuCliPuppet;
 use kamu_cli_puppet::extensions::{AddDatasetOptions, KamuCliPuppetExt};
@@ -446,13 +447,17 @@ pub async fn test_ingest_into_other_accounts_dataset_fails(mut kamu: KamuCliPupp
     let [alice, bob] = kamu.create_accounts(["alice", "bob"]).await;
 
     kamu.set_account(Some(bob));
-    for (name, visibility) in [("bob-root", "private"), ("bob-public", "public")] {
-        kamu.execute_with_input(
-            ["add", "--stdin", "--name", name, "--visibility", visibility],
+    for (name, visibility) in [
+        ("bob-root", odf::DatasetVisibility::Private),
+        ("bob-public", odf::DatasetVisibility::Public),
+    ] {
+        add_named_dataset(
+            &kamu,
+            name,
+            visibility,
             DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR,
         )
-        .await
-        .success();
+        .await;
     }
 
     // A dataset alice cannot read is not found for her, a readable one is denied

@@ -64,19 +64,12 @@ impl DatasetOperationGuardHarness {
     }
 
     fn classifying_as_internal() -> Self {
-        Self::new(|handles| ClassifyByAllowanceResponse {
-            authorized_handles: Vec::new(),
-            unauthorized_handles_with_errors: handles
-                .into_iter()
-                .map(|handle| {
-                    (
-                        handle,
-                        ClassifyByAllowanceDatasetPermissionError::Internal(
-                            "Classification failed".int_err(),
-                        ),
-                    )
-                })
-                .collect(),
+        Self::new(|handles| {
+            MockDatasetPermissionChecker::classify_handles(handles, |_| {
+                Some(ClassifyByAllowanceDatasetPermissionError::Internal(
+                    "Classification failed".int_err(),
+                ))
+            })
         })
     }
 

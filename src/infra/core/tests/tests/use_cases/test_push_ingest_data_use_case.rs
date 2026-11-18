@@ -12,7 +12,7 @@ use std::sync::Arc;
 
 use bytes::Bytes;
 use file_utils::MediaType;
-use kamu::testing::{BaseUseCaseHarness, BaseUseCaseHarnessOptions};
+use kamu::testing::{BaseRepoHarness, BaseUseCaseHarness, BaseUseCaseHarnessOptions};
 use kamu::*;
 use kamu_accounts::{Account, AccountRepository, QuotaError};
 use kamu_accounts_inmem::{InMemoryAccountQuotaEventStore, InMemoryAccountRepository};
@@ -46,7 +46,7 @@ use crate::utils::RecordingListener;
 
 #[tokio::test]
 async fn test_push_ingest_data_source_not_found() {
-    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let alias_foo = BaseRepoHarness::alias("foo");
     let (_, dataset_id_foo) = odf::DatasetID::new_generated_ed25519();
 
     let harness = PushIngestDataUseCaseHarness::new(
@@ -83,7 +83,7 @@ async fn test_push_ingest_data_source_not_found() {
 
 #[tokio::test]
 async fn test_push_ingest_data_denied_without_write() {
-    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let alias_foo = BaseRepoHarness::alias("foo");
     let (_, dataset_id_foo) = odf::DatasetID::new_generated_ed25519();
 
     let harness = PushIngestDataUseCaseHarness::new(
@@ -123,7 +123,7 @@ async fn test_push_ingest_data_denied_without_write() {
 #[tokio::test]
 #[test_group::group(engine, ingest, datafusion)]
 async fn test_push_ingest_data_from_json() {
-    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let alias_foo = BaseRepoHarness::alias("foo");
     let (_, dataset_id_foo) = odf::DatasetID::new_generated_ed25519();
 
     let harness = PushIngestDataUseCaseHarness::new(
@@ -161,7 +161,7 @@ async fn test_push_ingest_data_from_json() {
 #[tokio::test]
 #[test_group::group(engine, ingest, datafusion)]
 async fn test_push_ingest_data_from_file() {
-    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let alias_foo = BaseRepoHarness::alias("foo");
     let (_, dataset_id_foo) = odf::DatasetID::new_generated_ed25519();
 
     let harness = PushIngestDataUseCaseHarness::new(
@@ -207,7 +207,7 @@ async fn test_push_ingest_data_from_file() {
 #[tokio::test]
 #[test_group::group(engine, ingest, datafusion)]
 async fn test_push_ingest_data_execute_multi() {
-    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let alias_foo = BaseRepoHarness::alias("foo");
     let (_, dataset_id_foo) = odf::DatasetID::new_generated_ed25519();
 
     let harness = PushIngestDataUseCaseHarness::new(
@@ -274,7 +274,7 @@ async fn test_push_ingest_data_execute_multi() {
 #[tokio::test]
 #[test_group::group(engine, ingest, datafusion)]
 async fn test_push_ingest_data_upload_adds_push_source() {
-    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let alias_foo = BaseRepoHarness::alias("foo");
     let (_, dataset_id_foo) = odf::DatasetID::new_generated_ed25519();
 
     let harness = PushIngestDataUseCaseHarness::new(
@@ -303,7 +303,7 @@ async fn test_push_ingest_data_upload_adds_push_source() {
 #[tokio::test]
 #[test_group::group(engine, ingest, datafusion)]
 async fn test_push_ingest_data_upload_with_expected_head_adds_push_source() {
-    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let alias_foo = BaseRepoHarness::alias("foo");
     let (_, dataset_id_foo) = odf::DatasetID::new_generated_ed25519();
 
     let harness = PushIngestDataUseCaseHarness::new(
@@ -325,7 +325,7 @@ async fn test_push_ingest_data_upload_with_expected_head_adds_push_source() {
 #[tokio::test]
 #[test_group::group(engine, ingest, datafusion)]
 async fn test_push_ingest_data_empty_upload_reports_the_added_push_source() {
-    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let alias_foo = BaseRepoHarness::alias("foo");
     let (_, dataset_id_foo) = odf::DatasetID::new_generated_ed25519();
 
     let harness = PushIngestDataUseCaseHarness::new(
@@ -355,7 +355,7 @@ async fn test_push_ingest_data_empty_upload_reports_the_added_push_source() {
 #[tokio::test]
 #[test_group::group(engine, ingest, datafusion)]
 async fn test_push_ingest_data_upload_with_old_event_time_adds_push_source() {
-    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let alias_foo = BaseRepoHarness::alias("foo");
     let (_, dataset_id_foo) = odf::DatasetID::new_generated_ed25519();
 
     let harness = PushIngestDataUseCaseHarness::new(
@@ -385,8 +385,8 @@ async fn test_push_ingest_data_upload_with_old_event_time_adds_push_source() {
 
 #[tokio::test]
 async fn test_push_ingest_data_into_derivative_rejected() {
-    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
-    let alias_bar = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("bar"));
+    let alias_foo = BaseRepoHarness::alias("foo");
+    let alias_bar = BaseRepoHarness::alias("bar");
     let (_, dataset_id_foo) = odf::DatasetID::new_generated_ed25519();
     let (_, dataset_id_bar) = odf::DatasetID::new_generated_ed25519();
 
@@ -418,7 +418,7 @@ async fn test_push_ingest_data_into_derivative_rejected() {
 #[tokio::test]
 #[test_group::group(engine, ingest, datafusion)]
 async fn test_push_ingest_data_ref_moved_concurrently() {
-    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let alias_foo = BaseRepoHarness::alias("foo");
     let (_, dataset_id_foo) = odf::DatasetID::new_generated_ed25519();
 
     let harness = PushIngestDataUseCaseHarness::new(
@@ -452,7 +452,7 @@ async fn test_push_ingest_data_ref_moved_concurrently() {
 
 #[tokio::test]
 async fn test_push_ingest_data_upload_ref_moved_before_push_source_commit() {
-    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let alias_foo = BaseRepoHarness::alias("foo");
     let (_, dataset_id_foo) = odf::DatasetID::new_generated_ed25519();
 
     let harness = PushIngestDataUseCaseHarness::new(
@@ -486,7 +486,7 @@ async fn test_push_ingest_data_upload_ref_moved_before_push_source_commit() {
 #[tokio::test]
 #[test_group::group(engine, ingest, datafusion)]
 async fn test_push_ingest_data_execute_multi_ref_moved_concurrently() {
-    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let alias_foo = BaseRepoHarness::alias("foo");
     let (_, dataset_id_foo) = odf::DatasetID::new_generated_ed25519();
 
     let harness = PushIngestDataUseCaseHarness::new(
@@ -526,7 +526,7 @@ async fn test_push_ingest_data_execute_multi_ref_moved_concurrently() {
 #[tokio::test]
 #[test_group::group(engine, ingest, datafusion)]
 async fn test_push_ingest_data_named_source() {
-    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let alias_foo = BaseRepoHarness::alias("foo");
     let (_, dataset_id_foo) = odf::DatasetID::new_generated_ed25519();
 
     let harness = PushIngestDataUseCaseHarness::new(
@@ -561,7 +561,7 @@ async fn test_push_ingest_data_named_source() {
 #[tokio::test]
 #[test_group::group(engine, ingest, datafusion)]
 async fn test_push_ingest_data_empty_input_into_source_with_schema() {
-    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let alias_foo = BaseRepoHarness::alias("foo");
     let (_, dataset_id_foo) = odf::DatasetID::new_generated_ed25519();
 
     let harness = PushIngestDataUseCaseHarness::new(
@@ -585,7 +585,7 @@ async fn test_push_ingest_data_empty_input_into_source_with_schema() {
 #[tokio::test]
 #[test_group::group(engine, ingest, datafusion)]
 async fn test_push_ingest_data_empty_input_into_source_without_schema() {
-    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let alias_foo = BaseRepoHarness::alias("foo");
     let (_, dataset_id_foo) = odf::DatasetID::new_generated_ed25519();
 
     let harness = PushIngestDataUseCaseHarness::new(
@@ -606,7 +606,7 @@ async fn test_push_ingest_data_empty_input_into_source_without_schema() {
 
 #[tokio::test]
 async fn test_push_ingest_data_unsupported_media_type() {
-    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let alias_foo = BaseRepoHarness::alias("foo");
     let (_, dataset_id_foo) = odf::DatasetID::new_generated_ed25519();
 
     let harness = PushIngestDataUseCaseHarness::new(
@@ -642,7 +642,7 @@ async fn test_push_ingest_data_unsupported_media_type() {
 #[tokio::test]
 #[test_group::group(engine, ingest, datafusion)]
 async fn test_push_ingest_data_reports_success_after_commit() {
-    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let alias_foo = BaseRepoHarness::alias("foo");
     let (_, dataset_id_foo) = odf::DatasetID::new_generated_ed25519();
 
     let harness = PushIngestDataUseCaseHarness::new(
@@ -665,7 +665,7 @@ async fn test_push_ingest_data_reports_success_after_commit() {
 #[tokio::test]
 #[test_group::group(engine, ingest, datafusion)]
 async fn test_push_ingest_data_ref_moved_before_commit_reports_error_not_success() {
-    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let alias_foo = BaseRepoHarness::alias("foo");
     let (_, dataset_id_foo) = odf::DatasetID::new_generated_ed25519();
 
     let harness = PushIngestDataUseCaseHarness::new(

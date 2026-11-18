@@ -13,7 +13,7 @@ use std::time::Duration;
 use dill::Catalog;
 use internal_error::InternalError;
 
-use crate::{DatabaseTransactionManager, TransactionRef};
+use crate::DatabaseTransactionManager;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -61,7 +61,7 @@ where
     let transaction_manager = catalog.get_one::<dyn DatabaseTransactionManager>().unwrap();
 
     let first = transaction_manager.make_transaction_ref().await.unwrap();
-    first_write(catalog_with(catalog, &first)).await;
+    first_write(first.chained_catalog(catalog)).await;
 
     // Begun inside the task: storage with one connection makes it wait for the
     // first to finish
@@ -70,7 +70,7 @@ where
         let transaction_manager = transaction_manager.clone();
         async move {
             let second = transaction_manager.make_transaction_ref().await.unwrap();
-            let result = second_write(catalog_with(&catalog, &second)).await;
+            let result = second_write(second.chained_catalog(&catalog)).await;
             (second, result)
         }
     });
@@ -98,14 +98,6 @@ where
             Ok(()) => RacingTransactionOutcome::Committed,
         },
     }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-fn catalog_with(catalog: &Catalog, transaction: &TransactionRef) -> Catalog {
-    let mut b = catalog.builder_chained();
-    transaction.register(&mut b);
-    b.build()
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

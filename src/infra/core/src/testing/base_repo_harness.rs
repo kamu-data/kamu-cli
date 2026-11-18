@@ -71,13 +71,9 @@ impl BaseRepoHarness {
                 .add::<odf::dataset::DatasetLfsBuilderDefault>()
                 .add::<DatasetRegistrySoloUnitBridge>();
 
-            let current_account_subject =
-                current_account_subject.unwrap_or_else(CurrentAccountSubject::new_test);
-            if let Some(principal) = principal {
-                b.add_value(current_account_subject).add_value(principal);
-            } else {
-                current_account_subject.register(&mut b);
-            }
+            current_account_subject
+                .unwrap_or_else(CurrentAccountSubject::new_test)
+                .register_acting_as(principal, &mut b);
 
             if let Some(mock_did_generator) = mock_did_generator {
                 b.add_value(mock_did_generator)
@@ -279,15 +275,32 @@ impl BaseRepoHarness {
         prev: &odf::Multihash,
         description: &str,
     ) -> odf::Multihash {
-        let chain = created.dataset.as_metadata_chain();
-        let prev_block = chain.get_block(prev).await.unwrap();
-
-        let block = MetadataFactory::metadata_block(
-            MetadataFactory::set_info().description(description).build(),
+        Self::append_unreferenced_set_info(
+            created.dataset.as_metadata_chain(),
+            prev,
+            description,
+            Some(self.system_time_source.now()),
         )
-        .prev(prev, prev_block.sequence_number)
-        .system_time(self.system_time_source.now())
-        .build();
+        .await
+    }
+
+    /// Appends a `SetInfo` block after `prev` without moving any reference, the
+    /// way a writer that has not moved `HEAD` yet leaves it. Without
+    /// `system_time` the block takes `prev`'s, which keeps the chain monotonic
+    /// whatever the clock says.
+    pub async fn append_unreferenced_set_info(
+        chain: &dyn odf::dataset::MetadataChain,
+        prev: &odf::Multihash,
+        description: &str,
+        system_time: Option<DateTime<Utc>>,
+    ) -> odf::Multihash {
+        let prev_block = chain.get_block(prev).await.unwrap();
+        let block = Self::set_info_block(
+            prev,
+            prev_block.sequence_number,
+            description,
+            system_time.unwrap_or(prev_block.system_time),
+        );
 
         chain
             .append(
@@ -299,6 +312,22 @@ impl BaseRepoHarness {
             )
             .await
             .unwrap()
+    }
+
+    /// A `SetInfo` block following the block `prev` with
+    /// `prev_sequence_number`
+    pub fn set_info_block(
+        prev: &odf::Multihash,
+        prev_sequence_number: u64,
+        description: &str,
+        system_time: DateTime<Utc>,
+    ) -> odf::MetadataBlock {
+        MetadataFactory::metadata_block(
+            MetadataFactory::set_info().description(description).build(),
+        )
+        .prev(prev, prev_sequence_number)
+        .system_time(system_time)
+        .build()
     }
 
     /// Gives a root dataset a schema and a block that only advances its

@@ -334,12 +334,12 @@ impl ModifyAccountPasswordUseCaseImplHarness {
     ) -> Self {
         let account_base_harness = AccountBaseUseCaseHarness::new(AccountBaseUseCaseHarnessOpts {
             account_authorization_helper_provider,
+            principal: Some(principal),
             ..Default::default()
         });
 
         let mut b = dill::CatalogBuilder::new_chained(account_base_harness.intermediate_catalog());
         b.add_value(mock_outbox).bind::<dyn Outbox, MockOutbox>();
-        b.add_value(principal);
         b.add::<ModifyAccountPasswordUseCaseImpl>();
 
         let catalog = b.build();

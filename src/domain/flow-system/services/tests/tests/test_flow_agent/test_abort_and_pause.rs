@@ -13,7 +13,6 @@ use kamu_adapter_task_dataset::*;
 use kamu_core::TransformStatus;
 use kamu_flow_system::*;
 use kamu_task_system::*;
-use odf::dataset::MetadataChainIncrementInterval;
 
 use crate::tests::{
     FlowHarness,
@@ -563,19 +562,7 @@ async fn test_abort_flow_after_task_finishes() {
                 run_since_start: Duration::milliseconds(10),
                 finish_in_with: Some((
                     Duration::milliseconds(10),
-                    TaskOutcome::Success(
-                        TaskResultDatasetUpdate::Updated {
-                            old_head: Some(odf::Multihash::from_digest_sha3_256(b"foo-old-slice")),
-                            new_head: odf::Multihash::from_digest_sha3_256(b"foo-new-slice"),
-                            has_more: false,
-                            increment: MetadataChainIncrementInterval {
-                                num_blocks: 1,
-                                num_records: 5,
-                                updated_watermark: None,
-                            },
-                        }
-                        .into_task_result(),
-                    ),
+                    FlowHarness::dataset_updated(b"foo-old-slice", b"foo-new-slice", 1, 5),
                 )),
                 expected_logical_plan: LogicalPlanDatasetUpdate {
                     dataset_id: foo_id.clone(),
@@ -636,19 +623,7 @@ async fn test_abort_flow_after_task_finishes() {
                 run_since_start: Duration::milliseconds(140),
                 finish_in_with: Some((
                     Duration::milliseconds(10),
-                    TaskOutcome::Success(
-                        TaskResultDatasetUpdate::Updated {
-                            old_head: Some(odf::Multihash::from_digest_sha3_256(b"foo-new-slice")),
-                            new_head: odf::Multihash::from_digest_sha3_256(b"foo-newer-slice"),
-                            has_more: false,
-                            increment: MetadataChainIncrementInterval {
-                                num_blocks: 1,
-                                num_records: 5,
-                                updated_watermark: None,
-                            },
-                        }
-                        .into_task_result(),
-                    ),
+                    FlowHarness::dataset_updated(b"foo-new-slice", b"foo-newer-slice", 1, 5),
                 )),
                 expected_logical_plan: LogicalPlanDatasetUpdate {
                     dataset_id: foo_id.clone(),
