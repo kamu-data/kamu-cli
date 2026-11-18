@@ -16,8 +16,7 @@ use crate::{ResetExecutionError, ResetPlanningError, ResetResult};
 
 /// Resets one dataset to an earlier block in one short transaction: it
 /// authorizes the reset for the acting principal, checks the expected old
-/// head and moves `HEAD` with a compare-and-swap. `kamu reset` and the reset
-/// tasks of flows both run it
+/// head and moves `HEAD` with a compare-and-swap
 #[async_trait::async_trait]
 pub trait ResetJob: Send + Sync {
     async fn run(

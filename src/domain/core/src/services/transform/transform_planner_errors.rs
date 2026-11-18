@@ -246,7 +246,7 @@ pub struct TransformNotDefinedError {}
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// The inputs of the transform in effect differ from those the last transform
-/// consumed. Continuing from the consumed positions is not supported yet.
+/// consumed. Continuing from the consumed positions is not supported.
 #[derive(Debug, Error)]
 #[error(
     "Transform of {dataset_handle} changed its inputs since it last ran, which is not supported \

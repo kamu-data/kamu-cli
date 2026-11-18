@@ -17,7 +17,7 @@ use crate::{SyncError, SyncListener, SyncOptions, SyncResult};
 /// it authorizes reading the dataset for the acting principal and resolves
 /// the source and the destination; it transfers with no transaction open, and
 /// the destination commits by a compare-and-swap of its head where it
-/// supports one. `kamu push` runs it
+/// supports one
 #[async_trait::async_trait]
 pub trait SyncToJob: Send + Sync {
     async fn run(

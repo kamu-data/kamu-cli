@@ -17,8 +17,8 @@ use kamu_datasets_services::DatasetOperationGuardImpl;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Pulls into a local dataset with `SyncFromJob`, which every dataset
-/// operation is allowed to the acting principal of the catalog
+/// Pulls into a local dataset with `SyncFromJob`, allowing the catalog's
+/// acting principal every dataset operation
 pub struct LocalSyncHelper {
     catalog: dill::Catalog,
 }
@@ -34,7 +34,7 @@ impl LocalSyncHelper {
         }
     }
 
-    /// Pulls into a destination that exists until the commit
+    /// Pulls into a destination that must not be deleted before the commit
     pub async fn pull(
         &self,
         src_ref: odf::DatasetRefRemote,
@@ -45,7 +45,7 @@ impl LocalSyncHelper {
             .await
     }
 
-    /// Pulls into a destination that exists until the commit
+    /// Pulls into a destination that must not be deleted before the commit
     pub async fn pull_with_listener(
         &self,
         src_ref: odf::DatasetRefRemote,

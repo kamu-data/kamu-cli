@@ -8579,8 +8579,7 @@ type SetVocab {
 }
 
 """
-Dataset head was moved by a concurrent update while the watermark was being
-set; nothing was committed
+Dataset head moved concurrently while the watermark was being set; nothing was committed
 """
 type SetWatermarkCasFailed implements SetWatermarkResult {
 	"""

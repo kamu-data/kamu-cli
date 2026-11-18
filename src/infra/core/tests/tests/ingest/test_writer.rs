@@ -30,10 +30,8 @@ use serde_json::json;
 use time_source::SystemTimeSourceDefault;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// TODO: This test belongs in kamu-ingest-datafusion crate.
-// We currently cannot move it there as it needs DatasetRepositoryLocalFs to
-// function. We should move it there once we further decompose the kamu core
-// crate.
+// TODO: Move these tests to the kamu-ingest-datafusion crate: they use nothing
+// from the kamu crate
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_group::group(engine, ingest, datafusion)]

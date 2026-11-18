@@ -378,7 +378,6 @@ async fn test_routing_dataset_name_case_insensetive() {
 
 /// Path parameters not named here (the account name, nested route parameters)
 /// are ignored.
-// TODO: Use the account name once DatasetRepository supports multi-tenancy
 #[derive(Debug, Deserialize)]
 struct DatasetByAccountAndName {
     dataset_name: odf::DatasetName,

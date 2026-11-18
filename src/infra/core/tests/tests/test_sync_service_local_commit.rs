@@ -818,7 +818,7 @@ impl LocalPullHarness {
             .unwrap();
     }
 
-    /// Pulls into a destination that exists until the commit
+    /// Pulls into a destination that must not be deleted before the commit
     async fn pull(
         &self,
         options: SyncOptions,

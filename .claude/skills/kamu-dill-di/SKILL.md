@@ -144,7 +144,7 @@ Holding a catalog is right to open transactions with `transaction!` or `#[transa
 [database-transactions.md](../../../docs/internal/database-transactions.md#3-where-a-transaction-opens)),
 in request handlers and agents that work on a per-request or
 background catalog by design, and in a singleton that resolves repositories per call
-([above](#singletons-must-not-depend-on-repositories)).
+([Singletons must not depend on repositories](#singletons-must-not-depend-on-repositories)).
 
 ### Helpers are never components
 

@@ -19,7 +19,7 @@ See also: `kamu-dill-di` for general dill patterns.
 
 ## Core Philosophy
 
-Tests in this codebase follow three non-negotiable rules:
+Tests in this codebase follow these non-negotiable rules:
 
 **Rule 1 — Test bodies must be high-level.**
 A test body reads like a specification: arrange, act, assert — with no

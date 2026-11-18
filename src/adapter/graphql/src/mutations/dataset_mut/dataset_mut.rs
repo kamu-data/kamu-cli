@@ -492,8 +492,7 @@ pub struct SetWatermarkIsDerivative {
     pub message: String,
 }
 
-/// Dataset head was moved by a concurrent update while the watermark was being
-/// set; nothing was committed
+/// Dataset head moved concurrently while the watermark was being set; nothing was committed
 #[derive(SimpleObject, Debug)]
 #[graphql(complex)]
 pub struct SetWatermarkCasFailed {

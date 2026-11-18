@@ -27,9 +27,7 @@ use crate::{
 /// Compacts one dataset, or resets it to metadata, from start to end. It
 /// authorizes the operation for the acting principal and plans in a short
 /// transaction, merges with no transaction open, and moves `HEAD` in another
-/// one. `kamu system compact`, the reset policy of `kamu pull` and the
-/// compaction tasks of flows all run it; see
-/// `docs/internal/database-transactions.md`, "Who owns a transaction"
+/// one; see `docs/internal/database-transactions.md`, "Who owns a transaction"
 #[async_trait::async_trait]
 pub trait CompactionJob: Send + Sync {
     async fn run(

@@ -958,10 +958,6 @@ async fn test_transform_empty_inputs() {
 
     let deriv_target = ResolvedDataset::from_stored(&deriv_stored, &deriv_alias);
 
-    // let deriv_helper = DatasetHelper::new(dataset.clone(),
-    // harness.tempdir.path()); let deriv_data_helper =
-    // DatasetDataHelper::new(dataset);
-
     ///////////////////////////////////////////////////////////////////////////
     // 1: Input doesn't have schema yet - elaboration reports it as not pulled
     ///////////////////////////////////////////////////////////////////////////

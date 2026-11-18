@@ -161,7 +161,6 @@ impl ApplyCommand {
             .await
             .map_err(ExecuteSingleManifestError::Execute)?;
 
-        // Roll back rejections (nothing to commit), carrying the outcome out.
         match outcome {
             outcome @ ExecuteResourceManifestOutcome::Accepted(_) => Ok(outcome),
             rejected @ ExecuteResourceManifestOutcome::Rejected(_) => {
@@ -319,8 +318,9 @@ impl ApplyCommand {
         }
     }
 
-    /// New atomic path: a single call to the batch facade method wraps the
-    /// *entire* batch in one transaction.
+    /// Applies the whole batch in one transaction: the first rejection or
+    /// failure rolls back everything, including earlier items that would
+    /// otherwise have succeeded
     async fn apply_manifests_as_one_batch(
         &self,
         printer: &ApplyPrinter<'_>,
@@ -329,9 +329,6 @@ impl ApplyCommand {
         summary: &mut ApplySummary,
         errors: &mut Vec<(BoxedError, String)>,
     ) -> Result<(), CLIError> {
-        // One transaction for the whole batch: the first rejection or failure
-        // rolls back everything, including earlier items that would otherwise
-        // have succeeded
         let applied = transaction!(
             |resource_facade_factory: Arc<dyn ResourceFacadeFactory>|
              -> Result<_, ExecuteBatchError> {

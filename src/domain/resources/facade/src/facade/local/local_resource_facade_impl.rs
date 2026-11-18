@@ -395,12 +395,9 @@ impl ResourceFacade for LocalResourceFacadeImpl {
         let mut successes = Vec::new();
         let (groups, mut problems) = self.group_refs_by_target(resource_refs).await?;
 
-        // One dispatcher call per `(account, schema)` group. The whole request
-        // runs inside a single database transaction — opened by the
-        // `#[transactional_handler]` GraphQL handler, or by the CLI's
-        // `DatabaseTransactionRunner` — so a failure in a later group rolls back
-        // the deletion requests an earlier one made. Fanning out therefore does
-        // not introduce partial-delete semantics.
+        // One dispatcher call per `(account, schema)` group. The request runs in one
+        // transaction (the `#[transactional_handler]` GraphQL handler, or the CLI command's
+        // `transaction!` block), so a failure in a later group rolls back earlier deletions.
         for group in groups {
             let (indexes, refs): (Vec<_>, Vec<_>) = group.entries.into_iter().unzip();
 

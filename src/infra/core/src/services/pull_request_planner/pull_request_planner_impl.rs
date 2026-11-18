@@ -72,10 +72,8 @@ impl PullRequestPlannerImpl {
         )
     }
 
-    // This function descends down the dependency tree of datasets (starting with
-    // provided references) assigning depth index to every dataset in the
-    // graph(s). Datasets that share the same depth level are independent and
-    // can be pulled in parallel.
+    /// Assigns a depth to every dataset reachable from the requests; datasets
+    /// of the same depth are independent and can be pulled in parallel
     #[tracing::instrument(name = PullRequestPlannerImpl_collect_pull_graph, level = "debug", skip_all, fields(num_requests = requests.len(), ?options))]
     async fn collect_pull_graph(
         &self,

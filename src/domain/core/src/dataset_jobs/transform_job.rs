@@ -27,7 +27,7 @@ use crate::{
 /// authorizes writing the derivative and reading its inputs for the acting
 /// principal, and elaborates the transform at the current heads; the engine
 /// runs with no transaction open, and `HEAD` moves with a compare-and-swap in
-/// another one. `kamu pull` and the update tasks of flows run it
+/// another one
 #[async_trait::async_trait]
 pub trait TransformJob: Send + Sync {
     async fn run(

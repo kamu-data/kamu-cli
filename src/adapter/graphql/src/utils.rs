@@ -34,11 +34,11 @@ use crate::queries::DatasetRequestState;
 /// let current_account_subject = from_catalog_n!(ctx, CurrentAccountSubject);
 ///
 /// // But sometimes, three at once:
-/// let (dataset_registry, polling_ingest_svc, dataset_changes_svc) = from_catalog_n!(
+/// let (dataset_registry, polling_ingest_svc, time_source) = from_catalog_n!(
 ///     ctx,
 ///     dyn DatasetRegistry,
 ///     dyn PollingIngestService,
-///     dyn DatasetChangesService
+///     dyn SystemTimeSource
 /// );
 /// ```
 macro_rules! from_catalog_n {

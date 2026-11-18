@@ -183,8 +183,8 @@ macro calls — macro bodies are hard to read, debug and test.
 - Order model files top-down: the highest-level result/union type first, then the structs and
   enums it references, each type's `impl` blocks immediately after the type.
 - When a function repeats a logical section, extract a named helper for it if it represents a
-  coherent concept. A transaction block is not such a section: it stays where it runs
-  ([database-transactions.md §3.2](../../../docs/internal/database-transactions.md#32-inside-a-level)).
+  coherent concept. A transaction block is not such a section
+  ([rule](#leave-no-dead-or-duplicate-code)).
 - `mod.rs` holds no code: only submodule declarations, re-exports and an optional `//!` module
   doc. Types, functions and constants live in named files. The exception is a `macro_rules!`
   macro the module exports.

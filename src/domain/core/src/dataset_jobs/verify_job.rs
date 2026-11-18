@@ -15,9 +15,7 @@ use crate::{VerificationListener, VerificationRequest, VerificationResult};
 
 /// Verifies one dataset. In a short transaction it authorizes reading the
 /// dataset and the inputs a replay reads, and plans; it then checks integrity
-/// and replays transforms with no transaction open. `kamu verify`,
-/// `kamu system diagnose` and the verification before `kamu system compact`
-/// run it
+/// and replays transforms with no transaction open
 #[async_trait::async_trait]
 pub trait VerifyJob: Send + Sync {
     async fn run(

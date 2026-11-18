@@ -144,7 +144,6 @@ pub(crate) async fn build_preliminary_request_ext(
         source.inputs.iter().map(|i| (i.clone(), None)).collect()
     };
 
-    // Build preliminary transform request
     Ok(TransformPreliminaryRequestExt {
         dataset_handle: target.get_handle().clone(),
         block_ref,

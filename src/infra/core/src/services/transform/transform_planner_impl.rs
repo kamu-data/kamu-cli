@@ -567,7 +567,7 @@ impl VerificationHistory {
             .await
             .int_err()?;
 
-        // Ensure start_block was found if specified
+        // A given tail must be part of the history
         if let Some(tail) = tail
             && !history.finished_range
         {

@@ -28,9 +28,7 @@ use crate::{
 /// Runs one polling ingest iteration of one dataset. In a short transaction it
 /// authorizes the ingest for the acting principal, plans it and resolves the
 /// dataset's environment variables; it fetches and stages data with no
-/// transaction open, and moves `HEAD` with a compare-and-swap in another one.
-/// `kamu pull` repeats it while the source has more data; the update tasks of
-/// flows run it once
+/// transaction open, and moves `HEAD` with a compare-and-swap in another one
 #[async_trait::async_trait]
 pub trait PollingIngestJob: Send + Sync {
     /// `maybe_continuation` is the writer state the previous iteration of the

@@ -178,9 +178,8 @@ impl<DB: sqlx::Database> Drop for TransactionState<DB> {
     fn drop(&mut self) {
         match self.maybe_transaction.try_lock() {
             Ok(guard) if guard.is_none() => (),
-            // This log message compliments COMMIT / ROLLBACK logs we have in
-            // `DatabaseTransactionRunner` and is used to detect when transaction gets
-            // dropped without being committted or rolled back
+            // Complements the COMMIT / ROLLBACK logs of `TransactionScope`: detects a
+            // transaction dropped without being committed or rolled back
             _ => tracing::warn!("Transaction DROPPED"),
         }
     }

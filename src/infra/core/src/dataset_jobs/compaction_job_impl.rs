@@ -97,7 +97,8 @@ impl CompactionJobImpl {
         Ok(result)
     }
 
-    /// Dropping all data needs more than compacting it
+    /// Compacting to metadata only drops all data, so it needs the right to
+    /// reset rather than to compact
     fn operation(options: &CompactionOptions) -> DatasetOperation {
         if options.keep_metadata_only {
             DatasetOperation::ResetToMetadata

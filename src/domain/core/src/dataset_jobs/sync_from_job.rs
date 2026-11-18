@@ -21,8 +21,7 @@ use crate::{PullLocalTarget, SyncError, SyncListener, SyncOptions, SyncResult};
 /// authorizes writing an existing target for the acting principal and reads
 /// the head the commit will expect; it transfers blocks and data with no
 /// transaction open, and commits in another one: a compare-and-swap of
-/// `HEAD`, or the creation of a new dataset. `kamu pull` and the update tasks
-/// of flows run it
+/// `HEAD`, or the creation of a new dataset
 #[async_trait::async_trait]
 pub trait SyncFromJob: Send + Sync {
     async fn run(
