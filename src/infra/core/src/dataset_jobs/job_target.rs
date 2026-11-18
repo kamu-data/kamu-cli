@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use internal_error::{ErrorIntoInternal, InternalError};
+use internal_error::InternalError;
 use kamu_datasets::{
     DatasetReferenceUpdater,
     DatasetRegistry,
@@ -38,32 +38,23 @@ where
 
 /// Moves the job target's `HEAD` from `old_head` to `new_head` in the current
 /// transaction, re-resolving the target first: the blocks were written with no
-/// transaction open, and the dataset may have been deleted meanwhile
+/// transaction open, and the dataset may have been deleted meanwhile. Without
+/// `old_head`, `HEAD` must not exist yet
 pub(crate) async fn commit_job_head<E>(
     dataset_registry: &dyn DatasetRegistry,
     dataset_reference_updater: &dyn DatasetReferenceUpdater,
     target: &odf::DatasetHandle,
-    old_head: &odf::Multihash,
+    old_head: Option<&odf::Multihash>,
     new_head: &odf::Multihash,
 ) -> Result<(), E>
 where
-    E: From<odf::DatasetNotFoundError>
-        + From<odf::dataset::RefCASError>
-        + From<odf::AccessError>
-        + From<InternalError>,
+    E: From<odf::DatasetNotFoundError> + From<odf::dataset::SetChainRefError> + From<InternalError>,
 {
-    use odf::dataset::SetChainRefError as E2;
-
     let dataset = resolve_job_target::<E>(dataset_registry, target).await?;
-    match dataset_reference_updater
-        .update_reference(&dataset, &odf::BlockRef::Head, Some(old_head), new_head)
-        .await
-    {
-        Ok(()) => Ok(()),
-        Err(E2::CASFailed(e)) => Err(e.into()),
-        Err(E2::Access(e)) => Err(e.into()),
-        Err(e @ (E2::BlockNotFound(_) | E2::Internal(_))) => Err(e.int_err().into()),
-    }
+    dataset_reference_updater
+        .update_reference(&dataset, &odf::BlockRef::Head, old_head, new_head)
+        .await?;
+    Ok(())
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

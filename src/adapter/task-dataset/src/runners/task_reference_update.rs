@@ -33,10 +33,11 @@ pub(crate) fn ref_moved_outcome(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// The outcome of a task that may not move its dataset's reference: retrying
-/// under the same account cannot gain the access, so it is not retried
-pub(crate) fn ref_update_not_allowed_outcome(error: &odf::AccessError) -> TaskOutcome {
-    tracing::error!(error = ?error, error_msg = %error, "Not allowed to move the task's dataset reference");
+/// The outcome of a task whose principal may not run its operation, checked
+/// before the operation or when it moves the dataset's reference: retrying
+/// under the same principal cannot gain the access, so it is not retried
+pub(crate) fn operation_not_allowed_outcome(error: &odf::AccessError) -> TaskOutcome {
+    tracing::error!(error = ?error, error_msg = %error, "The task's principal is not allowed the operation");
     TaskOutcome::Failed(TaskError::empty_unrecoverable())
 }
 

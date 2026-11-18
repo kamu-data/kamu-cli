@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use proc_macro2::Span;
+use proc_macro2::{Span, TokenStream, TokenTree};
 use quote::{ToTokens, quote};
 use syn::parse::{Parse, ParseStream};
 use syn::spanned::Spanned;
@@ -236,7 +236,9 @@ impl Binding {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// Finds a `return` that would leave the transaction body, skipping the nested
-/// closures, async blocks and items it does not leave
+/// closures, async blocks and items it does not leave. The tokens of a macro
+/// invocation are not parsed, so any `return` among them counts, even one in a
+/// closure passed to the macro
 struct ReturnFinder {
     maybe_found: Option<Span>,
 }
@@ -254,6 +256,14 @@ impl ReturnFinder {
             )),
         }
     }
+
+    fn find_return_token(tokens: TokenStream) -> Option<Span> {
+        tokens.into_iter().find_map(|token| match token {
+            TokenTree::Ident(ident) if ident == "return" => Some(ident.span()),
+            TokenTree::Group(group) => Self::find_return_token(group.stream()),
+            TokenTree::Ident(_) | TokenTree::Punct(_) | TokenTree::Literal(_) => None,
+        })
+    }
 }
 
 impl<'ast> Visit<'ast> for ReturnFinder {
@@ -266,6 +276,12 @@ impl<'ast> Visit<'ast> for ReturnFinder {
     fn visit_expr_async(&mut self, _: &'ast syn::ExprAsync) {}
 
     fn visit_item(&mut self, _: &'ast syn::Item) {}
+
+    fn visit_macro(&mut self, mac: &'ast syn::Macro) {
+        if self.maybe_found.is_none() {
+            self.maybe_found = Self::find_return_token(mac.tokens.clone());
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -320,6 +336,13 @@ mod tests {
     #[test]
     fn test_rejects_return_in_value_form() {
         assert!(error_of("|| { if x { return Ok(()); } }").contains("`return`"));
+    }
+
+    #[test]
+    fn test_rejects_return_inside_a_macro_in_value_form() {
+        assert!(error_of("|| { select! { _ = a => return Ok(()), } }").contains("`return`"));
+        assert!(error_of("|| { log!(\"{}\", { return 1; }); }").contains("`return`"));
+        parse("|| -> Result<(), E> { select! { _ = a => return Ok(()), } }").unwrap();
     }
 
     #[test]

@@ -358,7 +358,8 @@ fails with `PullError::Access` if one is denied. Resetting the derivative on a d
 its data, so `CompactionJob` checks `ResetToMetadata` (Maintain on the target) and the pull fails
 with `PullError::Access` without resetting when it is denied.
 
-A sync target that does not exist yet has nothing to check; creating it is governed by the sync.
+A sync target that does not exist yet has nothing to check; creating it is governed by the sync. If
+it exists by the time its job runs, `SyncFromJob` checks `SyncFrom` on it before transferring.
 `--all` only plans datasets the current account owns. Planning itself resolves datasets without
 access checks; nothing runs before the iteration's checks pass.
 

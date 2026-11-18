@@ -18,6 +18,7 @@ use kamu_core::{
     SyncFromJob,
     SyncFromJobError,
     SyncFromRequest,
+    SyncFromTarget,
     SyncFromTransfer,
     SyncFromTransferred,
     SyncFromTransferredTarget,
@@ -36,7 +37,7 @@ use kamu_datasets::{
     DatasetRegistry,
 };
 
-use super::job_target::resolve_job_target;
+use super::job_target::commit_job_head;
 use crate::utils::span_outcome::SpanOutcome;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -57,27 +58,30 @@ impl SyncFromJobImpl {
         options: SyncOptions,
         maybe_listener: Option<Arc<dyn SyncListener>>,
     ) -> Result<SyncResult, SyncFromJobError> {
-        // 1: Authorize and read the head the commit will expect
+        // 1: Read the head the commit will expect, and authorize moving it
         let dst =
             transaction!(|dataset_operation_guard: Arc<dyn DatasetOperationGuard>,
                           dataset_registry: Arc<dyn DatasetRegistry>| {
-                // A new dataset is authorized when it is created
-                if let PullLocalTarget::Existing(handle) = target {
+                let dst = target
+                    .resolve_sync_target(dataset_registry.as_ref())
+                    .await?
+                    .ok_or_else(|| odf::DatasetNotFoundError::new(target.as_local_ref()))?;
+
+                // Checked on the dataset found, which may have been created
+                // since a pull planned to create it. A new dataset is
+                // authorized when it is created
+                if let SyncFromTarget::Existing { dataset, .. } = &dst {
                     dataset_operation_guard
                         .check_operation(
                             &self.principal,
                             &DatasetOperationRequest::new(
-                                handle.clone(),
+                                dataset.get_handle().clone(),
                                 DatasetOperation::SyncFrom,
                             ),
                         )
                         .await?;
                 }
 
-                let dst = target
-                    .resolve_sync_target(dataset_registry.as_ref())
-                    .await?
-                    .ok_or_else(|| odf::DatasetNotFoundError::new(target.as_local_ref()))?;
                 dst.detach_from_transaction();
                 dst
             });
@@ -159,12 +163,14 @@ impl SyncFromJobImpl {
     ) -> Result<(), SyncFromJobError> {
         transaction!(|dataset_registry: Arc<dyn DatasetRegistry>,
                       updater: Arc<dyn DatasetReferenceUpdater>| {
-            let dataset =
-                resolve_job_target::<SyncFromJobError>(dataset_registry.as_ref(), target).await?;
-            updater
-                .update_reference(&dataset, &odf::BlockRef::Head, expected_head, new_head)
-                .await
-                .map_err(SyncError::from)?;
+            commit_job_head::<SyncFromJobError>(
+                dataset_registry.as_ref(),
+                updater.as_ref(),
+                target,
+                expected_head,
+                new_head,
+            )
+            .await?;
         });
         Ok(())
     }
