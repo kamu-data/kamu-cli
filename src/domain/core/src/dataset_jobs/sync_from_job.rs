@@ -66,6 +66,14 @@ impl From<DatasetPermissionError> for SyncFromJobError {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+impl From<odf::dataset::SetChainRefError> for SyncFromJobError {
+    fn from(v: odf::dataset::SetChainRefError) -> Self {
+        Self::Sync(v.into())
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 impl From<odf::DatasetNotFoundError> for SyncFromJobError {
     fn from(v: odf::DatasetNotFoundError) -> Self {
         Self::TargetDeleted(v)

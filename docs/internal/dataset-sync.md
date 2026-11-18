@@ -127,7 +127,7 @@ the reference carries an alias.
 
 | Step | Transaction | Does |
 | --- | --- | --- |
-| Target | one, which first authorizes `SyncFrom` on an existing dataset | `PullLocalTarget::resolve_sync_target`: read `expected_head`; no remote is contacted |
+| Target | one, which then authorizes `SyncFrom` on the dataset found, including one created since the pull was planned | `PullLocalTarget::resolve_sync_target`: read `expected_head`; no remote is contacted |
 | Transfer | none held across it | `sync_from`: resolve and open the source, compare the chains, store the `Seed` of a new dataset, copy objects, append blocks; no reference moves. Returns `SyncFromTransfer::UpToDate` or `Transferred(SyncFromTransferred)` |
 | Commit | a new one | `SyncFromJob`: for an existing dataset, `DatasetReferenceUpdater` moves `HEAD` from `expected_head` to the new head; for a new one, `CreateDatasetUseCase` creates the entry with `HEAD` already at the new head (`CreateDatasetUseCaseOptions::initial_head`) |
 
@@ -500,7 +500,7 @@ How `kamu pull` uses pull aliases to decide that a dataset is synced belongs to
 | --- | --- |
 | Server, every `{dataset}/…` route | `DatasetResolverLayer` resolves the dataset from the path (optional only for `/push`); `DatasetAuthorizationLayer` requires **Write** for `/push` and every unsafe method (anything but `GET`, `HEAD`, `OPTIONS` and `TRACE`), **Read** otherwise. With `allowAnonymous=false`, `AuthPolicyLayer` rejects anonymous callers first |
 | Server push to a new dataset | logged-in caller; the account in the path must be the caller's |
-| `kamu pull` sync jobs | `SyncFrom`: Write on an existing destination, for the whole plan and again in `SyncFromJob` ([dataset-pull.md](dataset-pull.md#7-authorization)) |
+| `kamu pull` sync jobs | `SyncFrom`: Write on an existing destination, for the whole plan and again in `SyncFromJob` on the destination it finds ([dataset-pull.md](dataset-pull.md#7-authorization)) |
 | `kamu push` | `SyncTo`: Read on each pushed dataset, for the whole push before planning and again in `SyncToJob`; the remote server decides about the destination |
 | Update task sync jobs | `SyncFrom` in `SyncFromJob`, which always passes for `Principal::Node`, as which the task runs ([dataset-pull.md](dataset-pull.md#8-server-use)) |
 

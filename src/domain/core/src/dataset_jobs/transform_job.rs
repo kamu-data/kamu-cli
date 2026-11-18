@@ -85,3 +85,18 @@ impl From<DatasetPermissionError> for TransformJobError {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl From<odf::dataset::SetChainRefError> for TransformJobError {
+    fn from(v: odf::dataset::SetChainRefError) -> Self {
+        use odf::dataset::SetChainRefError as E;
+
+        match v {
+            E::CASFailed(e) => Self::RefMoved(e),
+            E::Access(e) => Self::Access(e),
+            E::Internal(e) => Self::Internal(e),
+            e @ E::BlockNotFound(_) => Self::Internal(e.int_err()),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

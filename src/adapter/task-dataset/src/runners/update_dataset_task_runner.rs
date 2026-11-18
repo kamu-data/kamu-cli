@@ -15,8 +15,8 @@ use kamu_task_system::*;
 
 use super::task_reference_update::{
     dataset_deleted_outcome,
+    operation_not_allowed_outcome,
     ref_moved_outcome,
-    ref_update_not_allowed_outcome,
 };
 use super::task_span_outcome::TaskSpanOutcome;
 use crate::{
@@ -102,7 +102,7 @@ impl UpdateDatasetTaskRunner {
                 e.reference.clone(),
                 Some(e),
             )),
-            Err(PollingIngestJobError::Access(e)) => Ok(ref_update_not_allowed_outcome(&e)),
+            Err(PollingIngestJobError::Access(e)) => Ok(operation_not_allowed_outcome(&e)),
             Err(PollingIngestJobError::Planning(e)) => {
                 tracing::error!(error = ?e, error_msg = %e, "Ingest planning failed");
                 Ok(Self::failed(e.is_recoverable()))
@@ -161,7 +161,7 @@ impl UpdateDatasetTaskRunner {
                 e.reference.clone(),
                 Some(e),
             )),
-            Err(TransformJobError::Access(e)) => Ok(ref_update_not_allowed_outcome(&e)),
+            Err(TransformJobError::Access(e)) => Ok(operation_not_allowed_outcome(&e)),
             Err(TransformJobError::Internal(e)) => Err(e),
         }
     }

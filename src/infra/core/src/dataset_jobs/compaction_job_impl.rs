@@ -93,7 +93,7 @@ impl CompactionJobImpl {
                     dataset_registry.as_ref(),
                     updater.as_ref(),
                     target_handle,
-                    old_head,
+                    Some(old_head),
                     new_head,
                 )
                 .await?;

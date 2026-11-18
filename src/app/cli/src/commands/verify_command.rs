@@ -123,10 +123,6 @@ impl VerifyCommand {
             );
         }
 
-        if dataset_handles.is_empty() {
-            return Ok(vec![]);
-        }
-
         // Each verification opens its own short transaction and holds none
         // while it reads data or replays transforms
         let mut verification_results = Vec::new();

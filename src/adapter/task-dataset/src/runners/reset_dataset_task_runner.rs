@@ -15,8 +15,8 @@ use kamu_task_system::*;
 
 use super::task_reference_update::{
     dataset_deleted_outcome,
+    operation_not_allowed_outcome,
     ref_moved_outcome,
-    ref_update_not_allowed_outcome,
 };
 use super::task_span_outcome::TaskSpanOutcome;
 use crate::{
@@ -91,7 +91,7 @@ impl ResetDatasetTaskRunner {
             ),
             ResetError::Access(e)
             | ResetError::Execution(ResetExecutionError::SetReferenceFailed(E::Access(e))) => {
-                Ok(ref_update_not_allowed_outcome(&e))
+                Ok(operation_not_allowed_outcome(&e))
             }
             e @ (ResetError::Planning(ResetPlanningError::Internal(_))
             | ResetError::Execution(ResetExecutionError::SetReferenceFailed(E::Internal(_)))) => {

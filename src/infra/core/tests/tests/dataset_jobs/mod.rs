@@ -9,4 +9,5 @@
 
 mod test_compaction_job;
 mod test_reset_job;
+mod test_sync_from_job;
 mod test_verify_job;
