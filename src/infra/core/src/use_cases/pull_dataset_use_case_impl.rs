@@ -9,7 +9,7 @@
 
 use std::sync::Arc;
 
-use database_common_macros::transactional_method3;
+use database_common::transaction;
 use dill::*;
 use internal_error::InternalError;
 use kamu_accounts::Principal;
@@ -135,45 +135,6 @@ impl PullDatasetUseCaseImpl {
 
         Ok(results)
     }
-
-    /// The plan holds only the jobs the caller may run; the denied ones are
-    /// among its errors
-    #[transactional_method3(
-        pull_request_planner: Arc<dyn PullRequestPlanner>,
-        dataset_operation_guard: Arc<dyn DatasetOperationGuard>,
-        principal: Arc<Principal>
-    )]
-    async fn build_plan_for_requests(
-        &self,
-        requests: &[PullRequest],
-        options: &PullOptions,
-    ) -> Result<PullPlan, InternalError> {
-        let plan = pull_request_planner
-            .build_pull_multi_plan(requests, options, *self.tenancy_config)
-            .await;
-        PullAuthorization::new(dataset_operation_guard, principal)
-            .authorize(plan)
-            .await
-    }
-
-    /// The plan holds only the jobs the caller may run; the denied ones are
-    /// among its errors
-    #[transactional_method3(
-        pull_request_planner: Arc<dyn PullRequestPlanner>,
-        dataset_operation_guard: Arc<dyn DatasetOperationGuard>,
-        principal: Arc<Principal>
-    )]
-    async fn build_plan_for_all_owned_datasets(
-        &self,
-        options: &PullOptions,
-    ) -> Result<PullPlan, InternalError> {
-        let plan = pull_request_planner
-            .build_pull_plan_all_owner_datasets(options, *self.tenancy_config)
-            .await?;
-        PullAuthorization::new(dataset_operation_guard, principal)
-            .authorize(plan)
-            .await
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -216,9 +177,19 @@ impl PullDatasetUseCase for PullDatasetUseCaseImpl {
     ) -> Result<Vec<PullResponse>, InternalError> {
         tracing::info!(?requests, ?options, "Performing pull");
 
-        let PullPlan { iterations, errors } = self
-            .build_plan_for_requests(requests.as_slice(), &options)
-            .await?;
+        // The plan holds only the jobs the caller may run; the denied ones are
+        // among its errors
+        let PullPlan { iterations, errors } =
+            transaction!(|pull_request_planner: Arc<dyn PullRequestPlanner>,
+                          dataset_operation_guard: Arc<dyn DatasetOperationGuard>,
+                          principal: Arc<Principal>| {
+                let plan = pull_request_planner
+                    .build_pull_multi_plan(&requests, &options, *self.tenancy_config)
+                    .await;
+                PullAuthorization::new(dataset_operation_guard, principal)
+                    .authorize(plan)
+                    .await?
+            });
 
         tracing::info!(
             num_steps = iterations.len(),
@@ -245,8 +216,19 @@ impl PullDatasetUseCase for PullDatasetUseCaseImpl {
     ) -> Result<Vec<PullResponse>, InternalError> {
         tracing::info!(?options, "Performing pull (all owned)");
 
+        // The plan holds only the jobs the caller may run; the denied ones are
+        // among its errors
         let PullPlan { iterations, errors } =
-            self.build_plan_for_all_owned_datasets(&options).await?;
+            transaction!(|pull_request_planner: Arc<dyn PullRequestPlanner>,
+                          dataset_operation_guard: Arc<dyn DatasetOperationGuard>,
+                          principal: Arc<Principal>| {
+                let plan = pull_request_planner
+                    .build_pull_plan_all_owner_datasets(&options, *self.tenancy_config)
+                    .await?;
+                PullAuthorization::new(dataset_operation_guard, principal)
+                    .authorize(plan)
+                    .await?
+            });
 
         tracing::info!(
             num_steps = iterations.len(),

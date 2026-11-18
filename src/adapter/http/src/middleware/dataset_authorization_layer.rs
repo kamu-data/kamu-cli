@@ -8,11 +8,12 @@
 // by the Apache License, Version 2.0.
 
 use std::pin::Pin;
+use std::sync::Arc;
 use std::task::{Context, Poll};
 
 use axum::body::Body;
 use axum::response::Response;
-use database_common::DatabaseTransactionRunner;
+use database_common::transaction;
 use futures::Future;
 use internal_error::{ErrorIntoInternal, InternalError};
 use kamu_accounts::{AnonymousAccountReason, CurrentAccountSubject, Principal};
@@ -133,58 +134,53 @@ where
                 ErrorResponse(Response<Body>),
             }
 
-            let check_result: Result<CheckResult, InternalError> =
-                DatabaseTransactionRunner::new(catalog.clone())
-                    .transactional(|transaction_catalog| async move {
-                        use kamu_datasets::DatasetPermissionCheckerExt;
+            let check_result = transaction!(
+                #[catalog(catalog)]
+                |dataset_registry: Arc<dyn DatasetRegistry>,
+                 dataset_permission_checker: Arc<dyn DatasetPermissionChecker>,
+                 principal: Arc<Principal>|
+                 -> Result<CheckResult, InternalError> {
+                    use kamu_datasets::DatasetPermissionCheckerExt;
 
-                        let dataset_registry = transaction_catalog
-                            .get_one::<dyn DatasetRegistry>()
-                            .unwrap();
-                        let dataset_permission_checker = transaction_catalog
-                            .get_one::<dyn DatasetPermissionChecker>()
-                            .unwrap();
-                        let principal = transaction_catalog.get_one::<Principal>().unwrap();
+                    let dataset_handle = {
+                        use odf::DatasetRefUnresolvedError as E;
 
-                        let dataset_handle = {
-                            use odf::DatasetRefUnresolvedError as E;
-
-                            match dataset_registry
-                                .resolve_dataset_handle_by_ref(dataset_ref)
-                                .await
-                            {
-                                Ok(dataset_handle) => dataset_handle,
-                                Err(E::NotFound(_)) => {
-                                    // In case of dataset initial pushing, the dataset does not
-                                    // exist beforehand.
-                                    return Ok(CheckResult::Proceed);
-                                }
-                                Err(e @ E::Internal(_)) => {
-                                    return Err(e.int_err());
-                                }
+                        match dataset_registry
+                            .resolve_dataset_handle_by_ref(dataset_ref)
+                            .await
+                        {
+                            Ok(dataset_handle) => dataset_handle,
+                            Err(E::NotFound(_)) => {
+                                // In case of dataset initial pushing, the dataset does not
+                                // exist beforehand.
+                                return Ok(CheckResult::Proceed);
                             }
-                        };
-                        let granted_permissions = dataset_permission_checker
-                            .get_granted_permissions_for_existing_dataset(
-                                &principal,
-                                &dataset_handle.id,
-                            )
-                            .await?;
-
-                        match DatasetPermission::resolve_access(
-                            &granted_permissions,
-                            current_dataset_permission,
-                        ) {
-                            DatasetPermissionAccess::Allowed => Ok(CheckResult::Proceed),
-                            DatasetPermissionAccess::Insufficient => {
-                                Ok(CheckResult::ErrorResponse(forbidden_access_response()))
-                            }
-                            DatasetPermissionAccess::Forbidden => {
-                                Ok(CheckResult::ErrorResponse(not_found_response()))
+                            Err(e @ E::Internal(_)) => {
+                                return Err(e.int_err());
                             }
                         }
-                    })
-                    .await;
+                    };
+                    let granted_permissions = dataset_permission_checker
+                        .get_granted_permissions_for_existing_dataset(
+                            &principal,
+                            &dataset_handle.id,
+                        )
+                        .await?;
+
+                    match DatasetPermission::resolve_access(
+                        &granted_permissions,
+                        current_dataset_permission,
+                    ) {
+                        DatasetPermissionAccess::Allowed => Ok(CheckResult::Proceed),
+                        DatasetPermissionAccess::Insufficient => {
+                            Ok(CheckResult::ErrorResponse(forbidden_access_response()))
+                        }
+                        DatasetPermissionAccess::Forbidden => {
+                            Ok(CheckResult::ErrorResponse(not_found_response()))
+                        }
+                    }
+                }
+            );
 
             match check_result {
                 Ok(CheckResult::Proceed) => inner.call(request).await,

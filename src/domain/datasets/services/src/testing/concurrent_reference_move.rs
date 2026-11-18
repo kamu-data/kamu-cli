@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use database_common::{DatabaseTransactionManager, DatabaseTransactionRunner};
+use database_common::{DatabaseTransactionManager, transaction};
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_datasets::{DatasetReferenceRepository, DatasetRegistry};
 
@@ -41,35 +41,24 @@ impl ConcurrentReferenceMove {
 
     pub async fn apply(self, dataset_handle: &odf::DatasetHandle, block_ref: &odf::BlockRef) {
         // With no transaction manager there are no transactions to race with
-        if self
+        let has_transaction_manager = self
             .catalog
             .get_one::<dyn DatabaseTransactionManager>()
-            .is_err()
-        {
-            Self::move_reference(
-                &self.catalog,
-                dataset_handle,
-                block_ref,
-                self.concurrent_block_hash.as_ref(),
-            )
-            .await
-            .unwrap();
-            return;
-        }
+            .is_ok();
 
-        let concurrent_block_hash = self.concurrent_block_hash;
-        DatabaseTransactionRunner::new(self.catalog)
-            .transactional(|transaction_catalog| async move {
+        transaction!(
+            #[when(has_transaction_manager)]
+            |catalog| -> Result<_, InternalError> {
                 Self::move_reference(
-                    &transaction_catalog,
+                    &catalog,
                     dataset_handle,
                     block_ref,
-                    concurrent_block_hash.as_ref(),
+                    self.concurrent_block_hash.as_ref(),
                 )
                 .await
-            })
-            .await
-            .unwrap();
+            }
+        )
+        .unwrap();
     }
 
     async fn move_reference(

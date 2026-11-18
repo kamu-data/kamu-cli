@@ -11,7 +11,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use axum::extract::ws::{CloseFrame, Message, WebSocket};
-use database_common::DatabaseTransactionRunner;
+use database_common::transaction;
 use dill::Catalog;
 use internal_error::InternalError;
 use kamu_datasets::DatasetRegistry;
@@ -150,8 +150,9 @@ pub(crate) async fn prepare_object_transfer_strategies<
     dataset_url: Url,
     maybe_bearer_header: Option<BearerHeader>,
 ) -> Result<Vec<TStrategy>, InternalError> {
-    DatabaseTransactionRunner::new(catalog.clone())
-        .transactional_with(|dataset_registry: Arc<dyn DatasetRegistry>| async move {
+    transaction!(
+        #[catalog(catalog)]
+        |dataset_registry: Arc<dyn DatasetRegistry>| -> Result<_, InternalError> {
             let resolved_dataset = dataset_registry
                 .get_dataset_by_handle(&dataset_handle)
                 .await;
@@ -170,8 +171,8 @@ pub(crate) async fn prepare_object_transfer_strategies<
             }
 
             Ok(object_transfer_strategies)
-        })
-        .await
+        }
+    )
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

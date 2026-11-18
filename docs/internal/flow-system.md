@@ -273,7 +273,7 @@ sequenceDiagram
 
     note over FA: wakes at t
     rect rgba(128, 128, 128, 0.12)
-        note over FA,TS: one transaction per flow: activate_flow
+        note over FA,TS: one transaction per flow: activate_flows
         FA->>C: build_task_logical_plan(flow)
         FA->>TS: create_task(plan, metadata{flow_id})
         FA->>FA: StartConditionUpdated(Executor) + TaskScheduled
@@ -402,7 +402,7 @@ instead.
 ```mermaid
 flowchart TD
     START(["activate_due_flows<br/>now fixed for the pass"]) --> PAGE["get_flows_due_for_activation(now, after, batch_size)<br/>key-set paging by (time, flow_id)"]
-    PAGE --> EACH["activate_flow, one transaction per flow"]
+    PAGE --> EACH["activate_flows, one transaction per flow"]
     EACH -- ConcurrentModification --> SKIP["skip, re-read next pass"]
     EACH -- Internal error --> LOG["log, continue"]
     EACH -- ok --> HB
@@ -421,7 +421,7 @@ fires when a flow's `scheduled_for_activation_at` moves (details in
 
 ### Activation
 
-`activate_flow` → `schedule_flow_task` finds the controller for the flow type, calls
+`activate_flows` → `schedule_flow_task` finds the controller for the flow type, calls
 `build_task_logical_plan`, creates the task with `METADATA_TASK_FLOW_ID`, sets the `Executor`
 start condition and records `TaskScheduled`. A concurrent modification of the flow rolls back the
 whole activation, including the task.

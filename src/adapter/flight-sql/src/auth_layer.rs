@@ -11,7 +11,7 @@ use std::pin::Pin;
 use std::sync::Arc;
 use std::task::{Context, Poll};
 
-use database_common::DatabaseTransactionRunner;
+use database_common::transaction;
 use futures::Future;
 use kamu_accounts::{
     Account,
@@ -81,18 +81,14 @@ impl<Svc> AuthenticationMiddleware<Svc> {
         base_catalog: &dill::Catalog,
         access_token: String,
     ) -> Result<Account, GetAccountInfoError> {
-        use tracing::Instrument;
-
-        DatabaseTransactionRunner::new(base_catalog.clone())
-            .transactional_with(
-                |authentication_service: Arc<dyn AuthenticationService>| async move {
-                    authentication_service.account_by_token(access_token).await
-                },
-            )
-            .instrument(tracing::debug_span!(
-                "AuthenticationMiddleware::current_account_subject"
-            ))
-            .await
+        transaction!(
+            #[catalog(base_catalog)]
+            #[span(tracing::debug_span!("AuthenticationMiddleware::current_account_subject"))]
+            |authentication_service: Arc<dyn AuthenticationService>|
+             -> Result<_, GetAccountInfoError> {
+                authentication_service.account_by_token(access_token).await
+            }
+        )
     }
 }
 

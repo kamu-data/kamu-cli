@@ -10,7 +10,7 @@
 use std::collections::HashSet;
 use std::sync::{Arc, Mutex};
 
-use database_common_macros::transactional_method;
+use database_common::transaction;
 use internal_error::{InternalError, ResultIntoInternal};
 use tokio::sync::Semaphore;
 use tracing::Instrument;
@@ -250,15 +250,30 @@ impl ConsumeMessageTask {
             MessageConsumptionMode::Immediate => Err(InternalError::new(
                 "Immediate consumers are not expected in durable outbox processing",
             )),
-            MessageConsumptionMode::TransactionalWrapped => self.invoke_wrapped().await,
-            MessageConsumptionMode::TransactionalSelfManaged => self.invoke_self_managed().await,
+            // The consumer's changes and the consumption record commit together
+            MessageConsumptionMode::TransactionalWrapped => {
+                transaction!(|catalog| {
+                    self.dispatch(&catalog).await?;
+                    self.mark_consumed(&catalog).await?;
+                });
+                Ok(())
+            }
+            // The consumer commits in transactions of its own; the record moves
+            // once it returns
+            MessageConsumptionMode::TransactionalSelfManaged => {
+                self.dispatch(&self.catalog).await?;
+                transaction!(|catalog| {
+                    self.mark_consumed(&catalog).await?;
+                });
+                Ok(())
+            }
         }
     }
 
-    #[transactional_method]
-    async fn invoke_wrapped(&self) -> Result<(), InternalError> {
+    async fn dispatch(&self, target_catalog: &dill::Catalog) -> Result<(), InternalError> {
         tracing::debug!(
             outbox_message = ?self.message,
+            consumption_mode = ?self.consumption_mode,
             "Consuming message"
         );
 
@@ -266,62 +281,24 @@ impl ConsumeMessageTask {
 
         self.dispatcher
             .dispatch_message(
-                &transaction_catalog,
+                target_catalog,
                 ConsumerFilter::SelectedConsumer(&self.consumer_name),
                 &content_json,
                 self.message.version,
             )
-            .await?;
-
-        // Shift consumption record regardless of whether the consumer was interested in
-        // the message
-        tracing::debug!(
-            consumer_name = %self.consumer_name,
-            producer_name = %self.message.producer_name,
-            last_consumed_message_id = %self.message.message_id,
-            "Shifting consumption record"
-        );
-
-        self.mark_consumed(&transaction_catalog).await?;
-
-        Ok(())
+            .await
     }
 
-    async fn invoke_self_managed(&self) -> Result<(), InternalError> {
-        tracing::debug!(
-            outbox_message = ?self.message,
-            "Consuming message without framework transaction"
-        );
-
-        let content_json = self.message.content_json.to_string();
-
-        self.dispatcher
-            .dispatch_message(
-                &self.catalog,
-                ConsumerFilter::SelectedConsumer(&self.consumer_name),
-                &content_json,
-                self.message.version,
-            )
-            .await?;
-
-        self.mark_consumed_transactionally().await
-    }
-
-    #[transactional_method]
-    async fn mark_consumed_transactionally(&self) -> Result<(), InternalError> {
-        tracing::debug!(
-            consumer_name = %self.consumer_name,
-            producer_name = %self.message.producer_name,
-            last_consumed_message_id = %self.message.message_id,
-            "Shifting consumption record"
-        );
-
-        self.mark_consumed(&transaction_catalog).await?;
-
-        Ok(())
-    }
-
+    /// Shifts the consumption record, whether or not the consumer was
+    /// interested in the message
     async fn mark_consumed(&self, target_catalog: &dill::Catalog) -> Result<(), InternalError> {
+        tracing::debug!(
+            consumer_name = %self.consumer_name,
+            producer_name = %self.message.producer_name,
+            last_consumed_message_id = %self.message.message_id,
+            "Shifting consumption record"
+        );
+
         let outbox_message_bridge = target_catalog.get_one::<dyn OutboxMessageBridge>().unwrap();
 
         outbox_message_bridge

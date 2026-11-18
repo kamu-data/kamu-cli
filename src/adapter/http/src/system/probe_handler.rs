@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use database_common::transaction;
 use internal_error::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -40,10 +41,10 @@ pub async fn probe_handler(
     axum::Extension(catalog): axum::Extension<dill::Catalog>,
     axum::extract::Query(req): axum::extract::Query<ProbeRequest>,
 ) -> Result<axum::Json<ProbeResponse>, http_common::ApiError> {
-    let tx_runner = database_common::DatabaseTransactionRunner::new(catalog);
-
-    tx_runner
-        .maybe_transactional(req.db_transaction.unwrap_or(false), |cat| async move {
+    transaction!(
+        #[catalog(catalog)]
+        #[when(req.db_transaction.unwrap_or(false))]
+        |cat| -> Result<_, http_common::ApiError> {
             if let Some(tx) = cat
                 .get::<dill::specs::Maybe<dill::specs::OneOf<database_common::TransactionRef>>>()
                 .int_err()?
@@ -68,8 +69,8 @@ pub async fn probe_handler(
             }
 
             Ok(axum::Json(ProbeResponse {}))
-        })
-        .await
+        }
+    )
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

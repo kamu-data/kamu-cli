@@ -9,7 +9,7 @@
 
 use std::sync::Arc;
 
-use database_common_macros::{transactional_method1, transactional_method2};
+use database_common::transaction;
 use dill::{component, interface};
 use internal_error::{ErrorIntoInternal, InternalError};
 use kamu_accounts::Principal;
@@ -41,6 +41,10 @@ use crate::SyncRequestBuilder;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Sync requests, each with the index of its plan item, and the responses of
+/// the items no request could be built for
+type SyncRequestsOutcome = (Vec<(usize, SyncToRequest)>, Vec<PushResponse>);
+
 #[component]
 #[interface(dyn PushDatasetUseCase)]
 pub struct PushDatasetUseCaseImpl {
@@ -50,10 +54,10 @@ pub struct PushDatasetUseCaseImpl {
 
 #[common_macros::method_names_consts]
 impl PushDatasetUseCaseImpl {
-    #[transactional_method2(dataset_operation_guard: Arc<dyn DatasetOperationGuard>, principal: Arc<Principal>)]
     #[tracing::instrument(level = "debug", name = PushDatasetUseCaseImpl_make_authorization_checks, skip_all, fields(num_datasets = dataset_handles.len(), ?push_target))]
     async fn make_authorization_checks(
-        &self,
+        dataset_operation_guard: &dyn DatasetOperationGuard,
+        principal: &Principal,
         dataset_handles: Vec<odf::DatasetHandle>,
         push_target: Option<&odf::DatasetPushTarget>,
     ) -> Result<(Vec<odf::DatasetHandle>, Vec<PushResponse>), InternalError> {
@@ -62,7 +66,7 @@ impl PushDatasetUseCaseImpl {
             .map(|hdl| DatasetOperationRequest::new(hdl, DatasetOperation::SyncTo))
             .collect();
         let verdicts = dataset_operation_guard
-            .check_operations(&principal, &requests)
+            .check_operations(principal, &requests)
             .await?;
 
         let mut authorized_handles = Vec::with_capacity(requests.len());
@@ -90,7 +94,6 @@ impl PushDatasetUseCaseImpl {
     }
 
     /// Pairs each sync request with the index of its plan item
-    #[transactional_method1(sync_request_builder: Arc<SyncRequestBuilder>)]
     #[tracing::instrument(
         level = "debug",
         name = PushDatasetUseCaseImpl_build_sync_requests,
@@ -98,11 +101,11 @@ impl PushDatasetUseCaseImpl {
         fields(num_items = plan.len(), ?sync_options, ?push_target)
     )]
     async fn build_sync_requests(
-        &self,
+        sync_request_builder: &SyncRequestBuilder,
         plan: &[PushItem],
         sync_options: SyncOptions,
         push_target: Option<&odf::DatasetPushTarget>,
-    ) -> Result<(Vec<(usize, SyncToRequest)>, Vec<PushResponse>), InternalError> {
+    ) -> Result<SyncRequestsOutcome, InternalError> {
         let mut sync_requests = Vec::new();
         let mut errors = Vec::new();
 
@@ -126,30 +129,6 @@ impl PushDatasetUseCaseImpl {
         }
 
         Ok((sync_requests, errors))
-    }
-
-    #[transactional_method1(remote_alias_registry: Arc<dyn RemoteAliasesRegistry>)]
-    async fn save_dataset_alias_transactional(
-        &self,
-        local_handle: &odf::DatasetHandle,
-        remote_ref: &odf::DatasetRefRemote,
-    ) -> Result<bool, InternalError> {
-        remote_alias_registry
-            .get_remote_aliases(local_handle)
-            .await?
-            .add(remote_ref, RemoteAliasKind::Push)
-            .await
-    }
-
-    #[transactional_method1(push_request_planner: Arc<dyn PushRequestPlanner>)]
-    async fn prepare_push_plan_transactional(
-        &self,
-        authorized_handles: &[odf::DatasetHandle],
-        remote_target: Option<&odf::DatasetPushTarget>,
-    ) -> Result<(Vec<PushItem>, Vec<PushResponse>), InternalError> {
-        Ok(push_request_planner
-            .collect_plan(authorized_handles, remote_target)
-            .await)
     }
 
     /// Syncs, then reports the result to the listener: a push to a remote
@@ -201,26 +180,40 @@ impl PushDatasetUseCase for PushDatasetUseCaseImpl {
         let mut responses = Vec::new();
 
         // Authorization checks upon all datasets come first
-        let (authorized_handles, unauthorized_responses) = self
-            .make_authorization_checks(dataset_handles, options.remote_target.as_ref())
-            .await?;
+        let (authorized_handles, unauthorized_responses) =
+            transaction!(|dataset_operation_guard: Arc<dyn DatasetOperationGuard>,
+                          principal: Arc<Principal>| {
+                Self::make_authorization_checks(
+                    dataset_operation_guard.as_ref(),
+                    &principal,
+                    dataset_handles,
+                    options.remote_target.as_ref(),
+                )
+                .await?
+            });
         responses.extend(unauthorized_responses);
 
         // Prepare a push plan
-        let (plan, errors) = self
-            .prepare_push_plan_transactional(
-                authorized_handles.as_slice(),
-                options.remote_target.as_ref(),
-            )
-            .await?;
+        let (plan, errors) = transaction!(|push_request_planner: Arc<dyn PushRequestPlanner>| {
+            push_request_planner
+                .collect_plan(&authorized_handles, options.remote_target.as_ref())
+                .await
+        });
         responses.extend(errors);
 
         tracing::debug!(?plan, "Obtained push plan");
 
         // Create sync requests
-        let (sync_requests, errors) = self
-            .build_sync_requests(&plan, options.sync_options, options.remote_target.as_ref())
-            .await?;
+        let (sync_requests, errors) =
+            transaction!(|sync_request_builder: Arc<SyncRequestBuilder>| {
+                Self::build_sync_requests(
+                    &sync_request_builder,
+                    &plan,
+                    options.sync_options,
+                    options.remote_target.as_ref(),
+                )
+                .await?
+            });
         responses.extend(errors);
 
         // Run sync process
@@ -245,14 +238,18 @@ impl PushDatasetUseCase for PushDatasetUseCaseImpl {
         for (index, sync_result) in std::iter::zip(plan_indices, sync_results) {
             let push_item = &plan[index];
             let sync_result = match sync_result {
-                Ok(sync_result) if options.add_aliases => self
-                    .save_dataset_alias_transactional(
-                        &push_item.local_handle,
-                        &((&push_item.remote_target.url).into()),
-                    )
-                    .await
-                    .map(|_| sync_result)
-                    .map_err(|e| SyncError::Internal(PushAliasNotSavedError(e).int_err())),
+                Ok(sync_result) if options.add_aliases => transaction!(
+                    |remote_alias_registry: Arc<dyn RemoteAliasesRegistry>|
+                     -> Result<_, InternalError> {
+                        remote_alias_registry
+                            .get_remote_aliases(&push_item.local_handle)
+                            .await?
+                            .add(&(&push_item.remote_target.url).into(), RemoteAliasKind::Push)
+                            .await
+                    }
+                )
+                .map(|_| sync_result)
+                .map_err(|e| SyncError::Internal(PushAliasNotSavedError(e).int_err())),
                 sync_result => sync_result,
             };
             responses.push(push_item.as_response(sync_result));

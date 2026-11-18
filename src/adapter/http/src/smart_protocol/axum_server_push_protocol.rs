@@ -11,7 +11,7 @@ use std::collections::VecDeque;
 use std::sync::Arc;
 use std::time::Duration;
 
-use database_common::DatabaseTransactionRunner;
+use database_common::transaction;
 use dill::Catalog;
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_accounts::AuthenticationService;
@@ -30,7 +30,6 @@ use kamu_datasets::{
 };
 use messaging_outbox::{Outbox, OutboxExt};
 use odf::metadata::AsTypedBlock as _;
-use tracing::Instrument;
 use url::Url;
 
 use super::error_close::ErrorReplyClose;
@@ -260,19 +259,16 @@ impl AxumServerPushProtocolInstance {
                     seed_block_bytes: Some(first_block_bytes),
                     ..Default::default()
                 };
-                let create_result = DatabaseTransactionRunner::new(self.catalog.clone())
-                    .transactional_with(
-                        |create_dataset_use_case: Arc<dyn CreateDatasetUseCase>| async move {
-                            create_dataset_use_case
-                                .execute(dataset_alias, seed_block, create_options)
-                                .await
-                                .inspect(|res| res.dataset.detach_from_transaction())
-                        },
-                    )
-                    .instrument(tracing::debug_span!(
-                        "AxumServerPushProtocolInstance::create_dataset",
-                    ))
-                    .await;
+                let create_result = transaction!(
+                    #[span(tracing::debug_span!("AxumServerPushProtocolInstance::create_dataset"))]
+                    |create_dataset_use_case: Arc<dyn CreateDatasetUseCase>|
+                     -> Result<_, CreateDatasetError> {
+                        create_dataset_use_case
+                            .execute(dataset_alias, seed_block, create_options)
+                            .await
+                            .inspect(|res| res.dataset.detach_from_transaction())
+                    }
+                );
                 match create_result {
                     Ok(res) => {
                         // The remaining blocks build on the Seed just committed
@@ -363,8 +359,8 @@ impl AxumServerPushProtocolInstance {
         // TODO: consider size estimate and maybe cancel too large pushes
 
         let actual_head = if let Some(dataset_handle) = self.maybe_dataset_handle.as_ref() {
-            DatabaseTransactionRunner::new(self.catalog.clone())
-                .transactional_with(|dataset_registry: Arc<dyn DatasetRegistry>| async move {
+            transaction!(
+                |dataset_registry: Arc<dyn DatasetRegistry>| -> Result<_, odf::GetRefError> {
                     let resolved_dataset =
                         dataset_registry.get_dataset_by_handle(dataset_handle).await;
 
@@ -377,8 +373,8 @@ impl AxumServerPushProtocolInstance {
                         Err(odf::GetRefError::NotFound(_)) => Ok(None),
                         Err(e) => Err(e),
                     }
-                })
-                .await
+                }
+            )
         } else {
             Ok(None)
         }
@@ -615,17 +611,14 @@ impl AxumServerPushProtocolInstance {
         dataset_handle: &odf::DatasetHandle,
         new_blocks: &VecDeque<odf::dataset::HashedMetadataBlockBytesDecoded>,
     ) -> Result<(), PushServerError> {
-        let dataset_handle = dataset_handle.clone();
-        let resolved_dataset = DatabaseTransactionRunner::new(self.catalog.clone())
-            .transactional_with(|dataset_registry: Arc<dyn DatasetRegistry>| async move {
-                let resolved_dataset = dataset_registry
-                    .get_dataset_by_handle(&dataset_handle)
-                    .await;
+        let resolved_dataset = transaction!(
+            |dataset_registry: Arc<dyn DatasetRegistry>| -> Result<_, InternalError> {
+                let resolved_dataset = dataset_registry.get_dataset_by_handle(dataset_handle).await;
                 resolved_dataset.detach_from_transaction();
-                Ok::<_, InternalError>(resolved_dataset)
-            })
-            .await
-            .protocol_int_err(PushPhase::CompleteRequest)?;
+                Ok(resolved_dataset)
+            }
+        )
+        .protocol_int_err(PushPhase::CompleteRequest)?;
 
         let missing =
             collect_object_references_from_metadata(resolved_dataset.as_ref(), new_blocks, true)
@@ -670,76 +663,72 @@ impl AxumServerPushProtocolInstance {
         };
         // The commit and the message announcing it share one transaction, so
         // flows hear about every push that moved `HEAD`
-        let maybe_bearer_header = self.maybe_bearer_header.clone();
-        let new_head = DatabaseTransactionRunner::new(self.catalog.clone())
-            .transactional_with4(
-                |dataset_registry: Arc<dyn DatasetRegistry>,
-                 append_dataset_metadata_batch: Arc<dyn AppendDatasetMetadataBatchUseCase>,
-                 authentication_service: Arc<dyn AuthenticationService>,
-                 outbox: Arc<dyn Outbox>| async move {
-                    let account_name = match &maybe_bearer_header {
-                        Some(bearer_header) => Some(
-                            authentication_service
-                                .account_by_token(bearer_header.token().to_owned())
-                                .await
-                                .int_err()?
-                                .account_name,
-                        ),
-                        None => None,
-                    };
-
-                    let resolved_dataset = dataset_registry
-                        .get_dataset_by_handle(&dataset_handle)
-                        .await;
-
-                    append_dataset_metadata_batch
-                        .execute(
-                            &resolved_dataset,
-                            Box::new(new_blocks.into_iter()),
-                            AppendDatasetMetadataBatchUseCaseOptions {
-                                set_ref_check_ref_mode,
-                                ..Default::default()
-                            },
-                        )
-                        .await?;
-
-                    let new_head = resolved_dataset
-                        .as_metadata_chain()
-                        .resolve_ref(&odf::BlockRef::Head)
+        let new_head = transaction!(|dataset_registry: Arc<dyn DatasetRegistry>,
+                                     append_batch: Arc<dyn AppendDatasetMetadataBatchUseCase>,
+                                     authentication_service: Arc<dyn AuthenticationService>,
+                                     outbox: Arc<dyn Outbox>|
+         -> Result<_, AppendDatasetMetadataBatchUseCaseError> {
+            let account_name = match &self.maybe_bearer_header {
+                Some(bearer_header) => Some(
+                    authentication_service
+                        .account_by_token(bearer_header.token().to_owned())
                         .await
-                        .int_err()?;
+                        .int_err()?
+                        .account_name,
+                ),
+                None => None,
+            };
 
-                    outbox
-                        .post_message(
-                            MESSAGE_PRODUCER_KAMU_HTTP_ADAPTER,
-                            DatasetExternallyChangedMessage::smart_transfer_protocol_sync(
-                                resolved_dataset.get_id(),
-                                old_head_maybe.as_ref(),
-                                &new_head,
-                                account_name,
-                                force_update_if_diverged,
-                            ),
-                        )
-                        .await?;
+            let resolved_dataset = dataset_registry
+                .get_dataset_by_handle(&dataset_handle)
+                .await;
 
-                    Ok::<_, AppendDatasetMetadataBatchUseCaseError>(new_head)
-                },
-            )
-            .await
-            .map_err(|e| match e {
-                AppendDatasetMetadataBatchUseCaseError::SetRefError(
-                    odf::dataset::SetChainRefError::CASFailed(e),
-                ) => PushServerError::UpdatedConcurrently(e),
-                e @ (AppendDatasetMetadataBatchUseCaseError::BlockAppendError(_)
-                | AppendDatasetMetadataBatchUseCaseError::SetRefError(
-                    odf::dataset::SetChainRefError::BlockNotFound(_)
-                    | odf::dataset::SetChainRefError::Access(_)
-                    | odf::dataset::SetChainRefError::Internal(_),
+            append_batch
+                .execute(
+                    &resolved_dataset,
+                    Box::new(new_blocks.into_iter()),
+                    AppendDatasetMetadataBatchUseCaseOptions {
+                        set_ref_check_ref_mode,
+                        ..Default::default()
+                    },
                 )
-                | AppendDatasetMetadataBatchUseCaseError::Internal(_)) => {
-                    PushServerError::Internal(e.protocol_int_err(PushPhase::CompleteRequest))
-                }
-            })?;
+                .await?;
+
+            let new_head = resolved_dataset
+                .as_metadata_chain()
+                .resolve_ref(&odf::BlockRef::Head)
+                .await
+                .int_err()?;
+
+            outbox
+                .post_message(
+                    MESSAGE_PRODUCER_KAMU_HTTP_ADAPTER,
+                    DatasetExternallyChangedMessage::smart_transfer_protocol_sync(
+                        resolved_dataset.get_id(),
+                        old_head_maybe.as_ref(),
+                        &new_head,
+                        account_name,
+                        force_update_if_diverged,
+                    ),
+                )
+                .await?;
+
+            Ok(new_head)
+        })
+        .map_err(|e| match e {
+            AppendDatasetMetadataBatchUseCaseError::SetRefError(
+                odf::dataset::SetChainRefError::CASFailed(e),
+            ) => PushServerError::UpdatedConcurrently(e),
+            e @ (AppendDatasetMetadataBatchUseCaseError::BlockAppendError(_)
+            | AppendDatasetMetadataBatchUseCaseError::SetRefError(
+                odf::dataset::SetChainRefError::BlockNotFound(_)
+                | odf::dataset::SetChainRefError::Access(_)
+                | odf::dataset::SetChainRefError::Internal(_),
+            )
+            | AppendDatasetMetadataBatchUseCaseError::Internal(_)) => {
+                PushServerError::Internal(e.protocol_int_err(PushPhase::CompleteRequest))
+            }
+        })?;
 
         tracing::Span::current().record("new_head", tracing::field::display(&new_head));
 

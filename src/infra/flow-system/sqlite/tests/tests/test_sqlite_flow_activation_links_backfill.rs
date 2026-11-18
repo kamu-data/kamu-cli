@@ -9,7 +9,7 @@
 
 use std::sync::Arc;
 
-use database_common::{DatabaseTransactionRunner, SqliteTransactionManager};
+use database_common::{SqliteTransactionManager, transaction};
 use dill::{Catalog, CatalogBuilder};
 use internal_error::InternalError;
 use kamu_flow_system::*;
@@ -78,27 +78,19 @@ impl FlowActivationLinksBackfillHarness {
         }
     }
 
-    fn transaction_runner(&self) -> DatabaseTransactionRunner {
-        DatabaseTransactionRunner::new(self.catalog.clone())
-    }
-
     async fn write_scenario(&self) -> FlowActivationLinksBackfillScenario {
-        self.transaction_runner()
-            .transactional(|catalog| async move {
-                Ok::<_, InternalError>(FlowActivationLinksBackfillScenario::write(&catalog).await)
-            })
-            .await
-            .unwrap()
+        transaction!(|catalog| -> Result<_, InternalError> {
+            Ok(FlowActivationLinksBackfillScenario::write(&catalog).await)
+        })
+        .unwrap()
     }
 
     async fn write_event_after_history(&self) {
-        self.transaction_runner()
-            .transactional(|catalog| async move {
-                FlowActivationLinksBackfillScenario::write_event_after_history(&catalog).await;
-                Ok::<_, InternalError>(())
-            })
-            .await
-            .unwrap();
+        transaction!(|catalog| -> Result<_, InternalError> {
+            FlowActivationLinksBackfillScenario::write_event_after_history(&catalog).await;
+            Ok(())
+        })
+        .unwrap();
     }
 
     async fn run_backfill(&self) {
@@ -112,33 +104,28 @@ impl FlowActivationLinksBackfillHarness {
         &self,
         upstream_flow_ids: Vec<FlowID>,
     ) -> Vec<FlowActivationLink> {
-        self.transaction_runner()
-            .transactional_with(
-                |flow_activation_link_repository: Arc<
-                    dyn FlowActivationLinkRepository,
-                >| async move {
-                    flow_activation_link_repository
-                        .get_downstream_links(&upstream_flow_ids)
-                        .await
-                },
-            )
-            .await
-            .unwrap()
+        transaction!(
+            |flow_activation_link_repository: Arc<dyn FlowActivationLinkRepository>|
+             -> Result<_, InternalError> {
+                flow_activation_link_repository
+                    .get_downstream_links(&upstream_flow_ids)
+                    .await
+            }
+        )
+        .unwrap()
     }
 
     /// Events the projector would fetch next, without marking them applied
     async fn count_events_to_project(&self) -> usize {
-        self.transaction_runner()
-            .transactional(|catalog| async move {
-                catalog
-                    .get_one::<dyn FlowSystemEventBridge>()
-                    .unwrap()
-                    .fetch_next_batch(&catalog, FLOW_ACTIVATION_LINK_PROJECTOR_NAME, 100)
-                    .await
-            })
-            .await
-            .unwrap()
-            .len()
+        transaction!(|catalog,
+                      flow_system_event_bridge: Arc<dyn FlowSystemEventBridge>|
+         -> Result<_, InternalError> {
+            flow_system_event_bridge
+                .fetch_next_batch(&catalog, FLOW_ACTIVATION_LINK_PROJECTOR_NAME, 100)
+                .await
+        })
+        .unwrap()
+        .len()
     }
 }
 

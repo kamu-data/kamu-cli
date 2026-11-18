@@ -10,7 +10,7 @@
 use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
-use database_common_macros::transactional_method2;
+use database_common::transaction;
 use dill::{component, interface};
 use kamu_webhooks::*;
 
@@ -37,12 +37,10 @@ impl WebhookDeliveryWorkerImpl {
             %webhook_subscription_id,
         )
     )]
-    #[transactional_method2(
-        webhook_subscription_event_store: Arc<dyn WebhookSubscriptionEventStore>,
-        webhook_delivery_repo: Arc<dyn WebhookDeliveryRepository>
-    )]
     async fn prepare_delivery(
         &self,
+        webhook_subscription_event_store: &Arc<dyn WebhookSubscriptionEventStore>,
+        webhook_delivery_repo: &dyn WebhookDeliveryRepository,
         webhook_delivery_id: WebhookDeliveryID,
         webhook_subscription_id: WebhookSubscriptionID,
         event_type: WebhookEventType,
@@ -156,12 +154,9 @@ impl WebhookDeliveryWorkerImpl {
 
     /// Records the response; a successful one also moves the watermark
     #[tracing::instrument(level = "debug", skip_all, fields(%webhook_delivery_id))]
-    #[transactional_method2(
-        webhook_delivery_repo: Arc<dyn WebhookDeliveryRepository>,
-        webhook_watermark_repo: Arc<dyn WebhookWatermarkRepository>
-    )]
     async fn write_delivery_response(
-        &self,
+        webhook_delivery_repo: &dyn WebhookDeliveryRepository,
+        webhook_watermark_repo: &dyn WebhookWatermarkRepository,
         webhook_delivery_id: WebhookDeliveryID,
         webhook_subscription_id: WebhookSubscriptionID,
         event_type: &WebhookEventType,
@@ -197,17 +192,24 @@ impl WebhookDeliveryWorker for WebhookDeliveryWorkerImpl {
         payload: serde_json::Value,
         watermark: Option<WebhookWatermark>,
     ) -> Result<(), WebhookDeliveryError> {
-        // Prepare delivery, headers
-        let delivery_data = self
-            .prepare_delivery(
-                webhook_delivery_id,
-                webhook_subscription_id,
-                event_type.clone(),
-                payload,
-            )
-            .await?;
+        // Record the delivery and prepare its headers
+        let delivery_data =
+            transaction!(
+                |webhook_subscription_event_store: Arc<dyn WebhookSubscriptionEventStore>,
+                 webhook_delivery_repo: Arc<dyn WebhookDeliveryRepository>| {
+                    self.prepare_delivery(
+                        &webhook_subscription_event_store,
+                        webhook_delivery_repo.as_ref(),
+                        webhook_delivery_id,
+                        webhook_subscription_id,
+                        event_type.clone(),
+                        payload,
+                    )
+                    .await?
+                }
+            );
 
-        // Send the webhook
+        // Send the webhook, with no transaction open
         let webhook_response = self
             .webhook_sender
             .send_webhook(
@@ -219,14 +221,21 @@ impl WebhookDeliveryWorker for WebhookDeliveryWorkerImpl {
 
         // Write the response back to the database
         let response_status = webhook_response.status_code;
-        self.write_delivery_response(
-            webhook_delivery_id,
-            webhook_subscription_id,
-            &event_type,
-            webhook_response,
-            watermark,
-        )
-        .await?;
+        transaction!(
+            |webhook_delivery_repo: Arc<dyn WebhookDeliveryRepository>,
+             webhook_watermark_repo: Arc<dyn WebhookWatermarkRepository>| {
+                Self::write_delivery_response(
+                    webhook_delivery_repo.as_ref(),
+                    webhook_watermark_repo.as_ref(),
+                    webhook_delivery_id,
+                    webhook_subscription_id,
+                    &event_type,
+                    webhook_response,
+                    watermark,
+                )
+                .await?;
+            }
+        );
 
         // Fail delivery, unless the response is successful
         if response_status.is_success() {

@@ -9,7 +9,7 @@
 
 use std::sync::Arc;
 
-use database_common_macros::transactional_method1;
+use database_common::transaction;
 use kamu_core::{CorruptedSourceError, SyncError};
 use odf::metadata::AsTypedBlock as _;
 
@@ -25,28 +25,6 @@ pub struct PulledSeedStore {
 }
 
 impl PulledSeedStore {
-    #[transactional_method1(dataset_storage_unit_writer: Arc<dyn odf::dataset::DatasetStorageUnitWriter>)]
-    async fn store_transactionally(
-        &self,
-        seed_block: odf::MetadataBlockTyped<odf::metadata::Seed>,
-        seed_block_bytes: odf::MetadataBlockBytes,
-    ) -> Result<odf::dataset::StoreDatasetResult, SyncError> {
-        let stored = dataset_storage_unit_writer
-            .store_dataset(
-                seed_block,
-                odf::dataset::StoreDatasetOpts {
-                    seed_block_bytes: Some(seed_block_bytes),
-                },
-            )
-            .await
-            .map_err(|e| match e {
-                odf::dataset::StoreDatasetError::RefCollision(e) => SyncError::RefCollision(e),
-                odf::dataset::StoreDatasetError::Internal(e) => SyncError::Internal(e),
-            })?;
-        stored.dataset.detach_from_transaction();
-        Ok(stored)
-    }
-
     /// Stores a new dataset from the source's `Seed`, taking over one an earlier
     /// failed pull left without `HEAD`. Writes nothing to the database.
     pub(super) async fn store(
@@ -58,9 +36,18 @@ impl PulledSeedStore {
             source: None,
         })?;
 
-        let stored = self
-            .store_transactionally(seed_block.clone(), seed_block_bytes.clone())
-            .await?;
+        let stored = transaction!(|writer: Arc<dyn odf::dataset::DatasetStorageUnitWriter>| {
+            let stored = writer
+                .store_dataset(
+                    seed_block.clone(),
+                    odf::dataset::StoreDatasetOpts {
+                        seed_block_bytes: Some(seed_block_bytes.clone()),
+                    },
+                )
+                .await?;
+            stored.dataset.detach_from_transaction();
+            stored
+        });
 
         if stored.seed != seed_hash {
             return Err(CorruptedSourceError {

@@ -9,7 +9,7 @@
 
 use std::sync::Arc;
 
-use database_common_macros::{transactional_method2, transactional_method3};
+use database_common::transaction;
 use internal_error::{ErrorIntoInternal, InternalError};
 use kamu_accounts::Principal;
 use kamu_core::*;
@@ -154,8 +154,19 @@ impl PullTransformJob {
                 target,
                 elaboration: TransformElaboration::Elaborated(plan),
             })) => {
-                self.authorize_unplanned_inputs(&plan, planned_inputs)
-                    .await?;
+                let unplanned_inputs = Self::unplanned_inputs(&plan, planned_inputs);
+                if !unplanned_inputs.is_empty() {
+                    transaction!(|dataset_operation_guard: Arc<dyn DatasetOperationGuard>,
+                                  principal: Arc<Principal>| {
+                        Self::authorize_unplanned_inputs(
+                            dataset_operation_guard.as_ref(),
+                            &principal,
+                            &plan,
+                            unplanned_inputs,
+                        )
+                        .await?;
+                    });
+                }
                 self.execute_and_commit(target, plan, listener).await
             }
             Ok(Some(ElaboratedTransform {
@@ -171,30 +182,31 @@ impl PullTransformJob {
 
     /// The pull authorized reading the inputs of the transform it planned.
     /// Another writer may change the transform before the job elaborates it,
-    /// so inputs the pull did not plan are authorized here, before any is read
-    #[transactional_method2(dataset_operation_guard: Arc<dyn DatasetOperationGuard>, principal: Arc<Principal>)]
-    async fn authorize_unplanned_inputs(
-        &self,
+    /// so inputs the pull did not plan are authorized before any is read
+    fn unplanned_inputs(
         plan: &TransformExecutionPlan,
         planned_inputs: &[odf::DatasetHandle],
-    ) -> Result<(), PullError> {
-        let unplanned_inputs: Vec<_> = plan
-            .request
+    ) -> Vec<odf::DatasetHandle> {
+        plan.request
             .inputs
             .iter()
             .map(|input| &input.dataset_handle)
             .filter(|handle| !planned_inputs.iter().any(|planned| planned.id == handle.id))
             .cloned()
-            .collect();
-        if unplanned_inputs.is_empty() {
-            return Ok(());
-        }
+            .collect()
+    }
 
+    async fn authorize_unplanned_inputs(
+        dataset_operation_guard: &dyn DatasetOperationGuard,
+        principal: &Principal,
+        plan: &TransformExecutionPlan,
+        unplanned_inputs: Vec<odf::DatasetHandle>,
+    ) -> Result<(), PullError> {
         // The target is checked again along with the inputs; the iteration
         // already granted it, unless its permissions changed since
         dataset_operation_guard
             .check_operation(
-                &principal,
+                principal,
                 &DatasetOperationRequest::new(
                     plan.request.dataset_handle.clone(),
                     DatasetOperation::Transform {
@@ -246,18 +258,16 @@ impl PullTransformJob {
 
     /// Resetting drops the derivative's data, so it needs the right to
     /// maintain the dataset, beyond the write the pull was granted
-    #[transactional_method3(
-        dataset_registry: Arc<dyn DatasetRegistry>,
-        dataset_operation_guard: Arc<dyn DatasetOperationGuard>,
-        principal: Arc<Principal>
-    )]
     async fn plan_reset_to_metadata(
         &self,
+        dataset_registry: &dyn DatasetRegistry,
+        dataset_operation_guard: &dyn DatasetOperationGuard,
+        principal: &Principal,
         target_handle: &odf::DatasetHandle,
     ) -> Result<(ResolvedDataset, CompactionPlan), PullError> {
         dataset_operation_guard
             .check_operation(
-                &principal,
+                principal,
                 &DatasetOperationRequest::new(
                     target_handle.clone(),
                     DatasetOperation::ResetToMetadata,
@@ -298,8 +308,20 @@ impl PullTransformJob {
         &self,
         target_handle: &odf::DatasetHandle,
     ) -> Result<Option<(odf::Multihash, odf::Multihash)>, PullError> {
-        let (target, plan) = self.plan_reset_to_metadata(target_handle).await?;
+        let (target, plan) =
+            transaction!(|dataset_registry: Arc<dyn DatasetRegistry>,
+                          dataset_operation_guard: Arc<dyn DatasetOperationGuard>,
+                          principal: Arc<Principal>| {
+                self.plan_reset_to_metadata(
+                    dataset_registry.as_ref(),
+                    dataset_operation_guard.as_ref(),
+                    &principal,
+                    target_handle,
+                )
+                .await?
+            });
 
+        // Merged with no transaction open, then committed in a transaction of its own
         match self
             .compaction_executor
             .execute(target, plan, None)

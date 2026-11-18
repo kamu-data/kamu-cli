@@ -25,7 +25,6 @@ doctest = false
 common-macros = { workspace = true }
 crypto-utils = { workspace = true }
 database-common = { workspace = true }
-database-common-macros = { workspace = true }
 internal-error = { workspace = true }
 kamu-datasets = { workspace = true }
 kamu-webhooks = { workspace = true }

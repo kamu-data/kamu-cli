@@ -9,7 +9,7 @@
 
 use std::sync::Arc;
 
-use database_common_macros::{transactional_method2, transactional_method3};
+use database_common::transaction;
 use dill::{component, interface};
 use internal_error::ErrorIntoInternal;
 use kamu_accounts::Principal;
@@ -20,7 +20,6 @@ use kamu_core::{
     CompactionListener,
     CompactionMultiListener,
     CompactionOptions,
-    CompactionPlan,
     CompactionPlanner,
     CompactionResponse,
     CompactionResult,
@@ -34,7 +33,6 @@ use kamu_datasets::{
     DatasetPermissionError,
     DatasetReferenceUpdater,
     DatasetRegistry,
-    ResolvedDataset,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -50,13 +48,76 @@ pub struct CompactDatasetUseCaseImpl {
 }
 
 impl CompactDatasetUseCaseImpl {
-    #[transactional_method3(dataset_operation_guard: Arc<dyn DatasetOperationGuard>, dataset_registry: Arc<dyn DatasetRegistry>, compaction_planner: Arc<dyn CompactionPlanner>)]
-    async fn plan_transactionally(
+    async fn compact_and_commit(
         &self,
         dataset_handle: &odf::DatasetHandle,
         options: CompactionOptions,
-        maybe_listener: Option<Arc<dyn CompactionListener>>,
-    ) -> Result<(ResolvedDataset, CompactionPlan), CompactionError> {
+        listener: Arc<dyn CompactionListener>,
+    ) -> Result<CompactionResult, CompactionError> {
+        // 1: Plan
+        let (target, compaction_plan) =
+            transaction!(
+                |dataset_operation_guard: Arc<dyn DatasetOperationGuard>,
+                 dataset_registry: Arc<dyn DatasetRegistry>,
+                 compaction_planner: Arc<dyn CompactionPlanner>| {
+                    self.check_compaction_allowed(
+                        dataset_operation_guard.as_ref(),
+                        dataset_handle,
+                        &options,
+                    )
+                    .await?;
+
+                    let target = dataset_registry.get_dataset_by_handle(dataset_handle).await;
+                    let compaction_plan = compaction_planner
+                        .plan_compaction(target.clone(), options, Some(listener.clone()))
+                        .await?;
+                    target.detach_from_transaction();
+
+                    (target, compaction_plan)
+                }
+            );
+
+        // 2: Merge, with no transaction open
+        let compaction_result = self
+            .compaction_executor
+            .execute(target, compaction_plan, Some(listener))
+            .await?;
+
+        // 3: Commit, if something got compacted
+        match &compaction_result {
+            CompactionResult::NothingToDo => {
+                tracing::debug!(%dataset_handle, "Skipping setting reference. Dataset was not compacted");
+            }
+            CompactionResult::Success {
+                old_head, new_head, ..
+            } => {
+                tracing::debug!(%dataset_handle, %new_head, "Setting new compacted head");
+                transaction!(
+                    |dataset_registry: Arc<dyn DatasetRegistry>,
+                     dataset_reference_updater: Arc<dyn DatasetReferenceUpdater>| {
+                        let target = dataset_registry.get_dataset_by_handle(dataset_handle).await;
+                        dataset_reference_updater
+                            .update_reference(
+                                &target,
+                                &odf::BlockRef::Head,
+                                Some(old_head),
+                                new_head,
+                            )
+                            .await?;
+                    }
+                );
+            }
+        }
+
+        Ok(compaction_result)
+    }
+
+    async fn check_compaction_allowed(
+        &self,
+        dataset_operation_guard: &dyn DatasetOperationGuard,
+        dataset_handle: &odf::DatasetHandle,
+        options: &CompactionOptions,
+    ) -> Result<(), CompactionError> {
         let operation = if options.keep_metadata_only {
             DatasetOperation::ResetToMetadata
         } else {
@@ -76,63 +137,7 @@ impl CompactDatasetUseCaseImpl {
                     E::Access(e) => CompactionError::Access(e),
                     e @ E::Internal(_) => CompactionError::Internal(e.int_err()),
                 }
-            })?;
-
-        let target = dataset_registry.get_dataset_by_handle(dataset_handle).await;
-
-        let compaction_plan = compaction_planner
-            .plan_compaction(target.clone(), options, maybe_listener)
-            .await?;
-
-        target.detach_from_transaction();
-
-        Ok((target, compaction_plan))
-    }
-
-    async fn compact_and_commit(
-        &self,
-        dataset_handle: &odf::DatasetHandle,
-        options: CompactionOptions,
-        listener: Arc<dyn CompactionListener>,
-    ) -> Result<CompactionResult, CompactionError> {
-        let (target, compaction_plan) = self
-            .plan_transactionally(dataset_handle, options, Some(listener.clone()))
-            .await?;
-
-        let compaction_result = self
-            .compaction_executor
-            .execute(target, compaction_plan, Some(listener))
-            .await?;
-
-        // Set proposed reference, if something got compacted
-        match &compaction_result {
-            CompactionResult::NothingToDo => {
-                tracing::debug!(%dataset_handle, "Skipping setting reference. Dataset was not compacted");
-            }
-            CompactionResult::Success {
-                old_head, new_head, ..
-            } => {
-                tracing::debug!(%dataset_handle, %new_head, "Setting new compacted head");
-                self.update_reference_transactionally(dataset_handle, old_head, new_head)
-                    .await?;
-            }
-        }
-
-        Ok(compaction_result)
-    }
-
-    #[transactional_method2(dataset_registry: Arc<dyn DatasetRegistry>, dataset_reference_updater: Arc<dyn DatasetReferenceUpdater>)]
-    async fn update_reference_transactionally(
-        &self,
-        dataset_handle: &odf::DatasetHandle,
-        old_head: &odf::Multihash,
-        new_head: &odf::Multihash,
-    ) -> Result<(), odf::dataset::SetChainRefError> {
-        let target = dataset_registry.get_dataset_by_handle(dataset_handle).await;
-
-        dataset_reference_updater
-            .update_reference(&target, &odf::BlockRef::Head, Some(old_head), new_head)
-            .await
+            })
     }
 }
 

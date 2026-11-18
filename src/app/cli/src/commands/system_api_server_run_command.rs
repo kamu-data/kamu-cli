@@ -12,7 +12,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use console::style as s;
-use database_common::DatabaseTransactionRunner;
+use database_common::transaction;
 use internal_error::ResultIntoInternal;
 use kamu::domain::{FileUploadLimitConfig, TenancyConfig};
 use kamu_accounts::*;
@@ -20,7 +20,6 @@ use kamu_accounts_services::{PasswordLoginCredentials, PasswordPolicyConfig};
 use kamu_adapter_oauth::*;
 use kamu_datasets::{SecretsEncryptionConfig, VersionedFilesConfig};
 use kamu_webhooks::WebhooksConfig;
-use tracing::Instrument;
 
 use super::{CLIError, Command};
 use crate::OutputConfig;
@@ -91,8 +90,10 @@ impl APIServerRunCommand {
             password: account_config.password.into_inner(),
         };
 
-        let login_response = DatabaseTransactionRunner::new(api_server_catalog.clone())
-            .transactional_with(|auth_svc: Arc<dyn AuthenticationService>| async move {
+        let login_response = transaction!(
+            #[catalog(api_server_catalog)]
+            #[span(tracing::debug_span!("APIServerRunCommand::get_access_token"))]
+            |auth_svc: Arc<dyn AuthenticationService>| -> Result<_, CLIError> {
                 auth_svc
                     .login(
                         AccountProvider::Password.into(),
@@ -102,11 +103,8 @@ impl APIServerRunCommand {
                     )
                     .await
                     .map_int_err(CLIError::critical)
-            })
-            .instrument(tracing::debug_span!(
-                "APIServerRunCommand::get_access_token"
-            ))
-            .await?;
+            }
+        )?;
 
         Ok(login_response.access_token)
     }
