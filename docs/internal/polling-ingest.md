@@ -90,13 +90,14 @@ The concepts the writer builds on are listed in
 
 ## 4. Call sequence
 
-A polling ingest has three steps, the same for every caller:
+A polling ingest has three steps, the same for every caller. `PollingIngestJob` runs them, one
+iteration per run, for `kamu pull` and the update task alike:
 
 | Step | Who | Transaction |
 | --- | --- | --- |
-| **Plan** | `PollingIngestPlanner::plan_ingest(target)` builds the writer state at the current head into a `PollingIngestPlan`; `IngestEnvVarsResolver::resolve(dataset_id)` resolves the dataset's environment variables | one of its own, then the target is detached; `kamu pull` and the update task both plan through `DatasetUpdateSteps::plan_ingest` |
+| **Plan** | `PollingIngestPlanner::plan_ingest(target)` builds the writer state at the current head into a `PollingIngestPlan`; `IngestEnvVarsResolver::resolve(dataset_id)` resolves the dataset's environment variables | one of its own, opened by the job after it authorizes `PollingIngest`; then the target is detached |
 | **Execute** | `PollingIngestService::ingest(target, plan, options, env_vars, operation_id, listener)` runs one iteration and appends blocks without moving `HEAD` | none |
-| **Commit** | the caller moves `HEAD` through `DatasetReferenceUpdater` ([§9](#9-committing-and-concurrency)) | a new one |
+| **Commit** | the job moves `HEAD` through `DatasetReferenceUpdater` ([§9](#9-committing-and-concurrency)) | a new one |
 
 Planning fails with `SourceNotDefined` when the dataset has no `SetPollingSource`.
 `PollingIngestPlanPayload` is the plan's stored form, for a caller that stores a plan before
@@ -216,8 +217,8 @@ A source that yields data in batches (glob, container, EVM) reports `has_more`. 
 
 | Entry point | Path | Authorization | Transaction scope | Moves `HEAD` | Messages |
 | --- | --- | --- | --- | --- | --- |
-| `kamu pull <root>` | `PullCommand` → `PullDatasetUseCaseImpl` → `PullIngestLoop` → `PollingIngestService` | Write, per pull iteration ([dataset-pull.md](dataset-pull.md#7-authorization)) | pull planning in its own; then [§4](#4-call-sequence) per ingest iteration | after each iteration | `DatasetReferenceMessage` from the ref update |
-| Ingest flow | `FlowControllerIngest` → `LogicalPlanDatasetUpdate` → `UpdateDatasetTaskPlanner` → `UpdateDatasetTaskRunner` → `PollingIngestService` (one iteration) | none; the task runs as `Principal::Node` | [§4](#4-call-sequence), when the task runs | once | `DatasetReferenceMessage`; task and flow progress messages |
+| `kamu pull <root>` | `PullCommand` → `PullDatasetUseCaseImpl` → `PullIngestLoop` → `PollingIngestJob` → `PollingIngestService` | Write, per pull iteration ([dataset-pull.md](dataset-pull.md#7-authorization)) | pull planning in its own; then [§4](#4-call-sequence) per ingest iteration | after each iteration | `DatasetReferenceMessage` from the ref update |
+| Ingest flow | `FlowControllerIngest` → `LogicalPlanDatasetUpdate` → `UpdateDatasetTaskPlanner` → `UpdateDatasetTaskRunner` → `PollingIngestJob` → `PollingIngestService` (one iteration) | `PollingIngest` in the job, which always passes for `Principal::Node`, as which the task runs | [§4](#4-call-sequence), when the task runs | once | `DatasetReferenceMessage`; task and flow progress messages |
 
 Flow-side options reach ingest through `FlowConfigRuleIngest`: `fetch_uncacheable` becomes
 `PollingIngestOptions::fetch_uncacheable`; `fetch_next_iteration` is read by the flow controller
@@ -227,8 +228,8 @@ only. Dataset env vars are resolved by the planner in both paths ([§4](#4-call-
 
 ## 9. Committing and concurrency
 
-The writer appends blocks without moving `HEAD`; the caller then moves it with a CAS. The shared
-rules — the committer, the messages it posts, what a lost race leaves behind — are in
+The writer appends blocks without moving `HEAD`; `PollingIngestJob` then moves it with a CAS. The
+shared rules — the committer, the messages it posts, what a lost race leaves behind — are in
 [dataset-operations.md](dataset-operations.md#3-committing-head). Specific to polling:
 
 - The writer state is planned just before the fetch, for both `kamu pull` and the update task. A
@@ -328,7 +329,8 @@ hours. A long-running server does not evict while it runs.
 | Fetch step impls | [`fetch_service/`](../../src/infra/core/src/services/ingest/fetch_service) (`file.rs`, `http.rs`, `ftp.rs`, `container.rs`, `mqtt.rs`, `evm.rs`) |
 | Prepare steps | [`prep_service.rs`](../../src/infra/core/src/services/ingest/prep_service.rs) |
 | Pull use case | [`pull_dataset_use_case_impl.rs`](../../src/infra/core/src/use_cases/pull_dataset_use_case_impl.rs) |
-| Pull polling loop, ref update | [`pull_ingest_loop.rs`](../../src/infra/core/src/use_cases/pull_ingest_loop.rs) |
+| One iteration: authorization, plan, ingest, ref update | [`polling_ingest_job_impl.rs`](../../src/infra/core/src/dataset_jobs/polling_ingest_job_impl.rs) |
+| Pull polling loop | [`pull_ingest_loop.rs`](../../src/infra/core/src/use_cases/pull_ingest_loop.rs) |
 | Update task planner / runner | [`update_dataset_task_planner.rs`](../../src/adapter/task-dataset/src/planners/update_dataset_task_planner.rs), [`update_dataset_task_runner.rs`](../../src/adapter/task-dataset/src/runners/update_dataset_task_runner.rs) |
 | Ingest flow controller | [`flow_controller_ingest.rs`](../../src/adapter/flow-dataset/src/flow_controllers/flow_controller_ingest.rs) |
 | CLI command | [`pull_command.rs`](../../src/app/cli/src/commands/pull_command.rs) |

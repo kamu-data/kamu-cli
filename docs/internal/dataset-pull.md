@@ -86,8 +86,8 @@ Out of scope, each with its own owner:
 | Update kind | `kamu-core` — [`dataset_update_kind_resolver.rs`](../../src/domain/core/src/services/dataset_update_kind_resolver.rs); `kamu` — [`dataset_update_kind_resolver_impl.rs`](../../src/infra/core/src/services/dataset_update_kind_resolver_impl.rs) | `DatasetUpdateKindResolver`: how one local dataset is updated (ingest, transform or sync); used only by the planner |
 | Pull source | `kamu-core` — [`dataset_pull_source_resolver.rs`](../../src/domain/core/src/services/dataset_pull_source_resolver.rs); `kamu` — [`dataset_pull_source_resolver_impl.rs`](../../src/infra/core/src/services/remote/dataset_pull_source_resolver_impl.rs) | `DatasetPullSourceResolver`: a dataset's pull alias and its URL, and the inverse lookup ([dataset-sync.md](dataset-sync.md#9-remote-repositories-and-aliases)) |
 | Planner | `kamu` — [`pull_request_planner/`](../../src/infra/core/src/services/pull_request_planner) | `PullRequestPlannerImpl`, `PullGraphDepthFirstTraversal`, `PullTargetResolver` |
-| Update steps | `kamu-core` — [`dataset_update_steps.rs`](../../src/domain/core/src/services/dataset_update_steps.rs); `kamu` — [`dataset_update_steps_impl.rs`](../../src/infra/core/src/services/dataset_update_steps_impl.rs) | `DatasetUpdateSteps`: the transactional steps of updating one dataset, shared with the update task: plan an ingest, elaborate a transform, read a sync target, commit `HEAD`, transfer and commit a sync |
-| Use case | `kamu` — [`src/infra/core/src/use_cases/`](../../src/infra/core/src/use_cases) | `PullDatasetUseCaseImpl`: plan authorization and iteration loop; `PullIngestLoop`, `PullTransformJob` and `PullSyncJob` run the jobs |
+| Operation jobs | `kamu-core` — [`dataset_jobs/`](../../src/domain/core/src/dataset_jobs); `kamu` — [`dataset_jobs/`](../../src/infra/core/src/dataset_jobs) | `PollingIngestJob`, `TransformJob`, `SyncFromJob`, `CompactionJob`: one operation on one dataset, shared with the update task ([dataset-operations.md](dataset-operations.md#1-components)) |
+| Use case | `kamu` — [`src/infra/core/src/use_cases/`](../../src/infra/core/src/use_cases) | `PullDatasetUseCaseImpl`: plan authorization and iteration loop; `PullIngestLoop`, `PullTransformJob` and `PullSyncJob` run the operation jobs and add the pull's own policies |
 | CLI | `kamu-cli` — [`pull_command.rs`](../../src/app/cli/src/commands/pull_command.rs) | `PullCommand`, progress listeners, result summary |
 | Server | `kamu-adapter-task-dataset` | `UpdateDatasetTaskPlanner` calls the planner; `UpdateDatasetTaskRunner` runs the job ([task-system.md](task-system.md)) |
 
@@ -97,8 +97,8 @@ Out of scope, each with its own owner:
 
 `kamu pull` is dispatched in [`cli_commands.rs`](../../src/app/cli/src/cli_commands.rs): with
 `--set-watermark` it becomes `SetWatermarkCommand` and nothing below applies; otherwise it builds
-`PullCommand`. `PullCommand` runs without an outer transaction (the use case opens its own short
-ones), and the CLI processes outbox messages after it ([§9](#9-results-and-errors)).
+`PullCommand`. `PullCommand` runs without an outer transaction (the use case and its jobs open
+their own short ones), and the CLI processes outbox messages after it ([§9](#9-results-and-errors)).
 
 | Flag | Effect |
 | --- | --- |
@@ -261,15 +261,16 @@ sequenceDiagram
 ### 6.2 Per-job runners
 
 Each job plans when it runs, not when the pull was planned, so it sees what earlier depths
-committed. It moves `HEAD` through `DatasetUpdateSteps`, the same steps the update task uses
-([dataset-operations.md](dataset-operations.md#2-plan-execute-commit)).
+committed. It runs the operation jobs the update task also runs, which authorize, plan, execute and
+commit `HEAD` ([dataset-operations.md](dataset-operations.md#2-plan-execute-commit)).
 
 **Ingest** (`PullIngestLoop::run`):
 
-- plans the ingest and resolves the dataset's environment variables in one transaction
-  ([polling-ingest.md](polling-ingest.md#4-call-sequence));
-- runs ingest iterations until the source reports no more data (`exhaust_sources`), committing
-  `HEAD` after every iteration that returns `Updated`;
+- runs `PollingIngestJob` once per iteration until the source reports no more data
+  (`exhaust_sources`); each iteration plans and resolves the dataset's environment variables in one
+  transaction ([polling-ingest.md](polling-ingest.md#4-call-sequence)) and commits `HEAD` when it
+  returns `Updated`. The writer state an iteration ends with is handed to the next one, so later
+  iterations do not scan the metadata again;
 - reports one result spanning the first old head to the last new head. A dataset without a polling
   source is up to date;
 - a failure after earlier iterations committed is `PullError::IngestStopped`, which carries the
@@ -277,28 +278,27 @@ committed. It moves `HEAD` through `DatasetUpdateSteps`, the same steps the upda
 
 **Transform** (`PullTransformJob::run`):
 
-- elaborates in one transaction
-  ([derived-dataset-transform.md](derived-dataset-transform.md#44-transactions));
+- runs `TransformJob`, which elaborates in one transaction
+  ([derived-dataset-transform.md](derived-dataset-transform.md#44-transactions)), executes and
+  commits `HEAD`;
 - on a diverged input with `--reset-derivatives-on-diverged-input`, resets the derivative to
-  metadata, commits that, and elaborates once more
+  metadata with `CompactionJob` and runs `TransformJob` once more
   ([derived-dataset-transform.md](derived-dataset-transform.md#7-diverged-inputs));
-- executes and commits `HEAD`;
 - a failure after the reset committed is `PullError::TransformStopped`, which carries the reset's
   heads and the error.
 
 **Sync** (`PullSyncJob::run`):
 
-- reads the target's `HEAD` in a transaction of its own (`resolve_sync_target`);
-- transfers with no transaction open, then commits through `DatasetUpdateSteps::commit_sync`, which also
-  creates a new dataset (`transfer_and_commit_sync`);
+- runs `SyncFromJob`, which reads the target's `HEAD` in a transaction of its own, transfers with
+  no transaction open, then moves `HEAD` or creates the new dataset in a transaction of its own;
 - with `add_aliases` on, then stores the pull alias of a dataset the sync created, in a transaction
   of its own (`PullSyncJob::store_pull_alias`). Aliases live in the dataset's `info` storage, not
   in the database, so no transaction makes them atomic with the commit; a failure to store one
   fails the pull of that dataset with `SyncError::Internal` and leaves the dataset without it. Only `kamu pull` sets the option: the
   update task never records an alias.
 
-**How a commit that did not happen is reported.** `ReferenceUpdate::into_pull_result` turns each
-outcome of [the shared commit](dataset-operations.md#3-committing-head) into that dataset's error:
+**How a commit that did not happen is reported.** Each runner maps its job's error for
+[a commit that did not happen](dataset-operations.md#3-committing-head) into that dataset's error:
 
 | Commit | `PullError` |
 | --- | --- |
@@ -351,11 +351,12 @@ needs, and reports a dataset the account cannot read as not found:
 Denied jobs leave the plan and join its errors, in job order; a job's target error comes before its
 input errors. Like a planning error, a denial fails the whole command before any job runs.
 
-A transform job elaborates its transform again when it runs, and another writer may have changed
-the inputs meanwhile. Before executing, the job authorizes `Transform` again with the inputs the
-plan did not check, and fails with `PullError::Access` if one is denied. Resetting the
-derivative on a diverged input drops its data, so the job first checks `ResetToMetadata` (Maintain
-on the target) and fails with `PullError::Access` without resetting when it is denied.
+Every operation job checks its own operation again when it runs, as the principal of the pull.
+`TransformJob` checks `Transform` with the inputs its elaboration actually read, which may differ
+from the planned ones when another writer changed them meanwhile, before using any result, and
+fails with `PullError::Access` if one is denied. Resetting the derivative on a diverged input drops
+its data, so `CompactionJob` checks `ResetToMetadata` (Maintain on the target) and the pull fails
+with `PullError::Access` without resetting when it is denied.
 
 A sync target that does not exist yet has nothing to check; creating it is governed by the sync.
 `--all` only plans datasets the current account owns. Planning itself resolves datasets without
@@ -436,9 +437,9 @@ reporting it, so the deferred consumers of the datasets that did update run in t
 | Planner: resolution, traversal, depths, job building | [`pull_request_planner/`](../../src/infra/core/src/services/pull_request_planner) |
 | Use case: iteration loop | [`pull_dataset_use_case_impl.rs`](../../src/infra/core/src/use_cases/pull_dataset_use_case_impl.rs) |
 | Authorization of a plan | [`pull_authorization.rs`](../../src/infra/core/src/use_cases/pull_authorization.rs) |
-| Transform job: elaboration, reset, re-authorization of inputs, execution | [`pull_transform_job.rs`](../../src/infra/core/src/use_cases/pull_transform_job.rs) |
+| Transform job: reset on a diverged input | [`pull_transform_job.rs`](../../src/infra/core/src/use_cases/pull_transform_job.rs) |
 | Sync job | [`pull_sync_job.rs`](../../src/infra/core/src/use_cases/pull_sync_job.rs) |
-| Steps shared with the update task | [`dataset_update_steps_impl.rs`](../../src/infra/core/src/services/dataset_update_steps_impl.rs) |
+| Operation jobs shared with the update task | [`dataset_jobs/`](../../src/infra/core/src/dataset_jobs) |
 | Polling ingest loop of an ingest job | [`pull_ingest_loop.rs`](../../src/infra/core/src/use_cases/pull_ingest_loop.rs) |
 | CLI command, progress, error display | [`pull_command.rs`](../../src/app/cli/src/commands/pull_command.rs) |
 | CLI flags and dispatch | [`cli.rs`](../../src/app/cli/src/cli.rs), [`cli_commands.rs`](../../src/app/cli/src/cli_commands.rs) |

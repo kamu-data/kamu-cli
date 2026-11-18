@@ -29,8 +29,9 @@ page describes only what is specific to it:
   between two short transactions, never inside one.
 - **A lost race leaves garbage, not corruption.** The loser's blocks stay in storage unreferenced;
   the chain `HEAD` points at is never mixed.
-- **The same steps for the CLI and the server.** `kamu pull` and the update task call the same
-  `DatasetUpdateSteps`; they differ in who drives them and as whom they run.
+- **One job per operation, for the CLI and the server.** `kamu pull` and the update task run the
+  same job (`PollingIngestJob`, `TransformJob`, …), which owns the operation's transactions; they
+  differ in who drives it and as whom it runs.
 
 ---
 
@@ -39,45 +40,48 @@ page describes only what is specific to it:
 ```mermaid
 flowchart LR
     subgraph Entry["Entry points"]
-        CLI["CLI commands<br/>pull, ingest, compact, reset"]
+        CLI["CLI commands<br/>pull, push, compact, reset, verify"]
         GQL["GraphQL / REST"]
         FLOW["Flows → tasks<br/>(task agent)"]
     end
 
     subgraph Orchestration
-        UC["Use cases<br/>authorize, loop, report"]
+        UC["Pull and push use cases<br/>plan, loop, report"]
         RUN["Task runners<br/>map outcomes"]
     end
 
-    STEPS["DatasetUpdateSteps<br/>short transactions"]
+    JOBS["Operation jobs<br/>authorize, short transactions"]
     PLAN["Planners<br/>ingest · transform · compaction · reset"]
     EXEC["Executors, no transaction<br/>ingest · transform · sync · compaction"]
     COMMIT["DatasetReferenceUpdater<br/>CAS on HEAD"]
     OUTBOX[("Outbox:<br/>DatasetReferenceMessage")]
 
     CLI --> UC
+    CLI -- "compact, reset, verify" --> JOBS
     GQL --> UC
     FLOW --> RUN
-    UC --> STEPS
-    RUN --> STEPS
-    STEPS -- plan --> PLAN
-    UC -- execute --> EXEC
-    RUN -- execute --> EXEC
-    STEPS -- commit --> COMMIT
-    UC -- "compaction, reset: plan" --> PLAN
-    UC -- "compaction, reset: commit" --> COMMIT
+    UC --> JOBS
+    RUN --> JOBS
+    JOBS -- plan --> PLAN
+    JOBS -- execute --> EXEC
+    JOBS -- commit --> COMMIT
     COMMIT -- "via DatasetReferenceService" --> OUTBOX
 ```
 
-- **Use cases** (`PullDatasetUseCase`, `CompactDatasetUseCase`, `ResetDatasetUseCase`,
-  `PushIngestDataUseCase`, …) are the entry points of the CLI and the API. They authorize the
-  caller through `DatasetOperationGuard` and report per-dataset results.
-- **Task runners** do the same work for flows. They run as `Principal::Node`; access was checked
-  when the flow was configured or triggered ([§5](#5-who-runs-it)).
-- **`DatasetUpdateSteps`** holds the transactional steps of updating one dataset: plan an ingest,
-  elaborate a transform, read a sync target, commit a head, transfer and commit a sync. Each step
-  re-resolves the dataset by its handle in a transaction of its own and returns what it read
-  detached from it.
+- **Operation jobs** run one operation on one dataset from start to end: `PollingIngestJob` (one
+  iteration), `TransformJob`, `SyncFromJob`, `SyncToJob`, `CompactionJob` (also reset to metadata),
+  `ResetJob` and `VerifyJob` (traits in
+  [`kamu-core/src/dataset_jobs/`](../../src/domain/core/src/dataset_jobs/)).
+  A job authorizes its principal through `DatasetOperationGuard`, plans in a short transaction,
+  executes with none open, and commits in another short one, re-resolving the dataset by its ID
+  each time. Jobs own these transactions; nothing above them opens one around an operation
+  ([database-transactions.md](database-transactions.md#31-who-owns-a-transaction)).
+- **Use cases** that cover several operations (`PullDatasetUseCase`, `PushDatasetUseCase`) plan
+  over many datasets, run the jobs in order and report per-dataset results. `kamu system compact`,
+  `kamu reset` and `kamu verify` run their one job directly. `PushIngestDataUseCase` is not a job:
+  it runs in the request's or the command's transaction ([push-ingest.md](push-ingest.md)).
+- **Task runners** map a task definition to a job and the job's result to a task outcome. They run
+  as `Principal::Node` ([§5](#5-who-runs-it)).
 
 ---
 
@@ -88,23 +92,21 @@ no transaction. An ingest iteration of `kamu pull`:
 
 ```mermaid
 sequenceDiagram
-    participant J as Pull ingest job
-    participant S as DatasetUpdateSteps
+    participant J as PollingIngestJob
+    participant G as DatasetOperationGuard
     participant P as PollingIngestPlanner
     participant I as PollingIngestService
     participant C as DatasetReferenceUpdater
 
     rect rgba(100, 150, 255, 0.15)
-    J->>S: plan_ingest(handle)
-    S->>P: plan at current HEAD
-    S-->>J: plan + env vars, dataset detached
+    J->>G: check PollingIngest for the principal
+    J->>P: plan at current HEAD, resolve env vars
+    P-->>J: plan, dataset detached
     end
     J->>I: ingest: fetch, read, stage, append blocks
     I-->>J: Updated { old_head, new_head }
     rect rgba(100, 150, 255, 0.15)
-    J->>S: update_reference(HEAD, old_head, new_head)
-    S->>C: CAS HEAD old_head → new_head
-    S-->>J: ReferenceUpdate
+    J->>C: re-resolve, CAS HEAD old_head → new_head
     end
 ```
 
@@ -119,17 +121,19 @@ commit re-resolves the dataset first.
 
 How each operation fills in the steps:
 
-| Operation | Plan | Execute (writes blocks) | Commit |
-| --- | --- | --- | --- |
-| Polling ingest | `plan_ingest` | `PollingIngestService::ingest`, one iteration | `update_reference` |
-| Transform | `elaborate_transform` | `TransformExecutor` | `update_reference` |
-| Sync into a local dataset | `resolve_sync_target` reads the head | `SyncService::sync_from` | `transfer_and_commit_sync` through `commit_sync`, which also creates a new dataset |
-| Hard compaction, reset to metadata | `CompactionPlanner`, in a short transaction of the use case or of the task planner | `CompactionExecutor` | the use case through `DatasetReferenceUpdater`; the task runner through `update_reference` |
-| Reset to a block | `ResetPlanner` | — (the block already exists) | `ResetExecutor`, in the same transaction as the plan |
-| Push ingest | `PushIngestPlanner` | the push ingest executor | in the same transaction as the plan: the request's or the command's |
+| Operation | Job | Plan | Execute (writes blocks) | Commit |
+| --- | --- | --- | --- | --- |
+| Polling ingest | `PollingIngestJob` | `PollingIngestPlanner`, env vars | `PollingIngestService::ingest`, one iteration | `DatasetReferenceUpdater` |
+| Transform | `TransformJob` | `TransformPlanner::elaborate_transform` | `TransformExecutor` | `DatasetReferenceUpdater` |
+| Sync into a local dataset | `SyncFromJob` | reads the destination's head | `SyncService::sync_from` | `DatasetReferenceUpdater`, or `CreateDatasetUseCase` for a new dataset |
+| Hard compaction, reset to metadata | `CompactionJob` | `CompactionPlanner` | `CompactionExecutor` | `DatasetReferenceUpdater` |
+| Reset to a block | `ResetJob` | `ResetPlanner` | — (the block already exists) | `ResetExecutor`, in the same transaction as the plan |
+| Push ingest | — | `PushIngestPlanner` | the push ingest executor | in the same transaction as the plan: the request's or the command's |
 
-Reset and push ingest run in one transaction from plan to commit. The task-side view of the same
-table, with the outcome of each commit, is in [task-system.md](task-system.md#who-moves-head).
+Reset and push ingest run in one transaction from plan to commit. `SyncToJob` and `VerifyJob`
+change no local `HEAD`: they authorize and resolve in one transaction and then run with none open.
+The task-side view of the same table, with the outcome of each commit, is in
+[task-system.md](task-system.md#who-moves-head).
 
 ---
 
@@ -160,14 +164,14 @@ dependency graph), and update statistics and search ([outbox.md](outbox.md)). Pu
 smart push server also post `DatasetExternallyChangedMessage`, which flows use to tell user pushes
 from their own updates.
 
-`DatasetUpdateSteps::update_reference` returns the outcome as a `ReferenceUpdate`:
+A job reports a commit that did not happen as a variant of its own error type:
 
-| `ReferenceUpdate` | Meaning | `kamu pull` reports | A task ends |
+| Commit | Job error | `kamu pull` reports | A task ends |
 | --- | --- | --- | --- |
-| `Committed` | `HEAD` moved | the job's result | with its result |
-| `RefMoved` | another writer moved `HEAD` since planning | `PullError::RefMoved` | failed, recoverable |
-| `DatasetDeleted` | the dataset is gone | `NotFound` | failed, unrecoverable |
-| `NotAllowed` | the principal may not move `HEAD` | `Access` | failed, unrecoverable |
+| `HEAD` moved | — (the job's result) | the job's result | with its result |
+| Another writer moved `HEAD` since planning | `RefMoved` / `RefCASFailed` | `PullError::RefMoved` | failed, recoverable |
+| The dataset is gone | `NotFound` | `NotFound` | failed, unrecoverable |
+| The principal may not move `HEAD` | `Access` | `Access` | failed, unrecoverable |
 
 The pull mapping is owned by [dataset-pull.md](dataset-pull.md#62-per-job-runners), the task
 mapping by [task-system.md](task-system.md#who-moves-head).
@@ -210,8 +214,8 @@ Consequences shared by every operation:
 
 | Entry point | Principal | Where access is checked |
 | --- | --- | --- |
-| CLI command, GraphQL mutation, REST request | the caller | in the use case, through `DatasetOperationGuard`, per operation and dataset |
-| Task run by a flow | `Principal::Node` | when the flow is configured or triggered, by the GraphQL mutations ([flow-system.md](flow-system.md#12-graphql-api)) |
+| CLI command, GraphQL mutation, REST request | the caller | in the job, through `DatasetOperationGuard`, per operation and dataset; `kamu pull` and `kamu push` also check the whole batch before running any job |
+| Task run by a flow | `Principal::Node` | when the flow is configured or triggered, by the GraphQL mutations ([flow-system.md](flow-system.md#12-graphql-api)); the job's own check always passes for the node |
 
 Why background work runs as the node, and how its catalog is built, is owned by
 [identity.md](identity.md#background-work-runs-as-the-node). The permission each operation needs is
