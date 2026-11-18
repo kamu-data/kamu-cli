@@ -32,9 +32,10 @@ Recommendation: for ease of reading, use the following format:
   pulls and pushes (`--force`) too, and for pushes over the smart protocol and to S3 and local file
   system repositories. Tasks that fail this way are retried. A server older than this release, and
   storage without conditional writes, still overwrite such a change
-- A long `kamu system compact` no longer blocks other writers to the node's database. Each dataset
-  is committed as soon as it is compacted, so a failure in one dataset no longer undoes the
-  compaction of the others
+- `kamu system compact`, `kamu verify`, `kamu reset` and `kamu system diagnose` no longer hold a
+  database transaction while they run, so a long compaction no longer blocks other writers to the
+  node's database. `kamu system compact` commits each dataset as soon as it is compacted, so a
+  failure in one dataset no longer undoes the compaction of the others
 - Tasks no longer retry failures that a retry cannot fix:
   - update tasks pulling from a remote with diverged histories, an unknown repository, a missing
     remote dataset, a remote dataset named by ID, or metadata from the server that cannot be read
