@@ -1829,7 +1829,7 @@ pub struct Rename {
 /// Revert the dataset back to the specified state
 #[derive(Debug, clap::Args)]
 #[command(after_help = r#"
-Resetting a dataset to the specified block erases all metadata blocks that followed it and deletes all data added since that point. This can sometimes be useful to resolve conflicts, but otherwise should be used with care.
+Resetting a dataset to the specified block moves its head back to that block, so the metadata blocks that followed it and the data they added leave its history. Nothing is deleted: resetting to the hash of a later block brings them back. This can sometimes be useful to resolve conflicts, but otherwise should be used with care.
 
 Keep in mind that blocks that were pushed to a repository could've been already observed by other people, so resetting the history will not let you take that data back and instead create conflicts for the downstream consumers of your data.
 "#)]
@@ -2272,7 +2272,7 @@ There are two types of compactions: soft and hard.
 
 Soft compactions produce new files while leaving the old blocks intact. This allows for faster queries, while still preserving the accurate history of how dataset evolved over time.
 
-Hard compactions rewrite the history of the dataset as if data was originally written in big batches. They allow to shrink the history of a dataset to just a few blocks, reclaim the space used by old data files, but at the expense of history loss. Hard compactions will rewrite the metadata chain, changing block hashes. Therefore, they will **break all downstream datasets** that depend on them.
+Hard compactions rewrite the history of the dataset as if data was originally written in big batches. They allow to shrink the history of a dataset to just a few blocks, but at the expense of history loss. The old blocks and data files are not deleted. Hard compactions will rewrite the metadata chain, changing block hashes. Therefore, they will **break all downstream datasets** that depend on them.
 
 **Examples:**
 

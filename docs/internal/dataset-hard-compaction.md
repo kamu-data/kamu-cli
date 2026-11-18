@@ -256,7 +256,7 @@ unchanged, the Smart protocol accepts a forced push of the compacted chain.
 | Only root datasets can be hard-compacted | A derivative's blocks record what it consumed from each input; merging them would break verification by replay. Metadata-only compaction is allowed for any kind |
 | A single-slice batch keeps its original block | Rewriting a lone file would change nothing but the hash |
 | Offsets are preserved | Offset ranges stay valid for anything that reads by offset |
-| Nothing is deleted | Readers of the old head keep working. No collector reclaims the space, although the command's help text says compaction does |
+| Nothing is deleted | Readers of the old head keep working. No collector reclaims the space |
 | "Soft" compaction appears in the help but is rejected | Only hard compaction is implemented |
 
 ---

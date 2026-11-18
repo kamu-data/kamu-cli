@@ -102,14 +102,13 @@ pub enum PollingIngestResult {
 // Listener
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, strum::EnumCount)]
 pub enum PollingIngestStage {
     CheckCache,
     Fetch,
     Prepare,
     Read,
     Preprocess,
-    Merge,
     Commit,
 }
 

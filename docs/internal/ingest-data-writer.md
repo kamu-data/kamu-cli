@@ -148,9 +148,8 @@ only a watermark and optionally a source state. Ingest does not use it; `SetWate
 resumes where it was. That executor moves `HEAD` through `DatasetReferenceUpdater` and fails with
 `SetWatermarkExecutionError::RefCASFailed` if `HEAD` moved after planning.
 
-`stage` reports no progress, so neither kind of source ever reports its `Merge` listener stage
-(`PollingIngestStage::Merge`, `PushIngestStage::Merge`): `Preprocess`, when the source has a
-preprocess query, or `Read` is followed directly by `Commit`.
+`stage` reports no listener stage of its own: `Preprocess`, when the source has a preprocess query,
+or `Read` is followed directly by `Commit`.
 
 The writer never moves `HEAD`. The blocks published together can be a `SetDataSchema` alone, when a
 first ingest yields no rows ([§6](#6-what-stage-decides)).

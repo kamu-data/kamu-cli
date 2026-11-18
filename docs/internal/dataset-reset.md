@@ -259,7 +259,7 @@ prints errors as failures; task and GraphQL mappings are owned by
 
 | Behaviour | Why |
 | --- | --- |
-| Nothing is deleted by either reset | Readers holding the old head keep working, and a reset can be undone by hash. The `kamu reset` help text says data is deleted; it is not |
+| Nothing is deleted by either reset | Readers holding the old head keep working, and a reset can be undone by hash |
 | Reset to metadata keeps superseded metadata events | It drops data events only; flattening metadata is a separate concern |
 | Reset to a block writes no block | The chain already contains the target; moving the reference is enough |
 | A rewrite is detected by consumers, not announced | The reference consumers already follow `DatasetReferenceMessage`, and an invalid interval between the two heads is their signal; the dependency graph follows the `DatasetKeyBlocksMessage` the block index posts and reacts to the `Seed` reappearing in the interval |

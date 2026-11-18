@@ -150,7 +150,11 @@ impl TransactionBlock {
         function: ItemFn,
     ) -> syn::Result<TokenStream> {
         let ItemFn {
-            vis, sig, block, ..
+            attrs,
+            vis,
+            sig,
+            block,
+            ..
         } = function;
 
         let ReturnType::Type(_, result_type) = &sig.output else {
@@ -180,7 +184,10 @@ impl TransactionBlock {
         }
         .expand();
 
+        // Attributes written below the macro (`#[tracing::instrument]`, docs) stay on the
+        // function
         Ok(quote! {
+            #(#attrs)*
             #vis #sig {
                 #transaction_block
             }

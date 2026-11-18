@@ -130,9 +130,8 @@ or unreadable dataset `NotFound`. Both planner calls below reject a derived data
 4. **Finalize** — move `HEAD` from `old_head` to `new_head` through `DatasetReferenceUpdater` and post
    `DatasetExternallyChangedMessage::ingest_http`.
 
-The executor reports `begin` and the `Read`, `Preprocess` and `Commit` stages to the listener;
-`Merge` is never reported ([ingest-data-writer.md](ingest-data-writer.md#52-the-two-steps)). The use
-case reports `success` or `error` once, after step 4 or the failure
+The executor reports `begin` and the `Read`, `Preprocess` and `Commit` stages to the listener. The
+use case reports `success` or `error` once, after step 4 or the failure
 ([dataset-pull.md](dataset-pull.md#63-listeners)).
 
 `execute_multi`, which only tests call, runs steps 1 to 3 for each data source in turn, threading

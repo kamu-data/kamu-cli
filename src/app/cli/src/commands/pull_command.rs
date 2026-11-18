@@ -19,6 +19,7 @@ use kamu::utils::datasets_filtering::filter_datasets_by_any_pattern;
 use kamu_accounts::CurrentAccountSubject;
 use kamu_datasets::{DatasetPermission, DatasetPermissionMissingError, DatasetRegistry};
 use odf::{DatasetRefAny, DatasetRefUnresolvedError};
+use strum::EnumCount as _;
 
 use super::{BatchError, CLIError, Command};
 use crate::output::OutputConfig;
@@ -438,7 +439,7 @@ impl PrettyIngestProgress {
         step: u32,
         msg: T,
     ) -> String {
-        let step_str = format!("[{}/7]", step + 1);
+        let step_str = format!("[{}/{}]", step + 1, PollingIngestStage::COUNT);
         let dataset = format!("({})", dataset_handle.alias);
         format!(
             "{} {} {}",
@@ -455,7 +456,6 @@ impl PrettyIngestProgress {
             | PollingIngestStage::Prepare
             | PollingIngestStage::Read
             | PollingIngestStage::Preprocess
-            | PollingIngestStage::Merge
             | PollingIngestStage::Commit => ProgressStyle::Spinner,
         }
     }
@@ -467,7 +467,6 @@ impl PrettyIngestProgress {
             PollingIngestStage::Prepare => "Preparing data",
             PollingIngestStage::Read => "Reading data",
             PollingIngestStage::Preprocess => "Preprocessing data",
-            PollingIngestStage::Merge => "Merging data",
             PollingIngestStage::Commit => "Committing data",
         };
         Self::spinner_message(&self.dataset_handle, stage as u32, msg)

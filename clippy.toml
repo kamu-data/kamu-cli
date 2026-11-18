@@ -1,6 +1,8 @@
 unreadable-literal-lint-fractions = false
 disallowed-macros = ["std::dbg"]
 disallowed-names = []
+# Product names that doc comments may use without backticks (`..` keeps the defaults)
+doc-valid-idents = ["OData", ".."]
 
 # Too many complaints - we will lower this threshold over time
 # https://rust-lang.github.io/rust-clippy/master/index.html#large_enum_variant

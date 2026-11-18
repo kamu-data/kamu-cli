@@ -53,11 +53,10 @@ pub enum PushIngestResult {
 // Listener
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, strum::EnumCount)]
 pub enum PushIngestStage {
     Read,
     Preprocess,
-    Merge,
     Commit,
 }
 

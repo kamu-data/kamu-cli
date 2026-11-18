@@ -15,6 +15,7 @@ use chrono::{DateTime, Utc};
 use file_utils::MediaType;
 use kamu::domain::*;
 use kamu_datasets::{DatasetRegistry, ResolvedDataset};
+use strum::EnumCount as _;
 
 use super::{CLIError, Command};
 use crate::OutputConfig;
@@ -250,7 +251,7 @@ impl PushIngestProgress {
         step: u32,
         msg: T,
     ) -> String {
-        let step_str = format!("[{}/7]", step + 1);
+        let step_str = format!("[{}/{}]", step + 1, PushIngestStage::COUNT);
         let dataset = format!("({})", dataset_handle.alias);
         format!(
             "{} {} {}",
@@ -264,7 +265,6 @@ impl PushIngestProgress {
         let msg = match stage {
             PushIngestStage::Read => "Reading data",
             PushIngestStage::Preprocess => "Preprocessing data",
-            PushIngestStage::Merge => "Merging data",
             PushIngestStage::Commit => "Committing data",
         };
         Self::spinner_message(&self.dataset_handle, stage as u32, msg)
@@ -306,7 +306,7 @@ impl PushIngestListener for PushIngestProgress {
                     .curr_progress
                     .finish_with_message(Self::spinner_message(
                         &self.dataset_handle,
-                        PollingIngestStage::Commit as u32,
+                        PushIngestStage::Commit as u32,
                         console::style(format!(
                             "Committed new block {}",
                             new_head.as_multibase().short()
@@ -346,7 +346,7 @@ impl EngineProvisioningListener for PushIngestProgress {
         // This currently happens during the Read stage
         state.curr_progress.set_message(Self::spinner_message(
             &self.dataset_handle,
-            PollingIngestStage::Read as u32,
+            PushIngestStage::Read as u32,
             format!("Waiting for engine {engine_id}"),
         ));
     }
@@ -367,7 +367,7 @@ impl PullImageListener for PushIngestProgress {
         // This currently happens during the Read stage
         state.curr_progress.set_message(Self::spinner_message(
             &self.dataset_handle,
-            PollingIngestStage::Read as u32,
+            PushIngestStage::Read as u32,
             format!("Pulling image {image}"),
         ));
     }
