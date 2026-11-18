@@ -125,6 +125,12 @@ Rust style lives in the `kamu-rust-style` skill and test conventions in `kamu-te
 edit hook requires them before the first edit they govern (see the table below). Targeted test
 runs use nextest filtersets — see [Build scope](#build-scope--p).
 
+Code copied from another project stays as its upstream wrote it. `src/utils/datafusion-cli` is
+replaced from `apache/datafusion` on every upgrade
+([procedure](src/utils/datafusion-cli/README.md#upgrade-procedure)), so every local edit there must
+be merged again by hand. Kamu style, comment and divider rules, cleanups and audits do not apply to
+it; change it only when Kamu needs the change, and keep the difference from upstream minimal.
+
 ## What to load for which task
 
 ### Skills
@@ -149,6 +155,7 @@ addition to that match (a GraphQL resolver needs both `kamu-graphql-api` and `ka
 | dill components, interfaces, scopes, catalog building and chaining | `kamu-dill-di` | |
 | Outbox, repositories, domain/view construction, event modeling, operation-specific errors | `kamu-domain-design` | |
 | Renaming a type, field, message, flag or any other concept across layers | `kamu-renaming-a-concept` | |
+| Branch-wide cleanup of an epic, stage or other large changeset: one question per pass, a review and a commit per step | `kamu-reviewing-a-large-changeset` | |
 | Adding a new bounded context (domain + services + repositories + wiring) | `kamu-adding-a-bounded-context` | |
 | DataFusion, Arrow, Object Store, Parquet and related query-engine upgrades | `kamu-datafusion-upgrade-workflows` | |
 | Jupyter demo, rustfs, multi-platform demo image releases | `kamu-jupyter-demo-release-workflows` | |

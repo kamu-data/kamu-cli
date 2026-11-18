@@ -30,8 +30,8 @@ or renumbering.
 **Doc comments (`///`)** describe the contract — what the item guarantees, its errors, its
 invariants — not its implementation.
 
-**Dividing lines** (a comment line of only `/`) are exactly 120 characters, matching the
-surrounding files. A repo lint checks it.
+**Dividing lines** (a comment line of only `/`) are layout, not prose: `kamu-rust-style`,
+"Dividing lines".
 
 The post-edit hook rejects added Rust comments that cite plans or tickets or narrate change. It
 catches the common phrasings only, so the rules above still apply in full.

@@ -175,6 +175,20 @@ macro calls — macro bodies are hard to read, debug and test.
 - One concept per file. A module that grows several independent concepts becomes a directory with
   a file per type, with its errors and its tests in files of their own.
 
+### Dividing lines
+
+A dividing line is a comment line of exactly 120 `/` characters; the `dividing_lines` repo lint
+refuses any other length. It marks the units of a file:
+
+- A file with items has one right after the `use` block and one closing the file.
+- One separates each top-level unit from the next. A unit is a function, a test, or a type
+  with its `impl` blocks; whether a line also separates the `impl`s from the type and from each
+  other is a matter of taste.
+- A named section is a dividing line, a `// Name` line and another dividing line, e.g.
+  `// Harness` above a test file's harness.
+
+The lint checks only the length; placement is on review.
+
 ### No extension traits for convenience methods
 
 A trait that only adds methods to an existing type (`FooExt for Bar`) saves no code: every caller
@@ -217,7 +231,7 @@ Do not re-propose these without new evidence.
 
 ## What lives elsewhere
 
-- Comments, doc comments, dividing lines: `kamu-prose-and-comments`.
+- Comments and doc comments: `kamu-prose-and-comments`.
 - Test structure and assertions: `kamu-test-harness`.
 - DI components and scopes: `kamu-dill-di`.
 - Error types and domain modelling: `kamu-domain-design`.
