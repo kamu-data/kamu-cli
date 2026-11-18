@@ -14,6 +14,7 @@
 // Re-exports
 pub use kamu_core as domain;
 
+mod dataset_jobs;
 mod engine;
 mod services;
 #[cfg(any(feature = "testing", test))]
@@ -21,6 +22,7 @@ pub mod testing;
 mod use_cases;
 pub mod utils;
 
+pub use dataset_jobs::*;
 pub use engine::*;
 pub use services::*;
 pub use use_cases::*;

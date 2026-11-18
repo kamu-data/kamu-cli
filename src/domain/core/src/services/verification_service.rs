@@ -22,17 +22,12 @@ use crate::*;
 
 #[async_trait::async_trait]
 pub trait VerificationService: Send + Sync {
+    /// Verifies as planned. Reads only storage, so it needs no transaction
     async fn verify(
         &self,
-        request: VerificationRequest<ResolvedDataset>,
+        plan: VerificationPlan,
         listener: Option<Arc<dyn VerificationListener>>,
     ) -> VerificationResult;
-
-    async fn verify_multi(
-        &self,
-        requests: Vec<VerificationRequest<ResolvedDataset>>,
-        listener: Option<Arc<dyn VerificationMultiListener>>,
-    ) -> Vec<VerificationResult>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -44,6 +39,65 @@ pub struct VerificationRequest<TTarget> {
     pub target: TTarget,
     pub block_range: (Option<odf::Multihash>, Option<odf::Multihash>),
     pub options: VerificationOptions,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// What a verification checks, read in a transaction and detached from it
+#[derive(Debug)]
+pub struct VerificationPlan {
+    pub request: VerificationRequest<ResolvedDataset>,
+    /// The transforms to replay, when the request asks for it and the target
+    /// is a derivative
+    pub maybe_replay: Option<VerifyTransformOperation>,
+}
+
+impl VerificationPlan {
+    /// Reads what verifying `request` needs, in the caller's transaction: pins
+    /// the end of the block range to the current `HEAD`, which storage may
+    /// not reflect yet, and plans the transform replay of a derivative. The
+    /// plan comes back detached from the transaction
+    pub async fn build(
+        mut request: VerificationRequest<ResolvedDataset>,
+        transform_planner: &dyn TransformPlanner,
+    ) -> Result<Self, VerificationError> {
+        if request.block_range.1.is_none() {
+            let head = request
+                .target
+                .as_metadata_chain()
+                .resolve_ref(&odf::BlockRef::Head)
+                .await?;
+            request.block_range.1 = Some(head);
+        }
+
+        let maybe_replay = if request.target.get_kind() == odf::DatasetKind::Derivative
+            && request.options.replay_transformations
+        {
+            Some(
+                transform_planner
+                    .build_transform_verification_plan(
+                        request.target.clone(),
+                        request.block_range.clone(),
+                    )
+                    .await
+                    .map_err(|e| {
+                        VerificationError::VerifyTransform(VerifyTransformError::Plan(e))
+                    })?,
+            )
+        } else {
+            None
+        };
+
+        request.target.detach_from_transaction();
+        if let Some(replay) = &maybe_replay {
+            replay.datasets_map.detach_from_transaction();
+        }
+
+        Ok(Self {
+            request,
+            maybe_replay,
+        })
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

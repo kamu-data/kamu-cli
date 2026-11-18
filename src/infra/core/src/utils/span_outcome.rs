@@ -8,11 +8,11 @@
 // by the Apache License, Version 2.0.
 
 use internal_error::InternalError;
-use kamu_core::{PullError, PullResponse, PullResult, ReferenceUpdate, SyncError};
+use kamu_core::{PullError, PullResponse, PullResult, SyncError};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// How a step of a dataset update ended, recorded as the `outcome` field of
+/// How a dataset job or a pull job ended, recorded as the `outcome` field of
 /// its span
 #[derive(Debug, Clone, Copy, PartialEq, Eq, strum::IntoStaticStr, strum::EnumIter)]
 #[strum(serialize_all = "snake_case")]
@@ -23,11 +23,6 @@ pub(crate) enum SpanOutcome {
     RefMoved,
     NotAllowed,
     Failed,
-    Planned,
-    Elaborated,
-    Existing,
-    New,
-    Committed,
 }
 
 impl SpanOutcome {
@@ -96,17 +91,6 @@ impl From<&PullError> for SpanOutcome {
     }
 }
 
-impl From<&ReferenceUpdate> for SpanOutcome {
-    fn from(reference_update: &ReferenceUpdate) -> Self {
-        match reference_update {
-            ReferenceUpdate::Committed => Self::Committed,
-            ReferenceUpdate::RefMoved(_) => Self::RefMoved,
-            ReferenceUpdate::DatasetDeleted => Self::DatasetDeleted,
-            ReferenceUpdate::NotAllowed(_) => Self::NotAllowed,
-        }
-    }
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[cfg(test)]
@@ -124,11 +108,6 @@ mod tests {
             (SpanOutcome::RefMoved, "ref_moved"),
             (SpanOutcome::NotAllowed, "not_allowed"),
             (SpanOutcome::Failed, "failed"),
-            (SpanOutcome::Planned, "planned"),
-            (SpanOutcome::Elaborated, "elaborated"),
-            (SpanOutcome::Existing, "existing"),
-            (SpanOutcome::New, "new"),
-            (SpanOutcome::Committed, "committed"),
         ];
 
         assert_eq!(names.len(), SpanOutcome::iter().count());

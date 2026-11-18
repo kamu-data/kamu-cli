@@ -24,12 +24,12 @@ pub use watermark::*;
 
 mod dataset_pull_source_resolver;
 mod dataset_update_kind_resolver;
-mod dataset_update_steps;
 mod did_generator;
 pub mod download_service;
 pub mod engine_provisioner;
 pub mod export_service;
 mod ipfs_service;
+mod local_sync_committer;
 pub mod metadata_query_service;
 pub mod object_store_registry;
 pub mod provenance_service;
@@ -51,12 +51,12 @@ pub mod verification_service;
 
 pub use dataset_pull_source_resolver::*;
 pub use dataset_update_kind_resolver::*;
-pub use dataset_update_steps::*;
 pub use did_generator::*;
 pub use download_service::*;
 pub use engine_provisioner::*;
 pub use export_service::*;
 pub use ipfs_service::*;
+pub use local_sync_committer::*;
 pub use metadata_query_service::*;
 pub use object_store_registry::*;
 pub use provenance_service::*;

@@ -7,34 +7,9 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_core::ReferenceUpdate;
 use kamu_task_system::{TaskError, TaskOutcome};
 
 use crate::{DatasetRefMovedError, TaskErrorDatasetCommit};
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-/// A task's reference update as the task's outcome
-pub(crate) trait ReferenceUpdateTaskOutcome {
-    /// `None` when the update was committed; otherwise the failed outcome of the
-    /// task of `dataset_handle`
-    fn into_failed_task_outcome(self, dataset_handle: &odf::DatasetHandle) -> Option<TaskOutcome>;
-}
-
-impl ReferenceUpdateTaskOutcome for ReferenceUpdate {
-    fn into_failed_task_outcome(self, dataset_handle: &odf::DatasetHandle) -> Option<TaskOutcome> {
-        match self {
-            Self::Committed => None,
-            Self::DatasetDeleted => Some(dataset_deleted_outcome(dataset_handle)),
-            Self::RefMoved(e) => Some(ref_moved_outcome(
-                dataset_handle.id.clone(),
-                e.reference.clone(),
-                Some(e),
-            )),
-            Self::NotAllowed(e) => Some(ref_update_not_allowed_outcome(&e)),
-        }
-    }
-}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

@@ -10,7 +10,12 @@
 use std::sync::Arc;
 
 use internal_error::{BoxedError, ErrorIntoInternal, InternalError};
-use kamu_datasets::{CreateDatasetError, NameCollisionError, ResolvedDataset};
+use kamu_datasets::{
+    CreateDatasetError,
+    DatasetPermissionError,
+    NameCollisionError,
+    ResolvedDataset,
+};
 use thiserror::Error;
 use url::Url;
 
@@ -27,7 +32,7 @@ pub trait SyncService: Send + Sync {
     /// Syncs into a destination that is not a dataset of this node: a push to
     /// a remote repository or to IPFS. A pull into a local dataset is
     /// [`SyncService::sync_from`] followed by
-    /// [`crate::DatasetUpdateSteps::commit_sync`]
+    /// [`crate::LocalSyncCommitter::commit`]
     async fn sync_to(
         &self,
         request: SyncToRequest,
@@ -37,7 +42,7 @@ pub trait SyncService: Send + Sync {
 
     /// Resolves and opens the remote source and writes the blocks, data and
     /// checkpoints the local dataset lacks as unreferenced objects, with no
-    /// transaction held. Commit with [`crate::DatasetUpdateSteps::commit_sync`];
+    /// transaction held. Commit with [`crate::LocalSyncCommitter::commit`];
     /// the listener gets `begin` and progress, and the caller reports the
     /// outcome.
     async fn sync_from(
@@ -570,6 +575,20 @@ pub struct CorruptedSourceError {
     pub message: String,
     #[source]
     pub source: Option<BoxedError>,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl From<DatasetPermissionError> for SyncError {
+    fn from(v: DatasetPermissionError) -> Self {
+        use DatasetPermissionError as E;
+
+        match v {
+            E::NotFound(e) => Self::DatasetNotFound(e.into()),
+            E::Access(e) => Self::Access(e),
+            E::Internal(e) => Self::Internal(e),
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

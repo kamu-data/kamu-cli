@@ -9,31 +9,23 @@
 
 use std::sync::Arc;
 
-use internal_error::{InternalError, ResultIntoInternal};
+use internal_error::{ErrorIntoInternal, InternalError};
 use kamu_core::*;
-use random_strings::get_random_name;
 
 use crate::utils::span_outcome::SpanOutcome;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Repeats polling ingest iterations of one dataset for `kamu pull`,
-/// committing `HEAD` after each of them
+/// Repeats polling ingest iterations of one dataset for `kamu pull`; each
+/// iteration commits its own `HEAD`
 pub(crate) struct PullIngestLoop {
-    update_steps: Arc<dyn DatasetUpdateSteps>,
-    polling_ingest_service: Arc<dyn PollingIngestService>,
+    polling_ingest_job: Arc<dyn PollingIngestJob>,
 }
 
 #[common_macros::method_names_consts]
 impl PullIngestLoop {
-    pub(crate) fn new(
-        update_steps: Arc<dyn DatasetUpdateSteps>,
-        polling_ingest_service: Arc<dyn PollingIngestService>,
-    ) -> Self {
-        Self {
-            update_steps,
-            polling_ingest_service,
-        }
+    pub(crate) fn new(polling_ingest_job: Arc<dyn PollingIngestJob>) -> Self {
+        Self { polling_ingest_job }
     }
 
     /// Runs the ingest job of one dataset and reports it as the pull's response
@@ -107,69 +99,38 @@ impl PullIngestLoop {
         exhaust_sources: bool,
         maybe_listener: Option<Arc<dyn PollingIngestListener>>,
     ) -> Result<PollingIngestResult, PullError> {
-        let PlannedIngest {
-            target,
-            mut plan,
-            env_vars,
-        } = match self.update_steps.plan_ingest(target_handle).await {
-            Ok(Some(planned)) => planned,
-            Ok(None) => {
-                return Err(PullError::NotFound(odf::DatasetNotFoundError::new(
-                    target_handle.as_local_ref(),
-                )));
-            }
-            Err(PollingIngestPlanError::SourceNotDefined(_)) => {
-                if let Some(listener) = &maybe_listener {
-                    listener.no_polling_source();
-                }
-                return Ok(PollingIngestResult::UpToDate { uncacheable: false });
-            }
-            Err(PollingIngestPlanError::ScanMetadata(e)) => return Err(e.into()),
-            Err(PollingIngestPlanError::Internal(e)) => return Err(e.into()),
-        };
-
         let mut combined: Option<PollingIngestResult> = None;
+        let mut maybe_continuation = None;
         loop {
             let result = match self
-                .polling_ingest_service
-                .ingest(
-                    target.clone(),
-                    plan,
+                .polling_ingest_job
+                .run(
+                    target_handle,
                     options.clone(),
-                    &env_vars,
-                    &get_random_name(None, 10),
+                    maybe_continuation.take(),
                     maybe_listener.clone(),
                 )
                 .await
             {
                 Ok(result) => result,
-                Err(e) => return Err(Self::stopped(combined, e.into())),
+                Err(PollingIngestJobError::Planning(PollingIngestPlanError::SourceNotDefined(
+                    _,
+                ))) if combined.is_none() => {
+                    if let Some(listener) = &maybe_listener {
+                        listener.no_polling_source();
+                    }
+                    return Ok(PollingIngestResult::UpToDate { uncacheable: false });
+                }
+                Err(e) => return Err(Self::stopped(combined, Self::into_pull_error(e))),
             };
 
-            let next_state = match &result {
+            maybe_continuation = match &result {
                 PollingIngestResult::UpToDate { .. } => None,
                 PollingIngestResult::Updated {
-                    old_head,
-                    new_head,
                     has_more,
                     metadata_state,
                     ..
-                } => {
-                    if let Err(e) = ReferenceUpdate::into_pull_result(
-                        self.update_steps
-                            .update_reference(
-                                target.get_handle(),
-                                &odf::BlockRef::Head,
-                                old_head,
-                                new_head,
-                            )
-                            .await,
-                        target.get_handle(),
-                    ) {
-                        return Err(Self::stopped(combined, e));
-                    }
-                    (*has_more && exhaust_sources).then(|| metadata_state.clone())
-                }
+                } => (*has_more && exhaust_sources).then(|| metadata_state.clone()),
             };
 
             if let Some(listener) = &maybe_listener {
@@ -178,13 +139,27 @@ impl PullIngestLoop {
 
             combined = Some(Self::merge_results(combined, result));
 
-            let Some(metadata_state) = next_state else {
+            if maybe_continuation.is_none() {
                 break;
-            };
-            plan = PollingIngestPlan::new(target.get_handle(), metadata_state).int_err()?;
+            }
         }
 
         Ok(combined.expect("The loop runs at least once"))
+    }
+
+    fn into_pull_error(error: PollingIngestJobError) -> PullError {
+        match error {
+            PollingIngestJobError::NotFound(e) => PullError::NotFound(e),
+            PollingIngestJobError::Access(e) => PullError::Access(e),
+            PollingIngestJobError::RefMoved(e) => PullError::RefMoved(e),
+            PollingIngestJobError::Planning(PollingIngestPlanError::ScanMetadata(e)) => e.into(),
+            PollingIngestJobError::Planning(e @ PollingIngestPlanError::SourceNotDefined(_)) => {
+                PullError::Internal(e.int_err())
+            }
+            PollingIngestJobError::Planning(PollingIngestPlanError::Internal(e))
+            | PollingIngestJobError::Internal(e) => PullError::Internal(e),
+            PollingIngestJobError::Ingest(e) => e.into(),
+        }
     }
 
     /// The error of an iteration, as [`PullError::IngestStopped`] when earlier

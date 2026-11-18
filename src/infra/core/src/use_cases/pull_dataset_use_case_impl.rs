@@ -26,12 +26,11 @@ use super::pull_transform_job::PullTransformJob;
 #[component]
 #[interface(dyn PullDatasetUseCase)]
 pub struct PullDatasetUseCaseImpl {
-    transform_executor: Arc<dyn TransformExecutor>,
-    compaction_planner: Arc<dyn CompactionPlanner>,
-    compaction_executor: Arc<dyn CompactionExecutor>,
+    polling_ingest_job: Arc<dyn PollingIngestJob>,
+    transform_job: Arc<dyn TransformJob>,
+    compaction_job: Arc<dyn CompactionJob>,
+    sync_from_job: Arc<dyn SyncFromJob>,
     tenancy_config: Arc<TenancyConfig>,
-    polling_ingest_service: Arc<dyn PollingIngestService>,
-    update_steps: Arc<dyn DatasetUpdateSteps>,
     catalog: dill::Catalog,
 }
 
@@ -71,13 +70,11 @@ impl PullDatasetUseCaseImpl {
                         let maybe_listener = maybe_ingest_multi_listener
                             .as_ref()
                             .and_then(|l| l.begin_ingest(&pii.target));
-                        tasks.spawn(
-                            PullIngestLoop::new(
-                                self.update_steps.clone(),
-                                self.polling_ingest_service.clone(),
-                            )
-                            .run(pii, options.clone(), maybe_listener),
-                        )
+                        tasks.spawn(PullIngestLoop::new(self.polling_ingest_job.clone()).run(
+                            pii,
+                            options.clone(),
+                            maybe_listener,
+                        ))
                     }
                     PullPlanIterationJob::Transform(pti) => {
                         let maybe_listener = maybe_transform_multi_listener
@@ -86,11 +83,8 @@ impl PullDatasetUseCaseImpl {
 
                         tasks.spawn(
                             PullTransformJob::new(
-                                self.update_steps.clone(),
-                                self.transform_executor.clone(),
-                                self.compaction_planner.clone(),
-                                self.compaction_executor.clone(),
-                                self.catalog.clone(),
+                                self.transform_job.clone(),
+                                self.compaction_job.clone(),
                             )
                             .run(
                                 pti,
@@ -107,7 +101,7 @@ impl PullDatasetUseCaseImpl {
                             )
                         });
                         tasks.spawn(
-                            PullSyncJob::new(self.update_steps.clone(), self.catalog.clone()).run(
+                            PullSyncJob::new(self.sync_from_job.clone(), self.catalog.clone()).run(
                                 psi,
                                 options.clone(),
                                 maybe_listener,

@@ -24,7 +24,7 @@ async fn test_reset_success() {
     let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
     let (_, dataset_id_foo) = odf::DatasetID::new_generated_ed25519();
 
-    let harness = ResetUseCaseHarness::new(
+    let harness = ResetJobHarness::new(
         MockDatasetPermissionChecker::new().expect_authorize_for(
             DatasetPermission::Maintain,
             &dataset_id_foo,
@@ -51,8 +51,8 @@ async fn test_reset_success() {
     );
 
     let reset_result = harness
-        .use_case
-        .execute(&foo.dataset_handle, Some(&foo.head), None)
+        .job
+        .run(&foo.dataset_handle, Some(&foo.head), None)
         .await
         .unwrap();
 
@@ -72,7 +72,7 @@ async fn test_try_reset_not_found_dataset() {
     let not_found_dataset_handle =
         odf::metadata::testing::handle(&"user", &"not-found-dataset", odf::DatasetKind::Root);
 
-    let harness = ResetUseCaseHarness::new(
+    let harness = ResetJobHarness::new(
         MockDatasetPermissionChecker::new().expect_authorize_for_not_found(
             DatasetPermission::Maintain,
             &not_found_dataset_handle.id,
@@ -83,8 +83,8 @@ async fn test_try_reset_not_found_dataset() {
 
     assert_matches!(
         harness
-            .use_case
-            .execute(&not_found_dataset_handle, None, None)
+            .job
+            .run(&not_found_dataset_handle, None, None)
             .await,
         Err(ResetError::NotFound(e))
             if e.dataset_ref == not_found_dataset_handle.as_local_ref()
@@ -98,7 +98,7 @@ async fn test_reset_dataset_unauthorized() {
     let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
     let (_, dataset_id_foo) = odf::DatasetID::new_generated_ed25519();
 
-    let harness = ResetUseCaseHarness::new(
+    let harness = ResetJobHarness::new(
         MockDatasetPermissionChecker::new().expect_denied_but_readable(
             DatasetPermission::Maintain,
             &dataset_id_foo,
@@ -111,8 +111,8 @@ async fn test_reset_dataset_unauthorized() {
 
     assert_matches!(
         harness
-            .use_case
-            .execute(&foo.dataset_handle, Some(&foo.head), None)
+            .job
+            .run(&foo.dataset_handle, Some(&foo.head), None)
             .await,
         Err(ResetError::Access(_))
     );
@@ -121,12 +121,12 @@ async fn test_reset_dataset_unauthorized() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[oop::extend(BaseUseCaseHarness, base_use_case_harness)]
-struct ResetUseCaseHarness {
+struct ResetJobHarness {
     base_use_case_harness: BaseUseCaseHarness,
-    use_case: Arc<dyn ResetDatasetUseCase>,
+    job: Arc<dyn ResetJob>,
 }
 
-impl ResetUseCaseHarness {
+impl ResetJobHarness {
     fn new(
         mock_dataset_permission_checker: MockDatasetPermissionChecker,
         mock_did_generator: MockDidGenerator,
@@ -137,18 +137,19 @@ impl ResetUseCaseHarness {
                 .with_maybe_mock_did_generator(Some(mock_did_generator)),
         );
 
-        let catalog = dill::CatalogBuilder::new_chained(base_use_case_harness.catalog())
-            .add::<ResetDatasetUseCaseImpl>()
+        let mut b = dill::CatalogBuilder::new_chained(base_use_case_harness.catalog());
+        b.add::<ResetJobImpl>()
             .add::<ResetPlannerImpl>()
             .add::<ResetExecutorImpl>()
-            .add::<DatasetReferenceUpdaterImpl>()
-            .build();
+            .add::<DatasetReferenceUpdaterImpl>();
+        database_common::NoOpDatabasePlugin::init_database_components(&mut b);
+        let catalog = b.build();
 
-        let use_case = catalog.get_one::<dyn ResetDatasetUseCase>().unwrap();
+        let job = catalog.get_one::<dyn ResetJob>().unwrap();
 
         Self {
             base_use_case_harness,
-            use_case,
+            job,
         }
     }
 }

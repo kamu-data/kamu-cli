@@ -12,7 +12,7 @@ use std::sync::Arc;
 
 use bon::bon;
 use chrono::{DateTime, Utc};
-use kamu_accounts::CurrentAccountSubject;
+use kamu_accounts::{CurrentAccountSubject, Principal};
 use kamu_core::{
     DidGenerator,
     DidGeneratorDefault,
@@ -49,6 +49,9 @@ impl BaseRepoHarness {
         tenancy_config: TenancyConfig,
         mock_did_generator: Option<MockDidGenerator>,
         current_account_subject: Option<CurrentAccountSubject>,
+        /// Acting principal instead of the subject's own, e.g. `Principal::Node`
+        /// for work that runs as the node
+        principal: Option<Principal>,
         system_time_source_stub: Option<SystemTimeSourceStub>,
     ) -> Self {
         let temp_dir = tempfile::tempdir().unwrap();
@@ -68,10 +71,12 @@ impl BaseRepoHarness {
                 .add::<odf::dataset::DatasetLfsBuilderDefault>()
                 .add::<DatasetRegistrySoloUnitBridge>();
 
-            if let Some(current_account_subject) = current_account_subject {
-                current_account_subject.register(&mut b);
+            let current_account_subject =
+                current_account_subject.unwrap_or_else(CurrentAccountSubject::new_test);
+            if let Some(principal) = principal {
+                b.add_value(current_account_subject).add_value(principal);
             } else {
-                CurrentAccountSubject::new_test().register(&mut b);
+                current_account_subject.register(&mut b);
             }
 
             if let Some(mock_did_generator) = mock_did_generator {

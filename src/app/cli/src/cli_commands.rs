@@ -601,12 +601,11 @@ pub fn command_needs_transaction(args: &cli::Cli) -> bool {
                     Some(cli::SystemApiServerSubCommand::GqlQuery(_))
                 )
             }
-            // Opens short transactions of its own around the merge
-            cli::SystemSubCommand::Compact(_) => false,
+            // Run dataset jobs, which open short transactions of their own
+            cli::SystemSubCommand::Compact(_) | cli::SystemSubCommand::Diagnose(_) => false,
             cli::SystemSubCommand::DebugToken(_)
             | cli::SystemSubCommand::Depgraph(_)
             | cli::SystemSubCommand::Decode(_)
-            | cli::SystemSubCommand::Diagnose(_)
             | cli::SystemSubCommand::E2e(_)
             | cli::SystemSubCommand::GenerateToken(_)
             | cli::SystemSubCommand::Gc(_)
@@ -619,6 +618,8 @@ pub fn command_needs_transaction(args: &cli::Cli) -> bool {
         cli::Command::Context(c) => {
             matches!(&c.subcommand, Some(cli::ContextSubCommand::ApiResources(_)))
         }
+        // Run dataset jobs, which open short transactions of their own
+        cli::Command::Reset(_) | cli::Command::Verify(_) => false,
         cli::Command::Apply(_)
         | cli::Command::Ui(_)
         | cli::Command::Login(_)
@@ -639,13 +640,11 @@ pub fn command_needs_transaction(args: &cli::Cli) -> bool {
         | cli::Command::New(_)
         | cli::Command::Notebook(_)
         | cli::Command::Rename(_)
-        | cli::Command::Reset(_)
         | cli::Command::Repo(_)
         | cli::Command::Search(_)
         | cli::Command::Sql(_)
         | cli::Command::Summary(_)
         | cli::Command::Tail(_)
-        | cli::Command::Verify(_)
         | cli::Command::Version(_) => true,
     }
 }

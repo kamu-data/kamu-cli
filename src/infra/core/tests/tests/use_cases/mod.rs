@@ -7,10 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-mod test_compact_dataset_use_case;
 mod test_pull_dataset_use_case;
 mod test_push_dataset_use_case;
 mod test_push_ingest_data_use_case;
-mod test_reset_dataset_use_case;
 mod test_set_watermark_use_case;
-mod test_verify_dataset_use_case;

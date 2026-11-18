@@ -531,16 +531,21 @@ pub fn configure_base_catalog(
     b.add::<kamu::utils::local_sync_writes::PulledSeedStore>();
     b.add::<kamu_adapter_http::SmartTransferProtocolClientWs>();
 
-    b.add::<CompactDatasetUseCaseImpl>();
+    b.add::<CompactionJobImpl>();
+    b.add::<ResetJobImpl>();
+    b.add::<VerifyJobImpl>();
+    b.add::<PollingIngestJobImpl>();
+    b.add::<TransformJobImpl>();
+    b.add::<SyncFromJobImpl>();
+    b.add::<SyncToJobImpl>();
+    b.add::<LocalSyncCommitterImpl>();
+
     b.add::<GetDatasetSchemaUseCaseImpl>();
     b.add::<PushIngestDataUseCaseImpl>();
     b.add::<PullDatasetUseCaseImpl>();
-    b.add::<DatasetUpdateStepsImpl>();
     b.add::<PushDatasetUseCaseImpl>();
     b.add::<QueryDatasetDataUseCaseImpl>();
-    b.add::<ResetDatasetUseCaseImpl>();
     b.add::<SetWatermarkUseCaseImpl>();
-    b.add::<VerifyDatasetUseCaseImpl>();
 
     // No GitHub login possible for single-tenant workspace
     if tenancy_config == TenancyConfig::MultiTenant {

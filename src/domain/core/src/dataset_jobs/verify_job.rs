@@ -9,28 +9,22 @@
 
 use std::sync::Arc;
 
-use crate::{
-    VerificationListener,
-    VerificationMultiListener,
-    VerificationRequest,
-    VerificationResult,
-};
+use crate::{VerificationListener, VerificationRequest, VerificationResult};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Verifies one dataset. In a short transaction it authorizes reading the
+/// dataset and the inputs a replay reads, and plans; it then checks integrity
+/// and replays transforms with no transaction open. `kamu verify`,
+/// `kamu system diagnose` and the verification before `kamu system compact`
+/// run it
 #[async_trait::async_trait]
-pub trait VerifyDatasetUseCase: Send + Sync {
-    async fn execute(
+pub trait VerifyJob: Send + Sync {
+    async fn run(
         &self,
         request: VerificationRequest<odf::DatasetHandle>,
         maybe_listener: Option<Arc<dyn VerificationListener>>,
     ) -> VerificationResult;
-
-    async fn execute_multi(
-        &self,
-        requests: Vec<VerificationRequest<odf::DatasetHandle>>,
-        maybe_multi_listener: Option<Arc<dyn VerificationMultiListener>>,
-    ) -> Vec<VerificationResult>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

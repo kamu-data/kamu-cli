@@ -10,11 +10,14 @@
 use std::sync::Arc;
 
 use internal_error::InternalError;
-use kamu_core::{CompactionExecutor, CompactionPlan, CompactionResult, DatasetUpdateSteps};
-use kamu_datasets::ResolvedDataset;
+use kamu_core::{CompactionError, CompactionJob, CompactionOptions, CompactionResult};
 use kamu_task_system::*;
 
-use super::task_reference_update::ReferenceUpdateTaskOutcome as _;
+use super::task_reference_update::{
+    dataset_deleted_outcome,
+    ref_moved_outcome,
+    ref_update_not_allowed_outcome,
+};
 use super::task_span_outcome::TaskSpanOutcome;
 use crate::{
     TaskDefinitionDatasetHardCompact,
@@ -26,7 +29,7 @@ use crate::{
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// Runs hard compaction and reset-to-metadata tasks, which differ only in
-/// their plan and in the result type they report.
+/// their options and in the result type they report.
 #[dill::component(pub)]
 #[dill::interface(dyn TaskRunner)]
 #[dill::meta(TaskRunnerMeta {
@@ -36,70 +39,53 @@ use crate::{
     task_type: TaskDefinitionDatasetResetToMetadata::TASK_TYPE,
 })]
 pub struct CompactionDatasetTaskRunner {
-    compaction_executor: Arc<dyn CompactionExecutor>,
-    update_steps: Arc<dyn DatasetUpdateSteps>,
+    compaction_job: Arc<dyn CompactionJob>,
 }
 
 #[common_macros::method_names_consts]
 impl CompactionDatasetTaskRunner {
-    #[tracing::instrument(name = CompactionDatasetTaskRunner_run_compaction, level = "info", skip_all, fields(target = %target.get_handle(), outcome))]
+    #[tracing::instrument(name = CompactionDatasetTaskRunner_run_compaction, level = "info", skip_all, fields(%target, outcome))]
     async fn run_compaction(
         &self,
-        target: ResolvedDataset,
-        plan: CompactionPlan,
+        target: odf::DatasetHandle,
+        options: CompactionOptions,
         into_task_result: fn(CompactionResult) -> TaskResult,
     ) -> Result<TaskOutcome, InternalError> {
-        let outcome = self
-            .run_compaction_job(target, plan, into_task_result)
-            .await;
+        let outcome = match self.compaction_job.run(&target, options, None).await {
+            Ok(result) => Ok(TaskOutcome::Success(into_task_result(result))),
+            Err(e) => Self::failed_outcome(&target, e),
+        };
         TaskSpanOutcome::record(&outcome);
         outcome
     }
 
-    async fn run_compaction_job(
-        &self,
-        target: ResolvedDataset,
-        plan: CompactionPlan,
-        into_task_result: fn(CompactionResult) -> TaskResult,
+    fn failed_outcome(
+        target: &odf::DatasetHandle,
+        error: CompactionError,
     ) -> Result<TaskOutcome, InternalError> {
-        tracing::debug!(dataset_handle = %target.get_handle(), ?plan, "Running compaction task");
-
-        // Run compaction execution without transaction
-        let compaction_result = match self
-            .compaction_executor
-            .execute(target.clone(), plan, None)
-            .await
-        {
-            Ok(compaction_result) => compaction_result,
-            Err(err) => {
-                tracing::error!(
-                    error = ?err,
-                    error_msg = %err,
-                    "Compaction failed",
-                );
-
-                return Ok(TaskOutcome::Failed(TaskError::empty_recoverable()));
+        match error {
+            CompactionError::NotFound(_) => Ok(dataset_deleted_outcome(target)),
+            CompactionError::RefCASFailed(e) => Ok(ref_moved_outcome(
+                target.id.clone(),
+                e.reference.clone(),
+                Some(e),
+            )),
+            CompactionError::Access(e) => Ok(ref_update_not_allowed_outcome(&e)),
+            CompactionError::Planning(e) => {
+                let recoverable = e.is_recoverable();
+                if recoverable {
+                    tracing::error!(error = ?e, error_msg = %e, "Compaction planning failed");
+                } else {
+                    tracing::warn!(error = ?e, error_msg = %e, "Compaction planning failed");
+                }
+                Ok(TaskOutcome::Failed(TaskError::empty(recoverable)))
             }
-        };
-
-        if let CompactionResult::Success {
-            old_head, new_head, ..
-        } = &compaction_result
-            && let Some(failed) = self
-                .update_steps
-                .update_reference(
-                    target.get_handle(),
-                    &odf::BlockRef::Head,
-                    old_head,
-                    new_head,
-                )
-                .await?
-                .into_failed_task_outcome(target.get_handle())
-        {
-            return Ok(failed);
+            CompactionError::Execution(e) => {
+                tracing::error!(error = ?e, error_msg = %e, "Compaction failed");
+                Ok(TaskOutcome::Failed(TaskError::empty_recoverable()))
+            }
+            CompactionError::Internal(e) => Err(e),
         }
-
-        Ok(TaskOutcome::Success(into_task_result(compaction_result)))
     }
 }
 
@@ -117,7 +103,7 @@ impl TaskRunner for CompactionDatasetTaskRunner {
                     .downcast::<TaskDefinitionDatasetHardCompact>()
                     .expect("Mismatched task type for CompactionDatasetTaskRunner");
 
-                self.run_compaction(task_compact.target, task_compact.compaction_plan, |r| {
+                self.run_compaction(task_compact.target, task_compact.options, |r| {
                     TaskResultDatasetHardCompact {
                         compaction_result: r,
                     }
@@ -132,7 +118,11 @@ impl TaskRunner for CompactionDatasetTaskRunner {
 
                 self.run_compaction(
                     task_reset.target,
-                    task_reset.compaction_metadata_only_plan,
+                    CompactionOptions {
+                        max_slice_size: None,
+                        max_slice_records: None,
+                        keep_metadata_only: true,
+                    },
                     |r| {
                         TaskResultDatasetResetToMetadata {
                             compaction_metadata_only_result: r,

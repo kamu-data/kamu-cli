@@ -7,18 +7,21 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::collections::HashSet;
 use std::sync::Arc;
 
-use kamu::ResetExecutorImpl;
 use kamu::testing::{BaseUseCaseHarness, BaseUseCaseHarnessOptions};
+use kamu::{ResetExecutorImpl, ResetJobImpl, ResetPlannerImpl};
+use kamu_accounts::Principal;
 use kamu_adapter_task_dataset::{
     DatasetRefMovedError,
+    DatasetResetOldHeadMismatch,
     ResetDatasetTaskRunner,
     TaskDefinitionDatasetReset,
     TaskErrorDatasetCommit,
+    TaskErrorDatasetReset,
 };
-use kamu_core::ResetPlan;
-use kamu_datasets::{CreateDatasetResult, DatasetReferenceUpdater};
+use kamu_datasets::{CreateDatasetResult, DatasetReferenceUpdater, MockDatasetPermissionChecker};
 use kamu_datasets_services::testing::RacingDatasetReferenceUpdater;
 use kamu_task_system::{TaskDefinition, TaskError, TaskOutcome, TaskRunner};
 use pretty_assertions::assert_eq;
@@ -31,14 +34,10 @@ async fn test_reset_ref_moved_after_planning_fails_recoverably() {
 
     let harness = ResetDatasetTaskRunnerHarness::new();
     let foo = harness.create_root_dataset(&alias_foo).await;
-    let reset_plan = ResetPlan {
-        old_head: Some(foo.head.clone()),
-        new_head: foo.head.clone(),
-    };
     let concurrent_head = harness.append_unreferenced_block(&foo, "concurrent").await;
-    harness.move_head(&foo, &foo.head, &concurrent_head).await;
+    harness.move_head_before_next_update(concurrent_head.clone());
 
-    let outcome = harness.run_reset(&foo, reset_plan).await;
+    let outcome = harness.run_reset(&foo, Some(foo.head.clone())).await;
 
     assert_eq!(
         TaskOutcome::Failed(
@@ -58,19 +57,41 @@ async fn test_reset_ref_moved_after_planning_fails_recoverably() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[tokio::test]
+async fn test_reset_with_mismatching_old_head_fails_unrecoverably() {
+    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+
+    let harness = ResetDatasetTaskRunnerHarness::new();
+    let foo = harness.create_root_dataset(&alias_foo).await;
+    let not_the_head = odf::Multihash::from_digest_sha3_256(b"not-the-head");
+
+    let outcome = harness.run_reset(&foo, Some(not_the_head.clone())).await;
+
+    let TaskOutcome::Failed(task_error) = outcome else {
+        panic!("Expected a failed reset, got {outcome:?}");
+    };
+    assert_eq!(
+        TaskErrorDatasetReset::OldHeadMismatch(DatasetResetOldHeadMismatch {
+            expected_head: not_the_head,
+            actual_head: foo.head.clone(),
+        })
+        .into_task_error(),
+        task_error
+    );
+    assert!(!task_error.recoverable);
+    assert_eq!(harness.get_head(&foo).await, foo.head);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[tokio::test]
 async fn test_reset_not_allowed_fails_unrecoverably() {
     let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
 
     let harness = ResetDatasetTaskRunnerHarness::new();
     let foo = harness.create_root_dataset(&alias_foo).await;
-    let reset_head = harness.append_unreferenced_block(&foo, "reset to").await;
-    let reset_plan = ResetPlan {
-        old_head: Some(foo.head.clone()),
-        new_head: reset_head,
-    };
     harness.deny_next_update();
 
-    let outcome = harness.run_reset(&foo, reset_plan).await;
+    let outcome = harness.run_reset(&foo, Some(foo.head.clone())).await;
 
     assert_eq!(
         TaskOutcome::Failed(TaskError::empty_unrecoverable()),
@@ -84,16 +105,26 @@ async fn test_reset_not_allowed_fails_unrecoverably() {
 #[oop::extend(BaseUseCaseHarness, base_use_case_harness)]
 struct ResetDatasetTaskRunnerHarness {
     base_use_case_harness: BaseUseCaseHarness,
+    catalog: dill::Catalog,
     runner: Arc<dyn TaskRunner>,
     racing_reference_updater: Arc<RacingDatasetReferenceUpdater>,
 }
 
 impl ResetDatasetTaskRunnerHarness {
+    /// Tasks run as the node, which may run every operation
     fn new() -> Self {
-        let base_use_case_harness = BaseUseCaseHarness::new(BaseUseCaseHarnessOptions::new());
+        let base_use_case_harness = BaseUseCaseHarness::new(
+            BaseUseCaseHarnessOptions::new()
+                .with_maybe_permission_checker(Some(MockDatasetPermissionChecker::denying_ids(
+                    HashSet::new(),
+                )))
+                .with_principal(Principal::Node),
+        );
 
         let mut b = dill::CatalogBuilder::new_chained(base_use_case_harness.catalog());
         b.add::<ResetDatasetTaskRunner>()
+            .add::<ResetJobImpl>()
+            .add::<ResetPlannerImpl>()
             .add::<ResetExecutorImpl>()
             .add_value(RacingDatasetReferenceUpdater::default())
             .bind::<dyn DatasetReferenceUpdater, RacingDatasetReferenceUpdater>();
@@ -106,6 +137,7 @@ impl ResetDatasetTaskRunnerHarness {
             base_use_case_harness,
             runner: catalog.get_one::<ResetDatasetTaskRunner>().unwrap(),
             racing_reference_updater: catalog.get_one().unwrap(),
+            catalog,
         }
     }
 
@@ -113,11 +145,24 @@ impl ResetDatasetTaskRunnerHarness {
         self.racing_reference_updater.deny_next_update();
     }
 
-    async fn run_reset(&self, created: &CreateDatasetResult, reset_plan: ResetPlan) -> TaskOutcome {
+    /// Another writer moves `HEAD` to `concurrent_head` after the reset was
+    /// planned
+    fn move_head_before_next_update(&self, concurrent_head: odf::Multihash) {
+        self.racing_reference_updater
+            .move_reference_before_next_update(&self.catalog, concurrent_head);
+    }
+
+    /// Resets `created` to its `Seed`, expecting `HEAD` at `old_head_hash`
+    async fn run_reset(
+        &self,
+        created: &CreateDatasetResult,
+        old_head_hash: Option<odf::Multihash>,
+    ) -> TaskOutcome {
         self.runner
             .run_task(TaskDefinition::new(TaskDefinitionDatasetReset {
                 dataset_handle: created.dataset_handle.clone(),
-                reset_plan,
+                new_head_hash: None,
+                old_head_hash,
             }))
             .await
             .unwrap()
