@@ -200,3 +200,4 @@ Do not re-propose these without new evidence.
 - Repository trait test suites and storage harnesses: `kamu-repository-tests`.
 - Cross-context references (no foreign keys) and repository naming: `kamu-domain-design`.
 - `LISTEN`/`NOTIFY` triggers in migrations: [`docs/internal/wakeup-listeners.md`](../../../docs/internal/wakeup-listeners.md).
+- Opening and ending transactions, where they belong in an algorithm, the managers: [`docs/internal/database-transactions.md`](../../../docs/internal/database-transactions.md).

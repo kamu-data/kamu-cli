@@ -11,7 +11,7 @@ use std::sync::Arc;
 
 use internal_error::{InternalError, ResultIntoInternal};
 
-use crate::TransactionRef;
+use crate::{TransactionRef, TransactionScope};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -54,55 +54,15 @@ impl DatabaseTransactionRunner {
     {
         use tracing::Instrument;
 
-        // Extract transaction manager, specific for the database
-        let db_transaction_manager = self
-            .catalog
-            .get_one::<dyn DatabaseTransactionManager>()
-            .unwrap();
+        let transaction = TransactionScope::begin(&self.catalog, true).await?;
 
-        // Start transaction
-        let transaction_ref = db_transaction_manager.make_transaction_ref().await?;
+        let result = callback(transaction.catalog().clone())
+            .instrument(tracing::trace_span!(
+                "DatabaseTransactionRunner::transactional::callback"
+            ))
+            .await;
 
-        // A catalog with a transaction must live for a limited time
-        let result = {
-            // Create a chained catalog for transaction-aware components,
-            // but keep a local copy of a transaction pointer
-            let mut b = self.catalog.builder_chained();
-            transaction_ref.register(&mut b);
-
-            let catalog_with_transaction = b.build();
-
-            callback(catalog_with_transaction)
-                .instrument(tracing::trace_span!(
-                    "DatabaseTransactionRunner::transactional::callback"
-                ))
-                .await
-        };
-
-        // Commit or rollback transaction depending on the result
-        match result {
-            // In case everything succeeded, commit the transaction
-            Ok(res) => {
-                tracing::debug!("Transaction COMMIT");
-
-                db_transaction_manager
-                    .commit_transaction(transaction_ref)
-                    .await?;
-
-                Ok(res)
-            }
-
-            // Otherwise, do an explicit rollback
-            Err(e) => {
-                tracing::warn!("Transaction ROLLBACK");
-
-                db_transaction_manager
-                    .rollback_transaction(transaction_ref)
-                    .await?;
-
-                Err(e)
-            }
-        }
+        transaction.finish(result).await
     }
 
     pub async fn maybe_transactional<H, HFut, HFutResultT, HFutResultE>(
