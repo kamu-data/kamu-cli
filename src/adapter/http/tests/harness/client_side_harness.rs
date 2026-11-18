@@ -220,7 +220,6 @@ impl ClientSideHarness {
         b.add::<PollingIngestJobImpl>();
         b.add::<TransformJobImpl>();
         b.add::<SyncFromJobImpl>();
-        b.add::<LocalSyncCommitterImpl>();
         b.add::<PushDatasetUseCaseImpl>();
         b.add::<SyncToJobImpl>();
 

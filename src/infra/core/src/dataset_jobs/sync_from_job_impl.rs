@@ -10,12 +10,11 @@
 use std::sync::Arc;
 
 use database_common::transaction;
-use dill::{Lazy, component, interface};
-use internal_error::ResultIntoInternal;
+use dill::{component, interface};
 use kamu_accounts::Principal;
 use kamu_core::{
-    LocalSyncCommitter,
     PullLocalTarget,
+    SyncError,
     SyncFromJob,
     SyncFromJobError,
     SyncFromRequest,
@@ -28,12 +27,16 @@ use kamu_core::{
     SyncService,
 };
 use kamu_datasets::{
+    CreateDatasetUseCase,
+    CreateDatasetUseCaseOptions,
     DatasetOperation,
     DatasetOperationGuard,
     DatasetOperationRequest,
+    DatasetReferenceUpdater,
     DatasetRegistry,
 };
 
+use super::job_target::resolve_job_target;
 use crate::utils::span_outcome::SpanOutcome;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -42,9 +45,7 @@ use crate::utils::span_outcome::SpanOutcome;
 #[interface(dyn SyncFromJob)]
 pub struct SyncFromJobImpl {
     catalog: dill::Catalog,
-    // Resolved only when a sync runs, so catalogs that never sync need no sync
-    // service
-    sync_service: Lazy<Arc<dyn SyncService>>,
+    sync_service: Arc<dyn SyncService>,
     principal: Arc<Principal>,
 }
 
@@ -82,8 +83,8 @@ impl SyncFromJobImpl {
             });
 
         // 2: Transfer blocks and data, with no transaction open
-        let sync_service = self.sync_service.get().int_err()?;
-        let transferred = match sync_service
+        let transferred = match self
+            .sync_service
             .sync_from(
                 SyncFromRequest {
                     src: src.clone(),
@@ -102,29 +103,86 @@ impl SyncFromJobImpl {
         self.commit(transferred).await
     }
 
-    /// Moves `HEAD` of an existing dataset, or creates a new one
+    /// Moves `HEAD` of an existing dataset, or creates a new one, each in a
+    /// transaction of its own
     async fn commit(
         &self,
         transferred: SyncFromTransferred,
     ) -> Result<SyncResult, SyncFromJobError> {
-        let maybe_existing_ref = match &transferred.target {
-            SyncFromTransferredTarget::Existing { dataset, .. } => {
-                Some(dataset.get_handle().as_local_ref())
+        let SyncFromTransferred {
+            target,
+            new_head,
+            num_blocks,
+            increment,
+        } = transferred;
+
+        let old_head = match target {
+            SyncFromTransferredTarget::Existing {
+                dataset,
+                expected_head,
+            } => {
+                self.commit_into_existing(dataset.get_handle(), expected_head.as_ref(), &new_head)
+                    .await?;
+                expected_head
             }
-            SyncFromTransferredTarget::New { .. } => None,
+            SyncFromTransferredTarget::New {
+                alias,
+                seed_block,
+                seed_block_bytes,
+                visibility,
+            } => {
+                let options = CreateDatasetUseCaseOptions {
+                    dataset_visibility: visibility,
+                    seed_block_bytes: Some(seed_block_bytes),
+                    initial_head: Some(new_head.clone()),
+                };
+                self.commit_into_new(&alias, seed_block, options).await?;
+                None
+            }
         };
 
-        let committed = transaction!(|committer: Arc<dyn LocalSyncCommitter>| {
-            committer.commit(transferred).await?
-        });
+        Ok(SyncResult::Updated {
+            old_head,
+            new_head,
+            num_blocks,
+            increment,
+        })
+    }
 
-        match (committed, maybe_existing_ref) {
-            (Some(sync_result), _) => Ok(sync_result),
-            (None, Some(existing_ref)) => Err(SyncFromJobError::TargetDeleted(
-                odf::DatasetNotFoundError::new(existing_ref),
-            )),
-            (None, None) => unreachable!("Only an existing target can be deleted"),
-        }
+    /// Moves `HEAD` from the head the transfer started from. The transfer
+    /// ran detached, so the dataset is re-resolved here
+    async fn commit_into_existing(
+        &self,
+        target: &odf::DatasetHandle,
+        expected_head: Option<&odf::Multihash>,
+        new_head: &odf::Multihash,
+    ) -> Result<(), SyncFromJobError> {
+        transaction!(|dataset_registry: Arc<dyn DatasetRegistry>,
+                      updater: Arc<dyn DatasetReferenceUpdater>| {
+            let dataset =
+                resolve_job_target::<SyncFromJobError>(dataset_registry.as_ref(), target).await?;
+            updater
+                .update_reference(&dataset, &odf::BlockRef::Head, expected_head, new_head)
+                .await
+                .map_err(SyncError::from)?;
+        });
+        Ok(())
+    }
+
+    /// Creates the dataset with `HEAD` already at the transferred head
+    async fn commit_into_new(
+        &self,
+        alias: &odf::DatasetAlias,
+        seed_block: odf::MetadataBlockTyped<odf::metadata::Seed>,
+        options: CreateDatasetUseCaseOptions,
+    ) -> Result<(), SyncFromJobError> {
+        transaction!(|create_dataset_use_case: Arc<dyn CreateDatasetUseCase>| {
+            create_dataset_use_case
+                .execute(alias, seed_block, options)
+                .await
+                .map_err(SyncError::from)?;
+        });
+        Ok(())
     }
 
     fn span_outcome(result: &Result<SyncResult, SyncFromJobError>) -> SpanOutcome {

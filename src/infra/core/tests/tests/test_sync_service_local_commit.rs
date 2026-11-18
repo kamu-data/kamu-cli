@@ -64,12 +64,12 @@ async fn test_transfer_into_existing_dataset_moves_no_head() {
     let new_head = harness.append_source_data().await;
     harness.push_source().await;
 
-    let transferred = harness.transfer().await;
+    let _abandoned = harness.transfer().await;
     assert_eq!(harness.destination_head().await, Some(old_head.clone()));
 
     assert_eq!(
-        harness.commit(transferred).await.unwrap(),
-        Some(SyncResult::Updated {
+        harness.pull(SyncOptions::default(), None).await.unwrap(),
+        SyncResult::Updated {
             old_head: Some(old_head),
             new_head: new_head.clone(),
             num_blocks: 1,
@@ -78,7 +78,7 @@ async fn test_transfer_into_existing_dataset_moves_no_head() {
                 num_records: 10,
                 updated_watermark: None,
             },
-        })
+        }
     );
     assert_eq!(harness.destination_head().await, Some(new_head));
 }
@@ -233,8 +233,8 @@ async fn test_first_pull_creates_dataset_with_requested_visibility() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[test_log::test(tokio::test)]
-async fn test_commit_into_dataset_deleted_during_transfer_finds_no_target() {
+#[test_log::test(tokio::test(flavor = "multi_thread"))]
+async fn test_pull_into_dataset_deleted_during_transfer_finds_no_target() {
     let harness = LocalPullHarness::local_fs();
 
     harness.create_source_dataset().await;
@@ -243,10 +243,16 @@ async fn test_commit_into_dataset_deleted_during_transfer_finds_no_target() {
     harness.append_source_data().await;
     harness.push_source().await;
 
-    let transferred = harness.transfer().await;
-    harness.delete_destination().await;
+    let listener = Arc::new(DestinationDeletingListener {
+        catalog: harness.destination_catalog.clone(),
+        dataset_alias: harness.dataset_alias.clone(),
+        deleted: Mutex::new(false),
+    });
 
-    assert_matches!(harness.commit(transferred).await, Ok(None));
+    assert_matches!(
+        harness.run_pull_job(Some(listener)).await,
+        Err(SyncFromJobError::TargetDeleted(_))
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -360,10 +366,9 @@ async fn test_first_pull_into_alias_taken_before_commit_fails_unrecoverably() {
 
     harness.create_source_dataset().await;
     harness.push_source().await;
-    let transferred = harness.transfer().await;
 
     assert_matches!(
-        harness.commit(transferred).await,
+        harness.pull(SyncOptions::default(), None).await,
         Err(e @ SyncError::CreateDatasetFailed(CreateDatasetError::NameCollision(_)))
             if !e.is_recoverable()
     );
@@ -372,20 +377,21 @@ async fn test_first_pull_into_alias_taken_before_commit_fails_unrecoverably() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[test_log::test(tokio::test)]
+#[test_log::test(tokio::test(flavor = "multi_thread"))]
 async fn test_concurrent_first_pulls_create_dataset_once() {
-    let harness = LocalPullHarness::local_fs();
+    let harness = Arc::new(LocalPullHarness::local_fs());
 
     harness.create_source_dataset().await;
     let source_head = harness.append_source_data().await;
     harness.push_source().await;
 
-    let first = harness.transfer().await;
-    let second = harness.transfer().await;
-    harness.commit(first).await.unwrap();
+    let listener = Arc::new(ConcurrentPullListener {
+        harness: harness.clone(),
+        pulled: Mutex::new(false),
+    });
 
     assert_matches!(
-        harness.commit(second).await,
+        harness.pull(SyncOptions::default(), Some(listener)).await,
         Err(e @ SyncError::CreateDatasetFailed(CreateDatasetError::RefCollision(_)))
             if e.is_recoverable()
     );
@@ -541,10 +547,9 @@ impl LocalPullHarness {
         let _abandoned = self.transfer().await;
         assert_eq!(self.destination_head().await, None);
 
-        let transferred = self.transfer().await;
         assert_matches!(
-            self.commit(transferred).await,
-            Ok(Some(SyncResult::Updated { old_head: None, new_head, .. })) if new_head == source_head
+            self.pull(SyncOptions::default(), None).await,
+            Ok(SyncResult::Updated { old_head: None, new_head, .. }) if new_head == source_head
         );
         assert_eq!(self.destination_head().await, Some(source_head));
     }
@@ -561,7 +566,9 @@ impl LocalPullHarness {
         self.remove_repository_objects();
 
         let listener = Arc::new(StatsRecordingListener::default());
-        let transferred = self.transfer_with_listener(Some(listener.clone())).await;
+        let pulled = self
+            .pull(SyncOptions::default(), Some(listener.clone()))
+            .await;
 
         // Nothing copied is counted or estimated
         let stats = listener.last_stats();
@@ -582,8 +589,8 @@ impl LocalPullHarness {
             );
         }
         assert_matches!(
-            self.commit(transferred).await,
-            Ok(Some(SyncResult::Updated { new_head, .. })) if new_head == source_head
+            pulled,
+            Ok(SyncResult::Updated { new_head, .. }) if new_head == source_head
         );
     }
 
@@ -810,22 +817,44 @@ impl LocalPullHarness {
             .unwrap();
     }
 
+    /// Pulls into a destination that exists until the commit
     async fn pull(
         &self,
         options: SyncOptions,
         maybe_listener: Option<Arc<dyn SyncListener>>,
     ) -> Result<SyncResult, SyncError> {
-        let request = self.build_request(self.remote_ref()).await?;
         LocalSyncHelper::new(&self.destination_catalog)
-            .transfer_and_commit(request, options, maybe_listener)
+            .pull_with_listener(
+                self.remote_ref(),
+                self.dataset_alias.as_local_ref(),
+                options,
+                maybe_listener,
+            )
+            .await
+    }
+
+    async fn run_pull_job(
+        &self,
+        maybe_listener: Option<Arc<dyn SyncListener>>,
+    ) -> Result<SyncResult, SyncFromJobError> {
+        LocalSyncHelper::new(&self.destination_catalog)
+            .run_job(
+                self.remote_ref(),
+                self.dataset_alias.as_local_ref(),
+                SyncOptions::default(),
+                maybe_listener,
+            )
             .await
     }
 
     /// Pulls from `remote_ref` instead of the harness's own remote
     async fn pull_from(&self, remote_ref: odf::DatasetRefRemote) -> Result<SyncResult, SyncError> {
-        let request = self.build_request(remote_ref).await?;
         LocalSyncHelper::new(&self.destination_catalog)
-            .transfer_and_commit(request, SyncOptions::default(), None)
+            .pull(
+                remote_ref,
+                self.dataset_alias.as_local_ref(),
+                SyncOptions::default(),
+            )
             .await
     }
 
@@ -838,21 +867,15 @@ impl LocalPullHarness {
             .await
     }
 
+    /// Transfers without committing, as a pull interrupted before its commit
     async fn transfer(&self) -> SyncFromTransferred {
-        self.transfer_with_listener(None).await
-    }
-
-    async fn transfer_with_listener(
-        &self,
-        listener: Option<Arc<dyn SyncListener>>,
-    ) -> SyncFromTransferred {
         let request = self.build_request(self.remote_ref()).await.unwrap();
 
         let transfer = self
             .destination_catalog
             .get_one::<dyn SyncService>()
             .unwrap()
-            .sync_from(request, SyncOptions::default(), listener)
+            .sync_from(request, SyncOptions::default(), None)
             .await
             .unwrap();
         let SyncFromTransfer::Transferred(transferred) = transfer else {
@@ -903,27 +926,16 @@ impl LocalPullHarness {
             .await
     }
 
-    /// `None` when the destination was deleted before the commit
-    async fn commit(
-        &self,
-        transferred: SyncFromTransferred,
-    ) -> Result<Option<SyncResult>, SyncError> {
-        LocalSyncHelper::new(&self.destination_catalog)
-            .commit(transferred)
-            .await
-    }
-
-    async fn delete_destination(&self) {
-        let dataset_id = self
-            .destination_catalog
+    async fn delete_destination(catalog: &dill::Catalog, dataset_alias: &odf::DatasetAlias) {
+        let dataset_id = catalog
             .get_one::<dyn DatasetRegistry>()
             .unwrap()
-            .resolve_dataset_handle_by_ref(&self.dataset_alias.as_local_ref())
+            .resolve_dataset_handle_by_ref(&dataset_alias.as_local_ref())
             .await
             .unwrap()
             .id;
 
-        self.destination_catalog
+        catalog
             .get_one::<dyn odf::dataset::DatasetStorageUnitWriter>()
             .unwrap()
             .delete_dataset(&dataset_id)
@@ -1041,6 +1053,57 @@ impl SyncListener for DestinationHeadMovingListener {
             ))
         });
         *self.concurrent_head.lock().unwrap() = Some(concurrent_head);
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Deletes the destination the way another caller would, once the transfer
+/// has written its blocks and before the pull commits them
+struct DestinationDeletingListener {
+    catalog: dill::Catalog,
+    dataset_alias: odf::DatasetAlias,
+    deleted: Mutex<bool>,
+}
+
+impl SyncListener for DestinationDeletingListener {
+    fn on_status(&self, stage: SyncStage, _stats: &SyncStats) {
+        if stage != SyncStage::CommitBlocks
+            || std::mem::replace(&mut *self.deleted.lock().unwrap(), true)
+        {
+            return;
+        }
+
+        tokio::task::block_in_place(|| {
+            tokio::runtime::Handle::current().block_on(LocalPullHarness::delete_destination(
+                &self.catalog,
+                &self.dataset_alias,
+            ));
+        });
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Runs a whole second pull of the same source while the first one transfers
+struct ConcurrentPullListener {
+    harness: Arc<LocalPullHarness>,
+    pulled: Mutex<bool>,
+}
+
+impl SyncListener for ConcurrentPullListener {
+    fn on_status(&self, stage: SyncStage, _stats: &SyncStats) {
+        if stage != SyncStage::TransferData
+            || std::mem::replace(&mut *self.pulled.lock().unwrap(), true)
+        {
+            return;
+        }
+
+        tokio::task::block_in_place(|| {
+            tokio::runtime::Handle::current()
+                .block_on(self.harness.pull(SyncOptions::default(), None))
+                .unwrap();
+        });
     }
 }
 

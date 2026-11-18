@@ -538,7 +538,6 @@ pub fn configure_base_catalog(
     b.add::<TransformJobImpl>();
     b.add::<SyncFromJobImpl>();
     b.add::<SyncToJobImpl>();
-    b.add::<LocalSyncCommitterImpl>();
 
     b.add::<GetDatasetSchemaUseCaseImpl>();
     b.add::<PushIngestDataUseCaseImpl>();
