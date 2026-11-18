@@ -12,6 +12,23 @@ see. This skill owns the rest.
 
 ## Rules
 
+### Leave no dead or duplicate code
+
+Clippy sees unused private items only. Everything else is on whoever changes the code:
+
+- **Removing or replacing a caller removes what only it used:** functions and trait methods,
+  error variants nothing constructs any more, mock helpers, `#[automock]` attributes, `pub`
+  test-only helpers, config fields, and `Cargo.toml` dependencies. `git grep -w <name>` over the
+  whole repository is the check; `cargo udeps` misses a dependency that another dependency's API
+  also pulls in.
+- **Before writing a helper, a conversion or a test setup, search for an existing one** (a `From`
+  impl for the same source error, a harness method, a `testing` module helper) and use or extend
+  it. A second copy of the same mapping drifts from the first.
+- **Code a later stage needs is not dead:** check the plan before removing it, and say in its doc
+  comment what it is for.
+- Deduplication stops at a visible transaction block
+  ([database-transactions.md §3.2](../../../docs/internal/database-transactions.md#32-inside-a-level)).
+
 ### Imports and paths
 
 Import items with `use`; never spell out crate paths inline:
@@ -164,7 +181,8 @@ macro calls — macro bodies are hard to read, debug and test.
 - Order model files top-down: the highest-level result/union type first, then the structs and
   enums it references, each type's `impl` blocks immediately after the type.
 - When a function repeats a logical section, extract a named helper for it if it represents a
-  coherent concept.
+  coherent concept. A transaction block is not such a section: it stays where it runs
+  ([database-transactions.md §3.2](../../../docs/internal/database-transactions.md#32-inside-a-level)).
 - `mod.rs` holds no code: only submodule declarations, re-exports and an optional `//!` module
   doc. Types, functions and constants live in named files. The exception is a `macro_rules!`
   macro the module exports.

@@ -298,6 +298,18 @@ impl DatasetPermissionError {
             .into(),
         ))
     }
+
+    /// Maps each variant onto the same-named variant of an operation error.
+    pub fn into_error<E>(self) -> E
+    where
+        E: From<odf::DatasetNotFoundError> + From<odf::AccessError> + From<InternalError>,
+    {
+        match self {
+            Self::NotFound(e) => e.into(),
+            Self::Access(e) => e.into(),
+            Self::Internal(e) => e.into(),
+        }
+    }
 }
 
 #[derive(thiserror::Error, Debug)]

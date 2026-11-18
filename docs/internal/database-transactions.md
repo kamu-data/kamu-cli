@@ -28,7 +28,7 @@ rules (plan, execute, commit) are in [dataset-operations.md](dataset-operations.
 | `TransactionRef` / `TransactionRefT<DB>` | Shared handle to one `sqlx::Transaction`, injected into repositories. Begins the transaction on first use |
 | `DatabaseTransactionManager` | Makes a `TransactionRef` and commits or rolls it back. Registered by the database plugin |
 | `TransactionScope` | One open transaction: `begin` chains the catalog, `catalog` and `resolve` reach it, `finish` commits or rolls back |
-| `DatabaseTransactionRunner` | Callback form over `TransactionScope`, used by the attribute macros and test helpers |
+| `DatabaseTransactionRunner` | Callback form over `TransactionScope`, used by test helpers and the database test macros |
 
 | Manager | Used with | Commit and rollback |
 |---|---|---|
@@ -89,6 +89,11 @@ rather than call jobs, which makes them work the same against a remote node
 | A private method annotated only so that its caller gets a transaction | Neither: the caller opens the block, and the method takes the components as parameters | `PushDatasetUseCaseImpl::make_authorization_checks` |
 | A transaction only in some configurations | `#[when(<bool>)]` on the block | `run_startup_jobs`, the command run in `app.rs` |
 
+The blocks are the algorithm: a reader sees each transaction where the method runs it.
+Deduplication stops at a block's edge. A helper may run inside a block, but never opens one of the
+method's transactions or folds several into one call, even when the same block repeats across
+jobs.
+
 Step methods take components as `&dyn Iface`. A domain function that needs a `'static` trait object
 (an aggregate's `load` from an event store) takes `&Arc<dyn Iface>` instead.
 
@@ -145,4 +150,5 @@ its generic type across lines: name bindings short enough to fit.
 | A `macro_rules!` macro | It cannot reject `return` in a block without a return type, where `return Ok(..)` would silently commit and continue instead of leaving the function |
 | Rolling back by dropping the scope, so the body can be plain inline code | Relies on the driver's deferred rollback, skips the in-memory manager's rollback until the next transaction, and logs every rollback as `Transaction DROPPED` |
 | An `async move` body | Forces a clone of every local used after the block, as the `DatabaseTransactionRunner` callbacks do |
+| A shared helper that opens a block repeated across jobs (a commit helper with the transaction inside) | Hides a step of each job's algorithm behind a call; the repeated block is the price of reading every job top-down ([§3.2](#32-inside-a-level)) |
 | A step service that holds one phase of every operation (plan an ingest, elaborate a transform, commit a head, each in its own transaction) | Each operation is then composed twice, once by the CLI use case and once by the task runner, and its transactions spread over the steps, the use case, the task planner and the runner. A job per operation owns them in one place ([§3.1](#31-who-owns-a-transaction)) |

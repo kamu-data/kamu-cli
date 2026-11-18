@@ -506,13 +506,7 @@ impl PullError {
 
 impl From<DatasetPermissionError> for PullError {
     fn from(value: DatasetPermissionError) -> Self {
-        use DatasetPermissionError as E;
-
-        match value {
-            E::NotFound(e) => Self::NotFound(e),
-            E::Access(e) => Self::Access(e),
-            E::Internal(e) => Self::Internal(e),
-        }
+        value.into_error()
     }
 }
 

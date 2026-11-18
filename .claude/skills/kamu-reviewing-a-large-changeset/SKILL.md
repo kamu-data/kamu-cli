@@ -34,7 +34,7 @@ changesets whose diff does not fit in one careful read.
 | # | Step | The one question | Owner of the rules | Mode |
 |---|---|---|---|---|
 | 1 | Dead code | What did the branch leave unused? Functions, types, variants, errors, mock and harness helpers, config fields, dependencies, feature flags, leftovers of renames | `kamu-rust-style` | Report, then fix |
-| 2 | Duplication | Which code is duplicated or nearly so, and could be generalized, parameterized or decomposed? Production code, test harnesses and e2e scenarios alike | `kamu-rust-style`, `kamu-test-harness` | Report, then fix |
+| 2 | Duplication | Which code is duplicated or nearly so, and could be generalized, parameterized or decomposed? Production code, test harnesses and e2e scenarios alike, never at the cost of a method's visible transaction blocks | `kamu-rust-style`, `kamu-test-harness`, [database-transactions.md §3.2](../../../docs/internal/database-transactions.md#32-inside-a-level) | Report, then fix |
 | 3 | Rust rules | Does the branch's Rust follow the written rules? Exhaustive matches, imports, conversions, module layout, visibility, DI grouping, error mapping, test structure | `kamu-rust-style`, `kamu-dill-di`, `kamu-domain-design`, `kamu-test-harness` | Fix, then report |
 | 4 | Comments and docs | Does every comment and doc line the branch added or invalidated meet the prose rules? Include text made stale by merges from the base | `kamu-prose-and-comments` | Fix, then report |
 | 5 | Changelog | Is there one consolidated entry per user-visible change, written for users, with "breaking" checked against release tags? | `kamu-release-dependency-workflows` | Fix, then report |

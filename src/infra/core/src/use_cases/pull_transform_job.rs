@@ -153,7 +153,7 @@ impl PullTransformJob {
         match error {
             TransformJobError::NotFound(e) => PullError::NotFound(e),
             TransformJobError::Access(e) => PullError::Access(e),
-            TransformJobError::RefMoved(e) => PullError::RefMoved(e),
+            TransformJobError::RefCASFailed(e) => PullError::RefMoved(e),
             TransformJobError::Elaborate(e) => TransformError::from(e).into(),
             TransformJobError::Execute(e) => TransformError::from(e).into(),
             TransformJobError::Internal(e) => PullError::Internal(e),

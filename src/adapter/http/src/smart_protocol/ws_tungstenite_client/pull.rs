@@ -18,7 +18,12 @@ use kamu_core::*;
 use url::Url;
 
 use super::WsSmartTransferProtocolClient;
-use super::transport::{TungsteniteStream, close_after_flow, read_payload, write_payload};
+use super::transport::{
+    TungsteniteStream,
+    close_after_flow,
+    read_phase_payload,
+    write_phase_payload,
+};
 use crate::smart_protocol::errors::*;
 use crate::smart_protocol::messages::*;
 use crate::smart_protocol::phases::*;
@@ -53,20 +58,12 @@ impl WsSmartTransferProtocolClient {
 
         tracing::debug!("Sending pull request: {pull_request_message:?}");
 
-        write_payload(socket, pull_request_message)
-            .await
-            .map_err(|e| {
-                PullClientError::WriteFailed(PullWriteError::new(e, PullPhase::InitialRequest))
-            })?;
+        write_phase_payload(socket, pull_request_message, PullPhase::InitialRequest).await?;
 
         tracing::debug!("Reading pull request response");
 
         let dataset_pull_response =
-            read_payload::<DatasetPullResponse>(socket)
-                .await
-                .map_err(|e| {
-                    PullClientError::ReadFailed(PullReadError::new(e, PullPhase::InitialRequest))
-                })?;
+            read_phase_payload::<DatasetPullResponse>(socket, PullPhase::InitialRequest).await?;
 
         match dataset_pull_response {
             Ok(success) => {
@@ -115,19 +112,13 @@ impl WsSmartTransferProtocolClient {
         let pull_metadata_request = DatasetPullMetadataRequest {};
         tracing::debug!("Sending pull metadata request");
 
-        write_payload(socket, pull_metadata_request)
-            .await
-            .map_err(|e| {
-                PullClientError::WriteFailed(PullWriteError::new(e, PullPhase::MetadataRequest))
-            })?;
+        write_phase_payload(socket, pull_metadata_request, PullPhase::MetadataRequest).await?;
 
         tracing::debug!("Reading pull metadata request response");
 
-        let dataset_metadata_pull_response = read_payload::<DatasetMetadataPullResponse>(socket)
-            .await
-            .map_err(|e| {
-                PullClientError::ReadFailed(PullReadError::new(e, PullPhase::MetadataRequest))
-            })?;
+        let dataset_metadata_pull_response =
+            read_phase_payload::<DatasetMetadataPullResponse>(socket, PullPhase::MetadataRequest)
+                .await?;
 
         tracing::Span::current().record(
             "num_blocks",
@@ -156,20 +147,16 @@ impl WsSmartTransferProtocolClient {
             "Sending pull objects request",
         );
 
-        write_payload(socket, pull_objects_request)
-            .await
-            .map_err(|e| {
-                PullClientError::WriteFailed(PullWriteError::new(e, PullPhase::ObjectsRequest))
-            })?;
+        write_phase_payload(socket, pull_objects_request, PullPhase::ObjectsRequest).await?;
 
         tracing::debug!("Reading pull objects request response");
 
         let dataset_objects_pull_response =
-            read_payload::<DatasetPullObjectsTransferResponse>(socket)
-                .await
-                .map_err(|e| {
-                    PullClientError::ReadFailed(PullReadError::new(e, PullPhase::ObjectsRequest))
-                })?;
+            read_phase_payload::<DatasetPullObjectsTransferResponse>(
+                socket,
+                PullPhase::ObjectsRequest,
+            )
+            .await?;
 
         tracing::debug!(
             num_objects = % dataset_objects_pull_response

@@ -26,7 +26,9 @@ use url::Url;
 use super::WsSmartTransferProtocolClient;
 use crate::OdfSmtpVersion;
 use crate::smart_protocol::error_close::ErrorReplyClose;
+use crate::smart_protocol::errors::{PhaseReadError, PhaseWriteError};
 use crate::smart_protocol::messages::*;
+use crate::smart_protocol::phases::TransferPhase;
 use crate::ws_common::{self, ReadMessageError, WriteMessageError};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -115,7 +117,7 @@ pub(super) async fn close_after_flow<T>(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub(super) async fn read_payload<TMessagePayload: DeserializeOwned>(
+async fn read_payload<TMessagePayload: DeserializeOwned>(
     stream: &mut TungsteniteStream,
 ) -> Result<TMessagePayload, ReadMessageError> {
     match stream.next().await {
@@ -136,7 +138,7 @@ pub(super) async fn read_payload<TMessagePayload: DeserializeOwned>(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub(super) async fn write_payload<TMessagePayload: Serialize>(
+async fn write_payload<TMessagePayload: Serialize>(
     socket: &mut TungsteniteStream,
     payload: TMessagePayload,
 ) -> Result<(), WriteMessageError> {
@@ -148,6 +150,31 @@ pub(super) async fn write_payload<TMessagePayload: Serialize>(
         Ok(_) => Ok(()),
         Err(e) => Err(WriteMessageError::SocketError(Box::new(e))),
     }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Reads the next message of a transfer phase
+pub(super) async fn read_phase_payload<TMessagePayload: DeserializeOwned>(
+    stream: &mut TungsteniteStream,
+    phase: impl Into<TransferPhase>,
+) -> Result<TMessagePayload, PhaseReadError> {
+    read_payload(stream)
+        .await
+        .map_err(|e| PhaseReadError::new(e, phase))
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Writes a message of a transfer phase
+pub(super) async fn write_phase_payload<TMessagePayload: Serialize>(
+    socket: &mut TungsteniteStream,
+    payload: TMessagePayload,
+    phase: impl Into<TransferPhase>,
+) -> Result<(), PhaseWriteError> {
+    write_payload(socket, payload)
+        .await
+        .map_err(|e| PhaseWriteError::new(e, phase))
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

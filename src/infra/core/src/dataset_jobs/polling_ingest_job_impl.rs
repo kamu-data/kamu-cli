@@ -27,13 +27,12 @@ use kamu_core::{
 use kamu_datasets::{
     DatasetOperation,
     DatasetOperationGuard,
-    DatasetOperationRequest,
     DatasetReferenceUpdater,
     DatasetRegistry,
 };
 use random_strings::get_random_name;
 
-use super::job_target::{commit_job_head, resolve_job_target};
+use super::job_target::{authorize_and_resolve_job_target, commit_job_head};
 use crate::IngestEnvVarsResolver;
 use crate::utils::span_outcome::SpanOutcome;
 
@@ -61,19 +60,12 @@ impl PollingIngestJobImpl {
                           dataset_registry: Arc<dyn DatasetRegistry>,
                           planner: Arc<dyn PollingIngestPlanner>,
                           env_vars_resolver: Arc<IngestEnvVarsResolver>| {
-                dataset_operation_guard
-                    .check_operation(
-                        &self.principal,
-                        &DatasetOperationRequest::new(
-                            target_handle.clone(),
-                            DatasetOperation::PollingIngest,
-                        ),
-                    )
-                    .await?;
-
-                let target = resolve_job_target::<PollingIngestJobError>(
+                let target = authorize_and_resolve_job_target::<PollingIngestJobError>(
+                    dataset_operation_guard.as_ref(),
                     dataset_registry.as_ref(),
+                    &self.principal,
                     target_handle,
+                    DatasetOperation::PollingIngest,
                 )
                 .await?;
                 let plan = match maybe_continuation {
@@ -129,7 +121,7 @@ impl PollingIngestJobImpl {
             Ok(PollingIngestResult::Updated { .. }) => SpanOutcome::Updated,
             Ok(PollingIngestResult::UpToDate { .. }) => SpanOutcome::UpToDate,
             Err(PollingIngestJobError::NotFound(_)) => SpanOutcome::DatasetDeleted,
-            Err(PollingIngestJobError::RefMoved(_)) => SpanOutcome::RefMoved,
+            Err(PollingIngestJobError::RefCASFailed(_)) => SpanOutcome::RefMoved,
             Err(PollingIngestJobError::Access(_)) => SpanOutcome::NotAllowed,
             Err(
                 PollingIngestJobError::Planning(_)

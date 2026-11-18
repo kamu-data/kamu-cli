@@ -130,7 +130,7 @@ impl TransformJobImpl {
             Ok(TransformResult::Updated { .. }) => SpanOutcome::Updated,
             Ok(TransformResult::UpToDate) => SpanOutcome::UpToDate,
             Err(TransformJobError::NotFound(_)) => SpanOutcome::DatasetDeleted,
-            Err(TransformJobError::RefMoved(_)) => SpanOutcome::RefMoved,
+            Err(TransformJobError::RefCASFailed(_)) => SpanOutcome::RefMoved,
             Err(TransformJobError::Access(_)) => SpanOutcome::NotAllowed,
             Err(
                 TransformJobError::Elaborate(_)

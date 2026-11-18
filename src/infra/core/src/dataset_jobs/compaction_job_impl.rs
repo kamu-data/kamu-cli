@@ -25,12 +25,11 @@ use kamu_core::{
 use kamu_datasets::{
     DatasetOperation,
     DatasetOperationGuard,
-    DatasetOperationRequest,
     DatasetReferenceUpdater,
     DatasetRegistry,
 };
 
-use super::job_target::{commit_job_head, resolve_job_target};
+use super::job_target::{authorize_and_resolve_job_target, commit_job_head};
 use crate::utils::span_outcome::SpanOutcome;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -55,19 +54,14 @@ impl CompactionJobImpl {
             transaction!(|dataset_operation_guard: Arc<dyn DatasetOperationGuard>,
                           dataset_registry: Arc<dyn DatasetRegistry>,
                           planner: Arc<dyn CompactionPlanner>| {
-                dataset_operation_guard
-                    .check_operation(
-                        &self.principal,
-                        &DatasetOperationRequest::new(
-                            target_handle.clone(),
-                            Self::operation(&options),
-                        ),
-                    )
-                    .await?;
-
-                let target =
-                    resolve_job_target::<CompactionError>(dataset_registry.as_ref(), target_handle)
-                        .await?;
+                let target = authorize_and_resolve_job_target::<CompactionError>(
+                    dataset_operation_guard.as_ref(),
+                    dataset_registry.as_ref(),
+                    &self.principal,
+                    target_handle,
+                    Self::operation(&options),
+                )
+                .await?;
                 let plan = planner
                     .plan_compaction(target.clone(), options, Some(listener.clone()))
                     .await?;

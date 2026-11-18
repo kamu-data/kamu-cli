@@ -71,6 +71,14 @@ impl TransactionRef {
     pub fn register(&self, catalog_builder: &mut dill::CatalogBuilder) {
         TransactionStateErased::register(Arc::clone(&self.inner), catalog_builder);
     }
+
+    /// A catalog chained on `base` that resolves components inside this
+    /// transaction
+    pub fn chained_catalog(&self, base: &dill::Catalog) -> dill::Catalog {
+        let mut b = base.builder_chained();
+        self.register(&mut b);
+        b.build()
+    }
 }
 
 impl<DB: sqlx::Database> From<TransactionRefT<DB>> for TransactionRef {

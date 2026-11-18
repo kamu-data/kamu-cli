@@ -151,7 +151,7 @@ impl PullIngestLoop {
         match error {
             PollingIngestJobError::NotFound(e) => PullError::NotFound(e),
             PollingIngestJobError::Access(e) => PullError::Access(e),
-            PollingIngestJobError::RefMoved(e) => PullError::RefMoved(e),
+            PollingIngestJobError::RefCASFailed(e) => PullError::RefMoved(e),
             PollingIngestJobError::Planning(PollingIngestPlanError::ScanMetadata(e)) => e.into(),
             PollingIngestJobError::Planning(e @ PollingIngestPlanError::SourceNotDefined(_)) => {
                 PullError::Internal(e.int_err())

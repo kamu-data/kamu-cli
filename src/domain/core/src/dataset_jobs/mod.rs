@@ -10,6 +10,7 @@
 mod compaction_job;
 mod polling_ingest_job;
 mod reset_job;
+mod set_chain_ref_error;
 mod sync_from_job;
 mod sync_to_job;
 mod transform_job;
@@ -18,6 +19,7 @@ mod verify_job;
 pub use compaction_job::*;
 pub use polling_ingest_job::*;
 pub use reset_job::*;
+pub use set_chain_ref_error::*;
 pub use sync_from_job::*;
 pub use sync_to_job::*;
 pub use transform_job::*;

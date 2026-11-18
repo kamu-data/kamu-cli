@@ -33,6 +33,17 @@ pub(crate) fn ref_moved_outcome(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// The outcome of a task whose job lost the compare-and-swap of the target's
+/// reference
+pub(crate) fn ref_cas_failed_outcome(
+    target: &odf::DatasetHandle,
+    error: odf::dataset::RefCASError,
+) -> TaskOutcome {
+    ref_moved_outcome(target.id.clone(), error.reference.clone(), Some(error))
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 /// The outcome of a task whose principal may not run its operation, checked
 /// before the operation or when it moves the dataset's reference: retrying
 /// under the same principal cannot gain the access, so it is not retried
@@ -48,6 +59,24 @@ pub(crate) fn operation_not_allowed_outcome(error: &odf::AccessError) -> TaskOut
 pub(crate) fn dataset_deleted_outcome(dataset_handle: &odf::DatasetHandle) -> TaskOutcome {
     tracing::warn!(%dataset_handle, "The task's dataset no longer exists");
     TaskOutcome::Failed(TaskError::empty_unrecoverable())
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Logs a domain failure of a task's job, as an error when retrying may help
+/// and as a warning otherwise, and fails the task with an empty error of that
+/// recoverability
+pub(crate) fn failed_outcome(
+    error: &impl std::error::Error,
+    recoverable: bool,
+    what: &str,
+) -> TaskOutcome {
+    if recoverable {
+        tracing::error!(?error, error_msg = %error, "{what}");
+    } else {
+        tracing::warn!(?error, error_msg = %error, "{what}");
+    }
+    TaskOutcome::Failed(TaskError::empty(recoverable))
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

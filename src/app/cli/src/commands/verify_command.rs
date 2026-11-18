@@ -17,6 +17,7 @@ use kamu::domain::*;
 use kamu::utils::datasets_filtering::filter_datasets_by_local_pattern;
 use kamu_datasets::{DatasetRegistry, DependencyGraphService};
 
+use super::common::verify_datasets;
 use super::{BatchError, CLIError, Command};
 use crate::VerificationMultiProgress;
 use crate::output::OutputConfig;
@@ -96,7 +97,7 @@ impl VerifyCommand {
 
         let VerificationSelection {
             dataset_handles,
-            mut unresolved_results,
+            unresolved_results,
             missed_remote_dependencies,
         } = selection;
 
@@ -123,21 +124,16 @@ impl VerifyCommand {
             );
         }
 
-        // Each verification opens its own short transaction and holds none
-        // while it reads data or replays transforms
-        let mut verification_results = Vec::new();
-        verification_results.append(&mut unresolved_results);
-        for hdl in dataset_handles {
-            let listener = multi_listener
-                .as_ref()
-                .and_then(|multi_listener| multi_listener.begin_verify(&hdl));
-            let request = VerificationRequest {
-                target: hdl,
-                block_range: (None, None),
-                options: options.clone(),
-            };
-            verification_results.push(self.verify_job.run(request, listener).await);
-        }
+        let mut verification_results = unresolved_results;
+        verification_results.extend(
+            verify_datasets(
+                self.verify_job.as_ref(),
+                dataset_handles,
+                &options,
+                multi_listener.as_deref(),
+            )
+            .await,
+        );
 
         Ok(verification_results)
     }

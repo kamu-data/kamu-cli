@@ -12,7 +12,14 @@ use std::time::Duration;
 
 use chrono::{DateTime, Utc};
 use chrono_humanize::HumanTime;
-use kamu::domain::PullImageListener;
+use kamu::domain::{
+    PullImageListener,
+    VerificationMultiListener,
+    VerificationOptions,
+    VerificationRequest,
+    VerificationResult,
+    VerifyJob,
+};
 
 use crate::OutputConfig;
 
@@ -113,6 +120,42 @@ pub(crate) fn json_to_yaml_value(value: &serde_json::Value) -> serde_yaml::Value
                 .collect(),
         ),
     }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Verifies the whole chain of each dataset in turn. Each verification opens
+/// its own short transactions and holds none while it reads data or replays
+/// transforms
+pub(crate) async fn verify_datasets(
+    verify_job: &dyn VerifyJob,
+    dataset_handles: Vec<odf::DatasetHandle>,
+    options: &VerificationOptions,
+    maybe_multi_listener: Option<&dyn VerificationMultiListener>,
+) -> Vec<VerificationResult> {
+    let mut results = Vec::with_capacity(dataset_handles.len());
+    for dataset_handle in dataset_handles {
+        results
+            .push(verify_dataset(verify_job, dataset_handle, options, maybe_multi_listener).await);
+    }
+    results
+}
+
+/// Verifies the whole chain of one dataset, reporting to the multi-listener
+pub(crate) async fn verify_dataset(
+    verify_job: &dyn VerifyJob,
+    dataset_handle: odf::DatasetHandle,
+    options: &VerificationOptions,
+    maybe_multi_listener: Option<&dyn VerificationMultiListener>,
+) -> VerificationResult {
+    let maybe_listener = maybe_multi_listener
+        .and_then(|multi_listener| multi_listener.begin_verify(&dataset_handle));
+    let request = VerificationRequest {
+        target: dataset_handle,
+        block_range: (None, None),
+        options: options.clone(),
+    };
+    verify_job.run(request, maybe_listener).await
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -29,6 +29,7 @@ use kamu_datasets::{
     SetRefCheckRefMode,
 };
 use messaging_outbox::{Outbox, OutboxExt};
+use odf::dataset::MetadataChainExt as _;
 use odf::metadata::AsTypedBlock as _;
 use url::Url;
 
@@ -331,11 +332,11 @@ impl AxumServerPushProtocolInstance {
     async fn handle_push_request_initiation(
         &mut self,
     ) -> Result<DatasetPushRequest, PushServerError> {
-        let push_request = axum_read_payload::<DatasetPushRequest>(&mut self.socket)
-            .await
-            .map_err(|e| {
-                PushServerError::ReadFailed(PushReadError::new(e, PushPhase::InitialRequest))
-            })?;
+        let push_request = axum_read_phase_payload::<DatasetPushRequest>(
+            &mut self.socket,
+            PushPhase::InitialRequest,
+        )
+        .await?;
 
         let plan = &push_request.transfer_plan;
         tracing::Span::current()
@@ -360,19 +361,14 @@ impl AxumServerPushProtocolInstance {
 
         let actual_head = if let Some(dataset_handle) = self.maybe_dataset_handle.as_ref() {
             transaction!(
-                |dataset_registry: Arc<dyn DatasetRegistry>| -> Result<_, odf::GetRefError> {
+                |dataset_registry: Arc<dyn DatasetRegistry>| -> Result<_, InternalError> {
                     let resolved_dataset =
                         dataset_registry.get_dataset_by_handle(dataset_handle).await;
 
-                    match resolved_dataset
+                    resolved_dataset
                         .as_metadata_chain()
-                        .resolve_ref(&odf::BlockRef::Head)
+                        .try_get_ref(&odf::BlockRef::Head)
                         .await
-                    {
-                        Ok(head) => Ok(Some(head)),
-                        Err(odf::GetRefError::NotFound(_)) => Ok(None),
-                        Err(e) => Err(e),
-                    }
                 }
             )
         } else {
@@ -391,11 +387,12 @@ impl AxumServerPushProtocolInstance {
             Some(e) => Err(DatasetPushRequestError::InvalidHead(e.into())),
         };
 
-        axum_write_payload::<DatasetPushResponse>(&mut self.socket, response)
-            .await
-            .map_err(|e| {
-                PushServerError::WriteFailed(PushWriteError::new(e, PushPhase::InitialRequest))
-            })?;
+        axum_write_phase_payload::<DatasetPushResponse>(
+            &mut self.socket,
+            response,
+            PushPhase::InitialRequest,
+        )
+        .await?;
 
         match invalid_head {
             None => Ok(push_request),
@@ -413,14 +410,11 @@ impl AxumServerPushProtocolInstance {
         &mut self,
         push_request: DatasetPushRequest,
     ) -> Result<VecDeque<odf::dataset::HashedMetadataBlockBytesDecoded>, PushServerError> {
-        let push_metadata_request =
-            match axum_read_payload::<DatasetPushMetadataRequest>(&mut self.socket).await {
-                Ok(push_metadata_request) => Ok(push_metadata_request),
-                Err(e) => Err(PushServerError::ReadFailed(PushReadError::new(
-                    e,
-                    PushPhase::MetadataRequest,
-                ))),
-            }?;
+        let push_metadata_request = axum_read_phase_payload::<DatasetPushMetadataRequest>(
+            &mut self.socket,
+            PushPhase::MetadataRequest,
+        )
+        .await?;
 
         tracing::Span::current().record("num_blocks", push_metadata_request.new_blocks.num_blocks);
 
@@ -454,14 +448,12 @@ impl AxumServerPushProtocolInstance {
             ));
         }
 
-        axum_write_payload::<DatasetPushMetadataResponse>(
+        axum_write_phase_payload::<DatasetPushMetadataResponse>(
             &mut self.socket,
             DatasetPushMetadataResponse::Ok(DatasetPushMetadataAccepted {}),
+            PushPhase::MetadataRequest,
         )
-        .await
-        .map_err(|e| {
-            PushServerError::WriteFailed(PushWriteError::new(e, PushPhase::MetadataRequest))
-        })?;
+        .await?;
 
         Ok(new_blocks)
     }
@@ -473,11 +465,11 @@ impl AxumServerPushProtocolInstance {
         fields(num_objects = tracing::field::Empty)
     )]
     async fn try_handle_push_objects_request(&mut self) -> Result<bool, PushServerError> {
-        let request = axum_read_payload::<DatasetPushObjectsTransferRequest>(&mut self.socket)
-            .await
-            .map_err(|e| {
-                PushServerError::ReadFailed(PushReadError::new(e, PushPhase::ObjectsRequest))
-            })?;
+        let request = axum_read_phase_payload::<DatasetPushObjectsTransferRequest>(
+            &mut self.socket,
+            PushPhase::ObjectsRequest,
+        )
+        .await?;
 
         let objects_count = request.object_files.len();
         tracing::Span::current().record("num_objects", objects_count);
@@ -505,16 +497,14 @@ impl AxumServerPushProtocolInstance {
 
         tracing::debug!("Object transfer strategies defined");
 
-        axum_write_payload::<DatasetPushObjectsTransferResponse>(
+        axum_write_phase_payload::<DatasetPushObjectsTransferResponse>(
             &mut self.socket,
             Ok(DatasetPushObjectsTransferAccepted {
                 object_transfer_strategies,
             }),
+            PushPhase::ObjectsRequest,
         )
-        .await
-        .map_err(|e| {
-            PushServerError::WriteFailed(PushWriteError::new(e, PushPhase::ObjectsRequest))
-        })?;
+        .await?;
 
         let mut notify_interval = tokio::time::interval(self.upload_progress_interval);
         notify_interval.tick().await; // clear first immediate interval tick
@@ -523,17 +513,10 @@ impl AxumServerPushProtocolInstance {
             tokio::select! {
                 _ = notify_interval.tick() => {
                     tracing::debug!("Time to ask client about the upload progress");
-                    axum_write_payload::<DatasetPushObjectsUploadProgressRequest>(&mut self.socket, DatasetPushObjectsUploadProgressRequest { progress_requested: true })
-                        .await
-                        .map_err(|e| {
-                            PushServerError::WriteFailed(PushWriteError::new(e, PushPhase::ObjectsUploadProgress))
-                        })?;
+                    axum_write_phase_payload::<DatasetPushObjectsUploadProgressRequest>(&mut self.socket, DatasetPushObjectsUploadProgressRequest { progress_requested: true }, PushPhase::ObjectsUploadProgress).await?;
                 },
-                progress_response_result = axum_read_payload::<DatasetPushObjectsUploadProgressResponse>(&mut self.socket) => {
-                    let progress = progress_response_result
-                        .map_err(|e| {
-                            PushServerError::ReadFailed(PushReadError::new(e, PushPhase::ObjectsUploadProgress))
-                        })?;
+                progress_response_result = axum_read_phase_payload::<DatasetPushObjectsUploadProgressResponse>(&mut self.socket, PushPhase::ObjectsUploadProgress) => {
+                    let progress = progress_response_result?;
                     match progress.details {
                         ObjectsUploadProgressDetails::Running(p) => {
                             tracing::debug!(
@@ -566,11 +549,11 @@ impl AxumServerPushProtocolInstance {
         force_update_if_diverged: bool,
         old_head_maybe: Option<odf::Multihash>,
     ) -> Result<(), PushServerError> {
-        axum_read_payload::<DatasetPushComplete>(&mut self.socket)
-            .await
-            .map_err(|e| {
-                PushServerError::ReadFailed(PushReadError::new(e, PushPhase::CompleteRequest))
-            })?;
+        axum_read_phase_payload::<DatasetPushComplete>(
+            &mut self.socket,
+            PushPhase::CompleteRequest,
+        )
+        .await?;
 
         tracing::debug!("Push client sent a complete request. Committing the dataset");
 
@@ -591,14 +574,12 @@ impl AxumServerPushProtocolInstance {
 
         tracing::debug!("Sending completion confirmation");
 
-        axum_write_payload::<DatasetPushCompleteResponse>(
+        axum_write_phase_payload::<DatasetPushCompleteResponse>(
             &mut self.socket,
             Ok(DatasetPushCompleteConfirmed {}),
+            PushPhase::CompleteRequest,
         )
-        .await
-        .map_err(|e| {
-            PushServerError::WriteFailed(PushWriteError::new(e, PushPhase::CompleteRequest))
-        })?;
+        .await?;
 
         Ok(())
     }

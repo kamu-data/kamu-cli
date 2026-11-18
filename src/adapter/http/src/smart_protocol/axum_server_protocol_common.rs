@@ -20,7 +20,9 @@ use serde::de::DeserializeOwned;
 use url::Url;
 
 use super::error_close::ErrorReplyClose;
+use super::errors::{PhaseReadError, PhaseWriteError};
 use super::messages::ObjectFileReference;
+use super::phases::TransferPhase;
 use super::protocol_dataset_helper::ObjectTransferStrategy;
 use crate::BearerHeader;
 use crate::ws_common::{self, ReadMessageError, WriteMessageError};
@@ -57,6 +59,31 @@ pub async fn axum_write_payload<TMessagePayload: Serialize>(
         Ok(_) => Ok(()),
         Err(e) => Err(WriteMessageError::SocketError(Box::new(e))),
     }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Reads the next message of a transfer phase
+pub(crate) async fn axum_read_phase_payload<TMessagePayload: DeserializeOwned>(
+    socket: &mut WebSocket,
+    phase: impl Into<TransferPhase>,
+) -> Result<TMessagePayload, PhaseReadError> {
+    axum_read_payload(socket)
+        .await
+        .map_err(|e| PhaseReadError::new(e, phase))
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Writes a message of a transfer phase
+pub(crate) async fn axum_write_phase_payload<TMessagePayload: Serialize>(
+    socket: &mut WebSocket,
+    payload: TMessagePayload,
+    phase: impl Into<TransferPhase>,
+) -> Result<(), PhaseWriteError> {
+    axum_write_payload(socket, payload)
+        .await
+        .map_err(|e| PhaseWriteError::new(e, phase))
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

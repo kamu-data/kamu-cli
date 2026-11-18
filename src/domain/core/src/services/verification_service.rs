@@ -325,13 +325,7 @@ impl From<odf::IterBlocksError> for VerificationError {
 
 impl From<DatasetPermissionError> for VerificationError {
     fn from(v: DatasetPermissionError) -> Self {
-        use DatasetPermissionError as E;
-
-        match v {
-            E::NotFound(e) => Self::DatasetNotFound(e),
-            E::Access(e) => Self::Access(e),
-            e @ E::Internal(_) => Self::Internal(e.int_err()),
-        }
+        v.into_error()
     }
 }
 

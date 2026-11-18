@@ -89,6 +89,29 @@ pub struct AccountAuthorizationHelperImpl {
     rebac_service: Arc<dyn kamu_auth_rebac::RebacService>,
 }
 
+impl AccountAuthorizationHelperImpl {
+    async fn ensure_can_modify_account(
+        &self,
+        principal: &Principal,
+        account_name: &odf::AccountName,
+        make_error: fn(Option<odf::AccountName>, odf::AccountName) -> NotAuthorizedError,
+    ) -> Result<(), EnsureNotAuthorizedError> {
+        if !self.can_modify_account(principal, account_name).await? {
+            return Err(EnsureNotAuthorizedError::Access(
+                odf::AccessError::Unauthenticated(
+                    make_error(
+                        principal.maybe_account_name().cloned(),
+                        account_name.clone(),
+                    )
+                    .into(),
+                ),
+            ));
+        }
+
+        Ok(())
+    }
+}
+
 #[async_trait::async_trait]
 impl AccountAuthorizationHelper for AccountAuthorizationHelperImpl {
     async fn is_admin(&self, principal: &Principal) -> Result<bool, InternalError> {
@@ -115,14 +138,7 @@ impl AccountAuthorizationHelper for AccountAuthorizationHelperImpl {
             Principal::Node => Ok(true),
             Principal::Anonymous => Ok(false),
             Principal::User(account_handle) if account_handle.name == *account_name => Ok(true),
-            Principal::User(account_handle) => {
-                use kamu_auth_rebac::RebacServiceExt;
-
-                self.rebac_service
-                    .is_account_admin(&account_handle.did)
-                    .await
-                    .int_err()
-            }
+            Principal::User(_) => self.is_admin(principal).await,
         }
     }
 
@@ -131,19 +147,12 @@ impl AccountAuthorizationHelper for AccountAuthorizationHelperImpl {
         principal: &Principal,
         account_name: &odf::AccountName,
     ) -> Result<(), EnsureNotAuthorizedError> {
-        if !self.can_modify_account(principal, account_name).await? {
-            return Err(EnsureNotAuthorizedError::Access(
-                odf::AccessError::Unauthenticated(
-                    NotAuthorizedError::modify_account_password(
-                        principal.maybe_account_name().cloned(),
-                        account_name.clone(),
-                    )
-                    .into(),
-                ),
-            ));
-        }
-
-        Ok(())
+        self.ensure_can_modify_account(
+            principal,
+            account_name,
+            NotAuthorizedError::modify_account_password,
+        )
+        .await
     }
 
     async fn ensure_account_password_with_confirmation_can_be_modified(
@@ -151,19 +160,12 @@ impl AccountAuthorizationHelper for AccountAuthorizationHelperImpl {
         principal: &Principal,
         account_name: &odf::AccountName,
     ) -> Result<(), EnsureNotAuthorizedError> {
-        if !self.can_modify_account(principal, account_name).await? {
-            return Err(EnsureNotAuthorizedError::Access(
-                odf::AccessError::Unauthenticated(
-                    NotAuthorizedError::modify_account_password_with_confirmation(
-                        principal.maybe_account_name().cloned(),
-                        account_name.clone(),
-                    )
-                    .into(),
-                ),
-            ));
-        }
-
-        Ok(())
+        self.ensure_can_modify_account(
+            principal,
+            account_name,
+            NotAuthorizedError::modify_account_password_with_confirmation,
+        )
+        .await
     }
 
     async fn ensure_account_can_be_deleted(
@@ -171,19 +173,8 @@ impl AccountAuthorizationHelper for AccountAuthorizationHelperImpl {
         principal: &Principal,
         account_name: &odf::AccountName,
     ) -> Result<(), EnsureNotAuthorizedError> {
-        if !self.can_modify_account(principal, account_name).await? {
-            return Err(EnsureNotAuthorizedError::Access(
-                odf::AccessError::Unauthenticated(
-                    NotAuthorizedError::delete_account(
-                        principal.maybe_account_name().cloned(),
-                        account_name.clone(),
-                    )
-                    .into(),
-                ),
-            ));
-        }
-
-        Ok(())
+        self.ensure_can_modify_account(principal, account_name, NotAuthorizedError::delete_account)
+            .await
     }
 }
 

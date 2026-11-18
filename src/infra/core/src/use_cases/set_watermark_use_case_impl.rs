@@ -11,14 +11,12 @@ use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
 use dill::{component, interface};
-use internal_error::ErrorIntoInternal;
 use kamu_accounts::Principal;
 use kamu_core::*;
 use kamu_datasets::{
     DatasetOperation,
     DatasetOperationGuard,
     DatasetOperationRequest,
-    DatasetPermissionError,
     DatasetRegistry,
 };
 
@@ -56,16 +54,7 @@ impl SetWatermarkUseCase for SetWatermarkUseCaseImpl {
                     DatasetOperation::SetWatermark,
                 ),
             )
-            .await
-            .map_err(|e| {
-                use DatasetPermissionError as E;
-
-                match e {
-                    E::NotFound(e) => SetWatermarkError::NotFound(e),
-                    E::Access(e) => SetWatermarkError::Access(e),
-                    e @ E::Internal(_) => SetWatermarkError::Internal(e.int_err()),
-                }
-            })?;
+            .await?;
 
         let target = self
             .dataset_registry

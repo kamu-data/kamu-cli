@@ -35,8 +35,7 @@ impl ResetDatasetTaskPlanner {
         &self,
         dataset_id: &odf::DatasetID,
     ) -> Result<odf::DatasetHandle, PrepareTaskDefinitionError> {
-        let target = resolve_task_dataset(dataset_registry.as_ref(), dataset_id).await?;
-        Ok(target.take_handle())
+        resolve_task_dataset(dataset_registry.as_ref(), dataset_id).await
     }
 }
 

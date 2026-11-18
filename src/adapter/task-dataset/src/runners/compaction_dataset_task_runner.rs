@@ -15,8 +15,9 @@ use kamu_task_system::*;
 
 use super::task_reference_update::{
     dataset_deleted_outcome,
+    failed_outcome,
     operation_not_allowed_outcome,
-    ref_moved_outcome,
+    ref_cas_failed_outcome,
 };
 use super::task_span_outcome::TaskSpanOutcome;
 use crate::{
@@ -65,25 +66,14 @@ impl CompactionDatasetTaskRunner {
     ) -> Result<TaskOutcome, InternalError> {
         match error {
             CompactionError::NotFound(_) => Ok(dataset_deleted_outcome(target)),
-            CompactionError::RefCASFailed(e) => Ok(ref_moved_outcome(
-                target.id.clone(),
-                e.reference.clone(),
-                Some(e),
-            )),
+            CompactionError::RefCASFailed(e) => Ok(ref_cas_failed_outcome(target, e)),
             CompactionError::Access(e) => Ok(operation_not_allowed_outcome(&e)),
-            CompactionError::Planning(e) => {
-                let recoverable = e.is_recoverable();
-                if recoverable {
-                    tracing::error!(error = ?e, error_msg = %e, "Compaction planning failed");
-                } else {
-                    tracing::warn!(error = ?e, error_msg = %e, "Compaction planning failed");
-                }
-                Ok(TaskOutcome::Failed(TaskError::empty(recoverable)))
-            }
-            CompactionError::Execution(e) => {
-                tracing::error!(error = ?e, error_msg = %e, "Compaction failed");
-                Ok(TaskOutcome::Failed(TaskError::empty_recoverable()))
-            }
+            CompactionError::Planning(e) => Ok(failed_outcome(
+                &e,
+                e.is_recoverable(),
+                "Compaction planning failed",
+            )),
+            CompactionError::Execution(e) => Ok(failed_outcome(&e, true, "Compaction failed")),
             CompactionError::Internal(e) => Err(e),
         }
     }

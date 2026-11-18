@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use internal_error::{ErrorIntoInternal, InternalError};
+use internal_error::InternalError;
 use kamu_datasets::DatasetPermissionError;
 
 use crate::{ResetExecutionError, ResetPlanningError, ResetResult};
@@ -64,13 +64,7 @@ pub enum ResetError {
 
 impl From<DatasetPermissionError> for ResetError {
     fn from(v: DatasetPermissionError) -> Self {
-        use DatasetPermissionError as E;
-
-        match v {
-            E::NotFound(e) => Self::NotFound(e),
-            E::Access(e) => Self::Access(e),
-            e @ E::Internal(_) => Self::Internal(e.int_err()),
-        }
+        v.into_error()
     }
 }
 

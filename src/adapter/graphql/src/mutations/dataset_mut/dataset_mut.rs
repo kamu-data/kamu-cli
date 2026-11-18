@@ -202,13 +202,13 @@ impl DatasetMut {
             Err(domain::SetWatermarkError::Execution(
                 domain::SetWatermarkExecutionError::RefCASFailed(e),
             )) => {
-                // A watermark is always committed on top of an existing head
-                let Some(expected_head) = e.expected.clone() else {
-                    return Err(e.int_err().into());
-                };
+                let CasFailedHeads {
+                    expected_head,
+                    actual_head,
+                } = CasFailedHeads::try_from_ref_cas_error(e)?;
                 Ok(SetWatermarkResult::CasFailed(SetWatermarkCasFailed {
-                    expected_head: expected_head.into(),
-                    actual_head: e.actual.map(Into::into),
+                    expected_head,
+                    actual_head,
                 }))
             }
             Err(
@@ -507,7 +507,7 @@ pub struct SetWatermarkCasFailed {
 impl SetWatermarkCasFailed {
     /// Human-readable error message
     async fn message(&self) -> String {
-        "Expected head didn't match, dataset was likely updated concurrently".to_string()
+        CAS_FAILED_MESSAGE.to_string()
     }
 }
 

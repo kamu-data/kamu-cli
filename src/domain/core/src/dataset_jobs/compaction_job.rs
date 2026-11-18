@@ -9,7 +9,7 @@
 
 use std::sync::Arc;
 
-use internal_error::{ErrorIntoInternal, InternalError};
+use internal_error::InternalError;
 use kamu_datasets::DatasetPermissionError;
 use thiserror::Error;
 
@@ -19,6 +19,7 @@ use crate::{
     CompactionOptions,
     CompactionPlanningError,
     CompactionResult,
+    map_set_chain_ref_error,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -79,13 +80,7 @@ pub enum CompactionError {
 
 impl From<DatasetPermissionError> for CompactionError {
     fn from(v: DatasetPermissionError) -> Self {
-        use DatasetPermissionError as E;
-
-        match v {
-            E::NotFound(e) => Self::NotFound(e),
-            E::Access(e) => Self::Access(e),
-            e @ E::Internal(_) => Self::Internal(e.int_err()),
-        }
+        v.into_error()
     }
 }
 
@@ -93,12 +88,7 @@ impl From<DatasetPermissionError> for CompactionError {
 
 impl From<odf::dataset::SetChainRefError> for CompactionError {
     fn from(v: odf::dataset::SetChainRefError) -> Self {
-        match v {
-            odf::dataset::SetChainRefError::Access(e) => Self::Access(e),
-            odf::dataset::SetChainRefError::Internal(e) => Self::Internal(e),
-            odf::dataset::SetChainRefError::CASFailed(e) => Self::RefCASFailed(e),
-            odf::dataset::SetChainRefError::BlockNotFound(_) => Self::Internal(v.int_err()),
-        }
+        map_set_chain_ref_error(v)
     }
 }
 

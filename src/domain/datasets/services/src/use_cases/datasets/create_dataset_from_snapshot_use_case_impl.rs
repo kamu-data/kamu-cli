@@ -94,19 +94,8 @@ impl CreateDatasetFromSnapshotUseCase for CreateDatasetFromSnapshotUseCaseImpl {
             "Initiating creation of dataset from snapshot"
         );
 
-        let principal_account = match self.principal.as_ref() {
-            Principal::User(account) => account,
-            Principal::Node => {
-                return Err(CreateDatasetFromSnapshotError::Access(
-                    odf::AccessError::Unauthorized(
-                        "The node has no account to own a dataset".into(),
-                    ),
-                ));
-            }
-            Principal::Anonymous => {
-                panic!("Anonymous account cannot create dataset");
-            }
-        };
+        let principal_account =
+            CreateDatasetUseCaseHelper::principal_owner_account(&self.principal)?;
 
         // Validate / resolve metadata events from the snapshot
         odf::dataset::normalize_and_validate_dataset_snapshot(

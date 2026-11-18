@@ -169,7 +169,7 @@ A job reports a commit that did not happen as a variant of its own error type:
 | Commit | Job error | `kamu pull` reports | A task ends |
 | --- | --- | --- | --- |
 | `HEAD` moved | — (the job's result) | the job's result | with its result |
-| Another writer moved `HEAD` since planning | `RefMoved` / `RefCASFailed` | `PullError::RefMoved` | failed, recoverable |
+| Another writer moved `HEAD` since planning | `RefCASFailed` (sync: `SyncError::RefMoved`) | `PullError::RefMoved` | failed, recoverable |
 | The dataset is gone | `NotFound` | `NotFound` | failed, unrecoverable |
 | The principal may not move `HEAD` | `Access` | `Access` | failed, unrecoverable |
 

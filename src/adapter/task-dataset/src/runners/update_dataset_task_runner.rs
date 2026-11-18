@@ -15,7 +15,9 @@ use kamu_task_system::*;
 
 use super::task_reference_update::{
     dataset_deleted_outcome,
+    failed_outcome,
     operation_not_allowed_outcome,
+    ref_cas_failed_outcome,
     ref_moved_outcome,
 };
 use super::task_span_outcome::TaskSpanOutcome;
@@ -97,19 +99,17 @@ impl UpdateDatasetTaskRunner {
                 .into_task_result(),
             )),
             Err(PollingIngestJobError::NotFound(_)) => Ok(dataset_deleted_outcome(target_handle)),
-            Err(PollingIngestJobError::RefMoved(e)) => Ok(ref_moved_outcome(
-                target_handle.id.clone(),
-                e.reference.clone(),
-                Some(e),
-            )),
-            Err(PollingIngestJobError::Access(e)) => Ok(operation_not_allowed_outcome(&e)),
-            Err(PollingIngestJobError::Planning(e)) => {
-                tracing::error!(error = ?e, error_msg = %e, "Ingest planning failed");
-                Ok(Self::failed(e.is_recoverable()))
+            Err(PollingIngestJobError::RefCASFailed(e)) => {
+                Ok(ref_cas_failed_outcome(target_handle, e))
             }
+            Err(PollingIngestJobError::Access(e)) => Ok(operation_not_allowed_outcome(&e)),
+            Err(PollingIngestJobError::Planning(e)) => Ok(failed_outcome(
+                &e,
+                e.is_recoverable(),
+                "Ingest planning failed",
+            )),
             Err(PollingIngestJobError::Ingest(e)) => {
-                tracing::error!(error = ?e, error_msg = %e, "Ingest failed");
-                Ok(Self::failed(e.is_recoverable()))
+                Ok(failed_outcome(&e, e.is_recoverable(), "Ingest failed"))
             }
             Err(PollingIngestJobError::Internal(e)) => Err(e),
         }
@@ -147,20 +147,18 @@ impl UpdateDatasetTaskRunner {
                 e @ (TransformElaborateError::TransformNotDefined(_)
                 | TransformElaborateError::InputsChanged(_)
                 | TransformElaborateError::Internal(_)),
-            )) => {
-                tracing::error!(error = ?e, error_msg = %e, "Transform elaboration failed");
-                Ok(Self::failed(e.is_recoverable()))
-            }
-            Err(TransformJobError::Execute(e)) => {
-                tracing::error!(error = ?e, error_msg = %e, "Transform execution failed");
-                Ok(Self::failed(e.is_recoverable()))
-            }
-            Err(TransformJobError::NotFound(_)) => Ok(dataset_deleted_outcome(target_handle)),
-            Err(TransformJobError::RefMoved(e)) => Ok(ref_moved_outcome(
-                target_handle.id.clone(),
-                e.reference.clone(),
-                Some(e),
+            )) => Ok(failed_outcome(
+                &e,
+                e.is_recoverable(),
+                "Transform elaboration failed",
             )),
+            Err(TransformJobError::Execute(e)) => Ok(failed_outcome(
+                &e,
+                e.is_recoverable(),
+                "Transform execution failed",
+            )),
+            Err(TransformJobError::NotFound(_)) => Ok(dataset_deleted_outcome(target_handle)),
+            Err(TransformJobError::RefCASFailed(e)) => Ok(ref_cas_failed_outcome(target_handle, e)),
             Err(TransformJobError::Access(e)) => Ok(operation_not_allowed_outcome(&e)),
             Err(TransformJobError::Internal(e)) => Err(e),
         }
@@ -217,10 +215,7 @@ impl UpdateDatasetTaskRunner {
                 | SyncError::Corrupted(_)
                 | SyncError::Access(_)
                 | SyncError::Internal(_)),
-            )) => {
-                tracing::error!(error = ?e, error_msg = %e, "Sync failed");
-                Ok(Self::failed(e.is_recoverable()))
-            }
+            )) => Ok(failed_outcome(&e, e.is_recoverable(), "Sync failed")),
         }
     }
 
@@ -245,10 +240,6 @@ impl UpdateDatasetTaskRunner {
         TaskOutcome::Success(
             TaskResultDatasetUpdate::UpToDate(PullResultUpToDate::Transform).into_task_result(),
         )
-    }
-
-    fn failed(recoverable: bool) -> TaskOutcome {
-        TaskOutcome::Failed(TaskError::empty(recoverable))
     }
 }
 

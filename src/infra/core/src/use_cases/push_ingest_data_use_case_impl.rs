@@ -11,7 +11,7 @@ use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
 use dill::{component, interface};
-use internal_error::{ErrorIntoInternal, ResultIntoInternal};
+use internal_error::ResultIntoInternal;
 use kamu_accounts::Principal;
 use kamu_core::*;
 use kamu_datasets::{
@@ -52,15 +52,7 @@ impl PushIngestDataUseCaseImpl {
                 ),
             )
             .await
-            .map_err(|e| {
-                use DatasetPermissionError as E;
-
-                match e {
-                    E::NotFound(e) => PushIngestDataError::NotFound(e),
-                    E::Access(e) => PushIngestDataError::Access(e),
-                    e @ E::Internal(_) => PushIngestDataError::Internal(e.int_err()),
-                }
-            })
+            .map_err(DatasetPermissionError::into_error)
     }
 
     async fn run_single_ingest(

@@ -28,22 +28,6 @@ pub struct GetDatasetDownstreamDependenciesUseCaseImpl {
     dataset_entry_service: Arc<dyn DatasetEntryService>,
 }
 
-impl GetDatasetDownstreamDependenciesUseCaseImpl {
-    async fn can_maintain(&self, dataset_id: &odf::DatasetID) -> Result<bool, InternalError> {
-        match self
-            .dataset_permission_checker
-            .check_permission(&self.principal, dataset_id, DatasetPermission::Maintain)
-            .await
-        {
-            Ok(()) => Ok(true),
-            Err(DatasetPermissionError::Access(_) | DatasetPermissionError::NotFound(_)) => {
-                Ok(false)
-            }
-            Err(DatasetPermissionError::Internal(e)) => Err(e),
-        }
-    }
-}
-
 #[async_trait::async_trait]
 impl GetDatasetDownstreamDependenciesUseCase for GetDatasetDownstreamDependenciesUseCaseImpl {
     #[tracing::instrument(
@@ -125,7 +109,11 @@ impl GetDatasetDownstreamDependenciesUseCase for GetDatasetDownstreamDependencie
 
         // Downstreams the caller cannot read are counted for maintainers only:
         // to anyone else, the count would reveal that such datasets exist
-        if self.can_maintain(dataset_id).await? {
+        if self
+            .dataset_permission_checker
+            .is_permission_granted(&self.principal, dataset_id, DatasetPermission::Maintain)
+            .await?
+        {
             return Ok(self
                 .dependency_graph_service
                 .get_downstream_dependencies_count(dataset_id)

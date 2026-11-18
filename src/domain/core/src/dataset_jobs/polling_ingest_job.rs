@@ -9,7 +9,7 @@
 
 use std::sync::Arc;
 
-use internal_error::{ErrorIntoInternal, InternalError};
+use internal_error::InternalError;
 use kamu_datasets::DatasetPermissionError;
 use thiserror::Error;
 
@@ -20,6 +20,7 @@ use crate::{
     PollingIngestOptions,
     PollingIngestPlanError,
     PollingIngestResult,
+    map_set_chain_ref_error,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -76,7 +77,7 @@ pub enum PollingIngestJobError {
 
     /// `HEAD` moved since planning; nothing was committed
     #[error(transparent)]
-    RefMoved(#[from] odf::dataset::RefCASError),
+    RefCASFailed(#[from] odf::dataset::RefCASError),
 
     #[error(transparent)]
     Internal(#[from] InternalError),
@@ -86,13 +87,7 @@ pub enum PollingIngestJobError {
 
 impl From<DatasetPermissionError> for PollingIngestJobError {
     fn from(v: DatasetPermissionError) -> Self {
-        use DatasetPermissionError as E;
-
-        match v {
-            E::NotFound(e) => Self::NotFound(e),
-            E::Access(e) => Self::Access(e),
-            e @ E::Internal(_) => Self::Internal(e.int_err()),
-        }
+        v.into_error()
     }
 }
 
@@ -100,14 +95,7 @@ impl From<DatasetPermissionError> for PollingIngestJobError {
 
 impl From<odf::dataset::SetChainRefError> for PollingIngestJobError {
     fn from(v: odf::dataset::SetChainRefError) -> Self {
-        use odf::dataset::SetChainRefError as E;
-
-        match v {
-            E::CASFailed(e) => Self::RefMoved(e),
-            E::Access(e) => Self::Access(e),
-            E::Internal(e) => Self::Internal(e),
-            e @ E::BlockNotFound(_) => Self::Internal(e.int_err()),
-        }
+        map_set_chain_ref_error(v)
     }
 }
 

@@ -8,7 +8,12 @@
 // by the Apache License, Version 2.0.
 
 use internal_error::InternalError;
+use kamu_accounts::Principal;
 use kamu_datasets::{
+    DatasetOperation,
+    DatasetOperationGuard,
+    DatasetOperationRequest,
+    DatasetPermissionError,
     DatasetReferenceUpdater,
     DatasetRegistry,
     DatasetRegistryExt,
@@ -32,6 +37,29 @@ where
         .try_get_dataset_by_ref(&target_ref)
         .await?
         .ok_or_else(|| odf::DatasetNotFoundError::new(target_ref).into())
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Checks that the principal may run `operation` on the job's target, then
+/// resolves the target in the current transaction
+pub(crate) async fn authorize_and_resolve_job_target<E>(
+    dataset_operation_guard: &dyn DatasetOperationGuard,
+    dataset_registry: &dyn DatasetRegistry,
+    principal: &Principal,
+    target: &odf::DatasetHandle,
+    operation: DatasetOperation,
+) -> Result<ResolvedDataset, E>
+where
+    E: From<DatasetPermissionError> + From<odf::DatasetNotFoundError> + From<InternalError>,
+{
+    dataset_operation_guard
+        .check_operation(
+            principal,
+            &DatasetOperationRequest::new(target.clone(), operation),
+        )
+        .await?;
+    resolve_job_target::<E>(dataset_registry, target).await
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

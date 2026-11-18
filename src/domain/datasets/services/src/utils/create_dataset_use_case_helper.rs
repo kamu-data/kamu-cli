@@ -11,7 +11,7 @@ use std::sync::Arc;
 
 use dill::component;
 use internal_error::*;
-use kamu_accounts::{AccountHandle, DEFAULT_ACCOUNT_NAME};
+use kamu_accounts::{AccountHandle, DEFAULT_ACCOUNT_NAME, Principal};
 use kamu_core::TenancyConfig;
 use kamu_datasets::{
     CreateDatasetError,
@@ -45,6 +45,21 @@ pub struct CreateDatasetUseCaseHelper {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl CreateDatasetUseCaseHelper {
+    /// The account that will own a dataset the principal creates
+    pub fn principal_owner_account(
+        principal: &Principal,
+    ) -> Result<&AccountHandle, odf::AccessError> {
+        match principal {
+            Principal::User(account) => Ok(account),
+            Principal::Node => Err(odf::AccessError::Unauthorized(
+                "The node has no account to own a dataset".into(),
+            )),
+            Principal::Anonymous => {
+                panic!("Anonymous account cannot create dataset");
+            }
+        }
+    }
+
     /// Given a raw alias under which user wants to create a dataset and user's
     /// credentials determine the target account under which dataset will be
     /// created and whether user has permissions to do so

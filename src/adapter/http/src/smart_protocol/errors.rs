@@ -19,72 +19,38 @@ use crate::ws_common::{ReadMessageError, WriteMessageError};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Reading a message from the socket failed during a transfer phase
 #[derive(Error, Debug)]
-#[error("read_error: {read_error}, pull_phase: {pull_phase:?}")]
-pub struct PullReadError {
+#[error("Smart protocol read failed: phase={phase}, error={read_error}")]
+pub struct PhaseReadError {
     pub read_error: ReadMessageError,
-    pub pull_phase: PullPhase,
+    pub phase: TransferPhase,
 }
 
-impl PullReadError {
-    pub fn new(read_error: ReadMessageError, pull_phase: PullPhase) -> Self {
+impl PhaseReadError {
+    pub fn new(read_error: ReadMessageError, phase: impl Into<TransferPhase>) -> Self {
         Self {
             read_error,
-            pull_phase,
+            phase: phase.into(),
         }
     }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Writing a message to the socket failed during a transfer phase
 #[derive(Error, Debug)]
-#[error("read_error: {read_error}, push_phase: {push_phase:?}")]
-pub struct PushReadError {
-    pub read_error: ReadMessageError,
-    pub push_phase: PushPhase,
+#[error("Smart protocol write failed: phase={phase}, error={write_error}")]
+pub struct PhaseWriteError {
+    pub write_error: WriteMessageError,
+    pub phase: TransferPhase,
 }
 
-impl PushReadError {
-    pub fn new(read_error: ReadMessageError, push_phase: PushPhase) -> Self {
-        Self {
-            read_error,
-            push_phase,
-        }
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Error, Debug)]
-#[error("write_error: {write_error}, pull_phase: {pull_phase:?}")]
-pub struct PullWriteError {
-    write_error: WriteMessageError,
-    pull_phase: PullPhase,
-}
-
-impl PullWriteError {
-    pub fn new(write_error: WriteMessageError, pull_phase: PullPhase) -> Self {
+impl PhaseWriteError {
+    pub fn new(write_error: WriteMessageError, phase: impl Into<TransferPhase>) -> Self {
         Self {
             write_error,
-            pull_phase,
-        }
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Error, Debug)]
-#[error("write_error: {write_error}, push_phase: {push_phase:?}")]
-pub struct PushWriteError {
-    write_error: WriteMessageError,
-    push_phase: PushPhase,
-}
-
-impl PushWriteError {
-    pub fn new(write_error: WriteMessageError, push_phase: PushPhase) -> Self {
-        Self {
-            write_error,
-            push_phase,
+            phase: phase.into(),
         }
     }
 }
@@ -94,10 +60,10 @@ impl PushWriteError {
 #[derive(Error, Debug)]
 pub enum PullServerError {
     #[error(transparent)]
-    ReadFailed(PullReadError),
+    ReadFailed(#[from] PhaseReadError),
 
     #[error(transparent)]
-    WriteFailed(PullWriteError),
+    WriteFailed(#[from] PhaseWriteError),
 
     #[error(transparent)]
     Internal(PhaseInternalError),
@@ -111,10 +77,10 @@ pub enum PullClientError {
     OverwriteSeedBlock(OverwriteSeedBlockError),
 
     #[error(transparent)]
-    ReadFailed(PullReadError),
+    ReadFailed(#[from] PhaseReadError),
 
     #[error(transparent)]
-    WriteFailed(PullWriteError),
+    WriteFailed(#[from] PhaseWriteError),
 
     #[error(transparent)]
     InvalidInterval(odf::dataset::InvalidIntervalError),
@@ -135,10 +101,10 @@ pub enum PushServerError {
     OverwriteSeedBlock(OverwriteSeedBlockError),
 
     #[error(transparent)]
-    ReadFailed(PushReadError),
+    ReadFailed(#[from] PhaseReadError),
 
     #[error(transparent)]
-    WriteFailed(PushWriteError),
+    WriteFailed(#[from] PhaseWriteError),
 
     #[error(transparent)]
     RefCollision(odf::dataset::RefCollisionError),
@@ -185,10 +151,10 @@ pub enum PushClientError {
     OverwriteSeedBlock(OverwriteSeedBlockError),
 
     #[error(transparent)]
-    ReadFailed(PushReadError),
+    ReadFailed(#[from] PhaseReadError),
 
     #[error(transparent)]
-    WriteFailed(PushWriteError),
+    WriteFailed(#[from] PhaseWriteError),
 
     #[error(transparent)]
     InvalidHead(odf::dataset::RefCASError),

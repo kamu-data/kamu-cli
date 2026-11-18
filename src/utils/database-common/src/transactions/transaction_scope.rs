@@ -53,11 +53,8 @@ impl TransactionScope {
             .int_err()?;
         let transaction_ref = transaction_manager.make_transaction_ref().await?;
 
-        let mut b = catalog.builder_chained();
-        transaction_ref.register(&mut b);
-
         Ok(Self {
-            catalog: b.build(),
+            catalog: transaction_ref.chained_catalog(&catalog),
             maybe_open_transaction: Some(OpenTransaction {
                 transaction_manager,
                 transaction_ref,

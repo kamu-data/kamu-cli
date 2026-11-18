@@ -19,7 +19,7 @@ See also: `kamu-dill-di` for general dill patterns.
 
 ## Core Philosophy
 
-Tests in this codebase follow two non-negotiable rules:
+Tests in this codebase follow three non-negotiable rules:
 
 **Rule 1 — Test bodies must be high-level.**
 A test body reads like a specification: arrange, act, assert — with no
@@ -31,6 +31,12 @@ resolution, and service construction never appear inside a `#[test]` or
 There are no free `async fn` helpers, no `mod utils` full of functions that take
 a service or catalog as an argument. All reusable operations are methods on the
 harness struct. This keeps test code discoverable, namespaced, and self-contained.
+
+**Rule 3 — Reuse the harnesses that exist before adding to them.**
+Before writing a setup sequence, a builder of expected values or a mock expectation, look in the
+base harnesses (`BaseRepoHarness`, `BaseUseCaseHarness`, the crate's `testing` module) and in the
+suite's sibling files. Extend a shared harness rather than copying its setup into a new suite.
+When cases differ only by data, write one table-driven test instead of near-identical copies.
 
 ### What a well-written test looks like
 

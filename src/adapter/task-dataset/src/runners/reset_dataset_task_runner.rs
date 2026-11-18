@@ -15,8 +15,9 @@ use kamu_task_system::*;
 
 use super::task_reference_update::{
     dataset_deleted_outcome,
+    failed_outcome,
     operation_not_allowed_outcome,
-    ref_moved_outcome,
+    ref_cas_failed_outcome,
 };
 use super::task_span_outcome::TaskSpanOutcome;
 use crate::{
@@ -86,17 +87,16 @@ impl ResetDatasetTaskRunner {
                     TaskErrorDatasetReset::ResetHeadNotFound.into_task_error(),
                 ))
             }
-            ResetError::Execution(ResetExecutionError::SetReferenceFailed(E::CASFailed(e))) => Ok(
-                ref_moved_outcome(target.id.clone(), e.reference.clone(), Some(e)),
-            ),
+            ResetError::Execution(ResetExecutionError::SetReferenceFailed(E::CASFailed(e))) => {
+                Ok(ref_cas_failed_outcome(target, e))
+            }
             ResetError::Access(e)
             | ResetError::Execution(ResetExecutionError::SetReferenceFailed(E::Access(e))) => {
                 Ok(operation_not_allowed_outcome(&e))
             }
             e @ (ResetError::Planning(ResetPlanningError::Internal(_))
             | ResetError::Execution(ResetExecutionError::SetReferenceFailed(E::Internal(_)))) => {
-                tracing::error!(error = ?e, error_msg = %e, "Reset failed");
-                Ok(TaskOutcome::Failed(TaskError::empty_recoverable()))
+                Ok(failed_outcome(&e, true, "Reset failed"))
             }
             ResetError::Internal(e) => Err(e),
         }

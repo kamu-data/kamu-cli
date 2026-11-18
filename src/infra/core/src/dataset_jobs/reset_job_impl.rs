@@ -20,14 +20,9 @@ use kamu_core::{
     ResetPlanner,
     ResetResult,
 };
-use kamu_datasets::{
-    DatasetOperation,
-    DatasetOperationGuard,
-    DatasetOperationRequest,
-    DatasetRegistry,
-};
+use kamu_datasets::{DatasetOperation, DatasetOperationGuard, DatasetRegistry};
 
-use super::job_target::resolve_job_target;
+use super::job_target::authorize_and_resolve_job_target;
 use crate::utils::span_outcome::SpanOutcome;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -81,15 +76,14 @@ impl ResetJob for ResetJobImpl {
                                    planner: Arc<dyn ResetPlanner>,
                                    executor: Arc<dyn ResetExecutor>|
          -> Result<ResetResult, ResetError> {
-            dataset_operation_guard
-                .check_operation(
-                    &self.principal,
-                    &DatasetOperationRequest::new(target.clone(), DatasetOperation::Reset),
-                )
-                .await?;
-
-            let dataset =
-                resolve_job_target::<ResetError>(dataset_registry.as_ref(), target).await?;
+            let dataset = authorize_and_resolve_job_target::<ResetError>(
+                dataset_operation_guard.as_ref(),
+                dataset_registry.as_ref(),
+                &self.principal,
+                target,
+                DatasetOperation::Reset,
+            )
+            .await?;
             let plan = planner
                 .plan_reset(dataset.clone(), maybe_new_head, maybe_old_head)
                 .await?;

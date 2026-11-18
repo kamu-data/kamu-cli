@@ -19,7 +19,12 @@ use kamu_datasets::NameCollisionError;
 use url::Url;
 
 use super::WsSmartTransferProtocolClient;
-use super::transport::{TungsteniteStream, close_after_flow, read_payload, write_payload};
+use super::transport::{
+    TungsteniteStream,
+    close_after_flow,
+    read_phase_payload,
+    write_phase_payload,
+};
 use crate::smart_protocol::errors::*;
 use crate::smart_protocol::messages::*;
 use crate::smart_protocol::phases::*;
@@ -57,20 +62,12 @@ impl WsSmartTransferProtocolClient {
 
         tracing::debug!("Sending push request: {push_request_message:?}");
 
-        write_payload(socket, push_request_message)
-            .await
-            .map_err(|e| {
-                PushClientError::WriteFailed(PushWriteError::new(e, PushPhase::InitialRequest))
-            })?;
+        write_phase_payload(socket, push_request_message, PushPhase::InitialRequest).await?;
 
         tracing::debug!("Reading push request response");
 
         let dataset_push_response =
-            read_payload::<DatasetPushResponse>(socket)
-                .await
-                .map_err(|e| {
-                    PushClientError::ReadFailed(PushReadError::new(e, PushPhase::InitialRequest))
-                })?;
+            read_phase_payload::<DatasetPushResponse>(socket, PushPhase::InitialRequest).await?;
 
         match dataset_push_response {
             Ok(success) => {
@@ -119,29 +116,25 @@ impl WsSmartTransferProtocolClient {
             "Metadata batch of blocks formed",
         );
 
-        write_payload(
+        write_phase_payload(
             socket,
             DatasetPushMetadataRequest {
                 new_blocks: metadata_batch,
             },
+            PushPhase::MetadataRequest,
         )
-        .await
-        .map_err(|e| {
-            PushClientError::WriteFailed(PushWriteError::new(e, PushPhase::MetadataRequest))
-        })?;
+        .await?;
 
         tracing::debug!("Reading push metadata response");
 
-        let dataset_metadata_push_response = read_payload::<DatasetPushMetadataResponse>(socket)
-            .await
-            .map_err(|e| {
-                PushClientError::ReadFailed(PushReadError::new(e, PushPhase::MetadataRequest))
-            })?
-            .map_err(|e| match e {
-                DatasetPushMetadataError::SeedBlockOverwriteRestricted(_) => {
-                    PushClientError::OverwriteSeedBlock(OverwriteSeedBlockError {})
-                }
-            })?;
+        let dataset_metadata_push_response =
+            read_phase_payload::<DatasetPushMetadataResponse>(socket, PushPhase::MetadataRequest)
+                .await?
+                .map_err(|e| match e {
+                    DatasetPushMetadataError::SeedBlockOverwriteRestricted(_) => {
+                        PushClientError::OverwriteSeedBlock(OverwriteSeedBlockError {})
+                    }
+                })?;
 
         Ok(dataset_metadata_push_response)
     }
@@ -195,35 +188,31 @@ impl WsSmartTransferProtocolClient {
             "Sending push objects request"
         );
 
-        write_payload(socket, push_objects_request)
-            .await
-            .map_err(|e| {
-                PushClientError::WriteFailed(PushWriteError::new(e, PushPhase::ObjectsRequest))
-            })?;
+        write_phase_payload(socket, push_objects_request, PushPhase::ObjectsRequest).await?;
 
         tracing::debug!("Reading push objects request response");
 
         let dataset_objects_push_response =
-            read_payload::<DatasetPushObjectsTransferResponse>(socket)
-                .await
-                .map_err(|e| {
-                    PushClientError::ReadFailed(PushReadError::new(e, PushPhase::ObjectsRequest))
-                })?
-                .map_err(|e| match e {
-                    DatasetPushObjectsTransferError::RefCollision(err) => {
-                        PushClientError::RefCollision(odf::dataset::RefCollisionError {
-                            id: err.dataset_id,
-                        })
-                    }
-                    DatasetPushObjectsTransferError::NameCollision(err) => {
-                        PushClientError::NameCollision(NameCollisionError {
-                            alias: err.dataset_alias,
-                        })
-                    }
-                    DatasetPushObjectsTransferError::Internal(err) => {
-                        PushClientError::Internal(ClientInternalError::from(err).int_err())
-                    }
-                })?;
+            read_phase_payload::<DatasetPushObjectsTransferResponse>(
+                socket,
+                PushPhase::ObjectsRequest,
+            )
+            .await?
+            .map_err(|e| match e {
+                DatasetPushObjectsTransferError::RefCollision(err) => {
+                    PushClientError::RefCollision(odf::dataset::RefCollisionError {
+                        id: err.dataset_id,
+                    })
+                }
+                DatasetPushObjectsTransferError::NameCollision(err) => {
+                    PushClientError::NameCollision(NameCollisionError {
+                        alias: err.dataset_alias,
+                    })
+                }
+                DatasetPushObjectsTransferError::Internal(err) => {
+                    PushClientError::Internal(ClientInternalError::from(err).int_err())
+                }
+            })?;
 
         tracing::debug!(
             objects_count = % dataset_objects_push_response
@@ -284,12 +273,8 @@ impl WsSmartTransferProtocolClient {
 
         loop {
             tokio::select! {
-                progress_request = read_payload::<DatasetPushObjectsUploadProgressRequest>(socket) => {
-                    progress_request
-                        .map_err(|e| {
-                            PushClientError::ReadFailed(PushReadError::new(e, PushPhase::ObjectsUploadProgress))
-                        })
-                        .int_err()?;
+                progress_request = read_phase_payload::<DatasetPushObjectsUploadProgressRequest>(socket, PushPhase::ObjectsUploadProgress) => {
+                    progress_request.int_err()?;
                     let uploaded_files_count: i32 = uploaded_files_counter.load(Ordering::Relaxed);
                     tracing::debug!(%uploaded_files_count, "Notifying server about the upload progress");
                     self
@@ -321,7 +306,7 @@ impl WsSmartTransferProtocolClient {
         uploaded_objects_count: i32,
     ) -> Result<(), PushClientError> {
         tracing::debug!("Sending push objects upload progress");
-        write_payload(
+        write_phase_payload(
             socket,
             DatasetPushObjectsUploadProgressResponse {
                 details: ObjectsUploadProgressDetails::Running(
@@ -330,11 +315,9 @@ impl WsSmartTransferProtocolClient {
                     },
                 ),
             },
+            PushPhase::ObjectsUploadProgress,
         )
-        .await
-        .map_err(|e| {
-            PushClientError::WriteFailed(PushWriteError::new(e, PushPhase::ObjectsUploadProgress))
-        })?;
+        .await?;
         Ok(())
     }
 
@@ -343,16 +326,14 @@ impl WsSmartTransferProtocolClient {
         socket: &mut TungsteniteStream,
     ) -> Result<(), PushClientError> {
         tracing::debug!("Sending push objects upload complete");
-        write_payload(
+        write_phase_payload(
             socket,
             DatasetPushObjectsUploadProgressResponse {
                 details: ObjectsUploadProgressDetails::Complete,
             },
+            PushPhase::ObjectsUploadProgress,
         )
-        .await
-        .map_err(|e| {
-            PushClientError::WriteFailed(PushWriteError::new(e, PushPhase::ObjectsUploadProgress))
-        })?;
+        .await?;
         Ok(())
     }
 
@@ -367,20 +348,14 @@ impl WsSmartTransferProtocolClient {
     ) -> Result<(), PushClientError> {
         tracing::debug!("Sending push complete request");
 
-        write_payload(socket, DatasetPushComplete {})
-            .await
-            .map_err(|e| {
-                PushClientError::WriteFailed(PushWriteError::new(e, PushPhase::CompleteRequest))
-            })?;
+        write_phase_payload(socket, DatasetPushComplete {}, PushPhase::CompleteRequest).await?;
 
         tracing::debug!("Reading push complete response");
 
         loop {
-            let reply = read_payload::<DatasetPushCompleteReply>(socket)
-                .await
-                .map_err(|e| {
-                    PushClientError::ReadFailed(PushReadError::new(e, PushPhase::CompleteRequest))
-                })?;
+            let reply =
+                read_phase_payload::<DatasetPushCompleteReply>(socket, PushPhase::CompleteRequest)
+                    .await?;
 
             return match reply {
                 // The server stops asking for progress once it reads that the

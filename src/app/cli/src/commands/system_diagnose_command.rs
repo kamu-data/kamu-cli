@@ -20,17 +20,13 @@ use file_utils::OwnedFile;
 use futures::TryStreamExt;
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu::domain::engine::normalize_logs;
-use kamu::domain::{
-    VerificationMultiListener,
-    VerificationOptions,
-    VerificationRequest,
-    VerifyJob,
-};
+use kamu::domain::{VerificationOptions, VerifyJob};
 use kamu::utils::docker_images::BUSYBOX;
 use kamu_datasets::DatasetRegistry;
 use random_strings::get_random_name;
 use thiserror::Error;
 
+use super::common::verify_datasets;
 use super::{CLIError, Command};
 use crate::{VerificationMultiProgress, WorkspaceService};
 
@@ -352,20 +348,17 @@ impl DiagnosticCheck for CheckWorkspaceConsistent {
             dataset_registry.all_dataset_handles().try_collect().await?
         });
 
-        let mut results = Vec::with_capacity(dataset_handles.len());
-        for dataset_handle in dataset_handles {
-            let listener = progress.begin_verify(&dataset_handle);
-            let request = VerificationRequest {
-                target: dataset_handle,
-                block_range: (None, None),
-                options: VerificationOptions {
-                    check_integrity: true,
-                    check_logical_hashes: false,
-                    replay_transformations: false,
-                },
-            };
-            results.push(self.verify_job.run(request, listener).await);
-        }
+        let results = verify_datasets(
+            self.verify_job.as_ref(),
+            dataset_handles,
+            &VerificationOptions {
+                check_integrity: true,
+                check_logical_hashes: false,
+                replay_transformations: false,
+            },
+            Some(progress.as_ref()),
+        )
+        .await;
 
         for result in results {
             // TODO: This will currently not show which dataset validation failed for

@@ -20,6 +20,7 @@ use aws_sdk_s3::operation::create_multipart_upload::CreateMultipartUploadError;
 use aws_sdk_s3::operation::delete_object::{DeleteObjectError, DeleteObjectOutput};
 use aws_sdk_s3::operation::get_object::{GetObjectError, GetObjectOutput};
 use aws_sdk_s3::operation::head_object::{HeadObjectError, HeadObjectOutput};
+use aws_sdk_s3::operation::put_object::builders::PutObjectFluentBuilder;
 use aws_sdk_s3::operation::put_object::{PutObjectError, PutObjectOutput};
 use aws_sdk_s3::operation::upload_part::UploadPartError;
 use aws_sdk_s3::presigning::{PresignedRequest, PresigningConfig};
@@ -284,17 +285,7 @@ impl S3Context {
         data: &[u8],
     ) -> Result<PutObjectOutput, SdkError<PutObjectError>> {
         self.api_call("put_object", || async {
-            let size = i64::try_from(data.len()).unwrap();
-
-            self.client
-                .put_object()
-                .bucket(self.shared_state.bucket.clone())
-                .key(key)
-                // TODO: PERF: Avoid copying data into a buffer
-                .body(Vec::from(data).into())
-                .content_length(size)
-                .send()
-                .await
+            self.put_object_request(key, data).send().await
         })
         .await
     }
@@ -309,16 +300,7 @@ impl S3Context {
         condition: PutObjectCondition,
     ) -> Result<PutObjectOutput, SdkError<PutObjectError>> {
         self.api_call("put_object(conditional)", || async {
-            let size = i64::try_from(data.len()).unwrap();
-
-            let request = self
-                .client
-                .put_object()
-                .bucket(self.shared_state.bucket.clone())
-                .key(key)
-                // TODO: PERF: Avoid copying data into a buffer
-                .body(Vec::from(data).into())
-                .content_length(size);
+            let request = self.put_object_request(key, data);
 
             let request = match condition {
                 PutObjectCondition::IfMatch(e_tag) => request.if_match(e_tag),
@@ -328,6 +310,18 @@ impl S3Context {
             request.send().await
         })
         .await
+    }
+
+    fn put_object_request(&self, key: String, data: &[u8]) -> PutObjectFluentBuilder {
+        let size = i64::try_from(data.len()).unwrap();
+
+        self.client
+            .put_object()
+            .bucket(self.shared_state.bucket.clone())
+            .key(key)
+            // TODO: PERF: Avoid copying data into a buffer
+            .body(Vec::from(data).into())
+            .content_length(size)
     }
 
     pub async fn put_object_presigned_request(

@@ -15,14 +15,13 @@ use kamu::domain::{
     CompactionJob,
     CompactionMultiListener,
     CompactionOptions,
-    VerificationMultiListener,
     VerificationOptions,
-    VerificationRequest,
     VerifyJob,
 };
 use kamu::utils::datasets_filtering::filter_datasets_by_local_pattern;
 use kamu_datasets::DatasetRegistry;
 
+use super::common::verify_dataset;
 use crate::{
     BatchError,
     CLIError,
@@ -69,17 +68,13 @@ impl CompactCommand {
             progress.draw();
         });
 
-        let result = self
-            .verify_job
-            .run(
-                VerificationRequest {
-                    target: dataset_handle.clone(),
-                    block_range: (None, None),
-                    options: VerificationOptions::default(),
-                },
-                listener.begin_verify(dataset_handle),
-            )
-            .await;
+        let result = verify_dataset(
+            self.verify_job.as_ref(),
+            dataset_handle.clone(),
+            &VerificationOptions::default(),
+            Some(listener.as_ref()),
+        )
+        .await;
 
         listener.finish();
         draw_thread.join().unwrap();

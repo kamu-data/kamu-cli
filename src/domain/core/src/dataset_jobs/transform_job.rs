@@ -9,11 +9,17 @@
 
 use std::sync::Arc;
 
-use internal_error::{ErrorIntoInternal, InternalError};
+use internal_error::InternalError;
 use kamu_datasets::DatasetPermissionError;
 use thiserror::Error;
 
-use crate::{TransformElaborateError, TransformExecuteError, TransformListener, TransformResult};
+use crate::{
+    TransformElaborateError,
+    TransformExecuteError,
+    TransformListener,
+    TransformResult,
+    map_set_chain_ref_error,
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -64,7 +70,7 @@ pub enum TransformJobError {
 
     /// `HEAD` moved since elaboration; nothing was committed
     #[error(transparent)]
-    RefMoved(#[from] odf::dataset::RefCASError),
+    RefCASFailed(#[from] odf::dataset::RefCASError),
 
     #[error(transparent)]
     Internal(#[from] InternalError),
@@ -74,13 +80,7 @@ pub enum TransformJobError {
 
 impl From<DatasetPermissionError> for TransformJobError {
     fn from(v: DatasetPermissionError) -> Self {
-        use DatasetPermissionError as E;
-
-        match v {
-            E::NotFound(e) => Self::NotFound(e),
-            E::Access(e) => Self::Access(e),
-            e @ E::Internal(_) => Self::Internal(e.int_err()),
-        }
+        v.into_error()
     }
 }
 
@@ -88,14 +88,7 @@ impl From<DatasetPermissionError> for TransformJobError {
 
 impl From<odf::dataset::SetChainRefError> for TransformJobError {
     fn from(v: odf::dataset::SetChainRefError) -> Self {
-        use odf::dataset::SetChainRefError as E;
-
-        match v {
-            E::CASFailed(e) => Self::RefMoved(e),
-            E::Access(e) => Self::Access(e),
-            E::Internal(e) => Self::Internal(e),
-            e @ E::BlockNotFound(_) => Self::Internal(e.int_err()),
-        }
+        map_set_chain_ref_error(v)
     }
 }
 

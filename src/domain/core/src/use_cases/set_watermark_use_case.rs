@@ -57,13 +57,7 @@ pub enum SetWatermarkError {
 
 impl From<DatasetPermissionError> for SetWatermarkError {
     fn from(v: DatasetPermissionError) -> Self {
-        use DatasetPermissionError as E;
-
-        match v {
-            E::NotFound(e) => Self::NotFound(e),
-            E::Access(e) => Self::Access(e),
-            E::Internal(e) => Self::Internal(e),
-        }
+        v.into_error()
     }
 }
 

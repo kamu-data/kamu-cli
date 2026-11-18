@@ -115,11 +115,11 @@ impl AxumServerPullProtocolInstance {
         )
     )]
     async fn handle_pull_request_initiation(&mut self) -> Result<PlannedPull, PullServerError> {
-        let pull_request = axum_read_payload::<DatasetPullRequest>(&mut self.socket)
-            .await
-            .map_err(|e| {
-                PullServerError::ReadFailed(PullReadError::new(e, PullPhase::InitialRequest))
-            })?;
+        let pull_request = axum_read_phase_payload::<DatasetPullRequest>(
+            &mut self.socket,
+            PullPhase::InitialRequest,
+        )
+        .await?;
 
         tracing::debug!(
             "Pull client sent a pull request: beginAfter={:?} stopAt={:?} \
@@ -173,7 +173,7 @@ impl AxumServerPullProtocolInstance {
             .ok()
             .map(|planned| planned.stop_at.clone());
 
-        axum_write_payload::<DatasetPullResponse>(
+        axum_write_phase_payload::<DatasetPullResponse>(
             &mut self.socket,
             match transfer_plan_result {
                 Ok(PlannedTransfer { transfer_plan, .. }) => {
@@ -204,11 +204,9 @@ impl AxumServerPullProtocolInstance {
                     }))
                 }
             },
+            PullPhase::InitialRequest,
         )
-        .await
-        .map_err(|e| {
-            PullServerError::WriteFailed(PullWriteError::new(e, PullPhase::InitialRequest))
-        })?;
+        .await?;
 
         Ok(PlannedPull {
             request: pull_request,
@@ -220,16 +218,21 @@ impl AxumServerPullProtocolInstance {
         &mut self,
         planned_pull: PlannedPull,
     ) -> Result<bool, PullServerError> {
-        match axum_read_payload::<DatasetPullMetadataRequest>(&mut self.socket).await {
+        match axum_read_phase_payload::<DatasetPullMetadataRequest>(
+            &mut self.socket,
+            PullPhase::MetadataRequest,
+        )
+        .await
+        {
             Ok(_) => {
                 self.handle_pull_metadata_request(planned_pull).await?;
                 Ok(true)
             }
-            Err(ReadMessageError::Closed) => Ok(false),
-            Err(e) => Err(PullServerError::ReadFailed(PullReadError::new(
-                e,
-                PullPhase::MetadataRequest,
-            ))),
+            Err(PhaseReadError {
+                read_error: ReadMessageError::Closed,
+                ..
+            }) => Ok(false),
+            Err(e) => Err(e.into()),
         }
     }
 
@@ -278,29 +281,33 @@ impl AxumServerPullProtocolInstance {
             "Metadata batch of blocks formed",
         );
 
-        axum_write_payload::<DatasetMetadataPullResponse>(
+        axum_write_phase_payload::<DatasetMetadataPullResponse>(
             &mut self.socket,
             DatasetMetadataPullResponse {
                 blocks: metadata_batch,
             },
+            PullPhase::MetadataRequest,
         )
-        .await
-        .map_err(|e| {
-            PullServerError::WriteFailed(PullWriteError::new(e, PullPhase::MetadataRequest))
-        })
+        .await?;
+        Ok(())
     }
 
     async fn try_handle_pull_objects_request(&mut self) -> Result<bool, PullServerError> {
-        match axum_read_payload::<DatasetPullObjectsTransferRequest>(&mut self.socket).await {
+        match axum_read_phase_payload::<DatasetPullObjectsTransferRequest>(
+            &mut self.socket,
+            PullPhase::ObjectsRequest,
+        )
+        .await
+        {
             Ok(request) => {
                 self.handle_pull_objects_request(request).await?;
                 Ok(true)
             }
-            Err(ReadMessageError::Closed) => Ok(false),
-            Err(e) => Err(PullServerError::ReadFailed(PullReadError::new(
-                e,
-                PullPhase::ObjectsRequest,
-            ))),
+            Err(PhaseReadError {
+                read_error: ReadMessageError::Closed,
+                ..
+            }) => Ok(false),
+            Err(e) => Err(e.into()),
         }
     }
 
@@ -332,16 +339,15 @@ impl AxumServerPullProtocolInstance {
 
         tracing::debug!("Object transfer strategies defined");
 
-        axum_write_payload::<DatasetPullObjectsTransferResponse>(
+        axum_write_phase_payload::<DatasetPullObjectsTransferResponse>(
             &mut self.socket,
             DatasetPullObjectsTransferResponse {
                 object_transfer_strategies,
             },
+            PullPhase::ObjectsRequest,
         )
-        .await
-        .map_err(|e| {
-            PullServerError::WriteFailed(PullWriteError::new(e, PullPhase::ObjectsRequest))
-        })
+        .await?;
+        Ok(())
     }
 }
 

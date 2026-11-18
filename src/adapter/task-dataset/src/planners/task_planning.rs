@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_datasets::{DatasetRegistry, DatasetRegistryExt, ResolvedDataset};
+use kamu_datasets::{DatasetRegistry, DatasetRegistryExt};
 use kamu_task_system::{PrepareTaskDefinitionError, TaskError};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -17,9 +17,9 @@ use kamu_task_system::{PrepareTaskDefinitionError, TaskError};
 pub(crate) async fn resolve_task_dataset(
     dataset_registry: &dyn DatasetRegistry,
     dataset_id: &odf::DatasetID,
-) -> Result<ResolvedDataset, PrepareTaskDefinitionError> {
+) -> Result<odf::DatasetHandle, PrepareTaskDefinitionError> {
     match dataset_registry.get_dataset_by_id(dataset_id).await {
-        Ok(target) => Ok(target),
+        Ok(target) => Ok(target.take_handle()),
         Err(odf::DatasetRefUnresolvedError::NotFound(e)) => {
             tracing::warn!(error = %e, "The task's dataset no longer exists");
             Err(PrepareTaskDefinitionError::Failed(

@@ -16,6 +16,8 @@ use odf_dataset::*;
 use odf_metadata::*;
 use odf_storage::*;
 
+use crate::entities::store_dataset_steps::{append_seed, ensure_no_stored_head};
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[dill::component]
@@ -119,52 +121,8 @@ impl DatasetStorageUnitWriter for DatasetStorageUnitLocalFs {
         seed_block: MetadataBlockTyped<Seed>,
         opts: StoreDatasetOpts,
     ) -> Result<StoreDatasetResult, StoreDatasetError> {
-        // Check if a dataset with the same ID can be resolved successfully
-        use DatasetStorageUnit;
-        let maybe_existing_dataset = match self
-            .get_stored_dataset_by_id(&seed_block.event.dataset_id)
-            .await
-        {
-            Ok(existing_dataset) => Ok(Some(existing_dataset)),
-            Err(GetStoredDatasetError::UnresolvedId(_)) => Ok(None),
-            Err(GetStoredDatasetError::Internal(e)) => Err(StoreDatasetError::Internal(e)),
-        }?;
+        ensure_no_stored_head(self, &seed_block.event.dataset_id).await?;
 
-        // If so, there are 2 possibilities:
-        // - Dataset was partially created before (no head yet) and was not GC'd - so we assume
-        //   ownership
-        // - Dataset existed before (has valid head) - we should error out with ref collision
-        if let Some(existing_dataset) = maybe_existing_dataset {
-            match existing_dataset
-                .as_metadata_chain()
-                .as_uncached_ref_repo()
-                .get(BlockRef::Head.as_str())
-                .await
-            {
-                // Existing head
-                Ok(_) => {
-                    return Err(StoreDatasetError::RefCollision(RefCollisionError {
-                        id: seed_block.event.dataset_id.clone(),
-                    }));
-                }
-
-                // No head, so continue creating
-                Err(GetRefError::NotFound(_)) => {
-                    tracing::info!(
-                        dataset_id = %seed_block.event.dataset_id,
-                        "Taking over a stored dataset left without HEAD"
-                    );
-                }
-
-                // Errors...
-                Err(GetRefError::Access(e)) => {
-                    return Err(StoreDatasetError::Internal(e.int_err()));
-                }
-                Err(GetRefError::Internal(e)) => return Err(StoreDatasetError::Internal(e)),
-            }
-        }
-
-        // It's okay to create a new dataset by this point
         let dataset_id = seed_block.event.dataset_id.clone();
         let dataset_kind = seed_block.event.dataset_kind;
 
@@ -175,25 +133,7 @@ impl DatasetStorageUnitWriter for DatasetStorageUnitLocalFs {
             .dataset_lfs_builder
             .build_lfs_dataset(&dataset_id, layout);
 
-        // Write seed block; the caller sets `HEAD`
-        let seed = match dataset
-            .as_metadata_chain()
-            .append(
-                seed_block.into(),
-                AppendOpts {
-                    update_ref: None,
-                    block_data: opts
-                        .seed_block_bytes
-                        .as_ref()
-                        .map(MetadataBlockBytes::as_slice),
-                    ..AppendOpts::default()
-                },
-            )
-            .await
-        {
-            Ok(seed) => seed,
-            Err(err) => return Err(err.int_err().into()),
-        };
+        let seed = append_seed(dataset.as_metadata_chain(), seed_block, &opts).await?;
 
         tracing::info!(
             id = %dataset_id,

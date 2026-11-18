@@ -50,17 +50,8 @@ impl CreateDatasetUseCase for CreateDatasetUseCaseImpl {
             "Initiating creation of dataset from seed block"
         );
 
-        let principal_account = match self.principal.as_ref() {
-            Principal::User(account) => account,
-            Principal::Node => {
-                return Err(CreateDatasetError::Access(odf::AccessError::Unauthorized(
-                    "The node has no account to own a dataset".into(),
-                )));
-            }
-            Principal::Anonymous => {
-                panic!("Anonymous account cannot create dataset");
-            }
-        };
+        let principal_account =
+            CreateDatasetUseCaseHelper::principal_owner_account(&self.principal)?;
 
         // Resolve target account and full alias of the dataset
         let (canonical_alias, target_account_id) = self
