@@ -46,7 +46,7 @@ odf = { workspace = true, features = [
 async-trait = { version = "0.1", default-features = false }
 base64 = { version = "0.23", default-features = false }
 bytes = "1"
-cheap-clone = { version = "0.3", default-features = false, features = [
+cheap-clone = { version = "1", default-features = false, features = [
     "alloc",
 ] }
 chrono = { version = "0.4", default-features = false }

@@ -11,7 +11,7 @@ use chrono::{DateTime, Utc};
 use database_common::PaginationOpts;
 
 use crate::prelude::*;
-use crate::scalars::{AccountID, AccountName, ResourcePhase, TypeName, UInt64};
+use crate::scalars::{AccountDid, AccountName, ResourcePhase, TypeName, UInt64};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Type aliases for cleaner From implementations
@@ -104,10 +104,12 @@ impl ResourceLabelFilterInput {
 /// checked for agreement, so a mismatch is reported rather than ignored.
 #[derive(InputObject, Debug, Clone, Default)]
 pub struct ResourceOwnerRefInput {
+    /// Schema URI identifying the type
+    pub r#type: Option<TypeRef<'static>>,
     /// Resource ID of the account, only checked for agreement
     pub id: Option<ResourceID<'static>>,
     /// Account DID, used for lookup when given
-    pub did: Option<AccountID<'static>>,
+    pub did: Option<AccountDid<'static>>,
     /// Account name, used for lookup when `did` is absent
     pub name: Option<AccountName<'static>>,
 }
@@ -115,6 +117,7 @@ pub struct ResourceOwnerRefInput {
 impl ResourceOwnerRefInput {
     pub fn into_manifest_account(self) -> kamu_resources::ResourceOwnerRef {
         kamu_resources::ResourceOwnerRef {
+            r#type: self.r#type.map(Into::into),
             id: self.id.map(Into::into),
             did: self.did.map(Into::into),
             name: self.name.map(Into::into),

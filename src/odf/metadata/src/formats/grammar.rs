@@ -290,7 +290,13 @@ impl Grammar {
         Self::match_subdomain(s)
     }
 
+    // TODO: Revisit
+    pub fn match_resource_type_uri(s: &str) -> Option<(&str, &str)> {
+        Some((s, ""))
+    }
+
     // ResourceRef = ResourceTypeName ":"" (AccountName "/")? ResourceName
+    // TODO: Support ID / DID formats
     pub fn match_resource_ref(s: &str) -> Option<(&str, Option<&str>, &str)> {
         match s.split_once(':') {
             None => None,

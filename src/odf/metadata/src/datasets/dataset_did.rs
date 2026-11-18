@@ -17,16 +17,16 @@ use crate::formats::*;
 
 /// Unique identifier of the dataset
 #[derive(Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
-pub struct DatasetID {
+pub struct DatasetDid {
     did: DidOdf,
 }
 
-impl DatasetID {
+impl DatasetDid {
     pub fn new(did: DidOdf) -> Self {
         Self { did }
     }
 
-    /// Creates `DatasetID` from generated key pair using cryptographically
+    /// Creates `DatasetDid` from generated key pair using cryptographically
     /// secure RNG
     pub fn new_generated_ed25519() -> (SigningKey, Self) {
         let (key, did) = DidOdf::new_generated_ed25519();
@@ -34,7 +34,7 @@ impl DatasetID {
     }
 
     #[cfg(any(feature = "testing", test))]
-    /// For testing purposes only. Use [`DatasetID::new_generated_ed25519`] for
+    /// For testing purposes only. Use [`DatasetDid::new_generated_ed25519`] for
     /// cryptographically secure generation
     pub fn new_seeded_ed25519(seed: &[u8]) -> Self {
         Self::new(DidOdf::new_seeded_ed25519(seed))
@@ -44,17 +44,17 @@ impl DatasetID {
         &self.did
     }
 
-    /// Reads `DatasetID` from canonical byte representation
+    /// Reads `DatasetDid` from canonical byte representation
     pub fn from_bytes(bytes: &[u8]) -> Result<Self, DeserializeError<DidKey>> {
         Ok(Self::new(DidOdf::from_bytes(bytes)?))
     }
 
-    /// Parses `DatasetID` from a canonical `did:odf:<multibase>` string
+    /// Parses `DatasetDid` from a canonical `did:odf:<multibase>` string
     pub fn from_did_str(s: &str) -> Result<Self, ParseError<DidOdf>> {
         Ok(Self::new(DidOdf::from_did_str(s)?))
     }
 
-    /// Parses `DatasetID` from a multibase string (without `did:odf:`) prefix
+    /// Parses `DatasetDid` from a multibase string (without `did:odf:`) prefix
     pub fn from_multibase_string(s: &str) -> Result<Self, ParseError<DidOdf>> {
         Ok(Self::new(DidOdf::from_multibase(s)?))
     }
@@ -86,7 +86,7 @@ impl DatasetID {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl Multiformat for DatasetID {
+impl Multiformat for DatasetDid {
     fn format_name() -> &'static str {
         "did:odf"
     }
@@ -94,7 +94,7 @@ impl Multiformat for DatasetID {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl std::ops::Deref for DatasetID {
+impl std::ops::Deref for DatasetDid {
     type Target = DidOdf;
 
     fn deref(&self) -> &Self::Target {
@@ -102,41 +102,41 @@ impl std::ops::Deref for DatasetID {
     }
 }
 
-impl From<DidOdf> for DatasetID {
+impl From<DidOdf> for DatasetDid {
     fn from(did: DidOdf) -> Self {
         Self::new(did)
     }
 }
 
-impl From<DidKey> for DatasetID {
+impl From<DidKey> for DatasetDid {
     fn from(did: DidKey) -> Self {
         Self::new(DidOdf::from(did))
     }
 }
 
-impl From<DatasetID> for DidOdf {
-    fn from(val: DatasetID) -> Self {
+impl From<DatasetDid> for DidOdf {
+    fn from(val: DatasetDid) -> Self {
         val.did
     }
 }
 
-impl From<DatasetID> for DidKey {
-    fn from(val: DatasetID) -> Self {
+impl From<DatasetDid> for DidKey {
+    fn from(val: DatasetDid) -> Self {
         val.did.into()
     }
 }
 
-impl From<DatasetID> for Did {
-    fn from(value: DatasetID) -> Self {
+impl From<DatasetDid> for Did {
+    fn from(value: DatasetDid) -> Self {
         Did::Odf(value.did)
     }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl std::fmt::Debug for DatasetID {
+impl std::fmt::Debug for DatasetDid {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_tuple(&format!("DatasetID<{:?}>", Multicodec::Ed25519Pub))
+        f.debug_tuple(&format!("DatasetDid<{:?}>", Multicodec::Ed25519Pub))
             .field(&self.did.as_multibase())
             .finish()
     }
@@ -144,7 +144,7 @@ impl std::fmt::Debug for DatasetID {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl std::fmt::Display for DatasetID {
+impl std::fmt::Display for DatasetDid {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.as_did_str())
     }
@@ -152,12 +152,12 @@ impl std::fmt::Display for DatasetID {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Formats [`DatasetID`] as a canonical `did:odf:<multibase>` string
-pub struct DatasetIDFmt<'a> {
+/// Formats [`DatasetDid`] as a canonical `did:odf:<multibase>` string
+pub struct DatasetDidFmt<'a> {
     inner: DidKeyMultibaseFmt<'a>,
 }
 
-impl<'a> DatasetIDFmt<'a> {
+impl<'a> DatasetDidFmt<'a> {
     pub fn new(value: &'a DidKey) -> Self {
         Self {
             inner: DidKeyMultibaseFmt::new(value, Multibase::Base16),
@@ -171,13 +171,13 @@ impl<'a> DatasetIDFmt<'a> {
     }
 }
 
-impl std::fmt::Debug for DatasetIDFmt<'_> {
+impl std::fmt::Debug for DatasetDidFmt<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{self}")
     }
 }
 
-impl std::fmt::Display for DatasetIDFmt<'_> {
+impl std::fmt::Display for DatasetDidFmt<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "did:odf:{}", self.inner)
     }
@@ -187,51 +187,53 @@ impl std::fmt::Display for DatasetIDFmt<'_> {
 // Serde
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl serde::Serialize for DatasetID {
+impl serde::Serialize for DatasetDid {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         serializer.collect_str(&self.did.as_did_str())
     }
 }
 
-impl<'de> serde::Deserialize<'de> for DatasetID {
+impl<'de> serde::Deserialize<'de> for DatasetDid {
     fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        deserializer.deserialize_string(DatasetIDSerdeVisitor)
+        deserializer.deserialize_string(DatasetDidSerdeVisitor)
     }
 }
 
-struct DatasetIDSerdeVisitor;
+struct DatasetDidSerdeVisitor;
 
-impl serde::de::Visitor<'_> for DatasetIDSerdeVisitor {
-    type Value = DatasetID;
+impl serde::de::Visitor<'_> for DatasetDidSerdeVisitor {
+    type Value = DatasetDid;
 
     fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(formatter, "a DatasetID string")
+        write!(formatter, "a DatasetDid string")
     }
 
     fn visit_str<E: serde::de::Error>(self, v: &str) -> Result<Self::Value, E> {
-        DatasetID::from_did_str(v).map_err(serde::de::Error::custom)
+        DatasetDid::from_did_str(v).map_err(serde::de::Error::custom)
     }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[cfg(feature = "sqlx")]
-impl_sqlx!(DatasetID);
+impl_sqlx!(DatasetDid);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[cfg(feature = "utoipa")]
-impl utoipa::ToSchema for DatasetID {}
+impl utoipa::ToSchema for DatasetDid {}
 
 #[cfg(feature = "utoipa")]
-impl utoipa::PartialSchema for DatasetID {
+impl utoipa::PartialSchema for DatasetDid {
     fn schema() -> utoipa::openapi::RefOr<utoipa::openapi::schema::Schema> {
         use utoipa::openapi::schema::*;
 
         Schema::Object(
             ObjectBuilder::new()
                 .schema_type(SchemaType::Type(Type::String))
-                .examples([serde_json::json!(DatasetID::new_seeded_ed25519(b"dataset"))])
+                .examples([serde_json::json!(DatasetDid::new_seeded_ed25519(
+                    b"dataset"
+                ))])
                 .build(),
         )
         .into()

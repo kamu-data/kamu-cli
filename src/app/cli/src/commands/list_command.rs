@@ -361,7 +361,7 @@ mod tests {
         kamu_resources::ResourceTypeDescriptor {
             canonical_selector: kamu_resources::ResourceSelectorName::new(canonical).unwrap(),
             selector_aliases: Vec::new(),
-            schema: kamu_resources::TypeUri::new_unchecked(format!("dev.kamu/{canonical}/v1")),
+            schema: kamu_resources::TypeUri::new_unchecked(&format!("dev.kamu/{canonical}/v1")),
             list_columns: Vec::new(),
         }
     }

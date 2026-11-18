@@ -33,7 +33,7 @@ use crate::utils;
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Account {
-    account_id: AccountID<'static>,
+    account_id: AccountDid<'static>,
     account_name: AccountName<'static>,
     full_account_info: OnceCell<Box<kamu_accounts::Account>>,
 }
@@ -50,7 +50,7 @@ pub enum AccountType {
 impl Account {
     const DEFAULT_PER_PAGE: usize = 15;
 
-    pub(crate) fn new(account_id: AccountID<'static>, account_name: AccountName<'static>) -> Self {
+    pub(crate) fn new(account_id: AccountDid<'static>, account_name: AccountName<'static>) -> Self {
         Self {
             account_id,
             account_name,
@@ -60,7 +60,7 @@ impl Account {
 
     pub(crate) fn from_account(account: kamu_accounts::Account) -> Self {
         Self {
-            account_id: AccountID::from(account.id.clone()),
+            account_id: AccountDid::from(account.id.clone()),
             account_name: account.account_name.clone().into(),
             full_account_info: OnceCell::new_with(Some(Box::new(account))),
         }
@@ -68,7 +68,7 @@ impl Account {
 
     pub(crate) async fn from_account_id(
         ctx: &Context<'_>,
-        account_id: odf::AccountID,
+        account_id: odf::metadata::auth::AccountDid,
     ) -> Result<Self, InternalError> {
         let account_entity_data_loader = utils::get_account_entity_data_loader(ctx);
 
@@ -134,7 +134,7 @@ impl Account {
     async fn resolve_full_account_info(&self, ctx: &Context<'_>) -> Result<kamu_accounts::Account> {
         let account_entity_data_loader = utils::get_account_entity_data_loader(ctx);
 
-        let account_id: odf::AccountID = self.account_id.clone().into();
+        let account_id: odf::metadata::auth::AccountDid = self.account_id.clone().into();
         let maybe_account = account_entity_data_loader
             .load_one(account_id)
             .await
@@ -163,7 +163,7 @@ impl Account {
         &self.account_name
     }
 
-    pub(crate) fn account_id_internal(&self) -> &odf::AccountID {
+    pub(crate) fn account_id_internal(&self) -> &odf::metadata::auth::AccountDid {
         &self.account_id
     }
 }
@@ -176,7 +176,7 @@ impl Account {
 impl Account {
     /// Unique and stable identifier of this account.
     /// Visible to everyone.
-    async fn id(&self) -> &AccountID<'_> {
+    async fn id(&self) -> &AccountDid<'_> {
         &self.account_id
     }
 

@@ -57,17 +57,11 @@ impl ResourceManifest {
         // store-integrity bug.
         let schema = ResourceSchemaId::parse(schema.as_str()).int_err()?;
 
-        let account = Some(ResourceOwnerRef {
-            id: Some(headers.account.id),
-            did: Some(headers.account.did.clone()),
-            name: Some(headers.account.name.clone()),
-        });
-
         Ok(Self {
             schema,
             headers: ResourceManifestHeaders {
                 id: None,
-                account,
+                account: Some(ResourceOwnerRef::from(headers.account.clone())),
                 name: headers.name.to_string(),
                 labels: headers
                     .labels

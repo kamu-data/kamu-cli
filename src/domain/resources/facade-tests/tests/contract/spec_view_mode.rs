@@ -136,7 +136,7 @@ pub async fn test_revealed_spec_view_exposes_plaintext(h: &impl FacadeContractHa
 
     // Non-secret identity fields are unchanged
     assert_eq!(view.headers.name, "sv-revealed");
-    assert_eq!(view.schema, *SecretSetResource::schema());
+    assert_eq!(view.schema, *SecretSetResource::type_uri());
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

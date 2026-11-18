@@ -94,10 +94,10 @@ pub async fn test_lists_supported_resource_types(h: &impl FacadeContractHarness)
     // VariableSet and SecretSet must be present
     let has_variable_set = descriptors
         .iter()
-        .any(|d| d.schema == *VariableSetResource::schema());
+        .any(|d| d.schema == *VariableSetResource::type_uri());
     let has_secret_set = descriptors
         .iter()
-        .any(|d| d.schema == *SecretSetResource::schema());
+        .any(|d| d.schema == *SecretSetResource::type_uri());
     assert!(has_variable_set, "VariableSet type must be present");
     assert!(has_secret_set, "SecretSet type must be present");
 }
@@ -140,7 +140,7 @@ pub async fn test_selector_aliases_resolve_consistently(h: &impl FacadeContractH
     for s in &summaries.items {
         assert_eq!(
             s.schema,
-            *VariableSetResource::schema(),
+            *VariableSetResource::type_uri(),
             "search schema must be canonical"
         );
     }
@@ -158,7 +158,7 @@ pub async fn test_selector_aliases_resolve_consistently(h: &impl FacadeContractH
     for i in &handles.items {
         assert_eq!(
             i.r#type,
-            *VariableSetResource::schema(),
+            *VariableSetResource::type_uri(),
             "search_handles schema must be canonical"
         );
     }
@@ -197,7 +197,7 @@ pub async fn test_selector_aliases_resolve_consistently(h: &impl FacadeContractH
     for s in &short_name_summaries.items {
         assert_eq!(
             s.schema,
-            *VariableSetResource::schema(),
+            *VariableSetResource::type_uri(),
             "short name search schema must be canonical"
         );
     }
@@ -216,7 +216,7 @@ pub async fn test_selector_aliases_resolve_consistently(h: &impl FacadeContractH
     for s in &type_name_summaries.items {
         assert_eq!(
             s.schema,
-            *VariableSetResource::schema(),
+            *VariableSetResource::type_uri(),
             "TypeName selector search schema must be canonical"
         );
     }

@@ -143,7 +143,7 @@ where
     let (_id, headers, spec, status) = state.into_parts();
 
     Ok(Resource {
-        schema: R::schema().clone(),
+        schema: R::type_uri().cheap_clone(),
         headers,
         spec: serde_json::to_value(spec).int_err()?,
         status,

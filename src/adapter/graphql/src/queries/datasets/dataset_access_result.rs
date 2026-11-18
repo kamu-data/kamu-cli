@@ -26,7 +26,7 @@ impl DatasetAccessResult<'_> {
         Self::Accessible(DatasetAccessResultAccessible { dataset })
     }
 
-    pub fn not_accessible(dataset_id: odf::DatasetID) -> Self {
+    pub fn not_accessible(dataset_id: odf::metadata::datasets::DatasetDid) -> Self {
         Self::NotAccessible(DatasetAccessResultNotAccessible {
             id: dataset_id.into(),
         })
@@ -54,7 +54,7 @@ impl DatasetAccessResultAccessible {
 #[graphql(complex)]
 pub struct DatasetAccessResultNotAccessible<'a> {
     /// Identifier of the requested dataset
-    pub id: DatasetID<'a>,
+    pub id: DatasetDid<'a>,
 }
 
 #[ComplexObject]

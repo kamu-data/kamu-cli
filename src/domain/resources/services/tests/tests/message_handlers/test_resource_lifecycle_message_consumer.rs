@@ -321,7 +321,7 @@ impl ResourceLifecycleConsumerHarness {
     }
 
     fn make_snapshot(id: ResourceID) -> ResourceSnapshot {
-        Self::make_snapshot_with_schema(id, TestResource::schema())
+        Self::make_snapshot_with_schema(id, TestResource::type_uri())
     }
 
     fn make_snapshot_with_schema(id: ResourceID, schema: &TypeUri) -> ResourceSnapshot {

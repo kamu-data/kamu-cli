@@ -35,8 +35,8 @@ pub struct SecretSetSpecViewDispatcher {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl ResourceSpecViewDispatcher for SecretSetSpecViewDispatcher {
-    fn schema(&self) -> &'static TypeUri {
-        SecretSetResource::schema()
+    fn type_uri(&self) -> &'static TypeUri {
+        SecretSetResource::type_uri()
     }
 
     fn reveal_spec(

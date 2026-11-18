@@ -14,7 +14,7 @@ use crate::TypeUri;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub trait ResourceSpecViewDispatcher: Send + Sync {
-    fn schema(&self) -> &'static TypeUri;
+    fn type_uri(&self) -> &'static TypeUri;
 
     fn reveal_spec(&self, spec: serde_json::Value) -> Result<serde_json::Value, InternalError>;
 }

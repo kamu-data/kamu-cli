@@ -69,11 +69,7 @@ async fn test_create_resource_populates_label_projection() {
     let harness = ResourcePersistenceServiceHarness::new();
 
     let headers = kamu_resources::ResourceHeadersInputExt::try_new(
-        Some(odf::metadata::auth::ResourceOwnerRef {
-            id: Some(harness.account_handle.id),
-            did: Some(harness.account_handle.did.clone()),
-            name: Some(harness.account_handle.name.clone()),
-        }),
+        Some(harness.account_handle.clone().into()),
         "res-a",
         vec![
             ("env".parse().unwrap(), serde_json::json!("prod")),
@@ -118,11 +114,7 @@ async fn test_save_resource_resyncs_label_projection() {
 
     let mut loaded = harness.aggregate_loader().load(&id).await.unwrap();
     let new_headers = kamu_resources::ResourceHeadersInputExt::try_new(
-        Some(odf::metadata::auth::ResourceOwnerRef {
-            id: Some(harness.account_handle.id),
-            did: Some(harness.account_handle.did.clone()),
-            name: Some(harness.account_handle.name.clone()),
-        }),
+        Some(harness.account_handle.clone().into()),
         "res-a",
         vec![("env".parse().unwrap(), serde_json::json!("staging"))],
         vec![],
@@ -152,11 +144,7 @@ async fn test_completed_deletion_clears_label_projection() {
 
     let mut loaded = harness.aggregate_loader().load(&id).await.unwrap();
     let new_headers = kamu_resources::ResourceHeadersInputExt::try_new(
-        Some(odf::metadata::auth::ResourceOwnerRef {
-            id: Some(harness.account_handle.id),
-            did: Some(harness.account_handle.did.clone()),
-            name: Some(harness.account_handle.name.clone()),
-        }),
+        Some(harness.account_handle.clone().into()),
         "res-a",
         vec![("env".parse().unwrap(), serde_json::json!("staging"))],
         vec![],
@@ -427,7 +415,7 @@ impl ResourcePersistenceServiceHarness {
     async fn find_snapshot(&self, id: &ResourceID) -> ResourceSnapshot {
         self.resource_repo()
             .find_resource_snapshot(&ResourceRawEventQuery {
-                schema: TestResource::schema().clone(),
+                schema: TestResource::type_uri().cheap_clone(),
                 id: *id,
             })
             .await
@@ -438,7 +426,7 @@ impl ResourcePersistenceServiceHarness {
     async fn snapshot_not_found(&self, id: &ResourceID) -> bool {
         self.resource_repo()
             .find_resource_snapshot(&ResourceRawEventQuery {
-                schema: TestResource::schema().clone(),
+                schema: TestResource::type_uri().cheap_clone(),
                 id: *id,
             })
             .await

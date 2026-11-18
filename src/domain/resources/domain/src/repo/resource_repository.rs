@@ -445,6 +445,8 @@ pub struct ResourceHandleRow {
 impl ResourceHandleRow {
     pub fn account_handle(&self) -> odf::ResourceOwnerHandle {
         odf::ResourceOwnerHandle {
+            // TODO: Support Org accounts
+            r#type: odf::metadata::auth::User::type_uri().cheap_clone(),
             id: ResourceID::new(self.account_resource_id),
             did: self.account_id.clone(),
             name: odf::AccountName::new_unchecked(&self.account_name),
@@ -482,10 +484,12 @@ impl ResourceSnapshotRow {
 
         ResourceSnapshot {
             id,
-            schema: TypeUri::new_unchecked(self.resource_schema),
+            schema: TypeUri::new_unchecked(&self.resource_schema),
             headers: crate::ResourceHeaders {
                 id,
                 account: odf::ResourceOwnerHandle {
+                    // TODO: Support Org accounts
+                    r#type: odf::metadata::auth::User::type_uri().cheap_clone(),
                     id: ResourceID::new(self.account_resource_id),
                     did: self.account_id,
                     name: odf::AccountName::new_unchecked(&self.account_name),

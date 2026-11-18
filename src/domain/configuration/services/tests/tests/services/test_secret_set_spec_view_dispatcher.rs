@@ -86,7 +86,7 @@ async fn test_spec_view_dispatcher_reveals_encrypted_secrets_as_plaintext() {
         .catalog()
         .get_one::<ResourceDispatcherFactory>()
         .unwrap()
-        .spec_view_dispatcher(SecretSetResource::schema())
+        .spec_view_dispatcher(SecretSetResource::type_uri())
         .expect("SecretSetSpecViewDispatcher must be registered");
 
     let revealed_json = dispatcher

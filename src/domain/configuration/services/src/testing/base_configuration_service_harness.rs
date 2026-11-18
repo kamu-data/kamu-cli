@@ -127,7 +127,7 @@ impl BaseConfigurationServiceHarness {
         owner: &odf::ResourceOwnerHandle,
         dataset_id: &odf::DatasetID,
     ) -> Vec<ResourceID> {
-        self.resources_targeting(owner, VariableSetResource::schema(), dataset_id)
+        self.resources_targeting(owner, VariableSetResource::type_uri(), dataset_id)
             .await
     }
 
@@ -138,7 +138,7 @@ impl BaseConfigurationServiceHarness {
         owner: &odf::ResourceOwnerHandle,
         dataset_id: &odf::DatasetID,
     ) -> Vec<ResourceID> {
-        self.resources_targeting(owner, SecretSetResource::schema(), dataset_id)
+        self.resources_targeting(owner, SecretSetResource::type_uri(), dataset_id)
             .await
     }
 
@@ -168,7 +168,7 @@ impl BaseConfigurationServiceHarness {
         created_at: DateTime<Utc>,
     ) -> ResourceID {
         self.seed_resource_targeting(
-            VariableSetResource::schema(),
+            VariableSetResource::type_uri(),
             account,
             dataset_id,
             name,
@@ -186,7 +186,7 @@ impl BaseConfigurationServiceHarness {
         created_at: DateTime<Utc>,
     ) -> ResourceID {
         self.seed_resource_targeting(
-            SecretSetResource::schema(),
+            SecretSetResource::type_uri(),
             account,
             dataset_id,
             name,

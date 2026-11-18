@@ -282,6 +282,7 @@ impl LocalFacadeHarness {
                 visibility: ResourceVisibility::Active,
                 selectors: vec![ResourceSelector {
                     account: account.map(|account| ResourceOwnerRef {
+                        r#type: None,
                         id: None,
                         did: None,
                         name: Some(self.account_name(account)),

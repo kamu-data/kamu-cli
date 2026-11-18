@@ -111,7 +111,7 @@ pub async fn test_plan_create_json(h: &impl FacadeContractHarness) {
         unreachable!()
     };
     assert!(plan.executable, "plan must be executable");
-    assert_resource_view_fields(&plan.resource, VariableSetResource::schema(), "my-vars");
+    assert_resource_view_fields(&plan.resource, VariableSetResource::type_uri(), "my-vars");
 
     // Verify no side effect - resource must not exist yet
     let get_result = facade
@@ -158,7 +158,7 @@ pub async fn test_plan_create_yaml(h: &impl FacadeContractHarness) {
     assert!(plan.executable, "plan must be executable");
     assert_resource_view_fields(
         &plan.resource,
-        VariableSetResource::schema(),
+        VariableSetResource::type_uri(),
         "my-yaml-vars",
     );
 
@@ -465,7 +465,7 @@ pub async fn test_apply_create_json(h: &impl FacadeContractHarness) {
         .unwrap();
 
     let view = assert_applied_outcome(&decision, ApplyResourceOutcome::Created);
-    assert_resource_view_fields(view, VariableSetResource::schema(), "alpha");
+    assert_resource_view_fields(view, VariableSetResource::type_uri(), "alpha");
     assert_eq!(view.headers.generation, 1, "initial generation must be 1");
 
     let id = view.headers.id;
@@ -486,7 +486,7 @@ pub async fn test_apply_create_json(h: &impl FacadeContractHarness) {
             .unwrap(),
     );
     assert_eq!(fetched.headers.id, id, "id must match after apply");
-    assert_resource_view_fields(&fetched, VariableSetResource::schema(), "alpha");
+    assert_resource_view_fields(&fetched, VariableSetResource::type_uri(), "alpha");
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -507,7 +507,7 @@ pub async fn test_apply_create_yaml(h: &impl FacadeContractHarness) {
         .unwrap();
 
     let view = assert_applied_outcome(&decision, ApplyResourceOutcome::Created);
-    assert_resource_view_fields(view, VariableSetResource::schema(), "yaml-vars");
+    assert_resource_view_fields(view, VariableSetResource::type_uri(), "yaml-vars");
     assert_eq!(view.headers.generation, 1, "initial generation must be 1");
 
     // Semantic equivalence: same resource via get, just like after JSON apply
@@ -526,7 +526,7 @@ pub async fn test_apply_create_yaml(h: &impl FacadeContractHarness) {
             .unwrap(),
     );
     assert_eq!(fetched.headers.id, view.headers.id);
-    assert_resource_view_fields(&fetched, VariableSetResource::schema(), "yaml-vars");
+    assert_resource_view_fields(&fetched, VariableSetResource::type_uri(), "yaml-vars");
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -787,7 +787,7 @@ pub async fn test_apply_round_trips_populated_labels_annotations(h: &impl Facade
         .unwrap();
 
     let view = assert_applied_outcome(&decision, ApplyResourceOutcome::Created);
-    assert_resource_view_fields(view, VariableSetResource::schema(), "labeled-vars");
+    assert_resource_view_fields(view, VariableSetResource::type_uri(), "labeled-vars");
 
     assert_eq!(view.headers.labels.entries.len(), 2);
     assert_eq!(

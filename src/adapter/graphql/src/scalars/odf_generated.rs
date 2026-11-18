@@ -54,8 +54,8 @@ pub struct AddData {
     pub extra: Option<ExtraAttributes>,
 }
 
-impl From<odf::metadata::datasets::AddData> for AddData {
-    fn from(v: odf::metadata::datasets::AddData) -> Self {
+impl From<odf::meta::datasets::AddData> for AddData {
+    fn from(v: odf::meta::datasets::AddData) -> Self {
         Self {
             prev_checkpoint: v.prev_checkpoint.map(Into::into),
             prev_offset: v.prev_offset.map(Into::into),
@@ -85,8 +85,8 @@ pub struct AddPushSource {
     pub merge: MergeStrategy,
 }
 
-impl From<odf::metadata::legacy::AddPushSource> for AddPushSource {
-    fn from(v: odf::metadata::legacy::AddPushSource) -> Self {
+impl From<odf::meta::legacy::AddPushSource> for AddPushSource {
+    fn from(v: odf::meta::legacy::AddPushSource) -> Self {
         Self {
             source_name: v.source_name.into(),
             read: v.read.into(),
@@ -109,8 +109,8 @@ pub struct AttachmentEmbedded {
     pub content: String,
 }
 
-impl From<odf::metadata::datasets::AttachmentEmbedded> for AttachmentEmbedded {
-    fn from(v: odf::metadata::datasets::AttachmentEmbedded) -> Self {
+impl From<odf::meta::datasets::AttachmentEmbedded> for AttachmentEmbedded {
+    fn from(v: odf::meta::datasets::AttachmentEmbedded) -> Self {
         Self {
             path: v.path.into(),
             content: v.content.into(),
@@ -128,10 +128,10 @@ pub enum Attachments {
     Embedded(AttachmentsEmbedded),
 }
 
-impl From<odf::metadata::datasets::Attachments> for Attachments {
-    fn from(v: odf::metadata::datasets::Attachments) -> Self {
+impl From<odf::meta::datasets::Attachments> for Attachments {
+    fn from(v: odf::meta::datasets::Attachments) -> Self {
         match v {
-            odf::metadata::datasets::Attachments::Embedded(v) => Self::Embedded(v.into()),
+            odf::meta::datasets::Attachments::Embedded(v) => Self::Embedded(v.into()),
         }
     }
 }
@@ -147,8 +147,8 @@ pub struct AttachmentsEmbedded {
     pub items: Vec<AttachmentEmbedded>,
 }
 
-impl From<odf::metadata::datasets::AttachmentsEmbedded> for AttachmentsEmbedded {
-    fn from(v: odf::metadata::datasets::AttachmentsEmbedded) -> Self {
+impl From<odf::meta::datasets::AttachmentsEmbedded> for AttachmentsEmbedded {
+    fn from(v: odf::meta::datasets::AttachmentsEmbedded) -> Self {
         Self {
             items: v.items.into_iter().map(Into::into).collect(),
         }
@@ -168,8 +168,8 @@ pub struct Checkpoint {
     pub size: UInt64,
 }
 
-impl From<odf::metadata::datasets::Checkpoint> for Checkpoint {
-    fn from(v: odf::metadata::datasets::Checkpoint) -> Self {
+impl From<odf::meta::datasets::Checkpoint> for Checkpoint {
+    fn from(v: odf::meta::datasets::Checkpoint) -> Self {
         Self {
             physical_hash: v.physical_hash.into(),
             size: v.size.into(),
@@ -183,7 +183,7 @@ impl From<odf::metadata::datasets::Checkpoint> for Checkpoint {
 ///
 /// Schema: https://opendatafabric.org/schemas/sources/v1alpha1/CompressionFormat
 #[derive(Enum, Debug, Clone, Copy, PartialEq, Eq)]
-#[graphql(remote = "odf::metadata::sources::CompressionFormat")]
+#[graphql(remote = "odf::meta::sources::CompressionFormat")]
 pub enum CompressionFormat {
     Gzip,
     Zip,
@@ -206,8 +206,8 @@ pub struct DataSlice {
     pub size: UInt64,
 }
 
-impl From<odf::metadata::datasets::DataSlice> for DataSlice {
-    fn from(v: odf::metadata::datasets::DataSlice) -> Self {
+impl From<odf::meta::datasets::DataSlice> for DataSlice {
+    fn from(v: odf::meta::datasets::DataSlice) -> Self {
         Self {
             logical_hash: v.logical_hash.into(),
             physical_hash: v.physical_hash.into(),
@@ -223,7 +223,7 @@ impl From<odf::metadata::datasets::DataSlice> for DataSlice {
 ///
 /// Schema: https://opendatafabric.org/schemas/datasets/v1alpha1/DatasetKind
 #[derive(Enum, Debug, Clone, Copy, PartialEq, Eq)]
-#[graphql(remote = "odf::metadata::datasets::DatasetKind")]
+#[graphql(remote = "odf::meta::datasets::DatasetKind")]
 pub enum DatasetKind {
     Root,
     Derivative,
@@ -239,8 +239,8 @@ pub struct DisablePollingSource {
     pub _dummy: Option<String>,
 }
 
-impl From<odf::metadata::legacy::DisablePollingSource> for DisablePollingSource {
-    fn from(v: odf::metadata::legacy::DisablePollingSource) -> Self {
+impl From<odf::meta::legacy::DisablePollingSource> for DisablePollingSource {
+    fn from(v: odf::meta::legacy::DisablePollingSource) -> Self {
         Self { _dummy: None }
     }
 }
@@ -256,8 +256,8 @@ pub struct DisablePushSource {
     pub source_name: String,
 }
 
-impl From<odf::metadata::legacy::DisablePushSource> for DisablePushSource {
-    fn from(v: odf::metadata::legacy::DisablePushSource) -> Self {
+impl From<odf::meta::legacy::DisablePushSource> for DisablePushSource {
+    fn from(v: odf::meta::legacy::DisablePushSource) -> Self {
         Self {
             source_name: v.source_name.into(),
         }
@@ -277,8 +277,8 @@ pub struct EnvVar {
     pub value: Option<String>,
 }
 
-impl From<odf::metadata::sources::EnvVar> for EnvVar {
-    fn from(v: odf::metadata::sources::EnvVar) -> Self {
+impl From<odf::meta::sources::EnvVar> for EnvVar {
+    fn from(v: odf::meta::sources::EnvVar) -> Self {
         Self {
             name: v.name.into(),
             value: v.value.map(Into::into),
@@ -298,14 +298,12 @@ pub enum EventTimeSource {
     FromSystemTime(EventTimeSourceFromSystemTime),
 }
 
-impl From<odf::metadata::sources::EventTimeSource> for EventTimeSource {
-    fn from(v: odf::metadata::sources::EventTimeSource) -> Self {
+impl From<odf::meta::sources::EventTimeSource> for EventTimeSource {
+    fn from(v: odf::meta::sources::EventTimeSource) -> Self {
         match v {
-            odf::metadata::sources::EventTimeSource::FromMetadata(v) => {
-                Self::FromMetadata(v.into())
-            }
-            odf::metadata::sources::EventTimeSource::FromPath(v) => Self::FromPath(v.into()),
-            odf::metadata::sources::EventTimeSource::FromSystemTime(v) => {
+            odf::meta::sources::EventTimeSource::FromMetadata(v) => Self::FromMetadata(v.into()),
+            odf::meta::sources::EventTimeSource::FromPath(v) => Self::FromPath(v.into()),
+            odf::meta::sources::EventTimeSource::FromSystemTime(v) => {
                 Self::FromSystemTime(v.into())
             }
         }
@@ -322,8 +320,8 @@ pub struct EventTimeSourceFromMetadata {
     pub _dummy: Option<String>,
 }
 
-impl From<odf::metadata::sources::EventTimeSourceFromMetadata> for EventTimeSourceFromMetadata {
-    fn from(v: odf::metadata::sources::EventTimeSourceFromMetadata) -> Self {
+impl From<odf::meta::sources::EventTimeSourceFromMetadata> for EventTimeSourceFromMetadata {
+    fn from(v: odf::meta::sources::EventTimeSourceFromMetadata) -> Self {
         Self { _dummy: None }
     }
 }
@@ -341,8 +339,8 @@ pub struct EventTimeSourceFromPath {
     pub timestamp_format: Option<String>,
 }
 
-impl From<odf::metadata::sources::EventTimeSourceFromPath> for EventTimeSourceFromPath {
-    fn from(v: odf::metadata::sources::EventTimeSourceFromPath) -> Self {
+impl From<odf::meta::sources::EventTimeSourceFromPath> for EventTimeSourceFromPath {
+    fn from(v: odf::meta::sources::EventTimeSourceFromPath) -> Self {
         Self {
             pattern: v.pattern.into(),
             timestamp_format: v.timestamp_format.map(Into::into),
@@ -360,8 +358,8 @@ pub struct EventTimeSourceFromSystemTime {
     pub _dummy: Option<String>,
 }
 
-impl From<odf::metadata::sources::EventTimeSourceFromSystemTime> for EventTimeSourceFromSystemTime {
-    fn from(v: odf::metadata::sources::EventTimeSourceFromSystemTime) -> Self {
+impl From<odf::meta::sources::EventTimeSourceFromSystemTime> for EventTimeSourceFromSystemTime {
+    fn from(v: odf::meta::sources::EventTimeSourceFromSystemTime) -> Self {
         Self { _dummy: None }
     }
 }
@@ -393,8 +391,8 @@ pub struct ExecuteTransform {
     pub new_watermark: Option<DateTime<Utc>>,
 }
 
-impl From<odf::metadata::datasets::ExecuteTransform> for ExecuteTransform {
-    fn from(v: odf::metadata::datasets::ExecuteTransform) -> Self {
+impl From<odf::meta::datasets::ExecuteTransform> for ExecuteTransform {
+    fn from(v: odf::meta::datasets::ExecuteTransform) -> Self {
         Self {
             query_inputs: v.query_inputs.into_iter().map(Into::into).collect(),
             prev_checkpoint: v.prev_checkpoint.map(Into::into),
@@ -414,7 +412,7 @@ impl From<odf::metadata::datasets::ExecuteTransform> for ExecuteTransform {
 #[derive(SimpleObject, Debug, Clone)]
 pub struct ExecuteTransformInput {
     /// Input dataset identifier.
-    pub dataset_id: DatasetID<'static>,
+    pub dataset_id: DatasetDid<'static>,
     /// Last block of the input dataset that was previously incorporated into the derivative
     /// transformation, if any. Must be equal to the last non-empty `newBlockHash`. Together with
     /// `newBlockHash` defines a half-open `(prevBlockHash, newBlockHash]` interval of blocks that
@@ -435,8 +433,8 @@ pub struct ExecuteTransformInput {
     pub new_offset: Option<UInt64>,
 }
 
-impl From<odf::metadata::datasets::ExecuteTransformInput> for ExecuteTransformInput {
-    fn from(v: odf::metadata::datasets::ExecuteTransformInput) -> Self {
+impl From<odf::meta::datasets::ExecuteTransformInput> for ExecuteTransformInput {
+    fn from(v: odf::meta::datasets::ExecuteTransformInput) -> Self {
         Self {
             dataset_id: v.dataset_id.into(),
             prev_block_hash: v.prev_block_hash.map(Into::into),
@@ -456,23 +454,23 @@ impl From<odf::metadata::datasets::ExecuteTransformInput> for ExecuteTransformIn
 /// Schema: https://opendatafabric.org/schemas/data/v1alpha1/ExtraAttributes
 
 #[nutype::nutype(derive(AsRef, Clone, Debug, From, Into))]
-pub struct ExtraAttributes(odf::metadata::data::ExtraAttributes);
+pub struct ExtraAttributes(odf::meta::data::ExtraAttributes);
 
 #[async_graphql::Scalar]
 impl async_graphql::ScalarType for ExtraAttributes {
     fn parse(value: async_graphql::Value) -> async_graphql::InputValueResult<Self> {
-        let proxy: odf::metadata::serde::yaml::data::ExtraAttributes =
+        let proxy: odf::meta::serde::yaml::data::ExtraAttributes =
             async_graphql::from_value(value)?;
         let dto = proxy
             .try_into()
-            .map_err(|e: odf::metadata::errors::ValidationError| {
+            .map_err(|e: odf::meta::errors::ValidationError| {
                 async_graphql::InputValueError::custom(e.to_string())
             })?;
         Ok(Self::new(dto))
     }
 
     fn to_value(&self) -> async_graphql::Value {
-        let value: odf::metadata::serde::yaml::data::ExtraAttributes = self.as_ref().clone().into();
+        let value: odf::meta::serde::yaml::data::ExtraAttributes = self.as_ref().clone().into();
         async_graphql::to_value(&value).unwrap()
     }
 }
@@ -491,14 +489,14 @@ pub enum FetchStep {
     EthereumLogs(FetchStepEthereumLogs),
 }
 
-impl From<odf::metadata::legacy::FetchStep> for FetchStep {
-    fn from(v: odf::metadata::legacy::FetchStep) -> Self {
+impl From<odf::meta::legacy::FetchStep> for FetchStep {
+    fn from(v: odf::meta::legacy::FetchStep) -> Self {
         match v {
-            odf::metadata::legacy::FetchStep::Url(v) => Self::Url(v.into()),
-            odf::metadata::legacy::FetchStep::FilesGlob(v) => Self::FilesGlob(v.into()),
-            odf::metadata::legacy::FetchStep::Container(v) => Self::Container(v.into()),
-            odf::metadata::legacy::FetchStep::Mqtt(v) => Self::Mqtt(v.into()),
-            odf::metadata::legacy::FetchStep::EthereumLogs(v) => Self::EthereumLogs(v.into()),
+            odf::meta::legacy::FetchStep::Url(v) => Self::Url(v.into()),
+            odf::meta::legacy::FetchStep::FilesGlob(v) => Self::FilesGlob(v.into()),
+            odf::meta::legacy::FetchStep::Container(v) => Self::Container(v.into()),
+            odf::meta::legacy::FetchStep::Mqtt(v) => Self::Mqtt(v.into()),
+            odf::meta::legacy::FetchStep::EthereumLogs(v) => Self::EthereumLogs(v.into()),
         }
     }
 }
@@ -521,8 +519,8 @@ pub struct FetchStepContainer {
     pub env: Option<Vec<EnvVar>>,
 }
 
-impl From<odf::metadata::legacy::FetchStepContainer> for FetchStepContainer {
-    fn from(v: odf::metadata::legacy::FetchStepContainer) -> Self {
+impl From<odf::meta::legacy::FetchStepContainer> for FetchStepContainer {
+    fn from(v: odf::meta::legacy::FetchStepContainer) -> Self {
         Self {
             image: v.image.into(),
             command: v.command.map(|v| v.into_iter().map(Into::into).collect()),
@@ -556,8 +554,8 @@ pub struct FetchStepEthereumLogs {
     pub signature: Option<String>,
 }
 
-impl From<odf::metadata::legacy::FetchStepEthereumLogs> for FetchStepEthereumLogs {
-    fn from(v: odf::metadata::legacy::FetchStepEthereumLogs) -> Self {
+impl From<odf::meta::legacy::FetchStepEthereumLogs> for FetchStepEthereumLogs {
+    fn from(v: odf::meta::legacy::FetchStepEthereumLogs) -> Self {
         Self {
             chain_id: v.chain_id.map(Into::into),
             node_url: v.node_url.map(Into::into),
@@ -586,8 +584,8 @@ pub struct FetchStepFilesGlob {
     pub order: Option<SourceOrdering>,
 }
 
-impl From<odf::metadata::legacy::FetchStepFilesGlob> for FetchStepFilesGlob {
-    fn from(v: odf::metadata::legacy::FetchStepFilesGlob) -> Self {
+impl From<odf::meta::legacy::FetchStepFilesGlob> for FetchStepFilesGlob {
+    fn from(v: odf::meta::legacy::FetchStepFilesGlob) -> Self {
         Self {
             path: v.path.into(),
             event_time: v.event_time.map(Into::into),
@@ -616,8 +614,8 @@ pub struct FetchStepMqtt {
     pub topics: Vec<MqttTopicSubscription>,
 }
 
-impl From<odf::metadata::legacy::FetchStepMqtt> for FetchStepMqtt {
-    fn from(v: odf::metadata::legacy::FetchStepMqtt) -> Self {
+impl From<odf::meta::legacy::FetchStepMqtt> for FetchStepMqtt {
+    fn from(v: odf::meta::legacy::FetchStepMqtt) -> Self {
         Self {
             host: v.host.into(),
             port: v.port.into(),
@@ -645,8 +643,8 @@ pub struct FetchStepUrl {
     pub headers: Option<Vec<RequestHeader>>,
 }
 
-impl From<odf::metadata::legacy::FetchStepUrl> for FetchStepUrl {
-    fn from(v: odf::metadata::legacy::FetchStepUrl) -> Self {
+impl From<odf::meta::legacy::FetchStepUrl> for FetchStepUrl {
+    fn from(v: odf::meta::legacy::FetchStepUrl) -> Self {
         Self {
             url: v.url.into(),
             event_time: v.event_time.map(Into::into),
@@ -671,16 +669,16 @@ pub enum MergeStrategy {
     UpsertStream(MergeStrategyUpsertStream),
 }
 
-impl From<odf::metadata::sources::MergeStrategy> for MergeStrategy {
-    fn from(v: odf::metadata::sources::MergeStrategy) -> Self {
+impl From<odf::meta::sources::MergeStrategy> for MergeStrategy {
+    fn from(v: odf::meta::sources::MergeStrategy) -> Self {
         match v {
-            odf::metadata::sources::MergeStrategy::Append(v) => Self::Append(v.into()),
-            odf::metadata::sources::MergeStrategy::Ledger(v) => Self::Ledger(v.into()),
-            odf::metadata::sources::MergeStrategy::Snapshot(v) => Self::Snapshot(v.into()),
-            odf::metadata::sources::MergeStrategy::ChangelogStream(v) => {
+            odf::meta::sources::MergeStrategy::Append(v) => Self::Append(v.into()),
+            odf::meta::sources::MergeStrategy::Ledger(v) => Self::Ledger(v.into()),
+            odf::meta::sources::MergeStrategy::Snapshot(v) => Self::Snapshot(v.into()),
+            odf::meta::sources::MergeStrategy::ChangelogStream(v) => {
                 Self::ChangelogStream(v.into())
             }
-            odf::metadata::sources::MergeStrategy::UpsertStream(v) => Self::UpsertStream(v.into()),
+            odf::meta::sources::MergeStrategy::UpsertStream(v) => Self::UpsertStream(v.into()),
         }
     }
 }
@@ -698,8 +696,8 @@ pub struct MergeStrategyAppend {
     pub _dummy: Option<String>,
 }
 
-impl From<odf::metadata::sources::MergeStrategyAppend> for MergeStrategyAppend {
-    fn from(v: odf::metadata::sources::MergeStrategyAppend) -> Self {
+impl From<odf::meta::sources::MergeStrategyAppend> for MergeStrategyAppend {
+    fn from(v: odf::meta::sources::MergeStrategyAppend) -> Self {
         Self { _dummy: None }
     }
 }
@@ -719,8 +717,8 @@ pub struct MergeStrategyChangelogStream {
     pub primary_key: Vec<String>,
 }
 
-impl From<odf::metadata::sources::MergeStrategyChangelogStream> for MergeStrategyChangelogStream {
-    fn from(v: odf::metadata::sources::MergeStrategyChangelogStream) -> Self {
+impl From<odf::meta::sources::MergeStrategyChangelogStream> for MergeStrategyChangelogStream {
+    fn from(v: odf::meta::sources::MergeStrategyChangelogStream) -> Self {
         Self {
             primary_key: v.primary_key.into_iter().map(Into::into).collect(),
         }
@@ -743,8 +741,8 @@ pub struct MergeStrategyLedger {
     pub primary_key: Vec<String>,
 }
 
-impl From<odf::metadata::sources::MergeStrategyLedger> for MergeStrategyLedger {
-    fn from(v: odf::metadata::sources::MergeStrategyLedger) -> Self {
+impl From<odf::meta::sources::MergeStrategyLedger> for MergeStrategyLedger {
+    fn from(v: odf::meta::sources::MergeStrategyLedger) -> Self {
         Self {
             primary_key: v.primary_key.into_iter().map(Into::into).collect(),
         }
@@ -786,8 +784,8 @@ pub struct MergeStrategySnapshot {
     pub compare_columns: Option<Vec<String>>,
 }
 
-impl From<odf::metadata::sources::MergeStrategySnapshot> for MergeStrategySnapshot {
-    fn from(v: odf::metadata::sources::MergeStrategySnapshot) -> Self {
+impl From<odf::meta::sources::MergeStrategySnapshot> for MergeStrategySnapshot {
+    fn from(v: odf::meta::sources::MergeStrategySnapshot) -> Self {
         Self {
             primary_key: v.primary_key.into_iter().map(Into::into).collect(),
             compare_columns: v
@@ -813,8 +811,8 @@ pub struct MergeStrategyUpsertStream {
     pub primary_key: Vec<String>,
 }
 
-impl From<odf::metadata::sources::MergeStrategyUpsertStream> for MergeStrategyUpsertStream {
-    fn from(v: odf::metadata::sources::MergeStrategyUpsertStream) -> Self {
+impl From<odf::meta::sources::MergeStrategyUpsertStream> for MergeStrategyUpsertStream {
+    fn from(v: odf::meta::sources::MergeStrategyUpsertStream) -> Self {
         Self {
             primary_key: v.primary_key.into_iter().map(Into::into).collect(),
         }
@@ -839,8 +837,8 @@ pub struct MetadataBlock {
     pub event: MetadataEvent,
 }
 
-impl From<odf::metadata::datasets::MetadataBlock> for MetadataBlock {
-    fn from(v: odf::metadata::datasets::MetadataBlock) -> Self {
+impl From<odf::meta::datasets::MetadataBlock> for MetadataBlock {
+    fn from(v: odf::meta::datasets::MetadataBlock) -> Self {
         Self {
             system_time: v.system_time.into(),
             prev_block_hash: v.prev_block_hash.map(Into::into),
@@ -872,34 +870,28 @@ pub enum MetadataEvent {
     DisablePollingSource(DisablePollingSource),
 }
 
-impl From<odf::metadata::datasets::MetadataEvent> for MetadataEvent {
-    fn from(v: odf::metadata::datasets::MetadataEvent) -> Self {
+impl From<odf::meta::datasets::MetadataEvent> for MetadataEvent {
+    fn from(v: odf::meta::datasets::MetadataEvent) -> Self {
         match v {
-            odf::metadata::datasets::MetadataEvent::AddData(v) => Self::AddData(v.into()),
-            odf::metadata::datasets::MetadataEvent::ExecuteTransform(v) => {
+            odf::meta::datasets::MetadataEvent::AddData(v) => Self::AddData(v.into()),
+            odf::meta::datasets::MetadataEvent::ExecuteTransform(v) => {
                 Self::ExecuteTransform(v.into())
             }
-            odf::metadata::datasets::MetadataEvent::Seed(v) => Self::Seed(v.into()),
-            odf::metadata::datasets::MetadataEvent::SetPollingSource(v) => {
+            odf::meta::datasets::MetadataEvent::Seed(v) => Self::Seed(v.into()),
+            odf::meta::datasets::MetadataEvent::SetPollingSource(v) => {
                 Self::SetPollingSource(v.into())
             }
-            odf::metadata::datasets::MetadataEvent::SetTransform(v) => Self::SetTransform(v.into()),
-            odf::metadata::datasets::MetadataEvent::SetVocab(v) => Self::SetVocab(v.into()),
-            odf::metadata::datasets::MetadataEvent::SetAttachments(v) => {
-                Self::SetAttachments(v.into())
-            }
-            odf::metadata::datasets::MetadataEvent::SetInfo(v) => Self::SetInfo(v.into()),
-            odf::metadata::datasets::MetadataEvent::SetLicense(v) => Self::SetLicense(v.into()),
-            odf::metadata::datasets::MetadataEvent::SetDataSchema(v) => {
-                Self::SetDataSchema(v.into())
-            }
-            odf::metadata::datasets::MetadataEvent::AddPushSource(v) => {
-                Self::AddPushSource(v.into())
-            }
-            odf::metadata::datasets::MetadataEvent::DisablePushSource(v) => {
+            odf::meta::datasets::MetadataEvent::SetTransform(v) => Self::SetTransform(v.into()),
+            odf::meta::datasets::MetadataEvent::SetVocab(v) => Self::SetVocab(v.into()),
+            odf::meta::datasets::MetadataEvent::SetAttachments(v) => Self::SetAttachments(v.into()),
+            odf::meta::datasets::MetadataEvent::SetInfo(v) => Self::SetInfo(v.into()),
+            odf::meta::datasets::MetadataEvent::SetLicense(v) => Self::SetLicense(v.into()),
+            odf::meta::datasets::MetadataEvent::SetDataSchema(v) => Self::SetDataSchema(v.into()),
+            odf::meta::datasets::MetadataEvent::AddPushSource(v) => Self::AddPushSource(v.into()),
+            odf::meta::datasets::MetadataEvent::DisablePushSource(v) => {
                 Self::DisablePushSource(v.into())
             }
-            odf::metadata::datasets::MetadataEvent::DisablePollingSource(v) => {
+            odf::meta::datasets::MetadataEvent::DisablePollingSource(v) => {
                 Self::DisablePollingSource(v.into())
             }
         }
@@ -912,7 +904,7 @@ impl From<odf::metadata::datasets::MetadataEvent> for MetadataEvent {
 ///
 /// Schema: https://opendatafabric.org/schemas/sources/v1alpha1/MqttQos
 #[derive(Enum, Debug, Clone, Copy, PartialEq, Eq)]
-#[graphql(remote = "odf::metadata::sources::MqttQos")]
+#[graphql(remote = "odf::meta::sources::MqttQos")]
 pub enum MqttQos {
     AtMostOnce,
     AtLeastOnce,
@@ -934,8 +926,8 @@ pub struct MqttTopicSubscription {
     pub qos: Option<MqttQos>,
 }
 
-impl From<odf::metadata::sources::MqttTopicSubscription> for MqttTopicSubscription {
-    fn from(v: odf::metadata::sources::MqttTopicSubscription) -> Self {
+impl From<odf::meta::sources::MqttTopicSubscription> for MqttTopicSubscription {
+    fn from(v: odf::meta::sources::MqttTopicSubscription) -> Self {
         Self {
             path: v.path.into(),
             qos: v.qos.map(Into::into),
@@ -956,8 +948,8 @@ pub struct OffsetInterval {
     pub end: UInt64,
 }
 
-impl From<odf::metadata::datasets::OffsetInterval> for OffsetInterval {
-    fn from(v: odf::metadata::datasets::OffsetInterval) -> Self {
+impl From<odf::meta::datasets::OffsetInterval> for OffsetInterval {
+    fn from(v: odf::meta::datasets::OffsetInterval) -> Self {
         Self {
             start: v.start.into(),
             end: v.end.into(),
@@ -976,11 +968,11 @@ pub enum PrepStep {
     Pipe(PrepStepPipe),
 }
 
-impl From<odf::metadata::sources::PrepStep> for PrepStep {
-    fn from(v: odf::metadata::sources::PrepStep) -> Self {
+impl From<odf::meta::sources::PrepStep> for PrepStep {
+    fn from(v: odf::meta::sources::PrepStep) -> Self {
         match v {
-            odf::metadata::sources::PrepStep::Decompress(v) => Self::Decompress(v.into()),
-            odf::metadata::sources::PrepStep::Pipe(v) => Self::Pipe(v.into()),
+            odf::meta::sources::PrepStep::Decompress(v) => Self::Decompress(v.into()),
+            odf::meta::sources::PrepStep::Pipe(v) => Self::Pipe(v.into()),
         }
     }
 }
@@ -998,8 +990,8 @@ pub struct PrepStepDecompress {
     pub sub_path: Option<String>,
 }
 
-impl From<odf::metadata::sources::PrepStepDecompress> for PrepStepDecompress {
-    fn from(v: odf::metadata::sources::PrepStepDecompress) -> Self {
+impl From<odf::meta::sources::PrepStepDecompress> for PrepStepDecompress {
+    fn from(v: odf::meta::sources::PrepStepDecompress) -> Self {
         Self {
             format: v.format.into(),
             sub_path: v.sub_path.map(Into::into),
@@ -1018,8 +1010,8 @@ pub struct PrepStepPipe {
     pub command: Vec<String>,
 }
 
-impl From<odf::metadata::sources::PrepStepPipe> for PrepStepPipe {
-    fn from(v: odf::metadata::sources::PrepStepPipe) -> Self {
+impl From<odf::meta::sources::PrepStepPipe> for PrepStepPipe {
+    fn from(v: odf::meta::sources::PrepStepPipe) -> Self {
         Self {
             command: v.command.into_iter().map(Into::into).collect(),
         }
@@ -1047,16 +1039,16 @@ pub enum ReadStep {
     NdGeoJson(ReadStepNdGeoJson),
 }
 
-impl From<odf::metadata::ReadStep> for ReadStep {
-    fn from(v: odf::metadata::ReadStep) -> Self {
+impl From<odf::meta::ReadStep> for ReadStep {
+    fn from(v: odf::meta::ReadStep) -> Self {
         match v {
-            odf::metadata::ReadStep::Csv(v) => Self::Csv(v.into()),
-            odf::metadata::ReadStep::GeoJson(v) => Self::GeoJson(v.into()),
-            odf::metadata::ReadStep::EsriShapefile(v) => Self::EsriShapefile(v.into()),
-            odf::metadata::ReadStep::Parquet(v) => Self::Parquet(v.into()),
-            odf::metadata::ReadStep::Json(v) => Self::Json(v.into()),
-            odf::metadata::ReadStep::NdJson(v) => Self::NdJson(v.into()),
-            odf::metadata::ReadStep::NdGeoJson(v) => Self::NdGeoJson(v.into()),
+            odf::meta::ReadStep::Csv(v) => Self::Csv(v.into()),
+            odf::meta::ReadStep::GeoJson(v) => Self::GeoJson(v.into()),
+            odf::meta::ReadStep::EsriShapefile(v) => Self::EsriShapefile(v.into()),
+            odf::meta::ReadStep::Parquet(v) => Self::Parquet(v.into()),
+            odf::meta::ReadStep::Json(v) => Self::Json(v.into()),
+            odf::meta::ReadStep::NdJson(v) => Self::NdJson(v.into()),
+            odf::meta::ReadStep::NdGeoJson(v) => Self::NdGeoJson(v.into()),
         }
     }
 }
@@ -1123,9 +1115,9 @@ pub struct ReadStepCsv {
     pub schema: Option<Arc<odf::schema::DataSchema>>,
 }
 
-impl From<odf::metadata::ReadStepCsv> for ReadStepCsv {
-    fn from(v: odf::metadata::ReadStepCsv) -> Self {
-        let odf::metadata::ReadStepCsv {
+impl From<odf::meta::ReadStepCsv> for ReadStepCsv {
+    fn from(v: odf::meta::ReadStepCsv) -> Self {
+        let odf::meta::ReadStepCsv {
             ddl_schema,
             separator,
             encoding,
@@ -1194,9 +1186,9 @@ pub struct ReadStepEsriShapefile {
     pub schema: Option<Arc<odf::schema::DataSchema>>,
 }
 
-impl From<odf::metadata::ReadStepEsriShapefile> for ReadStepEsriShapefile {
-    fn from(v: odf::metadata::ReadStepEsriShapefile) -> Self {
-        let odf::metadata::ReadStepEsriShapefile {
+impl From<odf::meta::ReadStepEsriShapefile> for ReadStepEsriShapefile {
+    fn from(v: odf::meta::ReadStepEsriShapefile) -> Self {
+        let odf::meta::ReadStepEsriShapefile {
             ddl_schema,
             sub_path,
             schema,
@@ -1246,9 +1238,9 @@ pub struct ReadStepGeoJson {
     pub schema: Option<Arc<odf::schema::DataSchema>>,
 }
 
-impl From<odf::metadata::ReadStepGeoJson> for ReadStepGeoJson {
-    fn from(v: odf::metadata::ReadStepGeoJson) -> Self {
-        let odf::metadata::ReadStepGeoJson { ddl_schema, schema } = v;
+impl From<odf::meta::ReadStepGeoJson> for ReadStepGeoJson {
+    fn from(v: odf::meta::ReadStepGeoJson) -> Self {
+        let odf::meta::ReadStepGeoJson { ddl_schema, schema } = v;
         Self {
             ddl_schema,
             schema: schema.map(Arc::new),
@@ -1310,9 +1302,9 @@ pub struct ReadStepJson {
     pub schema: Option<Arc<odf::schema::DataSchema>>,
 }
 
-impl From<odf::metadata::ReadStepJson> for ReadStepJson {
-    fn from(v: odf::metadata::ReadStepJson) -> Self {
-        let odf::metadata::ReadStepJson {
+impl From<odf::meta::ReadStepJson> for ReadStepJson {
+    fn from(v: odf::meta::ReadStepJson) -> Self {
+        let odf::meta::ReadStepJson {
             sub_path,
             ddl_schema,
             date_format,
@@ -1369,9 +1361,9 @@ pub struct ReadStepNdGeoJson {
     pub schema: Option<Arc<odf::schema::DataSchema>>,
 }
 
-impl From<odf::metadata::ReadStepNdGeoJson> for ReadStepNdGeoJson {
-    fn from(v: odf::metadata::ReadStepNdGeoJson) -> Self {
-        let odf::metadata::ReadStepNdGeoJson { ddl_schema, schema } = v;
+impl From<odf::meta::ReadStepNdGeoJson> for ReadStepNdGeoJson {
+    fn from(v: odf::meta::ReadStepNdGeoJson) -> Self {
+        let odf::meta::ReadStepNdGeoJson { ddl_schema, schema } = v;
         Self {
             ddl_schema,
             schema: schema.map(Arc::new),
@@ -1429,9 +1421,9 @@ pub struct ReadStepNdJson {
     pub schema: Option<Arc<odf::schema::DataSchema>>,
 }
 
-impl From<odf::metadata::ReadStepNdJson> for ReadStepNdJson {
-    fn from(v: odf::metadata::ReadStepNdJson) -> Self {
-        let odf::metadata::ReadStepNdJson {
+impl From<odf::meta::ReadStepNdJson> for ReadStepNdJson {
+    fn from(v: odf::meta::ReadStepNdJson) -> Self {
+        let odf::meta::ReadStepNdJson {
             ddl_schema,
             date_format,
             encoding,
@@ -1484,9 +1476,9 @@ pub struct ReadStepParquet {
     pub schema: Option<Arc<odf::schema::DataSchema>>,
 }
 
-impl From<odf::metadata::ReadStepParquet> for ReadStepParquet {
-    fn from(v: odf::metadata::ReadStepParquet) -> Self {
-        let odf::metadata::ReadStepParquet { ddl_schema, schema } = v;
+impl From<odf::meta::ReadStepParquet> for ReadStepParquet {
+    fn from(v: odf::meta::ReadStepParquet) -> Self {
+        let odf::meta::ReadStepParquet { ddl_schema, schema } = v;
         Self {
             ddl_schema,
             schema: schema.map(Arc::new),
@@ -1526,8 +1518,8 @@ pub struct RequestHeader {
     pub value: String,
 }
 
-impl From<odf::metadata::sources::RequestHeader> for RequestHeader {
-    fn from(v: odf::metadata::sources::RequestHeader) -> Self {
+impl From<odf::meta::sources::RequestHeader> for RequestHeader {
+    fn from(v: odf::meta::sources::RequestHeader) -> Self {
         Self {
             name: v.name.into(),
             value: v.value.into(),
@@ -1553,8 +1545,8 @@ pub struct Resource {
     pub status: ResourceStatus,
 }
 
-impl From<odf::metadata::resources::Resource<serde_json::Value>> for Resource {
-    fn from(v: odf::metadata::resources::Resource<serde_json::Value>) -> Self {
+impl From<odf::meta::resources::Resource<serde_json::Value>> for Resource {
+    fn from(v: odf::meta::resources::Resource<serde_json::Value>) -> Self {
         Self {
             schema: v.schema.into(),
             headers: v.headers.into(),
@@ -1573,23 +1565,23 @@ impl From<odf::metadata::resources::Resource<serde_json::Value>> for Resource {
 /// Schema: https://opendatafabric.org/schemas/resources/v1alpha1/ResourceAnnotations
 
 #[nutype::nutype(derive(AsRef, Clone, Debug, From, Into))]
-pub struct ResourceAnnotations(odf::metadata::resources::ResourceAnnotations);
+pub struct ResourceAnnotations(odf::meta::resources::ResourceAnnotations);
 
 #[async_graphql::Scalar]
 impl async_graphql::ScalarType for ResourceAnnotations {
     fn parse(value: async_graphql::Value) -> async_graphql::InputValueResult<Self> {
-        let proxy: odf::metadata::serde::yaml::resources::ResourceAnnotations =
+        let proxy: odf::meta::serde::yaml::resources::ResourceAnnotations =
             async_graphql::from_value(value)?;
         let dto = proxy
             .try_into()
-            .map_err(|e: odf::metadata::errors::ValidationError| {
+            .map_err(|e: odf::meta::errors::ValidationError| {
                 async_graphql::InputValueError::custom(e.to_string())
             })?;
         Ok(Self::new(dto))
     }
 
     fn to_value(&self) -> async_graphql::Value {
-        let value: odf::metadata::serde::yaml::resources::ResourceAnnotations =
+        let value: odf::meta::serde::yaml::resources::ResourceAnnotations =
             self.as_ref().clone().into();
         async_graphql::to_value(&value).unwrap()
     }
@@ -1602,23 +1594,23 @@ impl async_graphql::ScalarType for ResourceAnnotations {
 /// Schema: https://opendatafabric.org/schemas/resources/v1alpha1/ResourceConditions
 
 #[nutype::nutype(derive(AsRef, Clone, Debug, From, Into))]
-pub struct ResourceConditions(odf::metadata::resources::ResourceConditions);
+pub struct ResourceConditions(odf::meta::resources::ResourceConditions);
 
 #[async_graphql::Scalar]
 impl async_graphql::ScalarType for ResourceConditions {
     fn parse(value: async_graphql::Value) -> async_graphql::InputValueResult<Self> {
-        let proxy: odf::metadata::serde::yaml::resources::ResourceConditions =
+        let proxy: odf::meta::serde::yaml::resources::ResourceConditions =
             async_graphql::from_value(value)?;
         let dto = proxy
             .try_into()
-            .map_err(|e: odf::metadata::errors::ValidationError| {
+            .map_err(|e: odf::meta::errors::ValidationError| {
                 async_graphql::InputValueError::custom(e.to_string())
             })?;
         Ok(Self::new(dto))
     }
 
     fn to_value(&self) -> async_graphql::Value {
-        let value: odf::metadata::serde::yaml::resources::ResourceConditions =
+        let value: odf::meta::serde::yaml::resources::ResourceConditions =
             self.as_ref().clone().into();
         async_graphql::to_value(&value).unwrap()
     }
@@ -1643,8 +1635,8 @@ pub struct ResourceHandle {
     pub name: ResourceName<'static>,
 }
 
-impl From<odf::metadata::resources::ResourceHandle> for ResourceHandle {
-    fn from(v: odf::metadata::resources::ResourceHandle) -> Self {
+impl From<odf::meta::resources::ResourceHandle> for ResourceHandle {
+    fn from(v: odf::meta::resources::ResourceHandle) -> Self {
         Self {
             account: v.account.into(),
             r#type: v.r#type.into(),
@@ -1698,8 +1690,8 @@ pub struct ResourceHeaders {
     pub deleted_at: Option<DateTime<Utc>>,
 }
 
-impl From<odf::metadata::resources::ResourceHeaders> for ResourceHeaders {
-    fn from(v: odf::metadata::resources::ResourceHeaders) -> Self {
+impl From<odf::meta::resources::ResourceHeaders> for ResourceHeaders {
+    fn from(v: odf::meta::resources::ResourceHeaders) -> Self {
         Self {
             id: v.id.into(),
             name: v.name.into(),
@@ -1726,24 +1718,23 @@ impl From<odf::metadata::resources::ResourceHeaders> for ResourceHeaders {
 /// Schema: https://opendatafabric.org/schemas/resources/v1alpha1/ResourceLabels
 
 #[nutype::nutype(derive(AsRef, Clone, Debug, From, Into))]
-pub struct ResourceLabels(odf::metadata::resources::ResourceLabels);
+pub struct ResourceLabels(odf::meta::resources::ResourceLabels);
 
 #[async_graphql::Scalar]
 impl async_graphql::ScalarType for ResourceLabels {
     fn parse(value: async_graphql::Value) -> async_graphql::InputValueResult<Self> {
-        let proxy: odf::metadata::serde::yaml::resources::ResourceLabels =
+        let proxy: odf::meta::serde::yaml::resources::ResourceLabels =
             async_graphql::from_value(value)?;
         let dto = proxy
             .try_into()
-            .map_err(|e: odf::metadata::errors::ValidationError| {
+            .map_err(|e: odf::meta::errors::ValidationError| {
                 async_graphql::InputValueError::custom(e.to_string())
             })?;
         Ok(Self::new(dto))
     }
 
     fn to_value(&self) -> async_graphql::Value {
-        let value: odf::metadata::serde::yaml::resources::ResourceLabels =
-            self.as_ref().clone().into();
+        let value: odf::meta::serde::yaml::resources::ResourceLabels = self.as_ref().clone().into();
         async_graphql::to_value(&value).unwrap()
     }
 }
@@ -1755,17 +1746,20 @@ impl async_graphql::ScalarType for ResourceLabels {
 /// Schema: https://opendatafabric.org/schemas/auth/v1alpha1/ResourceOwnerHandle
 #[derive(SimpleObject, Debug, Clone)]
 pub struct ResourceOwnerHandle {
+    /// Type URI of the account.
+    pub r#type: TypeUri<'static>,
     /// ID of the account resource.
     pub id: ResourceID<'static>,
     /// DID of the account.
-    pub did: AccountID<'static>,
+    pub did: AccountDid<'static>,
     /// Name of the account.
     pub name: AccountName<'static>,
 }
 
-impl From<odf::metadata::auth::ResourceOwnerHandle> for ResourceOwnerHandle {
-    fn from(v: odf::metadata::auth::ResourceOwnerHandle) -> Self {
+impl From<odf::meta::auth::ResourceOwnerHandle> for ResourceOwnerHandle {
+    fn from(v: odf::meta::auth::ResourceOwnerHandle) -> Self {
         Self {
+            r#type: v.r#type.into(),
             id: v.id.into(),
             did: v.did.into(),
             name: v.name.into(),
@@ -1779,7 +1773,7 @@ impl From<odf::metadata::auth::ResourceOwnerHandle> for ResourceOwnerHandle {
 ///
 /// Schema: https://opendatafabric.org/schemas/resources/v1alpha1/ResourcePhase
 #[derive(Enum, Debug, Clone, Copy, PartialEq, Eq)]
-#[graphql(remote = "odf::metadata::resources::ResourcePhase")]
+#[graphql(remote = "odf::meta::resources::ResourcePhase")]
 pub enum ResourcePhase {
     Pending,
     Reconciling,
@@ -1812,8 +1806,8 @@ pub struct ResourceStatus {
     pub conditions: ResourceConditions,
 }
 
-impl From<odf::metadata::resources::ResourceStatus> for ResourceStatus {
-    fn from(v: odf::metadata::resources::ResourceStatus) -> Self {
+impl From<odf::meta::resources::ResourceStatus> for ResourceStatus {
+    fn from(v: odf::meta::resources::ResourceStatus) -> Self {
         Self {
             phase: v.phase.into(),
             observed_generation: v.observed_generation.map(Into::into),
@@ -1833,13 +1827,13 @@ impl From<odf::metadata::resources::ResourceStatus> for ResourceStatus {
 #[derive(SimpleObject, Debug, Clone)]
 pub struct Seed {
     /// Unique identity of the dataset.
-    pub dataset_id: DatasetID<'static>,
+    pub dataset_id: DatasetDid<'static>,
     /// Type of the dataset.
     pub dataset_kind: DatasetKind,
 }
 
-impl From<odf::metadata::datasets::Seed> for Seed {
-    fn from(v: odf::metadata::datasets::Seed) -> Self {
+impl From<odf::meta::datasets::Seed> for Seed {
+    fn from(v: odf::meta::datasets::Seed) -> Self {
         Self {
             dataset_id: v.dataset_id.into(),
             dataset_kind: v.dataset_kind.into(),
@@ -1858,8 +1852,8 @@ pub struct SetAttachments {
     pub attachments: Attachments,
 }
 
-impl From<odf::metadata::datasets::SetAttachments> for SetAttachments {
-    fn from(v: odf::metadata::datasets::SetAttachments) -> Self {
+impl From<odf::meta::datasets::SetAttachments> for SetAttachments {
+    fn from(v: odf::meta::datasets::SetAttachments) -> Self {
         Self {
             attachments: v.attachments.into(),
         }
@@ -1887,8 +1881,8 @@ impl SetDataSchema {
     }
 }
 
-impl From<odf::metadata::SetDataSchema> for SetDataSchema {
-    fn from(v: odf::metadata::SetDataSchema) -> Self {
+impl From<odf::meta::SetDataSchema> for SetDataSchema {
+    fn from(v: odf::meta::SetDataSchema) -> Self {
         Self {
             schema: std::sync::Arc::new(v.upgrade().schema),
         }
@@ -1908,8 +1902,8 @@ pub struct SetInfo {
     pub keywords: Option<Vec<String>>,
 }
 
-impl From<odf::metadata::datasets::SetInfo> for SetInfo {
-    fn from(v: odf::metadata::datasets::SetInfo) -> Self {
+impl From<odf::meta::datasets::SetInfo> for SetInfo {
+    fn from(v: odf::meta::datasets::SetInfo) -> Self {
         Self {
             description: v.description.map(Into::into),
             keywords: v.keywords.map(|v| v.into_iter().map(Into::into).collect()),
@@ -1934,8 +1928,8 @@ pub struct SetLicense {
     pub website_url: String,
 }
 
-impl From<odf::metadata::datasets::SetLicense> for SetLicense {
-    fn from(v: odf::metadata::datasets::SetLicense) -> Self {
+impl From<odf::meta::datasets::SetLicense> for SetLicense {
+    fn from(v: odf::meta::datasets::SetLicense) -> Self {
         Self {
             short_name: v.short_name.into(),
             name: v.name.into(),
@@ -1964,8 +1958,8 @@ pub struct SetPollingSource {
     pub merge: MergeStrategy,
 }
 
-impl From<odf::metadata::legacy::SetPollingSource> for SetPollingSource {
-    fn from(v: odf::metadata::legacy::SetPollingSource) -> Self {
+impl From<odf::meta::legacy::SetPollingSource> for SetPollingSource {
+    fn from(v: odf::meta::legacy::SetPollingSource) -> Self {
         Self {
             fetch: v.fetch.into(),
             prepare: v.prepare.map(|v| v.into_iter().map(Into::into).collect()),
@@ -1989,8 +1983,8 @@ pub struct SetTransform {
     pub transform: Transform,
 }
 
-impl From<odf::metadata::datasets::SetTransform> for SetTransform {
-    fn from(v: odf::metadata::datasets::SetTransform) -> Self {
+impl From<odf::meta::datasets::SetTransform> for SetTransform {
+    fn from(v: odf::meta::datasets::SetTransform) -> Self {
         Self {
             inputs: v.inputs.into_iter().map(Into::into).collect(),
             transform: v.transform.into(),
@@ -2015,8 +2009,8 @@ pub struct SetVocab {
     pub event_time_column: Option<String>,
 }
 
-impl From<odf::metadata::datasets::SetVocab> for SetVocab {
-    fn from(v: odf::metadata::datasets::SetVocab) -> Self {
+impl From<odf::meta::datasets::SetVocab> for SetVocab {
+    fn from(v: odf::meta::datasets::SetVocab) -> Self {
         Self {
             offset_column: v.offset_column.map(Into::into),
             operation_type_column: v.operation_type_column.map(Into::into),
@@ -2036,10 +2030,10 @@ pub enum SourceCaching {
     Forever(SourceCachingForever),
 }
 
-impl From<odf::metadata::sources::SourceCaching> for SourceCaching {
-    fn from(v: odf::metadata::sources::SourceCaching) -> Self {
+impl From<odf::meta::sources::SourceCaching> for SourceCaching {
+    fn from(v: odf::meta::sources::SourceCaching) -> Self {
         match v {
-            odf::metadata::sources::SourceCaching::Forever(v) => Self::Forever(v.into()),
+            odf::meta::sources::SourceCaching::Forever(v) => Self::Forever(v.into()),
         }
     }
 }
@@ -2054,8 +2048,8 @@ pub struct SourceCachingForever {
     pub _dummy: Option<String>,
 }
 
-impl From<odf::metadata::sources::SourceCachingForever> for SourceCachingForever {
-    fn from(v: odf::metadata::sources::SourceCachingForever) -> Self {
+impl From<odf::meta::sources::SourceCachingForever> for SourceCachingForever {
+    fn from(v: odf::meta::sources::SourceCachingForever) -> Self {
         Self { _dummy: None }
     }
 }
@@ -2066,7 +2060,7 @@ impl From<odf::metadata::sources::SourceCachingForever> for SourceCachingForever
 ///
 /// Schema: https://opendatafabric.org/schemas/sources/v1alpha1/SourceOrdering
 #[derive(Enum, Debug, Clone, Copy, PartialEq, Eq)]
-#[graphql(remote = "odf::metadata::sources::SourceOrdering")]
+#[graphql(remote = "odf::meta::sources::SourceOrdering")]
 pub enum SourceOrdering {
     ByEventTime,
     ByName,
@@ -2087,8 +2081,8 @@ pub struct SourceState {
     pub value: String,
 }
 
-impl From<odf::metadata::sources::SourceState> for SourceState {
-    fn from(v: odf::metadata::sources::SourceState) -> Self {
+impl From<odf::meta::sources::SourceState> for SourceState {
+    fn from(v: odf::meta::sources::SourceState) -> Self {
         Self {
             source_name: v.source_name.into(),
             kind: v.kind.into(),
@@ -2111,8 +2105,8 @@ pub struct SqlQueryStep {
     pub query: String,
 }
 
-impl From<odf::metadata::datasets::SqlQueryStep> for SqlQueryStep {
-    fn from(v: odf::metadata::datasets::SqlQueryStep) -> Self {
+impl From<odf::meta::datasets::SqlQueryStep> for SqlQueryStep {
+    fn from(v: odf::meta::datasets::SqlQueryStep) -> Self {
         Self {
             alias: v.alias.map(Into::into),
             query: v.query.into(),
@@ -2133,8 +2127,8 @@ pub struct TemporalTable {
     pub primary_key: Vec<String>,
 }
 
-impl From<odf::metadata::datasets::TemporalTable> for TemporalTable {
-    fn from(v: odf::metadata::datasets::TemporalTable) -> Self {
+impl From<odf::meta::datasets::TemporalTable> for TemporalTable {
+    fn from(v: odf::meta::datasets::TemporalTable) -> Self {
         Self {
             name: v.name.into(),
             primary_key: v.primary_key.into_iter().map(Into::into).collect(),
@@ -2152,10 +2146,10 @@ pub enum Transform {
     Sql(TransformSql),
 }
 
-impl From<odf::metadata::datasets::Transform> for Transform {
-    fn from(v: odf::metadata::datasets::Transform) -> Self {
+impl From<odf::meta::datasets::Transform> for Transform {
+    fn from(v: odf::meta::datasets::Transform) -> Self {
         match v {
-            odf::metadata::datasets::Transform::Sql(v) => Self::Sql(v.into()),
+            odf::meta::datasets::Transform::Sql(v) => Self::Sql(v.into()),
         }
     }
 }
@@ -2173,8 +2167,8 @@ pub struct TransformSql {
     pub temporal_tables: Option<Vec<TemporalTable>>,
 }
 
-impl From<odf::metadata::TransformSql> for TransformSql {
-    fn from(v: odf::metadata::TransformSql) -> Self {
+impl From<odf::meta::TransformSql> for TransformSql {
+    fn from(v: odf::meta::TransformSql) -> Self {
         let queries = if let Some(query) = v.query {
             vec![SqlQueryStep { alias: None, query }]
         } else {
@@ -2262,8 +2256,8 @@ impl TransformInput {
     }
 }
 
-impl From<odf::metadata::TransformInput> for TransformInput {
-    fn from(v: odf::metadata::TransformInput) -> Self {
+impl From<odf::meta::TransformInput> for TransformInput {
+    fn from(v: odf::meta::TransformInput) -> Self {
         Self {
             dataset_ref: v.dataset_ref.into(),
             alias: v.alias.unwrap(),

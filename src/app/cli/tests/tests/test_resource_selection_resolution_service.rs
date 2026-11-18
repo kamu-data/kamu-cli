@@ -35,14 +35,14 @@ use kamu_resources_facade::{
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-fn variableset_type_uri() -> &'static TypeUri {
-    odf::metadata::config::VariableSet::schema()
+fn variableset_type_uri() -> TypeUri {
+    odf::metadata::config::VariableSet::type_uri().cheap_clone()
 }
 const VARIABLESETS_NAME: &str = "variablesets";
 const VARIABLESETS_SHORT_NAME: &str = "vs";
 
-fn secretset_type_uri() -> &'static TypeUri {
-    odf::metadata::config::SecretSet::schema()
+fn secretset_type_uri() -> TypeUri {
+    odf::metadata::config::SecretSet::type_uri().cheap_clone()
 }
 const SECRETSETS_NAME: &str = "secretsets";
 const SECRETSETS_SHORT_NAME: &str = "ss";
@@ -137,7 +137,7 @@ async fn resolves_exact_type_name_patterns_via_search() {
     harness.expect_search_handles(
         1,
         vec![ResourceHandle {
-            r#type: variableset_type_uri().clone(),
+            r#type: variableset_type_uri(),
             did: None,
             id: ResourceID::new(uuid::Uuid::new_v4()),
             name: "app-alpha".parse().unwrap(),
@@ -318,7 +318,7 @@ async fn ids_find_resources_being_deleted() {
     harness.expect_search_handles(
         1,
         vec![ResourceHandle {
-            r#type: variableset_type_uri().clone(),
+            r#type: variableset_type_uri(),
             did: None,
             id,
             name: "vars-a".parse().unwrap(),
@@ -406,7 +406,7 @@ async fn resolves_any_type_exact_ref_across_every_supported_type() {
         1,
         vec![
             ResourceHandle {
-                r#type: secretset_type_uri().clone(),
+                r#type: secretset_type_uri(),
                 did: None,
                 id: ResourceID::new(uuid::Uuid::new_v4()),
                 name: RESOURCE_DB_CREDS.parse().unwrap(),
@@ -512,14 +512,14 @@ async fn resolves_any_type_name_pattern_via_a_single_search() {
         1,
         vec![
             ResourceHandle {
-                r#type: variableset_type_uri().clone(),
+                r#type: variableset_type_uri(),
                 did: None,
                 id: ResourceID::new(uuid::Uuid::new_v4()),
                 name: "app-alpha".parse().unwrap(),
                 account: DEFAULT_ACCOUNT_HANDLE.clone().into(),
             },
             ResourceHandle {
-                r#type: secretset_type_uri().clone(),
+                r#type: secretset_type_uri(),
                 did: None,
                 id: ResourceID::new(uuid::Uuid::new_v4()),
                 name: "app-beta".parse().unwrap(),
@@ -690,7 +690,7 @@ async fn deduplicates_overlapping_name_patterns_before_counting_max_results() {
     harness.expect_search_handles(
         2,
         vec![ResourceHandle {
-            r#type: variableset_type_uri().clone(),
+            r#type: variableset_type_uri(),
             did: None,
             id: shared_id,
             name: "app-alpha".parse().unwrap(),
@@ -746,14 +746,14 @@ async fn errors_when_unique_targets_exceed_max_results_after_deduplication() {
         1,
         vec![
             ResourceHandle {
-                r#type: variableset_type_uri().clone(),
+                r#type: variableset_type_uri(),
                 did: None,
                 id: shared_id,
                 name: "app-alpha".parse().unwrap(),
                 account: DEFAULT_ACCOUNT_HANDLE.clone().into(),
             },
             ResourceHandle {
-                r#type: variableset_type_uri().clone(),
+                r#type: variableset_type_uri(),
                 did: None,
                 id: second_id,
                 name: "app-beta".parse().unwrap(),
@@ -809,7 +809,7 @@ async fn passes_the_label_filter_to_pattern_expansion() {
     harness.expect_search_handles(
         1,
         vec![ResourceHandle {
-            r#type: variableset_type_uri().clone(),
+            r#type: variableset_type_uri(),
             did: None,
             id: ResourceID::new(uuid::Uuid::new_v4()),
             name: "app-alpha".parse().unwrap(),
@@ -856,7 +856,7 @@ async fn passes_the_label_filter_to_the_all_selector() {
     harness.expect_search_handles(
         1,
         vec![ResourceHandle {
-            r#type: variableset_type_uri().clone(),
+            r#type: variableset_type_uri(),
             did: None,
             id: ResourceID::new(uuid::Uuid::new_v4()),
             name: "app-alpha".parse().unwrap(),
@@ -896,7 +896,7 @@ async fn narrows_exact_selectors_by_the_label_filter() {
     let matching_id = ResourceID::new(uuid::Uuid::new_v4());
 
     let matching = ResourceHandle {
-        r#type: variableset_type_uri().clone(),
+        r#type: variableset_type_uri(),
         did: None,
         id: matching_id,
         name: "vars-a".parse().unwrap(),
@@ -948,7 +948,7 @@ async fn narrows_exact_selectors_by_the_label_filter() {
 #[test_log::test(tokio::test)]
 async fn leaves_exact_selectors_untouched_without_a_label_filter() {
     let handle = ResourceHandle {
-        r#type: variableset_type_uri().clone(),
+        r#type: variableset_type_uri(),
         did: None,
         id: ResourceID::new(uuid::Uuid::new_v4()),
         name: "vars-a".parse().unwrap(),
@@ -1190,7 +1190,7 @@ impl ResourceSelectionResolutionHarness {
     /// A `VariableSet` handle with a fresh id.
     fn variableset_handle(&self, name: &str) -> ResourceHandle {
         ResourceHandle {
-            r#type: variableset_type_uri().clone(),
+            r#type: variableset_type_uri(),
             did: None,
             id: ResourceID::new(uuid::Uuid::new_v4()),
             name: name.parse().unwrap(),
@@ -1344,7 +1344,7 @@ impl ResourceSelectionResolutionHarness {
             selector_aliases: vec![
                 kamu_resources::ResourceSelectorName::new(VARIABLESETS_SHORT_NAME).unwrap(),
             ],
-            schema: variableset_type_uri().clone(),
+            schema: variableset_type_uri(),
             list_columns: Vec::new(),
         }
     }
@@ -1355,7 +1355,7 @@ impl ResourceSelectionResolutionHarness {
             selector_aliases: vec![
                 kamu_resources::ResourceSelectorName::new(SECRETSETS_SHORT_NAME).unwrap(),
             ],
-            schema: secretset_type_uri().clone(),
+            schema: secretset_type_uri(),
             list_columns: Vec::new(),
         }
     }

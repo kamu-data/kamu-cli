@@ -37,7 +37,7 @@ impl VariableSetResource {
     /// Used as the const dill-registry key (dill `#[meta]` requires a const);
     /// the typed identity is [`Self::schema`] returning a `TypeUri`. Both
     /// derive from the same generated static, so they cannot drift.
-    pub const SCHEMA_STR: &'static str = odf::metadata::config::VariableSet::schema_str();
+    pub const SCHEMA_STR: &'static str = odf::metadata::config::VariableSet::type_uri_str();
 
     // "variableset" (lowercase-of-canonical) is deliberately omitted: matching
     // is already case-insensitive, so it would collide with the canonical name.
@@ -47,8 +47,8 @@ impl VariableSetResource {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl ResourceSchemaProvider for VariableSetResource {
-    fn schema() -> &'static TypeUri {
-        odf::metadata::config::VariableSet::schema()
+    fn type_uri() -> &'static TypeUri {
+        odf::metadata::config::VariableSet::type_uri()
     }
 }
 

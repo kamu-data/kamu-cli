@@ -874,6 +874,8 @@ table AttachmentsEmbedded {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 table ResourceOwnerHandle {
+  // Type URI of the account.
+  type: string;
   // ID of the account resource.
   id: [ubyte];
   // DID of the account.
@@ -928,6 +930,8 @@ table AwsCredentials {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 table ResourceOwnerRef {
+  // Name or URI of the account type.
+  type: string;
   // UUID of the account resource.
   id: [ubyte];
   // DID of the account.
@@ -987,29 +991,46 @@ table AwsCredentialsInput {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 union SubjectHandle {
-  SubjectHandleResource,
+  SubjectHandlePrincipal,
+  SubjectHandleGroup,
   SubjectHandleAuthenticated,
   SubjectHandleAnonymous,
   SubjectHandleEveryone,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// SubjectHandleResource
-// A specific `User`, `ServiceAccount`, `Node`, or members of a `Group`.
+// SubjectHandlePrincipal
+// A specific `User`, `ServiceAccount`, or `Node`.
 //
-// Schema: https://opendatafabric.org/schemas/auth/v1alpha1/SubjectHandle#/$defs/Resource
+// Schema: https://opendatafabric.org/schemas/auth/v1alpha1/SubjectHandle#/$defs/Principal
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-table SubjectHandleResource {
-  // Type URI of the subject resource.
+table SubjectHandlePrincipal {
+  // Type URI of the principal.
   type: string;
-  // Account that owns the subject resource (for service accounts and groups).
+  // Account that owns the service account.
   account: ResourceOwnerHandle;
-  // ID of the subject resource.
+  // ID of the principal resource.
   id: [ubyte];
-  // DID of the subject resource, if applicable.
+  // DID of the principal, if applicable.
   did: [ubyte];
-  // Name of the subject resource.
+  // Name of the principal resource.
+  name: string;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// SubjectHandleGroup
+// Members of a `Group`, including members of nested groups.
+//
+// Schema: https://opendatafabric.org/schemas/auth/v1alpha1/SubjectHandle#/$defs/Group
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+table SubjectHandleGroup {
+  // Account that owns the group.
+  account: ResourceOwnerHandle;
+  // ID of the group resource.
+  id: [ubyte];
+  // Name of the group resource.
   name: string;
 }
 
@@ -1099,16 +1120,16 @@ table ResourceAnnotations {
 table ResourceRef {
   // Reference to an account that owns the target resource.
   account: ResourceOwnerRef;
-  // ID of the resource within a node.
-  id: [ubyte];
-  // DID of the resource.
-  did: [ubyte];
   // Short type name or full type URI of the target resource.
   //
   // Examples:
   // - "SecretSet"
   // - "https://opendatafabric.org/schemas/config/v1alpha1/SecretSet"
   type: string;
+  // ID of the resource within a node.
+  id: [ubyte];
+  // DID of the resource.
+  did: [ubyte];
   // Name of a resource.
   name: string;
 }
@@ -1930,7 +1951,7 @@ table PrincipalRef {
   account: ResourceOwnerRef;
   // ID of the principal resource.
   id: [ubyte];
-  // DID of the principal.
+  // DID of the principal account or node.
   did: [ubyte];
   // Name of the principal resource.
   name: string;
@@ -2556,15 +2577,15 @@ table FlowRunSpecInput {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 table PrincipalHandle {
+  // Owner account, if principal is a service account.
+  account: ResourceOwnerHandle;
   // Type URI of the principal.
   type: string;
-  // Account that owns the service account.
-  account: ResourceOwnerHandle;
-  // ID of the principal resource.
+  // ID of the principal account resource.
   id: [ubyte];
-  // DID of the principal, if applicable.
+  // DID of the principal account.
   did: [ubyte];
-  // Name of the principal resource.
+  // Name of the principal account.
   name: string;
 }
 
@@ -3371,35 +3392,52 @@ table FlowStatus {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // SubjectRef
-// Reference to a party a grant is given to. Unlike a principal, a subject may stand for many principals at once. Short form is either a well-known subject name (e.g. `Authenticated`) or a resource reference with a type prefix, DID, or ID (e.g. `Group:acme/engineering`).
+// Reference to a party a grant is given to. Unlike a principal, a subject may stand for many principals at once. Short form always starts with a prefix that determines the subject kind: a resource type followed by a resource name (e.g. `User:alice`, `Group:acme/engineering`), or a well-known subject followed by `*` (e.g. `Authenticated:*`).
 //
 // Schema: https://opendatafabric.org/schemas/auth/v1alpha1/SubjectRef
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 union SubjectRef {
-  SubjectRefResource,
+  SubjectRefPrincipal,
+  SubjectRefGroup,
   SubjectRefAuthenticated,
   SubjectRefAnonymous,
   SubjectRefEveryone,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// SubjectRefResource
-// A specific `User`, `ServiceAccount`, `Node`, or members of a `Group`.
+// SubjectRefPrincipal
+// A specific `User`, `ServiceAccount`, or `Node`.
 //
-// Schema: https://opendatafabric.org/schemas/auth/v1alpha1/SubjectRef#/$defs/Resource
+// Schema: https://opendatafabric.org/schemas/auth/v1alpha1/SubjectRef#/$defs/Principal
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-table SubjectRefResource {
-  // Short type name or full type URI of the subject resource.
+table SubjectRefPrincipal {
+  // Short type name or full type URI of the principal.
   type: string;
-  // Reference to an account that owns the subject resource (for service accounts and groups).
+  // Reference to an account that owns the service account.
   account: ResourceOwnerRef;
-  // ID of the subject resource.
+  // ID of the principal resource.
   id: [ubyte];
-  // DID of the subject resource.
+  // DID of the principal.
   did: [ubyte];
-  // Name of the subject resource.
+  // Name of the principal resource.
+  name: string;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// SubjectRefGroup
+// Members of a `Group`, including members of nested groups.
+//
+// Schema: https://opendatafabric.org/schemas/auth/v1alpha1/SubjectRef#/$defs/Group
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+table SubjectRefGroup {
+  // Reference to an account that owns the group.
+  account: ResourceOwnerRef;
+  // ID of the group resource.
+  id: [ubyte];
+  // Name of the group resource.
   name: string;
 }
 
@@ -3445,7 +3483,7 @@ table SubjectRefWrapper {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 table GroupSpecInput {
-  // Members of the group. Only the `Resource` subject kind is allowed, so that well-known subjects like `Everyone` cannot be nested into a group.
+  // Members of the group. Only the `Principal` and `Group` subject kinds are allowed, so that well-known subjects like `Everyone` cannot be nested into a group.
   members: [SubjectRefWrapper];
 }
 
@@ -3461,7 +3499,7 @@ table SubjectHandleWrapper {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 table GroupSpec {
-  // Members of the group. Only the `Resource` subject kind is allowed, so that well-known subjects like `Everyone` cannot be nested into a group.
+  // Members of the group. Only the `Principal` and `Group` subject kinds are allowed, so that well-known subjects like `Everyone` cannot be nested into a group.
   members: [SubjectHandleWrapper];
 }
 
@@ -3657,7 +3695,7 @@ table MetadataBlock {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 table NodeSpecInput {
-  // DID associated with the account by ODF or an external system.
+  // DID associated with the ODF node.
   did: [ubyte];
   // Human-friendly display name.
   display_name: string;
@@ -3671,7 +3709,7 @@ table NodeSpecInput {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 table NodeSpec {
-  // DID associated with the account by ODF or an external system.
+  // DID associated with the ODF node.
   did: [ubyte];
   // Human-friendly display name.
   display_name: string;

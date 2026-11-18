@@ -147,4 +147,16 @@ ignore = [
     # Pulled via sqlx-sqlite 0.9.0 (latest), which caps libsqlite3-sys below 0.38; the fix is 0.39
     # https://rustsec.org/advisories/RUSTSEC-2026-0459
     "RUSTSEC-2026-0459",
+    # Because chrono is now unmaintained and humantime wraps chrono, it is also unmaintained; all versions are affected.
+    # https://rustsec.org/advisories/RUSTSEC-2026-0542
+    "RUSTSEC-2026-0542",
+    # The chrono crate is unmaintained; all versions are affected.
+    # https://rustsec.org/advisories/RUSTSEC-2026-0543
+    "RUSTSEC-2026-0543",
+    # The chrono-tz crate is unmaintained; all versions are affected.
+    # https://rustsec.org/advisories/RUSTSEC-2026-0555
+    "RUSTSEC-2026-0555",
+    # The chrono-tz-build crate is unmaintained; all versions are affected.
+    # https://rustsec.org/advisories/RUSTSEC-2026-0559
+    "RUSTSEC-2026-0559",
 ]

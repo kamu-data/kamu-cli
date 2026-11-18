@@ -57,7 +57,7 @@ impl AccountsMut {
     async fn by_id(
         &self,
         ctx: &Context<'_>,
-        account_id: AccountID<'_>,
+        account_id: AccountDid<'_>,
     ) -> Result<Option<AccountMut>> {
         // NOTE: AccountMut' methods handle access verification
 
@@ -75,7 +75,7 @@ impl AccountsMut {
     async fn by_ids(
         &self,
         ctx: &Context<'_>,
-        account_ids: Vec<AccountID<'_>>,
+        account_ids: Vec<AccountDid<'_>>,
         #[graphql(
             desc = "Whether to skip unresolved accounts or return an error if one or more are \
                     missing"
@@ -98,7 +98,7 @@ impl AccountsMut {
 
         let found_accounts: Vec<kamu_accounts::Account> = {
             let found_accounts_map: std::collections::BTreeMap<
-                odf::AccountID,
+                odf::metadata::auth::AccountDid,
                 kamu_accounts::Account,
             > = lookup
                 .found

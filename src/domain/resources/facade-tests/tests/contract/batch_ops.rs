@@ -90,10 +90,10 @@ pub async fn test_get_all_successes(h: &impl FacadeContractHarness) {
     let view_a = by_index[&0];
     let view_b = by_index[&1];
 
-    assert_resource_view_fields(view_a, VariableSetResource::schema(), "batch-a");
+    assert_resource_view_fields(view_a, VariableSetResource::type_uri(), "batch-a");
     assert_eq!(view_a.headers.id, id_a);
 
-    assert_resource_view_fields(view_b, VariableSetResource::schema(), "batch-b");
+    assert_resource_view_fields(view_b, VariableSetResource::type_uri(), "batch-b");
     assert_eq!(view_b.headers.id, id_b);
 }
 
@@ -986,6 +986,7 @@ pub async fn test_batch_spans_types_and_accounts(h: &impl FacadeContractHarness)
     let spelled_out = vec![
         ResourceRef {
             account: Some(kamu_resources::ResourceOwnerRef {
+                r#type: None,
                 id: None,
                 did: None,
                 name: Some(h.account_name(TestAccount::Alice)),

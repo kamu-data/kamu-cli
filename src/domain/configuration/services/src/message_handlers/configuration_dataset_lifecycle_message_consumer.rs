@@ -251,7 +251,7 @@ impl MessageConsumerT<DatasetLifecycleMessage> for ConfigurationDatasetLifecycle
 
         Self::cleanup_schema(
             target_catalog,
-            VariableSetResource::schema(),
+            VariableSetResource::type_uri(),
             dataset_id,
             &DatasetEnvVarMutationAdapterImpl::legacy_variable_set_resource_name(dataset_id),
         )
@@ -259,7 +259,7 @@ impl MessageConsumerT<DatasetLifecycleMessage> for ConfigurationDatasetLifecycle
 
         Self::cleanup_schema(
             target_catalog,
-            SecretSetResource::schema(),
+            SecretSetResource::type_uri(),
             dataset_id,
             &DatasetEnvVarMutationAdapterImpl::legacy_secret_set_resource_name(dataset_id),
         )

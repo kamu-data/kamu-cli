@@ -18,10 +18,10 @@ pub struct IDFactory;
 
 /// Generates randomized unique identities for different resources
 impl IDFactory {
-    pub fn dataset_id() -> DatasetID {
+    pub fn dataset_did() -> DatasetDid {
         let name = Self::dataset_name();
         let digest = sha3::Sha3_256::digest(name.as_bytes());
-        DatasetID::new_seeded_ed25519(&digest)
+        DatasetDid::new_seeded_ed25519(&digest)
     }
 
     pub fn dataset_name() -> legacy::DatasetName {

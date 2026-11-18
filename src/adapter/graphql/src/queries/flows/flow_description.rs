@@ -382,8 +382,10 @@ impl FlowDescriptionResetResult {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct FlowDescriptionBuilder {
-    polling_sources_by_dataset_id: HashMap<odf::DatasetID, odf::metadata::SetPollingSource>,
-    transforms_by_dataset_id: HashMap<odf::DatasetID, odf::metadata::SetTransform>,
+    polling_sources_by_dataset_id:
+        HashMap<odf::metadata::datasets::DatasetDid, odf::metadata::SetPollingSource>,
+    transforms_by_dataset_id:
+        HashMap<odf::metadata::datasets::DatasetDid, odf::metadata::SetTransform>,
     webhook_subscriptions_by_id:
         HashMap<kamu_webhooks::WebhookSubscriptionID, kamu_webhooks::WebhookSubscription>,
 }
@@ -432,7 +434,9 @@ impl FlowDescriptionBuilder {
             .collect::<Vec<_>>()
     }
 
-    fn collect_unique_dataset_ids(flow_states: &[fs::FlowState]) -> Vec<odf::DatasetID> {
+    fn collect_unique_dataset_ids(
+        flow_states: &[fs::FlowState],
+    ) -> Vec<odf::metadata::datasets::DatasetDid> {
         flow_states
             .iter()
             .filter_map(|flow_state| {
@@ -445,8 +449,14 @@ impl FlowDescriptionBuilder {
 
     async fn detect_datasets_with_polling_sources(
         ctx: &Context<'_>,
-        dataset_ids: &[odf::DatasetID],
-    ) -> Result<Vec<(odf::DatasetID, odf::metadata::SetPollingSource)>, InternalError> {
+        dataset_ids: &[odf::metadata::datasets::DatasetDid],
+    ) -> Result<
+        Vec<(
+            odf::metadata::datasets::DatasetDid,
+            odf::metadata::SetPollingSource,
+        )>,
+        InternalError,
+    > {
         // Locate datasets with polling sources
         let key_blocks_repository =
             from_catalog_n!(ctx, dyn kamu_datasets::DatasetKeyBlockRepository);
@@ -485,8 +495,14 @@ impl FlowDescriptionBuilder {
 
     async fn detect_datasets_with_transforms(
         ctx: &Context<'_>,
-        dataset_ids: &[odf::DatasetID],
-    ) -> Result<Vec<(odf::DatasetID, odf::metadata::SetTransform)>, InternalError> {
+        dataset_ids: &[odf::metadata::datasets::DatasetDid],
+    ) -> Result<
+        Vec<(
+            odf::metadata::datasets::DatasetDid,
+            odf::metadata::SetTransform,
+        )>,
+        InternalError,
+    > {
         // Locate datasets with transforms
         let key_blocks_repository =
             from_catalog_n!(ctx, dyn kamu_datasets::DatasetKeyBlockRepository);
@@ -614,7 +630,7 @@ impl FlowDescriptionBuilder {
         &self,
         flow_state: &fs::FlowState,
         flow_type: &str,
-        dataset_id: &odf::DatasetID,
+        dataset_id: &odf::metadata::datasets::DatasetDid,
     ) -> Result<FlowDescriptionDataset> {
         Ok(match flow_type {
             FLOW_TYPE_DATASET_INGEST => {

@@ -9,7 +9,106 @@
 
 use crate::dtos;
 use crate::errors::ValidationError;
+use crate::resources::ResourceRefT;
 use crate::serde::yaml as proxies;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl From<dtos::auth::SubjectRef> for proxies::auth::SubjectRef {
+    fn from(v: dtos::auth::SubjectRef) -> Self {
+        match v {
+            dtos::auth::SubjectRef::Principal(dtos::auth::PrincipalRef {
+                r#type,
+                account,
+                id,
+                did,
+                name,
+            }) => Self::Principal(proxies::auth::SubjectRefPrincipal {
+                r#type,
+                account: account.map(Into::into),
+                id,
+                did,
+                name,
+            }),
+            dtos::auth::SubjectRef::Group(ResourceRefT {
+                account,
+                id,
+                did: _,
+                r#type: _,
+                name,
+            }) => Self::Group(proxies::auth::SubjectRefGroup {
+                account: account.map(Into::into),
+                id,
+                name,
+            }),
+            dtos::auth::SubjectRef::Authenticated => {
+                Self::Authenticated(proxies::auth::SubjectRefAuthenticated {})
+            }
+            dtos::auth::SubjectRef::Anonymous => {
+                Self::Anonymous(proxies::auth::SubjectRefAnonymous {})
+            }
+            dtos::auth::SubjectRef::Everyone => {
+                Self::Everyone(proxies::auth::SubjectRefEveryone {})
+            }
+        }
+    }
+}
+
+impl TryFrom<proxies::auth::SubjectRef> for dtos::auth::SubjectRef {
+    type Error = ValidationError;
+    fn try_from(v: proxies::auth::SubjectRef) -> Result<Self, Self::Error> {
+        match v {
+            proxies::auth::SubjectRef::Principal(proxies::auth::SubjectRefPrincipal {
+                r#type,
+                account,
+                id,
+                did,
+                name,
+            }) => Ok(Self::Principal(dtos::auth::PrincipalRef {
+                r#type,
+                account: account.map(TryInto::try_into).transpose()?,
+                id,
+                did,
+                name,
+            })),
+            proxies::auth::SubjectRef::Group(proxies::auth::SubjectRefGroup {
+                account,
+                id,
+                name,
+            }) => Ok(Self::Group(ResourceRefT {
+                account: account.map(TryInto::try_into).transpose()?,
+                id,
+                did: None,
+                r#type: std::marker::PhantomData,
+                name,
+            })),
+            proxies::auth::SubjectRef::Authenticated(proxies::auth::SubjectRefAuthenticated {}) => {
+                Ok(Self::Authenticated)
+            }
+            proxies::auth::SubjectRef::Anonymous(proxies::auth::SubjectRefAnonymous {}) => {
+                Ok(Self::Anonymous)
+            }
+            proxies::auth::SubjectRef::Everyone(proxies::auth::SubjectRefEveryone {}) => {
+                Ok(Self::Everyone)
+            }
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl From<dtos::auth::SubjectHandle> for proxies::auth::SubjectHandle {
+    fn from(_v: dtos::auth::SubjectHandle) -> Self {
+        todo!()
+    }
+}
+
+impl TryFrom<proxies::auth::SubjectHandle> for dtos::auth::SubjectHandle {
+    type Error = ValidationError;
+    fn try_from(_v: proxies::auth::SubjectHandle) -> Result<Self, Self::Error> {
+        todo!()
+    }
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

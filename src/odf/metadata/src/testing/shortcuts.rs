@@ -7,9 +7,9 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use crate::auth::{AccountID, AccountName};
+use crate::auth::{AccountDid, AccountName};
 use crate::datasets::legacy::{DatasetAlias, DatasetHandle, DatasetName};
-use crate::datasets::{DatasetID, DatasetKind};
+use crate::datasets::{DatasetDid, DatasetKind};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -24,7 +24,7 @@ pub fn handle(
         let mut seed = Vec::new();
         seed.extend(account_name.as_bytes());
         seed.extend(dataset_name.as_bytes());
-        DatasetID::new_seeded_ed25519(&seed)
+        DatasetDid::new_seeded_ed25519(&seed)
     };
 
     DatasetHandle::new(
@@ -41,17 +41,20 @@ pub fn alias(account: &impl AsRef<str>, dataset_name: &impl AsRef<str>) -> Datas
     )
 }
 
-pub fn account_id(name: &impl AsRef<str>) -> AccountID {
+pub fn account_id(name: &impl AsRef<str>) -> AccountDid {
     // NOTE: Seeding a private key from a buffer is fast
     let key = multiformats::PrivateKey::from_bytes_padded(name.as_ref().as_bytes());
-    AccountID::from_signing_key(&key)
+    AccountDid::from_signing_key(&key)
 }
 
 pub fn account_name(value: &impl AsRef<str>) -> AccountName {
     AccountName::new_unchecked(value.as_ref())
 }
 
-pub fn account_id_by_maybe_name(maybe_name: &Option<AccountName>, default_name: &str) -> AccountID {
+pub fn account_id_by_maybe_name(
+    maybe_name: &Option<AccountName>,
+    default_name: &str,
+) -> AccountDid {
     if let Some(name) = maybe_name {
         account_id(name)
     } else {

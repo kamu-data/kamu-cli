@@ -34,7 +34,7 @@ odf = { workspace = true, features = [
 async-stream = "0.3"
 async-trait = { version = "0.1", default-features = false }
 bytes = { version = "1", default-features = false }
-cheap-clone = { version = "0.3", default-features = false, features = [
+cheap-clone = { version = "1", default-features = false, features = [
     "alloc",
 ] }
 chrono = { version = "0.4" }

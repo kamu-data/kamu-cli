@@ -72,7 +72,7 @@ impl<'a> AccountFlowRuns<'a> {
             from_catalog_n!(ctx, dyn fs::FlowQueryService, dyn DatasetEntryService);
 
         let dataset_ids = {
-            let maybe_expected_dataset_ids: Option<HashSet<odf::DatasetID>> =
+            let maybe_expected_dataset_ids: Option<HashSet<odf::metadata::datasets::DatasetDid>> =
                 filters.as_ref().map(|filters| {
                     filters
                         .by_dataset_ids
@@ -185,7 +185,7 @@ pub struct AccountFlowFilters {
     /// Only flows started by the given initiator
     by_initiator: Option<InitiatorFilterInput>,
     /// Only flows of these datasets, empty means all owned datasets
-    by_dataset_ids: Vec<DatasetID<'static>>,
+    by_dataset_ids: Vec<DatasetDid<'static>>,
     /// Only flows of the given process kind
     by_process_type: Option<FlowProcessTypeFilterInput>,
 }

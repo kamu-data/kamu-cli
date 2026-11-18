@@ -54,16 +54,16 @@ async fn test_find_owned_snapshot_success() {
     let account_handle = odf::ResourceOwnerHandle::new_test("test-owner");
 
     harness
-        .insert_snapshot(id, &account_handle, TestResource::schema(), "res-a")
+        .insert_snapshot(id, &account_handle, TestResource::type_uri(), "res-a")
         .await;
 
     let result = harness
-        .find_owned_snapshot(&account_handle.did, TestResource::schema(), id)
+        .find_owned_snapshot(&account_handle.did, TestResource::type_uri(), id)
         .await;
 
     let snapshot = result.unwrap().unwrap();
     assert_eq!(snapshot.id, id);
-    assert_eq!(snapshot.schema, *TestResource::schema());
+    assert_eq!(snapshot.schema, *TestResource::type_uri());
     assert_eq!(snapshot.headers.account.did, account_handle.did);
 }
 
@@ -76,7 +76,7 @@ async fn test_find_owned_snapshot_not_found() {
     let account_handle = odf::ResourceOwnerHandle::new_test("test-owner");
 
     let result = harness
-        .find_owned_snapshot(&account_handle.did, TestResource::schema(), id)
+        .find_owned_snapshot(&account_handle.did, TestResource::type_uri(), id)
         .await;
 
     assert!(result.unwrap().is_none());
@@ -93,11 +93,11 @@ async fn test_find_owned_snapshot_access_denied() {
     let account_handle_b = odf::ResourceOwnerHandle::new_test("test-owner-b");
 
     harness
-        .insert_snapshot(id, &account_handle_a, TestResource::schema(), "res-a")
+        .insert_snapshot(id, &account_handle_a, TestResource::type_uri(), "res-a")
         .await;
 
     let result = harness
-        .find_owned_snapshot(&account_handle_b.did, TestResource::schema(), id)
+        .find_owned_snapshot(&account_handle_b.did, TestResource::type_uri(), id)
         .await;
 
     assert_matches!(
@@ -120,7 +120,7 @@ async fn test_find_owned_snapshot_schema_mismatch_by_query() {
     let account_handle = odf::ResourceOwnerHandle::new_test("test-owner");
 
     harness
-        .insert_snapshot(id, &account_handle, TestResource::schema(), "res-a")
+        .insert_snapshot(id, &account_handle, TestResource::type_uri(), "res-a")
         .await;
 
     let result = harness
@@ -145,7 +145,7 @@ async fn test_find_owned_snapshot_schema_mismatch_by_type() {
     let account_handle = odf::ResourceOwnerHandle::new_test("test-owner");
 
     harness
-        .insert_snapshot(id, &account_handle, TestResource::schema(), "res-a")
+        .insert_snapshot(id, &account_handle, TestResource::type_uri(), "res-a")
         .await;
 
     let result = harness
@@ -170,14 +170,14 @@ async fn test_find_owned_snapshots_all_found() {
 
     for (id, name) in [(uid_1, "res-1"), (uid_2, "res-2"), (uid_3, "res-3")] {
         harness
-            .insert_snapshot(id, &account_handle, TestResource::schema(), name)
+            .insert_snapshot(id, &account_handle, TestResource::type_uri(), name)
             .await;
     }
 
     let outcome = harness
         .find_owned_snapshots(
             &account_handle.did,
-            TestResource::schema(),
+            TestResource::type_uri(),
             &[uid_1, uid_2, uid_3],
         )
         .await;
@@ -200,7 +200,11 @@ async fn test_find_owned_snapshots_not_found() {
     let uid_2 = harness.allocate_id().await;
 
     let outcome = harness
-        .find_owned_snapshots(&account_handle.did, TestResource::schema(), &[uid_1, uid_2])
+        .find_owned_snapshots(
+            &account_handle.did,
+            TestResource::type_uri(),
+            &[uid_1, uid_2],
+        )
         .await;
 
     assert_eq!(outcome.found, []);
@@ -219,11 +223,11 @@ async fn test_find_owned_snapshots_access_denied() {
     let account_handle_b = odf::ResourceOwnerHandle::new_test("test-owner-b");
 
     harness
-        .insert_snapshot(id, &account_handle_a, TestResource::schema(), "res-a")
+        .insert_snapshot(id, &account_handle_a, TestResource::type_uri(), "res-a")
         .await;
 
     let outcome = harness
-        .find_owned_snapshots(&account_handle_b.did, TestResource::schema(), &[id])
+        .find_owned_snapshots(&account_handle_b.did, TestResource::type_uri(), &[id])
         .await;
 
     assert_eq!(outcome.found, []);
@@ -243,7 +247,7 @@ async fn test_find_owned_snapshots_schema_mismatch_by_type() {
         .await;
 
     let outcome = harness
-        .find_owned_snapshots(&account_handle.did, TestResource::schema(), &[id])
+        .find_owned_snapshots(&account_handle.did, TestResource::type_uri(), &[id])
         .await;
 
     assert_eq!(outcome.found, []);
@@ -265,7 +269,7 @@ async fn test_find_owned_snapshots_schema_mismatch_by_version() {
         .await;
 
     let outcome = harness
-        .find_owned_snapshots(&account_handle.did, TestResource::schema(), &[id])
+        .find_owned_snapshots(&account_handle.did, TestResource::type_uri(), &[id])
         .await;
 
     assert_eq!(outcome.found, []);
@@ -289,7 +293,7 @@ async fn test_find_owned_snapshots_mixed_outcomes() {
         .insert_snapshot(
             uid_found,
             &account_handle_a,
-            TestResource::schema(),
+            TestResource::type_uri(),
             "res-found",
         )
         .await;
@@ -311,7 +315,7 @@ async fn test_find_owned_snapshots_mixed_outcomes() {
         .insert_snapshot(
             uid_access_denied,
             &account_handle_b,
-            TestResource::schema(),
+            TestResource::type_uri(),
             "res-denied",
         )
         .await;
@@ -322,7 +326,7 @@ async fn test_find_owned_snapshots_mixed_outcomes() {
     let outcome = harness
         .find_owned_snapshots(
             &account_handle_a.did,
-            TestResource::schema(),
+            TestResource::type_uri(),
             &[
                 uid_found,
                 uid_schema_mismatch,

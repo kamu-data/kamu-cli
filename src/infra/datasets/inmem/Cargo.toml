@@ -28,7 +28,7 @@ kamu-datasets = { workspace = true }
 odf = { workspace = true }
 
 async-trait = { version = "0.1", default-features = false }
-cheap-clone = { version = "0.3", default-features = false, features = [
+cheap-clone = { version = "1", default-features = false, features = [
     "alloc",
 ] }
 dill = { version = "0.17", default-features = false }

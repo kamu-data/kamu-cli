@@ -102,7 +102,7 @@ impl Flow {
     }
 
     /// Associated dataset ID, if any
-    async fn dataset_id(&self) -> Option<DatasetID<'static>> {
+    async fn dataset_id(&self) -> Option<DatasetDid<'static>> {
         afs::FlowScopeDataset::maybe_dataset_id_in_scope(&self.flow_state.flow_binding.scope)
             .map(Into::into)
     }

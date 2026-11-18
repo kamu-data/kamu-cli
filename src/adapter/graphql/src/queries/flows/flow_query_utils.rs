@@ -71,7 +71,7 @@ pub(crate) fn prepare_flows_filter_by_types(
 
 pub(crate) fn prepare_flows_scope_query(
     maybe_input: Option<&FlowProcessTypeFilterInput>,
-    dataset_id_refs: &[&odf::DatasetID],
+    dataset_id_refs: &[&odf::metadata::datasets::DatasetDid],
 ) -> fs::FlowScopeQuery {
     match maybe_input {
         Some(FlowProcessTypeFilterInput::Webhooks(webhooks_filter)) => {
@@ -109,7 +109,7 @@ pub(crate) fn prepare_flows_scope_query(
 pub(crate) async fn build_dataset_id_handle_mapping_from_processes_listing(
     ctx: &Context<'_>,
     matched_processes_listing: &fs::FlowProcessStateListing,
-) -> Result<HashMap<odf::DatasetID, odf::DatasetHandle>> {
+) -> Result<HashMap<odf::metadata::datasets::DatasetDid, odf::DatasetHandle>> {
     if matched_processes_listing.processes.is_empty() {
         return Ok(HashMap::new());
     }

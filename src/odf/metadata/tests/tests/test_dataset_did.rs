@@ -7,20 +7,20 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use opendatafabric_metadata::datasets::DatasetID;
+use opendatafabric_metadata::datasets::DatasetDid;
 use opendatafabric_metadata::formats::*;
 
 #[test]
 fn test_debug() {
     assert_eq!(
-        format!("{:?}", DatasetID::new_seeded_ed25519(b"multihash")),
-        "DatasetID<Ed25519Pub>(fed012126262ba49e1ba8392c26f7a39e1ba8d756c7469786d3365200c68402ff65dc)"
+        format!("{:?}", DatasetDid::new_seeded_ed25519(b"multihash")),
+        "DatasetDid<Ed25519Pub>(fed012126262ba49e1ba8392c26f7a39e1ba8d756c7469786d3365200c68402ff65dc)"
     );
 
     assert_eq!(
         format!(
             "{:?}",
-            DatasetID::new_seeded_ed25519(b"multihash").as_did_str()
+            DatasetDid::new_seeded_ed25519(b"multihash").as_did_str()
         ),
         "did:odf:fed012126262ba49e1ba8392c26f7a39e1ba8d756c7469786d3365200c68402ff65dc"
     );
@@ -28,7 +28,7 @@ fn test_debug() {
     assert_eq!(
         format!(
             "{:?}",
-            DatasetID::new_seeded_ed25519(b"multihash").as_multibase()
+            DatasetDid::new_seeded_ed25519(b"multihash").as_multibase()
         ),
         "fed012126262ba49e1ba8392c26f7a39e1ba8d756c7469786d3365200c68402ff65dc"
     );
@@ -36,7 +36,7 @@ fn test_debug() {
 
 #[test]
 fn test_did_string() {
-    let value = DatasetID::from_did_str(
+    let value = DatasetDid::from_did_str(
         "did:odf:fed012e6fcce36701dc791488e0d0b1745cc1e33a4c1c9fcc41c63bd343dbbe0970e6",
     )
     .unwrap();
@@ -57,7 +57,7 @@ fn test_did_string() {
 #[test]
 fn test_multibase() {
     assert_eq!(
-        DatasetID::new_seeded_ed25519(b"multihash")
+        DatasetDid::new_seeded_ed25519(b"multihash")
             .as_multibase()
             .to_stack_string(),
         "fed012126262ba49e1ba8392c26f7a39e1ba8d756c7469786d3365200c68402ff65dc"
@@ -67,15 +67,15 @@ fn test_multibase() {
 #[test]
 fn test_eq() {
     assert_eq!(
-        DatasetID::from_did_str("did:odf:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK")
+        DatasetDid::from_did_str("did:odf:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK")
             .unwrap(),
-        DatasetID::from_did_str("did:odf:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK")
+        DatasetDid::from_did_str("did:odf:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK")
             .unwrap()
     );
     assert_ne!(
-        DatasetID::from_did_str("did:odf:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK")
+        DatasetDid::from_did_str("did:odf:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK")
             .unwrap(),
-        DatasetID::from_did_str("did:odf:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doL")
+        DatasetDid::from_did_str("did:odf:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doL")
             .unwrap()
     );
 }

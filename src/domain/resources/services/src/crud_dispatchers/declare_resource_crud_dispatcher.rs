@@ -45,7 +45,7 @@ macro_rules! declare_resource_crud_dispatcher {
                 std::error::Error + Send + Sync + 'static,
         {
             fn schema(&self) -> &'static kamu_resources::TypeUri {
-                <$resource as kamu_resources::ResourceSchemaProvider>::schema()
+                <$resource as kamu_resources::ResourceSchemaProvider>::type_uri()
             }
 
             async fn plan_apply(
@@ -55,7 +55,7 @@ macro_rules! declare_resource_crud_dispatcher {
                 kamu_resources::ApplyManifestPlanningDecision,
                 $crate::ApplyResourceCrudDispatcherError,
             > {
-                let schema = <$resource as kamu_resources::ResourceSchemaProvider>::schema();
+                let schema = <$resource as kamu_resources::ResourceSchemaProvider>::type_uri();
                 let spec = $crate::decode_resource_spec::<$resource>(schema, request.spec)?;
 
                 let plan = self
@@ -80,7 +80,7 @@ macro_rules! declare_resource_crud_dispatcher {
                 kamu_resources::ApplyManifestApplicationDecision,
                 $crate::ApplyResourceCrudDispatcherError,
             > {
-                let schema = <$resource as kamu_resources::ResourceSchemaProvider>::schema();
+                let schema = <$resource as kamu_resources::ResourceSchemaProvider>::type_uri();
                 let spec = $crate::decode_resource_spec::<$resource>(schema, request.spec)?;
 
                 let result = self

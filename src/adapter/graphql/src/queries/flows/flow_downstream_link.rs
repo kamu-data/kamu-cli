@@ -30,7 +30,7 @@ pub struct FlowDownstreamLink {
     /// When the downstream flow received the activation
     activated_at: DateTime<Utc>,
     /// Dataset the downstream flow belongs to, if any
-    dataset_id: Option<DatasetID<'static>>,
+    dataset_id: Option<DatasetDid<'static>>,
     /// Null only when `datasetId` is null
     dataset: Option<DatasetAccessResult<'static>>,
     /// Null unless the caller may see the downstream flow: Read on its
@@ -159,7 +159,7 @@ impl FlowDownstreamLink {
 /// The downstream flow's dataset as the caller may see it, and whether the
 /// caller may see the flow itself
 struct DownstreamFlowAccess {
-    dataset_id: Option<odf::DatasetID>,
+    dataset_id: Option<odf::metadata::datasets::DatasetDid>,
     dataset: Option<DatasetAccessResult<'static>>,
     is_flow_visible: bool,
 }

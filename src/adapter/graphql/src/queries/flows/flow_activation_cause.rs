@@ -135,7 +135,7 @@ impl From<fs::FlowActivationCauseIterationFinished> for FlowActivationCauseItera
 #[derive(SimpleObject)]
 pub(crate) struct FlowActivationCauseDatasetUpdate {
     /// Identifier of the updated dataset
-    dataset_id: DatasetID<'static>,
+    dataset_id: DatasetDid<'static>,
     /// Null when the dataset was deleted or is not readable by the caller
     dataset: Option<Dataset>,
     /// What updated the dataset

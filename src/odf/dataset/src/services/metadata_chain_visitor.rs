@@ -11,7 +11,7 @@ use std::marker::PhantomData;
 
 use odf_metadata::MetadataEventTypeFlags;
 
-use crate::{HashedMetadataBlockRef, Infallible};
+use crate::HashedMetadataBlockRef;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -102,6 +102,11 @@ where
     where
         E2: std::error::Error + Send,
         F: Fn(E1) -> E2 + Send;
+
+    fn map_err_into<E2>(self) -> MetadataChainVisitorMapError<Self, fn(E1) -> E2, E1, E2>
+    where
+        E2: std::error::Error + Send,
+        E1: Into<E2>;
 }
 
 impl<T, E1> MetadataChainVisitorExt<E1> for T
@@ -116,36 +121,13 @@ where
     {
         MetadataChainVisitorMapError::new(self, f)
     }
-}
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-/// Allows to convert infallible visitor into a type that agrees with others on
-/// what error should be returned. Similar to
-/// [`MetadataChainVisitorExt::map_err()`] but for infallible errors.
-pub trait MetadataChainVisitorExtInfallible
-where
-    Self: MetadataChainVisitor<Error = Infallible>,
-    Self: Sized,
-{
-    fn adapt_err<E2>(
-        self,
-    ) -> MetadataChainVisitorMapError<Self, fn(Infallible) -> E2, Infallible, E2>
-    where
-        E2: std::error::Error + Send;
-}
-
-impl<T> MetadataChainVisitorExtInfallible for T
-where
-    T: MetadataChainVisitor<Error = Infallible>,
-{
-    fn adapt_err<E2>(
-        self,
-    ) -> MetadataChainVisitorMapError<Self, fn(Infallible) -> E2, Infallible, E2>
+    fn map_err_into<E2>(self) -> MetadataChainVisitorMapError<Self, fn(E1) -> E2, E1, E2>
     where
         E2: std::error::Error + Send,
+        E1: Into<E2>,
     {
-        MetadataChainVisitorMapError::new(self, Infallible::into)
+        MetadataChainVisitorMapError::new(self, E1::into)
     }
 }
 

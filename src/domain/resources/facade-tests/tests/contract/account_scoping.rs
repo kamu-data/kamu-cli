@@ -88,6 +88,7 @@ fn variable_set_manifest_json_with_account(name: &str, account: &ResourceOwnerRe
 
 fn account_by_name(name: &odf::AccountName) -> ResourceOwnerRef {
     ResourceOwnerRef {
+        r#type: None,
         id: None,
         did: None,
         name: Some(name.clone()),
@@ -96,6 +97,7 @@ fn account_by_name(name: &odf::AccountName) -> ResourceOwnerRef {
 
 fn account_by_id(id: odf::AccountID) -> ResourceOwnerRef {
     ResourceOwnerRef {
+        r#type: None,
         id: None,
         did: Some(id),
         name: None,
@@ -104,6 +106,7 @@ fn account_by_id(id: odf::AccountID) -> ResourceOwnerRef {
 
 fn account_by_name_and_id(name: &odf::AccountName, id: odf::AccountID) -> ResourceOwnerRef {
     ResourceOwnerRef {
+        r#type: None,
         id: None,
         did: Some(id),
         name: Some(name.clone()),
@@ -112,6 +115,7 @@ fn account_by_name_and_id(name: &odf::AccountName, id: odf::AccountID) -> Resour
 
 fn unknown_account_by_name() -> ResourceOwnerRef {
     ResourceOwnerRef {
+        r#type: None,
         id: None,
         did: None,
         name: Some(odf::AccountName::new_unchecked(
@@ -122,6 +126,7 @@ fn unknown_account_by_name() -> ResourceOwnerRef {
 
 fn unknown_account_by_id() -> ResourceOwnerRef {
     ResourceOwnerRef {
+        r#type: None,
         id: None,
         did: Some(odf::AccountID::new_generated_ed25519().1),
         name: None,
@@ -557,7 +562,7 @@ pub async fn test_account_isolation_across_read_apis(h: &impl FacadeContractHarn
                 .summary(ResourcesSummaryRequest { account: None })
                 .await
                 .unwrap(),
-            VariableSetResource::schema(),
+            VariableSetResource::type_uri(),
         ),
         2
     );
@@ -566,7 +571,7 @@ pub async fn test_account_isolation_across_read_apis(h: &impl FacadeContractHarn
             bob.summary(ResourcesSummaryRequest { account: None })
                 .await
                 .unwrap(),
-            VariableSetResource::schema(),
+            VariableSetResource::type_uri(),
         ),
         2
     );

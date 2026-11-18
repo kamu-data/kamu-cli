@@ -20,6 +20,7 @@ Recommendation: for ease of reading, use the following format:
   balancers in front of the server, or they close the connection during long uploads
 - GraphQL: `setWatermark` can return `SetWatermarkCasFailed` with the expected and actual heads
   when the dataset's head moves concurrently, instead of an internal error
+- Data types now support a shorthand for optionality, e.g. `Float64?`
 ### Changed
 - Upgrading clears the history of tasks and flow runs, including pending manual runs. Flow
   configurations and triggers are kept, and enabled flows are scheduled again when the node starts

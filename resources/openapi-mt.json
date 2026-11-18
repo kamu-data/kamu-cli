@@ -1,7 +1,7 @@
 {
   "components": {
     "schemas": {
-      "AccountID": {
+      "AccountDid": {
         "examples": [
           "did:odf:fed01989de31f27202c3b989de31f27202c3b103636f656e746078ac3c053218d8e6b",
           "did:pkh:eip155:1:0xb9c5714089478a327f09197987f16f9e5d936e8a"
@@ -20,7 +20,7 @@
             "$ref": "#/components/schemas/AccountName"
           },
           "id": {
-            "$ref": "#/components/schemas/AccountID"
+            "$ref": "#/components/schemas/AccountDid"
           }
         },
         "required": [
@@ -77,7 +77,7 @@
             "$ref": "#/components/schemas/Multihash"
           },
           "dataset_id": {
-            "$ref": "#/components/schemas/DatasetID"
+            "$ref": "#/components/schemas/DatasetDid"
           },
           "message": {
             "type": "string"
@@ -90,7 +90,7 @@
         ],
         "type": "object"
       },
-      "DatasetID": {
+      "DatasetDid": {
         "examples": [
           "did:odf:fed01969b7413a41f25ba969b7413a41f25ba4016461736574607650ec170632ade10"
         ],
@@ -102,7 +102,7 @@
             "$ref": "#/components/schemas/DatasetName"
           },
           "id": {
-            "$ref": "#/components/schemas/DatasetID"
+            "$ref": "#/components/schemas/DatasetDid"
           },
           "owner": {
             "$ref": "#/components/schemas/DatasetOwnerInfo"
@@ -135,7 +135,7 @@
       "DatasetNotFound": {
         "properties": {
           "dataset_id": {
-            "$ref": "#/components/schemas/DatasetID"
+            "$ref": "#/components/schemas/DatasetDid"
           },
           "message": {
             "type": "string"
@@ -174,7 +174,7 @@
             "description": "Last block hash of the input datasets that was or should be considered\nduring the query planning"
           },
           "id": {
-            "$ref": "#/components/schemas/DatasetID",
+            "$ref": "#/components/schemas/DatasetDid",
             "description": "Globally unique identity of the dataset"
           }
         },

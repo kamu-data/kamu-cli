@@ -134,7 +134,7 @@ pub mod auth {
     pub struct GroupSpecInput {
         #[serde(default)]
         #[serde(skip_serializing_if = "Option::is_none")]
-        pub members: Option<Vec<UnionOrString<auth::SubjectRef>>>,
+        pub members: Option<Vec<StructOrString<auth::SubjectRef>>>,
     }
 
     impl IntoDto for GroupSpecInput {
@@ -177,7 +177,7 @@ pub mod auth {
     pub struct NodeSpec {
         #[serde(default)]
         #[serde(skip_serializing_if = "Option::is_none")]
-        pub did: Option<odf::auth::AccountID>,
+        pub did: Option<odf::auth::NodeDid>,
         #[serde(default)]
         #[serde(skip_serializing_if = "Option::is_none")]
         pub display_name: Option<String>,
@@ -218,7 +218,7 @@ pub mod auth {
     pub struct NodeSpecInput {
         #[serde(default)]
         #[serde(skip_serializing_if = "Option::is_none")]
-        pub did: Option<odf::auth::AccountID>,
+        pub did: Option<odf::auth::NodeDid>,
         #[serde(default)]
         #[serde(skip_serializing_if = "Option::is_none")]
         pub display_name: Option<String>,
@@ -390,7 +390,7 @@ pub mod auth {
     #[serde(rename_all = "camelCase")]
     pub struct PolicyBindingSpecInput {
         pub policy: StructOrString<auth::PolicyRef>,
-        pub subject: UnionOrString<auth::SubjectRef>,
+        pub subject: StructOrString<auth::SubjectRef>,
         pub object: StructOrString<resources::ResourceRef>,
     }
 
@@ -447,26 +447,7 @@ pub mod auth {
         }
     }
 
-    impl std::str::FromStr for PolicyRef {
-        type Err = String;
-
-        fn from_str(s: &str) -> Result<Self, Self::Err> {
-            let v = dtos::auth::PolicyRef::try_from(s).map_err(|e| e.to_string())?;
-            Ok(v.into())
-        }
-    }
-
-    impl From<dtos::auth::PolicyRef> for StructOrString<PolicyRef> {
-        fn from(v: dtos::auth::PolicyRef) -> Self {
-            Self(v.into())
-        }
-    }
-    impl TryFrom<StructOrString<PolicyRef>> for dtos::auth::PolicyRef {
-        type Error = ValidationError;
-        fn try_from(v: StructOrString<PolicyRef>) -> Result<Self, ValidationError> {
-            v.0.try_into()
-        }
-    }
+    impl_struct_or_string!(PolicyRef, dtos::auth::PolicyRef);
 
     impl From<dtos::auth::PolicyRef> for PolicyRef {
         fn from(v: dtos::auth::PolicyRef) -> Self {
@@ -697,10 +678,10 @@ pub mod auth {
     #[serde(deny_unknown_fields)]
     #[serde(rename_all = "camelCase")]
     pub struct PrincipalHandle {
-        pub r#type: odf::resources::TypeUri,
         #[serde(default)]
         #[serde(skip_serializing_if = "Option::is_none")]
         pub account: Option<auth::ResourceOwnerHandle>,
+        pub r#type: odf::resources::TypeUri,
         pub id: odf::resources::ResourceID,
         #[serde(default)]
         #[serde(skip_serializing_if = "Option::is_none")]
@@ -718,8 +699,8 @@ pub mod auth {
     impl From<dtos::auth::PrincipalHandle> for PrincipalHandle {
         fn from(v: dtos::auth::PrincipalHandle) -> Self {
             Self {
-                r#type: v.r#type,
                 account: v.account.map(|v| v.into()),
+                r#type: v.r#type,
                 id: v.id,
                 did: v.did,
                 name: v.name,
@@ -731,11 +712,11 @@ pub mod auth {
         type Error = ValidationError;
         fn try_from(v: PrincipalHandle) -> Result<Self, ValidationError> {
             Ok(Self {
-                r#type: v.r#type,
                 account: v
                     .account
                     .map(|v| dtos::auth::ResourceOwnerHandle::try_from(v))
                     .transpose()?,
+                r#type: v.r#type,
                 id: v.id,
                 did: v.did,
                 name: v.name,
@@ -774,26 +755,7 @@ pub mod auth {
         }
     }
 
-    impl std::str::FromStr for PrincipalRef {
-        type Err = String;
-
-        fn from_str(s: &str) -> Result<Self, Self::Err> {
-            let v = dtos::auth::PrincipalRef::try_from(s).map_err(|e| e.to_string())?;
-            Ok(v.into())
-        }
-    }
-
-    impl From<dtos::auth::PrincipalRef> for StructOrString<PrincipalRef> {
-        fn from(v: dtos::auth::PrincipalRef) -> Self {
-            Self(v.into())
-        }
-    }
-    impl TryFrom<StructOrString<PrincipalRef>> for dtos::auth::PrincipalRef {
-        type Error = ValidationError;
-        fn try_from(v: StructOrString<PrincipalRef>) -> Result<Self, ValidationError> {
-            v.0.try_into()
-        }
-    }
+    impl_struct_or_string!(PrincipalRef, dtos::auth::PrincipalRef);
 
     impl From<dtos::auth::PrincipalRef> for PrincipalRef {
         fn from(v: dtos::auth::PrincipalRef) -> Self {
@@ -830,8 +792,9 @@ pub mod auth {
     #[serde(deny_unknown_fields)]
     #[serde(rename_all = "camelCase")]
     pub struct ResourceOwnerHandle {
+        pub r#type: odf::resources::TypeUri,
         pub id: odf::resources::ResourceID,
-        pub did: odf::auth::AccountID,
+        pub did: odf::auth::AccountDid,
         pub name: odf::auth::AccountName,
     }
 
@@ -845,6 +808,7 @@ pub mod auth {
     impl From<dtos::auth::ResourceOwnerHandle> for ResourceOwnerHandle {
         fn from(v: dtos::auth::ResourceOwnerHandle) -> Self {
             Self {
+                r#type: v.r#type,
                 id: v.id,
                 did: v.did,
                 name: v.name,
@@ -856,6 +820,7 @@ pub mod auth {
         type Error = ValidationError;
         fn try_from(v: ResourceOwnerHandle) -> Result<Self, ValidationError> {
             Ok(Self {
+                r#type: v.r#type,
                 id: v.id,
                 did: v.did,
                 name: v.name,
@@ -872,10 +837,13 @@ pub mod auth {
     pub struct ResourceOwnerRef {
         #[serde(default)]
         #[serde(skip_serializing_if = "Option::is_none")]
+        pub r#type: Option<odf::resources::TypeRef>,
+        #[serde(default)]
+        #[serde(skip_serializing_if = "Option::is_none")]
         pub id: Option<odf::resources::ResourceID>,
         #[serde(default)]
         #[serde(skip_serializing_if = "Option::is_none")]
-        pub did: Option<odf::auth::AccountID>,
+        pub did: Option<odf::auth::AccountDid>,
         #[serde(default)]
         #[serde(skip_serializing_if = "Option::is_none")]
         pub name: Option<odf::auth::AccountName>,
@@ -888,30 +856,12 @@ pub mod auth {
         }
     }
 
-    impl std::str::FromStr for ResourceOwnerRef {
-        type Err = String;
-
-        fn from_str(s: &str) -> Result<Self, Self::Err> {
-            let v = dtos::auth::ResourceOwnerRef::try_from(s).map_err(|e| e.to_string())?;
-            Ok(v.into())
-        }
-    }
-
-    impl From<dtos::auth::ResourceOwnerRef> for StructOrString<ResourceOwnerRef> {
-        fn from(v: dtos::auth::ResourceOwnerRef) -> Self {
-            Self(v.into())
-        }
-    }
-    impl TryFrom<StructOrString<ResourceOwnerRef>> for dtos::auth::ResourceOwnerRef {
-        type Error = ValidationError;
-        fn try_from(v: StructOrString<ResourceOwnerRef>) -> Result<Self, ValidationError> {
-            v.0.try_into()
-        }
-    }
+    impl_struct_or_string!(ResourceOwnerRef, dtos::auth::ResourceOwnerRef);
 
     impl From<dtos::auth::ResourceOwnerRef> for ResourceOwnerRef {
         fn from(v: dtos::auth::ResourceOwnerRef) -> Self {
             Self {
+                r#type: v.r#type,
                 id: v.id,
                 did: v.did,
                 name: v.name,
@@ -923,6 +873,7 @@ pub mod auth {
         type Error = ValidationError;
         fn try_from(v: ResourceOwnerRef) -> Result<Self, ValidationError> {
             Ok(Self {
+                r#type: v.r#type,
                 id: v.id,
                 did: v.did,
                 name: v.name,
@@ -1019,44 +970,16 @@ pub mod auth {
     #[serde(deny_unknown_fields)]
     #[serde(tag = "kind")]
     pub enum SubjectHandle {
-        #[serde(alias = "resource")]
-        Resource(auth::SubjectHandleResource),
+        #[serde(alias = "principal")]
+        Principal(auth::SubjectHandlePrincipal),
+        #[serde(alias = "group")]
+        Group(auth::SubjectHandleGroup),
         #[serde(alias = "authenticated")]
         Authenticated(auth::SubjectHandleAuthenticated),
         #[serde(alias = "anonymous")]
         Anonymous(auth::SubjectHandleAnonymous),
         #[serde(alias = "everyone")]
         Everyone(auth::SubjectHandleEveryone),
-    }
-
-    impl IntoDto for SubjectHandle {
-        type Dto = dtos::auth::SubjectHandle;
-        fn into_dto(self) -> Result<Self::Dto, ValidationError> {
-            self.try_into()
-        }
-    }
-
-    impl From<dtos::auth::SubjectHandle> for SubjectHandle {
-        fn from(v: dtos::auth::SubjectHandle) -> Self {
-            match v {
-                dtos::auth::SubjectHandle::Resource(v) => Self::Resource(v.into()),
-                dtos::auth::SubjectHandle::Authenticated(v) => Self::Authenticated(v.into()),
-                dtos::auth::SubjectHandle::Anonymous(v) => Self::Anonymous(v.into()),
-                dtos::auth::SubjectHandle::Everyone(v) => Self::Everyone(v.into()),
-            }
-        }
-    }
-
-    impl TryFrom<SubjectHandle> for dtos::auth::SubjectHandle {
-        type Error = ValidationError;
-        fn try_from(v: SubjectHandle) -> Result<Self, Self::Error> {
-            match v {
-                SubjectHandle::Resource(v) => Ok(Self::Resource(v.try_into()?)),
-                SubjectHandle::Authenticated(v) => Ok(Self::Authenticated(v.try_into()?)),
-                SubjectHandle::Anonymous(v) => Ok(Self::Anonymous(v.try_into()?)),
-                SubjectHandle::Everyone(v) => Ok(Self::Everyone(v.try_into()?)),
-            }
-        }
     }
 
     implement_serde_as!(dtos::auth::SubjectHandle, SubjectHandle);
@@ -1148,11 +1071,51 @@ pub mod auth {
 
     implement_serde_as!(dtos::auth::SubjectHandleEveryone, SubjectHandleEveryone);
 
-    // Schema: https://opendatafabric.org/schemas/auth/v1alpha1/SubjectHandle#/$defs/Resource
+    // Schema: https://opendatafabric.org/schemas/auth/v1alpha1/SubjectHandle#/$defs/Group
     #[derive(Debug, Serialize, Deserialize)]
     #[serde(deny_unknown_fields)]
     #[serde(rename_all = "camelCase")]
-    pub struct SubjectHandleResource {
+    pub struct SubjectHandleGroup {
+        pub account: auth::ResourceOwnerHandle,
+        pub id: odf::resources::ResourceID,
+        pub name: odf::resources::ResourceName,
+    }
+
+    impl IntoDto for SubjectHandleGroup {
+        type Dto = dtos::auth::SubjectHandleGroup;
+        fn into_dto(self) -> Result<Self::Dto, ValidationError> {
+            self.try_into()
+        }
+    }
+
+    impl From<dtos::auth::SubjectHandleGroup> for SubjectHandleGroup {
+        fn from(v: dtos::auth::SubjectHandleGroup) -> Self {
+            Self {
+                account: v.account.into(),
+                id: v.id,
+                name: v.name,
+            }
+        }
+    }
+
+    impl TryFrom<SubjectHandleGroup> for dtos::auth::SubjectHandleGroup {
+        type Error = ValidationError;
+        fn try_from(v: SubjectHandleGroup) -> Result<Self, ValidationError> {
+            Ok(Self {
+                account: dtos::auth::ResourceOwnerHandle::try_from(v.account)?,
+                id: v.id,
+                name: v.name,
+            })
+        }
+    }
+
+    implement_serde_as!(dtos::auth::SubjectHandleGroup, SubjectHandleGroup);
+
+    // Schema: https://opendatafabric.org/schemas/auth/v1alpha1/SubjectHandle#/$defs/Principal
+    #[derive(Debug, Serialize, Deserialize)]
+    #[serde(deny_unknown_fields)]
+    #[serde(rename_all = "camelCase")]
+    pub struct SubjectHandlePrincipal {
         pub r#type: odf::resources::TypeUri,
         #[serde(default)]
         #[serde(skip_serializing_if = "Option::is_none")]
@@ -1164,15 +1127,15 @@ pub mod auth {
         pub name: odf::resources::ResourceName,
     }
 
-    impl IntoDto for SubjectHandleResource {
-        type Dto = dtos::auth::SubjectHandleResource;
+    impl IntoDto for SubjectHandlePrincipal {
+        type Dto = dtos::auth::SubjectHandlePrincipal;
         fn into_dto(self) -> Result<Self::Dto, ValidationError> {
             self.try_into()
         }
     }
 
-    impl From<dtos::auth::SubjectHandleResource> for SubjectHandleResource {
-        fn from(v: dtos::auth::SubjectHandleResource) -> Self {
+    impl From<dtos::auth::SubjectHandlePrincipal> for SubjectHandlePrincipal {
+        fn from(v: dtos::auth::SubjectHandlePrincipal) -> Self {
             Self {
                 r#type: v.r#type,
                 account: v.account.map(|v| v.into()),
@@ -1183,9 +1146,9 @@ pub mod auth {
         }
     }
 
-    impl TryFrom<SubjectHandleResource> for dtos::auth::SubjectHandleResource {
+    impl TryFrom<SubjectHandlePrincipal> for dtos::auth::SubjectHandlePrincipal {
         type Error = ValidationError;
-        fn try_from(v: SubjectHandleResource) -> Result<Self, ValidationError> {
+        fn try_from(v: SubjectHandlePrincipal) -> Result<Self, ValidationError> {
             Ok(Self {
                 r#type: v.r#type,
                 account: v
@@ -1199,15 +1162,17 @@ pub mod auth {
         }
     }
 
-    implement_serde_as!(dtos::auth::SubjectHandleResource, SubjectHandleResource);
+    implement_serde_as!(dtos::auth::SubjectHandlePrincipal, SubjectHandlePrincipal);
 
     // Schema: https://opendatafabric.org/schemas/auth/v1alpha1/SubjectRef
     #[derive(Debug, Serialize, Deserialize)]
     #[serde(deny_unknown_fields)]
     #[serde(tag = "kind")]
     pub enum SubjectRef {
-        #[serde(alias = "resource")]
-        Resource(auth::SubjectRefResource),
+        #[serde(alias = "principal")]
+        Principal(auth::SubjectRefPrincipal),
+        #[serde(alias = "group")]
+        Group(auth::SubjectRefGroup),
         #[serde(alias = "authenticated")]
         Authenticated(auth::SubjectRefAuthenticated),
         #[serde(alias = "anonymous")]
@@ -1216,47 +1181,7 @@ pub mod auth {
         Everyone(auth::SubjectRefEveryone),
     }
 
-    impl From<dtos::auth::SubjectRef> for UnionOrString<SubjectRef> {
-        fn from(v: dtos::auth::SubjectRef) -> Self {
-            Self(v.into())
-        }
-    }
-    impl TryFrom<UnionOrString<SubjectRef>> for dtos::auth::SubjectRef {
-        type Error = ValidationError;
-        fn try_from(v: UnionOrString<SubjectRef>) -> Result<Self, Self::Error> {
-            v.0.try_into()
-        }
-    }
-
-    impl IntoDto for SubjectRef {
-        type Dto = dtos::auth::SubjectRef;
-        fn into_dto(self) -> Result<Self::Dto, ValidationError> {
-            self.try_into()
-        }
-    }
-
-    impl From<dtos::auth::SubjectRef> for SubjectRef {
-        fn from(v: dtos::auth::SubjectRef) -> Self {
-            match v {
-                dtos::auth::SubjectRef::Resource(v) => Self::Resource(v.into()),
-                dtos::auth::SubjectRef::Authenticated(v) => Self::Authenticated(v.into()),
-                dtos::auth::SubjectRef::Anonymous(v) => Self::Anonymous(v.into()),
-                dtos::auth::SubjectRef::Everyone(v) => Self::Everyone(v.into()),
-            }
-        }
-    }
-
-    impl TryFrom<SubjectRef> for dtos::auth::SubjectRef {
-        type Error = ValidationError;
-        fn try_from(v: SubjectRef) -> Result<Self, Self::Error> {
-            match v {
-                SubjectRef::Resource(v) => Ok(Self::Resource(v.try_into()?)),
-                SubjectRef::Authenticated(v) => Ok(Self::Authenticated(v.try_into()?)),
-                SubjectRef::Anonymous(v) => Ok(Self::Anonymous(v.try_into()?)),
-                SubjectRef::Everyone(v) => Ok(Self::Everyone(v.try_into()?)),
-            }
-        }
-    }
+    impl_struct_or_string!(SubjectRef, dtos::auth::SubjectRef);
 
     implement_serde_as!(dtos::auth::SubjectRef, SubjectRef);
 
@@ -1344,11 +1269,60 @@ pub mod auth {
 
     implement_serde_as!(dtos::auth::SubjectRefEveryone, SubjectRefEveryone);
 
-    // Schema: https://opendatafabric.org/schemas/auth/v1alpha1/SubjectRef#/$defs/Resource
+    // Schema: https://opendatafabric.org/schemas/auth/v1alpha1/SubjectRef#/$defs/Group
     #[derive(Debug, Serialize, Deserialize)]
     #[serde(deny_unknown_fields)]
     #[serde(rename_all = "camelCase")]
-    pub struct SubjectRefResource {
+    pub struct SubjectRefGroup {
+        #[serde(default)]
+        #[serde(skip_serializing_if = "Option::is_none")]
+        pub account: Option<StructOrString<auth::ResourceOwnerRef>>,
+        #[serde(default)]
+        #[serde(skip_serializing_if = "Option::is_none")]
+        pub id: Option<odf::resources::ResourceID>,
+        #[serde(default)]
+        #[serde(skip_serializing_if = "Option::is_none")]
+        pub name: Option<odf::resources::ResourceName>,
+    }
+
+    impl IntoDto for SubjectRefGroup {
+        type Dto = dtos::auth::SubjectRefGroup;
+        fn into_dto(self) -> Result<Self::Dto, ValidationError> {
+            self.try_into()
+        }
+    }
+
+    impl From<dtos::auth::SubjectRefGroup> for SubjectRefGroup {
+        fn from(v: dtos::auth::SubjectRefGroup) -> Self {
+            Self {
+                account: v.account.map(|v| v.into()),
+                id: v.id,
+                name: v.name,
+            }
+        }
+    }
+
+    impl TryFrom<SubjectRefGroup> for dtos::auth::SubjectRefGroup {
+        type Error = ValidationError;
+        fn try_from(v: SubjectRefGroup) -> Result<Self, ValidationError> {
+            Ok(Self {
+                account: v
+                    .account
+                    .map(|v| dtos::auth::ResourceOwnerRef::try_from(v))
+                    .transpose()?,
+                id: v.id,
+                name: v.name,
+            })
+        }
+    }
+
+    implement_serde_as!(dtos::auth::SubjectRefGroup, SubjectRefGroup);
+
+    // Schema: https://opendatafabric.org/schemas/auth/v1alpha1/SubjectRef#/$defs/Principal
+    #[derive(Debug, Serialize, Deserialize)]
+    #[serde(deny_unknown_fields)]
+    #[serde(rename_all = "camelCase")]
+    pub struct SubjectRefPrincipal {
         #[serde(default)]
         #[serde(skip_serializing_if = "Option::is_none")]
         pub r#type: Option<odf::resources::TypeRef>,
@@ -1366,15 +1340,15 @@ pub mod auth {
         pub name: Option<odf::resources::ResourceName>,
     }
 
-    impl IntoDto for SubjectRefResource {
-        type Dto = dtos::auth::SubjectRefResource;
+    impl IntoDto for SubjectRefPrincipal {
+        type Dto = dtos::auth::SubjectRefPrincipal;
         fn into_dto(self) -> Result<Self::Dto, ValidationError> {
             self.try_into()
         }
     }
 
-    impl From<dtos::auth::SubjectRefResource> for SubjectRefResource {
-        fn from(v: dtos::auth::SubjectRefResource) -> Self {
+    impl From<dtos::auth::SubjectRefPrincipal> for SubjectRefPrincipal {
+        fn from(v: dtos::auth::SubjectRefPrincipal) -> Self {
             Self {
                 r#type: v.r#type,
                 account: v.account.map(|v| v.into()),
@@ -1385,9 +1359,9 @@ pub mod auth {
         }
     }
 
-    impl TryFrom<SubjectRefResource> for dtos::auth::SubjectRefResource {
+    impl TryFrom<SubjectRefPrincipal> for dtos::auth::SubjectRefPrincipal {
         type Error = ValidationError;
-        fn try_from(v: SubjectRefResource) -> Result<Self, ValidationError> {
+        fn try_from(v: SubjectRefPrincipal) -> Result<Self, ValidationError> {
             Ok(Self {
                 r#type: v.r#type,
                 account: v
@@ -1401,7 +1375,7 @@ pub mod auth {
         }
     }
 
-    implement_serde_as!(dtos::auth::SubjectRefResource, SubjectRefResource);
+    implement_serde_as!(dtos::auth::SubjectRefPrincipal, SubjectRefPrincipal);
 
     // Schema: https://opendatafabric.org/schemas/auth/v1alpha1/UserSpec
     #[derive(Debug, Serialize, Deserialize)]
@@ -1410,7 +1384,7 @@ pub mod auth {
     pub struct UserSpec {
         #[serde(default)]
         #[serde(skip_serializing_if = "Option::is_none")]
-        pub did: Option<odf::auth::AccountID>,
+        pub did: Option<odf::auth::AccountDid>,
         #[serde(default)]
         #[serde(skip_serializing_if = "Option::is_none")]
         pub display_name: Option<String>,
@@ -1474,7 +1448,7 @@ pub mod auth {
     pub struct UserSpecInput {
         #[serde(default)]
         #[serde(skip_serializing_if = "Option::is_none")]
-        pub did: Option<odf::auth::AccountID>,
+        pub did: Option<odf::auth::AccountDid>,
         #[serde(default)]
         #[serde(skip_serializing_if = "Option::is_none")]
         pub display_name: Option<String>,
@@ -1558,26 +1532,7 @@ pub mod config {
         }
     }
 
-    impl std::str::FromStr for Secret {
-        type Err = String;
-
-        fn from_str(s: &str) -> Result<Self, Self::Err> {
-            let v = dtos::config::Secret::try_from(s).map_err(|e| e.to_string())?;
-            Ok(v.into())
-        }
-    }
-
-    impl From<dtos::config::Secret> for StructOrString<Secret> {
-        fn from(v: dtos::config::Secret) -> Self {
-            Self(v.into())
-        }
-    }
-    impl TryFrom<StructOrString<Secret>> for dtos::config::Secret {
-        type Error = ValidationError;
-        fn try_from(v: StructOrString<Secret>) -> Result<Self, ValidationError> {
-            v.0.try_into()
-        }
-    }
+    impl_struct_or_string!(Secret, dtos::config::Secret);
 
     impl From<dtos::config::Secret> for Secret {
         fn from(v: dtos::config::Secret) -> Self {
@@ -1782,26 +1737,7 @@ pub mod config {
         }
     }
 
-    impl std::str::FromStr for ValueRef {
-        type Err = String;
-
-        fn from_str(s: &str) -> Result<Self, Self::Err> {
-            let v = dtos::config::ValueRef::try_from(s).map_err(|e| e.to_string())?;
-            Ok(v.into())
-        }
-    }
-
-    impl From<dtos::config::ValueRef> for StructOrString<ValueRef> {
-        fn from(v: dtos::config::ValueRef) -> Self {
-            Self(v.into())
-        }
-    }
-    impl TryFrom<StructOrString<ValueRef>> for dtos::config::ValueRef {
-        type Error = ValidationError;
-        fn try_from(v: StructOrString<ValueRef>) -> Result<Self, ValidationError> {
-            v.0.try_into()
-        }
-    }
+    impl_struct_or_string!(ValueRef, dtos::config::ValueRef);
 
     impl From<dtos::config::ValueRef> for ValueRef {
         fn from(v: dtos::config::ValueRef) -> Self {
@@ -1885,26 +1821,7 @@ pub mod config {
         }
     }
 
-    impl std::str::FromStr for Variable {
-        type Err = String;
-
-        fn from_str(s: &str) -> Result<Self, Self::Err> {
-            let v = dtos::config::Variable::try_from(s).map_err(|e| e.to_string())?;
-            Ok(v.into())
-        }
-    }
-
-    impl From<dtos::config::Variable> for StructOrString<Variable> {
-        fn from(v: dtos::config::Variable) -> Self {
-            Self(v.into())
-        }
-    }
-    impl TryFrom<StructOrString<Variable>> for dtos::config::Variable {
-        type Error = ValidationError;
-        fn try_from(v: StructOrString<Variable>) -> Result<Self, ValidationError> {
-            v.0.try_into()
-        }
-    }
+    impl_struct_or_string!(Variable, dtos::config::Variable);
 
     impl From<dtos::config::Variable> for Variable {
         fn from(v: dtos::config::Variable) -> Self {
@@ -2041,7 +1958,7 @@ pub mod data {
     #[serde(rename_all = "camelCase")]
     pub struct DataField {
         pub name: String,
-        pub r#type: UnionOrString<data::DataType>,
+        pub r#type: StructOrString<data::DataType>,
         #[serde(default)]
         #[serde(skip_serializing_if = "Option::is_none")]
         pub extra: Option<data::ExtraAttributes>,
@@ -2181,17 +2098,7 @@ pub mod data {
         String(data::DataTypeString),
     }
 
-    impl From<dtos::data::DataType> for UnionOrString<DataType> {
-        fn from(v: dtos::data::DataType) -> Self {
-            Self(v.into())
-        }
-    }
-    impl TryFrom<UnionOrString<DataType>> for dtos::data::DataType {
-        type Error = ValidationError;
-        fn try_from(v: UnionOrString<DataType>) -> Result<Self, Self::Error> {
-            v.0.try_into()
-        }
-    }
+    impl_struct_or_string!(DataType, dtos::data::DataType);
 
     impl IntoDto for DataType {
         type Dto = dtos::data::DataType;
@@ -2634,7 +2541,7 @@ pub mod data {
     #[serde(deny_unknown_fields)]
     #[serde(rename_all = "camelCase")]
     pub struct DataTypeList {
-        pub item_type: Box<UnionOrString<data::DataType>>,
+        pub item_type: Box<StructOrString<data::DataType>>,
         #[serde(default)]
         #[serde(skip_serializing_if = "Option::is_none")]
         pub fixed_length: Option<u64>,
@@ -2673,8 +2580,8 @@ pub mod data {
     #[serde(deny_unknown_fields)]
     #[serde(rename_all = "camelCase")]
     pub struct DataTypeMap {
-        pub key_type: Box<UnionOrString<data::DataType>>,
-        pub value_type: Box<UnionOrString<data::DataType>>,
+        pub key_type: Box<StructOrString<data::DataType>>,
+        pub value_type: Box<StructOrString<data::DataType>>,
         #[serde(default)]
         #[serde(skip_serializing_if = "Option::is_none")]
         pub keys_sorted: Option<bool>,
@@ -2743,7 +2650,7 @@ pub mod data {
     #[serde(deny_unknown_fields)]
     #[serde(rename_all = "camelCase")]
     pub struct DataTypeOption {
-        pub inner: Box<UnionOrString<data::DataType>>,
+        pub inner: Box<StructOrString<data::DataType>>,
     }
 
     impl IntoDto for DataTypeOption {
@@ -3438,11 +3345,9 @@ pub mod datasets {
     #[serde(deny_unknown_fields)]
     #[serde(rename_all = "camelCase")]
     pub struct DatasetHandle {
-        #[serde(default)]
-        #[serde(skip_serializing_if = "Option::is_none")]
-        pub account: Option<auth::ResourceOwnerHandle>,
+        pub account: auth::ResourceOwnerHandle,
         pub id: odf::resources::ResourceID,
-        pub did: odf::datasets::DatasetID,
+        pub did: odf::datasets::DatasetDid,
         pub name: odf::resources::ResourceName,
     }
 
@@ -3456,7 +3361,7 @@ pub mod datasets {
     impl From<dtos::datasets::DatasetHandle> for DatasetHandle {
         fn from(v: dtos::datasets::DatasetHandle) -> Self {
             Self {
-                account: v.account.map(|v| v.into()),
+                account: v.account.into(),
                 id: v.id,
                 did: v.did,
                 name: v.name,
@@ -3468,10 +3373,7 @@ pub mod datasets {
         type Error = ValidationError;
         fn try_from(v: DatasetHandle) -> Result<Self, ValidationError> {
             Ok(Self {
-                account: v
-                    .account
-                    .map(|v| dtos::auth::ResourceOwnerHandle::try_from(v))
-                    .transpose()?,
+                account: dtos::auth::ResourceOwnerHandle::try_from(v.account)?,
                 id: v.id,
                 did: v.did,
                 name: v.name,
@@ -3532,7 +3434,7 @@ pub mod datasets {
         pub id: Option<odf::resources::ResourceID>,
         #[serde(default)]
         #[serde(skip_serializing_if = "Option::is_none")]
-        pub did: Option<odf::datasets::DatasetID>,
+        pub did: Option<odf::datasets::DatasetDid>,
         #[serde(default)]
         #[serde(skip_serializing_if = "Option::is_none")]
         pub name: Option<odf::resources::ResourceName>,
@@ -3545,26 +3447,7 @@ pub mod datasets {
         }
     }
 
-    impl std::str::FromStr for DatasetRef {
-        type Err = String;
-
-        fn from_str(s: &str) -> Result<Self, Self::Err> {
-            let v = dtos::datasets::DatasetRef::try_from(s).map_err(|e| e.to_string())?;
-            Ok(v.into())
-        }
-    }
-
-    impl From<dtos::datasets::DatasetRef> for StructOrString<DatasetRef> {
-        fn from(v: dtos::datasets::DatasetRef) -> Self {
-            Self(v.into())
-        }
-    }
-    impl TryFrom<StructOrString<DatasetRef>> for dtos::datasets::DatasetRef {
-        type Error = ValidationError;
-        fn try_from(v: StructOrString<DatasetRef>) -> Result<Self, ValidationError> {
-            v.0.try_into()
-        }
-    }
+    impl_struct_or_string!(DatasetRef, dtos::datasets::DatasetRef);
 
     impl From<dtos::datasets::DatasetRef> for DatasetRef {
         fn from(v: dtos::datasets::DatasetRef) -> Self {
@@ -3623,26 +3506,7 @@ pub mod datasets {
         }
     }
 
-    impl std::str::FromStr for DatasetSelector {
-        type Err = String;
-
-        fn from_str(s: &str) -> Result<Self, Self::Err> {
-            let v = dtos::datasets::DatasetSelector::try_from(s).map_err(|e| e.to_string())?;
-            Ok(v.into())
-        }
-    }
-
-    impl From<dtos::datasets::DatasetSelector> for StructOrString<DatasetSelector> {
-        fn from(v: dtos::datasets::DatasetSelector) -> Self {
-            Self(v.into())
-        }
-    }
-    impl TryFrom<StructOrString<DatasetSelector>> for dtos::datasets::DatasetSelector {
-        type Error = ValidationError;
-        fn try_from(v: StructOrString<DatasetSelector>) -> Result<Self, ValidationError> {
-            v.0.try_into()
-        }
-    }
+    impl_struct_or_string!(DatasetSelector, dtos::datasets::DatasetSelector);
 
     implement_serde_as!(dtos::datasets::DatasetSelector, DatasetSelector);
 
@@ -3651,7 +3515,7 @@ pub mod datasets {
     #[serde(deny_unknown_fields)]
     #[serde(rename_all = "camelCase")]
     pub struct DatasetSpec {
-        pub did: odf::datasets::DatasetID,
+        pub did: odf::datasets::DatasetDid,
         pub kind: datasets::DatasetKind,
         pub metadata: Vec<datasets::MetadataEvent>,
         pub volume: resources::ResourceHandle,
@@ -3700,7 +3564,7 @@ pub mod datasets {
     pub struct DatasetSpecInput {
         #[serde(default)]
         #[serde(skip_serializing_if = "Option::is_none")]
-        pub did: Option<odf::datasets::DatasetID>,
+        pub did: Option<odf::datasets::DatasetDid>,
         pub kind: datasets::DatasetKind,
         pub metadata: Vec<datasets::MetadataEvent>,
         #[serde(default)]
@@ -3873,7 +3737,7 @@ pub mod datasets {
     #[serde(deny_unknown_fields)]
     #[serde(rename_all = "camelCase")]
     pub struct ExecuteTransformInput {
-        pub dataset_id: odf::datasets::DatasetID,
+        pub dataset_id: odf::datasets::DatasetDid,
         #[serde(default)]
         #[serde(skip_serializing_if = "Option::is_none")]
         pub prev_block_hash: Option<odf::Multihash>,
@@ -4185,7 +4049,7 @@ pub mod datasets {
     #[serde(deny_unknown_fields)]
     #[serde(rename_all = "camelCase")]
     pub struct Seed {
-        pub dataset_id: odf::datasets::DatasetID,
+        pub dataset_id: odf::datasets::DatasetDid,
         pub dataset_kind: datasets::DatasetKind,
     }
 
@@ -4982,7 +4846,7 @@ pub mod engines {
     #[serde(deny_unknown_fields)]
     #[serde(rename_all = "camelCase")]
     pub struct TransformRequest {
-        pub dataset_id: odf::datasets::DatasetID,
+        pub dataset_id: odf::datasets::DatasetDid,
         pub dataset_alias: odf::datasets::legacy::DatasetAlias,
         #[serde(with = "datetime_rfc3339")]
         pub system_time: DateTime<Utc>,
@@ -5050,7 +4914,7 @@ pub mod engines {
     #[serde(deny_unknown_fields)]
     #[serde(rename_all = "camelCase")]
     pub struct TransformRequestInput {
-        pub dataset_id: odf::datasets::DatasetID,
+        pub dataset_id: odf::datasets::DatasetDid,
         pub dataset_alias: odf::datasets::legacy::DatasetAlias,
         pub query_alias: String,
         pub vocab: datasets::DatasetVocabulary,
@@ -7358,10 +7222,10 @@ pub mod legacy {
         pub path: String,
         #[serde(default)]
         #[serde(skip_serializing_if = "Option::is_none")]
-        pub event_time: Option<UnionOrString<sources::EventTimeSource>>,
+        pub event_time: Option<StructOrString<sources::EventTimeSource>>,
         #[serde(default)]
         #[serde(skip_serializing_if = "Option::is_none")]
-        pub cache: Option<UnionOrString<sources::SourceCaching>>,
+        pub cache: Option<StructOrString<sources::SourceCaching>>,
         #[serde(default)]
         #[serde(skip_serializing_if = "Option::is_none")]
         pub order: Option<sources::SourceOrdering>,
@@ -7470,10 +7334,10 @@ pub mod legacy {
         pub url: String,
         #[serde(default)]
         #[serde(skip_serializing_if = "Option::is_none")]
-        pub event_time: Option<UnionOrString<sources::EventTimeSource>>,
+        pub event_time: Option<StructOrString<sources::EventTimeSource>>,
         #[serde(default)]
         #[serde(skip_serializing_if = "Option::is_none")]
-        pub cache: Option<UnionOrString<sources::SourceCaching>>,
+        pub cache: Option<StructOrString<sources::SourceCaching>>,
         #[serde(default)]
         #[serde(skip_serializing_if = "Option::is_none")]
         pub headers: Option<Vec<sources::RequestHeader>>,
@@ -8186,13 +8050,13 @@ pub mod resources {
         pub account: Option<StructOrString<auth::ResourceOwnerRef>>,
         #[serde(default)]
         #[serde(skip_serializing_if = "Option::is_none")]
+        pub r#type: Option<odf::resources::TypeRef>,
+        #[serde(default)]
+        #[serde(skip_serializing_if = "Option::is_none")]
         pub id: Option<odf::resources::ResourceID>,
         #[serde(default)]
         #[serde(skip_serializing_if = "Option::is_none")]
         pub did: Option<odf::Did>,
-        #[serde(default)]
-        #[serde(skip_serializing_if = "Option::is_none")]
-        pub r#type: Option<odf::resources::TypeRef>,
         #[serde(default)]
         #[serde(skip_serializing_if = "Option::is_none")]
         pub name: Option<odf::resources::ResourceName>,
@@ -8205,34 +8069,15 @@ pub mod resources {
         }
     }
 
-    impl std::str::FromStr for ResourceRef {
-        type Err = String;
-
-        fn from_str(s: &str) -> Result<Self, Self::Err> {
-            let v = dtos::resources::ResourceRef::try_from(s).map_err(|e| e.to_string())?;
-            Ok(v.into())
-        }
-    }
-
-    impl From<dtos::resources::ResourceRef> for StructOrString<ResourceRef> {
-        fn from(v: dtos::resources::ResourceRef) -> Self {
-            Self(v.into())
-        }
-    }
-    impl TryFrom<StructOrString<ResourceRef>> for dtos::resources::ResourceRef {
-        type Error = ValidationError;
-        fn try_from(v: StructOrString<ResourceRef>) -> Result<Self, ValidationError> {
-            v.0.try_into()
-        }
-    }
+    impl_struct_or_string!(ResourceRef, dtos::resources::ResourceRef);
 
     impl From<dtos::resources::ResourceRef> for ResourceRef {
         fn from(v: dtos::resources::ResourceRef) -> Self {
             Self {
                 account: v.account.map(|v| v.into()),
+                r#type: v.r#type,
                 id: v.id,
                 did: v.did,
-                r#type: v.r#type,
                 name: v.name,
             }
         }
@@ -8246,9 +8091,9 @@ pub mod resources {
                     .account
                     .map(|v| dtos::auth::ResourceOwnerRef::try_from(v))
                     .transpose()?,
+                r#type: v.r#type,
                 id: v.id,
                 did: v.did,
-                r#type: v.r#type,
                 name: v.name,
             })
         }
@@ -8288,26 +8133,7 @@ pub mod resources {
         }
     }
 
-    impl std::str::FromStr for ResourceSelector {
-        type Err = String;
-
-        fn from_str(s: &str) -> Result<Self, Self::Err> {
-            let v = dtos::resources::ResourceSelector::try_from(s).map_err(|e| e.to_string())?;
-            Ok(v.into())
-        }
-    }
-
-    impl From<dtos::resources::ResourceSelector> for StructOrString<ResourceSelector> {
-        fn from(v: dtos::resources::ResourceSelector) -> Self {
-            Self(v.into())
-        }
-    }
-    impl TryFrom<StructOrString<ResourceSelector>> for dtos::resources::ResourceSelector {
-        type Error = ValidationError;
-        fn try_from(v: StructOrString<ResourceSelector>) -> Result<Self, ValidationError> {
-            v.0.try_into()
-        }
-    }
+    impl_struct_or_string!(ResourceSelector, dtos::resources::ResourceSelector);
 
     implement_serde_as!(dtos::resources::ResourceSelector, ResourceSelector);
 
@@ -8565,17 +8391,7 @@ pub mod sources {
         FromSystemTime(sources::EventTimeSourceFromSystemTime),
     }
 
-    impl From<dtos::sources::EventTimeSource> for UnionOrString<EventTimeSource> {
-        fn from(v: dtos::sources::EventTimeSource) -> Self {
-            Self(v.into())
-        }
-    }
-    impl TryFrom<UnionOrString<EventTimeSource>> for dtos::sources::EventTimeSource {
-        type Error = ValidationError;
-        fn try_from(v: UnionOrString<EventTimeSource>) -> Result<Self, Self::Error> {
-            v.0.try_into()
-        }
-    }
+    impl_struct_or_string!(EventTimeSource, dtos::sources::EventTimeSource);
 
     impl IntoDto for EventTimeSource {
         type Dto = dtos::sources::EventTimeSource;
@@ -8957,10 +8773,10 @@ pub mod sources {
         pub path: String,
         #[serde(default)]
         #[serde(skip_serializing_if = "Option::is_none")]
-        pub event_time: Option<UnionOrString<sources::EventTimeSource>>,
+        pub event_time: Option<StructOrString<sources::EventTimeSource>>,
         #[serde(default)]
         #[serde(skip_serializing_if = "Option::is_none")]
-        pub cache: Option<UnionOrString<sources::SourceCaching>>,
+        pub cache: Option<StructOrString<sources::SourceCaching>>,
         #[serde(default)]
         #[serde(skip_serializing_if = "Option::is_none")]
         pub order: Option<sources::SourceOrdering>,
@@ -9108,10 +8924,10 @@ pub mod sources {
         pub url: String,
         #[serde(default)]
         #[serde(skip_serializing_if = "Option::is_none")]
-        pub event_time: Option<UnionOrString<sources::EventTimeSource>>,
+        pub event_time: Option<StructOrString<sources::EventTimeSource>>,
         #[serde(default)]
         #[serde(skip_serializing_if = "Option::is_none")]
-        pub cache: Option<UnionOrString<sources::SourceCaching>>,
+        pub cache: Option<StructOrString<sources::SourceCaching>>,
         #[serde(default)]
         #[serde(skip_serializing_if = "Option::is_none")]
         pub headers: Option<Vec<sources::RequestHeader>>,
@@ -10078,17 +9894,7 @@ pub mod sources {
         Forever(sources::SourceCachingForever),
     }
 
-    impl From<dtos::sources::SourceCaching> for UnionOrString<SourceCaching> {
-        fn from(v: dtos::sources::SourceCaching) -> Self {
-            Self(v.into())
-        }
-    }
-    impl TryFrom<UnionOrString<SourceCaching>> for dtos::sources::SourceCaching {
-        type Error = ValidationError;
-        fn try_from(v: UnionOrString<SourceCaching>) -> Result<Self, Self::Error> {
-            v.0.try_into()
-        }
-    }
+    impl_struct_or_string!(SourceCaching, dtos::sources::SourceCaching);
 
     impl IntoDto for SourceCaching {
         type Dto = dtos::sources::SourceCaching;
@@ -10520,26 +10326,7 @@ pub mod storage {
         }
     }
 
-    impl std::str::FromStr for PersistentVolumeRef {
-        type Err = String;
-
-        fn from_str(s: &str) -> Result<Self, Self::Err> {
-            let v = dtos::storage::PersistentVolumeRef::try_from(s).map_err(|e| e.to_string())?;
-            Ok(v.into())
-        }
-    }
-
-    impl From<dtos::storage::PersistentVolumeRef> for StructOrString<PersistentVolumeRef> {
-        fn from(v: dtos::storage::PersistentVolumeRef) -> Self {
-            Self(v.into())
-        }
-    }
-    impl TryFrom<StructOrString<PersistentVolumeRef>> for dtos::storage::PersistentVolumeRef {
-        type Error = ValidationError;
-        fn try_from(v: StructOrString<PersistentVolumeRef>) -> Result<Self, ValidationError> {
-            v.0.try_into()
-        }
-    }
+    impl_struct_or_string!(PersistentVolumeRef, dtos::storage::PersistentVolumeRef);
 
     impl From<dtos::storage::PersistentVolumeRef> for PersistentVolumeRef {
         fn from(v: dtos::storage::PersistentVolumeRef) -> Self {

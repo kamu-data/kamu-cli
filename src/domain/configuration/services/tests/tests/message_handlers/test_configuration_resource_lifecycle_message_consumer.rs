@@ -89,7 +89,7 @@ async fn test_reconciliation_succeeded_for_variable_set_cleans_up_old_entries() 
             Utc::now(),
             make_snapshot(
                 id,
-                VariableSetResource::schema(),
+                VariableSetResource::type_uri(),
                 &harness.account_handle,
                 2,
             ),
@@ -154,7 +154,12 @@ async fn test_reconciliation_succeeded_for_secret_set_cleans_up_old_entries() {
     harness
         .consume_message(&ResourceLifecycleMessage::reconciliation_succeeded(
             Utc::now(),
-            make_snapshot(id, SecretSetResource::schema(), &harness.account_handle, 2),
+            make_snapshot(
+                id,
+                SecretSetResource::type_uri(),
+                &harness.account_handle,
+                2,
+            ),
         ))
         .await
         .unwrap();
@@ -199,7 +204,7 @@ async fn test_applied_message_is_no_op() {
             kamu_resources::ResourceLifecycleMessageOutcome::Created,
             make_snapshot(
                 id,
-                VariableSetResource::schema(),
+                VariableSetResource::type_uri(),
                 &harness.account_handle,
                 1,
             ),

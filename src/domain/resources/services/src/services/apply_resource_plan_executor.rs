@@ -183,7 +183,7 @@ where
                     .with_context(format!(
                         "account_id={:?}, schema='{}', name='{}'",
                         headers_input.account,
-                        R::schema(),
+                        R::type_uri(),
                         headers_input.name
                     )),
             ));
@@ -218,7 +218,7 @@ where
                         .with_context(format!(
                             "account_id={:?}, schema='{}', name='{}'",
                             plan.resource.headers().account,
-                            R::schema(),
+                            R::type_uri(),
                             plan.resource.headers().name
                         )),
                 )),

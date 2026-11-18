@@ -732,15 +732,16 @@ pub const ENUM_MIN_SUBJECT_HANDLE: u8 = 0;
     since = "2.0.0",
     note = "Use associated constants instead. This will no longer be generated in 2021."
 )]
-pub const ENUM_MAX_SUBJECT_HANDLE: u8 = 4;
+pub const ENUM_MAX_SUBJECT_HANDLE: u8 = 5;
 #[deprecated(
     since = "2.0.0",
     note = "Use associated constants instead. This will no longer be generated in 2021."
 )]
 #[allow(non_camel_case_types)]
-pub const ENUM_VALUES_SUBJECT_HANDLE: [SubjectHandle; 5] = [
+pub const ENUM_VALUES_SUBJECT_HANDLE: [SubjectHandle; 6] = [
     SubjectHandle::NONE,
-    SubjectHandle::SubjectHandleResource,
+    SubjectHandle::SubjectHandlePrincipal,
+    SubjectHandle::SubjectHandleGroup,
     SubjectHandle::SubjectHandleAuthenticated,
     SubjectHandle::SubjectHandleAnonymous,
     SubjectHandle::SubjectHandleEveryone,
@@ -753,16 +754,18 @@ pub struct SubjectHandle(pub u8);
 #[allow(non_upper_case_globals)]
 impl SubjectHandle {
     pub const NONE: Self = Self(0);
-    pub const SubjectHandleResource: Self = Self(1);
-    pub const SubjectHandleAuthenticated: Self = Self(2);
-    pub const SubjectHandleAnonymous: Self = Self(3);
-    pub const SubjectHandleEveryone: Self = Self(4);
+    pub const SubjectHandlePrincipal: Self = Self(1);
+    pub const SubjectHandleGroup: Self = Self(2);
+    pub const SubjectHandleAuthenticated: Self = Self(3);
+    pub const SubjectHandleAnonymous: Self = Self(4);
+    pub const SubjectHandleEveryone: Self = Self(5);
 
     pub const ENUM_MIN: u8 = 0;
-    pub const ENUM_MAX: u8 = 4;
+    pub const ENUM_MAX: u8 = 5;
     pub const ENUM_VALUES: &'static [Self] = &[
         Self::NONE,
-        Self::SubjectHandleResource,
+        Self::SubjectHandlePrincipal,
+        Self::SubjectHandleGroup,
         Self::SubjectHandleAuthenticated,
         Self::SubjectHandleAnonymous,
         Self::SubjectHandleEveryone,
@@ -771,7 +774,8 @@ impl SubjectHandle {
     pub fn variant_name(self) -> Option<&'static str> {
         match self {
             Self::NONE => Some("NONE"),
-            Self::SubjectHandleResource => Some("SubjectHandleResource"),
+            Self::SubjectHandlePrincipal => Some("SubjectHandlePrincipal"),
+            Self::SubjectHandleGroup => Some("SubjectHandleGroup"),
             Self::SubjectHandleAuthenticated => Some("SubjectHandleAuthenticated"),
             Self::SubjectHandleAnonymous => Some("SubjectHandleAnonymous"),
             Self::SubjectHandleEveryone => Some("SubjectHandleEveryone"),
@@ -3124,15 +3128,16 @@ pub const ENUM_MIN_SUBJECT_REF: u8 = 0;
     since = "2.0.0",
     note = "Use associated constants instead. This will no longer be generated in 2021."
 )]
-pub const ENUM_MAX_SUBJECT_REF: u8 = 4;
+pub const ENUM_MAX_SUBJECT_REF: u8 = 5;
 #[deprecated(
     since = "2.0.0",
     note = "Use associated constants instead. This will no longer be generated in 2021."
 )]
 #[allow(non_camel_case_types)]
-pub const ENUM_VALUES_SUBJECT_REF: [SubjectRef; 5] = [
+pub const ENUM_VALUES_SUBJECT_REF: [SubjectRef; 6] = [
     SubjectRef::NONE,
-    SubjectRef::SubjectRefResource,
+    SubjectRef::SubjectRefPrincipal,
+    SubjectRef::SubjectRefGroup,
     SubjectRef::SubjectRefAuthenticated,
     SubjectRef::SubjectRefAnonymous,
     SubjectRef::SubjectRefEveryone,
@@ -3145,16 +3150,18 @@ pub struct SubjectRef(pub u8);
 #[allow(non_upper_case_globals)]
 impl SubjectRef {
     pub const NONE: Self = Self(0);
-    pub const SubjectRefResource: Self = Self(1);
-    pub const SubjectRefAuthenticated: Self = Self(2);
-    pub const SubjectRefAnonymous: Self = Self(3);
-    pub const SubjectRefEveryone: Self = Self(4);
+    pub const SubjectRefPrincipal: Self = Self(1);
+    pub const SubjectRefGroup: Self = Self(2);
+    pub const SubjectRefAuthenticated: Self = Self(3);
+    pub const SubjectRefAnonymous: Self = Self(4);
+    pub const SubjectRefEveryone: Self = Self(5);
 
     pub const ENUM_MIN: u8 = 0;
-    pub const ENUM_MAX: u8 = 4;
+    pub const ENUM_MAX: u8 = 5;
     pub const ENUM_VALUES: &'static [Self] = &[
         Self::NONE,
-        Self::SubjectRefResource,
+        Self::SubjectRefPrincipal,
+        Self::SubjectRefGroup,
         Self::SubjectRefAuthenticated,
         Self::SubjectRefAnonymous,
         Self::SubjectRefEveryone,
@@ -3163,7 +3170,8 @@ impl SubjectRef {
     pub fn variant_name(self) -> Option<&'static str> {
         match self {
             Self::NONE => Some("NONE"),
-            Self::SubjectRefResource => Some("SubjectRefResource"),
+            Self::SubjectRefPrincipal => Some("SubjectRefPrincipal"),
+            Self::SubjectRefGroup => Some("SubjectRefGroup"),
             Self::SubjectRefAuthenticated => Some("SubjectRefAuthenticated"),
             Self::SubjectRefAnonymous => Some("SubjectRefAnonymous"),
             Self::SubjectRefEveryone => Some("SubjectRefEveryone"),
@@ -15735,9 +15743,10 @@ impl<'a> ::flatbuffers::Follow<'a> for ResourceOwnerHandle<'a> {
 }
 
 impl<'a> ResourceOwnerHandle<'a> {
-    pub const VT_ID: ::flatbuffers::VOffsetT = 4;
-    pub const VT_DID: ::flatbuffers::VOffsetT = 6;
-    pub const VT_NAME: ::flatbuffers::VOffsetT = 8;
+    pub const VT_TYPE_: ::flatbuffers::VOffsetT = 4;
+    pub const VT_ID: ::flatbuffers::VOffsetT = 6;
+    pub const VT_DID: ::flatbuffers::VOffsetT = 8;
+    pub const VT_NAME: ::flatbuffers::VOffsetT = 10;
 
     #[inline]
     pub unsafe fn init_from_table(table: ::flatbuffers::Table<'a>) -> Self {
@@ -15763,9 +15772,22 @@ impl<'a> ResourceOwnerHandle<'a> {
         if let Some(x) = args.id {
             builder.add_id(x);
         }
+        if let Some(x) = args.type_ {
+            builder.add_type_(x);
+        }
         builder.finish()
     }
 
+    #[inline]
+    pub fn type_(&self) -> Option<&'a str> {
+        // Safety:
+        // Created from valid Table for this object
+        // which contains a valid value in this slot
+        unsafe {
+            self._tab
+                .get::<::flatbuffers::ForwardsUOffset<&str>>(ResourceOwnerHandle::VT_TYPE_, None)
+        }
+    }
     #[inline]
     pub fn id(&self) -> Option<::flatbuffers::Vector<'a, u8>> {
         // Safety:
@@ -15811,6 +15833,7 @@ impl ::flatbuffers::Verifiable for ResourceOwnerHandle<'_> {
         pos: usize,
     ) -> Result<(), ::flatbuffers::InvalidFlatbuffer> {
         v.visit_table(pos)?
+            .visit_field::<::flatbuffers::ForwardsUOffset<&str>>("type_", Self::VT_TYPE_, false)?
             .visit_field::<::flatbuffers::ForwardsUOffset<::flatbuffers::Vector<'_, u8>>>(
                 "id",
                 Self::VT_ID,
@@ -15827,6 +15850,7 @@ impl ::flatbuffers::Verifiable for ResourceOwnerHandle<'_> {
     }
 }
 pub struct ResourceOwnerHandleArgs<'a> {
+    pub type_: Option<::flatbuffers::WIPOffset<&'a str>>,
     pub id: Option<::flatbuffers::WIPOffset<::flatbuffers::Vector<'a, u8>>>,
     pub did: Option<::flatbuffers::WIPOffset<::flatbuffers::Vector<'a, u8>>>,
     pub name: Option<::flatbuffers::WIPOffset<&'a str>>,
@@ -15835,6 +15859,7 @@ impl<'a> Default for ResourceOwnerHandleArgs<'a> {
     #[inline]
     fn default() -> Self {
         ResourceOwnerHandleArgs {
+            type_: None,
             id: None,
             did: None,
             name: None,
@@ -15847,6 +15872,11 @@ pub struct ResourceOwnerHandleBuilder<'a: 'b, 'b, A: ::flatbuffers::Allocator + 
     start_: ::flatbuffers::WIPOffset<::flatbuffers::TableUnfinishedWIPOffset>,
 }
 impl<'a: 'b, 'b, A: ::flatbuffers::Allocator + 'a> ResourceOwnerHandleBuilder<'a, 'b, A> {
+    #[inline]
+    pub fn add_type_(&mut self, type_: ::flatbuffers::WIPOffset<&'b str>) {
+        self.fbb_
+            .push_slot_always::<::flatbuffers::WIPOffset<_>>(ResourceOwnerHandle::VT_TYPE_, type_);
+    }
     #[inline]
     pub fn add_id(&mut self, id: ::flatbuffers::WIPOffset<::flatbuffers::Vector<'b, u8>>) {
         self.fbb_
@@ -15882,6 +15912,7 @@ impl<'a: 'b, 'b, A: ::flatbuffers::Allocator + 'a> ResourceOwnerHandleBuilder<'a
 impl ::core::fmt::Debug for ResourceOwnerHandle<'_> {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         let mut ds = f.debug_struct("ResourceOwnerHandle");
+        ds.field("type_", &self.type_());
         ds.field("id", &self.id());
         ds.field("did", &self.did());
         ds.field("name", &self.name());
@@ -16283,9 +16314,10 @@ impl<'a> ::flatbuffers::Follow<'a> for ResourceOwnerRef<'a> {
 }
 
 impl<'a> ResourceOwnerRef<'a> {
-    pub const VT_ID: ::flatbuffers::VOffsetT = 4;
-    pub const VT_DID: ::flatbuffers::VOffsetT = 6;
-    pub const VT_NAME: ::flatbuffers::VOffsetT = 8;
+    pub const VT_TYPE_: ::flatbuffers::VOffsetT = 4;
+    pub const VT_ID: ::flatbuffers::VOffsetT = 6;
+    pub const VT_DID: ::flatbuffers::VOffsetT = 8;
+    pub const VT_NAME: ::flatbuffers::VOffsetT = 10;
 
     #[inline]
     pub unsafe fn init_from_table(table: ::flatbuffers::Table<'a>) -> Self {
@@ -16311,9 +16343,22 @@ impl<'a> ResourceOwnerRef<'a> {
         if let Some(x) = args.id {
             builder.add_id(x);
         }
+        if let Some(x) = args.type_ {
+            builder.add_type_(x);
+        }
         builder.finish()
     }
 
+    #[inline]
+    pub fn type_(&self) -> Option<&'a str> {
+        // Safety:
+        // Created from valid Table for this object
+        // which contains a valid value in this slot
+        unsafe {
+            self._tab
+                .get::<::flatbuffers::ForwardsUOffset<&str>>(ResourceOwnerRef::VT_TYPE_, None)
+        }
+    }
     #[inline]
     pub fn id(&self) -> Option<::flatbuffers::Vector<'a, u8>> {
         // Safety:
@@ -16359,6 +16404,7 @@ impl ::flatbuffers::Verifiable for ResourceOwnerRef<'_> {
         pos: usize,
     ) -> Result<(), ::flatbuffers::InvalidFlatbuffer> {
         v.visit_table(pos)?
+            .visit_field::<::flatbuffers::ForwardsUOffset<&str>>("type_", Self::VT_TYPE_, false)?
             .visit_field::<::flatbuffers::ForwardsUOffset<::flatbuffers::Vector<'_, u8>>>(
                 "id",
                 Self::VT_ID,
@@ -16375,6 +16421,7 @@ impl ::flatbuffers::Verifiable for ResourceOwnerRef<'_> {
     }
 }
 pub struct ResourceOwnerRefArgs<'a> {
+    pub type_: Option<::flatbuffers::WIPOffset<&'a str>>,
     pub id: Option<::flatbuffers::WIPOffset<::flatbuffers::Vector<'a, u8>>>,
     pub did: Option<::flatbuffers::WIPOffset<::flatbuffers::Vector<'a, u8>>>,
     pub name: Option<::flatbuffers::WIPOffset<&'a str>>,
@@ -16383,6 +16430,7 @@ impl<'a> Default for ResourceOwnerRefArgs<'a> {
     #[inline]
     fn default() -> Self {
         ResourceOwnerRefArgs {
+            type_: None,
             id: None,
             did: None,
             name: None,
@@ -16395,6 +16443,11 @@ pub struct ResourceOwnerRefBuilder<'a: 'b, 'b, A: ::flatbuffers::Allocator + 'a>
     start_: ::flatbuffers::WIPOffset<::flatbuffers::TableUnfinishedWIPOffset>,
 }
 impl<'a: 'b, 'b, A: ::flatbuffers::Allocator + 'a> ResourceOwnerRefBuilder<'a, 'b, A> {
+    #[inline]
+    pub fn add_type_(&mut self, type_: ::flatbuffers::WIPOffset<&'b str>) {
+        self.fbb_
+            .push_slot_always::<::flatbuffers::WIPOffset<_>>(ResourceOwnerRef::VT_TYPE_, type_);
+    }
     #[inline]
     pub fn add_id(&mut self, id: ::flatbuffers::WIPOffset<::flatbuffers::Vector<'b, u8>>) {
         self.fbb_
@@ -16430,6 +16483,7 @@ impl<'a: 'b, 'b, A: ::flatbuffers::Allocator + 'a> ResourceOwnerRefBuilder<'a, '
 impl ::core::fmt::Debug for ResourceOwnerRef<'_> {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         let mut ds = f.debug_struct("ResourceOwnerRef");
+        ds.field("type_", &self.type_());
         ds.field("id", &self.id());
         ds.field("did", &self.did());
         ds.field("name", &self.name());
@@ -16807,16 +16861,16 @@ impl ::core::fmt::Debug for AwsCredentialsInput<'_> {
         ds.finish()
     }
 }
-pub enum SubjectHandleResourceOffset {}
+pub enum SubjectHandlePrincipalOffset {}
 #[derive(Copy, Clone, PartialEq)]
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-pub struct SubjectHandleResource<'a> {
+pub struct SubjectHandlePrincipal<'a> {
     pub _tab: ::flatbuffers::Table<'a>,
 }
 
-impl<'a> ::flatbuffers::Follow<'a> for SubjectHandleResource<'a> {
-    type Inner = SubjectHandleResource<'a>;
+impl<'a> ::flatbuffers::Follow<'a> for SubjectHandlePrincipal<'a> {
+    type Inner = SubjectHandlePrincipal<'a>;
     #[inline]
     unsafe fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
         Self {
@@ -16825,7 +16879,7 @@ impl<'a> ::flatbuffers::Follow<'a> for SubjectHandleResource<'a> {
     }
 }
 
-impl<'a> SubjectHandleResource<'a> {
+impl<'a> SubjectHandlePrincipal<'a> {
     pub const VT_TYPE_: ::flatbuffers::VOffsetT = 4;
     pub const VT_ACCOUNT: ::flatbuffers::VOffsetT = 6;
     pub const VT_ID: ::flatbuffers::VOffsetT = 8;
@@ -16834,7 +16888,7 @@ impl<'a> SubjectHandleResource<'a> {
 
     #[inline]
     pub unsafe fn init_from_table(table: ::flatbuffers::Table<'a>) -> Self {
-        SubjectHandleResource { _tab: table }
+        SubjectHandlePrincipal { _tab: table }
     }
     #[allow(unused_mut)]
     pub fn create<
@@ -16844,9 +16898,9 @@ impl<'a> SubjectHandleResource<'a> {
         A: ::flatbuffers::Allocator + 'bldr,
     >(
         _fbb: &'mut_bldr mut ::flatbuffers::FlatBufferBuilder<'bldr, A>,
-        args: &'args SubjectHandleResourceArgs<'args>,
-    ) -> ::flatbuffers::WIPOffset<SubjectHandleResource<'bldr>> {
-        let mut builder = SubjectHandleResourceBuilder::new(_fbb);
+        args: &'args SubjectHandlePrincipalArgs<'args>,
+    ) -> ::flatbuffers::WIPOffset<SubjectHandlePrincipal<'bldr>> {
+        let mut builder = SubjectHandlePrincipalBuilder::new(_fbb);
         if let Some(x) = args.name {
             builder.add_name(x);
         }
@@ -16872,7 +16926,7 @@ impl<'a> SubjectHandleResource<'a> {
         // which contains a valid value in this slot
         unsafe {
             self._tab
-                .get::<::flatbuffers::ForwardsUOffset<&str>>(SubjectHandleResource::VT_TYPE_, None)
+                .get::<::flatbuffers::ForwardsUOffset<&str>>(SubjectHandlePrincipal::VT_TYPE_, None)
         }
     }
     #[inline]
@@ -16883,7 +16937,7 @@ impl<'a> SubjectHandleResource<'a> {
         unsafe {
             self._tab
                 .get::<::flatbuffers::ForwardsUOffset<ResourceOwnerHandle>>(
-                    SubjectHandleResource::VT_ACCOUNT,
+                    SubjectHandlePrincipal::VT_ACCOUNT,
                     None,
                 )
         }
@@ -16896,7 +16950,7 @@ impl<'a> SubjectHandleResource<'a> {
         unsafe {
             self._tab
                 .get::<::flatbuffers::ForwardsUOffset<::flatbuffers::Vector<'a, u8>>>(
-                    SubjectHandleResource::VT_ID,
+                    SubjectHandlePrincipal::VT_ID,
                     None,
                 )
         }
@@ -16909,7 +16963,7 @@ impl<'a> SubjectHandleResource<'a> {
         unsafe {
             self._tab
                 .get::<::flatbuffers::ForwardsUOffset<::flatbuffers::Vector<'a, u8>>>(
-                    SubjectHandleResource::VT_DID,
+                    SubjectHandlePrincipal::VT_DID,
                     None,
                 )
         }
@@ -16921,12 +16975,12 @@ impl<'a> SubjectHandleResource<'a> {
         // which contains a valid value in this slot
         unsafe {
             self._tab
-                .get::<::flatbuffers::ForwardsUOffset<&str>>(SubjectHandleResource::VT_NAME, None)
+                .get::<::flatbuffers::ForwardsUOffset<&str>>(SubjectHandlePrincipal::VT_NAME, None)
         }
     }
 }
 
-impl ::flatbuffers::Verifiable for SubjectHandleResource<'_> {
+impl ::flatbuffers::Verifiable for SubjectHandlePrincipal<'_> {
     #[inline]
     fn run_verifier(
         v: &mut ::flatbuffers::Verifier,
@@ -16954,17 +17008,17 @@ impl ::flatbuffers::Verifiable for SubjectHandleResource<'_> {
         Ok(())
     }
 }
-pub struct SubjectHandleResourceArgs<'a> {
+pub struct SubjectHandlePrincipalArgs<'a> {
     pub type_: Option<::flatbuffers::WIPOffset<&'a str>>,
     pub account: Option<::flatbuffers::WIPOffset<ResourceOwnerHandle<'a>>>,
     pub id: Option<::flatbuffers::WIPOffset<::flatbuffers::Vector<'a, u8>>>,
     pub did: Option<::flatbuffers::WIPOffset<::flatbuffers::Vector<'a, u8>>>,
     pub name: Option<::flatbuffers::WIPOffset<&'a str>>,
 }
-impl<'a> Default for SubjectHandleResourceArgs<'a> {
+impl<'a> Default for SubjectHandlePrincipalArgs<'a> {
     #[inline]
     fn default() -> Self {
-        SubjectHandleResourceArgs {
+        SubjectHandlePrincipalArgs {
             type_: None,
             account: None,
             id: None,
@@ -16974,15 +17028,15 @@ impl<'a> Default for SubjectHandleResourceArgs<'a> {
     }
 }
 
-pub struct SubjectHandleResourceBuilder<'a: 'b, 'b, A: ::flatbuffers::Allocator + 'a> {
+pub struct SubjectHandlePrincipalBuilder<'a: 'b, 'b, A: ::flatbuffers::Allocator + 'a> {
     fbb_: &'b mut ::flatbuffers::FlatBufferBuilder<'a, A>,
     start_: ::flatbuffers::WIPOffset<::flatbuffers::TableUnfinishedWIPOffset>,
 }
-impl<'a: 'b, 'b, A: ::flatbuffers::Allocator + 'a> SubjectHandleResourceBuilder<'a, 'b, A> {
+impl<'a: 'b, 'b, A: ::flatbuffers::Allocator + 'a> SubjectHandlePrincipalBuilder<'a, 'b, A> {
     #[inline]
     pub fn add_type_(&mut self, type_: ::flatbuffers::WIPOffset<&'b str>) {
         self.fbb_.push_slot_always::<::flatbuffers::WIPOffset<_>>(
-            SubjectHandleResource::VT_TYPE_,
+            SubjectHandlePrincipal::VT_TYPE_,
             type_,
         );
     }
@@ -16990,49 +17044,224 @@ impl<'a: 'b, 'b, A: ::flatbuffers::Allocator + 'a> SubjectHandleResourceBuilder<
     pub fn add_account(&mut self, account: ::flatbuffers::WIPOffset<ResourceOwnerHandle<'b>>) {
         self.fbb_
             .push_slot_always::<::flatbuffers::WIPOffset<ResourceOwnerHandle>>(
-                SubjectHandleResource::VT_ACCOUNT,
+                SubjectHandlePrincipal::VT_ACCOUNT,
                 account,
             );
     }
     #[inline]
     pub fn add_id(&mut self, id: ::flatbuffers::WIPOffset<::flatbuffers::Vector<'b, u8>>) {
         self.fbb_
-            .push_slot_always::<::flatbuffers::WIPOffset<_>>(SubjectHandleResource::VT_ID, id);
+            .push_slot_always::<::flatbuffers::WIPOffset<_>>(SubjectHandlePrincipal::VT_ID, id);
     }
     #[inline]
     pub fn add_did(&mut self, did: ::flatbuffers::WIPOffset<::flatbuffers::Vector<'b, u8>>) {
         self.fbb_
-            .push_slot_always::<::flatbuffers::WIPOffset<_>>(SubjectHandleResource::VT_DID, did);
+            .push_slot_always::<::flatbuffers::WIPOffset<_>>(SubjectHandlePrincipal::VT_DID, did);
     }
     #[inline]
     pub fn add_name(&mut self, name: ::flatbuffers::WIPOffset<&'b str>) {
         self.fbb_
-            .push_slot_always::<::flatbuffers::WIPOffset<_>>(SubjectHandleResource::VT_NAME, name);
+            .push_slot_always::<::flatbuffers::WIPOffset<_>>(SubjectHandlePrincipal::VT_NAME, name);
     }
     #[inline]
     pub fn new(
         _fbb: &'b mut ::flatbuffers::FlatBufferBuilder<'a, A>,
-    ) -> SubjectHandleResourceBuilder<'a, 'b, A> {
+    ) -> SubjectHandlePrincipalBuilder<'a, 'b, A> {
         let start = _fbb.start_table();
-        SubjectHandleResourceBuilder {
+        SubjectHandlePrincipalBuilder {
             fbb_: _fbb,
             start_: start,
         }
     }
     #[inline]
-    pub fn finish(self) -> ::flatbuffers::WIPOffset<SubjectHandleResource<'a>> {
+    pub fn finish(self) -> ::flatbuffers::WIPOffset<SubjectHandlePrincipal<'a>> {
         let o = self.fbb_.end_table(self.start_);
         ::flatbuffers::WIPOffset::new(o.value())
     }
 }
 
-impl ::core::fmt::Debug for SubjectHandleResource<'_> {
+impl ::core::fmt::Debug for SubjectHandlePrincipal<'_> {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
-        let mut ds = f.debug_struct("SubjectHandleResource");
+        let mut ds = f.debug_struct("SubjectHandlePrincipal");
         ds.field("type_", &self.type_());
         ds.field("account", &self.account());
         ds.field("id", &self.id());
         ds.field("did", &self.did());
+        ds.field("name", &self.name());
+        ds.finish()
+    }
+}
+pub enum SubjectHandleGroupOffset {}
+#[derive(Copy, Clone, PartialEq)]
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+pub struct SubjectHandleGroup<'a> {
+    pub _tab: ::flatbuffers::Table<'a>,
+}
+
+impl<'a> ::flatbuffers::Follow<'a> for SubjectHandleGroup<'a> {
+    type Inner = SubjectHandleGroup<'a>;
+    #[inline]
+    unsafe fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
+        Self {
+            _tab: unsafe { ::flatbuffers::Table::new(buf, loc) },
+        }
+    }
+}
+
+impl<'a> SubjectHandleGroup<'a> {
+    pub const VT_ACCOUNT: ::flatbuffers::VOffsetT = 4;
+    pub const VT_ID: ::flatbuffers::VOffsetT = 6;
+    pub const VT_NAME: ::flatbuffers::VOffsetT = 8;
+
+    #[inline]
+    pub unsafe fn init_from_table(table: ::flatbuffers::Table<'a>) -> Self {
+        SubjectHandleGroup { _tab: table }
+    }
+    #[allow(unused_mut)]
+    pub fn create<
+        'bldr: 'args,
+        'args: 'mut_bldr,
+        'mut_bldr,
+        A: ::flatbuffers::Allocator + 'bldr,
+    >(
+        _fbb: &'mut_bldr mut ::flatbuffers::FlatBufferBuilder<'bldr, A>,
+        args: &'args SubjectHandleGroupArgs<'args>,
+    ) -> ::flatbuffers::WIPOffset<SubjectHandleGroup<'bldr>> {
+        let mut builder = SubjectHandleGroupBuilder::new(_fbb);
+        if let Some(x) = args.name {
+            builder.add_name(x);
+        }
+        if let Some(x) = args.id {
+            builder.add_id(x);
+        }
+        if let Some(x) = args.account {
+            builder.add_account(x);
+        }
+        builder.finish()
+    }
+
+    #[inline]
+    pub fn account(&self) -> Option<ResourceOwnerHandle<'a>> {
+        // Safety:
+        // Created from valid Table for this object
+        // which contains a valid value in this slot
+        unsafe {
+            self._tab
+                .get::<::flatbuffers::ForwardsUOffset<ResourceOwnerHandle>>(
+                    SubjectHandleGroup::VT_ACCOUNT,
+                    None,
+                )
+        }
+    }
+    #[inline]
+    pub fn id(&self) -> Option<::flatbuffers::Vector<'a, u8>> {
+        // Safety:
+        // Created from valid Table for this object
+        // which contains a valid value in this slot
+        unsafe {
+            self._tab
+                .get::<::flatbuffers::ForwardsUOffset<::flatbuffers::Vector<'a, u8>>>(
+                    SubjectHandleGroup::VT_ID,
+                    None,
+                )
+        }
+    }
+    #[inline]
+    pub fn name(&self) -> Option<&'a str> {
+        // Safety:
+        // Created from valid Table for this object
+        // which contains a valid value in this slot
+        unsafe {
+            self._tab
+                .get::<::flatbuffers::ForwardsUOffset<&str>>(SubjectHandleGroup::VT_NAME, None)
+        }
+    }
+}
+
+impl ::flatbuffers::Verifiable for SubjectHandleGroup<'_> {
+    #[inline]
+    fn run_verifier(
+        v: &mut ::flatbuffers::Verifier,
+        pos: usize,
+    ) -> Result<(), ::flatbuffers::InvalidFlatbuffer> {
+        v.visit_table(pos)?
+            .visit_field::<::flatbuffers::ForwardsUOffset<ResourceOwnerHandle>>(
+                "account",
+                Self::VT_ACCOUNT,
+                false,
+            )?
+            .visit_field::<::flatbuffers::ForwardsUOffset<::flatbuffers::Vector<'_, u8>>>(
+                "id",
+                Self::VT_ID,
+                false,
+            )?
+            .visit_field::<::flatbuffers::ForwardsUOffset<&str>>("name", Self::VT_NAME, false)?
+            .finish();
+        Ok(())
+    }
+}
+pub struct SubjectHandleGroupArgs<'a> {
+    pub account: Option<::flatbuffers::WIPOffset<ResourceOwnerHandle<'a>>>,
+    pub id: Option<::flatbuffers::WIPOffset<::flatbuffers::Vector<'a, u8>>>,
+    pub name: Option<::flatbuffers::WIPOffset<&'a str>>,
+}
+impl<'a> Default for SubjectHandleGroupArgs<'a> {
+    #[inline]
+    fn default() -> Self {
+        SubjectHandleGroupArgs {
+            account: None,
+            id: None,
+            name: None,
+        }
+    }
+}
+
+pub struct SubjectHandleGroupBuilder<'a: 'b, 'b, A: ::flatbuffers::Allocator + 'a> {
+    fbb_: &'b mut ::flatbuffers::FlatBufferBuilder<'a, A>,
+    start_: ::flatbuffers::WIPOffset<::flatbuffers::TableUnfinishedWIPOffset>,
+}
+impl<'a: 'b, 'b, A: ::flatbuffers::Allocator + 'a> SubjectHandleGroupBuilder<'a, 'b, A> {
+    #[inline]
+    pub fn add_account(&mut self, account: ::flatbuffers::WIPOffset<ResourceOwnerHandle<'b>>) {
+        self.fbb_
+            .push_slot_always::<::flatbuffers::WIPOffset<ResourceOwnerHandle>>(
+                SubjectHandleGroup::VT_ACCOUNT,
+                account,
+            );
+    }
+    #[inline]
+    pub fn add_id(&mut self, id: ::flatbuffers::WIPOffset<::flatbuffers::Vector<'b, u8>>) {
+        self.fbb_
+            .push_slot_always::<::flatbuffers::WIPOffset<_>>(SubjectHandleGroup::VT_ID, id);
+    }
+    #[inline]
+    pub fn add_name(&mut self, name: ::flatbuffers::WIPOffset<&'b str>) {
+        self.fbb_
+            .push_slot_always::<::flatbuffers::WIPOffset<_>>(SubjectHandleGroup::VT_NAME, name);
+    }
+    #[inline]
+    pub fn new(
+        _fbb: &'b mut ::flatbuffers::FlatBufferBuilder<'a, A>,
+    ) -> SubjectHandleGroupBuilder<'a, 'b, A> {
+        let start = _fbb.start_table();
+        SubjectHandleGroupBuilder {
+            fbb_: _fbb,
+            start_: start,
+        }
+    }
+    #[inline]
+    pub fn finish(self) -> ::flatbuffers::WIPOffset<SubjectHandleGroup<'a>> {
+        let o = self.fbb_.end_table(self.start_);
+        ::flatbuffers::WIPOffset::new(o.value())
+    }
+}
+
+impl ::core::fmt::Debug for SubjectHandleGroup<'_> {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        let mut ds = f.debug_struct("SubjectHandleGroup");
+        ds.field("account", &self.account());
+        ds.field("id", &self.id());
         ds.field("name", &self.name());
         ds.finish()
     }
@@ -17859,9 +18088,9 @@ impl<'a> ::flatbuffers::Follow<'a> for ResourceRef<'a> {
 
 impl<'a> ResourceRef<'a> {
     pub const VT_ACCOUNT: ::flatbuffers::VOffsetT = 4;
-    pub const VT_ID: ::flatbuffers::VOffsetT = 6;
-    pub const VT_DID: ::flatbuffers::VOffsetT = 8;
-    pub const VT_TYPE_: ::flatbuffers::VOffsetT = 10;
+    pub const VT_TYPE_: ::flatbuffers::VOffsetT = 6;
+    pub const VT_ID: ::flatbuffers::VOffsetT = 8;
+    pub const VT_DID: ::flatbuffers::VOffsetT = 10;
     pub const VT_NAME: ::flatbuffers::VOffsetT = 12;
 
     #[inline]
@@ -17882,14 +18111,14 @@ impl<'a> ResourceRef<'a> {
         if let Some(x) = args.name {
             builder.add_name(x);
         }
-        if let Some(x) = args.type_ {
-            builder.add_type_(x);
-        }
         if let Some(x) = args.did {
             builder.add_did(x);
         }
         if let Some(x) = args.id {
             builder.add_id(x);
+        }
+        if let Some(x) = args.type_ {
+            builder.add_type_(x);
         }
         if let Some(x) = args.account {
             builder.add_account(x);
@@ -17908,6 +18137,16 @@ impl<'a> ResourceRef<'a> {
                     ResourceRef::VT_ACCOUNT,
                     None,
                 )
+        }
+    }
+    #[inline]
+    pub fn type_(&self) -> Option<&'a str> {
+        // Safety:
+        // Created from valid Table for this object
+        // which contains a valid value in this slot
+        unsafe {
+            self._tab
+                .get::<::flatbuffers::ForwardsUOffset<&str>>(ResourceRef::VT_TYPE_, None)
         }
     }
     #[inline]
@@ -17937,16 +18176,6 @@ impl<'a> ResourceRef<'a> {
         }
     }
     #[inline]
-    pub fn type_(&self) -> Option<&'a str> {
-        // Safety:
-        // Created from valid Table for this object
-        // which contains a valid value in this slot
-        unsafe {
-            self._tab
-                .get::<::flatbuffers::ForwardsUOffset<&str>>(ResourceRef::VT_TYPE_, None)
-        }
-    }
-    #[inline]
     pub fn name(&self) -> Option<&'a str> {
         // Safety:
         // Created from valid Table for this object
@@ -17970,6 +18199,7 @@ impl ::flatbuffers::Verifiable for ResourceRef<'_> {
                 Self::VT_ACCOUNT,
                 false,
             )?
+            .visit_field::<::flatbuffers::ForwardsUOffset<&str>>("type_", Self::VT_TYPE_, false)?
             .visit_field::<::flatbuffers::ForwardsUOffset<::flatbuffers::Vector<'_, u8>>>(
                 "id",
                 Self::VT_ID,
@@ -17980,7 +18210,6 @@ impl ::flatbuffers::Verifiable for ResourceRef<'_> {
                 Self::VT_DID,
                 false,
             )?
-            .visit_field::<::flatbuffers::ForwardsUOffset<&str>>("type_", Self::VT_TYPE_, false)?
             .visit_field::<::flatbuffers::ForwardsUOffset<&str>>("name", Self::VT_NAME, false)?
             .finish();
         Ok(())
@@ -17988,9 +18217,9 @@ impl ::flatbuffers::Verifiable for ResourceRef<'_> {
 }
 pub struct ResourceRefArgs<'a> {
     pub account: Option<::flatbuffers::WIPOffset<ResourceOwnerRef<'a>>>,
+    pub type_: Option<::flatbuffers::WIPOffset<&'a str>>,
     pub id: Option<::flatbuffers::WIPOffset<::flatbuffers::Vector<'a, u8>>>,
     pub did: Option<::flatbuffers::WIPOffset<::flatbuffers::Vector<'a, u8>>>,
-    pub type_: Option<::flatbuffers::WIPOffset<&'a str>>,
     pub name: Option<::flatbuffers::WIPOffset<&'a str>>,
 }
 impl<'a> Default for ResourceRefArgs<'a> {
@@ -17998,9 +18227,9 @@ impl<'a> Default for ResourceRefArgs<'a> {
     fn default() -> Self {
         ResourceRefArgs {
             account: None,
+            type_: None,
             id: None,
             did: None,
-            type_: None,
             name: None,
         }
     }
@@ -18020,6 +18249,11 @@ impl<'a: 'b, 'b, A: ::flatbuffers::Allocator + 'a> ResourceRefBuilder<'a, 'b, A>
             );
     }
     #[inline]
+    pub fn add_type_(&mut self, type_: ::flatbuffers::WIPOffset<&'b str>) {
+        self.fbb_
+            .push_slot_always::<::flatbuffers::WIPOffset<_>>(ResourceRef::VT_TYPE_, type_);
+    }
+    #[inline]
     pub fn add_id(&mut self, id: ::flatbuffers::WIPOffset<::flatbuffers::Vector<'b, u8>>) {
         self.fbb_
             .push_slot_always::<::flatbuffers::WIPOffset<_>>(ResourceRef::VT_ID, id);
@@ -18028,11 +18262,6 @@ impl<'a: 'b, 'b, A: ::flatbuffers::Allocator + 'a> ResourceRefBuilder<'a, 'b, A>
     pub fn add_did(&mut self, did: ::flatbuffers::WIPOffset<::flatbuffers::Vector<'b, u8>>) {
         self.fbb_
             .push_slot_always::<::flatbuffers::WIPOffset<_>>(ResourceRef::VT_DID, did);
-    }
-    #[inline]
-    pub fn add_type_(&mut self, type_: ::flatbuffers::WIPOffset<&'b str>) {
-        self.fbb_
-            .push_slot_always::<::flatbuffers::WIPOffset<_>>(ResourceRef::VT_TYPE_, type_);
     }
     #[inline]
     pub fn add_name(&mut self, name: ::flatbuffers::WIPOffset<&'b str>) {
@@ -18060,9 +18289,9 @@ impl ::core::fmt::Debug for ResourceRef<'_> {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         let mut ds = f.debug_struct("ResourceRef");
         ds.field("account", &self.account());
+        ds.field("type_", &self.type_());
         ds.field("id", &self.id());
         ds.field("did", &self.did());
-        ds.field("type_", &self.type_());
         ds.field("name", &self.name());
         ds.finish()
     }
@@ -33521,8 +33750,8 @@ impl<'a> ::flatbuffers::Follow<'a> for PrincipalHandle<'a> {
 }
 
 impl<'a> PrincipalHandle<'a> {
-    pub const VT_TYPE_: ::flatbuffers::VOffsetT = 4;
-    pub const VT_ACCOUNT: ::flatbuffers::VOffsetT = 6;
+    pub const VT_ACCOUNT: ::flatbuffers::VOffsetT = 4;
+    pub const VT_TYPE_: ::flatbuffers::VOffsetT = 6;
     pub const VT_ID: ::flatbuffers::VOffsetT = 8;
     pub const VT_DID: ::flatbuffers::VOffsetT = 10;
     pub const VT_NAME: ::flatbuffers::VOffsetT = 12;
@@ -33551,25 +33780,15 @@ impl<'a> PrincipalHandle<'a> {
         if let Some(x) = args.id {
             builder.add_id(x);
         }
-        if let Some(x) = args.account {
-            builder.add_account(x);
-        }
         if let Some(x) = args.type_ {
             builder.add_type_(x);
+        }
+        if let Some(x) = args.account {
+            builder.add_account(x);
         }
         builder.finish()
     }
 
-    #[inline]
-    pub fn type_(&self) -> Option<&'a str> {
-        // Safety:
-        // Created from valid Table for this object
-        // which contains a valid value in this slot
-        unsafe {
-            self._tab
-                .get::<::flatbuffers::ForwardsUOffset<&str>>(PrincipalHandle::VT_TYPE_, None)
-        }
-    }
     #[inline]
     pub fn account(&self) -> Option<ResourceOwnerHandle<'a>> {
         // Safety:
@@ -33581,6 +33800,16 @@ impl<'a> PrincipalHandle<'a> {
                     PrincipalHandle::VT_ACCOUNT,
                     None,
                 )
+        }
+    }
+    #[inline]
+    pub fn type_(&self) -> Option<&'a str> {
+        // Safety:
+        // Created from valid Table for this object
+        // which contains a valid value in this slot
+        unsafe {
+            self._tab
+                .get::<::flatbuffers::ForwardsUOffset<&str>>(PrincipalHandle::VT_TYPE_, None)
         }
     }
     #[inline]
@@ -33628,12 +33857,12 @@ impl ::flatbuffers::Verifiable for PrincipalHandle<'_> {
         pos: usize,
     ) -> Result<(), ::flatbuffers::InvalidFlatbuffer> {
         v.visit_table(pos)?
-            .visit_field::<::flatbuffers::ForwardsUOffset<&str>>("type_", Self::VT_TYPE_, false)?
             .visit_field::<::flatbuffers::ForwardsUOffset<ResourceOwnerHandle>>(
                 "account",
                 Self::VT_ACCOUNT,
                 false,
             )?
+            .visit_field::<::flatbuffers::ForwardsUOffset<&str>>("type_", Self::VT_TYPE_, false)?
             .visit_field::<::flatbuffers::ForwardsUOffset<::flatbuffers::Vector<'_, u8>>>(
                 "id",
                 Self::VT_ID,
@@ -33650,8 +33879,8 @@ impl ::flatbuffers::Verifiable for PrincipalHandle<'_> {
     }
 }
 pub struct PrincipalHandleArgs<'a> {
-    pub type_: Option<::flatbuffers::WIPOffset<&'a str>>,
     pub account: Option<::flatbuffers::WIPOffset<ResourceOwnerHandle<'a>>>,
+    pub type_: Option<::flatbuffers::WIPOffset<&'a str>>,
     pub id: Option<::flatbuffers::WIPOffset<::flatbuffers::Vector<'a, u8>>>,
     pub did: Option<::flatbuffers::WIPOffset<::flatbuffers::Vector<'a, u8>>>,
     pub name: Option<::flatbuffers::WIPOffset<&'a str>>,
@@ -33660,8 +33889,8 @@ impl<'a> Default for PrincipalHandleArgs<'a> {
     #[inline]
     fn default() -> Self {
         PrincipalHandleArgs {
-            type_: None,
             account: None,
+            type_: None,
             id: None,
             did: None,
             name: None,
@@ -33675,17 +33904,17 @@ pub struct PrincipalHandleBuilder<'a: 'b, 'b, A: ::flatbuffers::Allocator + 'a> 
 }
 impl<'a: 'b, 'b, A: ::flatbuffers::Allocator + 'a> PrincipalHandleBuilder<'a, 'b, A> {
     #[inline]
-    pub fn add_type_(&mut self, type_: ::flatbuffers::WIPOffset<&'b str>) {
-        self.fbb_
-            .push_slot_always::<::flatbuffers::WIPOffset<_>>(PrincipalHandle::VT_TYPE_, type_);
-    }
-    #[inline]
     pub fn add_account(&mut self, account: ::flatbuffers::WIPOffset<ResourceOwnerHandle<'b>>) {
         self.fbb_
             .push_slot_always::<::flatbuffers::WIPOffset<ResourceOwnerHandle>>(
                 PrincipalHandle::VT_ACCOUNT,
                 account,
             );
+    }
+    #[inline]
+    pub fn add_type_(&mut self, type_: ::flatbuffers::WIPOffset<&'b str>) {
+        self.fbb_
+            .push_slot_always::<::flatbuffers::WIPOffset<_>>(PrincipalHandle::VT_TYPE_, type_);
     }
     #[inline]
     pub fn add_id(&mut self, id: ::flatbuffers::WIPOffset<::flatbuffers::Vector<'b, u8>>) {
@@ -33722,8 +33951,8 @@ impl<'a: 'b, 'b, A: ::flatbuffers::Allocator + 'a> PrincipalHandleBuilder<'a, 'b
 impl ::core::fmt::Debug for PrincipalHandle<'_> {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         let mut ds = f.debug_struct("PrincipalHandle");
-        ds.field("type_", &self.type_());
         ds.field("account", &self.account());
+        ds.field("type_", &self.type_());
         ds.field("id", &self.id());
         ds.field("did", &self.did());
         ds.field("name", &self.name());
@@ -42135,16 +42364,16 @@ impl ::core::fmt::Debug for FlowStatus<'_> {
         ds.finish()
     }
 }
-pub enum SubjectRefResourceOffset {}
+pub enum SubjectRefPrincipalOffset {}
 #[derive(Copy, Clone, PartialEq)]
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-pub struct SubjectRefResource<'a> {
+pub struct SubjectRefPrincipal<'a> {
     pub _tab: ::flatbuffers::Table<'a>,
 }
 
-impl<'a> ::flatbuffers::Follow<'a> for SubjectRefResource<'a> {
-    type Inner = SubjectRefResource<'a>;
+impl<'a> ::flatbuffers::Follow<'a> for SubjectRefPrincipal<'a> {
+    type Inner = SubjectRefPrincipal<'a>;
     #[inline]
     unsafe fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
         Self {
@@ -42153,7 +42382,7 @@ impl<'a> ::flatbuffers::Follow<'a> for SubjectRefResource<'a> {
     }
 }
 
-impl<'a> SubjectRefResource<'a> {
+impl<'a> SubjectRefPrincipal<'a> {
     pub const VT_TYPE_: ::flatbuffers::VOffsetT = 4;
     pub const VT_ACCOUNT: ::flatbuffers::VOffsetT = 6;
     pub const VT_ID: ::flatbuffers::VOffsetT = 8;
@@ -42162,7 +42391,7 @@ impl<'a> SubjectRefResource<'a> {
 
     #[inline]
     pub unsafe fn init_from_table(table: ::flatbuffers::Table<'a>) -> Self {
-        SubjectRefResource { _tab: table }
+        SubjectRefPrincipal { _tab: table }
     }
     #[allow(unused_mut)]
     pub fn create<
@@ -42172,9 +42401,9 @@ impl<'a> SubjectRefResource<'a> {
         A: ::flatbuffers::Allocator + 'bldr,
     >(
         _fbb: &'mut_bldr mut ::flatbuffers::FlatBufferBuilder<'bldr, A>,
-        args: &'args SubjectRefResourceArgs<'args>,
-    ) -> ::flatbuffers::WIPOffset<SubjectRefResource<'bldr>> {
-        let mut builder = SubjectRefResourceBuilder::new(_fbb);
+        args: &'args SubjectRefPrincipalArgs<'args>,
+    ) -> ::flatbuffers::WIPOffset<SubjectRefPrincipal<'bldr>> {
+        let mut builder = SubjectRefPrincipalBuilder::new(_fbb);
         if let Some(x) = args.name {
             builder.add_name(x);
         }
@@ -42200,7 +42429,7 @@ impl<'a> SubjectRefResource<'a> {
         // which contains a valid value in this slot
         unsafe {
             self._tab
-                .get::<::flatbuffers::ForwardsUOffset<&str>>(SubjectRefResource::VT_TYPE_, None)
+                .get::<::flatbuffers::ForwardsUOffset<&str>>(SubjectRefPrincipal::VT_TYPE_, None)
         }
     }
     #[inline]
@@ -42211,7 +42440,7 @@ impl<'a> SubjectRefResource<'a> {
         unsafe {
             self._tab
                 .get::<::flatbuffers::ForwardsUOffset<ResourceOwnerRef>>(
-                    SubjectRefResource::VT_ACCOUNT,
+                    SubjectRefPrincipal::VT_ACCOUNT,
                     None,
                 )
         }
@@ -42224,7 +42453,7 @@ impl<'a> SubjectRefResource<'a> {
         unsafe {
             self._tab
                 .get::<::flatbuffers::ForwardsUOffset<::flatbuffers::Vector<'a, u8>>>(
-                    SubjectRefResource::VT_ID,
+                    SubjectRefPrincipal::VT_ID,
                     None,
                 )
         }
@@ -42237,7 +42466,7 @@ impl<'a> SubjectRefResource<'a> {
         unsafe {
             self._tab
                 .get::<::flatbuffers::ForwardsUOffset<::flatbuffers::Vector<'a, u8>>>(
-                    SubjectRefResource::VT_DID,
+                    SubjectRefPrincipal::VT_DID,
                     None,
                 )
         }
@@ -42249,12 +42478,12 @@ impl<'a> SubjectRefResource<'a> {
         // which contains a valid value in this slot
         unsafe {
             self._tab
-                .get::<::flatbuffers::ForwardsUOffset<&str>>(SubjectRefResource::VT_NAME, None)
+                .get::<::flatbuffers::ForwardsUOffset<&str>>(SubjectRefPrincipal::VT_NAME, None)
         }
     }
 }
 
-impl ::flatbuffers::Verifiable for SubjectRefResource<'_> {
+impl ::flatbuffers::Verifiable for SubjectRefPrincipal<'_> {
     #[inline]
     fn run_verifier(
         v: &mut ::flatbuffers::Verifier,
@@ -42282,17 +42511,17 @@ impl ::flatbuffers::Verifiable for SubjectRefResource<'_> {
         Ok(())
     }
 }
-pub struct SubjectRefResourceArgs<'a> {
+pub struct SubjectRefPrincipalArgs<'a> {
     pub type_: Option<::flatbuffers::WIPOffset<&'a str>>,
     pub account: Option<::flatbuffers::WIPOffset<ResourceOwnerRef<'a>>>,
     pub id: Option<::flatbuffers::WIPOffset<::flatbuffers::Vector<'a, u8>>>,
     pub did: Option<::flatbuffers::WIPOffset<::flatbuffers::Vector<'a, u8>>>,
     pub name: Option<::flatbuffers::WIPOffset<&'a str>>,
 }
-impl<'a> Default for SubjectRefResourceArgs<'a> {
+impl<'a> Default for SubjectRefPrincipalArgs<'a> {
     #[inline]
     fn default() -> Self {
-        SubjectRefResourceArgs {
+        SubjectRefPrincipalArgs {
             type_: None,
             account: None,
             id: None,
@@ -42302,63 +42531,238 @@ impl<'a> Default for SubjectRefResourceArgs<'a> {
     }
 }
 
-pub struct SubjectRefResourceBuilder<'a: 'b, 'b, A: ::flatbuffers::Allocator + 'a> {
+pub struct SubjectRefPrincipalBuilder<'a: 'b, 'b, A: ::flatbuffers::Allocator + 'a> {
     fbb_: &'b mut ::flatbuffers::FlatBufferBuilder<'a, A>,
     start_: ::flatbuffers::WIPOffset<::flatbuffers::TableUnfinishedWIPOffset>,
 }
-impl<'a: 'b, 'b, A: ::flatbuffers::Allocator + 'a> SubjectRefResourceBuilder<'a, 'b, A> {
+impl<'a: 'b, 'b, A: ::flatbuffers::Allocator + 'a> SubjectRefPrincipalBuilder<'a, 'b, A> {
     #[inline]
     pub fn add_type_(&mut self, type_: ::flatbuffers::WIPOffset<&'b str>) {
         self.fbb_
-            .push_slot_always::<::flatbuffers::WIPOffset<_>>(SubjectRefResource::VT_TYPE_, type_);
+            .push_slot_always::<::flatbuffers::WIPOffset<_>>(SubjectRefPrincipal::VT_TYPE_, type_);
     }
     #[inline]
     pub fn add_account(&mut self, account: ::flatbuffers::WIPOffset<ResourceOwnerRef<'b>>) {
         self.fbb_
             .push_slot_always::<::flatbuffers::WIPOffset<ResourceOwnerRef>>(
-                SubjectRefResource::VT_ACCOUNT,
+                SubjectRefPrincipal::VT_ACCOUNT,
                 account,
             );
     }
     #[inline]
     pub fn add_id(&mut self, id: ::flatbuffers::WIPOffset<::flatbuffers::Vector<'b, u8>>) {
         self.fbb_
-            .push_slot_always::<::flatbuffers::WIPOffset<_>>(SubjectRefResource::VT_ID, id);
+            .push_slot_always::<::flatbuffers::WIPOffset<_>>(SubjectRefPrincipal::VT_ID, id);
     }
     #[inline]
     pub fn add_did(&mut self, did: ::flatbuffers::WIPOffset<::flatbuffers::Vector<'b, u8>>) {
         self.fbb_
-            .push_slot_always::<::flatbuffers::WIPOffset<_>>(SubjectRefResource::VT_DID, did);
+            .push_slot_always::<::flatbuffers::WIPOffset<_>>(SubjectRefPrincipal::VT_DID, did);
     }
     #[inline]
     pub fn add_name(&mut self, name: ::flatbuffers::WIPOffset<&'b str>) {
         self.fbb_
-            .push_slot_always::<::flatbuffers::WIPOffset<_>>(SubjectRefResource::VT_NAME, name);
+            .push_slot_always::<::flatbuffers::WIPOffset<_>>(SubjectRefPrincipal::VT_NAME, name);
     }
     #[inline]
     pub fn new(
         _fbb: &'b mut ::flatbuffers::FlatBufferBuilder<'a, A>,
-    ) -> SubjectRefResourceBuilder<'a, 'b, A> {
+    ) -> SubjectRefPrincipalBuilder<'a, 'b, A> {
         let start = _fbb.start_table();
-        SubjectRefResourceBuilder {
+        SubjectRefPrincipalBuilder {
             fbb_: _fbb,
             start_: start,
         }
     }
     #[inline]
-    pub fn finish(self) -> ::flatbuffers::WIPOffset<SubjectRefResource<'a>> {
+    pub fn finish(self) -> ::flatbuffers::WIPOffset<SubjectRefPrincipal<'a>> {
         let o = self.fbb_.end_table(self.start_);
         ::flatbuffers::WIPOffset::new(o.value())
     }
 }
 
-impl ::core::fmt::Debug for SubjectRefResource<'_> {
+impl ::core::fmt::Debug for SubjectRefPrincipal<'_> {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
-        let mut ds = f.debug_struct("SubjectRefResource");
+        let mut ds = f.debug_struct("SubjectRefPrincipal");
         ds.field("type_", &self.type_());
         ds.field("account", &self.account());
         ds.field("id", &self.id());
         ds.field("did", &self.did());
+        ds.field("name", &self.name());
+        ds.finish()
+    }
+}
+pub enum SubjectRefGroupOffset {}
+#[derive(Copy, Clone, PartialEq)]
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+pub struct SubjectRefGroup<'a> {
+    pub _tab: ::flatbuffers::Table<'a>,
+}
+
+impl<'a> ::flatbuffers::Follow<'a> for SubjectRefGroup<'a> {
+    type Inner = SubjectRefGroup<'a>;
+    #[inline]
+    unsafe fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
+        Self {
+            _tab: unsafe { ::flatbuffers::Table::new(buf, loc) },
+        }
+    }
+}
+
+impl<'a> SubjectRefGroup<'a> {
+    pub const VT_ACCOUNT: ::flatbuffers::VOffsetT = 4;
+    pub const VT_ID: ::flatbuffers::VOffsetT = 6;
+    pub const VT_NAME: ::flatbuffers::VOffsetT = 8;
+
+    #[inline]
+    pub unsafe fn init_from_table(table: ::flatbuffers::Table<'a>) -> Self {
+        SubjectRefGroup { _tab: table }
+    }
+    #[allow(unused_mut)]
+    pub fn create<
+        'bldr: 'args,
+        'args: 'mut_bldr,
+        'mut_bldr,
+        A: ::flatbuffers::Allocator + 'bldr,
+    >(
+        _fbb: &'mut_bldr mut ::flatbuffers::FlatBufferBuilder<'bldr, A>,
+        args: &'args SubjectRefGroupArgs<'args>,
+    ) -> ::flatbuffers::WIPOffset<SubjectRefGroup<'bldr>> {
+        let mut builder = SubjectRefGroupBuilder::new(_fbb);
+        if let Some(x) = args.name {
+            builder.add_name(x);
+        }
+        if let Some(x) = args.id {
+            builder.add_id(x);
+        }
+        if let Some(x) = args.account {
+            builder.add_account(x);
+        }
+        builder.finish()
+    }
+
+    #[inline]
+    pub fn account(&self) -> Option<ResourceOwnerRef<'a>> {
+        // Safety:
+        // Created from valid Table for this object
+        // which contains a valid value in this slot
+        unsafe {
+            self._tab
+                .get::<::flatbuffers::ForwardsUOffset<ResourceOwnerRef>>(
+                    SubjectRefGroup::VT_ACCOUNT,
+                    None,
+                )
+        }
+    }
+    #[inline]
+    pub fn id(&self) -> Option<::flatbuffers::Vector<'a, u8>> {
+        // Safety:
+        // Created from valid Table for this object
+        // which contains a valid value in this slot
+        unsafe {
+            self._tab
+                .get::<::flatbuffers::ForwardsUOffset<::flatbuffers::Vector<'a, u8>>>(
+                    SubjectRefGroup::VT_ID,
+                    None,
+                )
+        }
+    }
+    #[inline]
+    pub fn name(&self) -> Option<&'a str> {
+        // Safety:
+        // Created from valid Table for this object
+        // which contains a valid value in this slot
+        unsafe {
+            self._tab
+                .get::<::flatbuffers::ForwardsUOffset<&str>>(SubjectRefGroup::VT_NAME, None)
+        }
+    }
+}
+
+impl ::flatbuffers::Verifiable for SubjectRefGroup<'_> {
+    #[inline]
+    fn run_verifier(
+        v: &mut ::flatbuffers::Verifier,
+        pos: usize,
+    ) -> Result<(), ::flatbuffers::InvalidFlatbuffer> {
+        v.visit_table(pos)?
+            .visit_field::<::flatbuffers::ForwardsUOffset<ResourceOwnerRef>>(
+                "account",
+                Self::VT_ACCOUNT,
+                false,
+            )?
+            .visit_field::<::flatbuffers::ForwardsUOffset<::flatbuffers::Vector<'_, u8>>>(
+                "id",
+                Self::VT_ID,
+                false,
+            )?
+            .visit_field::<::flatbuffers::ForwardsUOffset<&str>>("name", Self::VT_NAME, false)?
+            .finish();
+        Ok(())
+    }
+}
+pub struct SubjectRefGroupArgs<'a> {
+    pub account: Option<::flatbuffers::WIPOffset<ResourceOwnerRef<'a>>>,
+    pub id: Option<::flatbuffers::WIPOffset<::flatbuffers::Vector<'a, u8>>>,
+    pub name: Option<::flatbuffers::WIPOffset<&'a str>>,
+}
+impl<'a> Default for SubjectRefGroupArgs<'a> {
+    #[inline]
+    fn default() -> Self {
+        SubjectRefGroupArgs {
+            account: None,
+            id: None,
+            name: None,
+        }
+    }
+}
+
+pub struct SubjectRefGroupBuilder<'a: 'b, 'b, A: ::flatbuffers::Allocator + 'a> {
+    fbb_: &'b mut ::flatbuffers::FlatBufferBuilder<'a, A>,
+    start_: ::flatbuffers::WIPOffset<::flatbuffers::TableUnfinishedWIPOffset>,
+}
+impl<'a: 'b, 'b, A: ::flatbuffers::Allocator + 'a> SubjectRefGroupBuilder<'a, 'b, A> {
+    #[inline]
+    pub fn add_account(&mut self, account: ::flatbuffers::WIPOffset<ResourceOwnerRef<'b>>) {
+        self.fbb_
+            .push_slot_always::<::flatbuffers::WIPOffset<ResourceOwnerRef>>(
+                SubjectRefGroup::VT_ACCOUNT,
+                account,
+            );
+    }
+    #[inline]
+    pub fn add_id(&mut self, id: ::flatbuffers::WIPOffset<::flatbuffers::Vector<'b, u8>>) {
+        self.fbb_
+            .push_slot_always::<::flatbuffers::WIPOffset<_>>(SubjectRefGroup::VT_ID, id);
+    }
+    #[inline]
+    pub fn add_name(&mut self, name: ::flatbuffers::WIPOffset<&'b str>) {
+        self.fbb_
+            .push_slot_always::<::flatbuffers::WIPOffset<_>>(SubjectRefGroup::VT_NAME, name);
+    }
+    #[inline]
+    pub fn new(
+        _fbb: &'b mut ::flatbuffers::FlatBufferBuilder<'a, A>,
+    ) -> SubjectRefGroupBuilder<'a, 'b, A> {
+        let start = _fbb.start_table();
+        SubjectRefGroupBuilder {
+            fbb_: _fbb,
+            start_: start,
+        }
+    }
+    #[inline]
+    pub fn finish(self) -> ::flatbuffers::WIPOffset<SubjectRefGroup<'a>> {
+        let o = self.fbb_.end_table(self.start_);
+        ::flatbuffers::WIPOffset::new(o.value())
+    }
+}
+
+impl ::core::fmt::Debug for SubjectRefGroup<'_> {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        let mut ds = f.debug_struct("SubjectRefGroup");
+        ds.field("account", &self.account());
+        ds.field("id", &self.id());
         ds.field("name", &self.name());
         ds.finish()
     }
@@ -42684,13 +43088,28 @@ impl<'a> SubjectRefWrapper<'a> {
     }
     #[inline]
     #[allow(non_snake_case)]
-    pub fn value_as_subject_ref_resource(&self) -> Option<SubjectRefResource<'a>> {
-        if self.value_type() == SubjectRef::SubjectRefResource {
+    pub fn value_as_subject_ref_principal(&self) -> Option<SubjectRefPrincipal<'a>> {
+        if self.value_type() == SubjectRef::SubjectRefPrincipal {
             self.value().map(|t| {
                 // Safety:
                 // Created from a valid Table for this object
                 // Which contains a valid union in this slot
-                unsafe { SubjectRefResource::init_from_table(t) }
+                unsafe { SubjectRefPrincipal::init_from_table(t) }
+            })
+        } else {
+            None
+        }
+    }
+
+    #[inline]
+    #[allow(non_snake_case)]
+    pub fn value_as_subject_ref_group(&self) -> Option<SubjectRefGroup<'a>> {
+        if self.value_type() == SubjectRef::SubjectRefGroup {
+            self.value().map(|t| {
+                // Safety:
+                // Created from a valid Table for this object
+                // Which contains a valid union in this slot
+                unsafe { SubjectRefGroup::init_from_table(t) }
             })
         } else {
             None
@@ -42752,7 +43171,8 @@ impl ::flatbuffers::Verifiable for SubjectRefWrapper<'_> {
         v.visit_table(pos)?
      .visit_union::<SubjectRef, _>("value_type", Self::VT_VALUE_TYPE, "value", Self::VT_VALUE, false, |key, v, pos| {
         match key {
-          SubjectRef::SubjectRefResource => v.verify_union_variant::<::flatbuffers::ForwardsUOffset<SubjectRefResource>>("SubjectRef::SubjectRefResource", pos),
+          SubjectRef::SubjectRefPrincipal => v.verify_union_variant::<::flatbuffers::ForwardsUOffset<SubjectRefPrincipal>>("SubjectRef::SubjectRefPrincipal", pos),
+          SubjectRef::SubjectRefGroup => v.verify_union_variant::<::flatbuffers::ForwardsUOffset<SubjectRefGroup>>("SubjectRef::SubjectRefGroup", pos),
           SubjectRef::SubjectRefAuthenticated => v.verify_union_variant::<::flatbuffers::ForwardsUOffset<SubjectRefAuthenticated>>("SubjectRef::SubjectRefAuthenticated", pos),
           SubjectRef::SubjectRefAnonymous => v.verify_union_variant::<::flatbuffers::ForwardsUOffset<SubjectRefAnonymous>>("SubjectRef::SubjectRefAnonymous", pos),
           SubjectRef::SubjectRefEveryone => v.verify_union_variant::<::flatbuffers::ForwardsUOffset<SubjectRefEveryone>>("SubjectRef::SubjectRefEveryone", pos),
@@ -42817,8 +43237,18 @@ impl ::core::fmt::Debug for SubjectRefWrapper<'_> {
         let mut ds = f.debug_struct("SubjectRefWrapper");
         ds.field("value_type", &self.value_type());
         match self.value_type() {
-            SubjectRef::SubjectRefResource => {
-                if let Some(x) = self.value_as_subject_ref_resource() {
+            SubjectRef::SubjectRefPrincipal => {
+                if let Some(x) = self.value_as_subject_ref_principal() {
+                    ds.field("value", &x)
+                } else {
+                    ds.field(
+                        "value",
+                        &"InvalidFlatbuffer: Union discriminant does not match value.",
+                    )
+                }
+            }
+            SubjectRef::SubjectRefGroup => {
+                if let Some(x) = self.value_as_subject_ref_group() {
                     ds.field("value", &x)
                 } else {
                     ds.field(
@@ -43062,13 +43492,28 @@ impl<'a> SubjectHandleWrapper<'a> {
     }
     #[inline]
     #[allow(non_snake_case)]
-    pub fn value_as_subject_handle_resource(&self) -> Option<SubjectHandleResource<'a>> {
-        if self.value_type() == SubjectHandle::SubjectHandleResource {
+    pub fn value_as_subject_handle_principal(&self) -> Option<SubjectHandlePrincipal<'a>> {
+        if self.value_type() == SubjectHandle::SubjectHandlePrincipal {
             self.value().map(|t| {
                 // Safety:
                 // Created from a valid Table for this object
                 // Which contains a valid union in this slot
-                unsafe { SubjectHandleResource::init_from_table(t) }
+                unsafe { SubjectHandlePrincipal::init_from_table(t) }
+            })
+        } else {
+            None
+        }
+    }
+
+    #[inline]
+    #[allow(non_snake_case)]
+    pub fn value_as_subject_handle_group(&self) -> Option<SubjectHandleGroup<'a>> {
+        if self.value_type() == SubjectHandle::SubjectHandleGroup {
+            self.value().map(|t| {
+                // Safety:
+                // Created from a valid Table for this object
+                // Which contains a valid union in this slot
+                unsafe { SubjectHandleGroup::init_from_table(t) }
             })
         } else {
             None
@@ -43130,7 +43575,8 @@ impl ::flatbuffers::Verifiable for SubjectHandleWrapper<'_> {
         v.visit_table(pos)?
      .visit_union::<SubjectHandle, _>("value_type", Self::VT_VALUE_TYPE, "value", Self::VT_VALUE, false, |key, v, pos| {
         match key {
-          SubjectHandle::SubjectHandleResource => v.verify_union_variant::<::flatbuffers::ForwardsUOffset<SubjectHandleResource>>("SubjectHandle::SubjectHandleResource", pos),
+          SubjectHandle::SubjectHandlePrincipal => v.verify_union_variant::<::flatbuffers::ForwardsUOffset<SubjectHandlePrincipal>>("SubjectHandle::SubjectHandlePrincipal", pos),
+          SubjectHandle::SubjectHandleGroup => v.verify_union_variant::<::flatbuffers::ForwardsUOffset<SubjectHandleGroup>>("SubjectHandle::SubjectHandleGroup", pos),
           SubjectHandle::SubjectHandleAuthenticated => v.verify_union_variant::<::flatbuffers::ForwardsUOffset<SubjectHandleAuthenticated>>("SubjectHandle::SubjectHandleAuthenticated", pos),
           SubjectHandle::SubjectHandleAnonymous => v.verify_union_variant::<::flatbuffers::ForwardsUOffset<SubjectHandleAnonymous>>("SubjectHandle::SubjectHandleAnonymous", pos),
           SubjectHandle::SubjectHandleEveryone => v.verify_union_variant::<::flatbuffers::ForwardsUOffset<SubjectHandleEveryone>>("SubjectHandle::SubjectHandleEveryone", pos),
@@ -43195,8 +43641,18 @@ impl ::core::fmt::Debug for SubjectHandleWrapper<'_> {
         let mut ds = f.debug_struct("SubjectHandleWrapper");
         ds.field("value_type", &self.value_type());
         match self.value_type() {
-            SubjectHandle::SubjectHandleResource => {
-                if let Some(x) = self.value_as_subject_handle_resource() {
+            SubjectHandle::SubjectHandlePrincipal => {
+                if let Some(x) = self.value_as_subject_handle_principal() {
+                    ds.field("value", &x)
+                } else {
+                    ds.field(
+                        "value",
+                        &"InvalidFlatbuffer: Union discriminant does not match value.",
+                    )
+                }
+            }
+            SubjectHandle::SubjectHandleGroup => {
+                if let Some(x) = self.value_as_subject_handle_group() {
                     ds.field("value", &x)
                 } else {
                     ds.field(
@@ -47759,13 +48215,28 @@ impl<'a> PolicyBindingSpecInput<'a> {
     }
     #[inline]
     #[allow(non_snake_case)]
-    pub fn subject_as_subject_ref_resource(&self) -> Option<SubjectRefResource<'a>> {
-        if self.subject_type() == SubjectRef::SubjectRefResource {
+    pub fn subject_as_subject_ref_principal(&self) -> Option<SubjectRefPrincipal<'a>> {
+        if self.subject_type() == SubjectRef::SubjectRefPrincipal {
             self.subject().map(|t| {
                 // Safety:
                 // Created from a valid Table for this object
                 // Which contains a valid union in this slot
-                unsafe { SubjectRefResource::init_from_table(t) }
+                unsafe { SubjectRefPrincipal::init_from_table(t) }
+            })
+        } else {
+            None
+        }
+    }
+
+    #[inline]
+    #[allow(non_snake_case)]
+    pub fn subject_as_subject_ref_group(&self) -> Option<SubjectRefGroup<'a>> {
+        if self.subject_type() == SubjectRef::SubjectRefGroup {
+            self.subject().map(|t| {
+                // Safety:
+                // Created from a valid Table for this object
+                // Which contains a valid union in this slot
+                unsafe { SubjectRefGroup::init_from_table(t) }
             })
         } else {
             None
@@ -47828,7 +48299,8 @@ impl ::flatbuffers::Verifiable for PolicyBindingSpecInput<'_> {
      .visit_field::<::flatbuffers::ForwardsUOffset<PolicyRef>>("policy", Self::VT_POLICY, false)?
      .visit_union::<SubjectRef, _>("subject_type", Self::VT_SUBJECT_TYPE, "subject", Self::VT_SUBJECT, false, |key, v, pos| {
         match key {
-          SubjectRef::SubjectRefResource => v.verify_union_variant::<::flatbuffers::ForwardsUOffset<SubjectRefResource>>("SubjectRef::SubjectRefResource", pos),
+          SubjectRef::SubjectRefPrincipal => v.verify_union_variant::<::flatbuffers::ForwardsUOffset<SubjectRefPrincipal>>("SubjectRef::SubjectRefPrincipal", pos),
+          SubjectRef::SubjectRefGroup => v.verify_union_variant::<::flatbuffers::ForwardsUOffset<SubjectRefGroup>>("SubjectRef::SubjectRefGroup", pos),
           SubjectRef::SubjectRefAuthenticated => v.verify_union_variant::<::flatbuffers::ForwardsUOffset<SubjectRefAuthenticated>>("SubjectRef::SubjectRefAuthenticated", pos),
           SubjectRef::SubjectRefAnonymous => v.verify_union_variant::<::flatbuffers::ForwardsUOffset<SubjectRefAnonymous>>("SubjectRef::SubjectRefAnonymous", pos),
           SubjectRef::SubjectRefEveryone => v.verify_union_variant::<::flatbuffers::ForwardsUOffset<SubjectRefEveryone>>("SubjectRef::SubjectRefEveryone", pos),
@@ -47920,8 +48392,18 @@ impl ::core::fmt::Debug for PolicyBindingSpecInput<'_> {
         ds.field("policy", &self.policy());
         ds.field("subject_type", &self.subject_type());
         match self.subject_type() {
-            SubjectRef::SubjectRefResource => {
-                if let Some(x) = self.subject_as_subject_ref_resource() {
+            SubjectRef::SubjectRefPrincipal => {
+                if let Some(x) = self.subject_as_subject_ref_principal() {
+                    ds.field("subject", &x)
+                } else {
+                    ds.field(
+                        "subject",
+                        &"InvalidFlatbuffer: Union discriminant does not match value.",
+                    )
+                }
+            }
+            SubjectRef::SubjectRefGroup => {
+                if let Some(x) = self.subject_as_subject_ref_group() {
                     ds.field("subject", &x)
                 } else {
                     ds.field(
@@ -48076,13 +48558,28 @@ impl<'a> PolicyBindingSpec<'a> {
     }
     #[inline]
     #[allow(non_snake_case)]
-    pub fn subject_as_subject_handle_resource(&self) -> Option<SubjectHandleResource<'a>> {
-        if self.subject_type() == SubjectHandle::SubjectHandleResource {
+    pub fn subject_as_subject_handle_principal(&self) -> Option<SubjectHandlePrincipal<'a>> {
+        if self.subject_type() == SubjectHandle::SubjectHandlePrincipal {
             self.subject().map(|t| {
                 // Safety:
                 // Created from a valid Table for this object
                 // Which contains a valid union in this slot
-                unsafe { SubjectHandleResource::init_from_table(t) }
+                unsafe { SubjectHandlePrincipal::init_from_table(t) }
+            })
+        } else {
+            None
+        }
+    }
+
+    #[inline]
+    #[allow(non_snake_case)]
+    pub fn subject_as_subject_handle_group(&self) -> Option<SubjectHandleGroup<'a>> {
+        if self.subject_type() == SubjectHandle::SubjectHandleGroup {
+            self.subject().map(|t| {
+                // Safety:
+                // Created from a valid Table for this object
+                // Which contains a valid union in this slot
+                unsafe { SubjectHandleGroup::init_from_table(t) }
             })
         } else {
             None
@@ -48147,7 +48644,8 @@ impl ::flatbuffers::Verifiable for PolicyBindingSpec<'_> {
      .visit_field::<::flatbuffers::ForwardsUOffset<ResourceHandle>>("policy", Self::VT_POLICY, false)?
      .visit_union::<SubjectHandle, _>("subject_type", Self::VT_SUBJECT_TYPE, "subject", Self::VT_SUBJECT, false, |key, v, pos| {
         match key {
-          SubjectHandle::SubjectHandleResource => v.verify_union_variant::<::flatbuffers::ForwardsUOffset<SubjectHandleResource>>("SubjectHandle::SubjectHandleResource", pos),
+          SubjectHandle::SubjectHandlePrincipal => v.verify_union_variant::<::flatbuffers::ForwardsUOffset<SubjectHandlePrincipal>>("SubjectHandle::SubjectHandlePrincipal", pos),
+          SubjectHandle::SubjectHandleGroup => v.verify_union_variant::<::flatbuffers::ForwardsUOffset<SubjectHandleGroup>>("SubjectHandle::SubjectHandleGroup", pos),
           SubjectHandle::SubjectHandleAuthenticated => v.verify_union_variant::<::flatbuffers::ForwardsUOffset<SubjectHandleAuthenticated>>("SubjectHandle::SubjectHandleAuthenticated", pos),
           SubjectHandle::SubjectHandleAnonymous => v.verify_union_variant::<::flatbuffers::ForwardsUOffset<SubjectHandleAnonymous>>("SubjectHandle::SubjectHandleAnonymous", pos),
           SubjectHandle::SubjectHandleEveryone => v.verify_union_variant::<::flatbuffers::ForwardsUOffset<SubjectHandleEveryone>>("SubjectHandle::SubjectHandleEveryone", pos),
@@ -48239,8 +48737,18 @@ impl ::core::fmt::Debug for PolicyBindingSpec<'_> {
         ds.field("policy", &self.policy());
         ds.field("subject_type", &self.subject_type());
         match self.subject_type() {
-            SubjectHandle::SubjectHandleResource => {
-                if let Some(x) = self.subject_as_subject_handle_resource() {
+            SubjectHandle::SubjectHandlePrincipal => {
+                if let Some(x) = self.subject_as_subject_handle_principal() {
+                    ds.field("subject", &x)
+                } else {
+                    ds.field(
+                        "subject",
+                        &"InvalidFlatbuffer: Union discriminant does not match value.",
+                    )
+                }
+            }
+            SubjectHandle::SubjectHandleGroup => {
+                if let Some(x) = self.subject_as_subject_handle_group() {
                     ds.field("subject", &x)
                 } else {
                     ds.field(

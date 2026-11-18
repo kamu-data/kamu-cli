@@ -502,6 +502,7 @@ fn serde_execute_transform_response() {
 fn test_flatbuffers_resource_selectors() {
     fn account_ref() -> opendatafabric_metadata::auth::ResourceOwnerRef {
         opendatafabric_metadata::auth::ResourceOwnerRef {
+            r#type: None,
             id: None,
             did: None,
             name: Some("alice".parse().unwrap()),

@@ -15,7 +15,7 @@ use crate::prelude::*;
 #[derive(SimpleObject, Debug, PartialEq, Eq)]
 pub struct DatasetState {
     /// Globally unique identity of the dataset
-    pub id: DatasetID<'static>,
+    pub id: DatasetDid<'static>,
 
     /// Alias to be used in the query
     pub alias: String,

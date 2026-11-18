@@ -187,6 +187,7 @@ mod tests {
 
     fn account() -> auth::ResourceOwnerRef {
         auth::ResourceOwnerRef {
+            r#type: None,
             id: None,
             did: Some(odf::AccountID::new_seeded_ed25519(b"test-account")),
             name: None,

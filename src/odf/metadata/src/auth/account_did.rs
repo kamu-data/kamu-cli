@@ -14,13 +14,13 @@ use crate::formats::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub const MAX_ACCOUNT_ID_STRING_REPR_LEN: usize = {
+pub const MAX_ACCOUNT_DID_STRING_REPR_LEN: usize = {
     let a = MAX_DID_CANONICAL_STRING_REPR_LEN;
     let b = MAX_DID_PKH_STRING_REPR_LEN;
     if a > b { a } else { b }
 };
 
-pub const MAX_ACCOUNT_ID_STRING_WITHOUT_DID_PREFIX_REPR_LEN: usize = {
+pub const MAX_ACCOUNT_DID_STRING_WITHOUT_DID_PREFIX_REPR_LEN: usize = {
     let a = MAX_DID_CANONICAL_STRING_REPR_LEN
         .checked_sub(DID_ODF_PREFIX.len())
         .unwrap();
@@ -34,20 +34,20 @@ pub const MAX_ACCOUNT_ID_STRING_WITHOUT_DID_PREFIX_REPR_LEN: usize = {
 
 /// Unique identifier of the account
 #[derive(Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
-pub enum AccountID {
+pub enum AccountDid {
     Odf(DidOdf),
     Pkh(DidPkh),
 }
 
-impl AccountID {
-    /// Creates `AccountID` from a generated key pair using cryptographically
+impl AccountDid {
+    /// Creates `AccountDid` from a generated key pair using cryptographically
     /// secure RNG
     pub fn new_generated_ed25519() -> (SigningKey, Self) {
         let (key, did) = DidOdf::new_generated_ed25519();
         (key, Self::Odf(did))
     }
 
-    /// For testing purposes only. Use [`AccountID::new_generated_ed25519`] for
+    /// For testing purposes only. Use [`AccountDid::new_generated_ed25519`] for
     /// cryptographically secure generation
     #[cfg(any(feature = "testing", test))]
     pub fn new_seeded_ed25519(seed: &[u8]) -> Self {
@@ -72,11 +72,11 @@ impl AccountID {
         }
     }
 
-    pub fn as_bytes(&self) -> AccountIDBytes<'_> {
-        AccountIDBytes(self)
+    pub fn as_bytes(&self) -> AccountDidBytes<'_> {
+        AccountDidBytes(self)
     }
 
-    /// Reads `AccountID` from canonical byte representation
+    /// Reads `AccountDid` from canonical byte representation
     #[expect(
         clippy::wildcard_enum_match_arm,
         reason = "Multicodec mirrors an open registry; only key codecs are decodable"
@@ -93,9 +93,9 @@ impl AccountID {
         }
     }
 
-    /// Parses `AccountID` from a canonical `did:odf:<multibase>`
+    /// Parses `AccountDid` from a canonical `did:odf:<multibase>`
     /// or `did:pkh:<account_id(CAIP-10)>` string
-    pub fn from_did_str(s: &str) -> Result<Self, AccountIdParseStrError> {
+    pub fn from_did_str(s: &str) -> Result<Self, AccountDidParseStrError> {
         if let Some(stripped) = s.strip_prefix(DID_ODF_PREFIX) {
             return Self::from_multibase_string(stripped).map_err(Into::into);
         }
@@ -104,12 +104,12 @@ impl AccountID {
             return Self::parse_caip10_account_id(stripped).map_err(Into::into);
         }
 
-        Err(AccountIdParseStrError::InvalidValueFormat {
+        Err(AccountDidParseStrError::InvalidValueFormat {
             value: s.to_string(),
         })
     }
 
-    pub fn parse_id_without_did_prefix(s: &str) -> Result<Self, AccountIdParseStrError> {
+    pub fn parse_id_without_did_prefix(s: &str) -> Result<Self, AccountDidParseStrError> {
         if let Ok(id) = Self::from_multibase_string(s) {
             return Ok(id);
         }
@@ -118,24 +118,24 @@ impl AccountID {
             return Ok(id);
         }
 
-        Err(AccountIdParseStrError::InvalidValueFormat {
+        Err(AccountDidParseStrError::InvalidValueFormat {
             value: s.to_string(),
         })
     }
 
-    /// Parses `AccountID` from a multibase string (without `did:odf:`) prefix
+    /// Parses `AccountDid` from a multibase string (without `did:odf:`) prefix
     pub fn from_multibase_string(s: &str) -> Result<Self, ParseError<DidOdf>> {
         Ok(Self::Odf(DidOdf::from_multibase(s)?))
     }
 
-    /// Parses `AccountID` from a CAIP-10 account ID string (without `did:pkh:`)
+    /// Parses `AccountDid` from a CAIP-10 account ID string (without `did:pkh:`)
     /// prefix
     pub fn parse_caip10_account_id(s: &str) -> Result<Self, DidPkhParseError> {
         Ok(Self::Pkh(DidPkh::parse_caip10_account_id(s)?))
     }
 
-    pub fn as_id_without_did_prefix(&self) -> IdWithoutDidPrefixFmt<'_> {
-        IdWithoutDidPrefixFmt { value: self }
+    pub fn as_id_without_did_prefix(&self) -> DidWithoutDidPrefixFmt<'_> {
+        DidWithoutDidPrefixFmt { value: self }
     }
 }
 
@@ -143,30 +143,31 @@ impl AccountID {
 
 #[expect(
     unused,
-    reason = "stub until `AccountID::as_bytes` gets a real byte representation (see `Deref` below)"
+    reason = "stub until `AccountDid::as_bytes` gets a real byte representation (see `Deref` \
+              below)"
 )]
-pub struct AccountIDBytes<'a>(&'a AccountID);
+pub struct AccountDidBytes<'a>(&'a AccountDid);
 
-impl std::ops::Deref for AccountIDBytes<'_> {
+impl std::ops::Deref for AccountDidBytes<'_> {
     type Target = [u8];
 
     fn deref(&self) -> &[u8] {
         // TODO: Consider implementing via `Multicodec::MultiDid` representation
-        unimplemented!("AccountID::as_bytes() is not yet implemented")
+        unimplemented!("AccountDid::as_bytes() is not yet implemented")
     }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct IdWithoutDidPrefixFmt<'a> {
-    value: &'a AccountID,
+pub struct DidWithoutDidPrefixFmt<'a> {
+    value: &'a AccountDid,
 }
 
-impl std::fmt::Display for IdWithoutDidPrefixFmt<'_> {
+impl std::fmt::Display for DidWithoutDidPrefixFmt<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self.value {
-            AccountID::Odf(odf) => write!(f, "{}", odf.as_multibase()),
-            AccountID::Pkh(pkh) => {
+            AccountDid::Odf(odf) => write!(f, "{}", odf.as_multibase()),
+            AccountDid::Pkh(pkh) => {
                 let wallet = pkh.wallet_address();
 
                 // NOTE: We explicitly use only the address part (w/o chain id (CAIP-2))
@@ -179,18 +180,18 @@ impl std::fmt::Display for IdWithoutDidPrefixFmt<'_> {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl AsStackString<MAX_ACCOUNT_ID_STRING_REPR_LEN> for AccountID {}
-impl AsStackString<MAX_ACCOUNT_ID_STRING_REPR_LEN> for &AccountID {}
+impl AsStackString<MAX_ACCOUNT_DID_STRING_REPR_LEN> for AccountDid {}
+impl AsStackString<MAX_ACCOUNT_DID_STRING_REPR_LEN> for &AccountDid {}
 
-impl AsStackString<MAX_ACCOUNT_ID_STRING_WITHOUT_DID_PREFIX_REPR_LEN>
-    for IdWithoutDidPrefixFmt<'_>
+impl AsStackString<MAX_ACCOUNT_DID_STRING_WITHOUT_DID_PREFIX_REPR_LEN>
+    for DidWithoutDidPrefixFmt<'_>
 {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(thiserror::Error, Debug)]
-pub enum AccountIdParseStrError {
+pub enum AccountDidParseStrError {
     #[error(transparent)]
     OdfParseError(#[from] ParseError<DidOdf>),
 
@@ -204,7 +205,7 @@ pub enum AccountIdParseStrError {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(thiserror::Error, Debug)]
-pub enum AccountIdParseBytesError {
+pub enum AccountDidParseBytesError {
     #[error(transparent)]
     OdfDeserializeError(#[from] DeserializeError<DidKey>),
 
@@ -214,7 +215,7 @@ pub enum AccountIdParseBytesError {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl Multiformat for AccountID {
+impl Multiformat for AccountDid {
     fn format_name() -> &'static str {
         "did:odf"
     }
@@ -222,50 +223,50 @@ impl Multiformat for AccountID {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl From<DidOdf> for AccountID {
+impl From<DidOdf> for AccountDid {
     fn from(did: DidOdf) -> Self {
         Self::Odf(did)
     }
 }
 
-impl From<DidKey> for AccountID {
+impl From<DidKey> for AccountDid {
     fn from(odf: DidKey) -> Self {
         Self::Odf(DidOdf::from(odf))
     }
 }
 
-impl From<DidPkh> for AccountID {
+impl From<DidPkh> for AccountDid {
     fn from(pkh: DidPkh) -> Self {
         Self::Pkh(pkh)
     }
 }
 
-impl From<AccountID> for Did {
-    fn from(value: AccountID) -> Self {
+impl From<AccountDid> for Did {
+    fn from(value: AccountDid) -> Self {
         match value {
-            AccountID::Odf(v) => Did::Odf(v),
-            AccountID::Pkh(v) => Did::Pkh(v),
+            AccountDid::Odf(v) => Did::Odf(v),
+            AccountDid::Pkh(v) => Did::Pkh(v),
         }
     }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl std::fmt::Debug for AccountID {
+impl std::fmt::Debug for AccountDid {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Odf(odf) => f
-                .debug_tuple(&format!("AccountID<{:?}>", Multicodec::Ed25519Pub))
+                .debug_tuple(&format!("AccountDid<{:?}>", Multicodec::Ed25519Pub))
                 .field(&odf.as_multibase())
                 .finish(),
-            Self::Pkh(pkh) => f.debug_tuple("AccountID").field(&pkh).finish(),
+            Self::Pkh(pkh) => f.debug_tuple("AccountDid").field(&pkh).finish(),
         }
     }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl std::fmt::Display for AccountID {
+impl std::fmt::Display for AccountDid {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Odf(odf) => {
@@ -282,7 +283,7 @@ impl std::fmt::Display for AccountID {
 // Serde
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl serde::Serialize for AccountID {
+impl serde::Serialize for AccountDid {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         match &self {
             Self::Odf(odf) => serializer.collect_str(&odf.as_did_str()),
@@ -291,38 +292,38 @@ impl serde::Serialize for AccountID {
     }
 }
 
-impl<'de> serde::Deserialize<'de> for AccountID {
+impl<'de> serde::Deserialize<'de> for AccountDid {
     fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        deserializer.deserialize_string(AccountIDSerdeVisitor)
+        deserializer.deserialize_string(AccountDidSerdeVisitor)
     }
 }
 
-struct AccountIDSerdeVisitor;
+struct AccountDidSerdeVisitor;
 
-impl serde::de::Visitor<'_> for AccountIDSerdeVisitor {
-    type Value = AccountID;
+impl serde::de::Visitor<'_> for AccountDidSerdeVisitor {
+    type Value = AccountDid;
 
     fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(formatter, "a AccountID string")
+        write!(formatter, "a AccountDid string")
     }
 
     fn visit_str<E: serde::de::Error>(self, v: &str) -> Result<Self::Value, E> {
-        AccountID::from_did_str(v).map_err(serde::de::Error::custom)
+        AccountDid::from_did_str(v).map_err(serde::de::Error::custom)
     }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[cfg(feature = "sqlx")]
-impl_sqlx!(AccountID);
+impl_sqlx!(AccountDid);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[cfg(feature = "utoipa")]
-impl utoipa::ToSchema for AccountID {}
+impl utoipa::ToSchema for AccountDid {}
 
 #[cfg(feature = "utoipa")]
-impl utoipa::PartialSchema for AccountID {
+impl utoipa::PartialSchema for AccountDid {
     fn schema() -> utoipa::openapi::RefOr<utoipa::openapi::schema::Schema> {
         use serde_json::json;
         use utoipa::openapi::schema::*;
@@ -331,9 +332,9 @@ impl utoipa::PartialSchema for AccountID {
             ObjectBuilder::new()
                 .schema_type(SchemaType::Type(Type::String))
                 .examples([
-                    json!(AccountID::new_seeded_ed25519(b"account")),
+                    json!(AccountDid::new_seeded_ed25519(b"account")),
                     json!(
-                        AccountID::parse_caip10_account_id(
+                        AccountDid::parse_caip10_account_id(
                             "eip155:1:0xb9c5714089478a327f09197987f16f9e5d936e8a"
                         )
                         .unwrap()
@@ -348,13 +349,13 @@ impl utoipa::PartialSchema for AccountID {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[cfg(feature = "schemars")]
-impl schemars::JsonSchema for AccountID {
+impl schemars::JsonSchema for AccountDid {
     fn schema_name() -> std::borrow::Cow<'static, str> {
-        "AccountID".into()
+        "AccountDid".into()
     }
 
     fn schema_id() -> std::borrow::Cow<'static, str> {
-        concat!(module_path!(), "::AccountID").into()
+        concat!(module_path!(), "::AccountDid").into()
     }
 
     fn json_schema(g: &mut schemars::SchemaGenerator) -> schemars::Schema {

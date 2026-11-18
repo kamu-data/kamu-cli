@@ -141,9 +141,9 @@ impl Datasets {
     pub async fn by_id(
         &self,
         ctx: &Context<'_>,
-        dataset_id: DatasetID<'_>,
+        dataset_id: DatasetDid<'_>,
     ) -> Result<Option<Dataset>> {
-        let dataset_id: odf::DatasetID = dataset_id.into();
+        let dataset_id: odf::metadata::datasets::DatasetDid = dataset_id.into();
 
         Self::by_dataset_ref(ctx, &dataset_id.into_local_ref()).await
     }
@@ -156,7 +156,7 @@ impl Datasets {
     async fn by_ids(
         &self,
         ctx: &Context<'_>,
-        dataset_ids: Vec<DatasetID<'_>>,
+        dataset_ids: Vec<DatasetDid<'_>>,
         #[graphql(
             desc = "Whether to skip unresolved datasets or return an error if one or more are \
                     missing"
@@ -260,13 +260,13 @@ impl Datasets {
     async fn by_account_id(
         &self,
         ctx: &Context<'_>,
-        account_id: AccountID<'_>,
+        account_id: AccountDid<'_>,
         page: Option<usize>,
         per_page: Option<usize>,
     ) -> Result<DatasetConnection> {
         let account_entity_data_loader = utils::get_account_entity_data_loader(ctx);
 
-        let account_id: odf::AccountID = account_id.into();
+        let account_id: odf::metadata::auth::AccountDid = account_id.into();
         let maybe_account = account_entity_data_loader
             .load_one(account_id)
             .await

@@ -36,7 +36,7 @@
         "id": {
           "anyOf": [
             {
-              "$ref": "#/$defs/AccountID"
+              "$ref": "#/$defs/AccountDid"
             },
             {
               "type": "null"
@@ -100,7 +100,7 @@
       ],
       "type": "object"
     },
-    "AccountID": {
+    "AccountDid": {
       "type": "string"
     },
     "AccountName": {

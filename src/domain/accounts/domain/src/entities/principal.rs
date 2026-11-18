@@ -43,14 +43,14 @@ impl Principal {
     pub fn handle(&self) -> Option<odf::metadata::auth::PrincipalHandle> {
         match self {
             Self::User(account_handle) => Some(odf::metadata::auth::PrincipalHandle {
-                r#type: odf::metadata::auth::User::schema().clone(),
+                r#type: odf::metadata::auth::User::type_uri().clone(),
                 account: None,
                 id: account_handle.id,
                 did: Some(account_handle.did.clone().into()),
                 name: account_handle.name.clone().into(),
             }),
             Self::Node => Some(odf::metadata::auth::PrincipalHandle {
-                r#type: odf::metadata::auth::Node::schema().clone(),
+                r#type: odf::metadata::auth::Node::type_uri().clone(),
                 account: None,
                 id: *NODE_PRINCIPAL_RESOURCE_ID,
                 did: None,
@@ -119,13 +119,13 @@ mod tests {
         let account_handle = subject.account_handle();
 
         let user = Principal::from(&subject).handle().unwrap();
-        assert_eq!(user.r#type, *odf::metadata::auth::User::schema());
+        assert_eq!(user.r#type, *odf::metadata::auth::User::type_uri());
         assert_eq!(user.id, account_handle.id);
         assert_eq!(user.did, Some(account_handle.did.clone().into()));
         assert_eq!(user.name.as_str(), "alice");
 
         let node = Principal::Node.handle().unwrap();
-        assert_eq!(node.r#type, *odf::metadata::auth::Node::schema());
+        assert_eq!(node.r#type, *odf::metadata::auth::Node::type_uri());
         assert_eq!(node.id, Account::seed_resource_id_from_name("node"));
         assert_eq!(node.did, None);
         assert_eq!(node.name.as_str(), "node");

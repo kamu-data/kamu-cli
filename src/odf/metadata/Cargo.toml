@@ -66,6 +66,10 @@ bitflags = { version = "2", default-features = false, features = [
     "serde",
 ] }
 bytes = { version = "1", default-features = false }
+cheap-clone = { version = "1", default-features = false, features = [
+    "derive",
+    "std",
+] }
 chrono = { version = "0.4", features = [
     "serde",
 ] }
@@ -81,29 +85,17 @@ thiserror = { version = "2", default-features = false, features = [
     "std",
 ] }
 
-like = { version = "0.3", default-features = false }
-sha3 = "0.12"
-ssi-caips = { version = "0.3", default-features = false, features = [
-    "eip",
+base64 = { version = "0.23", default-features = false, features = [
+    "std",
 ] }
-url = "2"
-uuid = { version = "1", default-features = false, features = [
-    "v4",
-    "v5",
-] }
-
-# Crypto
 ed25519-dalek = { version = "3", default-features = false, features = [
     "fast",
     "rand_core",
     "zeroize",
 ] }
-
-# Serialization
-base64 = { version = "0.23", default-features = false, features = [
-    "std",
-] }
 flatbuffers = "25"
+like = { version = "0.3", default-features = false }
+paste = { version = "1", default-features = false }
 serde = { version = "1", features = [
     "derive",
 ] }
@@ -115,6 +107,15 @@ serde_with = { version = "3", default-features = false, features = [
     "std",
 ] }
 serde_yaml = { package = "serde_yaml_ng", version = "0.10", default-features = false }
+sha3 = "0.12"
+ssi-caips = { version = "0.3", default-features = false, features = [
+    "eip",
+] }
+url = "2"
+uuid = { version = "1", default-features = false, features = [
+    "v4",
+    "v5",
+] }
 
 # Optional
 arrow = { optional = true, version = "59", default-features = false, features = [
@@ -144,3 +145,5 @@ hex = "0.4"
 indoc = "2"
 pretty_assertions = { version = "1" }
 rand = { version = "0.10" }
+rstest = { version = "0.27", default-features = false, features = [
+] }

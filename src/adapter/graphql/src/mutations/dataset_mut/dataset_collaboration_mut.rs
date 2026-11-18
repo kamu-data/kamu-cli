@@ -40,7 +40,7 @@ impl<'a> DatasetCollaborationMut<'a> {
     async fn set_role(
         &self,
         ctx: &Context<'_>,
-        account_id: AccountID<'_>,
+        account_id: AccountDid<'_>,
         role: DatasetAccessRole,
     ) -> Result<SetRoleResult> {
         let apply_account_dataset_relations_uc = from_catalog_n!(
@@ -65,7 +65,7 @@ impl<'a> DatasetCollaborationMut<'a> {
     async fn unset_roles(
         &self,
         ctx: &Context<'_>,
-        account_ids: Vec<AccountID<'_>>,
+        account_ids: Vec<AccountDid<'_>>,
     ) -> Result<UnsetRoleResult> {
         let unset_dataset_accounts_relations_uc = from_catalog_n!(
             ctx,
@@ -75,7 +75,7 @@ impl<'a> DatasetCollaborationMut<'a> {
         let odf_account_ids = account_ids
             .into_iter()
             .map(Into::into)
-            .collect::<Vec<odf::AccountID>>();
+            .collect::<Vec<odf::metadata::auth::AccountDid>>();
         let odf_account_ids_refs = odf_account_ids.iter().collect::<Vec<_>>();
 
         unset_dataset_accounts_relations_uc

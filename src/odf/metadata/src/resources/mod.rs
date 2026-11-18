@@ -10,12 +10,20 @@
 // Combine this module's types with generated DTOs
 pub use crate::dtos::resources::*;
 
+mod resource_handle_t;
 mod resource_identity;
+mod resource_ref_t;
+mod resource_registry;
 mod resource_selector;
+mod resource_type;
 mod resource_types;
 
+pub use resource_handle_t::*;
 pub use resource_identity::*;
+pub use resource_ref_t::*;
+pub use resource_registry::*;
 pub use resource_selector::*;
+pub use resource_type::*;
 pub use resource_types::*;
 
 pub trait IntoResourceRef: Into<ResourceRef> {}
