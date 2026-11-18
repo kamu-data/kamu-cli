@@ -136,11 +136,13 @@ registration treated as "off". Regroup instead:
 | Work with no transaction plus a step that needs one | The transactional step moves to the component that opens the transaction, as a `#[transactional_methodN]` injecting its own dependencies | `DatasetUpdateSteps::commit_sync` (the `SyncService` transfer holds none) |
 | An authorized operation plus a system path that skips authorization | The use case keeps only the authorized path; the shared work goes into a plain helper both callers build | `UpdateAccountUseCase` and `UpdateAccountUseCaseHelper` |
 | Core work plus an optional feature enabled by registration | The feature becomes its own component taking `Option<Arc<T>>` dependencies | `IngestEnvVarsResolver` |
-| A transaction-free component that needs one transactional write | That write becomes a small component with a `#[transactional_methodN]`, injected instead of a catalog | `PulledSeedStore` in the transfer protocols |
+| A transaction-free component that needs one transactional write | That write becomes a small component that opens the transaction, injected instead of a catalog | `PulledSeedStore` in the transfer protocols |
 | Branches whose dependencies differ (create versus update) | One transactional method per branch, each injecting only its own | `commit_sync_into_existing`, `commit_sync_into_new` |
 
-Holding a catalog is right to open transactions with `#[transactional_methodN]` (the method
-declares what it injects), in request handlers and agents that work on a per-request or
+Holding a catalog is right to open transactions with `transaction!` or `#[transactional_methodN]`
+(both declare what they inject; where each goes is in
+[database-transactions.md](../../../docs/internal/database-transactions.md#3-where-a-transaction-opens)),
+in request handlers and agents that work on a per-request or
 background catalog by design, and in a singleton that resolves repositories per call
 ([above](#singletons-must-not-depend-on-repositories)).
 
@@ -242,3 +244,4 @@ Do not re-propose these without new evidence.
 - Wiring components in tests (harness catalogs, per-account isolation): `kamu-test-harness`.
 - Which repositories and services exist per bounded context: `kamu-domain-design`.
 - Full-app catalog wiring lives in `src/app/cli/src/app.rs` and `database.rs`.
+- Opening and ending transactions, where they belong in an algorithm, the managers: [`docs/internal/database-transactions.md`](../../../docs/internal/database-transactions.md).

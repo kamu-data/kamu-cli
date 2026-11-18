@@ -10,8 +10,12 @@
 #![feature(iter_intersperse)]
 
 // Re-exports
+pub use database_common_macros::transaction;
 pub use sqlx::postgres::PgPoolOptions;
 pub use sqlx::sqlite::SqlitePoolOptions;
+// For `transaction!`, which creates its span at the call site
+#[doc(hidden)]
+pub use tracing as __tracing;
 
 mod db_connection_settings;
 mod db_credentials;

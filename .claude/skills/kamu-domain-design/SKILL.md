@@ -91,4 +91,5 @@ Do not re-propose these without new evidence.
 - Outbox mechanics, consumers, ordering: [`docs/internal/outbox.md`](../../../docs/internal/outbox.md).
 - Repository implementations and SQL: `kamu-sqlx-database-work`; their test suites: `kamu-repository-tests`.
 - DI scopes for services and repositories: `kamu-dill-di`.
+- Opening and ending transactions, where they belong in an algorithm, the managers: [`docs/internal/database-transactions.md`](../../../docs/internal/database-transactions.md).
 - Scaffolding a whole new context: `kamu-adding-a-bounded-context`.

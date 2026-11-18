@@ -28,6 +28,10 @@ use syn::{
     parse_str,
 };
 
+mod transaction_block;
+
+use transaction_block::TransactionBlock;
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -741,6 +745,57 @@ pub fn transactional_static_method4(attr: TokenStream, item: TokenStream) -> Tok
     };
 
     TokenStream::from(updated_method)
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// transaction!
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Runs a block of code in a transaction of the catalog's
+/// `DatabaseTransactionManager`: the transaction commits when the block
+/// succeeds and rolls back when it fails. Write one block per transaction of an
+/// algorithm that runs several in sequence. The block borrows the locals it uses,
+/// as straight-line code does.
+///
+/// The bindings of the closure-shaped body are resolved from the transaction:
+/// `name: Arc<dyn Iface>` is a component, and a bare `name` is the transaction
+/// catalog.
+///
+/// Without a return type the block evaluates to the body's value, and `?` in it
+/// leaves the enclosing function, whose error type must implement
+/// `From<InternalError>`; `return` is refused there. With `-> Result<T, E>` the
+/// block evaluates to the body's `Result`, and `return` leaves the body.
+///
+/// The transaction comes from `self.catalog` unless attributes before the body
+/// say otherwise:
+/// - `#[catalog(<dill::Catalog>)]` opens it from another catalog;
+/// - `#[when(<bool>)]` opens it only when true; otherwise the body runs on the catalog as given;
+/// - `#[span(<tracing::Span>)]` replaces the block's span, by default a debug span named
+///   `transaction` at the call site.
+///
+/// # Examples
+/// ```compile_fail
+/// // 1: Plan
+/// let plan = transaction!(|planner: Arc<dyn Planner>| {
+///     planner.plan(&request).await?
+/// });
+///
+/// // 2: Run, outside any transaction
+/// let response = self.engine.execute(&plan).await?;
+///
+/// // 3: Commit, handling the error here
+/// let committed = transaction!(
+///     #[catalog(base_catalog)]
+///     |committer: Arc<dyn Committer>| -> Result<_, CommitError> {
+///         committer.commit(&response).await
+///     }
+/// );
+/// ```
+#[proc_macro]
+pub fn transaction(input: TokenStream) -> TokenStream {
+    parse_macro_input!(input as TransactionBlock)
+        .expand()
+        .into()
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -38,6 +38,7 @@ aws-sdk-secretsmanager = { version = "1", default-features = false, features = [
     "rt-tokio",
 ] }
 chrono = { version = "0.4", default-features = false }
+database-common-macros = { workspace = true }
 dill = { version = "0.17", default-features = false }
 futures = { version = "0.3", default-features = false }
 hex = "0.4"
