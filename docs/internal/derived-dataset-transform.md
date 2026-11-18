@@ -233,13 +233,12 @@ consumed, and a `SetDataSchema` before the first data.
 
 ### 4.4 Transactions
 
-Both callers that commit a transform, `kamu pull` and the update task, follow one rule through
-`DatasetUpdateSteps::{elaborate_transform, update_reference}`, each of which re-resolves the target by
-ID in its own transaction:
+Both callers that commit a transform, `kamu pull` and the update task, run `TransformJob`, which
+re-resolves the target by ID in each of its transactions:
 
 | Step | Transaction | Why |
 | --- | --- | --- |
-| `elaborate_transform` | one, with the target and inputs resolved through `DatasetRegistry` inside it | the expected head and every input head come from one database snapshot |
+| Authorize and elaborate | one, with the target and inputs resolved through `DatasetRegistry` inside it; `Transform` is checked with the inputs the elaboration read before any result is used | the expected head and every input head come from one database snapshot, and the inputs checked are exactly those read |
 | Execute | none; the target and the plan's datasets are detached first | the engine runs for minutes |
 | Commit | a new one, through `DatasetReferenceUpdater` with `old_head` (the request's `head`) as the expected head | the CAS fails if another writer moved `HEAD` since elaboration |
 
@@ -323,9 +322,9 @@ A successful run leaves nothing behind ([§10](#10-local-files)).
 
 | Entry point | Path | Authorization | Transaction scope | Moves `HEAD` |
 | --- | --- | --- | --- | --- |
-| `kamu pull <derivative>` | `PullCommand` → `PullDatasetUseCaseImpl` → planner, executor | per pull ([dataset-pull.md](dataset-pull.md#7-authorization)) | pull planning in one transaction per pull; per job, the rule of [§4.4](#44-transactions) ([dataset-pull.md](dataset-pull.md#62-per-job-runners)) | after each job |
-| Transform flow | `DerivedDatasetFlowSensor` → `FlowControllerTransform` → `LogicalPlanDatasetUpdate` → `UpdateDatasetTaskPlanner` → `UpdateDatasetTaskRunner::run_transform_update` | none; the task runs as `Principal::Node`, and the GraphQL mutations that configure or trigger the flow check access ([flow-system.md](flow-system.md#12-graphql-api)) | the rule of [§4.4](#44-transactions), when the task runs | once |
-| `kamu verify <derivative>` | `VerifyDatasetUseCaseImpl` → `VerificationServiceImpl` → `build_transform_verification_plan` → `execute_verify_transform` | Read on the target; with replay, also Read on every input the replay reads (`get_verification_inputs`), checked before replaying (`Verify` through [`DatasetOperationGuard`](../../src/domain/datasets/domain/src/services/dataset_operation_guard.rs)) | the command's | never |
+| `kamu pull <derivative>` | `PullCommand` → `PullDatasetUseCaseImpl` → `PullTransformJob` → `TransformJob` → planner, executor | per pull ([dataset-pull.md](dataset-pull.md#7-authorization)) | pull planning in one transaction per pull; per job, the rule of [§4.4](#44-transactions) ([dataset-pull.md](dataset-pull.md#62-per-job-runners)) | after each job |
+| Transform flow | `DerivedDatasetFlowSensor` → `FlowControllerTransform` → `LogicalPlanDatasetUpdate` → `UpdateDatasetTaskPlanner` → `UpdateDatasetTaskRunner::run_transform_update` → `TransformJob` | `Transform` in the job, which always passes for `Principal::Node`, as which the task runs; the GraphQL mutations that configure or trigger the flow check access ([flow-system.md](flow-system.md#12-graphql-api)) | the rule of [§4.4](#44-transactions), when the task runs | once |
+| `kamu verify <derivative>` | `VerifyCommand` → `VerifyJob` → `VerificationPlan::build` → `build_transform_verification_plan`; then `VerificationServiceImpl` → `execute_verify_transform` | Read on the target; with replay, also Read on every input the replay reads (`get_verification_inputs`), checked before replaying (`Verify` through [`DatasetOperationGuard`](../../src/domain/datasets/domain/src/services/dataset_operation_guard.rs)) | the job's: authorization and the replay plan in one, the replay with none open | never |
 
 **`kamu pull`.** Planning, depth ordering, concurrency and authorization belong to pull
 ([dataset-pull.md](dataset-pull.md)). What matters for transforms: a transform at depth 1 sees
@@ -485,8 +484,9 @@ reuses an ID fails instead of mixing its output with an earlier one.
 | Container lifecycle and logs | [`engine_container.rs`](../../src/infra/core/src/engine/engine_container.rs) |
 | Input materialization | [`engine_io_strategy.rs`](../../src/infra/core/src/engine/engine_io_strategy.rs) |
 | Chain validators | [`metadata_chain_validators.rs`](../../src/odf/dataset-impl/src/entities/metadata_chain_validators.rs) |
+| Authorization, elaboration, execution and commit of one transform | [`transform_job_impl.rs`](../../src/infra/core/src/dataset_jobs/transform_job_impl.rs) |
 | Pull planning and execution | [`pull_request_planner/`](../../src/infra/core/src/services/pull_request_planner), [`pull_dataset_use_case_impl.rs`](../../src/infra/core/src/use_cases/pull_dataset_use_case_impl.rs) |
 | Update task planner / runner | [`update_dataset_task_planner.rs`](../../src/adapter/task-dataset/src/planners/update_dataset_task_planner.rs), [`update_dataset_task_runner.rs`](../../src/adapter/task-dataset/src/runners/update_dataset_task_runner.rs) |
 | Transform flow controller and sensor | [`flow_controller_transform.rs`](../../src/adapter/flow-dataset/src/flow_controllers/flow_controller_transform.rs), [`derived_dataset_flow_sensor.rs`](../../src/adapter/flow-dataset/src/flow_sensors/derived_dataset_flow_sensor.rs) |
 | Status evaluator for flows | [`transform_flow_evaluator_impl.rs`](../../src/adapter/flow-dataset/src/services/transform_flow_evaluator_impl.rs) |
-| Verification | [`verification_service_impl.rs`](../../src/infra/core/src/services/verification_service_impl.rs) |
+| Verification | [`verify_job_impl.rs`](../../src/infra/core/src/dataset_jobs/verify_job_impl.rs), [`verification_service_impl.rs`](../../src/infra/core/src/services/verification_service_impl.rs) |

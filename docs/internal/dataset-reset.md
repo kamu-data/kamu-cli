@@ -42,7 +42,7 @@
 
 ## 1. Purpose & scope
 
-This page covers the reset planner and executor, `ResetDatasetUseCase`, `kamu reset`, the
+This page covers the reset planner and executor, `ResetJob`, `kamu reset`, the
 dataset-side semantics of reset to metadata, and the consequences of any `HEAD` move that rewrites
 history.
 
@@ -79,7 +79,7 @@ latest block. The ideas reset relies on:
 | Layer | Crate / path | Contents |
 | --- | --- | --- |
 | Domain interfaces | `kamu-core` — [`src/domain/core/src/services/reset/`](../../src/domain/core/src/services/reset) | `ResetPlanner`, `ResetExecutor`, `ResetPlan`, `ResetResult`, errors |
-| Use case | `kamu` — [`reset_dataset_use_case_impl.rs`](../../src/infra/core/src/use_cases/reset_dataset_use_case_impl.rs) | `ResetDatasetUseCaseImpl`: authorization, plan, execute |
+| Job | `kamu-core` — [`reset_job.rs`](../../src/domain/core/src/dataset_jobs/reset_job.rs); `kamu` — [`reset_job_impl.rs`](../../src/infra/core/src/dataset_jobs/reset_job_impl.rs) | `ResetJob`, `ResetError`: authorization, plan and execute in one short transaction |
 | Services | `kamu` — [`src/infra/core/src/services/reset/`](../../src/infra/core/src/services/reset) | `ResetPlannerImpl`, `ResetExecutorImpl` |
 | Reset to metadata | `kamu` — compaction services | see [dataset-hard-compaction.md](dataset-hard-compaction.md#3-layers-and-crates) |
 | CLI | `kamu-cli` — [`reset_command.rs`](../../src/app/cli/src/commands/reset_command.rs) | `kamu reset` |
@@ -93,12 +93,12 @@ latest block. The ideas reset relies on:
 
 | Entry point | Mechanism | Authorization | `HEAD` swap |
 | --- | --- | --- | --- |
-| `kamu reset <dataset> <hash>` | reset to a block, via `ResetDatasetUseCase` | Maintain (`Reset` through [`DatasetOperationGuard`](../../src/domain/datasets/domain/src/services/dataset_operation_guard.rs)), in the use case | CAS on the planned head, see [§5](#5-reset-to-a-block) |
-| GraphQL `runs.triggerResetFlow` | reset to a block (custom hash or `toSeed`), via the reset task | Maintain, checked by the mutation; the task runs as `Principal::Node` | CAS on the planned head |
-| `kamu system compact --hard --keep-metadata-only <pattern>…` | reset to metadata, via `CompactDatasetUseCase` | Maintain (`ResetToMetadata`), in the use case | CAS on the planned head |
-| GraphQL `runs.triggerResetToMetadataFlow` | reset to metadata, via the reset-to-metadata task | Maintain, checked by the mutation | CAS on the planned head |
+| `kamu reset <dataset> <hash>` | reset to a block, via `ResetJob` | Maintain (`Reset` through [`DatasetOperationGuard`](../../src/domain/datasets/domain/src/services/dataset_operation_guard.rs)), in the job | CAS on the planned head, see [§5](#5-reset-to-a-block) |
+| GraphQL `runs.triggerResetFlow` | reset to a block (custom hash or `toSeed`), via the reset task, which runs `ResetJob` | Maintain, checked by the mutation; the task runs as `Principal::Node` | CAS on the planned head |
+| `kamu system compact --hard --keep-metadata-only <pattern>…` | reset to metadata, via `CompactionJob` | Maintain (`ResetToMetadata`), in the job | CAS on the planned head |
+| GraphQL `runs.triggerResetToMetadataFlow` | reset to metadata, via the reset-to-metadata task, which runs `CompactionJob` | Maintain, checked by the mutation | CAS on the planned head |
 | `DerivedDatasetFlowSensor` with the `Recover` rule | reset to metadata of a derivative whose input broke | the downstream owner's opt-in; runs as `Principal::Node` ([identity.md](identity.md#background-work-runs-as-the-node)) | CAS on the planned head |
-| `kamu pull --reset-derivatives-on-diverged-input` | reset to metadata by the pull use case when elaboration finds a diverged input, before elaborating again | Maintain (`ResetToMetadata`), checked by the transform job before it resets ([dataset-pull.md](dataset-pull.md#7-authorization)) | CAS on the planned head |
+| `kamu pull --reset-derivatives-on-diverged-input` | reset to metadata with `CompactionJob` when elaboration finds a diverged input, before elaborating again | Maintain (`ResetToMetadata`), checked by `CompactionJob` before it resets ([dataset-pull.md](dataset-pull.md#7-authorization)) | CAS on the planned head |
 
 Reset flows run only when triggered, or (reset to metadata) when a sensor recovers from a breaking
 change. The GraphQL preconditions, configuration and trigger rules are owned by
@@ -106,9 +106,9 @@ change. The GraphQL preconditions, configuration and trigger rules are owned by
 [derived-dataset-transform.md](derived-dataset-transform.md#7-diverged-inputs).
 
 **`kamu reset`.** Takes a dataset and a block hash, both required: the CLI cannot reset to the
-`Seed` without its hash. It asks for confirmation, calls the use case with no expected old head,
-and prints "Dataset was reset". It runs in the command's transaction and processes the outbox
-afterwards.
+`Seed` without its hash. It resolves the dataset in a short transaction, asks for confirmation,
+runs `ResetJob` with no expected old head, and prints "Dataset was reset". The command holds no
+transaction of its own while it waits for the confirmation, and processes the outbox afterwards.
 
 ---
 
@@ -228,7 +228,7 @@ flowchart LR
 
 | Error | Raised by | Meaning |
 | --- | --- | --- |
-| `ResetError::NotFound`, `Access` | use case | the dataset is missing, or the caller lacks Maintain |
+| `ResetError::NotFound`, `Access` | job | the dataset is missing, or the caller lacks Maintain |
 | `ResetPlanningError::OldHeadMismatch` | planner | the head changed since the caller looked |
 | `ResetExecutionError::SetReferenceFailed(BlockNotFound)` | executor | the target block is not in the dataset's block store |
 | `ResetExecutionError::SetReferenceFailed(CASFailed)` | executor | `HEAD` moved after planning |
@@ -249,7 +249,7 @@ prints errors as failures; task and GraphQL mappings are owned by
 | What | Where |
 | --- | --- |
 | Planner and executor: drop the last block, reset to the current head, unknown block, old-head mismatch, default `Seed` | [`test_reset_service_impl.rs`](../../src/infra/core/tests/tests/test_reset_service_impl.rs) |
-| Use case: authorization | [`test_reset_dataset_use_case.rs`](../../src/infra/core/tests/tests/use_cases/test_reset_dataset_use_case.rs) |
+| Job: authorization, a missing dataset | [`test_reset_job.rs`](../../src/infra/core/tests/tests/dataset_jobs/test_reset_job.rs) |
 | Metadata-only compaction; transform status after an input reset | `test_compaction_services_impl.rs` (`test_dataset_keep_metadata_only_compact`), `test_transform_services_impl.rs` |
 | Flow controllers, sensor recovery, flow agent | `test_flow_controller_reset.rs`, `test_flow_controller_reset_to_metadata.rs`, `test_derived_dataset_flow_sensor.rs`, `test_flow_agent_impl.rs` |
 | GraphQL triggers | `test_gql_dataset_flow_runs.rs` |
@@ -272,7 +272,7 @@ prints errors as failures; task and GraphQL mappings are owned by
 | --- | --- |
 | Plan, result, errors | [`reset_planner.rs`](../../src/domain/core/src/services/reset/reset_planner.rs), [`reset_executor.rs`](../../src/domain/core/src/services/reset/reset_executor.rs) |
 | Planner and executor | [`reset_planner_impl.rs`](../../src/infra/core/src/services/reset/reset_planner_impl.rs), [`reset_executor_impl.rs`](../../src/infra/core/src/services/reset/reset_executor_impl.rs) |
-| Use case | [`reset_dataset_use_case.rs`](../../src/domain/core/src/use_cases/reset_dataset_use_case.rs), [`reset_dataset_use_case_impl.rs`](../../src/infra/core/src/use_cases/reset_dataset_use_case_impl.rs) |
+| Job | [`reset_job.rs`](../../src/domain/core/src/dataset_jobs/reset_job.rs), [`reset_job_impl.rs`](../../src/infra/core/src/dataset_jobs/reset_job_impl.rs) |
 | CLI | [`reset_command.rs`](../../src/app/cli/src/commands/reset_command.rs), `Reset` in [`cli.rs`](../../src/app/cli/src/cli.rs) |
 | Task planners and runners | [`reset_dataset_task_planner.rs`](../../src/adapter/task-dataset/src/planners/reset_dataset_task_planner.rs), [`reset_dataset_task_runner.rs`](../../src/adapter/task-dataset/src/runners/reset_dataset_task_runner.rs), [`compaction_dataset_task_planner.rs`](../../src/adapter/task-dataset/src/planners/compaction_dataset_task_planner.rs), [`compaction_dataset_task_runner.rs`](../../src/adapter/task-dataset/src/runners/compaction_dataset_task_runner.rs) |
 | Flow controllers | [`flow_controller_reset.rs`](../../src/adapter/flow-dataset/src/flow_controllers/flow_controller_reset.rs), [`flow_controller_reset_to_metadata.rs`](../../src/adapter/flow-dataset/src/flow_controllers/flow_controller_reset_to_metadata.rs) |

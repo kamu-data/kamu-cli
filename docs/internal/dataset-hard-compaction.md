@@ -42,7 +42,7 @@
 
 ## 1. Purpose & scope
 
-This page covers the compaction planner and executor, `CompactDatasetUseCase`, the
+This page covers the compaction planner and executor, `CompactionJob`, the
 `kamu system compact` command, and the dataset side of the hard compaction flow.
 
 Out of scope, each with its own owner:
@@ -80,7 +80,7 @@ history and treats the metadata chain as append-only. The pieces compaction work
 | Layer | Crate / path | Contents |
 | --- | --- | --- |
 | Domain interfaces | `kamu-core` — [`src/domain/core/src/services/compaction/`](../../src/domain/core/src/services/compaction) | `CompactionPlanner`, `CompactionExecutor`, `CompactionOptions`, `CompactionPlan`, `CompactionResult`, listeners, errors |
-| Use case | `kamu` — [`compact_dataset_use_case_impl.rs`](../../src/infra/core/src/use_cases/compact_dataset_use_case_impl.rs) | `CompactDatasetUseCaseImpl`: authorization and plan, execute, move `HEAD`, each step in its own transaction or none |
+| Job | `kamu-core` — [`compaction_job.rs`](../../src/domain/core/src/dataset_jobs/compaction_job.rs); `kamu` — [`compaction_job_impl.rs`](../../src/infra/core/src/dataset_jobs/compaction_job_impl.rs) | `CompactionJob`, `CompactionError`: authorization and plan, execute, move `HEAD`, each step in its own transaction or none |
 | Services | `kamu` — [`src/infra/core/src/services/compaction/`](../../src/infra/core/src/services/compaction) | `CompactionPlannerImpl`, `CompactionExecutorImpl` |
 | DataFusion session config | `kamu` — [`engine_config_embedded.rs`](../../src/infra/core/src/engine/engine_config_embedded.rs) | `EngineConfigDatafusionEmbeddedCompaction` |
 | CLI | `kamu-cli` — [`compact_command.rs`](../../src/app/cli/src/commands/compact_command.rs) | `kamu system compact` |
@@ -93,8 +93,8 @@ history and treats the metadata chain as append-only. The pieces compaction work
 
 | Entry point | Path | Authorization | Moves `HEAD` |
 | --- | --- | --- | --- |
-| `kamu system compact --hard <pattern>…` | `CompactCommand` → `CompactDatasetUseCase::execute_multi` | Maintain, per dataset, in the use case | the use case, CAS on the planned head |
-| Compaction flow, manual or scheduled | GraphQL `runs.triggerCompactionFlow` or a schedule set with `triggers.setTrigger` → `FlowControllerCompact` → hard compaction task | Maintain, checked by the GraphQL mutations ([flow-system.md](flow-system.md#12-graphql-api)); the task runs as `Principal::Node` ([identity.md](identity.md#background-work-runs-as-the-node)) | the task runner, CAS on the planned head |
+| `kamu system compact --hard <pattern>…` | `CompactCommand` → `CompactionJob`, per dataset | Maintain, per dataset, in the job | the job, CAS on the planned head |
+| Compaction flow, manual or scheduled | GraphQL `runs.triggerCompactionFlow` or a schedule set with `triggers.setTrigger` → `FlowControllerCompact` → hard compaction task | Maintain, checked by the GraphQL mutations ([flow-system.md](flow-system.md#12-graphql-api)); the task runs as `Principal::Node` ([identity.md](identity.md#background-work-runs-as-the-node)) | `CompactionJob`, run by the task runner, CAS on the planned head |
 | Metadata-only, from `kamu pull` or a reset-to-metadata flow | see [dataset-reset.md](dataset-reset.md#6-reset-to-metadata) | | |
 
 **CLI.** `kamu system compact` requires `--hard`; without it the command fails with "Soft
@@ -103,13 +103,13 @@ verifies every dataset first (`--verify`, stopping at the first failure), then c
 datasets one after another. `--max-slice-size` (bytes, default 300 MB) and `--max-slice-records`
 (default 10 000) bound each merged file. `--keep-metadata-only` turns the run into a reset to
 metadata. The command holds no database transaction of its own: listing the datasets and each
-verification run in short transactions, and the use case opens its own around each dataset's
+verification run in short transactions, and the job opens its own around each dataset's
 compaction. Each dataset commits on its own, so when one fails the command returns an error, but
 the datasets reported as compacted stay compacted. The outbox is processed afterwards, also when
 the command fails, so the deferred consumers of the compacted datasets run before it exits.
 
-**Use case.** `CompactDatasetUseCaseImpl::execute` works in three steps, so that no transaction is
-open during the merge:
+**Job.** `CompactionJob::run` compacts one dataset in three steps, so that no transaction is open
+during the merge:
 
 | Step | Transaction | Does |
 | --- | --- | --- |
@@ -118,8 +118,8 @@ open during the merge:
 | Commit | a new short one | on `Success`, re-resolves the dataset and moves `HEAD` from `old_head` through `DatasetReferenceUpdater` |
 
 A `HEAD` moved by another writer during the merge fails the commit ([§6](#6-execution)).
-`execute_multi` calls `execute` per dataset and returns one `CompactionResponse`
-each; one failure does not stop the others.
+`kamu system compact` runs the job per dataset and reports each; one failure does not stop the
+others.
 
 **Flow.** The flow's preconditions, configuration and logical plan are owned by
 [flow-system.md](flow-system.md#10-flow-types); how the task plans, runs and moves `HEAD`, by
@@ -199,14 +199,14 @@ after `SetInfo`, so it is carried over. The old blocks and files stay in storage
    executor never moves `HEAD`. The run directory is removed when `execute` returns, with whatever
    a failed run left in it.
 
-The caller moves `HEAD` with a compare-and-swap against `old_head`. A write that moved `HEAD`
+`CompactionJob` moves `HEAD` with a compare-and-swap against `old_head`. A write that moved `HEAD`
 after planning (an ingest, a push, another compaction) makes the swap fail, and the new blocks and
-merged files stay unreferenced. The use case returns `CompactionError::RefCASFailed` with the
+merged files stay unreferenced. The job returns `CompactionError::RefCASFailed` with the
 expected and actual heads; the task runners return the recoverable `DatasetCommitError`
 ([task-system.md](task-system.md#72-hard-compaction-and-reset-to-metadata)).
 
 `CompactionListener` hears `begin`, the plan, the start and end of the `GatherChainInfo`,
-`MergeDataslices` and `CommitNewBlocks` phases, and then either `success`, once the use case has set
+`MergeDataslices` and `CommitNewBlocks` phases, and then either `success`, once the job has set
 the new `HEAD`, or `error` with the `CompactionError` of any step. In the CLI,
 `CompactionMultiProgress` (a `CompactionMultiListener`) hands each dataset a `CompactionProgress`
 listener.
@@ -245,7 +245,7 @@ unchanged, the Smart protocol accepts a forced push of the compacted chain.
 | What | Where |
 | --- | --- |
 | Planner and executor: batching, limits, watermark-only blocks, offsets, schema changes, S3, metadata-only | [`test_compaction_services_impl.rs`](../../src/infra/core/tests/tests/test_compaction_services_impl.rs) |
-| Use case: authorization, several datasets | [`test_compact_dataset_use_case.rs`](../../src/infra/core/tests/tests/use_cases/test_compact_dataset_use_case.rs) |
+| Job: authorization, a missing dataset, commit, a `HEAD` moved meanwhile | [`test_compaction_job.rs`](../../src/infra/core/tests/tests/dataset_jobs/test_compaction_job.rs) |
 | Derivatives after compaction | `test_transform_services_impl.rs` (`test_transform_fails_on_diverged_input`, `test_transform_status_input_hard_compacted`), `test_pull_dataset_use_case.rs` (`test_pull_transform_diverged_input_resets_and_retransforms`) |
 | Flow controller and flow agent | `test_flow_controller_compact.rs`, `test_flow_agent_impl.rs` |
 | GraphQL configs and runs | `test_gql_dataset_flow_configs.rs`, `test_gql_dataset_flow_runs.rs` |
@@ -270,7 +270,7 @@ unchanged, the Smart protocol accepts a forced push of the compacted chain.
 | Options, plan, result, errors, listeners | [`src/domain/core/src/services/compaction/`](../../src/domain/core/src/services/compaction) |
 | Planner | [`compaction_planner_impl.rs`](../../src/infra/core/src/services/compaction/compaction_planner_impl.rs) |
 | Executor | [`compaction_executor_impl.rs`](../../src/infra/core/src/services/compaction/compaction_executor_impl.rs) |
-| Use case | [`compact_dataset_use_case_impl.rs`](../../src/infra/core/src/use_cases/compact_dataset_use_case_impl.rs) |
+| Job | [`compaction_job_impl.rs`](../../src/infra/core/src/dataset_jobs/compaction_job_impl.rs) |
 | CLI command, arguments, progress | [`compact_command.rs`](../../src/app/cli/src/commands/compact_command.rs), `SystemCompact` in [`cli.rs`](../../src/app/cli/src/cli.rs), [`compact_progress.rs`](../../src/app/cli/src/output/compact_progress.rs) |
 | Task planner and runner | [`compaction_dataset_task_planner.rs`](../../src/adapter/task-dataset/src/planners/compaction_dataset_task_planner.rs), [`compaction_dataset_task_runner.rs`](../../src/adapter/task-dataset/src/runners/compaction_dataset_task_runner.rs) |
 | Flow controller and rule | [`flow_controller_compact.rs`](../../src/adapter/flow-dataset/src/flow_controllers/flow_controller_compact.rs), [`flow_config_rule_compact.rs`](../../src/adapter/flow-dataset/src/entities/flow_config_rules/flow_config_rule_compact.rs) |
