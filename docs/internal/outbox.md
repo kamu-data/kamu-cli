@@ -130,8 +130,8 @@ impl Message for AccountLifecycleMessage {
 }
 ```
 
-**3. Register a dispatcher** for the producer, once per application — in `src/app/cli/src/app.rs`
-(`configure_base_catalog`), next to the others:
+**3. Register a dispatcher** for the producer, once per application — in `src/app/cli/src/outbox.rs`
+(`register_base_message_dispatchers`), next to the others:
 
 ```rust
 register_message_dispatcher::<AccountLifecycleMessage>(
@@ -489,7 +489,7 @@ boundaries, failure isolation, self-managed consumers, batching and concurrency 
 ## 10. Gotchas
 
 - **Forgotten dispatcher registration** — immediate consumers never fire; the agent panics on the
-  first stored message of that producer. Register in `app.rs`.
+  first stored message of that producer. Register in `src/app/cli/src/outbox.rs`.
 - **Forgotten consumer registration** — no route, no consumption record, and if it was the producer's
   only durable consumer, its messages are not even stored.
 - **Two message types under one producer** — not supported: a producer has one dispatcher, hence
@@ -515,7 +515,7 @@ boundaries, failure isolation, self-managed consumers, batching and concurrency 
 | Boundaries | `messaging-outbox` | `src/utils/messaging-outbox/src/entities` | `outbox_message_boundary.rs` |
 | Storage contract | `messaging-outbox` | `src/utils/messaging-outbox/src/repos` | `outbox_message_bridge.rs` |
 | Storage | `kamu-messaging-outbox-{postgres,sqlite,inmem}` | `src/infra/messaging-outbox/*/src/repos` | `*_outbox_message_bridge.rs` |
-| Testing helpers | `messaging-outbox` (`testing`) | `src/utils/messaging-outbox/src/services/testing` | `test_outbox_provider.rs`, `mock_outbox_impl.rs` |
+| Testing helpers | `messaging-outbox` (`testing`) | `src/utils/messaging-outbox/src/services/testing` | `test_outbox_provider.rs`, `dummy_outbox_impl.rs`; `MockOutbox` is generated from `services/outbox.rs` |
 | Schema | — | `migrations/{postgres,sqlite}` | `*_outbox_messages_consumptions.sql`, `*_outbox_message_version.sql`, `*_outbox_listen_notify.sql`, `*_outbox_wipe*.sql` |
-| App wiring | `kamu-cli` | `src/app/cli/src` | `app.rs` (outbox components, dispatchers), `services/config/models.rs` (`BackgroundAgentsConfig`) |
-| Flushing | `kamu-cli`, `kamu-adapter-http` | `src/app/cli/src`, `src/adapter/http/src/e2e` | `app.rs` (`run_while_has_tasks` after commands), `e2e_middleware.rs` |
+| App wiring | `kamu-cli` | `src/app/cli/src` | `outbox.rs` (outbox components, dispatchers), `services/config/models.rs` (`BackgroundAgentsConfig`) |
+| Flushing | `kamu-cli`, `kamu-adapter-http` | `src/app/cli/src`, `src/adapter/http/src/e2e` | `outbox.rs` (`process_outbox_after_command`), `e2e_middleware.rs` |

@@ -104,22 +104,20 @@ datasets one after another. `--max-slice-size` (bytes, default 300 MB) and `--ma
 (default 10 000) bound each merged file. `--keep-metadata-only` turns the run into a reset to
 metadata. The command holds no database transaction of its own: listing the datasets and each
 verification run in short transactions, and the job opens its own around each dataset's
-compaction. Each dataset commits on its own, so when one fails the command returns an error, but
-the datasets reported as compacted stay compacted. The outbox is processed afterwards, also when
+compaction. Each dataset commits on its own and one failure does not stop the others: the command
+then fails with "Failed to compact N/M dataset(s)", and the datasets reported as compacted stay
+compacted. The outbox is processed afterwards, also when
 the command fails, so the deferred consumers of the compacted datasets run before it exits.
 
-**Job.** `CompactionJob::run` compacts one dataset in three steps, so that no transaction is open
-during the merge:
+**Job.** `CompactionJob::run` compacts one dataset with the shared plan, execute, commit shape
+([dataset-operations.md](dataset-operations.md#2-plan-execute-commit)), so no transaction is open
+during the merge. Specific to compaction:
 
-| Step | Transaction | Does |
-| --- | --- | --- |
-| Plan | a short one | authorizes `Compaction` (or `ResetToMetadata` with `keep_metadata_only`) through [`DatasetOperationGuard`](../../src/domain/datasets/domain/src/services/dataset_operation_guard.rs), which needs Maintain; resolves the dataset, plans, detaches the dataset from the transaction |
-| Execute | none | `CompactionExecutor::execute`, which writes only blocks and files that no reference points to yet |
-| Commit | a new short one | on `Success`, re-resolves the dataset and moves `HEAD` from `old_head` through `DatasetReferenceUpdater` |
-
-A `HEAD` moved by another writer during the merge fails the commit ([§6](#6-execution)).
-`kamu system compact` runs the job per dataset and reports each; one failure does not stop the
-others.
+- it authorizes `Compaction`, or `ResetToMetadata` with `keep_metadata_only`, through
+  [`DatasetOperationGuard`](../../src/domain/datasets/domain/src/services/dataset_operation_guard.rs);
+  both need Maintain;
+- it commits only on `Success`; a `NothingToDo` result opens no second transaction;
+- a `HEAD` moved by another writer during the merge fails the commit ([§6](#6-execution)).
 
 **Flow.** The flow's preconditions, configuration and logical plan are owned by
 [flow-system.md](flow-system.md#10-flow-types); how the task plans, runs and moves `HEAD`, by
@@ -155,8 +153,7 @@ with empty size and record counts. A closed batch becomes:
 
 `CompactionPlan` holds the batches newest first, the `Seed` hash, the old head and block count, and
 the offset column name from the oldest `SetVocab` in the chain (the default vocabulary if there is
-none). A plan has no effect when the number of batches plus one (the `Seed`) equals the old block
-count.
+none).
 
 ---
 
@@ -182,7 +179,8 @@ The `Seed` is the same block. `s1`–`s3` merge because no other event separates
 after `SetInfo`, so it is carried over. The old blocks and files stay in storage
 ([§7](#7-storage)).
 
-`CompactionExecutorImpl::execute` returns `NothingToDo` for a plan with no effect. Otherwise:
+`CompactionExecutorImpl::execute` returns `NothingToDo` when every old block other than the `Seed`
+is its own batch, so nothing would merge or be dropped. Otherwise:
 
 1. **Merge.** For every `CompactedBatch`, a DataFusion session built from
    `EngineConfigDatafusionEmbeddedCompaction` reads the batch's Parquet files, sorts by the offset
@@ -202,7 +200,7 @@ after `SetInfo`, so it is carried over. The old blocks and files stay in storage
 `CompactionJob` moves `HEAD` with a compare-and-swap against `old_head`. A write that moved `HEAD`
 after planning (an ingest, a push, another compaction) makes the swap fail, and the new blocks and
 merged files stay unreferenced. The job returns `CompactionError::RefCASFailed` with the
-expected and actual heads; the task runners return the recoverable `DatasetCommitError`
+expected and actual heads; the task fails with the recoverable `TaskErrorDatasetCommit::RefMoved`
 ([task-system.md](task-system.md#72-hard-compaction-and-reset-to-metadata)).
 
 `CompactionListener` hears `begin`, the plan, the start and end of the `GatherChainInfo`,
@@ -247,7 +245,7 @@ unchanged, the Smart protocol accepts a forced push of the compacted chain.
 | Planner and executor: batching, limits, watermark-only blocks, offsets, schema changes, S3, metadata-only | [`test_compaction_services_impl.rs`](../../src/infra/core/tests/tests/test_compaction_services_impl.rs) |
 | Job: authorization, a missing dataset, commit, a `HEAD` moved meanwhile | [`test_compaction_job.rs`](../../src/infra/core/tests/tests/dataset_jobs/test_compaction_job.rs) |
 | Derivatives after compaction | `test_transform_services_impl.rs` (`test_transform_fails_on_diverged_input`, `test_transform_status_input_hard_compacted`), `test_pull_dataset_use_case.rs` (`test_pull_transform_diverged_input_resets_and_retransforms`) |
-| Flow controller and flow agent | `test_flow_controller_compact.rs`, `test_flow_agent_impl.rs` |
+| Flow controller and flow agent | `test_flow_controller_compact.rs`, `test_flow_agent/test_manual_triggers.rs` |
 | GraphQL configs and runs | `test_gql_dataset_flow_configs.rs`, `test_gql_dataset_flow_runs.rs` |
 | CLI end to end; push after compaction | `src/e2e/app/cli/repo-tests/src/commands/test_compact_command.rs`, `test_smart_transfer_protocol.rs` |
 

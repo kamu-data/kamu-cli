@@ -23,7 +23,7 @@ page describes only what is specific to it:
 - **Blocks first, `HEAD` last.** An operation appends its blocks and data files without moving
   `HEAD`. Until `HEAD` moves, no reader sees them.
 - **One way to move a reference.** `DatasetReferenceUpdater::update_reference` moves a dataset's
-  reference (today only `HEAD`) from an expected block to a new one inside the caller's
+  reference, such as `HEAD`, from an expected block to a new one inside the caller's
   transaction, and fails when another writer moved it first. There is no unconditional move.
 - **No transaction around slow work.** Fetching, engines and transfers run for minutes; they run
   between two short transactions, never inside one.
@@ -74,7 +74,8 @@ flowchart LR
   [`kamu-core/src/dataset_jobs/`](../../src/domain/core/src/dataset_jobs/)).
   A job authorizes its principal through `DatasetOperationGuard`, plans in a short transaction,
   executes with none open, and commits in another short one, re-resolving the dataset by its ID
-  each time. Jobs own these transactions; nothing above them opens one around an operation
+  each time (the shared steps are in
+  [`job_target.rs`](../../src/infra/core/src/dataset_jobs/job_target.rs)). Jobs own these transactions; nothing above them opens one around an operation
   ([database-transactions.md](database-transactions.md#31-who-owns-a-transaction)).
 - **Use cases** that cover several operations (`PullDatasetUseCase`, `PushDatasetUseCase`) plan
   over many datasets, run the jobs in order and report per-dataset results. `kamu system compact`,
@@ -153,8 +154,8 @@ as an argument, and an append that moves a reference expects the block's previou
 chain API has no unconditional write. The updater is still the single entry point, for audit and
 for injecting races in tests (`RacingDatasetReferenceUpdater`).
 
-Every layer below the operation takes `block_ref`; the operation picks it. Today every operation
-moves `HEAD`, the only reference ODF defines, and passes `odf::BlockRef::Head` where it calls the
+Every layer below the operation takes `block_ref`; the operation picks it. Every operation moves
+`HEAD`, the only reference ODF defines, and passes `odf::BlockRef::Head` where it calls the
 update. Errors and task outcomes for a lost race (`RefMoved`) carry the reference that moved.
 
 On a database-backed dataset the move goes through `DatasetReferenceServiceImpl::set_reference`,
@@ -169,7 +170,7 @@ A job reports a commit that did not happen as a variant of its own error type:
 | Commit | Job error | `kamu pull` reports | A task ends |
 | --- | --- | --- | --- |
 | `HEAD` moved | — (the job's result) | the job's result | with its result |
-| Another writer moved `HEAD` since planning | `RefCASFailed` (sync: `SyncError::RefMoved`) | `PullError::RefMoved` | failed, recoverable |
+| Another writer moved `HEAD` since planning | `RefCASFailed` (sync: `SyncError::RefMoved`; reset: `SetReferenceFailed(CASFailed)`) | `PullError::RefMoved` | failed, recoverable |
 | The dataset is gone | `NotFound` | `NotFound` | failed, unrecoverable |
 | The principal may not move `HEAD` | `Access` | `Access` | failed, unrecoverable |
 

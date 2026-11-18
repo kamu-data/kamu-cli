@@ -148,6 +148,10 @@ only a watermark and optionally a source state. Ingest does not use it; `SetWate
 resumes where it was. That executor moves `HEAD` through `DatasetReferenceUpdater` and fails with
 `SetWatermarkExecutionError::RefCASFailed` if `HEAD` moved after planning.
 
+`stage` reports no progress, so neither kind of source ever reports its `Merge` listener stage
+(`PollingIngestStage::Merge`, `PushIngestStage::Merge`): `Preprocess`, when the source has a
+preprocess query, or `Read` is followed directly by `Commit`.
+
 The writer never moves `HEAD`. The blocks published together can be a `SetDataSchema` alone, when a
 first ingest yields no rows ([§6](#6-what-stage-decides)).
 
@@ -229,7 +233,7 @@ including CSV and JSON values the readers decode only when the data is written.
 
 | Directory | Holds | Cleaned |
 | --- | --- | --- |
-| `RunInfoDir/ingest-<operation_id>/` | push input copies, reader temp files, `out/data.parquet` before commit | the staged Parquet file moves into the data repo on commit; polling and push ingest remove the directory on success; any left are cleared when the process starts |
+| `RunInfoDir/ingest-<operation_id>/` | push input copies, reader temp files, `out/data.parquet` before commit | removed on success, after the staged file moved into the data repo; kept on failure, then cleared when the process next starts |
 
 The fetch and preprocess directories and the cache belong to polling
 ([polling-ingest.md](polling-ingest.md#11-local-files)).

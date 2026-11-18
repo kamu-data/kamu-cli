@@ -15,7 +15,7 @@
   the CLI, an ingest flow on the server.
 - A run plans in a short transaction, then fetches, prepares and hands the file to the shared read,
   preprocess and write steps ([ingest-data-writer.md](ingest-data-writer.md)) with no transaction
-  open; the caller commits `HEAD` afterwards.
+  open, and commits `HEAD` in a new one (`PollingIngestJob`).
 - The **source state** stored in `AddData` (an ETag, a last-modified time, a last file name, a block
   number) lets the next run resume, and a local **savepoint** lets a failed run retry without
   fetching again.
@@ -25,7 +25,7 @@
 flowchart LR
     F[Fetch] --> P["Prepare<br/>decompress, pipe"]
     P --> W["Read, preprocess,<br/>write"]
-    W --> C(["Caller commits HEAD"])
+    W --> C(["Job commits HEAD"])
 ```
 
 **Where to start reading, by intent:**
@@ -79,6 +79,7 @@ The concepts the writer builds on are listed in
 | Layer | Crate / path | Contents |
 | --- | --- | --- |
 | Domain interfaces | `kamu-core` — [`src/domain/core/src/services/ingest/`](../../src/domain/core/src/services/ingest) | `PollingIngestPlanner`, `PollingIngestService`, polling error types |
+| Job | `kamu-core`, `kamu` — [`src/domain/core/src/dataset_jobs/`](../../src/domain/core/src/dataset_jobs), [`src/infra/core/src/dataset_jobs/`](../../src/infra/core/src/dataset_jobs) | `PollingIngestJob`, `PollingIngestJobImpl`: one iteration from authorization to commit |
 | Use case | `kamu-core` — `pull_dataset_use_case.rs` | `PullDatasetUseCase` |
 | Services | `kamu` — [`src/infra/core/src/services/ingest/`](../../src/infra/core/src/services/ingest) | `PollingIngestPlannerImpl`, `PollingIngestServiceImpl`, `FetchService`, `PrepService` |
 | Use case impl | `kamu` — [`src/infra/core/src/use_cases/`](../../src/infra/core/src/use_cases) | `PullDatasetUseCaseImpl` |
@@ -90,16 +91,20 @@ The concepts the writer builds on are listed in
 
 ## 4. Call sequence
 
-A polling ingest has three steps, the same for every caller. `PollingIngestJob` runs them, one
-iteration per run, for `kamu pull` and the update task alike:
+`PollingIngestJob` runs one iteration per run, for `kamu pull` and the update task alike, through
+the plan, execute and commit steps every operation shares
+([dataset-operations.md](dataset-operations.md#2-plan-execute-commit)). Specific to polling:
 
-| Step | Who | Transaction |
-| --- | --- | --- |
-| **Plan** | `PollingIngestPlanner::plan_ingest(target)` builds the writer state at the current head into a `PollingIngestPlan`; `IngestEnvVarsResolver::resolve(dataset_id)` resolves the dataset's environment variables | one of its own, opened by the job after it authorizes `PollingIngest`; then the target is detached |
-| **Execute** | `PollingIngestService::ingest(target, plan, options, env_vars, operation_id, listener)` runs one iteration and appends blocks without moving `HEAD` | none |
-| **Commit** | the job moves `HEAD` through `DatasetReferenceUpdater` ([§9](#9-committing-and-concurrency)) | a new one |
+- **Plan.** After authorizing `PollingIngest`, the job builds a `PollingIngestPlan` from the writer
+  state at the current head (`PollingIngestPlanner::plan_ingest`), or from the writer state the
+  previous iteration ended with, when the caller passes it on. `IngestEnvVarsResolver::resolve`
+  resolves the dataset's environment variables in the same transaction. Planning fails with
+  `SourceNotDefined` when the dataset has no `SetPollingSource`.
+- **Execute.** `PollingIngestService::ingest` runs one iteration (below) and appends blocks without
+  moving `HEAD`.
+- **Commit.** The job moves `HEAD` only when the iteration appended blocks
+  ([§9](#9-committing-and-concurrency)).
 
-Planning fails with `SourceNotDefined` when the dataset has no `SetPollingSource`.
 `PollingIngestPlanPayload` is the plan's stored form, for a caller that stores a plan before
 running it (only tests do). It records the expected head and what planning found there, never the
 writer state itself. `rebuild_ingest` turns it back into a plan, failing with `HeadMoved` when the
@@ -222,7 +227,7 @@ A source that yields data in batches (glob, container, EVM) reports `has_more`. 
 
 Flow-side options reach ingest through `FlowConfigRuleIngest`: `fetch_uncacheable` becomes
 `PollingIngestOptions::fetch_uncacheable`; `fetch_next_iteration` is read by the flow controller
-only. Dataset env vars are resolved by the planner in both paths ([§4](#4-call-sequence)).
+only. Both paths resolve dataset env vars in the job ([§4](#4-call-sequence)).
 
 ---
 
@@ -232,8 +237,8 @@ The writer appends blocks without moving `HEAD`; `PollingIngestJob` then moves i
 shared rules — the committer, the messages it posts, what a lost race leaves behind — are in
 [dataset-operations.md](dataset-operations.md#3-committing-head). Specific to polling:
 
-- The writer state is planned just before the fetch, for both `kamu pull` and the update task. A
-  push that lands while the fetch runs makes the poll's CAS fail.
+- The writer state is planned, or carried over from the iteration that just committed, right
+  before the fetch. A push that lands while the fetch runs makes the poll's CAS fail.
 - The blocks published together can be a `SetDataSchema` alone, when a first ingest yields no rows
   ([ingest-data-writer.md](ingest-data-writer.md#6-what-stage-decides)).
 
@@ -267,8 +272,12 @@ skipped as up to date unless `fetch_uncacheable` is set.
 | Directory | Holds | Cleaned |
 | --- | --- | --- |
 | `RunInfoDir/fetch-<operation_id>/`, `RunInfoDir/raw-query-<operation_id>/` | container fetch output and logs; preprocess engine I/O and logs | cleared when the process starts |
-| `CacheDir/fetch-*`, `prepare-*` | fetched and prepared input | prepared files after staging, or when reading or preprocessing fails; a fetch target no savepoint refers to (failed, up-to-date or zero-copy fetch) right away; other fetched files by eviction |
+| `CacheDir/fetch-*`, `prepare-*` | fetched and prepared input | see below |
 | `CacheDir/fetch-savepoint-<hash>` | savepoints | by eviction |
+
+Prepared files are deleted after staging, or when reading or preprocessing fails. A fetch target
+that no savepoint refers to (a failed, up-to-date or zero-copy fetch) is deleted right away; other
+fetched files stay until eviction.
 
 The operation directory the writer stages into is owned by
 [ingest-data-writer.md](ingest-data-writer.md#9-local-files).
@@ -318,7 +327,8 @@ hours. A long-running server does not evict while it runs.
 
 | Concern | File |
 | --- | --- |
-| Polling planner trait, plan, env vars, planning errors | [`polling_ingest_planner.rs`](../../src/domain/core/src/services/ingest/polling_ingest_planner.rs) |
+| Polling planner trait, plan, env vars | [`polling_ingest_planner.rs`](../../src/domain/core/src/services/ingest/polling_ingest_planner.rs) |
+| Planning and plan rebuild errors | [`polling_ingest_planner_errors.rs`](../../src/domain/core/src/services/ingest/polling_ingest_planner_errors.rs) |
 | Stored plan form | [`polling_ingest_plan_payload.rs`](../../src/domain/core/src/services/ingest/polling_ingest_plan_payload.rs) |
 | Polling planner impl | [`polling_ingest_planner_impl.rs`](../../src/infra/core/src/services/ingest/polling_ingest_planner_impl.rs) |
 | Dataset env vars of an ingest, and when they are enabled | [`ingest_env_vars_resolver.rs`](../../src/infra/core/src/services/ingest/ingest_env_vars_resolver.rs) |
@@ -329,6 +339,7 @@ hours. A long-running server does not evict while it runs.
 | Fetch step impls | [`fetch_service/`](../../src/infra/core/src/services/ingest/fetch_service) (`file.rs`, `http.rs`, `ftp.rs`, `container.rs`, `mqtt.rs`, `evm.rs`) |
 | Prepare steps | [`prep_service.rs`](../../src/infra/core/src/services/ingest/prep_service.rs) |
 | Pull use case | [`pull_dataset_use_case_impl.rs`](../../src/infra/core/src/use_cases/pull_dataset_use_case_impl.rs) |
+| Job trait and errors | [`polling_ingest_job.rs`](../../src/domain/core/src/dataset_jobs/polling_ingest_job.rs) |
 | One iteration: authorization, plan, ingest, ref update | [`polling_ingest_job_impl.rs`](../../src/infra/core/src/dataset_jobs/polling_ingest_job_impl.rs) |
 | Pull polling loop | [`pull_ingest_loop.rs`](../../src/infra/core/src/use_cases/pull_ingest_loop.rs) |
 | Update task planner / runner | [`update_dataset_task_planner.rs`](../../src/adapter/task-dataset/src/planners/update_dataset_task_planner.rs), [`update_dataset_task_runner.rs`](../../src/adapter/task-dataset/src/runners/update_dataset_task_runner.rs) |

@@ -34,7 +34,7 @@ rules (plan, execute, commit) are in [dataset-operations.md](dataset-operations.
 |---|---|---|
 | `PostgresTransactionManager`, `SqliteTransactionManager` | the database plugins | `COMMIT` / `ROLLBACK` on the connection, if the transaction began |
 | `NoOpTransactionManager` | in-memory repositories (no database) | nothing to do; in-memory changes apply at once |
-| `InMemoryTransactionManager` | tests that opt into rollback | applies or drops the working sets of participating in-memory repositories ([AGENTS.md](../../AGENTS.md#in-memory-repositories-review-context)) |
+| `InMemoryTransactionManager` | tests that opt into rollback | applies the working sets of participating repositories (`InMemoryTransactionalMap`) in all or none ([AGENTS.md](../../AGENTS.md#in-memory-repositories-review-context)) |
 
 **Ending needs the only reference.** The database managers take the `sqlx::Transaction` out of the
 `TransactionRef` to commit it, and panic when anything else still holds the reference: a component
@@ -49,7 +49,7 @@ dataset are detached from it first (`detach_from_transaction`), as the
 | Form | Opens | Use for |
 |---|---|---|
 | `transaction!(\|a: Arc<dyn A>\| { .. })` | a block inside a method | each step of a method that orders several transactions, or one transaction among other work |
-| `#[transactional_method1..4(a: Arc<dyn A>, ..)]` | the whole method, from `self.catalog` | a method that is itself one transactional step |
+| `#[transactional_method1..4(a: Arc<dyn A>, ..)]`, or `#[transactional_method]` for the bare `transaction_catalog` | the whole method, from `self.catalog` | a method that is itself one transactional step |
 | `#[transactional_handler]` | the whole axum handler, from its `Extension(catalog)` | HTTP handlers |
 | `DatabaseTransactionRunner::transactional(\|catalog\| ..)` | a callback | test helpers and generated code; production code uses a macro |
 
@@ -84,7 +84,7 @@ rather than call jobs, which makes them work the same against a remote node
 
 | Shape | Write | Precedent |
 |---|---|---|
-| A method running several transactions in sequence, or slow work next to one | One `transaction!` block per transaction in that method; each block stays short and calls step methods | `CompactionJob`'s run, `WebhookDeliveryWorkerImpl::deliver_webhook` |
+| A method running several transactions in sequence, or slow work next to one | One `transaction!` block per transaction in that method; each block stays short and calls step methods | `CompactionJobImpl::compact_and_commit`, `WebhookDeliveryWorkerImpl::deliver_webhook` |
 | A method that is itself one transactional step | `#[transactional_methodN]` on it | the task planners, `PushCommand::get_filtered_datasets` |
 | A private method annotated only so that its caller gets a transaction | Neither: the caller opens the block, and the method takes the components as parameters | `PushDatasetUseCaseImpl::make_authorization_checks` |
 | A transaction only in some configurations | `#[when(<bool>)]` on the block | `run_startup_jobs`, the command run in `app.rs` |

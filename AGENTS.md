@@ -176,7 +176,7 @@ change invalidates what it says.
 | Flows, triggers, configurations, scheduling, sensors, flow process state, new flow types | [`docs/internal/flow-system.md`](docs/internal/flow-system.md) |
 | Database transactions: how one opens and ends, `transaction!` versus the `#[transactional_*]` macros, where a transaction belongs in an algorithm, the managers, test helpers | [`docs/internal/database-transactions.md`](docs/internal/database-transactions.md) |
 | What every dataset operation shares: plan, execute and commit steps, `HEAD` CAS commits, races, who an operation runs as | [`docs/internal/dataset-operations.md`](docs/internal/dataset-operations.md) |
-| Polling ingest: `SetPollingSource`, the polling planner and service, fetch and prepare steps, source state, savepoints, `has_more` | [`docs/internal/polling-ingest.md`](docs/internal/polling-ingest.md) |
+| Polling ingest: `SetPollingSource`, `PollingIngestJob`, the polling planner and service, fetch and prepare steps, source state, savepoints, `has_more` | [`docs/internal/polling-ingest.md`](docs/internal/polling-ingest.md) |
 | Push ingest: `AddPushSource`, the push use case, planner and executor, data sources and formats, `kamu ingest` and the HTTP endpoint | [`docs/internal/push-ingest.md`](docs/internal/push-ingest.md) |
 | Ingest read, preprocess and write steps: the DataFusion data writer, writer state, `stage`/`commit`, merge strategies | [`docs/internal/ingest-data-writer.md`](docs/internal/ingest-data-writer.md) |
 | Dataset pull: `kamu pull` flags, pull planning and depth ordering, iteration execution, authorization, how the update task reuses the planner | [`docs/internal/dataset-pull.md`](docs/internal/dataset-pull.md) |

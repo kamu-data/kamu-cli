@@ -5,7 +5,7 @@ Two values describe who is behind a piece of work, and they are not the same thi
 | Value | What it is | Read by |
 |---|---|---|
 | `CurrentAccountSubject` | The **caller**: whoever authenticated the request or started the command | Adapters and the app only: guards (`LoggedInGuard`, `AdminGuard`, `CanProvisionAccountsGuard`), GraphQL "me", CLI commands and the CLI's saved remote-server tokens |
-| `Principal` | The identity **acting**: whose permissions are checked ([RFC-020, Principals](https://github.com/open-data-fabric/open-data-fabric/blob/master/rfcs/020-auth.md#principals)), whose account a bare alias names, and who owns what it creates | The auth layer (`DatasetPermissionChecker`, `DatasetOperationGuard`, `AccountAuthorizationHelper`, `ResourceAccountResolver`), through the components that call it ([Who reads it](#who-reads-it)); the dataset registries, pull planning, dataset creation |
+| `Principal` | The identity **acting** ([RFC-020, Principals](https://github.com/open-data-fabric/open-data-fabric/blob/master/rfcs/020-auth.md#principals)): whose permissions are checked, whose account a bare alias names, who owns what it creates | The auth layer and the components that call it ([Who reads it](#who-reads-it)); the dataset registries, pull planning, dataset creation |
 
 For a request or a CLI command the principal is derived from the caller. Background work has no
 caller and runs as `Principal::Node`.
@@ -22,8 +22,8 @@ caller and runs as `Principal::Node`.
 
 `Principal::handle()` gives the ODF `odf::metadata::auth::PrincipalHandle`, or `None` for
 `Anonymous`. The handle of `Node` has the name `node`, a resource ID seeded from that name, and no
-DID. RFC-020 reserves the name, but account creation does not refuse it yet, so nothing may look up
-an account by the node's name.
+DID. RFC-020 reserves the name, but account creation does not refuse it, so nothing may look up an
+account by the node's name.
 
 Match on `Principal` exhaustively, including in `==` and `matches!` tests: adding a variant must
 fail to compile at every site that decides permissions
@@ -41,8 +41,8 @@ A bare dataset alias (`foo`, no account) names a dataset of one account, chosen 
 | `Anonymous` | The default account | The default account |
 
 A dataset is created under the principal's own account unless its alias names another one. A
-`User` creates it; `Node` gets an `Access` error, having no account; `Anonymous` still panics. A resource manifest without an account selector is placed in the `User`'s account; `Node`
-must name one.
+`User` creates it; `Node` gets an `Access` error, having no account; `Anonymous` panics. A resource
+manifest without an account selector is placed in the `User`'s account; `Node` must name one.
 
 ## Who registers it
 
@@ -56,7 +56,7 @@ the caller is known; that job must not reach the permission layer.
 | HTTP authentication layer, Flight SQL auth layer, the CLI catalog (`app.rs`) | The caller with `CurrentAccountSubject::register`, which adds `Principal::from(&subject)` beside it |
 | Background catalog (`configure_background_catalog` in `app.rs`) | `Principal::Node` only |
 | `KamuBackgroundCatalog::node_catalog` (search lazy init, the admin index reset) | `Principal::Node` only |
-| Test harnesses | `CurrentAccountSubject::register`, or a `Principal` value directly where a mock ignores it |
+| Test harnesses | `CurrentAccountSubject::register`; `register_acting_as` (test-only) to act as another principal such as `Node`; a bare `Principal` value where a mock ignores it |
 
 Register the caller through `CurrentAccountSubject::register`, never with a bare
 `add_value(subject)`, so the two cannot disagree.
@@ -107,7 +107,6 @@ flowchart TD
     BG --> AG
     AG -. "CatalogWeakRef<br/>per-call resolution" .-> BG
 ```
-
 
 - It is a *sibling* of the CLI catalog on the same parent, holding `Principal::Node` and no caller;
   the CLI components that read the caller stay in the CLI catalog.

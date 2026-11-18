@@ -89,7 +89,7 @@ the repository model and both protocols. This page does not restate them; read t
 | Smart protocol client trait | `kamu` — [`smart_transfer_protocol.rs`](../../src/infra/core/src/utils/smart_transfer_protocol.rs) | `SmartTransferProtocolClient`, `TransferOptions` |
 | Smart protocol client and server | `kamu-adapter-http` — [`src/adapter/http/src/smart_protocol/`](../../src/adapter/http/src/smart_protocol) | `WsSmartTransferProtocolClient`, `AxumServerPullProtocolInstance`, `AxumServerPushProtocolInstance`, messages, `protocol_dataset_helper` |
 | Server HTTP endpoints | `kamu-adapter-http` — [`simple_protocol/handlers.rs`](../../src/adapter/http/src/simple_protocol/handlers.rs), [`http_server_dataset_router.rs`](../../src/adapter/http/src/http_server_dataset_router.rs) | `refs`, `blocks`, `data`, `checkpoints` (GET and PUT), `pull` and `push` WebSocket upgrades |
-| Sync jobs | `kamu-core` — [`dataset_jobs/`](../../src/domain/core/src/dataset_jobs); `kamu` — [`sync_from_job_impl.rs`](../../src/infra/core/src/dataset_jobs/sync_from_job_impl.rs), [`sync_to_job_impl.rs`](../../src/infra/core/src/dataset_jobs/sync_to_job_impl.rs) | `SyncFromJob`, `SyncToJob`: one sync of one local dataset, authorized, with no transaction held across the transfer. `SyncFromJob` commits a pull in a transaction of its own: `HEAD` CAS through `DatasetReferenceUpdater`, or creation through `CreateDatasetUseCase` |
+| Sync jobs | `kamu-core` — [`dataset_jobs/`](../../src/domain/core/src/dataset_jobs); `kamu` — [`sync_from_job_impl.rs`](../../src/infra/core/src/dataset_jobs/sync_from_job_impl.rs), [`sync_to_job_impl.rs`](../../src/infra/core/src/dataset_jobs/sync_to_job_impl.rs) | `SyncFromJob`, `SyncToJob`: one authorized sync of one local dataset, with no transaction held across the transfer; `SyncFromJob` also commits a pull ([§4](#4-sync-requests)) |
 | Local sync writes | `kamu` — [`local_sync_writes/`](../../src/infra/core/src/utils/local_sync_writes/) | the `Seed` store and block append both protocols share |
 | Appending incoming blocks | `kamu-datasets-services` — `AppendDatasetMetadataBatchUseCaseImpl`; `odf` — `MetadataChainExt::append_batch` | block validation, `HEAD` update on the smart push server |
 | Push | `kamu` — [`push_dataset_use_case_impl.rs`](../../src/infra/core/src/use_cases/push_dataset_use_case_impl.rs), [`push_request_planner_impl.rs`](../../src/infra/core/src/services/push_request_planner_impl.rs); CLI [`push_command.rs`](../../src/app/cli/src/commands/push_command.rs) | `kamu push` |
@@ -104,8 +104,8 @@ over the URL's storage (file, S3, HTTP, IPFS gateway).
 
 | Request | Source | Destination | Run by |
 | --- | --- | --- | --- |
-| `SyncToRequest` (push) | `ResolvedDataset`: a dataset of this node | `SyncRefRemote`: a dataset that is not a dataset reference of this node | `SyncToJob`: `SyncService::sync_to`, which also moves the destination's `HEAD` |
-| `SyncFromRequest` (pull) | `DatasetRefRemote`: the transfer resolves and opens it | `SyncFromTarget`: `Existing { dataset, expected_head }`, or `New(DatasetAlias)` for a dataset the commit creates from the source's `Seed` | `SyncFromJob`: `SyncService::sync_from`, then its commit |
+| `SyncToRequest` (push) | `ResolvedDataset`: a dataset of this node | `SyncRefRemote`: a dataset behind a URL | `SyncToJob`: `SyncService::sync_to`, which also moves the destination's `HEAD` |
+| `SyncFromRequest` (pull) | `DatasetRefRemote`: the transfer resolves and opens it | `SyncFromTarget`: `Existing { dataset, expected_head }`, or `New(DatasetAlias)` for a dataset the commit creates | `SyncFromJob`: `SyncService::sync_from`, then its commit |
 
 A pull's destination is read from the database and its source from the network, so the two are
 resolved at different steps. The destination is read as a `SyncFromTarget`, inside a transaction,
@@ -127,9 +127,9 @@ the reference carries an alias.
 
 | Step | Transaction | Does |
 | --- | --- | --- |
-| Target | one, which then authorizes `SyncFrom` on the dataset found, including one created since the pull was planned | `PullLocalTarget::resolve_sync_target`: read `expected_head`; no remote is contacted |
-| Transfer | none held across it | `sync_from`: resolve and open the source, compare the chains, store the `Seed` of a new dataset, copy objects, append blocks; no reference moves. Returns `SyncFromTransfer::UpToDate` or `Transferred(SyncFromTransferred)` |
-| Commit | a new one | `SyncFromJob`: for an existing dataset, `DatasetReferenceUpdater` moves `HEAD` from `expected_head` to the new head; for a new one, `CreateDatasetUseCase` creates the entry with `HEAD` already at the new head (`CreateDatasetUseCaseOptions::initial_head`) |
+| Target | one | `PullLocalTarget::resolve_sync_target` reads `expected_head`, then `SyncFrom` is authorized on the dataset found, even one created since planning; no remote is contacted |
+| Transfer | none held across it | `sync_from`: open the source, compare the chains, store a new dataset's `Seed`, copy objects, append blocks; no reference moves (`SyncFromTransfer`) |
+| Commit | a new one | an existing dataset's `HEAD` moves from `expected_head` (`DatasetReferenceUpdater`); a new dataset is created with `HEAD` at the new head (`CreateDatasetUseCase`, `initial_head`) |
 
 Opening the source fails with `RepositoryNotFound` for an unknown repository,
 `RemoteByIdUnsupported` for a remote named only by ID, and `DatasetNotFound` for a source without
@@ -140,16 +140,15 @@ writes nothing to the database: database-backed storage only needs one to build 
 is detached before the transaction ends. Storage takes over a unit left without `HEAD` by an
 earlier failed pull, so the next pull continues into it.
 
-`kamu pull` commits in a short transaction of its own after each transfer
-([dataset-pull.md](dataset-pull.md#62-per-job-runners)); the update task does the same
-([task-system.md](task-system.md#71-update-dataset)). Listeners follow the rule in
-[dataset-pull.md](dataset-pull.md#63-listeners).
+`kamu pull` ([dataset-pull.md](dataset-pull.md#62-per-job-runners)) and the update task
+([task-system.md](task-system.md#71-update-dataset)) both run `SyncFromJob`. Listeners follow the
+rule in [dataset-pull.md](dataset-pull.md#63-listeners).
 
 `SyncOptions`:
 
 | Option | Effect |
 | --- | --- |
-| `trust_source` | Simple protocol only: skip block validation and hash recomputation; defaults to `true` for a push, whose source is local, and `false` for a pull. The Smart protocol ignores it: the receiving side always validates |
+| `trust_source` | Simple protocol only: skip block validation and hash recomputation. Defaults to on for a push, whose source is local, and off for a pull |
 | `create_if_not_exists` | allow creating the destination (default on) |
 | `force` | accept a destination that is ahead or has diverged, and replace its history; never disables the CAS on `HEAD` |
 | `dataset_visibility` | visibility of a dataset created by the sync (default private) |
@@ -198,8 +197,8 @@ into an `odf+` URL when a push target is resolved ([§9](#9-remote-repositories-
 ### 6.1 Client: `SimpleTransferProtocol`
 
 The same code serves every non-smart direction: `transfer_into_local` for a pull into a local
-dataset, `push` for a file or S3 repository. Both ends
-are `odf::Dataset`s, so "remote" only changes which storage the object reads and writes go to.
+dataset, `push` for a file or S3 repository. Both ends are `odf::Dataset`s, so "remote" only
+changes which storage the object reads and writes go to.
 
 ```mermaid
 sequenceDiagram
@@ -242,15 +241,15 @@ sequenceDiagram
    storage works only from a trusted source, and then stores the stream without checking it.
 4. **Blocks.** All new blocks are appended at once. A local destination's `HEAD` is left to the
    caller's commit ([§4](#4-sync-requests)), a CAS on `expected_head`. A remote destination is
-   written with
-   `MetadataChainExt::append_batch_and_set_head`, which appends the blocks and moves `HEAD` by a
-   CAS on its storage, since its `HEAD` is not a dataset reference of this node. That CAS is the
+   written with `MetadataChainExt::append_batch_and_set_head`, which appends the blocks and moves
+   `HEAD` by a CAS on its storage, since its `HEAD` is not a dataset reference of this node. That
+   CAS is the
    storage's conditional write (`NamedObjectRepository::compare_and_set`): a conditional `PUT` on
    S3; on the local file system, a `head.lock` file created exclusively, then renamed over `head`
    (a lock left by an interrupted writer fails later pushes until it is removed). Storage without
    conditional writes re-reads the head just before an unconditional write, so a change landing in
-   between is lost. A destination that moved since step 1 fails with `RefMoved`, also with
-   `force`.
+   between is lost. A destination whose head moved since it was read fails with `RefMoved`, also
+   with `force`.
 
 Objects land before the blocks that reference them, so a failure leaves at most unreferenced
 objects and blocks, never a block with a missing object. A first pull that fails before its commit
@@ -370,10 +369,11 @@ skipped rather than taken for the confirmation. Peers without these messages sti
 
 | Peer | Behaviour |
 | --- | --- |
-| Client without `DatasetPushCompleteResponse` | takes any JSON object, including the reason of a close with the usual error code 1011, for a bare confirmation; reads a close with any other code as a disconnect, so with 1013 it fails the push instead of reporting success |
+| Client without `DatasetPushCompleteResponse` | takes any JSON object, even a 1011 close reason, for a confirmation; a 1013 close is a disconnect to it, so it fails the push |
 | Client with it | reads the reason of a close with 1011 or 1013 as the error |
 | Server without `DatasetPushCompleteResponse` | sends a bare `{}` confirmation, which the client accepts |
 | Server without `progress_requested` | sends `{}` for a progress request too, so a reply in flight stays ambiguous |
+| Server without the forced-push head check | under `force`, compares against its `HEAD` at commit time |
 
 Server-side details:
 
@@ -386,10 +386,9 @@ Server-side details:
   `current_head`. With `force` the batch may replace a divergent history, so the commit expects
   the request's `current_head` instead, or the `Seed` when the push created the dataset
   (`SetRefCheckRefMode::Explicit`). Either way a head moved after initiation fails the push with
-  `UpdatedConcurrently`. A server without this check compares against `HEAD` at commit time under
-  `force`. A batch starting with a `Seed` into an existing dataset, with `force` or without a
-  `HEAD`, is refused with `SeedBlockOverwriteRestricted` when that `Seed` has another dataset ID
-  or kind (`SeedConflict`, shared with the pull client).
+  `UpdatedConcurrently`. A batch starting with a `Seed` into an existing dataset, with `force` or
+  without a `HEAD`, is refused with `SeedBlockOverwriteRestricted` when that `Seed` has another
+  dataset ID or kind (`SeedConflict`, shared with the pull client).
 - While objects upload, the server asks for progress every
   `protocol.smartTransferProtocol.uploadProgressInterval` of the node configuration
   ([config reference](../../resources/config-reference.md#smarttransferprotocolconfig)).
@@ -423,7 +422,7 @@ when the client did not upload one, so `HEAD` never points at a block whose obje
 
 ## 8. Push
 
-`kamu push <dataset>…` builds `PushDatasetUseCase::execute_multi`:
+`kamu push <dataset>…` calls `PushDatasetUseCase::execute_multi`:
 
 1. **Authorization:** `SyncTo` on every dataset to push, which needs Read
    ([`DatasetOperationGuard`](../../src/domain/datasets/domain/src/services/dataset_operation_guard.rs),
@@ -433,7 +432,7 @@ when the client did not upload one, so `HEAD` never points at a block whose obje
 3. **Sync:** one `SyncToJob` per planned dataset, all concurrently (`join_all`), with the push's
    `SyncOptions`. Each job checks `SyncTo` again and builds its sync request (source = the local
    dataset, destination = the target URL) in one transaction, then transfers with none open.
-5. **Aliases:** with `add_aliases` on (the default; `--no-alias` turns it off), a push alias with
+4. **Aliases:** with `add_aliases` on (the default; `--no-alias` turns it off), a push alias with
    the target URL is stored on each dataset that was pushed. A dataset whose alias cannot be
    stored is reported with an internal error, though it was pushed.
 
@@ -459,9 +458,12 @@ calls it with no transaction held:
 
 | Resolution | Rule |
 | --- | --- |
-| Pull URL of `repo/name` or `repo/account/name` | `odf+` repository: the repository's `odf+http(s)` URL plus the account (asked from the server's `info` and `accounts/me` when the reference has none and the server is multi-tenant) and the name; other repositories: the repository URL joined with the alias |
+| Pull URL of `repo/name` or `repo/account/name` | `odf+` repository: its URL plus the account and the name; other repositories: the repository URL joined with the alias |
 | Pull URL of a URL | the URL itself, with a trailing `/` |
 | Pull URL of an ID | not supported |
+
+When a reference to an `odf+` repository names no account and the server is multi-tenant, the
+account is asked from the server's `info` and `accounts/me` endpoints.
 
 A push target is chosen in this order:
 
@@ -479,12 +481,14 @@ dataset ID on the server, falling back to the local name.
 
 | Method | Answer |
 | --- | --- |
-| `has_pull_source` | whether the dataset has any pull alias, several included; reads the alias registry only. `kamu ingest` and setting a watermark refuse such a dataset, since its history comes from the remote; `kamu verify` replays its transforms only when all its inputs exist locally |
+| `has_pull_source` | whether the dataset has any pull alias, several included; reads the alias registry only |
 | `find_pull_alias` | the dataset's single pull alias, `None` without one, `AmbiguousPullSourceError` with several; reads the alias registry only |
 | `resolve_remote_source` | a `DatasetPullSource { remote_ref, url }`, the URL from `RemoteDatasetUrlResolver::resolve_dataset_url`; an unknown repository is `RepositoryNotFound`, a remote named only by ID is `ByIdUnsupported` |
 | `resolve_pull_source` | both of the above for one dataset |
 | `find_dataset_by_pull_alias` | the current account's dataset whose pull aliases contain a remote ref: the dataset named as the remote one first, then a scan of the account's datasets |
 
+`kamu ingest` and setting a watermark refuse a dataset with a pull source, since its history comes
+from the remote; `kamu verify` replays its transforms only when all its inputs exist locally.
 `DatasetPullSource::to_sync_endpoint` gives the `SyncEndpoint` a sync task reads, without
 credentials. A pull does not use the resolver for its source URL: its transfer resolves it with
 `RemoteDatasetUrlResolver` ([§4](#4-sync-requests)).
@@ -498,13 +502,15 @@ How `kamu pull` uses pull aliases to decide that a dataset is synced belongs to
 
 | Path | Check |
 | --- | --- |
-| Server, every `{dataset}/…` route | `DatasetResolverLayer` resolves the dataset from the path (optional only for `/push`); `DatasetAuthorizationLayer` requires **Write** for `/push` and every unsafe method (anything but `GET`, `HEAD`, `OPTIONS` and `TRACE`), **Read** otherwise. With `allowAnonymous=false`, `AuthPolicyLayer` rejects anonymous callers first |
+| Server, every `{dataset}/…` route | `DatasetAuthorizationLayer`: **Write** for `/push` and every unsafe method (anything but `GET`, `HEAD`, `OPTIONS` and `TRACE`), **Read** otherwise |
 | Server push to a new dataset | logged-in caller; the account in the path must be the caller's |
 | `kamu pull` sync jobs | `SyncFrom`: Write on an existing destination, for the whole plan and again in `SyncFromJob` on the destination it finds ([dataset-pull.md](dataset-pull.md#7-authorization)) |
 | `kamu push` | `SyncTo`: Read on each pushed dataset, for the whole push before planning and again in `SyncToJob`; the remote server decides about the destination |
 | Update task sync jobs | `SyncFrom` in `SyncFromJob`, which always passes for `Principal::Node`, as which the task runs ([dataset-pull.md](dataset-pull.md#8-server-use)) |
 
-`SyncService` and `SyncRequestBuilder` resolve local datasets through the plain registry and check
+On the server, `DatasetResolverLayer` resolves the dataset from the path first (optional only for
+`/push`), and with `allowAnonymous=false` `AuthPolicyLayer` rejects anonymous callers before
+either. `SyncService` and `SyncRequestBuilder` resolve local datasets through the plain registry and check
 nothing themselves; the sync jobs own authorization.
 
 ---
@@ -526,32 +532,34 @@ either the old or the new head. A local destination's `HEAD` is set by `SyncFrom
 dataset of this node posts `DatasetReferenceMessage`; the smart push server also posts
 `DatasetExternallyChangedMessage`.
 
-The variants are in `SyncError` (`sync_service.rs`). A lost `HEAD` CAS is `RefMoved` on every
-destination, with a `SyncRefMovedError` that carries the expected and actual heads when they are
-known: always for a local destination and the Simple protocol. The Smart push server reports the
-heads in `InvalidHead` when `HEAD` moved before the push began, and none in
-`DatasetPushCompleteResponse` when it moved during the commit. A Smart-protocol push whose
-destination head is not in the local chain compares the chains the same way as a pull, so a
-remote that is ahead fails with `DestinationAhead`. One mapping is surprising: server-side internal
-failures reach the client as `Internal` with the generic message "Internal error", the cause
-staying in the server log (the one exception is a failure while computing the pull transfer plan,
-whose message is forwarded as is). When the server
-fails in a phase whose reply has no `Internal` case, the client reads the close reason as an
-internal error and reports the phase it names, instead of failing to parse the reply. Of the typed
-protocol errors, `InvalidInterval` (→ a chain comparison on pull), `SeedBlockOverwriteRestricted`
-(→ `OverwriteSeedBlock` on push; on pull the client makes the `Seed` check itself), `RefCollision`
-and `NameCollision` keep their meaning. A metadata batch or an object download that cannot be read
-fails the transfer with an error; so does a batch that unpacks to more than
-`MAX_UNPACKED_BATCH_SIZE` (`metadata_batch.rs`) or holds more blocks than its `num_blocks`. A
-download answered with an error status is `Internal`, so it is recoverable.
+The variants are in `SyncError` (`sync_service.rs`). How the notable cases arise:
+
+- **Lost `HEAD` CAS.** `RefMoved` on every destination, with a `SyncRefMovedError` that carries
+  the expected and actual heads when they are known: always for a local destination and the Simple
+  protocol. The Smart push server reports the heads in `InvalidHead` when `HEAD` moved before the
+  push began, and none in `DatasetPushCompleteResponse` when it moved during the commit.
+- **Remote ahead on push.** A Smart-protocol push whose destination head is not in the local chain
+  compares the chains the same way as a pull, so a remote that is ahead fails with
+  `DestinationAhead`.
+- **Server-side internal failures** reach the client as `Internal` with the generic message
+  "Internal error"; the cause stays in the server log. The one exception is a failure while
+  computing the pull transfer plan, whose message is forwarded as is. When the server fails in a
+  phase whose reply has no `Internal` case, the client reads the close reason as an internal error
+  and reports the phase it names.
+- **Typed protocol errors.** `InvalidInterval` becomes a chain comparison on pull;
+  `SeedBlockOverwriteRestricted` becomes `OverwriteSeedBlock` on push (on pull the client makes the
+  `Seed` check itself); `RefCollision` and `NameCollision` keep their meaning.
+- **Unreadable input.** A metadata batch or an object download that cannot be read fails the
+  transfer, and so does a batch that unpacks to more than `MAX_UNPACKED_BATCH_SIZE`
+  (`metadata_batch.rs`) or holds more blocks than its `num_blocks`. A download answered with an
+  error status is `Internal`, so it is recoverable.
 
 `SyncError::is_recoverable` says whether running the same sync again could succeed. A lost CAS
-(`RefMoved`) and `Internal`, which also covers network failures, are
-recoverable; conflicts between the chains, a corrupted source, denied access and errors in the
-request, such as an `InvalidDestination`, are not. `CreateDatasetFailed`
-is recoverable for a lost CAS, an internal failure and a `RefCollision`, where a concurrent first
-pull created the same dataset and the next attempt finds it. The update task runner turns the flag
-into the recoverability of the failed task.
+(`RefMoved`) and `Internal`, which also covers network failures, are recoverable; conflicts between
+the chains, a corrupted source, denied access and errors in the request, such as an
+`InvalidDestination`, are not. `CreateDatasetFailed` is recoverable for a lost CAS, an internal
+failure and a `RefCollision`, where a concurrent first pull created the same dataset and the next
+attempt finds it. The update task runner turns the flag into the recoverability of the failed task.
 
 ---
 
@@ -579,10 +587,10 @@ into the recoverability of the failed task.
 
 | Area | What happens |
 | --- | --- |
-| Plain `http(s)://` URLs | Read-only through the Simple protocol; a push to a *registered* `http(s)` repository is rewritten to `odf+http(s)` by `resolve_push_target` and uses the Smart protocol |
+| Plain `http(s)://` URLs | Read-only through the Simple protocol; a push to a *registered* `http(s)` repository uses the Smart protocol ([§9](#9-remote-repositories-and-aliases)) |
 | Created destination | Created by the commit, with its `HEAD` at the last transferred block; for a pull that fails before it, see [§4](#4-sync-requests) |
 | Unreferenced objects | A failed or concurrent sync can leave uploaded objects that no block references |
-| `force` | Replaces the destination's history from the source, but only from the destination head the sync observed: a head moved meanwhile fails with `RefMoved`. The Smart protocol refuses a different `Seed` (`OverwriteSeedBlock`, `SeedBlockOverwriteRestricted`); the Simple protocol refuses only a `Seed` of another dataset ID (`DatasetIdMismatch`) |
+| `force` | Replaces the destination's history, but only from the head the sync observed (a moved head fails with `RefMoved`). The Smart protocol also refuses a `Seed` of another kind; the Simple protocol only one of another dataset ID |
 | Trusted local source | A push from a local dataset skips validation and hash recomputation |
 
 ---

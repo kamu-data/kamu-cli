@@ -69,7 +69,7 @@ Out of scope, each with its own owner:
 | Term | Meaning |
 | --- | --- |
 | `PullRequest` | one thing to pull: `Local(DatasetRef)` or `Remote { remote_ref, maybe_local_alias }` |
-| Pull alias | a `RemoteAliasKind::Pull` entry in a dataset's remote aliases, added by `kamu repo alias add --pull` or recorded when the dataset was first synced from a remote ([dataset-sync.md](dataset-sync.md#9-remote-repositories-and-aliases)); it makes the dataset a sync target on every later pull |
+| Pull alias | a `RemoteAliasKind::Pull` remote alias of a dataset ([dataset-sync.md](dataset-sync.md#9-remote-repositories-and-aliases)); it makes the dataset a sync target on every pull |
 | Depth | the dataset's position in dependency order. Sync targets and roots are depth 0; a derivative is one deeper than its deepest input |
 | Plan iteration | `PullPlanIteration { depth, jobs }`: every job at one depth. Jobs within an iteration are independent |
 | Job | `PullPlanIterationJob`: `Ingest(PullIngestItem)`, `Transform(PullTransformItem)` or `Sync(PullSyncItem)`, each carrying what its service needs to start |
@@ -102,7 +102,7 @@ their own short ones), and the CLI processes outbox messages after it ([§9](#9-
 
 | Flag | Effect |
 | --- | --- |
-| `<dataset>…` | local or remote references, or wildcard patterns. Patterns are expanded by `filter_datasets_by_any_pattern` (local datasets, or remote repositories through `SearchServiceRemote`); each result becomes a `PullRequest` via `PullRequest::from_any_ref` |
+| `<dataset>…` | local or remote references, or wildcard patterns |
 | `--all` | every dataset owned by the current account (`execute_all_owned`); cannot be combined with references or `--recursive` |
 | `--recursive` | also pull every transitive upstream dependency |
 | `--as <name>` | exactly one remote reference, synced into a local dataset with this name (`PullRequest::Remote` with a local alias); only `--force`, `--visibility` and `--no-alias` apply |
@@ -112,8 +112,10 @@ their own short ones), and the CLI processes outbox messages after it ([§9](#9-
 | `--visibility` | visibility of datasets created by sync |
 | `--reset-derivatives-on-diverged-input` | `TransformOptions::reset_derivatives_on_diverged_input` ([derived-dataset-transform.md](derived-dataset-transform.md#7-diverged-inputs)) |
 
-The command always sets `PullOptions::exhaust_sources`, so a polling source is ingested until it
-has no more data ([§6.2](#62-per-job-runners)).
+Patterns are expanded by `filter_datasets_by_any_pattern`, over local datasets or, through
+`SearchServiceRemote`, remote repositories; each result becomes a `PullRequest`
+(`PullRequest::from_any_ref`). The command always sets `PullOptions::exhaust_sources`, so a polling
+source is ingested until it has no more data ([§6.2](#62-per-job-runners)).
 
 Reference interpretation depends on tenancy: in a single-tenant workspace a repo-like reference
 (`repo/name`) is a remote repository; in a multi-tenant workspace it is `account/name`, and
@@ -131,10 +133,9 @@ dataset the account can read, are shown as they are.
 
 `PullRequestPlannerImpl::build_pull_multi_plan(requests, options, tenancy)` runs in one
 transaction (a `transaction!` block in `PullDatasetUseCaseImpl::execute_multi`, or in
-`execute_all_owned` for `--all`); its items keep dataset handles only, which
-later transactions resolve again. Planning contacts no remote repository: a
-sync job's source is resolved by its transfer, so the transaction never waits
-on the network.
+`execute_all_owned` for `--all`); its items keep dataset handles only, which later transactions
+resolve again. Planning contacts no remote repository: a sync job's source is resolved by its
+transfer, so the transaction never waits on the network.
 
 ### 5.1 Resolving each request
 
@@ -154,9 +155,10 @@ request, or for a `Remote` one an existing dataset or the alias to create one un
    its dataset name, or for a URL the last path segment, then the host name. A ref none of these
    apply to, such as a remote ref by ID, fails with `CannotInferLocalName`.
 4. **Kind.** A `Remote` request is a sync from its remote ref, whether its target exists or is
-   still to be created. The target of a `Local` request gets its kind from `DatasetUpdateKindResolver`: its pull alias
-   (`DatasetPullSourceResolver::find_pull_alias`) makes it a sync, otherwise a root is ingested
-   and a derivative transformed. Two or more pull aliases fail with `AmbiguousSource`.
+   still to be created. The target of a `Local` request gets its kind from
+   `DatasetUpdateKindResolver`: its pull alias (`DatasetPullSourceResolver::find_pull_alias`) makes
+   it a sync, otherwise a root is ingested and a derivative transformed. Two or more pull aliases
+   fail with `AmbiguousSource`.
 5. **Depth.** Syncs and ingests are depth 0. A transform is one more than its deepest upstream
    dependency (`DependencyGraphService::get_upstream_dependencies`, visited recursively).
 
@@ -181,9 +183,9 @@ explicit, the item becomes explicit.
 | Case | Traversal | Depth |
 | --- | --- | --- |
 | One request, not `--recursive` (also every server update task) | `build_single_node_pull_graph`: upstreams are not visited | root 0, derivative 1, sync target 0 |
-| Two or more requests, or `--recursive` (`--all` takes the single-node path when the account owns exactly one dataset) | `collect_pull_graph`: upstreams are visited for every request | from the graph |
+| Two or more requests, or `--recursive` | `collect_pull_graph`: upstreams are visited for every request | from the graph |
 
-Without `--recursive`, the visited upstreams are dropped afterwards (only explicit items are
+`--all` takes the single-node path when the account owns exactly one dataset. Without `--recursive`, the visited upstreams are dropped afterwards (only explicit items are
 kept), but the depths computed from them stay, so the requested datasets still run in dependency
 order. Before traversing, `collect_pull_graph` resolves every request to its local dataset, so an
 upstream that is also requested is planned from its request (for example a sync from the remote
@@ -199,7 +201,7 @@ iteration per depth. The job follows the item's kind:
 | Item | Job | Built by | Holds |
 | --- | --- | --- | --- |
 | ingest | `Ingest(PullIngestItem)` | `build_pull_multi_plan`, inline | target; the ingest itself is planned when the job runs |
-| sync | `Sync(PullSyncItem)` | `build_pull_multi_plan`, inline, which only records the remote ref | local target (existing or to create) and remote ref; the job reads the target's `HEAD` and the transfer resolves the source when it runs ([dataset-sync.md](dataset-sync.md#4-sync-requests)) |
+| sync | `Sync(PullSyncItem)` | `build_pull_multi_plan`, inline | local target (existing or to create) and remote ref; `HEAD` and the source are read when the job runs ([dataset-sync.md](dataset-sync.md#4-sync-requests)) |
 | transform | `Transform(PullTransformItem)` | `build_transform_item` → `TransformPlanner::describe_transform`, which fails a broken transform before any job runs | target and the handles of its inputs; the transform itself is elaborated when the job runs |
 
 A dataset with a pull alias is always synced, whatever its kind: a derivative pulled from a
@@ -294,8 +296,8 @@ commit `HEAD` ([dataset-operations.md](dataset-operations.md#2-plan-execute-comm
 - with `add_aliases` on, then stores the pull alias of a dataset the sync created, in a transaction
   of its own (`PullSyncJob::store_pull_alias`). Aliases live in the dataset's `info` storage, not
   in the database, so no transaction makes them atomic with the commit; a failure to store one
-  fails the pull of that dataset with `SyncError::Internal` and leaves the dataset without it. Only `kamu pull` sets the option: the
-  update task never records an alias.
+  fails the pull of that dataset with `SyncError::Internal` and leaves the dataset without it.
+  Only `kamu pull` sets the option: the update task never records an alias.
 
 **How a commit that did not happen is reported.** Each runner maps its job's error for
 [a commit that did not happen](dataset-operations.md#3-committing-head) into that dataset's error:
@@ -374,10 +376,10 @@ The server never calls `PullDatasetUseCase`: the update task builds a single-nod
 | | `kamu pull` | Update task |
 | --- | --- | --- |
 | Datasets per run | many, by depth | one |
-| Authorization | the whole plan, before any job runs ([§7](#7-authorization)) | none at run time; access is checked when the flow is configured or triggered |
+| Authorization | the whole plan, before any job runs ([§7](#7-authorization)) | the job checks as `Principal::Node`, which always passes; access is checked when the flow is configured or triggered |
 | Polling loop | until `has_more` is false | one iteration; the flow decides whether to continue |
 | Diverged-input reset | optional flag | never |
-| Planning to running | immediate | separated by the task queue; planning fixes the job kind and, for a sync, the remote ref. Ingest and transform are planned when the task runs, and a sync reads the destination's `HEAD` and resolves its source then |
+| Planning to running | immediate | separated by the task queue: planning fixes the job kind and a sync's remote ref; the job plans the rest when the task runs |
 | Root dataset without a polling source | up to date | unrecoverable failure: a flow that keeps polling such a dataset is misconfigured |
 | Dataset deleted before it runs | `NotFound` for that dataset | unrecoverable failure |
 

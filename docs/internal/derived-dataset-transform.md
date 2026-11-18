@@ -28,7 +28,7 @@
 
 ```mermaid
 sequenceDiagram
-    participant J as Caller (pull job or update task)
+    participant J as TransformJob
     participant P as TransformPlanner
     participant X as TransformExecutor
     participant E as Engine container
@@ -37,6 +37,7 @@ sequenceDiagram
     rect rgba(100, 150, 255, 0.15)
     J->>P: elaborate at current heads
     P-->>J: request, or UpToDate
+    J->>J: authorize Transform on the inputs read
     end
     J->>X: execute_transform(request)
     X->>E: provision, mount inputs, run query
@@ -111,7 +112,7 @@ verifiability. This page does not restate them; read these first:
 | --- | --- | --- |
 | Domain interfaces | `kamu-core` — [`src/domain/core/src/services/transform/`](../../src/domain/core/src/services/transform) | `TransformPlanner`, `TransformExecutor`, `TransformListener`, `TransformPlanPayload`, `TransformStatus`, error types |
 | Engine interfaces | `kamu-core` — [`engine.rs`](../../src/domain/core/src/entities/engine.rs), [`engine_provisioner.rs`](../../src/domain/core/src/services/engine_provisioner.rs) | `Engine`, `TransformRequestExt`, `TransformResponseExt`, `EngineError`; `EngineProvisioner`, `EngineProvisioningError` |
-| Transform services | `kamu` — [`src/infra/core/src/services/transform/`](../../src/infra/core/src/services/transform) | `TransformPlannerImpl`, `TransformExecutorImpl`, `transform_helpers` |
+| Transform services | `kamu` — [`src/infra/core/src/services/transform/`](../../src/infra/core/src/services/transform) | `TransformPlannerImpl`, `TransformExecutorImpl`, `transform_preliminary_plan`, `transform_helpers` |
 | Engines | `kamu` — [`src/infra/core/src/engine/`](../../src/infra/core/src/engine) | `EngineProvisionerLocal`, `ODFEngine`, `EngineContainer`, the I/O strategies |
 | Engine protocol client | `opendatafabric-metadata` — `odf::metadata::engines::EngineGrpcClient` | gRPC client for the ODF engine adapter inside the container |
 | Chain validation | `opendatafabric-dataset-impl` — [`metadata_chain_validators.rs`](../../src/odf/dataset-impl/src/entities/metadata_chain_validators.rs) | `ValidateSetTransformVisitor`, `ValidateExecuteTransformVisitor` |
@@ -373,9 +374,14 @@ Walking back from the new `HEAD` never reaches `o2`, so elaboration fails with
 
 | Path | Detection | What happens |
 | --- | --- | --- |
-| `kamu pull` | elaboration fails with `InvalidInputIntervalError` | error, unless `--reset-derivatives-on-diverged-input`: then `PullTransformJob` resets the derivative to metadata ([dataset-reset.md](dataset-reset.md#6-reset-to-metadata)), moves `HEAD` to the reset head through `DatasetReferenceUpdater` (CAS), re-plans and elaborates once more. The pull reports one update from the head before the reset to the final head |
+| `kamu pull` | elaboration fails with `InvalidInputIntervalError` | an error, unless `--reset-derivatives-on-diverged-input` is set (below) |
 | Transform task | elaboration fails with `InvalidInputIntervalError` | the task fails unrecoverably ([task-system.md](task-system.md#71-update-dataset)) |
 | Flow sensor | `evaluate_transform_status` returns `InputBreakingChange` (checked before new data); or an upstream flow reports a `Breaking` change | with the `Recover` rule, a reset-to-metadata flow; with `NoAction`, a warning ([flow-system.md](flow-system.md#8-sensors-and-propagation)) |
+
+With `--reset-derivatives-on-diverged-input`, `PullTransformJob` runs `CompactionJob` with
+`keep_metadata_only`, which checks Maintain and commits the reset with its own CAS
+([dataset-reset.md](dataset-reset.md#6-reset-to-metadata)), then runs `TransformJob` once more. The
+pull reports one update, from the head before the reset to the final head.
 
 After a reset to metadata the derivative has no `ExecuteTransform`, so the next transform consumes
 every input from its first block.
@@ -399,9 +405,12 @@ moves it with a CAS on the head elaboration saw ([§4.4](#44-transactions)). The
 
 ## 9. Errors
 
-`TransformError` wraps the errors of the three phases (`TransformPlanError`,
-`TransformElaborateError`, `TransformExecuteError`); `rebuild_transform`, `evaluate_transform_status`
-and the verification plan have error types of their own. Which engine errors carry log paths is in
+`TransformJob` fails with `TransformJobError`: the elaboration and execution errors
+(`TransformElaborateError`, `TransformExecuteError`), or `NotFound`, `Access`, `RefCASFailed` and
+`Internal`. `kamu pull` reports the phase errors as `TransformError`, which also wraps the
+`TransformPlanError` of pull planning ([dataset-pull.md](dataset-pull.md#62-per-job-runners));
+`rebuild_transform`, `evaluate_transform_status` and the verification plan have error types of
+their own. Which engine errors carry log paths is in
 [§5.2](#52-one-transform-one-container).
 
 Each phase error's `is_recoverable` says whether a retry could succeed, and the engine part comes
@@ -420,9 +429,9 @@ including an input that has no data yet. The outcomes the update task decides it
 | --- | --- | --- |
 | `RunInfoDir/transform-<operation_id>/in/` | input schema files; with the remote proxy, downloaded slices and checkpoint | as soon as the engine container stops, whether the run succeeded or not |
 | `RunInfoDir/transform-<operation_id>/out/` | `data` and `checkpoint` written by the engine | both move into the dataset's repos on commit; a data file with no offset interval is deleted |
-| `RunInfoDir/transform-<operation_id>/logs/` | engine stdout and stderr; on failure, the demultiplexed adapter logs | after a successful commit, or when the process starts |
+| `RunInfoDir/transform-<operation_id>/logs/` | engine stdout and stderr; on failure, the demultiplexed adapter logs | once the executor has appended the blocks, or when the process starts |
 
-The executor removes the operation directory once a transform has committed; a failed run keeps
+The executor removes the operation directory once it has appended the blocks; a failed run keeps
 it, because the `EngineError` points at its log files. The executor's caller chooses
 `operation_id`, one per execution attempt, so two attempts of one plan never share staged output;
 it also names the engine container. The directory is created with `create_dir`, so an attempt that
@@ -472,7 +481,8 @@ reuses an ID fails instead of mixing its output with an earlier one.
 | Planner errors | [`transform_planner_errors.rs`](../../src/domain/core/src/services/transform/transform_planner_errors.rs) |
 | Executor trait | [`transform_executor.rs`](../../src/domain/core/src/services/transform/transform_executor.rs) |
 | Options, results, shared errors | [`transform_types.rs`](../../src/domain/core/src/services/transform/transform_types.rs) |
-| Preliminary request, input slicing | [`transform_helpers.rs`](../../src/infra/core/src/services/transform/transform_helpers.rs) |
+| Preliminary request | [`transform_preliminary_plan.rs`](../../src/infra/core/src/services/transform/transform_preliminary_plan.rs) |
+| Input slicing | [`transform_helpers.rs`](../../src/infra/core/src/services/transform/transform_helpers.rs) |
 | Planner: describe, elaborate, rebuild, status, verification plan | [`transform_planner_impl.rs`](../../src/infra/core/src/services/transform/transform_planner_impl.rs) |
 | Compact stored plan | [`transform_plan_payload.rs`](../../src/domain/core/src/services/transform/transform_plan_payload.rs) |
 | Reset on diverged input during `kamu pull` | [`pull_transform_job.rs`](../../src/infra/core/src/use_cases/pull_transform_job.rs) |

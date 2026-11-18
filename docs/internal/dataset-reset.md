@@ -251,7 +251,7 @@ prints errors as failures; task and GraphQL mappings are owned by
 | Planner and executor: drop the last block, reset to the current head, unknown block, old-head mismatch, default `Seed` | [`test_reset_service_impl.rs`](../../src/infra/core/tests/tests/test_reset_service_impl.rs) |
 | Job: authorization, a missing dataset | [`test_reset_job.rs`](../../src/infra/core/tests/tests/dataset_jobs/test_reset_job.rs) |
 | Metadata-only compaction; transform status after an input reset | `test_compaction_services_impl.rs` (`test_dataset_keep_metadata_only_compact`), `test_transform_services_impl.rs` |
-| Flow controllers, sensor recovery, flow agent | `test_flow_controller_reset.rs`, `test_flow_controller_reset_to_metadata.rs`, `test_derived_dataset_flow_sensor.rs`, `test_flow_agent_impl.rs` |
+| Flow controllers, sensor recovery, flow agent | `test_flow_controller_reset.rs`, `test_flow_controller_reset_to_metadata.rs`, `test_derived_dataset_flow_sensor.rs`, `test_flow_agent/test_manual_triggers.rs` |
 | GraphQL triggers | `test_gql_dataset_flow_runs.rs` |
 | CLI end to end, including a dependency drop on reset to `Seed`; pull with derivative reset; flow recovery | `src/e2e/app/cli/repo-tests/src/commands/test_reset_command.rs`, `test_pull_command.rs`, `src/e2e/app/cli/repo-tests/src/test_flow.rs` |
 

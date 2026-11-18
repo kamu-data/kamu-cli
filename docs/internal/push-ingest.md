@@ -76,7 +76,9 @@ The concepts the writer builds on are listed in
 
 ## 4. Call sequence
 
-Push ingest runs in one transaction, the command's or the request's:
+Push ingest follows the plan, execute and commit steps every operation shares
+([dataset-operations.md](dataset-operations.md#2-plan-execute-commit)), all in one transaction, the
+command's or the request's:
 
 ```mermaid
 sequenceDiagram
@@ -102,8 +104,8 @@ sequenceDiagram
 `PushIngest` (Write) on the target for the current `Principal` through
 [`DatasetOperationGuard`](../../src/domain/datasets/domain/src/services/dataset_operation_guard.rs),
 before anything is read; a denial on a readable dataset is `PushIngestDataError::Access`, a missing
-or unreadable dataset `NotFound`.
-Then:
+or unreadable dataset `NotFound`. Both planner calls below reject a derived dataset with
+`InvalidDatasetKind`. Then:
 
 1. **Add a push source** (uploads through the HTTP endpoint only) —
    `PushIngestPlannerImpl::plan_push_source_creation` returns an
@@ -114,8 +116,7 @@ Then:
    upload adds nothing, so the result is `Updated` either way and counts the source block. A
    failed ingest leaves the source block unreferenced. Without a media type the push fails with
    `SourceNotFound`.
-2. **Plan** — a derived dataset is rejected with `InvalidDatasetKind`.
-   `PushIngestPlannerImpl::plan_ingest` builds the writer state at `HEAD` (or at
+2. **Plan** — `PushIngestPlannerImpl::plan_ingest` builds the writer state at `HEAD` (or at
    `expected_head` when given) for `source_name`. The planner writes nothing. A missing source is
    `SourceNotFound`; with no `source_name` and several push sources, `WriterSourceEventVisitor`
    reports the ambiguity as `SourceNotFound` too.
@@ -129,13 +130,16 @@ Then:
 4. **Finalize** — move `HEAD` from `old_head` to `new_head` through `DatasetReferenceUpdater` and post
    `DatasetExternallyChangedMessage::ingest_http`.
 
-The executor reports `begin` and progress to the listener; the use case reports `success` or `error`
-once, after step 4 or the failure ([dataset-pull.md](dataset-pull.md#63-listeners)).
+The executor reports `begin` and the `Read`, `Preprocess` and `Commit` stages to the listener;
+`Merge` is never reported ([ingest-data-writer.md](ingest-data-writer.md#52-the-two-steps)). The use
+case reports `success` or `error` once, after step 4 or the failure
+([dataset-pull.md](dataset-pull.md#63-listeners)).
 
-`execute_multi` runs steps 1 to 3 for each data source in turn, threading the new head through
-`expected_head`, and moves `HEAD` once at the end from the first `old_head` to the last `new_head`.
-The account statistics count only data reachable from the committed `HEAD`, so each quota check
-adds the sizes of the files ingested earlier in the same call (`uncommitted_bytes`).
+`execute_multi`, which only tests call, runs steps 1 to 3 for each data source in turn, threading
+the new head through `expected_head`, and moves `HEAD` once at the end from the first `old_head` to
+the last `new_head`. The account statistics count only data reachable from the committed `HEAD`, so
+each quota check adds the sizes of the files ingested earlier in the same call
+(`uncommitted_bytes`).
 
 Push ingest stores no source state (`new_source_state: None`), so `AddPushSource`'s capacity for
 exactly-once resume is unused.
@@ -209,7 +213,9 @@ Input copies (a FIFO or device, a buffer, a stream) are written to
 
 ### Testing
 
-- Push service tests live in `src/infra/core/tests/tests/ingest/test_push_ingest.rs`; CLI scenarios
+- Push service tests live in `src/infra/core/tests/tests/ingest/test_push_ingest.rs`, use case
+  tests (auto-created sources, `execute_multi`, races, quota) in
+  `src/infra/core/tests/tests/use_cases/test_push_ingest_data_use_case.rs`; CLI scenarios
   in `src/e2e/app/cli/repo-tests/src/commands/test_ingest_command.rs`, wired for SQLite only when
   they check only CLI output.
 

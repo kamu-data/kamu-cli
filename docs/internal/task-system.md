@@ -235,7 +235,7 @@ sequenceDiagram
     participant R as TaskRunner
 
     loop until a task is taken
-        rect rgba(128, 128, 128, 0.12)
+        rect rgba(100, 150, 255, 0.15)
             note over A,O: transaction: take_next_task
             A->>S: try_take()
             S->>ES: try_get_queued_task() — earliest Queued by task_id
@@ -256,7 +256,7 @@ sequenceDiagram
     A->>R: run_task(definition)
     R-->>A: TaskOutcome (Err → Failed(empty_recoverable))
 
-    rect rgba(128, 128, 128, 0.12)
+    rect rgba(100, 150, 255, 0.15)
         note over A,O: transaction: finish_task
         A->>ES: task.update() — picks up a cancellation that arrived mid-run
         A->>ES: task.finish(now, outcome), save
@@ -448,7 +448,7 @@ task was scheduled fails the task unrecoverably.
 | `SetReferenceFailed(BlockNotFound)` — the target block is not in the dataset's block store | typed `TaskErrorDatasetReset::ResetHeadNotFound`, unrecoverable |
 | The dataset was deleted after planning | empty, unrecoverable |
 | `SetReferenceFailed(CASFailed)` — `HEAD` moved after planning | typed `TaskErrorDatasetCommit::RefMoved`, recoverable |
-| `SetReferenceFailed(Access)` — moving `HEAD` is not allowed | empty, unrecoverable |
+| `Access` or `SetReferenceFailed(Access)` — the principal may not reset the dataset | empty, unrecoverable |
 | An internal planning error, `SetReferenceFailed(Internal)`, `Internal` | empty, recoverable |
 
 The success result is `TaskResultDatasetReset { reset_result: ResetResult { old_head, new_head } }`.
