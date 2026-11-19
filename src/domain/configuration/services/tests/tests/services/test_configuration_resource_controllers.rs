@@ -115,14 +115,14 @@ impl ControllersHarness {
         name: &str,
         variables: impl IntoIterator<Item = (&'static str, &'static str)>,
     ) -> ResourceID {
-        let spec = VariableSetSpecInput::new(odf::metadata::config::VariableSetSpecInput {
-            variables: odf::metadata::config::Variables {
+        let spec = VariableSetSpecInput::new(odf::meta::config::VariableSetSpecInput {
+            variables: odf::meta::config::Variables {
                 entries: variables
                     .into_iter()
                     .map(|(name, value)| {
                         (
                             name.to_string(),
-                            odf::metadata::config::Variable {
+                            odf::meta::config::Variable {
                                 value: value.to_string(),
                             },
                         )
@@ -158,11 +158,11 @@ impl ControllersHarness {
     /// A `SecretSet` whose secret claims an encoding it does not have, written
     /// past the sanitizer, so that every reconciliation of it fails
     async fn create_secret_set_with_undecryptable_secret(&self) -> ResourceID {
-        let spec = SecretSetSpecInput::new(odf::metadata::config::SecretSetSpecInput {
-            secrets: odf::metadata::config::Secrets {
+        let spec = SecretSetSpecInput::new(odf::meta::config::SecretSetSpecInput {
+            secrets: odf::meta::config::Secrets {
                 entries: [(
                     "TOKEN".to_string(),
-                    odf::metadata::config::Secret {
+                    odf::meta::config::Secret {
                         value: "not-a-jwe".to_string(),
                         content_encoding: Some("jwe".to_string()),
                     },

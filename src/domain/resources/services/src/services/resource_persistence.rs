@@ -188,7 +188,7 @@ where
 
         ResourceDurableStateValidator::new(self.extension_schema_registry)
             .validate_changes(
-                R::schema(),
+                R::type_uri(),
                 ResourceExtensionState {
                     headers: resource.headers(),
                     status: resource.status(),
