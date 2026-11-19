@@ -83,7 +83,7 @@ Do not re-propose these without new evidence.
 | Approach | Why it was rejected |
 |---|---|
 | Database foreign keys across bounded contexts | Couples schemas and blocks splitting contexts into services. Use lifecycle-message cleanup. |
-| Modelling transactions (rollback) in `*-inmem` repositories | They are test-only; the fidelity gain does not justify the complexity (AGENTS.md). |
+| Modelling transactions (rollback) in every `*-inmem` repository | They are test-only; the fidelity gain does not justify the complexity. The dataset repositories have an opt-in emulation where a test needs rollback (AGENTS.md). |
 | Catch-all `_ =>` arms in error conversions | A new variant then compiles silently into the wrong mapping. List variants explicitly. |
 
 ## What lives elsewhere
@@ -91,4 +91,5 @@ Do not re-propose these without new evidence.
 - Outbox mechanics, consumers, ordering: [`docs/internal/outbox.md`](../../../docs/internal/outbox.md).
 - Repository implementations and SQL: `kamu-sqlx-database-work`; their test suites: `kamu-repository-tests`.
 - DI scopes for services and repositories: `kamu-dill-di`.
+- Opening and ending transactions, where they belong in an algorithm, the managers: [`docs/internal/database-transactions.md`](../../../docs/internal/database-transactions.md).
 - Scaffolding a whole new context: `kamu-adding-a-bounded-context`.

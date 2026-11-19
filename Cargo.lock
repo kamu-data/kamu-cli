@@ -4085,7 +4085,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c54e03a951783e8b327515db3f2a2fd0e3bed362a96b066f341ce66ed49b4ead"
 dependencies = [
  "data-encoding",
- "syn 3.0.9",
+ "syn 1.0.109",
 ]
 
 [[package]]
@@ -4098,6 +4098,7 @@ dependencies = [
  "aws-credential-types",
  "aws-sdk-secretsmanager",
  "chrono",
+ "database-common-macros",
  "dill",
  "futures",
  "hex",
@@ -4119,6 +4120,7 @@ dependencies = [
 name = "database-common-macros"
 version = "0.272.1"
 dependencies = [
+ "proc-macro2",
  "quote",
  "syn 3.0.9",
 ]
@@ -5667,6 +5669,8 @@ version = "0.272.1"
 dependencies = [
  "fs_extra",
  "serde",
+ "tempfile",
+ "tracing",
 ]
 
 [[package]]
@@ -7717,7 +7721,6 @@ dependencies = [
  "curl-sys",
  "dashmap",
  "database-common",
- "database-common-macros",
  "datafusion",
  "datafusion-ethers",
  "datafusion-functions-json",
@@ -7733,7 +7736,6 @@ dependencies = [
  "indoc 2.0.8",
  "init-on-startup",
  "internal-error",
- "itertools 0.15.0",
  "kamu-accounts",
  "kamu-accounts-inmem",
  "kamu-accounts-services",
@@ -7767,6 +7769,7 @@ dependencies = [
  "serde_with",
  "serde_yaml_ng",
  "sha3 0.12.0",
+ "strum 0.28.0",
  "tempfile",
  "test-group",
  "test-log",
@@ -7794,6 +7797,7 @@ dependencies = [
  "crc32fast",
  "crypto-utils",
  "database-common",
+ "dill",
  "email-utils",
  "event-sourcing",
  "futures",
@@ -7990,10 +7994,12 @@ dependencies = [
  "kamu-datasets-inmem",
  "kamu-datasets-services",
  "messaging-outbox",
+ "oop",
  "opendatafabric",
  "oso",
  "pretty_assertions",
  "rayon",
+ "strum 0.28.0",
  "test-log",
  "thiserror 2.0.21",
  "time-source",
@@ -8046,8 +8052,11 @@ dependencies = [
  "futures",
  "http",
  "indoc 2.0.8",
+ "internal-error",
  "kamu-accounts",
+ "kamu-adapter-flight-sql",
  "kamu-core",
+ "kamu-datasets",
  "like",
  "mockall",
  "opendatafabric",
@@ -8072,6 +8081,7 @@ dependencies = [
  "dill",
  "futures",
  "internal-error",
+ "kamu",
  "kamu-accounts",
  "kamu-adapter-task-dataset",
  "kamu-core",
@@ -8083,6 +8093,7 @@ dependencies = [
  "kamu-wakeup-listener-inmem",
  "messaging-outbox",
  "mockall",
+ "oop",
  "opendatafabric",
  "pretty_assertions",
  "serde",
@@ -8231,6 +8242,7 @@ dependencies = [
  "base64 0.23.1",
  "bytes",
  "chrono",
+ "common-macros",
  "container-runtime",
  "database-common",
  "database-common-macros",
@@ -8394,17 +8406,29 @@ name = "kamu-adapter-task-dataset"
 version = "0.272.1"
 dependencies = [
  "async-trait",
+ "chrono",
  "common-macros",
+ "container-runtime",
  "database-common",
  "database-common-macros",
+ "datafusion",
  "dill",
  "internal-error",
+ "kamu",
+ "kamu-accounts",
  "kamu-core",
  "kamu-datasets",
+ "kamu-datasets-inmem",
+ "kamu-datasets-services",
  "kamu-task-system",
+ "oop",
  "opendatafabric",
+ "pretty_assertions",
  "serde",
  "serde_json",
+ "strum 0.28.0",
+ "thiserror 2.0.21",
+ "tokio",
  "tracing",
 ]
 
@@ -9079,7 +9103,6 @@ dependencies = [
  "object_store",
  "opendatafabric",
  "pathdiff",
- "random-strings",
  "serde",
  "serde_json",
  "serde_with",
@@ -9221,6 +9244,7 @@ dependencies = [
  "dill",
  "email-utils",
  "futures",
+ "internal-error",
  "itertools 0.15.0",
  "kamu-accounts",
  "kamu-datasets",
@@ -9262,6 +9286,7 @@ dependencies = [
  "kamu-core",
  "kamu-datasets",
  "kamu-datasets-inmem",
+ "kamu-datasets-services",
  "kamu-messaging-outbox-inmem",
  "kamu-search",
  "kamu-search-cache-inmem",
@@ -10398,7 +10423,6 @@ dependencies = [
  "common-macros",
  "crypto-utils",
  "database-common",
- "database-common-macros",
  "dill",
  "hex",
  "http",
@@ -11956,6 +11980,7 @@ dependencies = [
  "bytes",
  "chrono",
  "dashmap",
+ "futures",
  "http",
  "internal-error",
  "mockall",
@@ -15665,7 +15690,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "32497e9a4c7b38532efcdebeef879707aa9f794296a4f0244f6f69e9bc8574bd"
 dependencies = [
  "fastrand",
- "getrandom 0.4.3",
+ "getrandom 0.3.4",
  "once_cell",
  "rustix",
  "windows-sys 0.61.2",

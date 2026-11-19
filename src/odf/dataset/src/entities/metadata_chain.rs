@@ -92,12 +92,15 @@ pub trait MetadataChain: Send + Sync {
     /// Resolves reference to the block hash it's pointing to
     async fn resolve_ref(&self, r: &BlockRef) -> Result<Multihash, GetRefError>;
 
-    /// Update reference to point at the specified block
-    async fn set_ref<'a>(
-        &'a self,
+    /// Moves reference `r` from `expected` to `hash` (compare-and-swap).
+    /// `expected = None` means the reference must not exist yet. Fails with
+    /// `CASFailed` when `r` points elsewhere; there is no unconditional move
+    async fn set_ref(
+        &self,
         r: &BlockRef,
+        expected: Option<&Multihash>,
         hash: &Multihash,
-        opts: SetRefOpts<'a>,
+        opts: SetRefOpts,
     ) -> Result<(), SetChainRefError>;
 
     /// Returns uncached version of the metadata chain
@@ -139,6 +142,83 @@ pub trait MetadataChainExt: MetadataChain {
             Err(GetBlockError::NotFound(_)) => Ok(None),
             Err(e) => Err(e.int_err()),
         }
+    }
+
+    /// Appends the blocks in order without moving any reference. Returns
+    /// `None` for an empty batch.
+    async fn append_batch(
+        &self,
+        new_blocks: Box<dyn Iterator<Item = HashedMetadataBlockBytesDecoded> + Send>,
+        opts: AppendBatchOpts,
+    ) -> Result<Option<AppendedBatch>, AppendBatchError> {
+        let mut new_blocks = new_blocks.peekable();
+
+        let Some((_, first_block, _)) = new_blocks.peek() else {
+            return Ok(None);
+        };
+        let base_head = first_block.prev_block_hash.clone();
+
+        let mut new_head = None;
+        for (hash, block, block_bytes) in new_blocks {
+            tracing::debug!(sequence_number = %block.sequence_number, hash = %hash, "Appending block");
+
+            let block_sequence_number = block.sequence_number;
+            if let Err(append_error) = self
+                .append(
+                    block,
+                    AppendOpts {
+                        validation: opts.validation,
+                        update_ref: None,
+                        precomputed_hash: opts.trust_hashes.then_some(&hash),
+                        expected_hash: Some(&hash),
+                        block_data: Some(&block_bytes),
+                    },
+                )
+                .await
+            {
+                return Err(AppendBatchError {
+                    append_error,
+                    block_sequence_number,
+                    block_hash: hash,
+                });
+            }
+
+            new_head = Some(hash);
+        }
+
+        Ok(Some(AppendedBatch {
+            base_head,
+            // Safety: the batch is not empty
+            new_head: new_head.unwrap(),
+        }))
+    }
+
+    /// Appends the blocks like `append_batch`, then moves `HEAD` once to the
+    /// last one by compare-and-set from `expected_head`. Returns `None` for an
+    /// empty batch. Meant for chains whose `HEAD` is written directly, such as
+    /// remote datasets; local datasets move `HEAD` through the node's
+    /// reference updater.
+    async fn append_batch_and_set_head(
+        &self,
+        new_blocks: Box<dyn Iterator<Item = HashedMetadataBlockBytesDecoded> + Send>,
+        opts: AppendBatchOpts,
+        expected_head: Option<&Multihash>,
+    ) -> Result<Option<Multihash>, AppendBatchAndSetHeadError> {
+        let Some(appended) = self.append_batch(new_blocks, opts).await? else {
+            return Ok(None);
+        };
+
+        self.set_ref(
+            &BlockRef::Head,
+            expected_head,
+            &appended.new_head,
+            SetRefOpts {
+                validate_block_present: false,
+            },
+        )
+        .await?;
+
+        Ok(Some(appended.new_head))
     }
 
     /// Convenience function to iterate blocks starting with the `head`
@@ -702,20 +782,15 @@ impl Default for AcceptByIntervalOptions {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Clone, Debug)]
-pub struct SetRefOpts<'a> {
+pub struct SetRefOpts {
     /// Ensure new value points to a valid block
     pub validate_block_present: bool,
-
-    /// Validate that old reference still points to the specified block
-    /// (compare-and-swap)
-    pub check_ref_is: Option<Option<&'a Multihash>>,
 }
 
-impl Default for SetRefOpts<'_> {
+impl Default for SetRefOpts {
     fn default() -> Self {
         Self {
             validate_block_present: true,
-            check_ref_is: None,
         }
     }
 }
@@ -735,16 +810,9 @@ pub struct AppendOpts<'a> {
     /// Validations to perform on the newly appended block
     pub validation: AppendValidation,
 
-    /// Update specified reference to the block after appending
+    /// Moves the specified reference from `block.prev_block_hash` to the
+    /// appended block (compare-and-swap)
     pub update_ref: Option<&'a BlockRef>,
-
-    /// Validate that `update_ref` points to the same block as
-    /// `block.prev_block_hash` (compare-and-swap)
-    pub check_ref_is_prev_block: bool,
-
-    /// Validate that `update_ref` points to the specified block
-    /// (compare-and-swap)
-    pub check_ref_is: Option<Option<&'a Multihash>>,
 
     /// Append block using the provided hash computed elsewhere.
     ///
@@ -769,13 +837,39 @@ impl Default for AppendOpts<'_> {
         Self {
             validation: AppendValidation::Full,
             update_ref: Some(&BlockRef::Head),
-            check_ref_is_prev_block: true,
-            check_ref_is: None,
             precomputed_hash: None,
             expected_hash: None,
             block_data: None,
         }
     }
+}
+
+#[derive(Clone, Copy, Debug)]
+pub struct AppendBatchOpts {
+    /// Validations to perform on each appended block
+    pub validation: AppendValidation,
+
+    /// Store each block under the hash it comes with instead of computing it.
+    ///
+    /// Warning: Use only when you fully trust the source of the blocks.
+    pub trust_hashes: bool,
+}
+
+impl Default for AppendBatchOpts {
+    fn default() -> Self {
+        Self {
+            validation: AppendValidation::Full,
+            trust_hashes: false,
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct AppendedBatch {
+    /// The block the batch was appended to
+    pub base_head: Option<Multihash>,
+    /// The last appended block
+    pub new_head: Multihash,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -900,6 +994,22 @@ pub struct AppendResult {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Error, Debug)]
+pub enum AppendBatchAndSetHeadError {
+    #[error(transparent)]
+    Append(#[from] AppendBatchError),
+    #[error(transparent)]
+    SetHead(#[from] SetChainRefError),
+}
+
+#[derive(Error, Debug)]
+#[error("Failed to append block {block_sequence_number} ({block_hash}): {append_error}")]
+pub struct AppendBatchError {
+    pub append_error: AppendError,
+    pub block_sequence_number: u64,
+    pub block_hash: Multihash,
+}
 
 #[derive(Error, Debug)]
 pub enum AppendError {

@@ -185,13 +185,11 @@ pub type EntityPageStream<'a, Entity> =
 /// // An example use case with passing some value to each page callback:
 /// let dataset_handles_by_owner_name_stream = EntityPageStreamer::default().into_stream(
 ///     move || async move {
-///         let owner_id = self
-///             .resolve_account_id_by_maybe_name(Some(&owner_name))
-///             .await?;
+///         let owner_id = self.resolve_account_id_by_name(&owner_name).await?;
 ///         Ok(Arc::new(owner_id))
 ///     },
 ///     move |owner_id, pagination| async move {
-///         self.list_all_dataset_handles_by_owner_name(&owner_id, pagination)
+///         self.list_all_dataset_handles_by_owner_id(&owner_id, pagination)
 ///             .await
 ///     },
 /// )

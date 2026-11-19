@@ -52,6 +52,19 @@ async fn test_store_dataset() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[tokio::test]
+async fn test_store_dataset_takes_over_headless() {
+    let tempdir = tempfile::tempdir().unwrap();
+    let harness = LocalFsStorageUnitHarness::create(&tempdir);
+
+    test_dataset_storage_unit_shared::test_store_dataset_takes_over_headless(
+        harness.storage_unit.as_ref(),
+    )
+    .await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[tokio::test]
 async fn test_delete_dataset() {
     let tempdir = tempfile::tempdir().unwrap();
     let harness = LocalFsStorageUnitHarness::create(&tempdir);

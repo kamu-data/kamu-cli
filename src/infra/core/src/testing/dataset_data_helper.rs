@@ -10,7 +10,6 @@
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use datafusion::arrow::datatypes::SchemaRef;
 use datafusion::prelude::*;
 use futures::TryStreamExt;
 use odf::utils::data::DataFrameExt;
@@ -113,19 +112,6 @@ impl DatasetDataHelper {
             .await
             .unwrap()
             .into()
-    }
-
-    #[deprecated(
-        note = "Use `get_latest_schema_in_meta` instead that returns ODF schema as specified in \
-                metadata chain"
-    )]
-    pub async fn get_latest_data_schema(&self) -> SchemaRef {
-        self.get_last_set_data_schema_block()
-            .await
-            .event
-            .schema_as_arrow(&odf::metadata::ToArrowSettings::default())
-            .map(Arc::new)
-            .unwrap()
     }
 
     pub async fn get_latest_schema_in_meta(&self) -> odf::schema::DataSchema {

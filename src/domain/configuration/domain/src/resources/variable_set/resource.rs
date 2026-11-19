@@ -35,7 +35,7 @@ impl VariableSetResource {
     /// Canonical schema URL as a `&'static str`, sourced from the ODF codegen.
     ///
     /// Used as the const dill-registry key (dill `#[meta]` requires a const);
-    /// the typed identity is [`Self::schema`] returning a `TypeUri`. Both
+    /// the typed identity is [`Self::type_uri`] returning a `TypeUri`. Both
     /// derive from the same generated static, so they cannot drift.
     pub const SCHEMA_STR: &'static str = odf::metadata::config::VariableSet::type_uri_str();
 

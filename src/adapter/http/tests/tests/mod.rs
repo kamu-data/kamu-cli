@@ -44,7 +44,7 @@ macro_rules! test_client_server_local_fs_harness_permutations {
                     ServerSideLocalFsHarness::new(ServerSideHarnessOptions {
                         tenancy_config: TenancyConfig::SingleTenant,
                         authorized_writes: true,
-                        base_catalog: None,
+                        ..ServerSideHarnessOptions::default()
                     }).await,
                 )
                 .await;
@@ -62,7 +62,7 @@ macro_rules! test_client_server_local_fs_harness_permutations {
                     ServerSideLocalFsHarness::new(ServerSideHarnessOptions {
                         tenancy_config: TenancyConfig::MultiTenant,
                         authorized_writes: true,
-                        base_catalog: None,
+                        ..ServerSideHarnessOptions::default()
                     }).await,
                 )
                 .await;
@@ -80,7 +80,7 @@ macro_rules! test_client_server_local_fs_harness_permutations {
                     ServerSideLocalFsHarness::new(ServerSideHarnessOptions {
                         tenancy_config: TenancyConfig::SingleTenant,
                         authorized_writes: true,
-                        base_catalog: None,
+                        ..ServerSideHarnessOptions::default()
                     }).await,
                 )
                 .await;
@@ -98,7 +98,7 @@ macro_rules! test_client_server_local_fs_harness_permutations {
                     ServerSideLocalFsHarness::new(ServerSideHarnessOptions {
                         tenancy_config: TenancyConfig::MultiTenant,
                         authorized_writes: true,
-                        base_catalog: None,
+                        ..ServerSideHarnessOptions::default()
                     }).await,
                 )
                 .await;
@@ -126,7 +126,7 @@ macro_rules! test_client_server_s3_harness_permutations {
                     ServerSideS3Harness::new(ServerSideHarnessOptions {
                         tenancy_config: TenancyConfig::SingleTenant,
                         authorized_writes: true,
-                        base_catalog: None,
+                        ..ServerSideHarnessOptions::default()
                     }).await,
                 )
                 .await;
@@ -145,7 +145,7 @@ macro_rules! test_client_server_s3_harness_permutations {
                     ServerSideS3Harness::new(ServerSideHarnessOptions {
                         tenancy_config: TenancyConfig::MultiTenant,
                         authorized_writes: true,
-                        base_catalog: None,
+                        ..ServerSideHarnessOptions::default()
                     }).await,
                 )
                 .await;

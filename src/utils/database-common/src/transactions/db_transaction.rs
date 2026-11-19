@@ -8,9 +8,11 @@
 // by the Apache License, Version 2.0.
 
 use std::any::Any;
-use std::sync::Arc;
+use std::sync::{Arc, Weak};
 
 use internal_error::*;
+
+use crate::TransactionId;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -44,6 +46,17 @@ impl TransactionRef {
         self.inner.begin().await
     }
 
+    pub fn id(&self) -> TransactionId {
+        self.inner.id()
+    }
+
+    /// A weak handle that upgrades only while some reference to this
+    /// transaction is alive
+    pub(crate) fn liveness(&self) -> Weak<dyn Any + Send + Sync> {
+        let inner: Arc<dyn Any + Send + Sync> = self.inner.clone();
+        Arc::downgrade(&inner)
+    }
+
     /// Performs dynamic downcasting into a DB-specific type. Typically you
     /// should be able to inject [`TransactionRefT`] directly without the need
     /// for manual downcasting.
@@ -57,6 +70,14 @@ impl TransactionRef {
     /// counterpart in the catalog
     pub fn register(&self, catalog_builder: &mut dill::CatalogBuilder) {
         TransactionStateErased::register(Arc::clone(&self.inner), catalog_builder);
+    }
+
+    /// A catalog chained on `base` that resolves components inside this
+    /// transaction
+    pub(crate) fn chained_catalog(&self, base: &dill::Catalog) -> dill::Catalog {
+        let mut b = base.builder_chained();
+        self.register(&mut b);
+        b.build()
     }
 }
 
@@ -130,6 +151,7 @@ impl<DB: sqlx::Database> TransactionRefT<DB> {
 
 #[derive(Debug)]
 struct TransactionState<DB: sqlx::Database> {
+    id: TransactionId,
     connection_pool: sqlx::pool::Pool<DB>,
     maybe_transaction: tokio::sync::Mutex<Option<sqlx::Transaction<'static, DB>>>,
 }
@@ -137,6 +159,7 @@ struct TransactionState<DB: sqlx::Database> {
 impl<DB: sqlx::Database> TransactionState<DB> {
     fn new(connection_pool: sqlx::pool::Pool<DB>) -> Self {
         Self {
+            id: TransactionId::next(),
             connection_pool,
             maybe_transaction: tokio::sync::Mutex::new(None),
         }
@@ -155,9 +178,8 @@ impl<DB: sqlx::Database> Drop for TransactionState<DB> {
     fn drop(&mut self) {
         match self.maybe_transaction.try_lock() {
             Ok(guard) if guard.is_none() => (),
-            // This log message compliments COMMIT / ROLLBACK logs we have in
-            // `DatabaseTransactionRunner` and is used to detect when transaction gets
-            // dropped without being committted or rolled back
+            // Complements the COMMIT / ROLLBACK logs of `TransactionScope`: detects a
+            // transaction dropped without being committed or rolled back
             _ => tracing::warn!("Transaction DROPPED"),
         }
     }
@@ -168,6 +190,8 @@ impl<DB: sqlx::Database> Drop for TransactionState<DB> {
 #[async_trait::async_trait]
 trait TransactionStateErased: std::fmt::Debug + Any + Send + Sync {
     fn register(self: Arc<Self>, catalog_builder: &mut dill::CatalogBuilder);
+
+    fn id(&self) -> TransactionId;
 
     /// Acquires a connection from the connection pool and starts the
     /// transaction if it's not already started. You probably should not call
@@ -186,6 +210,10 @@ impl<DB: sqlx::Database> TransactionStateErased for TransactionState<DB> {
 
         // Add erased wrapper
         catalog_builder.add_value(TransactionRef { inner: self });
+    }
+
+    fn id(&self) -> TransactionId {
+        self.id
     }
 
     async fn begin(&self) -> Result<bool, InternalError> {

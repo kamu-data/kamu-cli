@@ -9,6 +9,7 @@
 
 use std::sync::Arc;
 
+use database_common::transaction;
 use kamu::domain::*;
 use kamu_datasets::DatasetRegistry;
 
@@ -21,8 +22,8 @@ use crate::Interact;
 #[dill::interface(dyn Command)]
 pub struct ResetCommand {
     interact: Arc<Interact>,
-    dataset_registry: Arc<dyn DatasetRegistry>,
-    reset_dataset_use_case: Arc<dyn ResetDatasetUseCase>,
+    catalog: dill::Catalog,
+    reset_job: Arc<dyn ResetJob>,
 
     #[dill::component(explicit)]
     dataset_ref: odf::DatasetRef,
@@ -34,10 +35,11 @@ pub struct ResetCommand {
 #[async_trait::async_trait(?Send)]
 impl Command for ResetCommand {
     async fn run(&self) -> Result<(), CLIError> {
-        let dataset_handle = self
-            .dataset_registry
-            .resolve_dataset_handle_by_ref(&self.dataset_ref)
-            .await?;
+        let dataset_handle = transaction!(|dataset_registry: Arc<dyn DatasetRegistry>| {
+            dataset_registry
+                .resolve_dataset_handle_by_ref(&self.dataset_ref)
+                .await?
+        });
 
         self.interact.require_confirmation(format!(
             "{}: {}\n{}",
@@ -46,8 +48,8 @@ impl Command for ResetCommand {
             console::style("This operation is irreversible!").yellow(),
         ))?;
 
-        self.reset_dataset_use_case
-            .execute(&dataset_handle, Some(&self.block_hash), None)
+        self.reset_job
+            .run(&dataset_handle, Some(&self.block_hash), None)
             .await
             .map_err(CLIError::failure)?;
 

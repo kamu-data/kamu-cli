@@ -12,12 +12,10 @@ use std::sync::Arc;
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_core::engine::TransformRequestInputExt;
 use kamu_core::{
-    InputSchemaNotDefinedError,
+    InputNotPulledError,
     InvalidInputIntervalError,
     TransformElaborateError,
-    TransformNotDefinedError,
-    TransformPlanError,
-    TransformPreliminaryRequestExt,
+    TransformStatusError,
     VerifyTransformPlanError,
 };
 use kamu_datasets::{ResolvedDataset, ResolvedDatasetsMap};
@@ -25,101 +23,12 @@ use thiserror::Error;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[tracing::instrument(level = "info", skip_all)]
-pub async fn build_preliminary_request_ext(
-    target: ResolvedDataset,
-) -> Result<TransformPreliminaryRequestExt, BuildPreliminaryTransformRequestError> {
-    let dataset_kind = target.get_kind();
-    if dataset_kind != odf::DatasetKind::Derivative {
-        return Err(TransformNotDefinedError {}.into());
-    }
-
-    let output_chain = target.as_metadata_chain();
-
-    // TODO: externalize
-    let block_ref = odf::BlockRef::Head;
-    let head = output_chain.resolve_ref(&block_ref).await.int_err()?;
-
-    // TODO: PERF: Search for source, vocab, and data schema result in full scan
-    let (source, schema, set_vocab, prev_query) = {
-        // TODO: Support transform evolution
-        let mut set_transform_visitor = odf::dataset::SearchSetTransformVisitor::new(dataset_kind);
-        let mut set_vocab_visitor = odf::dataset::SearchSetVocabVisitor::new();
-        let mut set_data_schema_visitor = odf::dataset::SearchSetDataSchemaVisitor::new();
-        let mut execute_transform_visitor =
-            odf::dataset::SearchExecuteTransformVisitor::new(dataset_kind);
-
-        use odf::dataset::MetadataChainExt;
-        target
-            .as_metadata_chain()
-            .accept_by_hash(
-                &mut [
-                    &mut set_transform_visitor,
-                    &mut set_vocab_visitor,
-                    &mut set_data_schema_visitor,
-                    &mut execute_transform_visitor,
-                ],
-                &head,
-            )
-            .await
-            .int_err()?;
-
-        (
-            set_transform_visitor.into_inner().into_event(),
-            set_data_schema_visitor
-                .into_event()
-                .as_ref()
-                .map(|e| e.schema_as_arrow(&odf::metadata::ToArrowSettings::default()))
-                .transpose() // Option<Result<Schema, E>> -> Result<Option<Schema>, E>
-                .int_err()?
-                .map(Arc::new),
-            set_vocab_visitor.into_event(),
-            execute_transform_visitor.into_inner().into_event(),
-        )
-    };
-
-    let Some(source) = source else {
-        return Err(TransformNotDefinedError {}.into());
-    };
-    tracing::debug!(?source, "Transforming using source");
-
-    // Prepare inputs
-    use itertools::Itertools;
-    let input_states: Vec<(
-        odf::metadata::TransformInput,
-        Option<odf::metadata::ExecuteTransformInput>,
-    )> = if let Some(query) = &prev_query {
-        source
-            .inputs
-            .iter()
-            .cloned()
-            .zip_eq(query.query_inputs.iter().cloned().map(Some))
-            .collect()
-    } else {
-        source.inputs.iter().map(|i| (i.clone(), None)).collect()
-    };
-
-    // Build preliminary transform request
-    Ok(TransformPreliminaryRequestExt {
-        dataset_handle: target.get_handle().clone(),
-        block_ref,
-        head,
-        transform: source.transform,
-        schema,
-        prev_offset: prev_query
-            .as_ref()
-            .and_then(odf::metadata::ExecuteTransform::last_offset),
-        vocab: set_vocab.unwrap_or_default().into(),
-        input_states,
-        prev_checkpoint: prev_query.and_then(|q| q.new_checkpoint.map(|c| c.physical_hash)),
-    })
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
+/// Computes the input interval up to `maybe_input_head`, or up to the input's
+/// current head
 pub(crate) async fn get_transform_query_input(
     input_decl: odf::metadata::TransformInput,
     input_state: Option<odf::metadata::ExecuteTransformInput>,
+    maybe_input_head: Option<&odf::Multihash>,
     datasets_map: &ResolvedDatasetsMap,
 ) -> Result<odf::metadata::ExecuteTransformInput, GetTransformQueryInputError> {
     let dataset_id = input_decl.dataset_ref.id().unwrap();
@@ -137,10 +46,13 @@ pub(crate) async fn get_transform_query_input(
         .and_then(odf::metadata::ExecuteTransformInput::last_offset);
 
     // Determine unprocessed block and offset range
-    let last_unprocessed_block = input_chain
-        .resolve_ref(&odf::BlockRef::Head)
-        .await
-        .int_err()?;
+    let last_unprocessed_block = match maybe_input_head {
+        Some(input_head) => input_head.clone(),
+        None => input_chain
+            .resolve_ref(&odf::BlockRef::Head)
+            .await
+            .int_err()?,
+    };
 
     use odf::dataset::MetadataChainExt;
     let last_unprocessed_offset = input_chain
@@ -179,14 +91,15 @@ pub(crate) async fn get_transform_query_input(
 /// descends from that block, i.e. the input history was rewritten.
 pub(crate) async fn collect_unprocessed_input_blocks(
     query_input: &odf::metadata::ExecuteTransformInput,
-    input_chain: &dyn odf::MetadataChain,
+    input: &ResolvedDataset,
 ) -> Result<Vec<(odf::Multihash, odf::MetadataBlock)>, CollectUnprocessedInputBlocksError> {
     let Some(new_block_hash) = &query_input.new_block_hash else {
         return Ok(Vec::new());
     };
 
     use futures::TryStreamExt;
-    input_chain
+    input
+        .as_metadata_chain()
         .iter_blocks_interval(
             new_block_hash.into(),
             query_input.prev_block_hash.as_ref().map(Into::into),
@@ -200,7 +113,7 @@ pub(crate) async fn collect_unprocessed_input_blocks(
                     InvalidInputIntervalError {
                         head: err.head,
                         tail: err.tail,
-                        input_dataset_id: query_input.dataset_id.clone(),
+                        input_dataset: input.get_handle().clone(),
                     },
                 )
             }
@@ -220,30 +133,45 @@ pub(crate) async fn collect_unprocessed_input_blocks(
 pub(crate) async fn get_transform_input_from_query_input(
     query_input: odf::metadata::ExecuteTransformInput,
     alias: String,
-    vocab_hint: Option<odf::metadata::DatasetVocabulary>,
     datasets_map: &ResolvedDatasetsMap,
 ) -> Result<TransformRequestInputExt, GetTransformInputError> {
     let resolved_input = datasets_map.get_by_id(&query_input.dataset_id);
     let input_chain = resolved_input.as_metadata_chain();
 
+    // Schema and vocabulary are read as of the last consumed block, so that a
+    // request rebuilt later does not see metadata the input gained since
+    let consumed_head = match query_input
+        .new_block_hash
+        .as_ref()
+        .or(query_input.prev_block_hash.as_ref())
+    {
+        Some(consumed_head) => consumed_head.clone(),
+        None => input_chain
+            .resolve_ref(&odf::BlockRef::Head)
+            .await
+            .int_err()?,
+    };
+
     // Find schema
     // TODO: PERF: Make single-pass via multi-visitor
     use odf::dataset::MetadataChainExt;
-    let schema = resolved_input
-        .as_metadata_chain()
-        .accept_one(odf::dataset::SearchSetDataSchemaVisitor::new())
+    let schema = input_chain
+        .accept_one_by_hash(
+            &consumed_head,
+            odf::dataset::SearchSetDataSchemaVisitor::new(),
+        )
         .await
         .int_err()?
         .into_event()
         .map(|e| e.schema_as_arrow(&odf::metadata::ToArrowSettings::default()))
         .transpose()
         .int_err()?
-        .ok_or_else(|| InputSchemaNotDefinedError {
+        .ok_or_else(|| InputNotPulledError {
             dataset_handle: resolved_input.get_handle().clone(),
         })?;
 
     // Collect unprocessed input blocks
-    let blocks_unprocessed = collect_unprocessed_input_blocks(&query_input, input_chain).await?;
+    let blocks_unprocessed = collect_unprocessed_input_blocks(&query_input, resolved_input).await?;
 
     use odf::metadata::IntoDataStreamBlock;
     let mut data_slices = Vec::new();
@@ -265,10 +193,7 @@ pub(crate) async fn get_transform_input_from_query_input(
         }
     }
 
-    let vocab = match vocab_hint {
-        Some(v) => v,
-        None => get_vocab(resolved_input.as_ref()).await?,
-    };
+    let vocab = get_vocab(input_chain, &consumed_head).await?;
 
     let is_empty = data_slices.is_empty() && explicit_watermarks.is_empty();
 
@@ -294,46 +219,17 @@ pub(crate) async fn get_transform_input_from_query_input(
 
 // TODO: Avoid iterating through output chain multiple times
 async fn get_vocab(
-    dataset: &dyn odf::Dataset,
+    chain: &dyn odf::MetadataChain,
+    head: &odf::Multihash,
 ) -> Result<odf::metadata::DatasetVocabulary, InternalError> {
     use odf::dataset::MetadataChainExt;
-    Ok(dataset
-        .as_metadata_chain()
-        .accept_one(odf::dataset::SearchSetVocabVisitor::new())
+    Ok(chain
+        .accept_one_by_hash(head, odf::dataset::SearchSetVocabVisitor::new())
         .await
         .int_err()?
         .into_event()
         .unwrap_or_default()
         .into())
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug, Error)]
-pub(crate) enum BuildPreliminaryTransformRequestError {
-    #[error(transparent)]
-    TransformNotDefined(
-        #[from]
-        #[backtrace]
-        TransformNotDefinedError,
-    ),
-    #[error(transparent)]
-    Internal(
-        #[from]
-        #[backtrace]
-        InternalError,
-    ),
-}
-
-impl From<BuildPreliminaryTransformRequestError> for TransformPlanError {
-    fn from(value: BuildPreliminaryTransformRequestError) -> Self {
-        match value {
-            BuildPreliminaryTransformRequestError::TransformNotDefined(e) => {
-                Self::TransformNotDefined(e)
-            }
-            BuildPreliminaryTransformRequestError::Internal(e) => Self::Internal(e),
-        }
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -349,6 +245,14 @@ pub(crate) enum GetTransformQueryInputError {
 }
 
 impl From<GetTransformQueryInputError> for TransformElaborateError {
+    fn from(value: GetTransformQueryInputError) -> Self {
+        match value {
+            GetTransformQueryInputError::Internal(e) => Self::Internal(e),
+        }
+    }
+}
+
+impl From<GetTransformQueryInputError> for TransformStatusError {
     fn from(value: GetTransformQueryInputError) -> Self {
         match value {
             GetTransformQueryInputError::Internal(e) => Self::Internal(e),
@@ -390,10 +294,10 @@ impl From<CollectUnprocessedInputBlocksError> for GetTransformInputError {
 #[derive(Debug, Error)]
 pub(crate) enum GetTransformInputError {
     #[error(transparent)]
-    InputSchemaNotDefined(
+    InputNotPulled(
         #[from]
         #[backtrace]
-        InputSchemaNotDefinedError,
+        InputNotPulledError,
     ),
     #[error(transparent)]
     InvalidInputInterval(
@@ -412,7 +316,7 @@ pub(crate) enum GetTransformInputError {
 impl From<GetTransformInputError> for TransformElaborateError {
     fn from(value: GetTransformInputError) -> Self {
         match value {
-            GetTransformInputError::InputSchemaNotDefined(e) => Self::InputSchemaNotDefined(e),
+            GetTransformInputError::InputNotPulled(e) => Self::InputNotPulled(e),
             GetTransformInputError::InvalidInputInterval(e) => Self::InvalidInputInterval(e),
             GetTransformInputError::Internal(e) => Self::Internal(e),
         }
@@ -422,7 +326,7 @@ impl From<GetTransformInputError> for TransformElaborateError {
 impl From<GetTransformInputError> for VerifyTransformPlanError {
     fn from(value: GetTransformInputError) -> Self {
         match value {
-            GetTransformInputError::InputSchemaNotDefined(e) => Self::InputSchemaNotDefined(e),
+            GetTransformInputError::InputNotPulled(e) => Self::InputNotPulled(e),
             GetTransformInputError::InvalidInputInterval(e) => Self::InvalidInputInterval(e),
             GetTransformInputError::Internal(e) => Self::Internal(e),
         }

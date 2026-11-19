@@ -120,16 +120,16 @@ impl LoginService {
                 )
                 .await?;
 
-            tracing::debug!(response = ?device_access_token_response, "Device access token response");
-
             match device_access_token_response {
                 DeviceAccessTokenResult::Success(r) => {
+                    tracing::debug!("Device access token received");
                     return Ok(LoginInteractiveResponse {
                         access_token: r.access_token,
                         backend_url: odf_server_backend_url,
                     });
                 }
                 DeviceAccessTokenResult::Error(r) => {
+                    tracing::debug!(status = %r.message, "Device access token not issued");
                     use DeviceAccessTokenErrorStatus as Status;
                     match r.message {
                         Status::AuthorizationPending | Status::SlowDown => {

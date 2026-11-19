@@ -14,7 +14,7 @@ use chrono::{TimeZone, Utc};
 use kamu::testing::BaseRepoHarness;
 use kamu_accounts::{DidEntity, DidSecretKeyRepository, SAMPLE_DID_SECRET_KEY_ENCRYPTION_KEY};
 use kamu_core::MockDidGenerator;
-use kamu_datasets::{CreateDatasetFromSnapshotUseCase, DatasetReferenceRepository};
+use kamu_datasets::CreateDatasetFromSnapshotUseCase;
 use kamu_datasets_services::CreateDatasetFromSnapshotUseCaseImpl;
 use kamu_datasets_services::utils::CreateDatasetUseCaseHelper;
 use odf::metadata::testing::MetadataFactory;
@@ -60,12 +60,7 @@ async fn test_create_root_dataset_from_snapshot() {
         .unwrap();
 
     assert_matches!(harness.check_dataset_exists(&alias_foo).await, Ok(_));
-    assert_eq!(
-        harness
-            .get_dataset_reference(&foo_created.dataset_handle.id, &odf::BlockRef::Head)
-            .await,
-        foo_created.head,
-    );
+    assert_eq!(harness.stored_head(&foo_created).await, foo_created.head);
 
     // Note: the stability of these identifiers is ensured via
     //  predefined dataset ID and stubbed system time
@@ -171,18 +166,8 @@ async fn test_create_derived_dataset_from_snapshot() {
     assert_matches!(harness.check_dataset_exists(&alias_foo).await, Ok(_));
     assert_matches!(harness.check_dataset_exists(&alias_bar).await, Ok(_));
 
-    assert_eq!(
-        harness
-            .get_dataset_reference(&foo_created.dataset_handle.id, &odf::BlockRef::Head)
-            .await,
-        foo_created.head,
-    );
-    assert_eq!(
-        harness
-            .get_dataset_reference(&bar_created.dataset_handle.id, &odf::BlockRef::Head)
-            .await,
-        bar_created.head,
-    );
+    assert_eq!(harness.stored_head(&foo_created).await, foo_created.head);
+    assert_eq!(harness.stored_head(&bar_created).await, bar_created.head);
 
     // Note: the stability of these identifiers is ensured via
     //  predefined dataset ID and stubbed system time
@@ -271,12 +256,7 @@ async fn test_create_dataset_from_snapshot_creates_did_secret_key() {
         .unwrap();
 
     assert_matches!(harness.check_dataset_exists(&alias_foo).await, Ok(_));
-    assert_eq!(
-        harness
-            .get_dataset_reference(&foo_created.dataset_handle.id, &odf::BlockRef::Head)
-            .await,
-        foo_created.head,
-    );
+    assert_eq!(harness.stored_head(&foo_created).await, foo_created.head);
 
     let did_secret_key = harness
         .did_secret_key_repo
@@ -304,7 +284,6 @@ async fn test_create_dataset_from_snapshot_creates_did_secret_key() {
 struct CreateFromSnapshotUseCaseHarness {
     dataset_base_use_case_harness: DatasetBaseUseCaseHarness,
     use_case: Arc<dyn CreateDatasetFromSnapshotUseCase>,
-    dataset_reference_repo: Arc<dyn DatasetReferenceRepository>,
     did_secret_key_repo: Arc<dyn DidSecretKeyRepository>,
 }
 
@@ -332,20 +311,8 @@ impl CreateFromSnapshotUseCaseHarness {
         Self {
             dataset_base_use_case_harness,
             use_case: catalog.get_one().unwrap(),
-            dataset_reference_repo: catalog.get_one().unwrap(),
             did_secret_key_repo: catalog.get_one().unwrap(),
         }
-    }
-
-    async fn get_dataset_reference(
-        &self,
-        dataset_id: &odf::DatasetID,
-        block_ref: &odf::BlockRef,
-    ) -> odf::Multihash {
-        self.dataset_reference_repo
-            .get_dataset_reference(dataset_id, block_ref)
-            .await
-            .unwrap()
     }
 }
 

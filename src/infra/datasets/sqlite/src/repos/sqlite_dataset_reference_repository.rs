@@ -137,27 +137,46 @@ impl DatasetReferenceRepository for SqliteDatasetReferenceRepository {
 
             let block_ref_str = block_ref.as_str();
 
-            let maybe_prev_block_hash_bytes = maybe_prev_block_hash.map(odf::Multihash::digest);
             let block_hash_bytes = block_hash.digest();
 
-            sqlx::query!(
-                r#"
-                INSERT INTO dataset_references (dataset_id, block_ref_name, block_hash_bin)
-                    VALUES ($1, $2, $3)
-                    ON CONFLICT(dataset_id, block_ref_name)
-                    DO UPDATE SET block_hash_bin = $3 WHERE dataset_references.block_hash_bin = $4
-                "#,
-                dataset_id_str,
-                block_ref_str,
-                block_hash_bytes,
-                maybe_prev_block_hash_bytes,
-            )
-            .execute(connection_mut)
-            .await
-            .int_err()?
+            if let Some(prev_block_hash) = maybe_prev_block_hash {
+                let prev_block_hash_bytes = prev_block_hash.digest();
+
+                sqlx::query!(
+                    r#"
+                    UPDATE dataset_references SET block_hash_bin = $3
+                        WHERE dataset_id = $1
+                            AND block_ref_name = $2
+                            AND block_hash_bin = $4
+                    "#,
+                    dataset_id_str,
+                    block_ref_str,
+                    block_hash_bytes,
+                    prev_block_hash_bytes,
+                )
+                .execute(connection_mut)
+                .await
+                .int_err()?
+            } else {
+                sqlx::query!(
+                    r#"
+                    INSERT INTO dataset_references (dataset_id, block_ref_name, block_hash_bin)
+                        VALUES ($1, $2, $3)
+                        ON CONFLICT(dataset_id, block_ref_name) DO NOTHING
+                    "#,
+                    dataset_id_str,
+                    block_ref_str,
+                    block_hash_bytes,
+                )
+                .execute(connection_mut)
+                .await
+                .int_err()?
+            }
         };
 
         if query_result.rows_affected() == 0 {
+            // Read for the error only: a concurrent transaction may have changed
+            // the reference again since the compare failed
             let maybe_actual_block_hash =
                 match self.get_dataset_reference(dataset_id, block_ref).await {
                     Ok(actual_block_hash) => Some(actual_block_hash),
@@ -165,7 +184,6 @@ impl DatasetReferenceRepository for SqliteDatasetReferenceRepository {
                     Err(GetDatasetReferenceError::Internal(e)) => return Err(e.into()),
                 };
 
-            assert_ne!(maybe_actual_block_hash.as_ref(), maybe_prev_block_hash);
             Err(SetDatasetReferenceError::CASFailed(
                 DatasetReferenceCASError::new(
                     dataset_id,

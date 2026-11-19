@@ -10,15 +10,19 @@
 use std::borrow::Cow;
 use std::sync::Arc;
 
+use database_common::transaction;
 use futures::{StreamExt, TryStreamExt};
-use internal_error::ResultIntoInternal;
+use internal_error::{InternalError, ResultIntoInternal};
 use kamu::domain::*;
 use kamu::utils::datasets_filtering::filter_datasets_by_local_pattern;
 use kamu_datasets::{DatasetRegistry, DependencyGraphService};
 
+use super::common::verify_datasets;
 use super::{BatchError, CLIError, Command};
 use crate::VerificationMultiProgress;
 use crate::output::OutputConfig;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 type GenericVerificationResult = Result<Vec<VerificationResult>, CLIError>;
 
@@ -27,10 +31,8 @@ type GenericVerificationResult = Result<Vec<VerificationResult>, CLIError>;
 #[dill::component]
 #[dill::interface(dyn Command)]
 pub struct VerifyCommand {
-    verify_dataset_use_case: Arc<dyn VerifyDatasetUseCase>,
-    dataset_registry: Arc<dyn DatasetRegistry>,
-    dependency_graph_service: Arc<dyn DependencyGraphService>,
-    remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
+    catalog: dill::Catalog,
+    verify_job: Arc<dyn VerifyJob>,
     output_config: Arc<OutputConfig>,
 
     #[dill::component(explicit)]
@@ -46,6 +48,13 @@ pub struct VerifyCommand {
 struct RemoteRefDependency {
     source_dataset: String,
     dependencies: Vec<String>,
+}
+
+/// The datasets to verify, and those that cannot be
+struct VerificationSelection {
+    dataset_handles: Vec<odf::DatasetHandle>,
+    unresolved_results: Vec<VerificationResult>,
+    missed_remote_dependencies: Vec<RemoteRefDependency>,
 }
 
 impl VerifyCommand {
@@ -73,45 +82,24 @@ impl VerifyCommand {
         options: VerificationOptions,
         multi_listener: Option<Arc<dyn VerificationMultiListener>>,
     ) -> GenericVerificationResult {
-        let dataset_ref_pattern = self.refs.first().unwrap();
-
-        let dataset_handles: Vec<_> = filter_datasets_by_local_pattern(
-            self.dataset_registry.as_ref(),
-            vec![dataset_ref_pattern.clone()],
-        )
-        .try_collect()
-        .await?;
-
-        let mut verification_results = Vec::new();
-
-        let dataset_handles: Vec<_> = if self.recursive {
-            let input_dataset_ids = dataset_handles.into_iter().map(|hdl| hdl.id).collect();
-
-            let all_dataset_ids = self
-                .dependency_graph_service
-                .get_recursive_upstream_dependencies(input_dataset_ids)
-                .await
-                .int_err()?
-                .map(Cow::Owned)
-                .collect::<Vec<Cow<'static, _>>>()
-                .await;
-            let resolution_results = self
-                .dataset_registry
-                .resolve_multiple_dataset_handles_by_ids(&all_dataset_ids)
-                .await
-                .int_err()?;
-
-            for (_, e) in resolution_results.unresolved_datasets {
-                verification_results.push(VerificationResult::err_no_handle(e));
+        let selection = transaction!(
+            |dataset_registry: Arc<dyn DatasetRegistry>,
+             graph: Arc<dyn DependencyGraphService>,
+             pull_sources: Arc<dyn DatasetPullSourceResolver>| {
+                self.select_datasets(
+                    dataset_registry.as_ref(),
+                    graph.as_ref(),
+                    pull_sources.as_ref(),
+                )
+                .await?
             }
+        );
 
-            resolution_results.resolved_handles
-        } else {
-            dataset_handles
-        };
-
-        let (filtered_dataset_handles, missed_remote_dependencies) =
-            self.detect_remote_datasets(dataset_handles).await;
+        let VerificationSelection {
+            dataset_handles,
+            unresolved_results,
+            missed_remote_dependencies,
+        } = selection;
 
         if !missed_remote_dependencies.is_empty() {
             let missed_dependency_warnings: Vec<String> = missed_remote_dependencies
@@ -136,54 +124,97 @@ impl VerifyCommand {
             );
         }
 
-        if filtered_dataset_handles.is_empty() {
-            return Ok(vec![]);
-        }
+        let mut verification_results = unresolved_results;
+        verification_results.extend(
+            verify_datasets(
+                self.verify_job.as_ref(),
+                dataset_handles,
+                &options,
+                multi_listener.as_deref(),
+            )
+            .await,
+        );
 
-        let filtered_requests = filtered_dataset_handles
-            .into_iter()
-            .map(|hdl| VerificationRequest {
-                target: hdl,
-                block_range: (None, None),
-                options: options.clone(),
-            })
-            .collect();
-
-        let mut main_verification_results = self
-            .verify_dataset_use_case
-            .clone()
-            .execute_multi(filtered_requests, multi_listener)
-            .await;
-
-        verification_results.append(&mut main_verification_results);
         Ok(verification_results)
+    }
+
+    /// The datasets matching the pattern, with their upstream dependencies
+    /// when recursive, except remote datasets whose inputs are missing
+    async fn select_datasets(
+        &self,
+        dataset_registry: &dyn DatasetRegistry,
+        dependency_graph_service: &dyn DependencyGraphService,
+        pull_source_resolver: &dyn DatasetPullSourceResolver,
+    ) -> Result<VerificationSelection, CLIError> {
+        let dataset_ref_pattern = self.refs.first().unwrap();
+
+        let dataset_handles: Vec<_> =
+            filter_datasets_by_local_pattern(dataset_registry, vec![dataset_ref_pattern.clone()])
+                .try_collect()
+                .await?;
+
+        let mut unresolved_results = Vec::new();
+
+        let dataset_handles: Vec<_> = if self.recursive {
+            let input_dataset_ids = dataset_handles.into_iter().map(|hdl| hdl.id).collect();
+
+            let all_dataset_ids = dependency_graph_service
+                .get_recursive_upstream_dependencies(input_dataset_ids)
+                .await
+                .int_err()?
+                .map(Cow::Owned)
+                .collect::<Vec<Cow<'static, _>>>()
+                .await;
+            let resolution_results = dataset_registry
+                .resolve_multiple_dataset_handles_by_ids(&all_dataset_ids)
+                .await
+                .int_err()?;
+
+            for (_, e) in resolution_results.unresolved_datasets {
+                unresolved_results.push(VerificationResult::err_no_handle(e));
+            }
+
+            resolution_results.resolved_handles
+        } else {
+            dataset_handles
+        };
+
+        let (dataset_handles, missed_remote_dependencies) = self
+            .detect_remote_datasets(
+                dataset_registry,
+                dependency_graph_service,
+                pull_source_resolver,
+                dataset_handles,
+            )
+            .await?;
+
+        Ok(VerificationSelection {
+            dataset_handles,
+            unresolved_results,
+            missed_remote_dependencies,
+        })
     }
 
     // Return tuple with filtered VerificationRequests(check existing)
     //   with a list of missed remote dependencies
     async fn detect_remote_datasets(
         &self,
+        dataset_registry: &dyn DatasetRegistry,
+        dependency_graph_service: &dyn DependencyGraphService,
+        pull_source_resolver: &dyn DatasetPullSourceResolver,
         dataset_handles: Vec<odf::DatasetHandle>,
-    ) -> (Vec<odf::DatasetHandle>, Vec<RemoteRefDependency>) {
+    ) -> Result<(Vec<odf::DatasetHandle>, Vec<RemoteRefDependency>), InternalError> {
         let mut result = vec![];
         let mut missed_dependencies = vec![];
 
         for hdl in dataset_handles {
-            let is_remote = self
-                .remote_alias_reg
-                .get_remote_aliases(&hdl)
-                .await
-                .unwrap()
-                .get_by_kind(RemoteAliasKind::Pull)
-                .next()
-                .is_some();
+            let is_remote = pull_source_resolver.has_pull_source(&hdl).await?;
             if !is_remote || self.integrity {
                 result.push(hdl);
                 continue;
             }
 
-            let upstream_dependencies: Vec<odf::DatasetID> = self
-                .dependency_graph_service
+            let upstream_dependencies: Vec<odf::DatasetID> = dependency_graph_service
                 .get_upstream_dependencies(&hdl.id)
                 .await
                 .collect()
@@ -192,8 +223,7 @@ impl VerifyCommand {
             let mut current_missed_dependencies = vec![];
 
             for dependency in upstream_dependencies {
-                if self
-                    .dataset_registry
+                if dataset_registry
                     .resolve_dataset_handle_by_ref(&dependency.as_local_ref())
                     .await
                     .is_err()
@@ -211,7 +241,7 @@ impl VerifyCommand {
             }
         }
 
-        (result, missed_dependencies)
+        Ok((result, missed_dependencies))
     }
 }
 
@@ -288,3 +318,5 @@ impl Command for VerifyCommand {
         }
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

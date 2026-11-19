@@ -19,6 +19,7 @@ use kamu_accounts::{
     ModifyAccountPasswordUseCase,
     ModifyAccountPasswordWithConfirmationError,
     Password,
+    Principal,
 };
 use messaging_outbox::Outbox;
 use time_source::SystemTimeSource;
@@ -31,6 +32,7 @@ use crate::utils;
 #[dill::interface(dyn ModifyAccountPasswordUseCase)]
 pub struct ModifyAccountPasswordUseCaseImpl {
     account_authorization_helper: Arc<dyn utils::AccountAuthorizationHelper>,
+    principal: Arc<Principal>,
     account_service: Arc<dyn AccountService>,
     outbox: Arc<dyn Outbox>,
     time_source: Arc<dyn SystemTimeSource>,
@@ -66,7 +68,7 @@ impl ModifyAccountPasswordUseCase for ModifyAccountPasswordUseCaseImpl {
         password: Password,
     ) -> Result<(), ModifyAccountPasswordError> {
         self.account_authorization_helper
-            .ensure_account_password_can_be_modified(&account.account_name)
+            .ensure_account_password_can_be_modified(&self.principal, &account.account_name)
             .await?;
 
         self.account_service
@@ -85,7 +87,10 @@ impl ModifyAccountPasswordUseCase for ModifyAccountPasswordUseCaseImpl {
         new_password: Password,
     ) -> Result<(), ModifyAccountPasswordWithConfirmationError> {
         self.account_authorization_helper
-            .ensure_account_password_with_confirmation_can_be_modified(&account.account_name)
+            .ensure_account_password_with_confirmation_can_be_modified(
+                &self.principal,
+                &account.account_name,
+            )
             .await?;
 
         self.account_service

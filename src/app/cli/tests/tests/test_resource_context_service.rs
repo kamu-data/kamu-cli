@@ -354,12 +354,10 @@ content:
     };
 
     let make_state_svc = |account: &str| {
-        CatalogBuilder::new_chained(&base)
-            .add_value(CurrentAccountSubject::new_test_with(&account))
-            .add::<resource_context::CurrentContextStateService>()
-            .build()
-            .get_one::<CurrentContextStateService>()
-            .unwrap()
+        let mut b = CatalogBuilder::new_chained(&base);
+        CurrentAccountSubject::new_test_with(&account).register(&mut b);
+        b.add::<resource_context::CurrentContextStateService>();
+        b.build().get_one::<CurrentContextStateService>().unwrap()
     };
 
     // The legacy file is readable without panic; unknown top-level fields are
@@ -439,12 +437,12 @@ impl ResourceContextHarness {
     /// are inherited from the base; only the account identity is account-
     /// specific.
     fn catalog(&self, account_name: &str) -> dill::Catalog {
-        CatalogBuilder::new_chained(&self.base_catalog)
-            .add_value(CurrentAccountSubject::new_test_with(&account_name))
-            .add::<resource_context::ResourceContextRegistryService>()
+        let mut b = CatalogBuilder::new_chained(&self.base_catalog);
+        CurrentAccountSubject::new_test_with(&account_name).register(&mut b);
+        b.add::<resource_context::ResourceContextRegistryService>()
             .add::<resource_context::CurrentContextStateService>()
-            .add::<resource_context::ResourceContextResolver>()
-            .build()
+            .add::<resource_context::ResourceContextResolver>();
+        b.build()
     }
 
     fn resolver(&self, account_name: &str) -> Arc<ResourceContextResolver> {

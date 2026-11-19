@@ -23,21 +23,14 @@ use crate::utils::cached_object::CachedObject;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct VerificationServiceImpl {
-    transform_request_planner: Arc<dyn TransformRequestPlanner>,
     transform_executor: Arc<dyn TransformExecutor>,
 }
 
 #[component(pub)]
 #[interface(dyn VerificationService)]
 impl VerificationServiceImpl {
-    pub fn new(
-        transform_request_planner: Arc<dyn TransformRequestPlanner>,
-        transform_executor: Arc<dyn TransformExecutor>,
-    ) -> Self {
-        Self {
-            transform_request_planner,
-            transform_executor,
-        }
+    pub fn new(transform_executor: Arc<dyn TransformExecutor>) -> Self {
+        Self { transform_executor }
     }
 
     #[tracing::instrument(level = "info", skip_all)]
@@ -138,48 +131,48 @@ impl VerificationServiceImpl {
                         }
                     }
                 }
+            }
 
-                if let Some(checkpoint) = block.event.new_checkpoint {
-                    // Check size
-                    let size_actual = resolved_dataset
-                        .as_checkpoint_repo()
-                        .get_size(&checkpoint.physical_hash)
-                        .await
-                        .int_err()?;
+            if let Some(checkpoint) = block.event.new_checkpoint {
+                // Check size
+                let size_actual = resolved_dataset
+                    .as_checkpoint_repo()
+                    .get_size(&checkpoint.physical_hash)
+                    .await
+                    .int_err()?;
 
-                    if size_actual != checkpoint.size {
-                        return Err(VerificationError::CheckpointDoesNotMatchMetadata(
-                            CheckpointDoesNotMatchMetadata {
-                                block_hash,
-                                error: CheckpointVerificationError::SizeMismatch {
-                                    expected: checkpoint.size,
-                                    actual: size_actual,
-                                },
+                if size_actual != checkpoint.size {
+                    return Err(VerificationError::CheckpointDoesNotMatchMetadata(
+                        CheckpointDoesNotMatchMetadata {
+                            block_hash,
+                            error: CheckpointVerificationError::SizeMismatch {
+                                expected: checkpoint.size,
+                                actual: size_actual,
                             },
-                        ));
-                    }
+                        },
+                    ));
+                }
 
-                    // Check physical hash
-                    let checkpoint_hashing_helper = CachedObject::from(
-                        &checkpoint.physical_hash,
-                        resolved_dataset.as_checkpoint_repo(),
-                    )
-                    .await?;
+                // Check physical hash
+                let checkpoint_hashing_helper = CachedObject::from(
+                    &checkpoint.physical_hash,
+                    resolved_dataset.as_checkpoint_repo(),
+                )
+                .await?;
 
-                    let physical_hash_actual =
-                        checkpoint_hashing_helper.physical_hash().await.int_err()?;
+                let physical_hash_actual =
+                    checkpoint_hashing_helper.physical_hash().await.int_err()?;
 
-                    if physical_hash_actual != checkpoint.physical_hash {
-                        return Err(VerificationError::CheckpointDoesNotMatchMetadata(
-                            CheckpointDoesNotMatchMetadata {
-                                block_hash,
-                                error: CheckpointVerificationError::PhysicalHashMismatch {
-                                    expected: checkpoint.physical_hash,
-                                    actual: physical_hash_actual,
-                                },
+                if physical_hash_actual != checkpoint.physical_hash {
+                    return Err(VerificationError::CheckpointDoesNotMatchMetadata(
+                        CheckpointDoesNotMatchMetadata {
+                            block_hash,
+                            error: CheckpointVerificationError::PhysicalHashMismatch {
+                                expected: checkpoint.physical_hash,
+                                actual: physical_hash_actual,
                             },
-                        ));
-                    }
+                        },
+                    ));
                 }
             }
 
@@ -278,15 +271,19 @@ impl VerificationService for VerificationServiceImpl {
         level = "info",
         skip_all,
         fields(
-            target_alias=%request.target.get_alias(),
-            block_range=?request.block_range
+            target_alias=%plan.request.target.get_alias(),
+            block_range=?plan.request.block_range
         )
     )]
     async fn verify(
         &self,
-        request: VerificationRequest<ResolvedDataset>,
+        plan: VerificationPlan,
         maybe_listener: Option<Arc<dyn VerificationListener>>,
     ) -> VerificationResult {
+        let VerificationPlan {
+            request,
+            maybe_replay,
+        } = plan;
         let dataset_kind = request.target.get_kind();
 
         let listener = maybe_listener.unwrap_or(Arc::new(NullVerificationListener {}));
@@ -311,22 +308,14 @@ impl VerificationService for VerificationServiceImpl {
                 .await?;
             }
 
-            if dataset_kind == odf::DatasetKind::Derivative
-                && request.options.replay_transformations
-            {
-                let plan = self
-                    .transform_request_planner
-                    .build_transform_verification_plan(
-                        request.target.clone(),
-                        request.block_range.clone(),
-                    )
-                    .await
-                    .map_err(|e| {
-                        VerificationError::VerifyTransform(VerifyTransformError::Plan(e))
-                    })?;
-
+            if let Some(replay) = maybe_replay {
+                let replay = replay.map_err(VerificationError::from)?;
                 self.transform_executor
-                    .execute_verify_transform(request.target.clone(), plan, Some(listener.clone()))
+                    .execute_verify_transform(
+                        request.target.clone(),
+                        replay,
+                        Some(listener.clone()),
+                    )
                     .await
                     .map_err(|e| {
                         VerificationError::VerifyTransform(VerifyTransformError::Execute(e))
@@ -347,25 +336,6 @@ impl VerificationService for VerificationServiceImpl {
         }
 
         result
-    }
-
-    #[tracing::instrument(level = "info", skip_all)]
-    async fn verify_multi(
-        &self,
-        requests: Vec<VerificationRequest<ResolvedDataset>>,
-        maybe_multi_listener: Option<Arc<dyn VerificationMultiListener>>,
-    ) -> Vec<VerificationResult> {
-        let multi_listener =
-            maybe_multi_listener.unwrap_or(Arc::new(NullVerificationMultiListener {}));
-
-        let mut results = Vec::new();
-        for request in requests {
-            let dataset_handle = request.target.get_handle();
-            let listener = multi_listener.begin_verify(dataset_handle);
-            results.push(self.verify(request, listener).await);
-        }
-
-        results
     }
 }
 

@@ -112,16 +112,24 @@ compact entry when the feature is finalized.
 
 ### In-memory repositories review context
 
-`*-inmem` repository crates exist for tests only and intentionally do not model transactions (no
-rollback on a failed transaction). Do not raise missing rollback or "in-memory used in production"
-as findings. Do fix genuine in-memory bugs that break test fidelity (e.g. index corruption on a
-rejected save).
+`*-inmem` repository crates exist for tests only and do not model transactions by default (no
+rollback on a failed transaction). The one exception is opt-in: under `InMemoryTransactionManager`
+(`database-common`), the `kamu-datasets-inmem` repositories keep each transaction's changes in a
+working set until it commits. Do not raise missing rollback elsewhere, or "in-memory used in
+production", as findings. Do fix genuine in-memory bugs that break test fidelity (e.g. index
+corruption on a rejected save).
 
 ## Code style and tests
 
 Rust style lives in the `kamu-rust-style` skill and test conventions in `kamu-test-harness`; the
 edit hook requires them before the first edit they govern (see the table below). Targeted test
 runs use nextest filtersets — see [Build scope](#build-scope--p).
+
+Code copied from another project stays as its upstream wrote it. `src/utils/datafusion-cli` is
+replaced from `apache/datafusion` on every upgrade
+([procedure](src/utils/datafusion-cli/README.md#upgrade-procedure)), so every local edit there must
+be merged again by hand. Kamu style, comment and divider rules, cleanups and audits do not apply to
+it; change it only when Kamu needs the change, and keep the difference from upstream minimal.
 
 ## What to load for which task
 
@@ -147,6 +155,7 @@ addition to that match (a GraphQL resolver needs both `kamu-graphql-api` and `ka
 | dill components, interfaces, scopes, catalog building and chaining | `kamu-dill-di` | |
 | Outbox, repositories, domain/view construction, event modeling, operation-specific errors | `kamu-domain-design` | |
 | Renaming a type, field, message, flag or any other concept across layers | `kamu-renaming-a-concept` | |
+| Branch-wide cleanup of an epic, stage or other large changeset: one question per pass, a review and a commit per step | `kamu-reviewing-a-large-changeset` | |
 | Adding a new bounded context (domain + services + repositories + wiring) | `kamu-adding-a-bounded-context` | |
 | DataFusion, Arrow, Object Store, Parquet and related query-engine upgrades | `kamu-datafusion-upgrade-workflows` | |
 | Jupyter demo, rustfs, multi-platform demo image releases | `kamu-jupyter-demo-release-workflows` | |
@@ -165,13 +174,18 @@ change invalidates what it says.
 | Exported Prometheus metrics, recommended alerts, adding metrics | [`docs/internal/metrics.md`](docs/internal/metrics.md) |
 | Task scheduling and execution, the task agent, planners and runners, new task types | [`docs/internal/task-system.md`](docs/internal/task-system.md) |
 | Flows, triggers, configurations, scheduling, sensors, flow process state, new flow types | [`docs/internal/flow-system.md`](docs/internal/flow-system.md) |
-| Root dataset ingest: polling and push sources, fetch steps, savepoints, the DataFusion data writer, merge strategies | [`docs/internal/root-dataset-ingest.md`](docs/internal/root-dataset-ingest.md) |
+| Database transactions: how one opens and ends, `transaction!` versus the `#[transactional_*]` macros, where a transaction belongs in an algorithm, the managers, test helpers | [`docs/internal/database-transactions.md`](docs/internal/database-transactions.md) |
+| What every dataset operation shares: plan, execute and commit steps, `HEAD` CAS commits, races, who an operation runs as | [`docs/internal/dataset-operations.md`](docs/internal/dataset-operations.md) |
+| Polling ingest: `SetPollingSource`, `PollingIngestJob`, the polling planner and service, fetch and prepare steps, source state, savepoints, `has_more` | [`docs/internal/polling-ingest.md`](docs/internal/polling-ingest.md) |
+| Push ingest: `AddPushSource`, the push use case, planner and executor, data sources and formats, `kamu ingest` and the HTTP endpoint | [`docs/internal/push-ingest.md`](docs/internal/push-ingest.md) |
+| Ingest read, preprocess and write steps: the DataFusion data writer, writer state, `stage`/`commit`, merge strategies | [`docs/internal/ingest-data-writer.md`](docs/internal/ingest-data-writer.md) |
 | Dataset pull: `kamu pull` flags, pull planning and depth ordering, iteration execution, authorization, how the update task reuses the planner | [`docs/internal/dataset-pull.md`](docs/internal/dataset-pull.md) |
 | Dataset sync: `SyncService`, Simple and Smart Transfer Protocols (client and server), `kamu push`, remote repositories and aliases, IPFS | [`docs/internal/dataset-sync.md`](docs/internal/dataset-sync.md) |
 | Derived dataset transform: transform planning and elaboration, engine provisioning and containers, diverged inputs, transform replay in verification | [`docs/internal/derived-dataset-transform.md`](docs/internal/derived-dataset-transform.md) |
 | Hard compaction: `kamu system compact`, the compaction planner and executor, merged slices, what is (not) deleted | [`docs/internal/dataset-hard-compaction.md`](docs/internal/dataset-hard-compaction.md) |
 | Dataset reset: `kamu reset`, reset to a block, reset to metadata, how block indexes, statistics, search and the dependency graph react to any history rewrite | [`docs/internal/dataset-reset.md`](docs/internal/dataset-reset.md) |
 | Webhooks: subscriptions and their statuses, secrets, delivery signing and payload, the receiver contract, how subscriptions drive flow triggers | [`docs/internal/webhooks.md`](docs/internal/webhooks.md) |
+| Caller vs principal: `CurrentAccountSubject` and `Principal`, who registers and reads each, background work as `Principal::Node` | [`docs/internal/identity.md`](docs/internal/identity.md) |
 | The declarative resources subsystem | [`docs/internal/resources-framework.md`](docs/internal/resources-framework.md) |
 | Authored vs generated fields of a resource | [`docs/internal/resources-anatomy.md`](docs/internal/resources-anatomy.md) |
 | Resource label selectors and filtering | [`docs/internal/resources-label-filtering.md`](docs/internal/resources-label-filtering.md) |

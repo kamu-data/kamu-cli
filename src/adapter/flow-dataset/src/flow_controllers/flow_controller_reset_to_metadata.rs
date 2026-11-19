@@ -77,7 +77,6 @@ impl fs::FlowController for FlowControllerResetToMetadata {
                 old_num_blocks: _,
                 new_num_blocks: _,
             } => {
-                // Reset to metadata is a breaking operation.
                 // Datasets with enabled updates would compact to metadata only.
                 // Other datasets will stay unaffected, but would break on next update attempt
                 let dataset_id =

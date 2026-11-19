@@ -9,6 +9,7 @@
 
 mod test_fetch;
 mod test_polling_ingest;
+mod test_polling_ingest_planner;
 mod test_prep;
 mod test_push_ingest;
 mod test_writer;

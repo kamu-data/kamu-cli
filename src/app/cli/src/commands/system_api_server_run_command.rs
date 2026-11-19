@@ -12,7 +12,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use console::style as s;
-use database_common::DatabaseTransactionRunner;
+use database_common::transaction;
 use internal_error::ResultIntoInternal;
 use kamu::domain::{FileUploadLimitConfig, TenancyConfig};
 use kamu_accounts::*;
@@ -20,7 +20,6 @@ use kamu_accounts_services::{PasswordLoginCredentials, PasswordPolicyConfig};
 use kamu_adapter_oauth::*;
 use kamu_datasets::{SecretsEncryptionConfig, VersionedFilesConfig};
 use kamu_webhooks::WebhooksConfig;
-use tracing::Instrument;
 
 use super::{CLIError, Command};
 use crate::OutputConfig;
@@ -61,7 +60,7 @@ pub struct APIServerRunCommand {
     #[dill::component(explicit)]
     base_catalog: dill::Catalog,
     #[dill::component(explicit)]
-    cli_catalog: dill::Catalog,
+    background_catalog: dill::Catalog,
 }
 
 impl APIServerRunCommand {
@@ -70,7 +69,7 @@ impl APIServerRunCommand {
         api_server_catalog: &dill::Catalog,
     ) -> Result<String, CLIError> {
         let current_account_name = match self.account_subject.as_ref() {
-            CurrentAccountSubject::Logged(l) => l.account_handle.name.clone(),
+            CurrentAccountSubject::Logged(l) => l.name.clone(),
             CurrentAccountSubject::Anonymous(_) => {
                 unreachable!("Cannot launch API server with anonymous account")
             }
@@ -91,8 +90,10 @@ impl APIServerRunCommand {
             password: account_config.password.into_inner(),
         };
 
-        let login_response = DatabaseTransactionRunner::new(api_server_catalog.clone())
-            .transactional_with(|auth_svc: Arc<dyn AuthenticationService>| async move {
+        let login_response = transaction!(
+            #[catalog(api_server_catalog)]
+            #[span(tracing::debug_span!("APIServerRunCommand::get_access_token"))]
+            |auth_svc: Arc<dyn AuthenticationService>| -> Result<_, CLIError> {
                 auth_svc
                     .login(
                         AccountProvider::Password.into(),
@@ -102,11 +103,8 @@ impl APIServerRunCommand {
                     )
                     .await
                     .map_int_err(CLIError::critical)
-            })
-            .instrument(tracing::debug_span!(
-                "APIServerRunCommand::get_access_token"
-            ))
-            .await?;
+            }
+        )?;
 
         Ok(login_response.access_token)
     }
@@ -133,7 +131,7 @@ impl Command for APIServerRunCommand {
     async fn run(&self) -> Result<(), CLIError> {
         let api_server = crate::explore::APIServer::new(
             &self.base_catalog,
-            &self.cli_catalog,
+            &self.background_catalog,
             self.tenancy_config,
             self.address,
             self.port,

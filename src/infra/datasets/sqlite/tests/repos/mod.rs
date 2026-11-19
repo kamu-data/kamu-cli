@@ -7,6 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+// Race fixtures are not wired for SQLite (see `database_concurrent_transactions_test`)
+
 mod test_sqlite_dataset_block_query_repository;
 mod test_sqlite_dataset_data_blocks_repository;
 mod test_sqlite_dataset_dependency_repository;

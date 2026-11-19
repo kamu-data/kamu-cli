@@ -70,9 +70,3 @@ kamu_cli_execute_command_e2e_test!(
     fixture = kamu_cli_e2e_repo_tests::commands::test_export_to_unsupported_format,
     extra_test_groups = "engine, datafusion"
 );
-
-kamu_cli_execute_command_e2e_test!(
-    storage = postgres,
-    fixture = kamu_cli_e2e_repo_tests::commands::test_export_non_existent_dataset,
-    extra_test_groups = "engine, datafusion"
-);

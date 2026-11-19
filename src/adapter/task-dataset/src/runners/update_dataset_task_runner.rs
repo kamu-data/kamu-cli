@@ -9,14 +9,20 @@
 
 use std::sync::Arc;
 
-use database_common_macros::transactional_method1;
 use internal_error::InternalError;
-use kamu_core::engine::EngineError;
 use kamu_core::*;
-use kamu_datasets::{DatasetIncrementQueryService, DatasetRegistry};
 use kamu_task_system::*;
 
+use super::task_failure_outcomes::{
+    dataset_deleted_outcome,
+    failed_outcome,
+    operation_not_allowed_outcome,
+    ref_cas_failed_outcome,
+    ref_moved_outcome,
+};
+use super::task_span_outcome::TaskSpanOutcome;
 use crate::{
+    DatasetUpdateJob,
     InputDatasetCompactedError,
     TaskDefinitionDatasetUpdate,
     TaskErrorDatasetUpdate,
@@ -31,271 +37,209 @@ use crate::{
     task_type: TaskDefinitionDatasetUpdate::TASK_TYPE,
 })]
 pub struct UpdateDatasetTaskRunner {
-    catalog: dill::Catalog,
-    polling_ingest_service: Arc<dyn PollingIngestService>,
-    transform_elaboration_service: Arc<dyn TransformElaborationService>,
-    transform_executor: Arc<dyn TransformExecutor>,
-    sync_service: Arc<dyn SyncService>,
+    polling_ingest_job: Arc<dyn PollingIngestJob>,
+    transform_job: Arc<dyn TransformJob>,
+    sync_from_job: Arc<dyn SyncFromJob>,
 }
 
 #[common_macros::method_names_consts]
 impl UpdateDatasetTaskRunner {
-    #[tracing::instrument(name = UpdateDatasetTaskRunner_run_update, level = "debug", skip_all)]
+    #[tracing::instrument(name = UpdateDatasetTaskRunner_run_update, level = "info", skip_all, fields(target = %task_update.job.target(), outcome))]
     async fn run_update(
+        &self,
+        task_update: TaskDefinitionDatasetUpdate,
+    ) -> Result<TaskOutcome, InternalError> {
+        let outcome = self.run_update_job(task_update).await;
+        TaskSpanOutcome::record(&outcome);
+        outcome
+    }
+
+    async fn run_update_job(
         &self,
         task_update: TaskDefinitionDatasetUpdate,
     ) -> Result<TaskOutcome, InternalError> {
         tracing::debug!(?task_update, "Running update task");
 
-        match task_update.pull_job {
-            PullPlanIterationJob::Ingest(ingest_item) => {
-                self.run_ingest_update(ingest_item, task_update.pull_options.ingest_options)
+        match task_update.job {
+            DatasetUpdateJob::Ingest(target_handle) => {
+                self.run_ingest_update(&target_handle, task_update.ingest_options)
                     .await
             }
-            PullPlanIterationJob::Transform(transform_item) => {
-                self.run_transform_update(transform_item).await
+            DatasetUpdateJob::Transform(target_handle) => {
+                self.run_transform_update(&target_handle).await
             }
-            PullPlanIterationJob::Sync(sync_item) => {
-                self.run_sync_update(
-                    *sync_item.sync_request,
-                    task_update.pull_options.sync_options,
-                )
-                .await
-            }
-        }
-    }
-
-    #[transactional_method1(dataset_registry: Arc<dyn DatasetRegistry>)]
-    async fn run_sync_update(
-        &self,
-        mut sync_request: SyncRequest,
-        sync_opts: SyncOptions,
-    ) -> Result<TaskOutcome, InternalError> {
-        sync_request
-            .src
-            .refresh_dataset_from_registry(dataset_registry.as_ref())
-            .await;
-        sync_request
-            .dst
-            .refresh_dataset_from_registry(dataset_registry.as_ref())
-            .await;
-
-        let sync_response = self
-            .sync_service
-            .sync(sync_request.clone(), sync_opts, None)
-            .await;
-        match sync_response {
-            Ok(sync_result) => {
-                if let SyncRef::Local(local_ref) = &sync_request.dst {
-                    self.combine_task_result(sync_result.into(), &local_ref.get_handle().id)
-                        .await
-                } else {
-                    Ok(TaskOutcome::Success(
-                        TaskResultDatasetUpdate {
-                            pull_result: sync_result.into(),
-                            data_increment: None,
-                        }
-                        .into_task_result(),
-                    ))
-                }
-            }
-            Err(_) =>
-            // TODO: classify sync errors as recoverable/unrecoverable
-            {
-                Ok(TaskOutcome::Failed(TaskError::empty_recoverable()))
+            DatasetUpdateJob::Sync { target, remote_ref } => {
+                self.run_sync_update(&target, &remote_ref, task_update.sync_options)
+                    .await
             }
         }
     }
 
     async fn run_ingest_update(
         &self,
-        ingest_item: PullIngestItem,
+        target_handle: &odf::DatasetHandle,
         ingest_options: PollingIngestOptions,
     ) -> Result<TaskOutcome, InternalError> {
-        let ingest_response = self
-            .polling_ingest_service
-            .ingest(
-                ingest_item.target.clone(),
-                ingest_item.metadata_state,
-                ingest_options,
-                None,
-            )
-            .await;
-        match ingest_response {
-            Ok(ingest_res) => {
-                // Do we have a new HEAD suggestion?
-                if let PollingIngestResult::Updated {
-                    old_head, new_head, ..
-                } = &ingest_res.result
-                {
-                    // Update the reference transactionally
-                    self.update_dataset_head(
-                        ingest_item.target.get_handle(),
-                        Some(old_head),
-                        new_head,
-                    )
-                    .await?;
-                }
-
-                self.combine_task_result(
-                    ingest_res.result.into(),
-                    &ingest_item.target.get_handle().id,
-                )
-                .await
+        match self
+            .polling_ingest_job
+            .run(target_handle, ingest_options, None, None)
+            .await
+        {
+            Ok(PollingIngestResult::Updated {
+                old_head,
+                new_head,
+                has_more,
+                increment,
+                ..
+            }) => Ok(Self::updated(Some(old_head), new_head, has_more, increment)),
+            Ok(PollingIngestResult::UpToDate { uncacheable }) => Ok(TaskOutcome::Success(
+                TaskResultDatasetUpdate::UpToDate(PullResultUpToDate::PollingIngest(
+                    PollingIngestResultUpToDate { uncacheable },
+                ))
+                .into_task_result(),
+            )),
+            Err(PollingIngestJobError::NotFound(_)) => Ok(dataset_deleted_outcome(target_handle)),
+            Err(PollingIngestJobError::RefCASFailed(e)) => {
+                Ok(ref_cas_failed_outcome(target_handle, e))
             }
-            Err(e) => match e {
-                PollingIngestError::ParameterNotFound(_)
-                | PollingIngestError::ReadError(_)
-                | PollingIngestError::EngineError(EngineError::InvalidQuery(_))
-                | PollingIngestError::BadInputSchema(_)
-                | PollingIngestError::IncompatibleSchema(_)
-                | PollingIngestError::InvalidParameterFormat(_)
-                | PollingIngestError::MergeError(_)
-                | PollingIngestError::ExecutionError(_)
-                | PollingIngestError::TemplateError(_) => {
-                    Ok(TaskOutcome::Failed(TaskError::empty_unrecoverable()))
-                }
-
-                PollingIngestError::CommitError(_)
-                | PollingIngestError::DataValidation(_)
-                | PollingIngestError::EngineError(_)
-                | PollingIngestError::EngineProvisioningError(_)
-                | PollingIngestError::ImagePull(_)
-                | PollingIngestError::Internal(_)
-                | PollingIngestError::NotFound { .. }
-                | PollingIngestError::PipeError(_)
-                | PollingIngestError::ProcessError(_)
-                | PollingIngestError::Unreachable { .. } => {
-                    Ok(TaskOutcome::Failed(TaskError::empty_recoverable()))
-                }
-            },
+            Err(PollingIngestJobError::Access(e)) => Ok(operation_not_allowed_outcome(&e)),
+            Err(PollingIngestJobError::Planning(e)) => Ok(failed_outcome(
+                &e,
+                e.is_recoverable(),
+                "Ingest planning failed",
+            )),
+            Err(PollingIngestJobError::Ingest(e)) => {
+                Ok(failed_outcome(&e, e.is_recoverable(), "Ingest failed"))
+            }
+            Err(PollingIngestJobError::Internal(e)) => Err(e),
         }
     }
 
     async fn run_transform_update(
         &self,
-        transform_item: PullTransformItem,
+        target_handle: &odf::DatasetHandle,
     ) -> Result<TaskOutcome, InternalError> {
-        let transform_elaboration = match self
-            .transform_elaboration_service
-            .elaborate_transform(
-                transform_item.target.clone(),
-                transform_item.plan,
-                TransformOptions::default(),
+        match self.transform_job.run(target_handle, None).await {
+            Ok(TransformResult::Updated {
+                old_head,
+                new_head,
+                increment,
+                ..
+            }) => Ok(Self::updated(Some(old_head), new_head, false, increment)),
+            Ok(TransformResult::UpToDate) => Ok(Self::transform_up_to_date()),
+            // The derivative waits for its input, the same as when it is up to date
+            Err(TransformJobError::Elaborate(TransformElaborateError::InputNotPulled(e))) => {
+                tracing::info!(
+                    input = %e.dataset_handle,
+                    "Not processing because one of the inputs has no data yet",
+                );
+                Ok(Self::transform_up_to_date())
+            }
+            Err(TransformJobError::Elaborate(TransformElaborateError::InvalidInputInterval(e))) => {
+                Ok(TaskOutcome::Failed(
+                    TaskErrorDatasetUpdate::InputDatasetCompacted(InputDatasetCompactedError {
+                        dataset_id: e.input_dataset.id,
+                    })
+                    .into_task_error(),
+                ))
+            }
+            Err(TransformJobError::Elaborate(
+                e @ (TransformElaborateError::TransformNotDefined(_)
+                | TransformElaborateError::InputsChanged(_)
+                | TransformElaborateError::Internal(_)),
+            )) => Ok(failed_outcome(
+                &e,
+                e.is_recoverable(),
+                "Transform elaboration failed",
+            )),
+            Err(TransformJobError::Execute(e)) => Ok(failed_outcome(
+                &e,
+                e.is_recoverable(),
+                "Transform execution failed",
+            )),
+            Err(TransformJobError::NotFound(_)) => Ok(dataset_deleted_outcome(target_handle)),
+            Err(TransformJobError::RefCASFailed(e)) => Ok(ref_cas_failed_outcome(target_handle, e)),
+            Err(TransformJobError::Access(e)) => Ok(operation_not_allowed_outcome(&e)),
+            Err(TransformJobError::Internal(e)) => Err(e),
+        }
+    }
+
+    async fn run_sync_update(
+        &self,
+        target_handle: &odf::DatasetHandle,
+        remote_ref: &odf::DatasetRefRemote,
+        sync_options: SyncOptions,
+    ) -> Result<TaskOutcome, InternalError> {
+        match self
+            .sync_from_job
+            .run(
+                &PullLocalTarget::Existing(target_handle.clone()),
+                remote_ref,
+                sync_options,
                 None,
             )
             .await
         {
-            Ok(request) => Ok(request),
-            // Special case: input dataset compacted
-            Err(TransformElaborateError::InvalidInputInterval(e)) => {
-                return Ok(TaskOutcome::Failed(
-                    TaskErrorDatasetUpdate::InputDatasetCompacted(InputDatasetCompactedError {
-                        dataset_id: e.input_dataset_id,
-                    })
-                    .into_task_error(),
-                ));
-            }
-            Err(e) => {
-                tracing::error!(error = ?e, "Transform elaboration failed");
-                match e {
-                    TransformElaborateError::InputSchemaNotDefined(_)
-                    | TransformElaborateError::InvalidInputInterval(_) => {
-                        return Ok(TaskOutcome::Failed(TaskError::empty_unrecoverable()));
-                    }
-
-                    TransformElaborateError::Internal(_) => {
-                        return Ok(TaskOutcome::Failed(TaskError::empty_recoverable()));
-                    }
-                }
-            }
-        }?;
-
-        match transform_elaboration {
-            TransformElaboration::Elaborated(transform_plan) => {
-                let (_, execution_result) = self
-                    .transform_executor
-                    .execute_transform(transform_item.target.clone(), transform_plan, None)
-                    .await;
-
-                match execution_result {
-                    Ok(transform_result) => {
-                        if let TransformResult::Updated { old_head, new_head } = &transform_result {
-                            // Update the reference transactionally
-                            self.update_dataset_head(
-                                transform_item.target.get_handle(),
-                                Some(old_head),
-                                new_head,
-                            )
-                            .await?;
-                        }
-
-                        self.combine_task_result(
-                            transform_result.into(),
-                            &transform_item.target.get_handle().id,
-                        )
-                        .await
-                    }
-                    Err(e) => {
-                        tracing::error!(error = ?e, "Transform execution failed");
-                        match e {
-                            TransformExecuteError::EngineError(EngineError::InvalidQuery(_)) => {
-                                Ok(TaskOutcome::Failed(TaskError::empty_unrecoverable()))
-                            }
-
-                            TransformExecuteError::CommitError(_)
-                            | TransformExecuteError::EngineError(_)
-                            | TransformExecuteError::EngineProvisioningError(_)
-                            | TransformExecuteError::Internal(_) => {
-                                Ok(TaskOutcome::Failed(TaskError::empty_recoverable()))
-                            }
-                        }
-                    }
-                }
-            }
-            TransformElaboration::UpToDate => Ok(TaskOutcome::Success(TaskResult::empty())),
+            Ok(SyncResult::Updated {
+                old_head,
+                new_head,
+                increment,
+                ..
+            }) => Ok(Self::updated(old_head, new_head, false, increment)),
+            Ok(SyncResult::UpToDate) => Ok(TaskOutcome::Success(
+                TaskResultDatasetUpdate::UpToDate(PullResultUpToDate::Sync).into_task_result(),
+            )),
+            Err(SyncFromJobError::TargetDeleted(_)) => Ok(dataset_deleted_outcome(target_handle)),
+            Err(SyncFromJobError::Sync(SyncError::RefMoved(SyncRefMovedError {
+                block_ref,
+                reported,
+            }))) => Ok(ref_moved_outcome(
+                target_handle.id.clone(),
+                block_ref,
+                reported,
+            )),
+            Err(SyncFromJobError::Sync(
+                e @ (SyncError::DatasetNotFound(_)
+                | SyncError::RefCollision(_)
+                | SyncError::NameCollision(_)
+                | SyncError::CreateDatasetFailed(_)
+                | SyncError::UnsupportedProtocol(_)
+                | SyncError::UnsupportedIpfsStorageType(_)
+                | SyncError::RemoteByIdUnsupported(_)
+                | SyncError::InvalidDestination(_)
+                | SyncError::RepositoryNotFound(_)
+                | SyncError::DatasetsDiverged(_)
+                | SyncError::DatasetIdMismatch(_)
+                | SyncError::DestinationAhead(_)
+                | SyncError::OverwriteSeedBlock(_)
+                | SyncError::Corrupted(_)
+                | SyncError::Access(_)
+                | SyncError::Internal(_)),
+            )) => Ok(failed_outcome(&e, e.is_recoverable(), "Sync failed")),
         }
     }
 
-    #[transactional_method1(dataset_increment_query_service: Arc<dyn DatasetIncrementQueryService>)]
-    async fn combine_task_result(
-        &self,
-        pull_result: PullResult,
-        dataset_id: &odf::DatasetID,
-    ) -> Result<TaskOutcome, InternalError> {
-        let task_result = TaskResultDatasetUpdate::from_pull_result(
-            pull_result,
-            dataset_increment_query_service.as_ref(),
-            dataset_id,
+    fn updated(
+        old_head: Option<odf::Multihash>,
+        new_head: odf::Multihash,
+        has_more: bool,
+        increment: odf::dataset::MetadataChainIncrementInterval,
+    ) -> TaskOutcome {
+        TaskOutcome::Success(
+            TaskResultDatasetUpdate::Updated {
+                old_head,
+                new_head,
+                has_more,
+                increment,
+            }
+            .into_task_result(),
         )
-        .await
-        .int_err()?;
-
-        Ok(TaskOutcome::Success(task_result.into_task_result()))
     }
 
-    #[tracing::instrument(name = UpdateDatasetTaskRunner_update_dataset_head, level = "debug", skip_all, fields(%dataset_handle, %new_head))]
-    #[transactional_method1(dataset_registry: Arc<dyn DatasetRegistry>)]
-    async fn update_dataset_head(
-        &self,
-        dataset_handle: &odf::DatasetHandle,
-        old_head: Option<&odf::Multihash>,
-        new_head: &odf::Multihash,
-    ) -> Result<(), InternalError> {
-        let target = dataset_registry.get_dataset_by_handle(dataset_handle).await;
-
-        target
-            .as_metadata_chain()
-            .set_ref(
-                &odf::BlockRef::Head,
-                new_head,
-                odf::dataset::SetRefOpts {
-                    validate_block_present: true,
-                    check_ref_is: Some(old_head),
-                },
-            )
-            .await
-            .int_err()
+    fn transform_up_to_date() -> TaskOutcome {
+        TaskOutcome::Success(
+            TaskResultDatasetUpdate::UpToDate(PullResultUpToDate::Transform).into_task_result(),
+        )
     }
 }
 
@@ -306,7 +250,7 @@ impl TaskRunner for UpdateDatasetTaskRunner {
     async fn run_task(
         &self,
         task_definition: TaskDefinition,
-    ) -> Result<kamu_task_system::TaskOutcome, kamu_task_system::InternalError> {
+    ) -> Result<TaskOutcome, InternalError> {
         let task_update = task_definition
             .downcast::<TaskDefinitionDatasetUpdate>()
             .expect("Mismatched task type for UpdateDatasetTaskRunner");

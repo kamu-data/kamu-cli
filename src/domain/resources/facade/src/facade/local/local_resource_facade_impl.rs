@@ -11,6 +11,7 @@ use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
 use internal_error::{InternalError, ResultIntoInternal};
+use kamu_accounts::Principal;
 use kamu_resources::*;
 use kamu_resources_services::{ResourceDispatcherFactory, ResourceExtensionSchemaResolver};
 
@@ -24,6 +25,7 @@ use crate::*;
 pub struct LocalResourceFacadeImpl {
     dispatcher_factory: Arc<ResourceDispatcherFactory>,
     resource_account_resolver: Arc<dyn ResourceAccountResolver>,
+    principal: Arc<Principal>,
     generic_resource_query_service: Arc<dyn GenericResourceQueryService>,
     resource_extension_schema_resolver: Arc<ResourceExtensionSchemaResolver>,
 }
@@ -44,7 +46,7 @@ impl ResourceFacade for LocalResourceFacadeImpl {
     ) -> Result<ResourcesSummary, ResourcesSummaryError> {
         let target_account = self
             .resource_account_resolver
-            .resolve_target_account(request.account.as_ref())
+            .resolve_target_account(&self.principal, request.account.as_ref())
             .await?;
 
         let resource_counts = self
@@ -192,11 +194,11 @@ impl ResourceFacade for LocalResourceFacadeImpl {
         &self,
         request: SearchResourcesRequest,
     ) -> Result<SearchResourcesResponse, ListResourcesError> {
-        // The authenticated subject: the default for selectors naming no
-        // account, and the check that an anonymous caller cannot search.
+        // The principal's own account: the default for selectors naming no
+        // account, and the check that a principal without one cannot search.
         let target_account = self
             .resource_account_resolver
-            .resolve_target_account(None)
+            .resolve_target_account(&self.principal, None)
             .await?;
 
         let scope = self.resolve_scope(request.selectors).await?;
@@ -234,11 +236,11 @@ impl ResourceFacade for LocalResourceFacadeImpl {
         &self,
         request: SearchResourcesRequest,
     ) -> Result<SearchResourceHandlesResponse, ListResourcesError> {
-        // The authenticated subject: the default for selectors naming no
-        // account, and the check that an anonymous caller cannot search.
+        // The principal's own account: the default for selectors naming no
+        // account, and the check that a principal without one cannot search.
         let target_account = self
             .resource_account_resolver
-            .resolve_target_account(None)
+            .resolve_target_account(&self.principal, None)
             .await?;
 
         let scope = self.resolve_scope(request.selectors).await?;
@@ -393,12 +395,9 @@ impl ResourceFacade for LocalResourceFacadeImpl {
         let mut successes = Vec::new();
         let (groups, mut problems) = self.group_refs_by_target(resource_refs).await?;
 
-        // One dispatcher call per `(account, schema)` group. The whole request
-        // runs inside a single database transaction — opened by the
-        // `#[transactional_handler]` GraphQL handler, or by the CLI's
-        // `DatabaseTransactionRunner` — so a failure in a later group rolls back
-        // the deletion requests an earlier one made. Fanning out therefore does
-        // not introduce partial-delete semantics.
+        // One dispatcher call per `(account, schema)` group. The request runs in one
+        // transaction (the `#[transactional_handler]` GraphQL handler, or the CLI command's
+        // `transaction!` block), so a failure in a later group rolls back earlier deletions.
         for group in groups {
             let (indexes, refs): (Vec<_>, Vec<_>) = group.entries.into_iter().unzip();
 
@@ -667,7 +666,7 @@ impl LocalResourceFacadeImpl {
         let account_refs = distinct_account_refs(&resource_refs);
         let resolved_accounts = self
             .resource_account_resolver
-            .resolve_target_accounts(&account_refs)
+            .resolve_target_accounts(&self.principal, &account_refs)
             .await?;
 
         let descriptors = self.list_resource_type_descriptors();
@@ -770,8 +769,8 @@ impl LocalResourceFacadeImpl {
         // Resolved in one batch, deduplicated by spelling, with the permission
         // check applied per distinct account. Any denial fails the whole call.
         //
-        // `None` stays `None` rather than resolving to the caller's own
-        // account: the repository takes the authenticated subject as the
+        // `None` stays `None` rather than resolving to the principal's own
+        // account: the repository takes that account as the
         // default for exactly those rows, so resolving here would be redundant
         // work and would lose the "unset" distinction the scope relies on.
         let account_refs = selectors
@@ -782,7 +781,7 @@ impl LocalResourceFacadeImpl {
             vec![None; account_refs.len()]
         } else {
             self.resource_account_resolver
-                .resolve_target_accounts(&account_refs)
+                .resolve_target_accounts(&self.principal, &account_refs)
                 .await?
                 .into_iter()
                 .zip(account_refs.iter())
@@ -1146,7 +1145,7 @@ impl LocalResourceFacadeImpl {
 
         let target_account = self
             .resource_account_resolver
-            .resolve_target_account(manifest.headers.account.as_ref())
+            .resolve_target_account(&self.principal, manifest.headers.account.as_ref())
             .await?;
 
         let dispatcher = self

@@ -7,10 +7,13 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::assert_matches;
 use std::collections::BTreeMap;
+use std::time::Duration;
 
 use kamu_cli::WorkspaceLayout;
 use kamu_cli::config::{CLIConfig, ConfigService};
+use kamu_cli::error::CLIError;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -278,6 +281,45 @@ fn test_config_merging_of_engine_options() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[test_log::test]
+fn test_config_upload_progress_interval_defaults_to_10s() {
+    let harness = ConfigHarness::new();
+
+    pretty_assertions::assert_eq!(
+        harness.upload_progress_interval(None),
+        Ok(Duration::from_secs(10))
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test]
+fn test_config_upload_progress_interval_is_read_from_its_key() {
+    let harness = ConfigHarness::new();
+
+    pretty_assertions::assert_eq!(
+        harness.upload_progress_interval(Some("30s")),
+        Ok(Duration::from_secs(30))
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test]
+fn test_config_zero_upload_progress_interval_is_a_usage_error() {
+    let harness = ConfigHarness::new();
+
+    pretty_assertions::assert_eq!(
+        harness.upload_progress_interval(Some("0s")),
+        Err(
+            "protocol.smartTransferProtocol.uploadProgressInterval must be greater than zero"
+                .to_string()
+        )
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[test_group::group(resourcegen)]
 #[test]
 fn update_config_schema() {
@@ -302,6 +344,63 @@ fn update_config_markdown() {
     path.push("../../../resources/config-reference.md");
 
     std::fs::write(&path, md).unwrap();
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Harness
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+struct ConfigHarness {
+    tmp_dir: tempfile::TempDir,
+}
+
+impl ConfigHarness {
+    fn new() -> Self {
+        Self {
+            tmp_dir: tempfile::tempdir().unwrap(),
+        }
+    }
+
+    /// The interval the server is configured with, from a config that sets it
+    /// to `maybe_interval`, or that leaves it out. A refused config yields the
+    /// message of its usage error
+    fn upload_progress_interval(&self, maybe_interval: Option<&str>) -> Result<Duration, String> {
+        let config_paths = match maybe_interval {
+            None => Vec::new(),
+            Some(interval) => {
+                let config_path = self.tmp_dir.path().join("config.yaml");
+                std::fs::write(
+                    &config_path,
+                    indoc::formatdoc!(
+                        r#"
+                        kind: CLIConfig
+                        version: 1
+                        content:
+                            protocol:
+                                smartTransferProtocol:
+                                    uploadProgressInterval: {interval}
+                        "#
+                    ),
+                )
+                .unwrap();
+                vec![config_path]
+            }
+        };
+
+        let config = ConfigService::new(&WorkspaceLayout::new("."))
+            .load_from(&config_paths)
+            .unwrap();
+
+        config
+            .protocol
+            .smart_transfer_protocol
+            .to_server_config()
+            .map(|server_config| server_config.upload_progress_interval)
+            .map_err(|e| {
+                assert_matches!(&e, CLIError::UsageError(_));
+                e.to_string()
+            })
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

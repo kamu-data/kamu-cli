@@ -19,8 +19,8 @@ use internal_error::InternalError;
 use kamu_accounts::{DEFAULT_ACCOUNT_NAME_STR, TEST_ACCOUNT_ID};
 use kamu_adapter_flow_dataset::*;
 use kamu_adapter_flow_webhook::{DatasetRefUpdatedWatermarkProvider, FlowControllerWebhookDeliver};
+use kamu_adapter_task_dataset::TaskResultDatasetUpdate;
 use kamu_datasets::*;
-use kamu_datasets_inmem::InMemoryDatasetDependencyRepository;
 use kamu_datasets_services::DependencyGraphServiceImpl;
 use kamu_datasets_services::testing::{FakeDatasetEntryService, FakeDatasetReferenceService};
 use kamu_flow_system::*;
@@ -31,6 +31,7 @@ use kamu_task_system::{
     Task,
     TaskEventStore,
     TaskID,
+    TaskOutcome,
     TaskProgressMessage,
 };
 use kamu_task_system_inmem::{InMemoryTaskEventStore, InMemoryTaskQueueWakeupSource};
@@ -131,6 +132,7 @@ impl FlowHarness {
                 b.add::<HeartbeatProbeFlowSystemEventProjector>();
             }
 
+            kamu_datasets_inmem::register_dependencies(&mut b);
             b.add_builder(messaging_outbox::OutboxImmediateImpl::builder(
                 messaging_outbox::ConsumerFilter::AllConsumers,
             ))
@@ -172,7 +174,6 @@ impl FlowHarness {
             .add_value(mock_transform_flow_evaluator)
             .bind::<dyn TransformFlowEvaluator, MockTransformFlowEvaluator>()
             .add::<DependencyGraphServiceImpl>()
-            .add::<InMemoryDatasetDependencyRepository>()
             .add::<TaskSchedulerImpl>()
             .add::<InMemoryTaskEventStore>()
             .add::<InMemoryTaskQueueWakeupSource>()
@@ -682,9 +683,14 @@ impl FlowHarness {
         self.catalog.get_one::<FlowCompletionMetrics>().unwrap()
     }
 
+    /// The listener that records the flows a scenario runs
+    pub fn flow_listener(&self) -> Arc<FlowSystemTestListener> {
+        self.catalog.get_one::<FlowSystemTestListener>().unwrap()
+    }
+
     /// Every projected activation link, rendered by the test listener
     pub async fn activation_links_report(&self) -> String {
-        let test_flow_listener = self.catalog.get_one::<FlowSystemTestListener>().unwrap();
+        let test_flow_listener = self.flow_listener();
 
         let mut links = Vec::new();
         for flow_id in test_flow_listener.flow_ids() {
@@ -828,7 +834,7 @@ impl FlowHarness {
             .await?;
 
         // Create initial snapshot - the state at moment 0 after flow agent loaded
-        let test_flow_listener = self.catalog.get_one::<FlowSystemTestListener>().unwrap();
+        let test_flow_listener = self.flow_listener();
         test_flow_listener.mark_as_loaded();
         test_flow_listener.make_a_snapshot(self.now());
 
@@ -853,6 +859,82 @@ impl FlowHarness {
             .await?;
 
         Ok(())
+    }
+
+    /// Outcome of a dataset update task that moved `HEAD` from `old_head` to `new_head`, with
+    /// nothing more to update and no watermark change
+    pub fn dataset_updated(
+        old_head: &[u8],
+        new_head: &[u8],
+        num_blocks: u64,
+        num_records: u64,
+    ) -> TaskOutcome {
+        Self::dataset_update_outcome(
+            old_head,
+            new_head,
+            false,
+            odf::dataset::MetadataChainIncrementInterval {
+                num_blocks,
+                num_records,
+                updated_watermark: None,
+            },
+        )
+    }
+
+    /// Like [`Self::dataset_updated`], with the source reporting more data to update
+    pub fn dataset_updated_with_more(
+        old_head: &[u8],
+        new_head: &[u8],
+        num_blocks: u64,
+        num_records: u64,
+    ) -> TaskOutcome {
+        Self::dataset_update_outcome(
+            old_head,
+            new_head,
+            true,
+            odf::dataset::MetadataChainIncrementInterval {
+                num_blocks,
+                num_records,
+                updated_watermark: None,
+            },
+        )
+    }
+
+    /// Like [`Self::dataset_updated`], with the update moving the watermark
+    pub fn dataset_updated_with_watermark(
+        old_head: &[u8],
+        new_head: &[u8],
+        num_blocks: u64,
+        num_records: u64,
+        updated_watermark: DateTime<Utc>,
+    ) -> TaskOutcome {
+        Self::dataset_update_outcome(
+            old_head,
+            new_head,
+            false,
+            odf::dataset::MetadataChainIncrementInterval {
+                num_blocks,
+                num_records,
+                updated_watermark: Some(updated_watermark),
+            },
+        )
+    }
+
+    fn dataset_update_outcome(
+        old_head: &[u8],
+        new_head: &[u8],
+        has_more: bool,
+        increment: odf::dataset::MetadataChainIncrementInterval,
+    ) -> TaskOutcome {
+        TaskOutcome::Success(
+            TaskResultDatasetUpdate::Updated {
+                old_head: Some(odf::Multihash::from_digest_sha3_256(old_head)),
+                new_head: odf::Multihash::from_digest_sha3_256(new_head),
+                has_more,
+                increment,
+            }
+            .into_task_result(),
+        )
     }
 }
 

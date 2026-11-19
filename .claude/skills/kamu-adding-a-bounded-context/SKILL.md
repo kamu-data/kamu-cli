@@ -31,7 +31,7 @@ Each step names the skill to load and what proves the step is done.
 | 12 | **Cross-context cleanup**: subscribe to other contexts' lifecycle messages (e.g. `DatasetLifecycleMessage::Deleted`) instead of foreign keys | services `message_handlers/` or `services/` | `kamu-domain-design` | a test deleting the foreign entity |
 | 13 | **Config** (if any): setty struct in `src/app/cli/src/services/config/models.rs`, validation and `add_value` in `app.rs` | — | — | `make resources`; review the `resources/config-*` diff |
 | 14 | **API** (if any): GraphQL roots/queries/mutations, REST handlers | `src/adapter/graphql/`, `src/adapter/http/` | `kamu-graphql-api` | `make resources-graphql-schema`; GraphQL tests |
-| 15 | **E2E** (if user-visible through the CLI): scenarios in `src/e2e/app/cli/repo-tests`, wired in sqlite and postgres in lockstep | `src/e2e/app/cli/` | `kamu-cli-e2e-tests` | SQLite permutation green |
+| 15 | **E2E** (if user-visible through the CLI): scenarios in `src/e2e/app/cli/repo-tests`, wired in sqlite, and in postgres when the repository type can change the result | `src/e2e/app/cli/` | `kamu-cli-e2e-tests` | SQLite permutation green |
 | 16 | **Docs**: add a `docs/internal/<ctx>.md` when the context has non-obvious mechanics, and route it in AGENTS.md | `docs/internal/`, `AGENTS.md` | `kamu-prose-and-comments` | `make lint-harness` |
 
 Finish with the AGENTS.md "Validation" steps plus `make lint-sqlx`, since new DB crates were

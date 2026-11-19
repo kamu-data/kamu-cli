@@ -46,6 +46,18 @@ pub enum ResetPlanningError {
     Internal(#[from] InternalError),
 }
 
+impl ResetPlanningError {
+    /// Whether planning the same reset again could succeed. The expected old
+    /// head is part of the request, so a mismatch fails the same way on a
+    /// retry.
+    pub fn is_recoverable(&self) -> bool {
+        match self {
+            Self::OldHeadMismatch(_) => false,
+            Self::Internal(_) => true,
+        }
+    }
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Error, Debug)]

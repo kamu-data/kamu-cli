@@ -9,10 +9,20 @@
 
 use std::assert_matches;
 
+use database_common::testing::{
+    RacingTransactionOutcome,
+    in_committed_transaction,
+    race_transactions,
+};
 use dill::Catalog;
 use kamu_datasets::*;
 
-use crate::helpers::{init_dataset_entry, init_test_account, remove_dataset_entry};
+use crate::helpers::{
+    init_committed_entries,
+    init_dataset_entry,
+    init_test_account,
+    remove_dataset_entry,
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -148,6 +158,35 @@ pub async fn test_update_reference_provoke_cas_violation(catalog: &Catalog) {
 
     let ref_1_hash = odf::Multihash::from_digest_sha3_256(b"a");
     let ref_2_hash = odf::Multihash::from_digest_sha3_256(b"b");
+    let stale_hash = odf::Multihash::from_digest_sha3_256(b"stale");
+
+    // -- set a reference 2 relatively to a never stored reference 1 => CAS error
+
+    let set_res = dataset_ref_repo
+        .set_dataset_reference(
+            &dataset_id,
+            &odf::BlockRef::Head,
+            Some(&ref_1_hash),
+            &ref_2_hash,
+        )
+        .await;
+    assert_matches!(
+        set_res,
+        Err(SetDatasetReferenceError::CASFailed(e))
+        if e.dataset_id == dataset_id &&
+           e.block_ref == odf::BlockRef::Head &&
+           e.expected_prev_block_hash == Some(ref_1_hash.clone()) &&
+           e.actual_prev_block_hash.is_none(),
+        "missing reference expecting a hash"
+    );
+    let get_all_res = dataset_ref_repo
+        .get_all_dataset_references(&dataset_id)
+        .await;
+    assert_matches!(
+        get_all_res,
+        Ok(v) if v.is_empty(),
+        "nothing stored after a CAS error on a missing reference"
+    );
 
     // -- set a reference 1 relatively to None
 
@@ -156,7 +195,7 @@ pub async fn test_update_reference_provoke_cas_violation(catalog: &Catalog) {
         .await;
     assert_matches!(set_res, Ok(()));
 
-    // -- set a reference 2 also relatively to None => should provoke CAS error
+    // -- set a reference 2 also relatively to None => CAS error
 
     let set_res = dataset_ref_repo
         .set_dataset_reference(&dataset_id, &odf::BlockRef::Head, None, &ref_2_hash)
@@ -167,10 +206,31 @@ pub async fn test_update_reference_provoke_cas_violation(catalog: &Catalog) {
         if e.dataset_id == dataset_id &&
            e.block_ref == odf::BlockRef::Head &&
            e.expected_prev_block_hash.is_none() &&
-           e.actual_prev_block_hash == Some(ref_1_hash.clone())
+           e.actual_prev_block_hash == Some(ref_1_hash.clone()),
+        "existing reference expecting none"
     );
 
-    // -- observe the changes: they should have stucked at reference 1
+    // -- set a reference 2 relatively to a hash it does not point at => CAS error
+
+    let set_res = dataset_ref_repo
+        .set_dataset_reference(
+            &dataset_id,
+            &odf::BlockRef::Head,
+            Some(&stale_hash),
+            &ref_2_hash,
+        )
+        .await;
+    assert_matches!(
+        set_res,
+        Err(SetDatasetReferenceError::CASFailed(e))
+        if e.dataset_id == dataset_id &&
+           e.block_ref == odf::BlockRef::Head &&
+           e.expected_prev_block_hash == Some(stale_hash.clone()) &&
+           e.actual_prev_block_hash == Some(ref_1_hash.clone()),
+        "existing reference expecting a stale hash"
+    );
+
+    // -- observe the changes: they should have stuck at reference 1
 
     let get_res = dataset_ref_repo
         .get_dataset_reference(&dataset_id, &odf::BlockRef::Head)
@@ -419,6 +479,140 @@ pub async fn test_reacts_to_dataset_removals(catalog: &Catalog) {
         .get_all_dataset_references(&dataset_2_id)
         .await;
     assert_matches!(get_all_2_res, Ok(v) if v == vec![(odf::BlockRef::Head, ref_2_hash)]);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Two transactions move `HEAD` from the same block: the one that commits
+/// first wins, the other never commits
+pub async fn test_update_reference_in_concurrent_transactions(catalog: &Catalog) {
+    let hash_a = odf::Multihash::from_digest_sha3_256(b"a");
+    let hash_b = odf::Multihash::from_digest_sha3_256(b"b");
+    let hash_c = odf::Multihash::from_digest_sha3_256(b"c");
+
+    let dataset_id = init_racing_dataset(catalog, Some(&hash_a)).await;
+
+    let outcome = race_head_updates(catalog, &dataset_id, Some(&hash_a), &hash_b, &hash_c).await;
+
+    assert_second_head_rejected(outcome, &hash_b);
+    pretty_assertions::assert_eq!(committed_head(catalog, &dataset_id).await, Some(hash_b));
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Two transactions set the first `HEAD` of a dataset: the one that commits
+/// first wins, the other never commits
+pub async fn test_set_initial_reference_in_concurrent_transactions(catalog: &Catalog) {
+    let hash_a = odf::Multihash::from_digest_sha3_256(b"a");
+    let hash_b = odf::Multihash::from_digest_sha3_256(b"b");
+
+    let dataset_id = init_racing_dataset(catalog, None).await;
+
+    let outcome = race_head_updates(catalog, &dataset_id, None, &hash_a, &hash_b).await;
+
+    assert_second_head_rejected(outcome, &hash_a);
+    pretty_assertions::assert_eq!(committed_head(catalog, &dataset_id).await, Some(hash_a));
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// A dataset with a committed `HEAD` at `maybe_head`, if given
+async fn init_racing_dataset(
+    catalog: &Catalog,
+    maybe_head: Option<&odf::Multihash>,
+) -> odf::DatasetID {
+    let (_, entries) = init_committed_entries(catalog, &[("foo", odf::DatasetKind::Root)]).await;
+    let dataset_id = entries[0].id.clone();
+
+    if let Some(head) = maybe_head {
+        let head_dataset_id = dataset_id.clone();
+        in_committed_transaction(catalog, |catalog| async move {
+            set_head(&catalog, &head_dataset_id, None, head)
+                .await
+                .unwrap();
+        })
+        .await;
+    }
+
+    dataset_id
+}
+
+/// The second writer never commits; a rejected write reports the first
+/// writer's `HEAD` as the actual one
+fn assert_second_head_rejected(
+    outcome: RacingTransactionOutcome<SetDatasetReferenceError>,
+    first_head: &odf::Multihash,
+) {
+    match outcome {
+        RacingTransactionOutcome::FailedAtWrite(SetDatasetReferenceError::CASFailed(e)) => {
+            pretty_assertions::assert_eq!(e.actual_prev_block_hash.as_ref(), Some(first_head));
+        }
+        RacingTransactionOutcome::FailedAtCommit(_) => {}
+        RacingTransactionOutcome::FailedAtWrite(SetDatasetReferenceError::Internal(e)) => {
+            panic!("Second write failed with an internal error: {e:?}")
+        }
+        RacingTransactionOutcome::Committed => panic!("Second transaction committed"),
+    }
+}
+
+async fn race_head_updates(
+    catalog: &Catalog,
+    dataset_id: &odf::DatasetID,
+    expected_head: Option<&odf::Multihash>,
+    first_head: &odf::Multihash,
+    second_head: &odf::Multihash,
+) -> RacingTransactionOutcome<SetDatasetReferenceError> {
+    let second_dataset_id = dataset_id.clone();
+    let second_expected_head = expected_head.cloned();
+    let second_head = second_head.clone();
+
+    race_transactions(
+        catalog,
+        |catalog| async move {
+            set_head(&catalog, dataset_id, expected_head, first_head)
+                .await
+                .unwrap();
+        },
+        move |catalog| async move {
+            set_head(
+                &catalog,
+                &second_dataset_id,
+                second_expected_head.as_ref(),
+                &second_head,
+            )
+            .await
+        },
+    )
+    .await
+}
+
+async fn set_head(
+    catalog: &Catalog,
+    dataset_id: &odf::DatasetID,
+    expected_head: Option<&odf::Multihash>,
+    head: &odf::Multihash,
+) -> Result<(), SetDatasetReferenceError> {
+    catalog
+        .get_one::<dyn DatasetReferenceRepository>()
+        .unwrap()
+        .set_dataset_reference(dataset_id, &odf::BlockRef::Head, expected_head, head)
+        .await
+}
+
+async fn committed_head(catalog: &Catalog, dataset_id: &odf::DatasetID) -> Option<odf::Multihash> {
+    in_committed_transaction(catalog, |catalog| async move {
+        match catalog
+            .get_one::<dyn DatasetReferenceRepository>()
+            .unwrap()
+            .get_dataset_reference(dataset_id, &odf::BlockRef::Head)
+            .await
+        {
+            Ok(head) => Some(head),
+            Err(GetDatasetReferenceError::NotFound(_)) => None,
+            Err(GetDatasetReferenceError::Internal(e)) => panic!("{e}"),
+        }
+    })
+    .await
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

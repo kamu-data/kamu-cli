@@ -177,9 +177,10 @@ mod tests {
     #[tokio::test]
     async fn test_anonymous_subject_error_is_json() {
         let mut catalog_builder = dill::CatalogBuilder::new();
-        catalog_builder.add_value(CurrentAccountSubject::anonymous(
+        CurrentAccountSubject::anonymous(
             kamu_accounts::AnonymousAccountReason::NoAuthenticationProvided,
-        ));
+        )
+        .register(&mut catalog_builder);
         let catalog = catalog_builder.build();
 
         let response = AuthPolicyMiddleware::<()>::check_http_subject(&catalog).unwrap_err();

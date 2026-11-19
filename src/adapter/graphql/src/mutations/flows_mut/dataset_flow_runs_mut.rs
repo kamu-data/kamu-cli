@@ -84,7 +84,7 @@ impl<'a> DatasetFlowRunsMut<'a> {
             .run_flow_manually(
                 utils::system_time_now(ctx),
                 &flow_binding,
-                logged_account.account_handle.did,
+                logged_account.did,
                 maybe_forced_configuration_rule,
             )
             .await
@@ -131,7 +131,7 @@ impl<'a> DatasetFlowRunsMut<'a> {
             .run_flow_manually(
                 utils::system_time_now(ctx),
                 &flow_binding,
-                logged_account.account_handle.did,
+                logged_account.did,
                 None,
             )
             .await
@@ -198,7 +198,7 @@ impl<'a> DatasetFlowRunsMut<'a> {
             .run_flow_manually(
                 utils::system_time_now(ctx),
                 &flow_binding,
-                logged_account.account_handle.did,
+                logged_account.did,
                 maybe_forced_configuration_rule,
             )
             .await
@@ -284,7 +284,7 @@ impl<'a> DatasetFlowRunsMut<'a> {
             .run_flow_manually(
                 utils::system_time_now(ctx),
                 &flow_binding,
-                logged_account.account_handle.did,
+                logged_account.did,
                 maybe_forced_flow_config_rule,
             )
             .await
@@ -328,7 +328,7 @@ impl<'a> DatasetFlowRunsMut<'a> {
             .run_flow_manually(
                 utils::system_time_now(ctx),
                 &flow_binding,
-                logged_account.account_handle.did,
+                logged_account.did,
                 None,
             )
             .await

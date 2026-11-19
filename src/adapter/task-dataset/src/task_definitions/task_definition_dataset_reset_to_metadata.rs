@@ -7,15 +7,11 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_core::CompactionPlan;
-use kamu_datasets::ResolvedDataset;
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 kamu_task_system::task_definition_struct! {
     pub struct TaskDefinitionDatasetResetToMetadata {
-        pub target: ResolvedDataset,
-        pub compaction_metadata_only_plan: CompactionPlan,
+        pub target: odf::DatasetHandle,
     }
     => "dev.kamu.tasks.dataset.reset_to_metadata"
 }

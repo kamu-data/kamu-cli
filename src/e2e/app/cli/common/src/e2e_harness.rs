@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use std::future::Future;
+use std::sync::LazyLock;
 
 use chrono::{DateTime, NaiveTime, TimeZone, Utc};
 use kamu_cli_puppet::extensions::KamuCliPuppetExt;
@@ -15,6 +16,12 @@ use kamu_cli_puppet::{KamuCliPuppet, NewWorkspaceOptions};
 use sqlx::PgPool;
 
 use crate::{KamuApiServerClient, api_server_e2e_test};
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// The system time of [`KamuCliApiServerHarnessOptions::with_frozen_system_time`]
+pub static FROZEN_SYSTEM_TIME: LazyLock<DateTime<Utc>> =
+    LazyLock::new(|| Utc.with_ymd_and_hms(2050, 1, 2, 3, 4, 5).unwrap());
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -113,9 +120,7 @@ impl KamuCliApiServerHarnessOptions {
     }
 
     pub fn with_frozen_system_time(self) -> Self {
-        let t = Utc.with_ymd_and_hms(2050, 1, 2, 3, 4, 5).unwrap();
-
-        self.with_custom_frozen_system_time(t)
+        self.with_custom_frozen_system_time(*FROZEN_SYSTEM_TIME)
     }
 
     pub fn with_today_as_frozen_system_time(self) -> Self {

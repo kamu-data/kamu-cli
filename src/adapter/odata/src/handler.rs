@@ -26,7 +26,7 @@ use dill::Catalog;
 use http_common::{ApiError, IntoApiError};
 use internal_error::ErrorIntoInternal;
 use kamu_auth_rebac::{RebacDatasetRefUnresolvedError, RebacDatasetRegistryFacade};
-use kamu_datasets::DatasetAction;
+use kamu_datasets::DatasetPermission;
 
 use crate::context::*;
 
@@ -226,7 +226,7 @@ pub async fn odata_collection_handler_common(
     let resolved_dataset = rebac_dataset_registry_facade
         .resolve_dataset_by_ref(
             &requested_dataset_alias.into_local_ref(),
-            DatasetAction::Read,
+            DatasetPermission::Read,
         )
         .await
         .map_err(|e| {

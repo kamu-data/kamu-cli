@@ -15,6 +15,8 @@ mod dataset_storage_unit_s3;
 mod metadata_chain_impl;
 mod metadata_chain_ref_repo;
 mod metadata_chain_validators;
+#[cfg(any(feature = "lfs", feature = "s3"))]
+mod store_dataset_steps;
 
 pub use dataset_impl::*;
 #[cfg(feature = "lfs")]

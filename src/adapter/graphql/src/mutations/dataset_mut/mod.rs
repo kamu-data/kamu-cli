@@ -8,9 +8,11 @@
 // by the Apache License, Version 2.0.
 
 mod adapters_mut;
+mod cas_failed_heads;
 mod dataset_collaboration_mut;
 mod dataset_mut;
 
 pub(crate) use adapters_mut::*;
+pub(crate) use cas_failed_heads::*;
 pub(crate) use dataset_collaboration_mut::*;
 pub(crate) use dataset_mut::*;

@@ -9,17 +9,19 @@
 
 use std::sync::Arc;
 
+use database_common::transaction;
 use futures::TryStreamExt as _;
 use kamu::domain::{
-    CompactDatasetUseCase,
+    CompactionJob,
+    CompactionMultiListener,
     CompactionOptions,
-    VerificationMultiListener,
     VerificationOptions,
-    VerificationRequest,
-    VerifyDatasetUseCase,
+    VerifyJob,
 };
+use kamu::utils::datasets_filtering::filter_datasets_by_local_pattern;
 use kamu_datasets::DatasetRegistry;
 
+use super::common::verify_dataset;
 use crate::{
     BatchError,
     CLIError,
@@ -29,13 +31,15 @@ use crate::{
     VerificationMultiProgress,
 };
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[dill::component]
 #[dill::interface(dyn Command)]
 pub struct CompactCommand {
     interact: Arc<Interact>,
-    compact_dataset_use_case: Arc<dyn CompactDatasetUseCase>,
-    verify_dataset_use_case: Arc<dyn VerifyDatasetUseCase>,
-    dataset_registry: Arc<dyn DatasetRegistry>,
+    catalog: dill::Catalog,
+    compaction_job: Arc<dyn CompactionJob>,
+    verify_job: Arc<dyn VerifyJob>,
 
     #[dill::component(explicit)]
     dataset_ref_patterns: Vec<odf::DatasetRefPattern>,
@@ -64,17 +68,13 @@ impl CompactCommand {
             progress.draw();
         });
 
-        let result = self
-            .verify_dataset_use_case
-            .execute(
-                VerificationRequest {
-                    target: dataset_handle.clone(),
-                    block_range: (None, None),
-                    options: VerificationOptions::default(),
-                },
-                listener.begin_verify(dataset_handle),
-            )
-            .await;
+        let result = verify_dataset(
+            self.verify_job.as_ref(),
+            dataset_handle.clone(),
+            &VerificationOptions::default(),
+            Some(listener.as_ref()),
+        )
+        .await;
 
         listener.finish();
         draw_thread.join().unwrap();
@@ -96,14 +96,14 @@ impl Command for CompactCommand {
             ));
         }
 
-        let dataset_handles: Vec<odf::DatasetHandle> = {
-            kamu::utils::datasets_filtering::filter_datasets_by_local_pattern(
-                self.dataset_registry.as_ref(),
+        let dataset_handles = transaction!(|dataset_registry: Arc<dyn DatasetRegistry>| {
+            filter_datasets_by_local_pattern(
+                dataset_registry.as_ref(),
                 self.dataset_ref_patterns.clone(),
             )
-            .try_collect()
+            .try_collect::<Vec<_>>()
             .await?
-        };
+        });
 
         self.interact.require_confirmation(format!(
             "{}\n  {}\n{}",
@@ -135,31 +135,27 @@ impl Command for CompactCommand {
             progress.draw();
         });
 
-        let compaction_results = self
-            .compact_dataset_use_case
-            .execute_multi(
-                dataset_handles,
-                CompactionOptions {
-                    max_slice_size: Some(self.max_slice_size),
-                    max_slice_records: Some(self.max_slice_records),
-                    keep_metadata_only: self.keep_metadata_only,
-                },
-                Some(listener.clone()),
-            )
-            .await;
+        let options = CompactionOptions {
+            max_slice_size: Some(self.max_slice_size),
+            max_slice_records: Some(self.max_slice_records),
+            keep_metadata_only: self.keep_metadata_only,
+        };
 
-        let total_results = compaction_results.len();
+        // Each dataset is committed as soon as it is compacted
+        let mut errors = Vec::new();
+        for hdl in &dataset_handles {
+            if let Err(e) = self
+                .compaction_job
+                .run(hdl, options.clone(), listener.begin_compact(hdl))
+                .await
+            {
+                errors.push((e, format!("Failed to compact {}", hdl.as_local_ref())));
+            }
+        }
+        let total_results = dataset_handles.len();
 
         listener.finish();
         draw_thread.join().unwrap();
-
-        let errors: Vec<_> = compaction_results
-            .into_iter()
-            .filter_map(|response| match response.result {
-                Ok(_) => None,
-                Err(e) => Some((e, format!("Failed to compact {}", response.dataset_ref))),
-            })
-            .collect();
 
         if errors.is_empty() {
             eprintln!(
@@ -181,3 +177,5 @@ impl Command for CompactCommand {
         }
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

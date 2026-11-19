@@ -441,3 +441,100 @@ async fn assert_ingest_data_to_player_scores_from_stdio<I, S, T>(
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_ingest_of_invalid_request_fails(kamu: KamuCliPuppet) {
+    kamu.execute_with_input(["add", "--stdin"], DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR)
+        .await
+        .success();
+    kamu.execute_with_input(
+        ["add", "--stdin"],
+        DATASET_DERIVATIVE_LEADERBOARD_SNAPSHOT_STR,
+    )
+    .await
+    .success();
+    kamu.execute_with_input(
+        ["add", "--stdin", "--name", "pulled-scores"],
+        DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR,
+    )
+    .await
+    .success();
+    kamu.execute([
+        "repo",
+        "alias",
+        "add",
+        "pulled-scores",
+        "odf+http://example.com/x",
+        "--pull",
+    ])
+    .await
+    .success();
+
+    let data = DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_1;
+    for (case, cmd, stdin, expected_stderr) in [
+        (
+            "into a derivative",
+            &["ingest", "leaderboard", "--stdin"][..],
+            Some(data),
+            &["Ingesting data available for root datasets only"][..],
+        ),
+        (
+            "without files or stdin",
+            &["ingest", "player-scores"],
+            None,
+            &["Specify a list of files or pass --stdin"],
+        ),
+        (
+            "unknown source name",
+            &[
+                "ingest",
+                "player-scores",
+                "--stdin",
+                "--source-name",
+                "unknown",
+            ],
+            Some(data),
+            &["Source 'unknown' not found"],
+        ),
+        (
+            "unparsable value",
+            &["ingest", "player-scores", "--stdin"],
+            Some(
+                r#"{"match_time": "2000-01-01", "match_id": "not-a-number", "player_id": "Alice", "score": 100}"#,
+            ),
+            &[r#"failed to parse "not-a-number" as Int64"#],
+        ),
+        (
+            "into a dataset with a pull alias",
+            &["ingest", "pulled-scores", "--stdin"],
+            Some(data),
+            &[
+                "Ingesting data into a dataset that is pulled from a remote will cause histories \
+                 to diverge",
+                "kamu repo alias list",
+            ],
+        ),
+    ] {
+        let stderr = kamu
+            .assert_failure_stderr_in_order(case, cmd, stdin, expected_stderr)
+            .await
+            .stderr;
+
+        // The request is at fault, so it is not reported as an internal error
+        assert!(
+            !stderr.contains("Internal error"),
+            "Case '{case}': reported as an internal error\n{stderr}"
+        );
+    }
+
+    // No failed request leaves data behind
+    pretty_assertions::assert_eq!(
+        vec![0; 3],
+        kamu.list_datasets()
+            .await
+            .into_iter()
+            .map(|dataset| dataset.records)
+            .collect::<Vec<_>>()
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

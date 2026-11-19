@@ -11,13 +11,14 @@ use std::sync::Arc;
 
 use dill::component;
 use internal_error::*;
-use kamu_accounts::{DEFAULT_ACCOUNT_NAME, LoggedAccount};
+use kamu_accounts::{AccountHandle, DEFAULT_ACCOUNT_NAME, Principal};
 use kamu_core::TenancyConfig;
 use kamu_datasets::{
     CreateDatasetError,
     CreateDatasetFromSnapshotError,
     DatasetLifecycleMessage,
     DatasetReferenceCASError,
+    DatasetReferenceUpdater,
     MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
     NameCollisionError,
     ResolvedDataset,
@@ -36,6 +37,7 @@ pub struct CreateDatasetUseCaseHelper {
     tenancy_config: Arc<TenancyConfig>,
     dataset_entry_writer: Arc<dyn DatasetEntryWriter>,
     dataset_storage_unit_writer: Arc<dyn odf::DatasetStorageUnitWriter>,
+    dataset_reference_updater: Arc<dyn DatasetReferenceUpdater>,
     time_source: Arc<dyn SystemTimeSource>,
     outbox: Arc<dyn Outbox>,
 }
@@ -43,13 +45,28 @@ pub struct CreateDatasetUseCaseHelper {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl CreateDatasetUseCaseHelper {
+    /// The account that will own a dataset the principal creates
+    pub fn principal_owner_account(
+        principal: &Principal,
+    ) -> Result<&AccountHandle, odf::AccessError> {
+        match principal {
+            Principal::User(account) => Ok(account),
+            Principal::Node => Err(odf::AccessError::Unauthorized(
+                "The node has no account to own a dataset".into(),
+            )),
+            Principal::Anonymous => {
+                panic!("Anonymous account cannot create dataset");
+            }
+        }
+    }
+
     /// Given a raw alias under which user wants to create a dataset and user's
     /// credentials determine the target account under which dataset will be
     /// created and whether user has permissions to do so
     pub fn resolve_alias_target(
         &self,
         raw_alias: &odf::DatasetAlias,
-        subject: &LoggedAccount,
+        subject: &AccountHandle,
     ) -> Result<(CanonicalDatasetAlias, odf::AccountID), CreateDatasetError> {
         match self.tenancy_config.as_ref() {
             TenancyConfig::SingleTenant => {
@@ -59,12 +76,12 @@ impl CreateDatasetUseCaseHelper {
                         None,
                         raw_alias.dataset_name.clone(),
                     )),
-                    subject.account_handle.did.clone(),
+                    subject.did.clone(),
                 ))
             }
             TenancyConfig::MultiTenant => {
                 if let Some(account_name) = &raw_alias.account_name
-                    && *account_name != subject.account_handle.name
+                    && *account_name != subject.name
                 {
                     // Creating dataset for account different that the subject
                     // TODO: check organization permissions
@@ -77,10 +94,10 @@ impl CreateDatasetUseCaseHelper {
                 } else {
                     Ok((
                         CanonicalDatasetAlias::new(odf::DatasetAlias::new(
-                            Some(subject.account_handle.name.clone()),
+                            Some(subject.name.clone()),
                             raw_alias.dataset_name.clone(),
                         )),
-                        subject.account_handle.did.clone(),
+                        subject.did.clone(),
                     ))
                 }
             }
@@ -223,21 +240,15 @@ impl CreateDatasetUseCaseHelper {
             .await
     }
 
+    /// Sets the first `HEAD` of a dataset; fails with a CAS error if the
+    /// dataset already has one
     pub async fn set_created_head(
         &self,
         dataset: ResolvedDataset,
         initial_head: &odf::Multihash,
     ) -> Result<(), CreateDatasetError> {
-        dataset
-            .as_metadata_chain()
-            .set_ref(
-                &odf::BlockRef::Head,
-                initial_head,
-                odf::dataset::SetRefOpts {
-                    validate_block_present: true,
-                    check_ref_is: Some(None),
-                },
-            )
+        self.dataset_reference_updater
+            .update_reference(&dataset, &odf::BlockRef::Head, None, initial_head)
             .await
             .map_err(|e| match e {
                 odf::dataset::SetChainRefError::CASFailed(e) => {

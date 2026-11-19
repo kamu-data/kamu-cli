@@ -105,28 +105,13 @@ where
         self.storage_ref_repo.get(r.as_str()).await
     }
 
-    #[tracing::instrument(level="debug", skip_all, fields(%r, %hash))]
-    async fn set_ref<'a>(
-        &'a self,
+    #[tracing::instrument(level="debug", skip_all, fields(%r, ?expected, %hash))]
+    async fn set_ref(
+        &self,
         r: &odf::BlockRef,
+        expected: Option<&odf::Multihash>,
         hash: &odf::Multihash,
-        check_ref_is: Option<Option<&'a odf::Multihash>>,
     ) -> Result<(), odf::dataset::SetChainRefError> {
-        let maybe_prev_block_hash = if let Some(check_ref_is) = check_ref_is {
-            Ok(check_ref_is.cloned())
-        } else {
-            match self.get_ref(r).await {
-                Ok(hash) => Ok(Some(hash)),
-                Err(odf::storage::GetRefError::NotFound(_)) => Ok(None),
-                Err(odf::storage::GetRefError::Access(e)) => {
-                    Err(odf::dataset::SetChainRefError::Access(e))
-                }
-                Err(odf::storage::GetRefError::Internal(e)) => {
-                    Err(odf::dataset::SetChainRefError::Internal(e))
-                }
-            }
-        }?;
-
         let maybe_dataset_ref_service = {
             // Drop cached reference: if commit succeeds, we will find it out on next read.
             // If commit fails, we did nothing harmful
@@ -140,7 +125,7 @@ where
 
         if let Some(dataset_ref_service) = maybe_dataset_ref_service {
             dataset_ref_service
-                .set_reference(&self.dataset_id, r, maybe_prev_block_hash.as_ref(), hash)
+                .set_reference(&self.dataset_id, r, expected, hash)
                 .await
                 .map_err(|e| match e {
                     SetDatasetReferenceError::CASFailed(e) => {

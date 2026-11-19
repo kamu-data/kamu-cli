@@ -30,6 +30,7 @@ e2e = [
 
 
 [dependencies]
+common-macros = { workspace = true }
 database-common = { workspace = true }
 database-common-macros = { workspace = true }
 email-utils = { workspace = true }
@@ -147,7 +148,9 @@ kamu-core = { workspace = true, features = [
     "testing",
 ] }
 kamu-datasets-inmem = { workspace = true }
-kamu-datasets-services = { workspace = true }
+kamu-datasets-services = { workspace = true, features = [
+    "testing",
+] }
 kamu-ingest-datafusion = { workspace = true }
 messaging-outbox = { workspace = true }
 observability = { workspace = true, features = [

@@ -17,3 +17,13 @@ kamu_cli_execute_command_e2e_test!(
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+kamu_cli_execute_command_e2e_test!(
+    storage = sqlite,
+    fixture = kamu_cli_e2e_repo_tests::commands::test_system_diagnose_verifies_datasets,
+    extra_test_groups = "containerized, engine, ingest, datafusion",
+    sqlite_only =
+        "checks that diagnose verifies workspace datasets; the repository type cannot change it"
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

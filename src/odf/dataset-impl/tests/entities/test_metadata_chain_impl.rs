@@ -118,6 +118,7 @@ async fn test_set_ref() {
         chain
             .set_ref(
                 &BlockRef::Head,
+                None,
                 &odf::Multihash::from_digest_sha3_256(b"does-not-exist"),
                 SetRefOpts::default(),
             )
@@ -129,12 +130,10 @@ async fn test_set_ref() {
         chain
             .set_ref(
                 &BlockRef::Head,
+                Some(&odf::Multihash::from_digest_sha3_256(b"does-not-exist")),
                 &hash_1,
                 SetRefOpts {
                     validate_block_present: false,
-                    check_ref_is: Some(Some(&odf::Multihash::from_digest_sha3_256(
-                        b"does-not-exist"
-                    ))),
                 }
             )
             .await,
@@ -142,7 +141,7 @@ async fn test_set_ref() {
     );
 
     chain
-        .set_ref(&BlockRef::Head, &hash_1, SetRefOpts::default())
+        .set_ref(&BlockRef::Head, None, &hash_1, SetRefOpts::default())
         .await
         .unwrap();
     assert_eq!(chain.resolve_ref(&BlockRef::Head).await.unwrap(), hash_1);
@@ -327,15 +326,29 @@ async fn test_append_unexpected_ref() {
         .unwrap();
     assert_eq!(chain.resolve_ref(&BlockRef::Head).await.unwrap(), hash);
 
-    let invalid_hash = odf::Multihash::from_digest_sha3_256(b"does-not-exist");
+    // Appended without moving `HEAD`, so `HEAD` is not the next block's
+    // previous block
+    let unreferenced_hash = chain
+        .append(
+            MetadataFactory::metadata_block(MetadataFactory::set_data_schema().build())
+                .prev(&hash, 0)
+                .build(),
+            AppendOpts {
+                update_ref: None,
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
     assert_matches!(
         chain
             .append(
                 MetadataFactory::metadata_block(MetadataFactory::set_data_schema().build())
-                    .prev(&hash, 0)
+                    .prev(&unreferenced_hash, 1)
                     .build(),
+                // Only the reference check is under test
                 AppendOpts {
-                    check_ref_is: Some(Some(&invalid_hash)),
+                    validation: AppendValidation::None,
                     ..Default::default()
                 }
             )

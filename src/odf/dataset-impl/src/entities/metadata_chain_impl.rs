@@ -243,14 +243,6 @@ where
             }?;
         }
 
-        let check_ref_is = if opts.update_ref.is_some()
-            && (opts.check_ref_is.is_some() || opts.check_ref_is_prev_block)
-        {
-            opts.check_ref_is.or(Some(block.prev_block_hash.as_ref()))
-        } else {
-            None
-        };
-
         let res = if let Some(block_data) = opts.block_data {
             self.meta_block_repo
                 .insert_block_data(
@@ -285,10 +277,10 @@ where
         if let Some(r) = opts.update_ref {
             self.set_ref(
                 r,
+                block.prev_block_hash.as_ref(),
                 &res.hash,
                 SetRefOpts {
                     validate_block_present: false,
-                    check_ref_is,
                 },
             )
             .await
@@ -310,11 +302,12 @@ where
     }
 
     #[tracing::instrument(level = "debug", skip_all, fields(r, hash, ?opts))]
-    async fn set_ref<'a>(
-        &'a self,
+    async fn set_ref(
+        &self,
         r: &BlockRef,
+        expected: Option<&Multihash>,
         hash: &Multihash,
-        opts: SetRefOpts<'a>,
+        opts: SetRefOpts,
     ) -> Result<(), SetChainRefError> {
         if opts.validate_block_present {
             match self.meta_block_repo.contains_block(hash).await {
@@ -327,9 +320,7 @@ where
             }?;
         }
 
-        self.meta_ref_repo
-            .set_ref(r, hash, opts.check_ref_is)
-            .await?;
+        self.meta_ref_repo.set_ref(r, expected, hash).await?;
 
         Ok(())
     }

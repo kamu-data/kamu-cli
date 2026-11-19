@@ -28,6 +28,11 @@ pub enum TransformResult {
     Updated {
         old_head: odf::Multihash,
         new_head: odf::Multihash,
+        /// Offsets of the records the transform appended, if any
+        new_offset_interval: Option<odf::metadata::OffsetInterval>,
+        /// Blocks and records the transform appended, and the new watermark
+        /// when it changed
+        increment: odf::dataset::MetadataChainIncrementInterval,
     },
 }
 
@@ -70,6 +75,18 @@ pub enum TransformError {
     ),
 }
 
+impl TransformError {
+    /// Whether running the same transform again could succeed
+    pub fn is_recoverable(&self) -> bool {
+        match self {
+            Self::Plan(e) => e.is_recoverable(),
+            Self::Elaborate(e) => e.is_recoverable(),
+            Self::Execute(e) => e.is_recoverable(),
+            Self::Internal(_) => true,
+        }
+    }
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Error)]
@@ -91,17 +108,19 @@ pub enum VerifyTransformError {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Error)]
-#[error("Dataset {dataset_handle} has not defined a schema yet")]
-pub struct InputSchemaNotDefinedError {
+#[error("Input dataset {dataset_handle} has no data yet, pull it first")]
+pub struct InputNotPulledError {
     pub dataset_handle: odf::DatasetHandle,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// The block the last transform consumed is no longer an ancestor of the
+/// input's head: the input's history was rewritten
 #[derive(Error, Debug)]
-#[error("Invalid block interval [{head}, {tail}) in input dataset '{input_dataset_id}'")]
+#[error("Invalid block interval [{head}, {tail}) in input dataset {input_dataset}")]
 pub struct InvalidInputIntervalError {
-    pub input_dataset_id: odf::DatasetID,
+    pub input_dataset: odf::DatasetHandle,
     pub head: odf::Multihash,
     pub tail: odf::Multihash,
 }

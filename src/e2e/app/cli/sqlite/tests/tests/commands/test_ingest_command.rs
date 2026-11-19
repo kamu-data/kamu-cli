@@ -56,3 +56,13 @@ kamu_cli_execute_command_e2e_test!(
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+kamu_cli_execute_command_e2e_test!(
+    storage = sqlite,
+    fixture = kamu_cli_e2e_repo_tests::commands::test_ingest_of_invalid_request_fails,
+    options = Options::default().with_frozen_system_time(),
+    extra_test_groups = "engine, ingest, datafusion",
+    sqlite_only = "checks why the CLI rejects ingests; the repository type cannot change it"
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

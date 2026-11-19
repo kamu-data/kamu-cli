@@ -26,11 +26,12 @@ use datafusion::sql::sqlparser::ast::{
 };
 use futures::TryStreamExt;
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
+use kamu_accounts::Principal;
 use kamu_core::*;
 use kamu_datasets::{
-    DatasetAction,
-    DatasetActionAuthorizer,
-    DatasetActionAuthorizerExt as _,
+    DatasetPermission,
+    DatasetPermissionChecker,
+    DatasetPermissionCheckerExt as _,
     DatasetRegistry,
     ResolvedDataset,
 };
@@ -47,7 +48,8 @@ use crate::utils::docker_images;
 pub struct QueryServiceImpl {
     session_context_builder: Arc<SessionContextBuilder>,
     dataset_registry: Arc<dyn DatasetRegistry>,
-    dataset_action_authorizer: Arc<dyn DatasetActionAuthorizer>,
+    dataset_permission_checker: Arc<dyn DatasetPermissionChecker>,
+    principal: Arc<Principal>,
 }
 
 impl CheapClone for QueryServiceImpl {}
@@ -84,8 +86,12 @@ impl QueryServiceImpl {
                 .map(Cow::Borrowed)
                 .collect::<Vec<_>>();
             let by_access = self
-                .dataset_action_authorizer
-                .classify_dataset_ids_by_allowance(&dataset_id_refs, DatasetAction::Read)
+                .dataset_permission_checker
+                .classify_dataset_ids_by_allowance(
+                    &self.principal,
+                    &dataset_id_refs,
+                    DatasetPermission::Read,
+                )
                 .await?;
 
             for (id, _) in by_access.unauthorized_ids_with_errors {
@@ -191,10 +197,11 @@ impl QueryServiceImpl {
                 // - Anonymous: get all the public
                 // - Logged: all owned datasets and datasets with relations
                 let handles: Vec<odf::DatasetHandle> = self
-                    .dataset_action_authorizer
+                    .dataset_permission_checker
                     .filtered_datasets_stream(
+                        &self.principal,
                         self.dataset_registry.all_dataset_handles(),
-                        DatasetAction::Read,
+                        DatasetPermission::Read,
                     )
                     .try_collect()
                     .await?;
@@ -265,8 +272,8 @@ impl QueryServiceImpl {
                     }
 
                     if !self
-                        .dataset_action_authorizer
-                        .is_action_allowed(&hdl.id, DatasetAction::Read)
+                        .dataset_permission_checker
+                        .is_permission_granted(&self.principal, &hdl.id, DatasetPermission::Read)
                         .await?
                     {
                         // Ignore this alias and let the query fail with the "not found" error
@@ -476,10 +483,11 @@ impl QueryService for QueryServiceImpl {
         // Use DataFusion remote catalog pattern instead:
         // https://github.com/apache/datafusion/blob/main/datafusion-examples/examples/remote_catalog.rs
         let handles: Vec<odf::DatasetHandle> = self
-            .dataset_action_authorizer
+            .dataset_permission_checker
             .filtered_datasets_stream(
+                &self.principal,
                 self.dataset_registry.all_dataset_handles(),
-                DatasetAction::Read,
+                DatasetPermission::Read,
             )
             .try_collect()
             .await?;
@@ -893,6 +901,8 @@ fn is_to_table_function(name: &ObjectName) -> bool {
     )
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 /// Returns the dataset reference passed to `to_table()`, if it is a single identifier.
 /// Other argument shapes are rejected when the function is planned.
 fn to_table_dataset_arg(args: &TableFunctionArgs) -> Option<ObjectName> {
@@ -906,3 +916,5 @@ fn to_table_dataset_arg(args: &TableFunctionArgs) -> Option<ObjectName> {
 
     Some(ObjectName(vec![ObjectNamePart::Identifier(ident.clone())]))
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -16,8 +16,9 @@ mod session_auth_anon;
 mod session_auth_bearer_only;
 mod session_manager;
 mod session_manager_caching;
-mod session_manager_singleton;
 pub mod sql_info;
+#[cfg(feature = "testing")]
+pub mod testing;
 mod types;
 
 pub use auth_layer::*;
@@ -29,5 +30,4 @@ pub use session_auth_anon::*;
 pub use session_auth_bearer_only::*;
 pub use session_manager::*;
 pub use session_manager_caching::*;
-pub use session_manager_singleton::*;
 pub use types::*;

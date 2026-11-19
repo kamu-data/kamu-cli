@@ -208,14 +208,6 @@ impl From<odf::DatasetRefUnresolvedError> for CLIError {
     }
 }
 
-impl From<GetAliasesError> for CLIError {
-    fn from(v: GetAliasesError) -> Self {
-        match v {
-            e @ GetAliasesError::Internal(_) => Self::critical(e),
-        }
-    }
-}
-
 impl From<DeleteDatasetError> for CLIError {
     fn from(v: DeleteDatasetError) -> Self {
         match v {

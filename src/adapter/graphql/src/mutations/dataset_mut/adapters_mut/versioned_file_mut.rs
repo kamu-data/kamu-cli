@@ -17,6 +17,7 @@ use kamu_datasets::{
     WriteCheckedDataset,
 };
 
+use crate::mutations::{CAS_FAILED_MESSAGE, CasFailedHeads};
 use crate::prelude::*;
 use crate::queries::{DatasetRequestState, FileVersion};
 use crate::utils::{ContentSource, GetContentArgsError, get_content_args};
@@ -258,7 +259,7 @@ impl UpdateVersionErrorCasFailed {
     }
     /// Human-readable error message
     pub async fn message(&self) -> String {
-        "Expected head didn't match, dataset was likely updated concurrently".to_string()
+        CAS_FAILED_MESSAGE.to_string()
     }
 }
 
@@ -442,12 +443,18 @@ fn update_version_result(
             new_head: res.new_head.into(),
             content_hash: res.content_hash.into(),
         })),
-        Err(UpdateVersionFileUseCaseError::RefCASFailed(err)) => Ok(
-            UpdateVersionResult::CasFailed(UpdateVersionErrorCasFailed {
-                expected_head: err.expected.unwrap().into(),
-                actual_head: err.actual.unwrap().into(),
-            }),
-        ),
+        Err(UpdateVersionFileUseCaseError::RefCASFailed(err)) => {
+            let CasFailedHeads {
+                expected_head,
+                actual_head,
+            } = CasFailedHeads::try_from(err)?;
+            Ok(UpdateVersionResult::CasFailed(
+                UpdateVersionErrorCasFailed {
+                    expected_head,
+                    actual_head: actual_head.unwrap(),
+                },
+            ))
+        }
         Err(UpdateVersionFileUseCaseError::NoVersions) => Ok(UpdateVersionResult::NoVersions(
             UpdateVersionErrorNoVersions,
         )),

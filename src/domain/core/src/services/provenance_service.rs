@@ -7,15 +7,16 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use internal_error::{ErrorIntoInternal, InternalError};
-use kamu_datasets::DatasetActionUnauthorizedError;
+use internal_error::InternalError;
+use kamu_datasets::DatasetPermissionError;
 use thiserror::Error;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
 pub trait ProvenanceService: Sync + Send {
-    /// Passes the visitor through the dependency graph of a dataset
+    /// Passes the visitor through the dependency graph of a dataset, as far as
+    /// the current principal may read it.
     /// Some predefined visitors are available.
     async fn get_dataset_lineage(
         &self,
@@ -105,15 +106,9 @@ impl From<odf::DatasetRefUnresolvedError> for GetLineageError {
     }
 }
 
-impl From<DatasetActionUnauthorizedError> for GetLineageError {
-    fn from(v: DatasetActionUnauthorizedError) -> Self {
-        use DatasetActionUnauthorizedError as E;
-
-        match v {
-            E::NotFound(e) => Self::NotFound(e),
-            E::Access(e) => Self::Access(e),
-            e @ E::Internal(_) => Self::Internal(e.int_err()),
-        }
+impl From<DatasetPermissionError> for GetLineageError {
+    fn from(v: DatasetPermissionError) -> Self {
+        v.into_error()
     }
 }
 

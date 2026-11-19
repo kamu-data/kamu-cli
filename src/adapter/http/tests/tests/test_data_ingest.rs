@@ -15,7 +15,9 @@ use kamu::domain::*;
 use kamu::testing::DatasetDataHelper;
 use kamu::*;
 use kamu_adapter_http::platform::UploadServiceLocal;
-use kamu_datasets::CreateDatasetResult;
+use kamu_datasets::{CreateDatasetResult, DatasetPermission, MockDatasetPermissionChecker};
+use kamu_datasets_services::DatasetOperationGuardImpl;
+use odf::metadata::testing::MetadataFactory;
 use serde_json::json;
 use url::Url;
 use uuid::Uuid;
@@ -608,6 +610,177 @@ async fn test_data_push_ingest_upload_token_actual_file_different_size() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[test_group::group(engine, ingest, datafusion)]
+#[test_log::test(tokio::test)]
+async fn test_data_push_ingest_rejected_request_status() {
+    let harness = DataIngestHarness::new().await;
+    let with_source = harness.create_population_dataset(true).await;
+    let without_source = harness
+        .create_root_dataset("population-without-source", false)
+        .await;
+    let derivative = harness
+        .create_derivative_dataset(&with_source.dataset_handle.alias)
+        .await;
+    let reading_system_column = harness.create_dataset_reading_system_column().await;
+    let declaring_other_schema = harness
+        .create_population_dataset_declaring_other_schema()
+        .await;
+    let census = harness.create_census_dataset_with_object_links().await;
+    let with_source_url = harness.ingest_url(&with_source.dataset_handle.alias);
+    let without_source_url = harness.ingest_url(&without_source.dataset_handle.alias);
+    let derivative_url = harness.ingest_url(&derivative.dataset_handle.alias);
+    let reading_system_column_url = harness.ingest_url(&reading_system_column.dataset_handle.alias);
+    let declaring_other_schema_url =
+        harness.ingest_url(&declaring_other_schema.dataset_handle.alias);
+    let census_url = harness.ingest_url(&census.dataset_handle.alias);
+
+    let cases = [
+        (
+            "unsupported_media_type",
+            &with_source_url,
+            http::HeaderValue::from_static("application/x-unknown"),
+            "A,100",
+            http::StatusCode::UNSUPPORTED_MEDIA_TYPE,
+        ),
+        (
+            "into_dataset_without_push_source",
+            &without_source_url,
+            http::HeaderValue::from_static("application/x-ndjson"),
+            DataIngestHarness::POPULATION_RECORD,
+            http::StatusCode::BAD_REQUEST,
+        ),
+        (
+            "value_of_wrong_type",
+            &with_source_url,
+            http::HeaderValue::from_static("application/x-ndjson"),
+            r#"{"event_time": "2020-01-01T00:00:00", "city": "A", "population": "many"}"#,
+            http::StatusCode::BAD_REQUEST,
+        ),
+        (
+            "content_type_not_text",
+            &with_source_url,
+            http::HeaderValue::from_bytes(b"application/x-ndjson\xff").unwrap(),
+            DataIngestHarness::POPULATION_RECORD,
+            http::StatusCode::BAD_REQUEST,
+        ),
+        (
+            "into_derivative",
+            &derivative_url,
+            http::HeaderValue::from_static("application/x-ndjson"),
+            DataIngestHarness::POPULATION_RECORD,
+            http::StatusCode::BAD_REQUEST,
+        ),
+        (
+            "column_named_as_system_column",
+            &reading_system_column_url,
+            http::HeaderValue::from_static("application/x-ndjson"),
+            r#"{"offset": 1, "city": "A"}"#,
+            http::StatusCode::BAD_REQUEST,
+        ),
+        (
+            "schema_other_than_declared",
+            &declaring_other_schema_url,
+            http::HeaderValue::from_static("application/x-ndjson"),
+            DataIngestHarness::POPULATION_RECORD,
+            http::StatusCode::BAD_REQUEST,
+        ),
+        (
+            "object_link_to_missing_object",
+            &census_url,
+            http::HeaderValue::from_static("application/x-ndjson"),
+            r#"{"event_time": "2020-01-01T00:00:00", "city": "A", "census_hash": "f1620ffd8538233905b7fb9a9c7bff1315bbb3f9eaecd1746c6562426328835785dcb"}"#,
+            http::StatusCode::BAD_REQUEST,
+        ),
+    ];
+
+    let client = async move {
+        for (case, ingest_url, content_type, body, expected_status) in cases {
+            let res =
+                DataIngestHarness::push_with_content_type(ingest_url, content_type, body).await;
+
+            pretty_assertions::assert_eq!(expected_status, res.status(), "{case}");
+        }
+    };
+
+    await_client_server_flow!(harness.server_harness.api_server_run(), client);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_group::group(engine, ingest, datafusion)]
+#[test_log::test(tokio::test)]
+async fn test_data_push_ingest_without_write_access_fails_without_committing() {
+    for (web_access, expected_status) in [
+        (RestrictedWebAccess::Reader, http::StatusCode::FORBIDDEN),
+        (
+            RestrictedWebAccess::WriteDeniedPastLayer,
+            http::StatusCode::NOT_FOUND,
+        ),
+    ] {
+        let harness = DataIngestHarness::with_restricted_web_access(web_access).await;
+        let create_result = harness.create_population_dataset(true).await;
+        let dataset_id = create_result.dataset_handle.id.clone();
+        let ingest_url = harness.ingest_url(&create_result.dataset_handle.alias);
+        let stored_heads = harness.server_harness.stored_heads();
+        let head_before = stored_heads.get(&dataset_id).await;
+
+        let client = async move {
+            let res = DataIngestHarness::push_population_record(&ingest_url).await;
+
+            pretty_assertions::assert_eq!(expected_status, res.status(), "{web_access:?}");
+            pretty_assertions::assert_eq!(
+                head_before,
+                stored_heads.get(&dataset_id).await,
+                "{web_access:?}"
+            );
+        };
+
+        await_client_server_flow!(harness.server_harness.api_server_run(), client);
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_group::group(engine, ingest, datafusion)]
+#[test_log::test(tokio::test)]
+async fn test_data_push_ingest_ref_moved_concurrently_is_conflict() {
+    let harness = DataIngestHarness::new().await;
+    let create_result = harness.create_population_dataset(true).await;
+    let dataset_id = create_result.dataset_handle.id.clone();
+    let ingest_url = harness.ingest_url(&create_result.dataset_handle.alias);
+    let concurrent_head = harness
+        .server_harness
+        .append_unreferenced_block(&create_result.dataset_handle)
+        .await;
+    harness
+        .server_harness
+        .move_reference_before_next_update(concurrent_head.clone());
+    let stored_heads = harness.server_harness.stored_heads();
+
+    let client = async move {
+        let res = DataIngestHarness::push_population_record(&ingest_url).await;
+
+        pretty_assertions::assert_eq!(http::StatusCode::CONFLICT, res.status());
+        pretty_assertions::assert_eq!(concurrent_head, stored_heads.get(&dataset_id).await);
+    };
+
+    await_client_server_flow!(harness.server_harness.api_server_run(), client);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Web access to server datasets that does not allow a push ingest
+#[derive(Debug, Clone, Copy)]
+enum RestrictedWebAccess {
+    /// Web callers may only read server datasets
+    Reader,
+    /// The authorization layer sees a writer, while the use case's own check
+    /// denies the write, as when the permission is revoked between the two
+    WriteDeniedPastLayer,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 struct DataIngestHarness {
     pub server_harness: ServerSideLocalFsHarness,
     pub system_time: DateTime<Utc>,
@@ -615,6 +788,29 @@ struct DataIngestHarness {
 
 impl DataIngestHarness {
     async fn new() -> Self {
+        Self::with_web_access(true, None).await
+    }
+
+    async fn with_restricted_web_access(web_access: RestrictedWebAccess) -> Self {
+        let web_permission_checker: fn() -> MockDatasetPermissionChecker = match web_access {
+            RestrictedWebAccess::Reader => || {
+                MockDatasetPermissionChecker::new()
+                    .make_expect_get_granted_permissions(&[DatasetPermission::Read], 1)
+            },
+            RestrictedWebAccess::WriteDeniedPastLayer => || {
+                MockDatasetPermissionChecker::denying().make_expect_get_granted_permissions(
+                    &[DatasetPermission::Read, DatasetPermission::Write],
+                    1,
+                )
+            },
+        };
+        Self::with_web_access(false, Some(web_permission_checker)).await
+    }
+
+    async fn with_web_access(
+        authorized_writes: bool,
+        web_permission_checker: Option<fn() -> MockDatasetPermissionChecker>,
+    ) -> Self {
         let catalog = dill::CatalogBuilder::new()
             .add::<DataFormatRegistryImpl>()
             .add_value(EngineConfigDatafusionEmbeddedIngest::default())
@@ -623,13 +819,16 @@ impl DataIngestHarness {
             .add::<EngineProvisionerNull>()
             .add::<UploadServiceLocal>()
             .add::<PushIngestDataUseCaseImpl>()
+            .add::<DatasetOperationGuardImpl>()
             .add_value(FileUploadLimitConfig::new_in_bytes(1000))
             .build();
 
         let server_harness = ServerSideLocalFsHarness::new(ServerSideHarnessOptions {
             tenancy_config: TenancyConfig::MultiTenant,
-            authorized_writes: true,
+            authorized_writes,
+            web_permission_checker,
             base_catalog: Some(catalog),
+            ..ServerSideHarnessOptions::default()
         })
         .await;
 
@@ -647,44 +846,146 @@ impl DataIngestHarness {
     }
 
     async fn create_population_dataset(&self, with_schema: bool) -> CreateDatasetResult {
+        self.create_root_dataset("population", with_schema).await
+    }
+
+    /// A root dataset, with a push source of the population schema if
+    /// `with_schema`
+    async fn create_root_dataset(&self, name: &str, with_schema: bool) -> CreateDatasetResult {
+        let metadata = if with_schema {
+            vec![Self::population_push_source()]
+        } else {
+            vec![]
+        };
+        self.create_root_dataset_with_metadata(name, metadata).await
+    }
+
+    /// A dataset whose push source reads a column named as a system column
+    async fn create_dataset_reading_system_column(&self) -> CreateDatasetResult {
+        self.create_root_dataset_with_metadata(
+            "reading-system-column",
+            vec![Self::append_push_source(vec![
+                odf::schema::DataField::i64("offset"),
+                odf::schema::DataField::string("city"),
+            ])],
+        )
+        .await
+    }
+
+    /// A dataset with the population push source whose declared data schema
+    /// lacks the columns the source produces
+    async fn create_population_dataset_declaring_other_schema(&self) -> CreateDatasetResult {
+        self.create_root_dataset_with_metadata(
+            "population-other-schema",
+            vec![
+                Self::population_push_source(),
+                MetadataFactory::set_data_schema().build().into(),
+            ],
+        )
+        .await
+    }
+
+    /// A dataset whose `census_hash` column links to objects in its own
+    /// storage
+    async fn create_census_dataset_with_object_links(&self) -> CreateDatasetResult {
+        self.create_root_dataset_with_metadata(
+            "census",
+            vec![
+                Self::append_push_source(vec![
+                    odf::schema::DataField::timestamp_millis_utc("event_time"),
+                    odf::schema::DataField::string("city"),
+                    odf::schema::DataField::string("census_hash"),
+                ]),
+                odf::metadata::SetDataSchema::new(odf::schema::DataSchema::new(vec![
+                    odf::schema::DataField::i64("offset"),
+                    odf::schema::DataField::i32("op"),
+                    odf::schema::DataField::timestamp_millis_utc("system_time"),
+                    odf::schema::DataField::timestamp_millis_utc("event_time"),
+                    odf::schema::DataField::string("city"),
+                    odf::schema::DataField::string("census_hash").type_ext(
+                        odf::schema::ext::DataTypeExt::object_link(
+                            odf::schema::ext::DataTypeExt::multihash(),
+                        ),
+                    ),
+                ]))
+                .into(),
+            ],
+        )
+        .await
+    }
+
+    async fn create_root_dataset_with_metadata(
+        &self,
+        name: &str,
+        metadata: Vec<odf::MetadataEvent>,
+    ) -> CreateDatasetResult {
         self.server_harness
             .cli_create_dataset_from_snapshot_use_case()
             .execute(
                 odf::DatasetSnapshot {
                     name: odf::DatasetAlias::new(
                         self.server_harness.operating_account_name(),
-                        odf::DatasetName::new_unchecked("population"),
+                        odf::DatasetName::new_unchecked(name),
                     ),
                     kind: odf::DatasetKind::Root,
-                    metadata: if with_schema {
-                        vec![
-                            odf::metadata::AddPushSource {
-                                source_name: "source1".to_string(),
-                                read: odf::metadata::ReadStepNdJson {
-                                    schema: Some(odf::schema::DataSchema::new(vec![
-                                        odf::schema::DataField::timestamp_millis_utc("event_time"),
-                                        odf::schema::DataField::string("city"),
-                                        odf::schema::DataField::i64("population"),
-                                    ])),
-                                    ..Default::default()
-                                }
-                                .into(),
-                                preprocess: None,
-                                merge: odf::metadata::MergeStrategy::Ledger(
-                                    odf::metadata::MergeStrategyLedger {
-                                        primary_key: vec![
-                                            "event_time".to_owned(),
-                                            "city".to_owned(),
-                                        ],
-                                    },
-                                ),
-                            }
-                            .into(),
-                        ]
-                    } else {
-                        vec![]
-                    },
+                    metadata,
                 },
+                Default::default(),
+            )
+            .await
+            .unwrap()
+    }
+
+    fn population_push_source() -> odf::MetadataEvent {
+        odf::metadata::AddPushSource {
+            source_name: "source1".to_string(),
+            read: odf::metadata::ReadStepNdJson {
+                schema: Some(odf::schema::DataSchema::new(vec![
+                    odf::schema::DataField::timestamp_millis_utc("event_time"),
+                    odf::schema::DataField::string("city"),
+                    odf::schema::DataField::i64("population"),
+                ])),
+                ..Default::default()
+            }
+            .into(),
+            preprocess: None,
+            merge: odf::metadata::MergeStrategy::Ledger(odf::metadata::MergeStrategyLedger {
+                primary_key: vec!["event_time".to_owned(), "city".to_owned()],
+            }),
+        }
+        .into()
+    }
+
+    fn append_push_source(fields: Vec<odf::schema::DataField>) -> odf::MetadataEvent {
+        odf::metadata::AddPushSource {
+            source_name: "source1".to_string(),
+            read: odf::metadata::ReadStepNdJson {
+                schema: Some(odf::schema::DataSchema::new(fields)),
+                ..Default::default()
+            }
+            .into(),
+            preprocess: None,
+            merge: odf::metadata::MergeStrategy::Append(odf::metadata::MergeStrategyAppend {}),
+        }
+        .into()
+    }
+
+    async fn create_derivative_dataset(&self, input: &odf::DatasetAlias) -> CreateDatasetResult {
+        self.server_harness
+            .cli_create_dataset_from_snapshot_use_case()
+            .execute(
+                MetadataFactory::dataset_snapshot()
+                    .name(odf::DatasetAlias::new(
+                        self.server_harness.operating_account_name(),
+                        odf::DatasetName::new_unchecked("population-derived"),
+                    ))
+                    .kind(odf::DatasetKind::Derivative)
+                    .push_event(
+                        MetadataFactory::set_transform()
+                            .inputs_from_refs_and_aliases([(input.clone(), "population")])
+                            .build(),
+                    )
+                    .build(),
                 Default::default(),
             )
             .await
@@ -693,6 +994,46 @@ impl DataIngestHarness {
 
     fn dataset_http_url(&self, alias: &odf::DatasetAlias) -> Url {
         self.server_harness.dataset_url_with_scheme(alias, "http")
+    }
+
+    fn ingest_url(&self, alias: &odf::DatasetAlias) -> String {
+        format!("{}/ingest", self.dataset_http_url(alias))
+    }
+
+    /// Pushes a raw `body` as `content_type` without naming a source
+    async fn push(ingest_url: &str, content_type: &str, body: &'static str) -> reqwest::Response {
+        Self::push_with_content_type(
+            ingest_url,
+            http::HeaderValue::from_str(content_type).unwrap(),
+            body,
+        )
+        .await
+    }
+
+    /// One record matching the population schema
+    const POPULATION_RECORD: &'static str =
+        r#"{"event_time": "2020-01-01T00:00:00", "city": "A", "population": 100}"#;
+
+    async fn push_population_record(ingest_url: &str) -> reqwest::Response {
+        Self::push(ingest_url, "application/x-ndjson", Self::POPULATION_RECORD).await
+    }
+
+    async fn push_with_content_type(
+        ingest_url: &str,
+        content_type: http::HeaderValue,
+        body: &'static str,
+    ) -> reqwest::Response {
+        let cl = reqwest::Client::new();
+        cl.execute(
+            cl.post(ingest_url)
+                .bearer_auth(odf::dataset::DUMMY_ODF_ACCESS_TOKEN)
+                .header("Content-Type", content_type)
+                .body(body)
+                .build()
+                .unwrap(),
+        )
+        .await
+        .unwrap()
     }
 
     async fn upload_file(&self, upload_id: &str, file_name: &str, file_content: &str) {

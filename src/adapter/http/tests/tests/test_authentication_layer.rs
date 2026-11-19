@@ -13,11 +13,15 @@ use std::str::FromStr;
 
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu_accounts::{
+    Account,
+    AccountHandle,
     AnonymousAccountReason,
     AuthenticationService,
     CurrentAccountSubject,
     DEFAULT_ACCOUNT_NAME_STR,
+    DUMMY_ACCESS_TOKEN,
     MockAuthenticationService,
+    Principal,
 };
 use url::Url;
 
@@ -29,15 +33,18 @@ use crate::harness::await_client_server_flow;
 async fn test_anonymous_api_access() {
     let server_harness = ServerHarness::new(MockAuthenticationService::new(), None).await;
     let test_url = server_harness.test_url();
+    let principal_url = server_harness.principal_url();
 
     let api_server_handle = server_harness.api_server_run();
 
     let client_handle = async {
-        let client = reqwest::Client::new();
-        let response = client.get(test_url).send().await.unwrap();
         assert_eq!(
             format!("{:?}", AnonymousAccountReason::NoAuthenticationProvided),
-            response.text().await.unwrap()
+            ServerHarness::get_text(&test_url, None).await
+        );
+        assert_eq!(
+            format!("{:?}", Principal::Anonymous),
+            ServerHarness::get_text(&principal_url, None).await
         );
     };
 
@@ -49,26 +56,27 @@ async fn test_anonymous_api_access() {
 #[test_log::test(tokio::test)]
 async fn test_non_anonymous_api_valid_access() {
     let server_harness = ServerHarness::new(
-        MockAuthenticationService::resolving_token(
-            kamu_accounts::DUMMY_ACCESS_TOKEN,
-            kamu_accounts::Account::dummy(),
-        ),
+        MockAuthenticationService::resolving_token(DUMMY_ACCESS_TOKEN, Account::dummy()),
         None,
     )
     .await;
     let test_url = server_harness.test_url();
+    let principal_url = server_harness.principal_url();
 
     let api_server_handle = server_harness.api_server_run();
 
     let client_handle = async {
-        let client = reqwest::Client::new();
-        let response = client
-            .get(test_url)
-            .bearer_auth(kamu_accounts::DUMMY_ACCESS_TOKEN)
-            .send()
-            .await
-            .unwrap();
-        assert_eq!(DEFAULT_ACCOUNT_NAME_STR, response.text().await.unwrap());
+        assert_eq!(
+            DEFAULT_ACCOUNT_NAME_STR,
+            ServerHarness::get_text(&test_url, Some(DUMMY_ACCESS_TOKEN)).await
+        );
+        assert_eq!(
+            format!(
+                "{:?}",
+                Principal::User(AccountHandle::from(&Account::dummy()))
+            ),
+            ServerHarness::get_text(&principal_url, Some(DUMMY_ACCESS_TOKEN)).await
+        );
     };
 
     await_client_server_flow!(api_server_handle, client_handle);
@@ -125,20 +133,18 @@ async fn test_correct_handle_empty_bearer_token() {
 async fn test_non_anonymous_api_access_invalid_token() {
     let server_harness = ServerHarness::new(MockAuthenticationService::invalid_token(), None).await;
     let test_url = server_harness.test_url();
+    let principal_url = server_harness.principal_url();
 
     let api_server_handle = server_harness.api_server_run();
 
     let client_handle = async {
-        let client = reqwest::Client::new();
-        let response = client
-            .get(test_url)
-            .bearer_auth(kamu_accounts::DUMMY_ACCESS_TOKEN)
-            .send()
-            .await
-            .unwrap();
         assert_eq!(
             format!("{:?}", AnonymousAccountReason::AuthenticationInvalid),
-            response.text().await.unwrap()
+            ServerHarness::get_text(&test_url, Some(DUMMY_ACCESS_TOKEN)).await
+        );
+        assert_eq!(
+            format!("{:?}", Principal::Anonymous),
+            ServerHarness::get_text(&principal_url, Some(DUMMY_ACCESS_TOKEN)).await
         );
     };
 
@@ -148,6 +154,7 @@ async fn test_non_anonymous_api_access_invalid_token() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 const TEST_ENDPOINT: &str = "/foo";
+const PRINCIPAL_ENDPOINT: &str = "/principal";
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -168,7 +175,7 @@ impl ServerHarness {
                 .bind::<dyn AuthenticationService, MockAuthenticationService>();
 
             if let Some(current_account_subject) = initial_current_account_subject {
-                b.add_value(current_account_subject);
+                current_account_subject.register(&mut b);
             }
 
             database_common::NoOpDatabasePlugin::init_database_components(&mut b);
@@ -180,6 +187,10 @@ impl ServerHarness {
             .route(
                 TEST_ENDPOINT,
                 axum::routing::get(ServerHarness::foo_handler),
+            )
+            .route(
+                PRINCIPAL_ENDPOINT,
+                axum::routing::get(ServerHarness::principal_handler),
             )
             .layer(
                 tower::ServiceBuilder::new()
@@ -213,6 +224,22 @@ impl ServerHarness {
         Url::from_str(format!("http://{}{}", self.local_addr, TEST_ENDPOINT).as_str()).unwrap()
     }
 
+    /// An endpoint that answers with the `Debug` form of the request's
+    /// [`Principal`]
+    pub fn principal_url(&self) -> Url {
+        Url::from_str(format!("http://{}{}", self.local_addr, PRINCIPAL_ENDPOINT).as_str()).unwrap()
+    }
+
+    pub async fn get_text(url: &Url, bearer_token: Option<&str>) -> String {
+        let client = reqwest::Client::new();
+        let request = client.get(url.clone());
+        let request = match bearer_token {
+            Some(token) => request.bearer_auth(token),
+            None => request,
+        };
+        request.send().await.unwrap().text().await.unwrap()
+    }
+
     #[expect(clippy::unused_async, reason = "axum handlers must be async")]
     async fn foo_handler(
         axum::extract::Extension(catalog): axum::extract::Extension<dill::Catalog>,
@@ -220,7 +247,15 @@ impl ServerHarness {
         let current_account_subject = catalog.get_one::<CurrentAccountSubject>().unwrap();
         match current_account_subject.as_ref() {
             CurrentAccountSubject::Anonymous(r) => Ok(format!("{r:?}")),
-            CurrentAccountSubject::Logged(l) => Ok(l.account_handle.name.to_string()),
+            CurrentAccountSubject::Logged(l) => Ok(l.name.to_string()),
         }
+    }
+
+    #[expect(clippy::unused_async, reason = "axum handlers must be async")]
+    async fn principal_handler(
+        axum::extract::Extension(catalog): axum::extract::Extension<dill::Catalog>,
+    ) -> String {
+        let principal = catalog.get_one::<Principal>().unwrap();
+        format!("{principal:?}")
     }
 }

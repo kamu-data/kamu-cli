@@ -7,14 +7,13 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_core::ResetPlan;
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 kamu_task_system::task_definition_struct! {
     pub struct TaskDefinitionDatasetReset {
         pub dataset_handle: odf::DatasetHandle,
-        pub reset_plan: ResetPlan,
+        pub new_head_hash: Option<odf::Multihash>,
+        pub old_head_hash: Option<odf::Multihash>,
     }
     => "dev.kamu.tasks.dataset.reset"
 }

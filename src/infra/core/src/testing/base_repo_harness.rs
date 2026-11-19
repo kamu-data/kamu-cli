@@ -11,15 +11,25 @@ use std::path::Path;
 use std::sync::Arc;
 
 use bon::bon;
-use kamu_accounts::CurrentAccountSubject;
-use kamu_core::{DidGenerator, DidGeneratorDefault, MockDidGenerator, RunInfoDir, TenancyConfig};
+use chrono::{DateTime, Utc};
+use kamu_accounts::{CurrentAccountSubject, Principal};
+use kamu_core::{
+    DidGenerator,
+    DidGeneratorDefault,
+    MockDidGenerator,
+    RemoteAliasKind,
+    RemoteAliases,
+    RemoteAliasesRegistry,
+    RunInfoDir,
+    TenancyConfig,
+};
 use kamu_datasets::{CreateDatasetResult, DatasetRegistry, DatasetRegistryExt, ResolvedDataset};
 use odf::dataset::DatasetStorageUnitLocalFs;
 use odf::dataset::testing::create_test_dataset_from_snapshot;
-use odf::metadata::testing::MetadataFactory;
+use odf::metadata::testing::{DatasetSnapshotBuilder, MetadataFactory};
 use time_source::{SystemTimeSource, SystemTimeSourceDefault, SystemTimeSourceStub};
 
-use crate::DatasetRegistrySoloUnitBridge;
+use crate::{DatasetRegistrySoloUnitBridge, RemoteAliasesRegistryImpl};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -39,6 +49,9 @@ impl BaseRepoHarness {
         tenancy_config: TenancyConfig,
         mock_did_generator: Option<MockDidGenerator>,
         current_account_subject: Option<CurrentAccountSubject>,
+        /// Acting principal instead of the subject's own, e.g. `Principal::Node`
+        /// for work that runs as the node
+        principal: Option<Principal>,
         system_time_source_stub: Option<SystemTimeSourceStub>,
     ) -> Self {
         let temp_dir = tempfile::tempdir().unwrap();
@@ -58,11 +71,9 @@ impl BaseRepoHarness {
                 .add::<odf::dataset::DatasetLfsBuilderDefault>()
                 .add::<DatasetRegistrySoloUnitBridge>();
 
-            if let Some(current_account_subject) = current_account_subject {
-                b.add_value(current_account_subject);
-            } else {
-                b.add_value(CurrentAccountSubject::new_test());
-            }
+            current_account_subject
+                .unwrap_or_else(CurrentAccountSubject::new_test)
+                .register_acting_as(principal, &mut b);
 
             if let Some(mock_did_generator) = mock_did_generator {
                 b.add_value(mock_did_generator)
@@ -121,34 +132,89 @@ impl BaseRepoHarness {
         Ok(())
     }
 
-    pub async fn create_root_dataset(&self, alias: &odf::DatasetAlias) -> CreateDatasetResult {
-        let snapshot = MetadataFactory::dataset_snapshot()
-            .name(alias.clone())
-            .kind(odf::DatasetKind::Root)
-            .push_event(MetadataFactory::set_polling_source().build())
-            .build();
+    /// An alias without an account, for single-tenant workspaces
+    pub fn alias(name: &str) -> odf::DatasetAlias {
+        odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked(name))
+    }
 
-        let store_result = create_test_dataset_from_snapshot(
-            self.dataset_registry.as_ref(),
-            self.dataset_storage_unit_writer.as_ref(),
-            snapshot,
-            self.did_generator.generate_dataset_id().0,
-            self.system_time_source.now(),
+    pub fn remote_ref(remote_ref: &str) -> odf::DatasetRefRemote {
+        odf::DatasetRefRemote::try_from(remote_ref).unwrap()
+    }
+
+    /// A root dataset with a polling source, named without an account
+    pub async fn create_root(&self, name: &str) -> odf::DatasetHandle {
+        self.create_root_dataset(&Self::alias(name))
+            .await
+            .dataset_handle
+    }
+
+    pub async fn create_root_dataset(&self, alias: &odf::DatasetAlias) -> CreateDatasetResult {
+        self.create_root_dataset_with_events(
+            alias,
+            vec![MetadataFactory::set_polling_source().build().into()],
         )
         .await
-        .unwrap();
-
-        CreateDatasetResult::from_stored(store_result, alias.clone())
     }
 
     pub async fn create_root_dataset_with_push_source(
         &self,
         alias: &odf::DatasetAlias,
     ) -> CreateDatasetResult {
-        let snapshot = MetadataFactory::dataset_snapshot()
-            .name(alias.clone())
-            .kind(odf::DatasetKind::Root)
-            .push_event(MetadataFactory::add_push_source().build())
+        self.create_root_dataset_with_events(
+            alias,
+            vec![MetadataFactory::add_push_source().build().into()],
+        )
+        .await
+    }
+
+    /// A root dataset polling the CSV file at `src_path`, with `city` and
+    /// `population` columns and a header row
+    pub async fn create_root_dataset_polling_csv(
+        &self,
+        alias: &odf::DatasetAlias,
+        src_path: &Path,
+    ) -> CreateDatasetResult {
+        let source = MetadataFactory::set_polling_source()
+            .fetch(odf::metadata::FetchStep::Url(odf::metadata::FetchStepUrl {
+                url: url::Url::from_file_path(src_path).unwrap().to_string(),
+                event_time: Some(odf::metadata::EventTimeSourceFromSystemTime {}.into()),
+                cache: None,
+                headers: None,
+            }))
+            .read(odf::metadata::ReadStep::Csv(odf::metadata::ReadStepCsv {
+                header: Some(true),
+                schema: Some(odf::schema::DataSchema::new(vec![
+                    odf::schema::DataField::string("city"),
+                    odf::schema::DataField::i64("population"),
+                ])),
+                ..odf::metadata::ReadStepCsv::default()
+            }))
+            .build();
+
+        self.create_root_dataset_with_events(alias, vec![source.into()])
+            .await
+    }
+
+    pub async fn create_root_dataset_without_source(
+        &self,
+        alias: &odf::DatasetAlias,
+    ) -> CreateDatasetResult {
+        self.create_root_dataset_with_events(alias, vec![]).await
+    }
+
+    pub async fn create_root_dataset_with_events(
+        &self,
+        alias: &odf::DatasetAlias,
+        events: Vec<odf::MetadataEvent>,
+    ) -> CreateDatasetResult {
+        let snapshot = events
+            .into_iter()
+            .fold(
+                MetadataFactory::dataset_snapshot()
+                    .name(alias.clone())
+                    .kind(odf::DatasetKind::Root),
+                DatasetSnapshotBuilder::push_event,
+            )
             .build();
 
         let store_result = create_test_dataset_from_snapshot(
@@ -188,6 +254,210 @@ impl BaseRepoHarness {
         .unwrap();
 
         CreateDatasetResult::from_stored(store_result, alias.clone())
+    }
+
+    /// Appends a `SetInfo` block after the current `HEAD` without moving any
+    /// reference
+    pub async fn append_unreferenced_block(
+        &self,
+        created: &CreateDatasetResult,
+        description: &str,
+    ) -> odf::Multihash {
+        let head = self.get_head(created).await;
+        self.append_unreferenced_block_after(created, &head, description)
+            .await
+    }
+
+    /// Appends a `SetInfo` block after `prev` without moving any reference
+    pub async fn append_unreferenced_block_after(
+        &self,
+        created: &CreateDatasetResult,
+        prev: &odf::Multihash,
+        description: &str,
+    ) -> odf::Multihash {
+        Self::append_unreferenced_set_info(
+            created.dataset.as_metadata_chain(),
+            prev,
+            description,
+            Some(self.system_time_source.now()),
+        )
+        .await
+    }
+
+    /// Appends a `SetInfo` block after `prev` without moving any reference, the
+    /// way a writer that has not moved `HEAD` yet leaves it. Without
+    /// `system_time` the block takes `prev`'s, which keeps the chain monotonic
+    /// whatever the clock says.
+    pub async fn append_unreferenced_set_info(
+        chain: &dyn odf::dataset::MetadataChain,
+        prev: &odf::Multihash,
+        description: &str,
+        system_time: Option<DateTime<Utc>>,
+    ) -> odf::Multihash {
+        let prev_block = chain.get_block(prev).await.unwrap();
+        let block = Self::set_info_block(
+            prev,
+            prev_block.sequence_number,
+            description,
+            system_time.unwrap_or(prev_block.system_time),
+        );
+
+        chain
+            .append(
+                block,
+                odf::dataset::AppendOpts {
+                    update_ref: None,
+                    ..odf::dataset::AppendOpts::default()
+                },
+            )
+            .await
+            .unwrap()
+    }
+
+    /// A `SetInfo` block following the block `prev` with
+    /// `prev_sequence_number`
+    pub fn set_info_block(
+        prev: &odf::Multihash,
+        prev_sequence_number: u64,
+        description: &str,
+        system_time: DateTime<Utc>,
+    ) -> odf::MetadataBlock {
+        MetadataFactory::metadata_block(
+            MetadataFactory::set_info().description(description).build(),
+        )
+        .prev(prev, prev_sequence_number)
+        .system_time(system_time)
+        .build()
+    }
+
+    /// Gives a root dataset a schema and a block that only advances its
+    /// watermark to `watermark`, so a derivative of it has something to
+    /// transform without data files
+    pub async fn append_schema_and_watermark(
+        &self,
+        created: &CreateDatasetResult,
+        watermark: DateTime<Utc>,
+    ) {
+        let chain = created.dataset.as_metadata_chain();
+        for event in [
+            odf::MetadataEvent::SetDataSchema(MetadataFactory::set_data_schema().build()),
+            odf::MetadataEvent::AddData(
+                MetadataFactory::add_data()
+                    .new_watermark(Some(watermark))
+                    .build(),
+            ),
+        ] {
+            let head = self.get_head(created).await;
+            let head_block = chain.get_block(&head).await.unwrap();
+            chain
+                .append(
+                    MetadataFactory::metadata_block(event)
+                        .prev(&head, head_block.sequence_number)
+                        .system_time(self.system_time_source.now())
+                        .build(),
+                    odf::dataset::AppendOpts::default(),
+                )
+                .await
+                .unwrap();
+        }
+    }
+
+    /// Moves `HEAD` the way a concurrent writer would
+    pub async fn move_head(
+        &self,
+        created: &CreateDatasetResult,
+        old_head: &odf::Multihash,
+        new_head: &odf::Multihash,
+    ) {
+        created
+            .dataset
+            .as_metadata_chain()
+            .set_ref(
+                &odf::BlockRef::Head,
+                Some(old_head),
+                new_head,
+                odf::dataset::SetRefOpts {
+                    validate_block_present: true,
+                },
+            )
+            .await
+            .unwrap();
+    }
+
+    /// Appends a block after the current `HEAD` and moves `HEAD` to it, the
+    /// way a concurrent writer would; returns the new `HEAD`
+    pub async fn move_head_concurrently(&self, created: &CreateDatasetResult) -> odf::Multihash {
+        let old_head = self.get_head(created).await;
+        let new_head = self
+            .append_unreferenced_block_after(created, &old_head, "concurrent")
+            .await;
+        self.move_head(created, &old_head, &new_head).await;
+        new_head
+    }
+
+    /// Adds a remote alias to the dataset; `false` when it already has it
+    pub async fn add_remote_alias(
+        &self,
+        target: &odf::DatasetHandle,
+        remote_ref: &str,
+        kind: RemoteAliasKind,
+    ) -> bool {
+        self.remote_aliases_of(target)
+            .await
+            .add(&Self::remote_ref(remote_ref), kind)
+            .await
+            .unwrap()
+    }
+
+    /// The stored remote aliases of the dataset
+    pub async fn get_remote_aliases(
+        &self,
+        created: &CreateDatasetResult,
+    ) -> Box<dyn RemoteAliases> {
+        self.remote_aliases_of(&created.dataset_handle).await
+    }
+
+    /// The stored pull aliases of the dataset named `alias`
+    pub async fn pull_aliases_of(&self, alias: &odf::DatasetAlias) -> Vec<odf::DatasetRefRemote> {
+        let target = self
+            .dataset_registry
+            .resolve_dataset_handle_by_ref(&alias.as_local_ref())
+            .await
+            .unwrap();
+        self.remote_aliases_of(&target)
+            .await
+            .get_by_kind(RemoteAliasKind::Pull)
+            .cloned()
+            .collect()
+    }
+
+    async fn remote_aliases_of(&self, target: &odf::DatasetHandle) -> Box<dyn RemoteAliases> {
+        dill::CatalogBuilder::new_chained(&self.catalog)
+            .add::<RemoteAliasesRegistryImpl>()
+            .build()
+            .get_one::<dyn RemoteAliasesRegistry>()
+            .unwrap()
+            .get_remote_aliases(target)
+            .await
+            .unwrap()
+    }
+
+    /// Deletes the dataset's storage, as if it was deleted after a task or
+    /// pull was planned
+    pub async fn delete_dataset(&self, created: &CreateDatasetResult) {
+        self.dataset_storage_unit_writer
+            .delete_dataset(&created.dataset_handle.id)
+            .await
+            .unwrap();
+    }
+
+    pub async fn get_head(&self, created: &CreateDatasetResult) -> odf::Multihash {
+        created
+            .dataset
+            .as_metadata_chain()
+            .resolve_ref(&odf::BlockRef::Head)
+            .await
+            .unwrap()
     }
 
     pub async fn num_blocks(&self, target: ResolvedDataset) -> usize {
