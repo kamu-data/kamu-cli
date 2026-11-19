@@ -72,9 +72,11 @@ features = [
 
 
 [dev-dependencies]
+database-common-macros = { workspace = true }
 mockall = { version = "0.15", default-features = false }
 pretty_assertions = { version = "1" }
 tempfile = "3"
 tokio = { version = "1", default-features = true, features = [
     "macros",
 ] }
+tracing = "0.1"

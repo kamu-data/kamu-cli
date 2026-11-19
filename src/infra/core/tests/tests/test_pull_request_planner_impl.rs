@@ -20,7 +20,7 @@ use kamu::utils::ipfs_wrapper::IpfsClient;
 use kamu::utils::local_sync_writes::PulledSeedStore;
 use kamu::utils::simple_transfer_protocol::SimpleTransferProtocol;
 use kamu::*;
-use kamu_accounts::CurrentAccountSubject;
+use kamu_accounts::{CurrentAccountSubject, Principal};
 use kamu_datasets::{
     DatasetReferenceMessage,
     DatasetRegistry,
@@ -795,6 +795,84 @@ async fn test_sync_from_url_only_multi_tenant_case() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// In multi-tenant mode a URL pull without a local alias lands in the account
+/// of the acting principal
+#[tokio::test]
+async fn test_sync_from_url_only_multi_tenant_names_account_by_principal() {
+    let cases = [
+        (PullTestHarness::user("alice"), Some(mn!("alice/bar"))),
+        (Principal::Anonymous, Some(mn!("kamu/bar"))),
+        (Principal::Node, None),
+    ];
+
+    for (principal, expected_alias) in cases {
+        let harness =
+            PullTestHarness::with_principal(TenancyConfig::MultiTenant, principal.clone());
+
+        let res = harness
+            .pull_with_requests(
+                vec![PullRequest::Remote(PullRequestRemote {
+                    maybe_local_alias: None,
+                    remote_ref: rr!("http://example.com/bar"),
+                })],
+                PullOptions::default(),
+            )
+            .await;
+
+        match expected_alias {
+            Some(alias) => assert_eq!(
+                res.unwrap(),
+                vec![vec![PullJob::Sync((
+                    rr!("http://example.com/bar").into(),
+                    alias.into()
+                ))]],
+                "{principal:?}"
+            ),
+            None => {
+                let responses = res.unwrap_err();
+                assert_eq!(1, responses.len());
+                assert_matches!(
+                    responses[0].result,
+                    Err(PullError::CannotInferLocalName(_)),
+                    "{principal:?}"
+                );
+            }
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Pulling all owned datasets pulls those of the acting principal's account;
+/// the node owns none
+#[tokio::test]
+async fn test_pull_all_owned_multi_tenant_by_principal() {
+    let cases = [
+        (PullTestHarness::user("alice"), mnames!["alice/foo"]),
+        (Principal::Anonymous, mnames!["kamu/bar"]),
+        (Principal::Node, mnames![]),
+    ];
+
+    for (principal, expected_ingested) in cases {
+        let harness =
+            PullTestHarness::with_principal(TenancyConfig::MultiTenant, principal.clone());
+        create_graph(
+            harness.dataset_registry(),
+            harness.dataset_storage_unit_writer(),
+            vec![(mn!("alice/foo"), mnames![]), (mn!("kamu/bar"), mnames![])],
+        )
+        .await;
+
+        let expected: Vec<Vec<PullJob>> = expected_ingested
+            .into_iter()
+            .map(|alias| vec![PullJob::Ingest(alias.as_any_ref())])
+            .collect();
+        assert_eq!(harness.pull_all_owned().await, expected, "{principal:?}");
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[tokio::test]
 async fn test_sync_from_url_same_id_different_aliases() {
     let mut mock_dataset_entry_writer = MockDatasetEntryWriter::new();
@@ -1161,7 +1239,22 @@ impl PullTestHarness {
         tenancy_config: TenancyConfig,
         mock_dataset_entry_writer: MockDatasetEntryWriter,
     ) -> Self {
-        Self::build(tenancy_config, mock_dataset_entry_writer, None)
+        Self::build(tenancy_config, mock_dataset_entry_writer, None, None)
+    }
+
+    /// Plans as `principal` instead of the subject's own
+    fn with_principal(tenancy_config: TenancyConfig, principal: Principal) -> Self {
+        Self::build(
+            tenancy_config,
+            MockDatasetEntryWriter::new(),
+            None,
+            Some(principal),
+        )
+    }
+
+    /// The principal of a logged-in `account_name`
+    fn user(account_name: &str) -> Principal {
+        Principal::from(&CurrentAccountSubject::new_test_with(&account_name))
     }
 
     fn with_pull_source_resolver(
@@ -1172,6 +1265,7 @@ impl PullTestHarness {
             tenancy_config,
             MockDatasetEntryWriter::new(),
             Some(mock_pull_source_resolver),
+            None,
         )
     }
 
@@ -1179,9 +1273,11 @@ impl PullTestHarness {
         tenancy_config: TenancyConfig,
         mock_dataset_entry_writer: MockDatasetEntryWriter,
         maybe_mock_pull_source_resolver: Option<MockDatasetPullSourceResolver>,
+        maybe_principal: Option<Principal>,
     ) -> Self {
         let base_repo_harness = BaseRepoHarness::builder()
             .tenancy_config(tenancy_config)
+            .maybe_principal(maybe_principal)
             .build();
 
         let calls = Arc::new(Mutex::new(Vec::new()));
@@ -1289,30 +1385,27 @@ impl PullTestHarness {
         }
 
         for iteration in iterations {
-            let mut jobs = Vec::new();
-            for job in iteration.jobs {
-                match job {
-                    PullPlanIterationJob::Ingest(pii) => {
-                        jobs.push(PullJob::Ingest(pii.target.as_any_ref()));
-                    }
-                    PullPlanIterationJob::Transform(pti) => {
-                        jobs.push(PullJob::Transform(pti.target.as_any_ref()));
-                    }
-                    PullPlanIterationJob::Sync(psi) => {
-                        jobs.push(PullJob::Sync((
-                            psi.remote_ref.as_any_ref(),
-                            psi.local_target.as_local_ref().as_any_ref(),
-                        )));
-                    }
-                }
-            }
-
+            let jobs = iteration.jobs.into_iter().map(PullJob::from).collect();
             self.calls.lock().unwrap().push(jobs);
         }
 
         tokio::time::sleep(Duration::from_millis(1)).await;
 
         Ok(self.collect_calls())
+    }
+
+    /// Jobs of pulling all datasets the acting principal owns, per iteration
+    async fn pull_all_owned(&self) -> Vec<Vec<PullJob>> {
+        let PullPlan { iterations, errors } = self
+            .pull_request_planner
+            .build_pull_plan_all_owner_datasets(&PullOptions::default(), self.tenancy_config)
+            .await
+            .unwrap();
+        assert!(errors.is_empty());
+        iterations
+            .into_iter()
+            .map(|iteration| iteration.jobs.into_iter().map(PullJob::from).collect())
+            .collect()
     }
 
     async fn get_remote_aliases(&self, dataset_ref: &odf::DatasetRef) -> Box<dyn RemoteAliases> {
@@ -1368,6 +1461,19 @@ enum PullJob {
     Ingest(odf::DatasetRefAny),
     Transform(odf::DatasetRefAny),
     Sync((odf::DatasetRefAny, odf::DatasetRefAny)),
+}
+
+impl From<PullPlanIterationJob> for PullJob {
+    fn from(job: PullPlanIterationJob) -> Self {
+        match job {
+            PullPlanIterationJob::Ingest(pii) => Self::Ingest(pii.target.as_any_ref()),
+            PullPlanIterationJob::Transform(pti) => Self::Transform(pti.target.as_any_ref()),
+            PullPlanIterationJob::Sync(psi) => Self::Sync((
+                psi.remote_ref.as_any_ref(),
+                psi.local_target.as_local_ref().as_any_ref(),
+            )),
+        }
+    }
 }
 
 impl PullJob {

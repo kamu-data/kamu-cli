@@ -100,6 +100,24 @@ async fn test_reset_not_allowed_fails_unrecoverably() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[tokio::test]
+async fn test_reset_of_dataset_deleted_after_planning_fails_unrecoverably() {
+    let alias_foo = BaseRepoHarness::alias("foo");
+
+    let harness = ResetDatasetTaskRunnerHarness::new();
+    let foo = harness.create_root_dataset(&alias_foo).await;
+    harness.delete_dataset(&foo).await;
+
+    let outcome = harness.run_reset(&foo, Some(foo.head.clone())).await;
+
+    assert_eq!(
+        TaskOutcome::Failed(TaskError::empty_unrecoverable()),
+        outcome
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[oop::extend(BaseUseCaseHarness, base_use_case_harness)]
 struct ResetDatasetTaskRunnerHarness {
     base_use_case_harness: BaseUseCaseHarness,

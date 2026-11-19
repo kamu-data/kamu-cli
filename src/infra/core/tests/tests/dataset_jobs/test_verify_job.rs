@@ -152,6 +152,53 @@ async fn test_verify_unreadable_is_not_found() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[tokio::test(flavor = "multi_thread")]
+async fn test_verify_covers_head_of_the_job_transaction() {
+    let alias_foo = BaseRepoHarness::alias("foo");
+    let (_, dataset_id_foo) = odf::DatasetID::new_generated_ed25519();
+
+    let harness = VerifyJobHarness::new(
+        MockDatasetPermissionChecker::new().expect_authorize_for(
+            DatasetPermission::Read,
+            &dataset_id_foo,
+            2,
+            true,
+        ),
+        MockDidGenerator::predefined_dataset_ids(vec![dataset_id_foo]),
+    );
+
+    let foo = harness.create_root_dataset(&alias_foo).await;
+    let broken_head = harness
+        .append_unreferenced_block_out_of_sequence(&foo)
+        .await;
+    assert_matches!(
+        harness
+            .verify_range(
+                ResolvedDataset::from_created(&foo),
+                (None, Some(broken_head.clone()))
+            )
+            .await,
+        VerificationResult {
+            outcome: Err(VerificationError::BlockMalformed(e)),
+            ..
+        } if e.hash == broken_head
+    );
+
+    // `HEAD` moves onto the broken block once the verification has started
+    assert_matches!(
+        harness
+            .verify_dataset_moving_head_to(&foo, &broken_head)
+            .await,
+        VerificationResult {
+            dataset_handle: Some(dataset_handle),
+            outcome: Ok(()),
+        } if dataset_handle == foo.dataset_handle
+    );
+    assert_eq!(harness.get_head(&foo).await, broken_head);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[oop::extend(BaseUseCaseHarness, base_use_case_harness)]
 struct VerifyJobHarness {
     base_use_case_harness: BaseUseCaseHarness,
@@ -196,6 +243,75 @@ impl VerifyJobHarness {
                 None,
             )
             .await
+    }
+
+    async fn verify_range(
+        &self,
+        target: ResolvedDataset,
+        block_range: (Option<odf::Multihash>, Option<odf::Multihash>),
+    ) -> VerificationResult {
+        self.job
+            .run(
+                VerificationRequest::<odf::DatasetHandle> {
+                    target: target.take_handle(),
+                    block_range,
+                    options: VerificationOptions::default(),
+                },
+                None,
+            )
+            .await
+    }
+
+    /// Verifies all of `created`, moving its `HEAD` to `new_head` when the
+    /// verification begins
+    async fn verify_dataset_moving_head_to(
+        &self,
+        created: &CreateDatasetResult,
+        new_head: &odf::Multihash,
+    ) -> VerificationResult {
+        let listener = Arc::new(HeadMovingListener {
+            dataset: created.dataset.clone(),
+            old_head: self.get_head(created).await,
+            new_head: new_head.clone(),
+        });
+        self.job
+            .run(
+                VerificationRequest::<odf::DatasetHandle> {
+                    target: created.dataset_handle.clone(),
+                    block_range: (None, None),
+                    options: VerificationOptions::default(),
+                },
+                Some(listener),
+            )
+            .await
+    }
+
+    /// Appends a block after `HEAD` that skips a sequence number, without
+    /// moving any reference; returns its hash
+    async fn append_unreferenced_block_out_of_sequence(
+        &self,
+        created: &CreateDatasetResult,
+    ) -> odf::Multihash {
+        let chain = created.dataset.as_metadata_chain();
+        let head = self.get_head(created).await;
+        let head_block = chain.get_block(&head).await.unwrap();
+
+        chain
+            .append(
+                BaseRepoHarness::set_info_block(
+                    &head,
+                    head_block.sequence_number + 1,
+                    "out of sequence",
+                    head_block.system_time,
+                ),
+                odf::dataset::AppendOpts {
+                    validation: odf::dataset::AppendValidation::None,
+                    update_ref: None,
+                    ..odf::dataset::AppendOpts::default()
+                },
+            )
+            .await
+            .unwrap()
     }
 
     async fn verify_dataset_with_replay(&self, target: ResolvedDataset) -> VerificationResult {
@@ -251,6 +367,38 @@ impl VerifyJobHarness {
             )
             .await
             .unwrap();
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Moves `HEAD` of `dataset` from `old_head` to `new_head` when the
+/// verification begins, the way a concurrent writer would
+struct HeadMovingListener {
+    dataset: Arc<dyn odf::Dataset>,
+    old_head: odf::Multihash,
+    new_head: odf::Multihash,
+}
+
+impl VerificationListener for HeadMovingListener {
+    fn begin(&self) {
+        // The listener is synchronous, while moving a reference is not
+        tokio::task::block_in_place(|| {
+            tokio::runtime::Handle::current().block_on(async {
+                self.dataset
+                    .as_metadata_chain()
+                    .set_ref(
+                        &odf::BlockRef::Head,
+                        Some(&self.old_head),
+                        &self.new_head,
+                        odf::dataset::SetRefOpts {
+                            validate_block_present: true,
+                        },
+                    )
+                    .await
+                    .unwrap();
+            });
+        });
     }
 }
 

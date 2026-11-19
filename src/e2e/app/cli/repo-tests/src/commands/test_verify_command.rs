@@ -212,6 +212,21 @@ pub async fn test_verify_pulled_derivative_without_its_input(kamu: KamuCliPuppet
     )
     .await;
 
+    // Recursively, the input is selected too and cannot be resolved
+    kamu.assert_failure_command_execution(
+        [
+            "verify",
+            DATASET_DERIVATIVE_LEADERBOARD_NAME.as_str(),
+            "--recursive",
+        ],
+        None,
+        Some([
+            r#"Failed to verify 1 dataset\(s\)"#,
+            r#"Failed to initiate verification: Dataset not found: did:odf:"#,
+        ]),
+    )
+    .await;
+
     kamu.assert_success_command_execution(
         [
             "verify",

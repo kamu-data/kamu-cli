@@ -158,25 +158,12 @@ impl EngineProvisionerLocal {
     }
 
     fn get_dynamic_max_concurrency(&self, outstanding_handles: u32) -> u32 {
-        match (
+        dynamic_max_concurrency(
             self.config.max_concurrency,
             self.container_runtime.config.network_ns,
-        ) {
-            (None | Some(0), NetworkNamespaceType::Host) | (Some(1), _) => 1,
-            // TODO: Use available memory to determine the optimal limit
-            (None | Some(0), NetworkNamespaceType::Private) => {
-                (outstanding_handles + 1).min(Self::default_max_concurrency())
-            }
-            (Some(multi), NetworkNamespaceType::Private) => multi,
-            (Some(multi), NetworkNamespaceType::Host) => {
-                tracing::warn!(
-                    "Ignoring specified engine max concurrency of {} since running in the Host \
-                     networking mode",
-                    multi
-                );
-                1
-            }
-        }
+            outstanding_handles,
+            Self::default_max_concurrency(),
+        )
     }
 
     /// Engines per private network namespace when no limit is configured: one
@@ -197,6 +184,37 @@ impl EngineProvisionerLocal {
         }
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// How many engines may run at once with `outstanding_handles` already
+/// running. Without a configured limit, a private network namespace grows one
+/// engine at a time up to `default_cap`; the host namespace allows a single
+/// engine whatever the limit.
+fn dynamic_max_concurrency(
+    max_concurrency: Option<u32>,
+    network_ns: NetworkNamespaceType,
+    outstanding_handles: u32,
+    default_cap: u32,
+) -> u32 {
+    match (max_concurrency, network_ns) {
+        (None | Some(0), NetworkNamespaceType::Host) | (Some(1), _) => 1,
+        // TODO: Use available memory to determine the optimal limit
+        (None | Some(0), NetworkNamespaceType::Private) => {
+            (outstanding_handles + 1).min(default_cap)
+        }
+        (Some(multi), NetworkNamespaceType::Private) => multi,
+        (Some(multi), NetworkNamespaceType::Host) => {
+            tracing::warn!(
+                "Ignoring specified engine max concurrency of {multi} since running in the Host \
+                 networking mode"
+            );
+            1
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
 impl EngineProvisioner for EngineProvisionerLocal {
@@ -328,6 +346,51 @@ impl Engine for EngineHandle {
 impl Drop for EngineHandle {
     fn drop(&mut self) {
         EngineProvisionerLocal::release_engine(&self.inner, self.engine.as_ref());
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+    #[test]
+    fn test_dynamic_max_concurrency() {
+        use NetworkNamespaceType::{Host, Private};
+
+        // (max_concurrency, network_ns, outstanding_handles, default_cap, expected)
+        let cases = [
+            (None, Host, 0, 8, 1),
+            (None, Host, 5, 8, 1),
+            (Some(0), Host, 5, 8, 1),
+            (Some(1), Host, 0, 8, 1),
+            (Some(1), Private, 5, 8, 1),
+            (Some(4), Private, 0, 8, 4),
+            (Some(16), Private, 0, 8, 16),
+            (Some(4), Host, 0, 8, 1),
+            (None, Private, 0, 8, 1),
+            (None, Private, 3, 8, 4),
+            (Some(0), Private, 3, 8, 4),
+            (None, Private, 7, 8, 8),
+            (None, Private, 8, 8, 8),
+            (None, Private, 20, 8, 8),
+        ];
+
+        for (max_concurrency, network_ns, outstanding_handles, default_cap, expected) in cases {
+            assert_eq!(
+                dynamic_max_concurrency(
+                    max_concurrency,
+                    network_ns,
+                    outstanding_handles,
+                    default_cap
+                ),
+                expected,
+                "{max_concurrency:?} {network_ns:?} {outstanding_handles} {default_cap}"
+            );
+        }
     }
 }
 

@@ -20,46 +20,13 @@ pub(crate) async fn test_smart_push_new_dataset<TServerHarness: ServerSideHarnes
     a_client_harness: ClientSideHarness,
     a_server_harness: TServerHarness,
 ) {
-    let scenario = SmartPushNewDatasetScenario::prepare(a_client_harness, a_server_harness).await;
-    let dataset_fixture = scenario.server_harness.dataset_fixture();
-
-    let api_server_handle = scenario.server_harness.api_server_run();
-
-    let client_handle = async {
-        let push_result = scenario
-            .client_harness
-            .push_dataset_result(
-                scenario.client_dataset_ref,
-                scenario.server_dataset_ref.try_into().unwrap(),
-                false,
-                odf::DatasetVisibility::Private,
-            )
-            .await;
-
-        assert_eq!(
-            SyncResult::Updated {
-                old_head: None,
-                new_head: scenario.client_commit_result.new_head,
-                num_blocks: 4,
-                increment: odf::dataset::MetadataChainIncrementInterval {
-                    num_blocks: 4,
-                    num_records: 10,
-                    updated_watermark: None,
-                },
-            },
-            push_result
-        );
-
-        dataset_fixture
-            .assert_dataset_in_sync(
-                &scenario.client_dataset_handle,
-                &scenario.client_dataset_layout,
-            )
-            .await
-            .unwrap();
-    };
-
-    await_client_server_flow!(api_server_handle, client_handle);
+    smart_push_new_dataset(
+        a_client_harness,
+        a_server_harness,
+        false,
+        odf::DatasetVisibility::Private,
+    )
+    .await;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -67,6 +34,39 @@ pub(crate) async fn test_smart_push_new_dataset<TServerHarness: ServerSideHarnes
 pub(crate) async fn test_smart_push_new_dataset_as_public<TServerHarness: ServerSideHarness>(
     a_client_harness: ClientSideHarness,
     a_server_harness: TServerHarness,
+) {
+    smart_push_new_dataset(
+        a_client_harness,
+        a_server_harness,
+        false,
+        odf::DatasetVisibility::Public,
+    )
+    .await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// The blocks after the Seed are committed against the Seed the server has just created
+pub(crate) async fn test_smart_push_new_dataset_forced<TServerHarness: ServerSideHarness>(
+    a_client_harness: ClientSideHarness,
+    a_server_harness: TServerHarness,
+) {
+    smart_push_new_dataset(
+        a_client_harness,
+        a_server_harness,
+        true,
+        odf::DatasetVisibility::Private,
+    )
+    .await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+async fn smart_push_new_dataset<TServerHarness: ServerSideHarness>(
+    a_client_harness: ClientSideHarness,
+    a_server_harness: TServerHarness,
+    force: bool,
+    dataset_visibility: odf::DatasetVisibility,
 ) {
     let scenario = SmartPushNewDatasetScenario::prepare(a_client_harness, a_server_harness).await;
     let dataset_fixture = scenario.server_harness.dataset_fixture();
@@ -79,8 +79,8 @@ pub(crate) async fn test_smart_push_new_dataset_as_public<TServerHarness: Server
             .push_dataset_result(
                 scenario.client_dataset_ref,
                 scenario.server_dataset_ref.try_into().unwrap(),
-                false,
-                odf::DatasetVisibility::Public,
+                force,
+                dataset_visibility,
             )
             .await;
 

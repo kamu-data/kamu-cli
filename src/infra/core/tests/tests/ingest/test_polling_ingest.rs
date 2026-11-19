@@ -1357,6 +1357,49 @@ async fn test_ingest_polling_failure_keeps_its_directory() {
 
 #[test_group::group(engine, ingest, datafusion)]
 #[test_log::test(tokio::test)]
+async fn test_ingest_polling_wrong_typed_json_value_is_execution_error() {
+    let harness = IngestTestHarness::new();
+    let src_path = harness.temp_dir.path().join("data.json");
+    let target = harness.create_ndjson_polling_dataset(&src_path).await;
+    std::fs::write(&src_path, r#"{"city": "A", "population": "not-a-number"}"#).unwrap();
+
+    let res = harness.ingest(target).await;
+
+    assert_matches!(res, Err(PollingIngestError::ExecutionError(_)));
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_group::group(engine, ingest, datafusion)]
+#[test_log::test(tokio::test)]
+async fn test_ingest_polling_failed_cast_in_preprocess_is_execution_error() {
+    let harness = IngestTestHarness::new();
+    let src_path = harness.temp_dir.path().join("data.csv");
+    std::fs::write(&src_path, "city,population\nA,1000\n").unwrap();
+    let target = harness
+        .create_csv_url_polling_dataset(
+            Url::from_file_path(&src_path).unwrap(),
+            Some(odf::metadata::TransformSql {
+                engine: "datafusion".to_string(),
+                version: None,
+                query: Some(
+                    "select city, cast(city as bigint) as population from input".to_string(),
+                ),
+                queries: None,
+                temporal_tables: None,
+            }),
+        )
+        .await;
+
+    let res = harness.ingest(target).await;
+
+    assert_matches!(res, Err(PollingIngestError::ExecutionError(_)));
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_group::group(engine, ingest, datafusion)]
+#[test_log::test(tokio::test)]
 async fn test_ingest_polling_fixed_zero_copy_source_is_ingested_once() {
     let harness = IngestTestHarness::new();
     let src_path = harness.temp_dir.path().join("data.csv");
@@ -1699,6 +1742,35 @@ impl IngestTestHarness {
             preprocess,
         )
         .await
+    }
+
+    /// A root dataset polling an NDJSON file with `city` and `population`
+    async fn create_ndjson_polling_dataset(&self, src_path: &std::path::Path) -> ResolvedDataset {
+        let dataset_snapshot = MetadataFactory::dataset_snapshot()
+            .name("foo")
+            .kind(odf::DatasetKind::Root)
+            .push_event(
+                MetadataFactory::set_polling_source()
+                    .fetch(odf::metadata::FetchStep::Url(odf::metadata::FetchStepUrl {
+                        url: Url::from_file_path(src_path).unwrap().to_string(),
+                        event_time: Some(odf::metadata::EventTimeSourceFromSystemTime {}.into()),
+                        cache: None,
+                        headers: None,
+                    }))
+                    .read(odf::metadata::ReadStepNdJson {
+                        schema: Some(odf::schema::DataSchema::new(vec![
+                            odf::schema::DataField::string("city"),
+                            odf::schema::DataField::i64("population"),
+                        ])),
+                        ..odf::metadata::ReadStepNdJson::default()
+                    })
+                    .build(),
+            )
+            .build();
+
+        let dataset_alias = dataset_snapshot.name.clone();
+        let stored = self.create_dataset(dataset_snapshot).await;
+        ResolvedDataset::from_stored(&stored, &dataset_alias)
     }
 
     async fn create_csv_dataset_fetching(

@@ -10,6 +10,7 @@
 use std::assert_matches;
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 use chrono::{DateTime, TimeZone, Utc};
 use container_runtime::{ContainerRuntime, ContainerRuntimeConfig};
@@ -333,6 +334,29 @@ async fn test_pull_ingest_exhausts_source() {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[tokio::test]
+async fn test_pull_ingest_exhausting_source_plans_only_the_first_iteration() {
+    let alias_foo = BaseRepoHarness::alias("foo");
+    let heads = [(); 3].map(|()| ReportedHeads::default());
+
+    let harness = PullUseCaseHarness::new(PullUseCaseHarnessMocks::for_ingest_iterations(
+        &alias_foo,
+        vec![
+            MockIngestIteration::updated(&heads[0], true, 2),
+            MockIngestIteration::updated(&heads[1], true, 3),
+            MockIngestIteration::updated(&heads[2], false, 4),
+        ],
+    ));
+    let foo = harness.create_root_dataset(&alias_foo).await;
+    harness.chain_reported_heads(&foo, &heads).await;
+
+    let pull_response = harness.pull_local_exhausting_sources(&alias_foo).await;
+
+    assert_matches!(pull_response.result, Ok(PullResult::Updated { .. }));
+    // Later iterations continue from the writer state the previous one returned
+    assert_eq!(harness.planned_ingest_iterations(), 1);
+}
 
 #[tokio::test]
 async fn test_pull_ingest_without_exhausting_runs_one_iteration() {
@@ -1897,7 +1921,8 @@ impl PullUseCaseHarness {
             .add::<PullRequestPlannerImpl>()
             .add::<DatasetUpdateKindResolverImpl>()
             .add::<DatasetPullSourceResolverImpl>()
-            .add::<PollingIngestPlannerImpl>()
+            .add_value(CountingPollingIngestPlanner::default())
+            .bind::<dyn PollingIngestPlanner, CountingPollingIngestPlanner>()
             .add::<IngestEnvVarsResolver>()
             .add::<CompactionPlannerImpl>()
             .add_value(mocks.mock_compaction_executor)
@@ -2074,6 +2099,15 @@ impl PullUseCaseHarness {
             .get_one::<RacingDatasetReferenceUpdater>()
             .unwrap()
             .move_reference_before_next_update(&self.catalog, concurrent_head);
+    }
+
+    /// Number of polling ingest iterations planned from the dataset's `HEAD`
+    fn planned_ingest_iterations(&self) -> usize {
+        self.catalog
+            .get_one::<CountingPollingIngestPlanner>()
+            .unwrap()
+            .planned
+            .load(Ordering::SeqCst)
     }
 
     /// A root dataset polling a CSV file in the harness directory that holds
@@ -2284,6 +2318,35 @@ impl PullUseCaseHarness {
             .run_initialization()
             .await
             .unwrap();
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Plans polling ingest for real and counts the iterations it planned
+#[derive(Default)]
+struct CountingPollingIngestPlanner {
+    planned: AtomicUsize,
+}
+
+#[async_trait::async_trait]
+impl PollingIngestPlanner for CountingPollingIngestPlanner {
+    async fn plan_ingest(
+        &self,
+        target: ResolvedDataset,
+    ) -> Result<PollingIngestPlan, PollingIngestPlanError> {
+        self.planned.fetch_add(1, Ordering::SeqCst);
+        PollingIngestPlannerImpl {}.plan_ingest(target).await
+    }
+
+    async fn rebuild_ingest(
+        &self,
+        target: ResolvedDataset,
+        stored: &PollingIngestPlanPayload,
+    ) -> Result<PollingIngestPlan, PollingIngestRebuildError> {
+        PollingIngestPlannerImpl {}
+            .rebuild_ingest(target, stored)
+            .await
     }
 }
 

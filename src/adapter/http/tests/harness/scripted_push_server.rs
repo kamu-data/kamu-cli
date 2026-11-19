@@ -35,6 +35,14 @@ impl ScriptedPushServer {
         Self::new(PushScript::ProgressDuringUpload).await
     }
 
+    pub async fn unreadable_message_during_upload() -> Self {
+        Self::new(PushScript::UnreadableMessageDuringUpload).await
+    }
+
+    pub async fn name_collision(dataset_alias: odf::DatasetAlias) -> Self {
+        Self::new(PushScript::NameCollision(dataset_alias)).await
+    }
+
     async fn new(script: PushScript) -> Self {
         Self {
             listener: ScriptedServerListener::bind().await,
@@ -89,7 +97,7 @@ impl ScriptedPushServer {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// What the server does once the client asked to transfer objects
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 enum PushScript {
     /// Skips every upload, sends one more progress request after the client
     /// reports completion (as a real server's timer can), then fails the
@@ -100,6 +108,15 @@ enum PushScript {
     /// client answered one progress request, then confirms the completion.
     /// A push with no objects to hold fails, as the server closes the socket
     ProgressDuringUpload,
+
+    /// Takes every object by HTTP upload and holds each upload, sends a
+    /// message that is not a progress request, then reads until the client
+    /// goes away
+    UnreadableMessageDuringUpload,
+
+    /// Rejects the objects request: the alias was taken after the session
+    /// started
+    NameCollision(odf::DatasetAlias),
 }
 
 #[derive(Default)]
@@ -147,7 +164,7 @@ impl ScriptedPushSession {
 
         let objects_request = socket.receive::<DatasetPushObjectsTransferRequest>().await;
 
-        match self.script {
+        match &self.script {
             PushScript::StaleProgressRequest => {
                 socket
                     .send::<DatasetPushObjectsTransferResponse>(Ok(
@@ -171,18 +188,7 @@ impl ScriptedPushSession {
                 if objects_request.object_files.is_empty() {
                     return;
                 }
-                let object_transfer_strategies = objects_request
-                    .object_files
-                    .into_iter()
-                    .map(|object_file| self.upload_strategy(object_file))
-                    .collect();
-                socket
-                    .send::<DatasetPushObjectsTransferResponse>(Ok(
-                        DatasetPushObjectsTransferAccepted {
-                            object_transfer_strategies,
-                        },
-                    ))
-                    .await;
+                self.accept_uploads(&mut socket, objects_request).await;
 
                 Self::send_progress_request(&mut socket).await;
                 self.receive_progress(&mut socket).await;
@@ -194,7 +200,41 @@ impl ScriptedPushSession {
                     .send::<DatasetPushCompleteResponse>(Ok(DatasetPushCompleteConfirmed {}))
                     .await;
             }
+            PushScript::UnreadableMessageDuringUpload => {
+                self.accept_uploads(&mut socket, objects_request).await;
+
+                socket.send("not a progress request").await;
+                socket.drain_until_closed().await;
+            }
+            PushScript::NameCollision(dataset_alias) => {
+                socket
+                    .send::<DatasetPushObjectsTransferResponse>(Err(
+                        DatasetPushObjectsTransferError::NameCollision(
+                            DatasetPushObjectsTransferNameCollisionError {
+                                dataset_alias: dataset_alias.clone(),
+                            },
+                        ),
+                    ))
+                    .await;
+            }
         }
+    }
+
+    async fn accept_uploads(
+        &self,
+        socket: &mut ScriptedSocket,
+        objects_request: DatasetPushObjectsTransferRequest,
+    ) {
+        let object_transfer_strategies = objects_request
+            .object_files
+            .into_iter()
+            .map(|object_file| self.upload_strategy(object_file))
+            .collect();
+        socket
+            .send::<DatasetPushObjectsTransferResponse>(Ok(DatasetPushObjectsTransferAccepted {
+                object_transfer_strategies,
+            }))
+            .await;
     }
 
     fn upload_strategy(&self, object_file: ObjectFileReference) -> PushObjectTransferStrategy {

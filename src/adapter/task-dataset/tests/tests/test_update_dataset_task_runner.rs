@@ -445,6 +445,72 @@ async fn test_transform_not_defined_fails_unrecoverably() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[tokio::test]
+async fn test_transform_ref_moved_concurrently_fails_recoverably() {
+    let (harness, bar, _) = UpdateDatasetTaskRunnerHarness::new_transforming_new_derivative(
+        &BaseRepoHarness::alias("bar"),
+    )
+    .await;
+    let concurrent_head = harness.append_unreferenced_block(&bar, "concurrent").await;
+    harness.move_reference_before_next_update(concurrent_head.clone());
+
+    let outcome = harness.run_transform_update(&bar).await;
+
+    assert_eq!(
+        TaskOutcome::Failed(
+            TaskErrorDatasetCommit::RefMoved(DatasetRefMovedError {
+                dataset_id: bar.dataset_handle.id.clone(),
+                block_ref: odf::BlockRef::Head,
+                expected_block_hash: Some(bar.head.clone()),
+                actual_block_hash: Some(concurrent_head.clone()),
+            })
+            .into_task_error()
+        ),
+        outcome,
+    );
+    assert!(outcome.is_recoverable_failure());
+    assert_eq!(harness.get_head(&bar).await, concurrent_head);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[tokio::test]
+async fn test_transform_commit_not_allowed_fails_unrecoverably() {
+    let (harness, bar, _) = UpdateDatasetTaskRunnerHarness::new_transforming_new_derivative(
+        &BaseRepoHarness::alias("bar"),
+    )
+    .await;
+    harness.deny_next_update();
+
+    let outcome = harness.run_transform_update(&bar).await;
+
+    assert_eq!(
+        TaskOutcome::Failed(TaskError::empty_unrecoverable()),
+        outcome
+    );
+    assert_eq!(harness.get_head(&bar).await, bar.head);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[tokio::test]
+async fn test_transform_of_dataset_deleted_during_execution_fails_unrecoverably() {
+    let (harness, bar) =
+        UpdateDatasetTaskRunnerHarness::new_transforming_derivative_deleted_meanwhile(
+            &BaseRepoHarness::alias("bar"),
+        )
+        .await;
+
+    let outcome = harness.run_transform_update(&bar).await;
+
+    assert_eq!(
+        TaskOutcome::Failed(TaskError::empty_unrecoverable()),
+        outcome
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[tokio::test]
 async fn test_transform_with_real_planner_and_executor_commits_and_reports_increment() {
     let watermark = Utc.with_ymd_and_hms(2050, 1, 1, 12, 0, 0).unwrap();
 
@@ -1069,6 +1135,72 @@ impl UpdateDatasetTaskRunnerHarness {
                 .make_expect_transform_updated(alias.clone(), heads.clone()),
             ..UpdateDatasetTaskRunnerMocks::default()
         })
+    }
+
+    /// Creates derivative `alias` and expects one transform of it reporting a
+    /// new head, appended unreferenced; returns the dataset and that head
+    async fn new_transforming_new_derivative(
+        alias: &odf::DatasetAlias,
+    ) -> (Self, CreateDatasetResult, odf::Multihash) {
+        let reported_heads = ReportedHeads::default();
+        let harness = Self::new_transforming(alias, &reported_heads);
+        let created = harness.create_derivative(alias).await;
+        let transformed_head = harness
+            .append_unreferenced_block(&created, "transformed")
+            .await;
+        reported_heads.set(&created.head, &transformed_head);
+        (harness, created, transformed_head)
+    }
+
+    /// Creates derivative `alias` and expects one transform of it reporting a
+    /// new head, during which another writer deletes the dataset
+    async fn new_transforming_derivative_deleted_meanwhile(
+        alias: &odf::DatasetAlias,
+    ) -> (Self, CreateDatasetResult) {
+        let reported_heads = ReportedHeads::default();
+        let harness = Self::new(UpdateDatasetTaskRunnerMocks {
+            mock_transform_planner: MockTransformPlanner::new()
+                .make_expect_elaborate_transform(alias.clone()),
+            mock_transform_executor: Self::transform_deleting_target(alias, &reported_heads),
+            ..UpdateDatasetTaskRunnerMocks::default()
+        });
+        let created = harness.create_derivative(alias).await;
+        let transformed_head = harness
+            .append_unreferenced_block(&created, "transformed")
+            .await;
+        reported_heads.set(&created.head, &transformed_head);
+        (harness, created)
+    }
+
+    /// Expects one transform of `alias` that deletes the dataset's storage
+    /// before it reports `heads`, as another writer deleting the dataset
+    /// would
+    fn transform_deleting_target(
+        alias: &odf::DatasetAlias,
+        heads: &ReportedHeads,
+    ) -> MockTransformExecutor {
+        let alias = alias.clone();
+        let heads = heads.clone();
+        let mut mock_transform_executor = MockTransformExecutor::new();
+        mock_transform_executor
+            .expect_execute_transform()
+            .withf(move |target, _, _, _| target.get_alias() == &alias)
+            .times(1)
+            .returning(move |target, _, _, _| {
+                std::fs::remove_dir_all(target.get_storage_internal_url().to_file_path().unwrap())
+                    .unwrap();
+                let (old_head, new_head) = heads.get();
+                (
+                    target,
+                    Ok(TransformResult::Updated {
+                        old_head,
+                        new_head,
+                        new_offset_interval: None,
+                        increment: MockTransformExecutor::REPORTED_INCREMENT,
+                    }),
+                )
+            });
+        mock_transform_executor
     }
 
     /// Runs the sync of a fresh dataset whose transfer fails with

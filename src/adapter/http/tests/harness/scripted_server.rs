@@ -79,6 +79,11 @@ impl ScriptedSocket {
         axum_write_payload(&mut self.socket, payload).await.unwrap();
     }
 
+    /// Ignores whatever the client still sends
+    pub async fn drain_until_closed(&mut self) {
+        while let Some(Ok(_)) = self.socket.recv().await {}
+    }
+
     /// Fails the push completion as a real server does
     pub async fn close_push_not_completed(&mut self, error: DatasetPushCompleteError) {
         axum_write_error_close(&mut self.socket, ErrorReplyClose::push_not_completed(error)).await;

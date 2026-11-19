@@ -474,3 +474,148 @@ impl std::fmt::Display for PipeError {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[cfg(test)]
+mod tests {
+    use container_runtime::ContainerRuntimeError;
+    use datafusion::arrow::datatypes::Schema;
+    use internal_error::ErrorIntoInternal;
+
+    use super::*;
+    use crate::UnsupportedEngineError;
+
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+    #[test]
+    fn test_polling_ingest_error_recoverability() {
+        let cases = [
+            (
+                PollingIngestError::unreachable("http://example.com/data.csv", None),
+                true,
+            ),
+            (
+                PollingIngestError::not_found("http://example.com/data.csv", None),
+                true,
+            ),
+            (
+                PollingIngestError::ImagePull(ImagePullError::runtime(
+                    "ghcr.io/kamu-data/fetch:latest",
+                    ContainerRuntimeError::from(std::io::Error::other("registry unavailable")),
+                )),
+                true,
+            ),
+            (
+                PollingIngestError::ParameterNotFound(IngestParameterNotFound::new("API_KEY")),
+                false,
+            ),
+            (
+                PollingIngestError::ProcessError(ProcessError::new(Some(1), Vec::new())),
+                true,
+            ),
+            (
+                PollingIngestError::PipeError(PipeError::new(
+                    Vec::new(),
+                    vec!["jq .".to_string()],
+                    std::io::Error::other("broken pipe"),
+                )),
+                true,
+            ),
+            (
+                PollingIngestError::ReadError(BadInputError::new("unterminated quote").into()),
+                false,
+            ),
+            (
+                PollingIngestError::EngineProvisioningError(
+                    UnsupportedEngineError {
+                        engine_id: "cobol".to_string(),
+                    }
+                    .into(),
+                ),
+                false,
+            ),
+            (
+                PollingIngestError::EngineProvisioningError(EngineProvisioningError::Internal(
+                    "provisioning failed".int_err(),
+                )),
+                true,
+            ),
+            (
+                PollingIngestError::EngineError(EngineError::invalid_query(
+                    "unknown column",
+                    Vec::new(),
+                )),
+                false,
+            ),
+            (
+                PollingIngestError::EngineError(ProcessError::new(Some(1), Vec::new()).into()),
+                true,
+            ),
+            (
+                PollingIngestError::BadInputSchema(BadInputSchemaError::new(
+                    "Column names are not unique",
+                    Arc::new(Schema::empty()),
+                )),
+                false,
+            ),
+            (
+                PollingIngestError::IncompatibleSchema(IncompatibleSchemaError::new(
+                    "Schema of the new slice is not compatible",
+                    Arc::new(Schema::empty()),
+                    Arc::new(Schema::empty()),
+                )),
+                false,
+            ),
+            (
+                PollingIngestError::MergeError(MergeError::Internal("merge failed".int_err())),
+                false,
+            ),
+            (
+                PollingIngestError::ExecutionError(ExecutionError::new(
+                    "Cannot cast string 'abc' to value of Int64 type",
+                )),
+                false,
+            ),
+            (
+                PollingIngestError::DataValidation(
+                    InvalidValueError::new("value is not a valid DID").into(),
+                ),
+                false,
+            ),
+            (
+                PollingIngestError::CommitError(odf::dataset::CommitError::Internal(
+                    "storage unavailable".int_err(),
+                )),
+                true,
+            ),
+            (
+                PollingIngestError::InvalidParameterFormat(InvalidIngestParameterFormat::new(
+                    "PAGE_SIZE",
+                    "many",
+                )),
+                false,
+            ),
+            (
+                PollingIngestError::TemplateError(TemplateError::ValueNotFound(
+                    TemplateValueNotFoundError::new("${{ env.API_KEY }}"),
+                )),
+                false,
+            ),
+            (
+                PollingIngestError::InvalidFetchStep(InvalidFetchStepError::new(
+                    "Container fetch steps are not allowed",
+                )),
+                false,
+            ),
+            (
+                PollingIngestError::Internal("fetch container exited".int_err()),
+                true,
+            ),
+        ];
+
+        for (error, recoverable) in cases {
+            assert_eq!(error.is_recoverable(), recoverable, "{error:?}");
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

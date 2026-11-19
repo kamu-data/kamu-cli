@@ -8,10 +8,8 @@
 // by the Apache License, Version 2.0.
 
 use proc_macro::TokenStream;
-use proc_macro2::Span;
 use quote::{format_ident, quote};
 use syn::parse::{Parse, ParseStream};
-use syn::punctuated::Punctuated;
 use syn::{
     ExprArray,
     FnArg,
@@ -265,28 +263,14 @@ pub fn transactional_method4(attr: TokenStream, item: TokenStream) -> TokenStrea
 }
 
 fn transactional_method_with(arity: usize, attr: TokenStream, item: TokenStream) -> TokenStream {
-    let bindings = parse_macro_input!(attr with Punctuated::<Binding, Token![,]>::parse_terminated);
     let input = parse_macro_input!(item as ItemFn);
 
-    if bindings.len() != arity {
-        return syn::Error::new(
-            Span::call_site(),
-            format!(
-                "expected {arity} `name: Type` bindings, found {}",
-                bindings.len()
-            ),
-        )
-        .into_compile_error()
-        .into();
-    }
-
-    TransactionBlock::wrap_function(
-        parse_quote!(self.catalog),
-        bindings.into_iter().collect(),
-        input,
-    )
-    .unwrap_or_else(syn::Error::into_compile_error)
-    .into()
+    Binding::parse_exactly(arity, attr.into())
+        .and_then(|bindings| {
+            TransactionBlock::wrap_function(parse_quote!(self.catalog), bindings, input)
+        })
+        .unwrap_or_else(syn::Error::into_compile_error)
+        .into()
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

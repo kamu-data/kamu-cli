@@ -1322,6 +1322,28 @@ async fn test_ingest_push_deprecated_ddl_schema() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[test_group::group(engine, ingest, datafusion)]
+#[test_log::test(tokio::test)]
+async fn test_ingest_push_failure_keeps_its_directory() {
+    let harness = IngestTestHarness::new();
+    let target = harness.create_csv_push_dataset().await;
+    let data = std::io::Cursor::new("city,population\nA,not-a-number\n");
+
+    let res = harness
+        .ingest_from(
+            target,
+            None,
+            DataSource::Stream(Box::new(data)),
+            PushIngestOpts::default(),
+        )
+        .await;
+
+    assert_matches!(res, Err(PushIngestError::ExecutionError(_)));
+    assert_eq!(harness.ingest_dirs_left().len(), 1);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 struct IngestTestHarness {
     temp_dir: TempDir,
     dataset_registry: Arc<dyn DatasetRegistry>,
@@ -1406,6 +1428,30 @@ impl IngestTestHarness {
         )
         .await
         .unwrap()
+    }
+
+    /// A root dataset with a CSV push source of `city` and `population`
+    async fn create_csv_push_dataset(&self) -> ResolvedDataset {
+        let dataset_snapshot = MetadataFactory::dataset_snapshot()
+            .name("foo")
+            .kind(odf::DatasetKind::Root)
+            .push_event(
+                MetadataFactory::add_push_source()
+                    .read(odf::metadata::ReadStepCsv {
+                        header: Some(true),
+                        schema: Some(odf::schema::DataSchema::new(vec![
+                            odf::schema::DataField::string("city"),
+                            odf::schema::DataField::i64("population"),
+                        ])),
+                        ..odf::metadata::ReadStepCsv::default()
+                    })
+                    .build(),
+            )
+            .build();
+
+        let dataset_alias = dataset_snapshot.name.clone();
+        let stored = self.create_dataset(dataset_snapshot).await;
+        ResolvedDataset::from_stored(&stored, &dataset_alias)
     }
 
     fn ingest_dirs_left(&self) -> Vec<String> {

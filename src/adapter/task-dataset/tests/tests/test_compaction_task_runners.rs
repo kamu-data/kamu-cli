@@ -29,8 +29,8 @@ use kamu_adapter_task_dataset::{
 };
 use kamu_core::testing::ReportedHeads;
 use kamu_core::*;
-use kamu_datasets::CreateDatasetResult;
-use kamu_datasets_services::DatasetReferenceUpdaterImpl;
+use kamu_datasets::{CreateDatasetResult, DatasetReferenceUpdater};
+use kamu_datasets_services::testing::RacingDatasetReferenceUpdater;
 use kamu_task_system::{
     TaskDefinition,
     TaskError,
@@ -136,6 +136,23 @@ async fn test_hard_compact_of_dataset_deleted_during_merge_fails_unrecoverably()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[tokio::test]
+async fn test_hard_compact_not_allowed_fails_unrecoverably() {
+    let (harness, foo, _) =
+        CompactionTaskRunnersHarness::new_compacting_new_root(&BaseRepoHarness::alias("foo")).await;
+    harness.deny_next_update();
+
+    let outcome = harness.run_hard_compact(&foo).await;
+
+    assert_eq!(
+        TaskOutcome::Failed(TaskError::empty_unrecoverable()),
+        outcome
+    );
+    assert_eq!(harness.get_head(&foo).await, foo.head);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[tokio::test]
 async fn test_hard_compact_execution_failure_fails_recoverably() {
     let alias_foo = BaseRepoHarness::alias("foo");
 
@@ -203,6 +220,7 @@ async fn test_hard_compact_with_nothing_to_do_succeeds_without_moving_head() {
 struct CompactionTaskRunnersHarness {
     base_use_case_harness: BaseUseCaseHarness,
     catalog: dill::Catalog,
+    racing_reference_updater: Arc<RacingDatasetReferenceUpdater>,
 }
 
 impl CompactionTaskRunnersHarness {
@@ -217,14 +235,22 @@ impl CompactionTaskRunnersHarness {
             .add::<CompactionPlannerImpl>()
             .add_value(EngineConfigDatafusionEmbeddedCompaction::default())
             .add::<ObjectStoreRegistryImpl>()
-            .add::<DatasetReferenceUpdaterImpl>()
+            .add_value(RacingDatasetReferenceUpdater::default())
+            .bind::<dyn DatasetReferenceUpdater, RacingDatasetReferenceUpdater>()
             .add_value(mock_compaction_executor)
             .bind::<dyn CompactionExecutor, MockCompactionExecutor>();
 
+        let catalog = b.build();
+
         Self {
             base_use_case_harness,
-            catalog: b.build(),
+            racing_reference_updater: catalog.get_one().unwrap(),
+            catalog,
         }
+    }
+
+    fn deny_next_update(&self) {
+        self.racing_reference_updater.deny_next_update();
     }
 
     /// Creates root `alias` and expects one compaction of it reporting a new

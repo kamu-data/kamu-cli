@@ -588,6 +588,27 @@ impl ClientSideHarness {
         &self,
         dataset_handle: &odf::DatasetHandle,
     ) -> (DatasetPushRequest, DatasetPushMetadataRequest) {
+        let seed_hash = self.seed_hash(dataset_handle).await;
+
+        let (mut push_request, metadata_request) =
+            self.raw_push_requests(dataset_handle, &seed_hash).await;
+        push_request.current_head = None;
+        (push_request, metadata_request)
+    }
+
+    /// The requests that push the dataset's whole chain to a server that has
+    /// no dataset under its alias
+    pub async fn raw_new_dataset_push_requests(
+        &self,
+        dataset_handle: &odf::DatasetHandle,
+    ) -> (DatasetPushRequest, DatasetPushMetadataRequest) {
+        let seed_hash = self.seed_hash(dataset_handle).await;
+
+        self.raw_new_dataset_push_requests_with_seed_hash(dataset_handle, &seed_hash)
+            .await
+    }
+
+    async fn seed_hash(&self, dataset_handle: &odf::DatasetHandle) -> odf::Multihash {
         let resolved_dataset = self
             .dataset_registry()
             .get_dataset_by_handle(dataset_handle)
@@ -600,11 +621,7 @@ impl ClientSideHarness {
             .unwrap()
             .pop()
             .unwrap();
-
-        let (mut push_request, metadata_request) =
-            self.raw_push_requests(dataset_handle, &seed_hash).await;
-        push_request.current_head = None;
-        (push_request, metadata_request)
+        seed_hash
     }
 
     /// The requests that push the dataset's whole chain to a server that has

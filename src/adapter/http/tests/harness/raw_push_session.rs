@@ -73,6 +73,12 @@ impl RawPushSession {
         );
     }
 
+    /// The server's reply to the objects request, which it may send before
+    /// the request arrives when it fails to prepare the target dataset
+    pub async fn objects_transfer_response(&mut self) -> DatasetPushObjectsTransferResponse {
+        self.socket.receive().await
+    }
+
     /// The phase of the internal error the server ends the session with
     pub async fn internal_error_phase(&mut self) -> String {
         match self.socket.receive::<TransferInternalErrorReply>().await {

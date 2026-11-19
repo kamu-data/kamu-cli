@@ -193,7 +193,7 @@ pub(crate) trait ServerSideHarness {
 
     /// A dataset of the operating account with its own `Seed` but no `HEAD`
     async fn create_headless_dataset(&self, dataset_name: &str) -> odf::DatasetHandle {
-        HeadlessDatasets::new(self.cli_create_dataset_use_case_helper())
+        self.headless_datasets()
             .create(
                 &self.server_account_id(),
                 &odf::DatasetAlias::new(
@@ -202,6 +202,11 @@ pub(crate) trait ServerSideHarness {
                 ),
             )
             .await
+    }
+
+    /// Taken before `api_server_run`, which consumes the harness
+    fn headless_datasets(&self) -> HeadlessDatasets {
+        HeadlessDatasets::new(self.cli_create_dataset_use_case_helper())
     }
 
     /// The server's handle of a dataset pushed from the client, which keeps its

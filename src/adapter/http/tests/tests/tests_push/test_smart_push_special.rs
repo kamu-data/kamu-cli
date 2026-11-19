@@ -16,6 +16,7 @@ use kamu_adapter_http::smart_protocol::messages::{
     DatasetPushCompleteConfirmed,
     DatasetPushCompleteError,
     DatasetPushObjectsNotUploadedError,
+    DatasetPushObjectsTransferError,
     DatasetPushRequest,
     DatasetPushRequestError,
     ObjectsUploadProgressDetails,
@@ -678,6 +679,134 @@ async fn test_smart_push_reads_the_completion_reply_after_a_stale_progress_reque
             Err(PushError::SyncError(SyncError::RefMoved(
                 SyncRefMovedError { reported: None, .. }
             )))
+        );
+    };
+
+    await_client_server_flow!(server_handle, client_handle);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_smart_push_of_new_dataset_whose_alias_is_taken_after_upgrade_is_rejected() {
+    let (client_harness, server_harness) = LocalFsTransferOptions {
+        client_tenancy: TenancyConfig::MultiTenant,
+        authenticated_remotely: true,
+        server_tenancy: TenancyConfig::MultiTenant,
+        authorized_writes: true,
+    }
+    .build()
+    .await;
+    let scenario = SmartPushNewDatasetScenario::prepare(client_harness, server_harness).await;
+
+    let dataset_handle = &scenario.client_dataset_handle;
+    let (push_request, metadata_request) = scenario
+        .client_harness
+        .raw_new_dataset_push_requests(dataset_handle)
+        .await;
+    let server_alias = odf::DatasetAlias::new(
+        scenario.server_harness.operating_account_name(),
+        scenario.dataset_name.clone(),
+    );
+    let server_account_id = scenario.server_harness.server_account_id();
+    let headless_datasets = scenario.server_harness.headless_datasets();
+    let stored_heads = scenario.server_harness.stored_heads();
+
+    let api_server_handle = scenario.server_harness.api_server_run();
+
+    let client_handle = async {
+        let mut session = scenario
+            .client_harness
+            .open_raw_push_session(scenario.server_dataset_ref.url().unwrap())
+            .await;
+        // The upgrade found no dataset under the alias, so the push creates one
+        headless_datasets
+            .create(&server_account_id, &server_alias)
+            .await;
+        session.send_metadata(push_request, metadata_request).await;
+        session.assert_metadata_accepted().await;
+
+        assert_matches!(
+            session.objects_transfer_response().await,
+            Err(DatasetPushObjectsTransferError::NameCollision(e))
+                if e.dataset_alias == server_alias
+        );
+        pretty_assertions::assert_eq!(stored_heads.find(&dataset_handle.id).await, None);
+    };
+
+    await_client_server_flow!(api_server_handle, client_handle);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_smart_push_reports_name_collision_of_the_server() {
+    let client_harness = ClientSideHarness::new(ClientSideHarnessOptions {
+        tenancy_config: TenancyConfig::SingleTenant,
+        authenticated_remotely: false,
+    })
+    .await;
+    let dataset_ref = client_harness.create_root_dataset_with_data("foo").await;
+    let taken_alias = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let server = ScriptedPushServer::name_collision(taken_alias.clone()).await;
+    let server_dataset_url = server.dataset_url("foo");
+
+    let server_handle = server.run();
+
+    let client_handle = async {
+        let push_responses = client_harness
+            .push_dataset(
+                dataset_ref,
+                odf::DatasetRefRemote::from(&server_dataset_url)
+                    .try_into()
+                    .unwrap(),
+                false,
+                odf::DatasetVisibility::Private,
+            )
+            .await;
+
+        pretty_assertions::assert_eq!(push_responses.len(), 1);
+        assert_matches!(
+            &push_responses[0].result,
+            Err(PushError::SyncError(SyncError::NameCollision(e))) if e.alias == taken_alias
+        );
+    };
+
+    await_client_server_flow!(server_handle, client_handle);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_smart_push_fails_on_unreadable_message_during_upload() {
+    let client_harness = ClientSideHarness::new(ClientSideHarnessOptions {
+        tenancy_config: TenancyConfig::SingleTenant,
+        authenticated_remotely: false,
+    })
+    .await;
+    let dataset_ref = client_harness.create_root_dataset_with_data("foo").await;
+    let server = ScriptedPushServer::unreadable_message_during_upload().await;
+    let server_dataset_url = server.dataset_url("foo");
+
+    let server_handle = server.run();
+
+    let client_handle = async {
+        let push_responses = client_harness
+            .push_dataset(
+                dataset_ref,
+                odf::DatasetRefRemote::from(&server_dataset_url)
+                    .try_into()
+                    .unwrap(),
+                false,
+                odf::DatasetVisibility::Private,
+            )
+            .await;
+
+        // The uploads never finish, so only the failed read ends the push
+        pretty_assertions::assert_eq!(push_responses.len(), 1);
+        assert_matches!(
+            &push_responses[0].result,
+            Err(PushError::SyncError(SyncError::Internal(_)))
         );
     };
 

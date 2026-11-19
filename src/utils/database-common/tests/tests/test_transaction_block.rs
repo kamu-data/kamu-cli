@@ -10,8 +10,12 @@
 use std::sync::{Arc, Mutex};
 
 use database_common::{DatabaseTransactionManager, TransactionRef, transaction};
+use database_common_macros::{transactional_handler, transactional_method, transactional_method1};
 use internal_error::{ErrorIntoInternal, InternalError};
 use pretty_assertions::assert_eq;
+use tracing::instrument::WithSubscriber;
+use tracing::span::{Attributes, Id, Record};
+use tracing::{Dispatch, Event, Metadata, Subscriber};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -70,6 +74,75 @@ async fn test_catalog_binding_sees_the_transaction() {
     assert_eq!(harness.transaction_endings(), ["COMMIT"]);
 }
 
+#[tokio::test]
+async fn test_transactional_method_keeps_attributes_and_ends_transaction() {
+    let harness = TransactionBlockHarness::new();
+
+    assert_eq!(
+        harness.method_sees_transaction(Step::Succeeds).await,
+        Ok(true)
+    );
+    assert_eq!(
+        harness.method_sees_transaction(Step::Fails).await,
+        Err("Internal error: step failed".to_string())
+    );
+    assert_eq!(harness.transaction_endings(), ["COMMIT", "ROLLBACK"]);
+    assert_eq!(
+        harness.recorded_spans(),
+        [
+            "attribute_below_macro",
+            "sees_transaction_in_method",
+            "attribute_below_macro",
+            "sees_transaction_in_method",
+        ]
+    );
+}
+
+#[tokio::test]
+async fn test_transactional_method1_keeps_attributes_and_ends_transaction() {
+    let harness = TransactionBlockHarness::new();
+
+    assert_eq!(harness.method_greeting_length(Step::Succeeds).await, Ok(5));
+    assert_eq!(
+        harness.method_greeting_length(Step::Fails).await,
+        Err("Internal error: step failed".to_string())
+    );
+    assert_eq!(harness.transaction_endings(), ["COMMIT", "ROLLBACK"]);
+    assert_eq!(
+        harness.recorded_spans(),
+        [
+            "attribute_below_macro",
+            "greeting_length_in_method",
+            "attribute_below_macro",
+            "greeting_length_in_method",
+        ]
+    );
+}
+
+#[tokio::test]
+async fn test_transactional_handler_keeps_attributes_and_ends_transaction() {
+    let harness = TransactionBlockHarness::new();
+
+    assert_eq!(
+        harness.handler_sees_transaction(Step::Succeeds).await,
+        Ok(true)
+    );
+    assert_eq!(
+        harness.handler_sees_transaction(Step::Fails).await,
+        Err("Internal error: step failed".to_string())
+    );
+    assert_eq!(harness.transaction_endings(), ["COMMIT", "ROLLBACK"]);
+    assert_eq!(
+        harness.recorded_spans(),
+        [
+            "attribute_below_macro",
+            "sees_transaction_in_handler",
+            "attribute_below_macro",
+            "sees_transaction_in_handler",
+        ]
+    );
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Clone, Copy)]
@@ -93,6 +166,7 @@ struct Greeting(&'static str);
 struct TransactionBlockHarness {
     catalog: dill::Catalog,
     transaction_manager: Arc<RecordingTransactionManager>,
+    span_recorder: Arc<SpanRecorder>,
 }
 
 impl TransactionBlockHarness {
@@ -107,6 +181,7 @@ impl TransactionBlockHarness {
         Self {
             catalog,
             transaction_manager,
+            span_recorder: Arc::default(),
         }
     }
 
@@ -164,7 +239,68 @@ impl TransactionBlockHarness {
         )
         .unwrap()
     }
+
+    async fn method_sees_transaction(&self, step: Step) -> Result<bool, String> {
+        self.recording_spans(self.sees_transaction_in_method(step))
+            .await
+            .map_err(|e| e.reason())
+    }
+
+    async fn method_greeting_length(&self, step: Step) -> Result<usize, String> {
+        self.recording_spans(self.greeting_length_in_method(step))
+            .await
+            .map_err(|e| e.reason())
+    }
+
+    async fn handler_sees_transaction(&self, step: Step) -> Result<bool, String> {
+        self.recording_spans(Self::sees_transaction_in_handler(
+            Extension(self.catalog.clone()),
+            step,
+        ))
+        .await
+        .map_err(|e| e.reason())
+    }
+
+    async fn recording_spans<F: Future>(&self, future: F) -> F::Output {
+        future
+            .with_subscriber(Dispatch::new(Arc::clone(&self.span_recorder)))
+            .await
+    }
+
+    fn recorded_spans(&self) -> Vec<&'static str> {
+        self.span_recorder.names.lock().unwrap().clone()
+    }
+
+    // The span of each `#[tracing::instrument]` below is recorded only if the
+    // macro above it keeps the attributes written below it
+
+    #[transactional_method]
+    #[tracing::instrument(name = "attribute_below_macro", skip_all)]
+    async fn sees_transaction_in_method(&self, step: Step) -> Result<bool, InternalError> {
+        step.run()?;
+        Ok(transaction_catalog.get_one::<TransactionRef>().is_ok())
+    }
+
+    #[transactional_method1(greeting: Arc<Greeting>)]
+    #[tracing::instrument(name = "attribute_below_macro", skip_all)]
+    async fn greeting_length_in_method(&self, step: Step) -> Result<usize, InternalError> {
+        step.run()?;
+        Ok(greeting.0.len())
+    }
+
+    #[transactional_handler]
+    #[tracing::instrument(name = "attribute_below_macro", skip_all)]
+    async fn sees_transaction_in_handler(
+        Extension(catalog): Extension<dill::Catalog>,
+        step: Step,
+    ) -> Result<bool, InternalError> {
+        step.run()?;
+        Ok(catalog.get_one::<TransactionRef>().is_ok())
+    }
 }
+
+/// The shape of the request-catalog argument `#[transactional_handler]` looks for
+struct Extension<T>(T);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -206,6 +342,36 @@ impl DatabaseTransactionManager for RecordingTransactionManager {
         self.end(transaction_ref, "ROLLBACK");
         Ok(())
     }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Records the name of each span opened while it is the default subscriber
+#[derive(Default)]
+struct SpanRecorder {
+    names: Mutex<Vec<&'static str>>,
+}
+
+impl Subscriber for SpanRecorder {
+    fn enabled(&self, _: &Metadata<'_>) -> bool {
+        true
+    }
+
+    fn new_span(&self, span: &Attributes<'_>) -> Id {
+        let mut names = self.names.lock().unwrap();
+        names.push(span.metadata().name());
+        Id::from_u64(u64::try_from(names.len()).unwrap())
+    }
+
+    fn record(&self, _: &Id, _: &Record<'_>) {}
+
+    fn record_follows_from(&self, _: &Id, _: &Id) {}
+
+    fn event(&self, _: &Event<'_>) {}
+
+    fn enter(&self, _: &Id) {}
+
+    fn exit(&self, _: &Id) {}
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

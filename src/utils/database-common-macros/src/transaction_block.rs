@@ -9,7 +9,8 @@
 
 use proc_macro2::{Span, TokenStream, TokenTree};
 use quote::{ToTokens, quote};
-use syn::parse::{Parse, ParseStream};
+use syn::parse::{Parse, ParseStream, Parser};
+use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
 use syn::visit::Visit;
 use syn::visit_mut::{self, VisitMut};
@@ -275,6 +276,22 @@ impl Binding {
         Self::Catalog(Ident::new(name, Span::call_site()))
     }
 
+    /// Parses the comma-separated bindings of `#[transactional_methodN(..)]`,
+    /// refusing any count other than `arity`
+    pub(crate) fn parse_exactly(arity: usize, tokens: TokenStream) -> syn::Result<Vec<Self>> {
+        let bindings = Punctuated::<Self, Token![,]>::parse_terminated.parse2(tokens)?;
+        if bindings.len() != arity {
+            return Err(syn::Error::new(
+                Span::call_site(),
+                format!(
+                    "expected {arity} `name: Type` bindings, found {}",
+                    bindings.len()
+                ),
+            ));
+        }
+        Ok(bindings.into_iter().collect())
+    }
+
     fn from_pat(input: &Pat) -> syn::Result<Self> {
         if let Pat::Ident(pat_ident) = input {
             return Ok(Self::Catalog(Self::plain_name(pat_ident)?));
@@ -434,36 +451,99 @@ mod tests {
     }
 
     #[test]
-    fn test_rejects_return_in_value_form() {
-        assert!(error_of("|| { if x { return Ok(()); } }").contains("`return`"));
+    fn test_refuses_malformed_blocks() {
+        let cases = [
+            // `return` would leave only the body of a block without a return type
+            ("|| { if x { return Ok(()); } }", "`return`"),
+            ("|| { match x { _ => return 1 } }", "`return`"),
+            ("|| { loop { return; } }", "`return`"),
+            // The tokens of a macro call are searched whole, closures in them included
+            ("|| { select! { _ = a => return Ok(()), } }", "`return`"),
+            ("|| { log!(\"{}\", { return 1; }); }", "`return`"),
+            ("|| { outer!(inner!(return)); }", "`return`"),
+            ("|| { log!(\"{}\", items.map(|i| return i)); }", "`return`"),
+            // The body is already async and borrows what it uses
+            ("async || {}", "drop `async`"),
+            ("async move || {}", "drop `async`"),
+            ("move || {}", "drop `move`"),
+            ("for<'a> || {}", "expected `|bindings| body`"),
+            // Attributes
+            ("#[timeout(5)] || {}", "expected `#[catalog"),
+            ("#[catalog(a)] #[catalog(b)] || {}", "given twice"),
+            ("#[when(a)] #[when(b)] || {}", "given twice"),
+            ("#[span(a)] #[span(b)] || {}", "given twice"),
+            // Bindings
+            ("|(a, b): (A, B)| {}", "expected `name`"),
+            ("|mut catalog| {}", "expected `name`"),
+            ("|ref catalog| {}", "expected `name`"),
+            ("|_: Arc<dyn Svc>| {}", "expected `name`"),
+            (
+                "|| {} trailing",
+                "unexpected input after the transaction body",
+            ),
+        ];
+
+        for (input, expected_error) in cases {
+            let error = error_of(input);
+            assert!(
+                error.contains(expected_error),
+                "`{input}` failed with `{error}`, expected `{expected_error}`"
+            );
+        }
     }
 
     #[test]
-    fn test_rejects_return_inside_a_macro_in_value_form() {
-        assert!(error_of("|| { select! { _ = a => return Ok(()), } }").contains("`return`"));
-        assert!(error_of("|| { log!(\"{}\", { return 1; }); }").contains("`return`"));
-        parse("|| -> Result<(), E> { select! { _ = a => return Ok(()), } }").unwrap();
+    fn test_accepts_well_formed_blocks() {
+        let cases = [
+            // A body with a return type may return from itself
+            "|| -> Result<(), E> { if x { return Ok(()); } Ok(()) }",
+            "|| -> Result<(), E> { select! { _ = a => return Ok(()), } }",
+            "|svc: Arc<dyn Svc>| -> Result<_, E> { svc.run().await }",
+            // A `return` that leaves only a nested closure, async block or item
+            "|| { items.iter().map(|i| { return i; }).count() }",
+            "|| { async { return 1; }.await }",
+            "|| { async move { return 1; }.await }",
+            "|| { fn helper() -> u32 { return 1; } helper() }",
+            "|| { log!(\"{}\", value) }",
+            "#[span(make_span())] #[when(enabled)] #[catalog(base)] |catalog| { catalog }",
+        ];
+
+        for input in cases {
+            if let Err(e) = parse(input) {
+                panic!("`{input}` was refused: {e}");
+            }
+        }
     }
 
     #[test]
-    fn test_allows_return_in_result_form_and_nested_closures() {
-        parse("|| -> Result<(), E> { if x { return Ok(()); } Ok(()) }").unwrap();
-        parse("|| { items.iter().map(|i| { return i; }).count() }").unwrap();
-        parse("|| { async { return 1; }.await }").unwrap();
-    }
+    fn test_method_bindings_must_match_the_arity() {
+        let cases = [
+            (1, "svc: Arc<dyn Svc>", Ok(1)),
+            (1, "svc: Arc<dyn Svc>,", Ok(1)),
+            (2, "a: Arc<dyn A>, b: Arc<dyn B>", Ok(2)),
+            (1, "", Err("expected 1 `name: Type` bindings, found 0")),
+            (
+                1,
+                "a: Arc<dyn A>, b: Arc<dyn B>",
+                Err("expected 1 `name: Type` bindings, found 2"),
+            ),
+            (
+                3,
+                "a: Arc<dyn A>, b: Arc<dyn B>",
+                Err("expected 3 `name: Type` bindings, found 2"),
+            ),
+        ];
 
-    #[test]
-    fn test_rejects_unknown_and_repeated_attributes() {
-        assert!(error_of("#[timeout(5)] || {}").contains("expected `#[catalog"));
-        assert!(error_of("#[when(a)] #[when(b)] || {}").contains("given twice"));
-    }
-
-    #[test]
-    fn test_rejects_async_move_and_patterns() {
-        assert!(error_of("async || {}").contains("drop `async`"));
-        assert!(error_of("move || {}").contains("drop `move`"));
-        assert!(error_of("|(a, b): (A, B)| {}").contains("expected `name`"));
-        assert!(error_of("|mut catalog| {}").contains("expected `name`"));
+        for (arity, input, expected) in cases {
+            let actual = Binding::parse_exactly(arity, input.parse().unwrap())
+                .map(|bindings| bindings.len())
+                .map_err(|e| e.to_string());
+            assert_eq!(
+                actual,
+                expected.map_err(ToString::to_string),
+                "arity {arity}, `{input}`"
+            );
+        }
     }
 }
 

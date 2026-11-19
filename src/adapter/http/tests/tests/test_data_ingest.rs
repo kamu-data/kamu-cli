@@ -621,9 +621,18 @@ async fn test_data_push_ingest_rejected_request_status() {
     let derivative = harness
         .create_derivative_dataset(&with_source.dataset_handle.alias)
         .await;
+    let reading_system_column = harness.create_dataset_reading_system_column().await;
+    let declaring_other_schema = harness
+        .create_population_dataset_declaring_other_schema()
+        .await;
+    let census = harness.create_census_dataset_with_object_links().await;
     let with_source_url = harness.ingest_url(&with_source.dataset_handle.alias);
     let without_source_url = harness.ingest_url(&without_source.dataset_handle.alias);
     let derivative_url = harness.ingest_url(&derivative.dataset_handle.alias);
+    let reading_system_column_url = harness.ingest_url(&reading_system_column.dataset_handle.alias);
+    let declaring_other_schema_url =
+        harness.ingest_url(&declaring_other_schema.dataset_handle.alias);
+    let census_url = harness.ingest_url(&census.dataset_handle.alias);
 
     let cases = [
         (
@@ -659,6 +668,34 @@ async fn test_data_push_ingest_rejected_request_status() {
             &derivative_url,
             http::HeaderValue::from_static("application/x-ndjson"),
             DataIngestHarness::POPULATION_RECORD,
+            http::StatusCode::BAD_REQUEST,
+        ),
+        (
+            "column_named_as_system_column",
+            &reading_system_column_url,
+            http::HeaderValue::from_static("application/x-ndjson"),
+            r#"{"offset": 1, "city": "A"}"#,
+            http::StatusCode::BAD_REQUEST,
+        ),
+        (
+            "schema_other_than_declared",
+            &declaring_other_schema_url,
+            http::HeaderValue::from_static("application/x-ndjson"),
+            DataIngestHarness::POPULATION_RECORD,
+            http::StatusCode::BAD_REQUEST,
+        ),
+        (
+            "object_link_not_a_multihash",
+            &census_url,
+            http::HeaderValue::from_static("application/x-ndjson"),
+            r#"{"event_time": "2020-01-01T00:00:00", "city": "A", "census_hash": "not-a-multihash"}"#,
+            http::StatusCode::BAD_REQUEST,
+        ),
+        (
+            "object_link_to_missing_object",
+            &census_url,
+            http::HeaderValue::from_static("application/x-ndjson"),
+            r#"{"event_time": "2020-01-01T00:00:00", "city": "A", "census_hash": "f1620ffd8538233905b7fb9a9c7bff1315bbb3f9eaecd1746c6562426328835785dcb"}"#,
             http::StatusCode::BAD_REQUEST,
         ),
     ];
@@ -830,6 +867,73 @@ impl DataIngestHarness {
     /// A root dataset, with a push source of the population schema if
     /// `with_schema`
     async fn create_root_dataset(&self, name: &str, with_schema: bool) -> CreateDatasetResult {
+        let metadata = if with_schema {
+            vec![Self::population_push_source()]
+        } else {
+            vec![]
+        };
+        self.create_root_dataset_with_metadata(name, metadata).await
+    }
+
+    /// A dataset whose push source reads a column named as a system column
+    async fn create_dataset_reading_system_column(&self) -> CreateDatasetResult {
+        self.create_root_dataset_with_metadata(
+            "reading-system-column",
+            vec![Self::append_push_source(vec![
+                odf::schema::DataField::i64("offset"),
+                odf::schema::DataField::string("city"),
+            ])],
+        )
+        .await
+    }
+
+    /// A dataset with the population push source whose declared data schema
+    /// lacks the columns the source produces
+    async fn create_population_dataset_declaring_other_schema(&self) -> CreateDatasetResult {
+        self.create_root_dataset_with_metadata(
+            "population-other-schema",
+            vec![
+                Self::population_push_source(),
+                MetadataFactory::set_data_schema().build().into(),
+            ],
+        )
+        .await
+    }
+
+    /// A dataset whose `census_hash` column links to objects in its own
+    /// storage
+    async fn create_census_dataset_with_object_links(&self) -> CreateDatasetResult {
+        self.create_root_dataset_with_metadata(
+            "census",
+            vec![
+                Self::append_push_source(vec![
+                    odf::schema::DataField::timestamp_millis_utc("event_time"),
+                    odf::schema::DataField::string("city"),
+                    odf::schema::DataField::string("census_hash"),
+                ]),
+                odf::metadata::SetDataSchema::new(odf::schema::DataSchema::new(vec![
+                    odf::schema::DataField::i64("offset"),
+                    odf::schema::DataField::i32("op"),
+                    odf::schema::DataField::timestamp_millis_utc("system_time"),
+                    odf::schema::DataField::timestamp_millis_utc("event_time"),
+                    odf::schema::DataField::string("city"),
+                    odf::schema::DataField::string("census_hash").type_ext(
+                        odf::schema::ext::DataTypeExt::object_link(
+                            odf::schema::ext::DataTypeExt::multihash(),
+                        ),
+                    ),
+                ]))
+                .into(),
+            ],
+        )
+        .await
+    }
+
+    async fn create_root_dataset_with_metadata(
+        &self,
+        name: &str,
+        metadata: Vec<odf::MetadataEvent>,
+    ) -> CreateDatasetResult {
         self.server_harness
             .cli_create_dataset_from_snapshot_use_case()
             .execute(
@@ -839,39 +943,46 @@ impl DataIngestHarness {
                         odf::DatasetName::new_unchecked(name),
                     ),
                     kind: odf::DatasetKind::Root,
-                    metadata: if with_schema {
-                        vec![
-                            odf::metadata::AddPushSource {
-                                source_name: "source1".to_string(),
-                                read: odf::metadata::ReadStepNdJson {
-                                    schema: Some(odf::schema::DataSchema::new(vec![
-                                        odf::schema::DataField::timestamp_millis_utc("event_time"),
-                                        odf::schema::DataField::string("city"),
-                                        odf::schema::DataField::i64("population"),
-                                    ])),
-                                    ..Default::default()
-                                }
-                                .into(),
-                                preprocess: None,
-                                merge: odf::metadata::MergeStrategy::Ledger(
-                                    odf::metadata::MergeStrategyLedger {
-                                        primary_key: vec![
-                                            "event_time".to_owned(),
-                                            "city".to_owned(),
-                                        ],
-                                    },
-                                ),
-                            }
-                            .into(),
-                        ]
-                    } else {
-                        vec![]
-                    },
+                    metadata,
                 },
                 Default::default(),
             )
             .await
             .unwrap()
+    }
+
+    fn population_push_source() -> odf::MetadataEvent {
+        odf::metadata::AddPushSource {
+            source_name: "source1".to_string(),
+            read: odf::metadata::ReadStepNdJson {
+                schema: Some(odf::schema::DataSchema::new(vec![
+                    odf::schema::DataField::timestamp_millis_utc("event_time"),
+                    odf::schema::DataField::string("city"),
+                    odf::schema::DataField::i64("population"),
+                ])),
+                ..Default::default()
+            }
+            .into(),
+            preprocess: None,
+            merge: odf::metadata::MergeStrategy::Ledger(odf::metadata::MergeStrategyLedger {
+                primary_key: vec!["event_time".to_owned(), "city".to_owned()],
+            }),
+        }
+        .into()
+    }
+
+    fn append_push_source(fields: Vec<odf::schema::DataField>) -> odf::MetadataEvent {
+        odf::metadata::AddPushSource {
+            source_name: "source1".to_string(),
+            read: odf::metadata::ReadStepNdJson {
+                schema: Some(odf::schema::DataSchema::new(fields)),
+                ..Default::default()
+            }
+            .into(),
+            preprocess: None,
+            merge: odf::metadata::MergeStrategy::Append(odf::metadata::MergeStrategyAppend {}),
+        }
+        .into()
     }
 
     async fn create_derivative_dataset(&self, input: &odf::DatasetAlias) -> CreateDatasetResult {
