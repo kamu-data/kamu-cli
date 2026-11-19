@@ -139,7 +139,7 @@ impl ScriptedPullServer {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// Where the server breaks the transfer
-#[derive(Clone, Copy)]
+#[derive(Debug, Clone, Copy)]
 pub(crate) enum PullScript {
     /// Sends the whole chain, then answers the request for objects wrongly
     Objects(ObjectsScript),
@@ -150,7 +150,7 @@ pub(crate) enum PullScript {
 }
 
 /// How the server answers the request for objects
-#[derive(Clone, Copy)]
+#[derive(Debug, Clone, Copy)]
 pub(crate) enum ObjectsScript {
     /// Offers none of them
     Omit,
@@ -165,7 +165,7 @@ pub(crate) enum ObjectsScript {
 }
 
 /// Which metadata batch the server sends in place of the planned one
-#[derive(Clone, Copy)]
+#[derive(Debug, Clone, Copy)]
 pub(crate) enum MetadataScript {
     /// A payload that is not an archive
     Undecodable,

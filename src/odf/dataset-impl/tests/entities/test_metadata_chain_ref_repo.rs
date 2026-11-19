@@ -18,51 +18,33 @@ use odf::storage::*;
 
 #[tokio::test]
 async fn test_set_ref_cas_reports_the_actual_head() {
-    let harness = RefRepoHarness::new();
+    for harness in [
+        RefRepoHarness::new(),
+        RefRepoHarness::without_conditional_writes(),
+    ] {
+        harness.set_head(None, &harness.hash_a).await.unwrap();
 
-    harness.set_head(None, &harness.hash_a).await.unwrap();
+        assert_matches!(
+            harness.set_head(Some(&harness.hash_b), &harness.hash_c).await,
+            Err(SetChainRefError::CASFailed(RefCASError { expected, actual, .. }))
+                if expected == Some(harness.hash_b.clone())
+                    && actual == Some(harness.hash_a.clone())
+        );
+        assert_matches!(
+            harness.set_head(None, &harness.hash_c).await,
+            Err(SetChainRefError::CASFailed(RefCASError {
+                expected: None,
+                ..
+            }))
+        );
+        assert_eq!(harness.head().await, harness.hash_a);
 
-    assert_matches!(
-        harness.set_head(Some(&harness.hash_b), &harness.hash_c).await,
-        Err(SetChainRefError::CASFailed(RefCASError { expected, actual, .. }))
-            if expected == Some(harness.hash_b.clone()) && actual == Some(harness.hash_a.clone())
-    );
-    assert_matches!(
-        harness.set_head(None, &harness.hash_c).await,
-        Err(SetChainRefError::CASFailed(RefCASError {
-            expected: None,
-            ..
-        }))
-    );
-    assert_eq!(harness.head().await, harness.hash_a);
-
-    harness
-        .set_head(Some(&harness.hash_a), &harness.hash_b)
-        .await
-        .unwrap();
-    assert_eq!(harness.head().await, harness.hash_b);
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[tokio::test]
-async fn test_set_ref_without_conditional_writes_checks_before_writing() {
-    let harness = RefRepoHarness::without_conditional_writes();
-
-    harness.set_head(None, &harness.hash_a).await.unwrap();
-
-    assert_matches!(
-        harness.set_head(Some(&harness.hash_b), &harness.hash_c).await,
-        Err(SetChainRefError::CASFailed(RefCASError { actual, .. }))
-            if actual == Some(harness.hash_a.clone())
-    );
-    assert_eq!(harness.head().await, harness.hash_a);
-
-    harness
-        .set_head(Some(&harness.hash_a), &harness.hash_b)
-        .await
-        .unwrap();
-    assert_eq!(harness.head().await, harness.hash_b);
+        harness
+            .set_head(Some(&harness.hash_a), &harness.hash_b)
+            .await
+            .unwrap();
+        assert_eq!(harness.head().await, harness.hash_b);
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

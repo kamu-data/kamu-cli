@@ -16,34 +16,19 @@ use chrono::{DateTime, TimeZone, Utc};
 use container_runtime::{ContainerRuntime, ContainerRuntimeConfig};
 use datafusion::arrow::datatypes::Schema;
 use internal_error::{ErrorIntoInternal, InternalError};
-use kamu::testing::{
-    BaseRepoHarness,
-    BaseUseCaseHarness,
-    BaseUseCaseHarnessOptions,
-    DatasetTestHelper,
-    DummySmartTransferProtocolClient,
-};
-use kamu::utils::ipfs_wrapper::IpfsClient;
-use kamu::utils::local_sync_writes::PulledSeedStore;
-use kamu::utils::simple_transfer_protocol::SimpleTransferProtocol;
+use kamu::testing::{BaseRepoHarness, BaseUseCaseHarness, BaseUseCaseHarnessOptions};
 use kamu::{
     DataFormatRegistryImpl,
     EngineConfigDatafusionEmbeddedIngest,
     EngineProvisionerNull,
     FetchService,
     IngestEnvVarsResolver,
-    IpfsServiceImpl,
     ObjectStoreBuilderLocalFs,
     ObjectStoreRegistryImpl,
     PollingIngestJobImpl,
     PollingIngestPlannerImpl,
     PollingIngestServiceImpl,
-    RemoteDatasetUrlResolverImpl,
-    RemoteReposDir,
-    RemoteRepositoryRegistryImpl,
     SyncFromJobImpl,
-    SyncRequestBuilder,
-    SyncServiceImpl,
     TransformExecutorImpl,
     TransformJobImpl,
     TransformPlannerImpl,
@@ -66,7 +51,6 @@ use kamu_datasets::{
     CreateDatasetResult,
     DatasetEnvVar,
     DatasetEnvVarResolver,
-    DatasetEnvVarValue,
     DatasetReferenceUpdater,
     GetDatasetEnvVarError,
     SecretsEncryptionConfig,
@@ -74,36 +58,7 @@ use kamu_datasets::{
 use kamu_datasets_services::DatasetKeyValueServiceSysEnv;
 use kamu_datasets_services::testing::RacingDatasetReferenceUpdater;
 use kamu_task_system::{TaskDefinition, TaskError, TaskOutcome, TaskRunner};
-use odf::metadata::testing::MetadataFactory;
 use pretty_assertions::assert_eq;
-use url::Url;
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[tokio::test]
-async fn test_ingest_ref_moved_concurrently_fails_recoverably() {
-    let (harness, foo, _) =
-        UpdateDatasetTaskRunnerHarness::new_ingesting_new_root(&BaseRepoHarness::alias("foo"))
-            .await;
-    let concurrent_head = harness.append_unreferenced_block(&foo, "concurrent").await;
-    harness.move_head(&foo, &foo.head, &concurrent_head).await;
-
-    let outcome = harness.run_ingest_update(&foo).await;
-
-    assert_eq!(
-        TaskOutcome::Failed(
-            TaskErrorDatasetCommit::RefMoved(DatasetRefMovedError {
-                dataset_id: foo.dataset_handle.id.clone(),
-                block_ref: odf::BlockRef::Head,
-                expected_block_hash: Some(foo.head.clone()),
-                actual_block_hash: Some(concurrent_head.clone()),
-            })
-            .into_task_error()
-        ),
-        outcome,
-    );
-    assert_eq!(harness.get_head(&foo).await, concurrent_head);
-}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -228,35 +183,6 @@ async fn test_ingest_from_unreachable_source_fails_recoverably() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[tokio::test]
-async fn test_ingest_with_real_planner_and_service_commits_and_reports_increment() {
-    let harness = UpdateDatasetTaskRunnerHarness::new_with_real_ingest();
-    let src_path = harness.write_source_file("city,population\nA,1000\nB,2000\nC,3000\n");
-    let foo = harness
-        .create_root_dataset_polling_csv(&BaseRepoHarness::alias("foo"), &src_path)
-        .await;
-
-    let outcome = harness.run_ingest_update(&foo).await;
-
-    let new_head = harness.get_head(&foo).await;
-    assert_ne!(new_head, foo.head);
-    assert_matches!(
-        harness.task_result_update(outcome),
-        TaskResultDatasetUpdate::Updated {
-            old_head: Some(old_head),
-            new_head: reported_head,
-            has_more: false,
-            increment: odf::dataset::MetadataChainIncrementInterval {
-                num_blocks: 2,
-                num_records: 3,
-                ..
-            },
-        } if old_head == foo.head && reported_head == new_head
-    );
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[tokio::test]
 async fn test_ingest_with_real_service_of_unreadable_data_fails_unrecoverably() {
     let harness = UpdateDatasetTaskRunnerHarness::new_with_real_ingest();
     let src_path = harness.write_source_file("city,population\nA,not-a-number\n");
@@ -276,36 +202,46 @@ async fn test_ingest_with_real_service_of_unreadable_data_fails_unrecoverably() 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[tokio::test]
-async fn test_transform_input_not_pulled_succeeds_as_up_to_date() {
-    let alias_bar = BaseRepoHarness::alias("bar");
-    let input_handle = odf::DatasetHandle::new(
-        odf::DatasetID::new_seeded_ed25519(b"foo"),
-        BaseRepoHarness::alias("foo"),
-        odf::DatasetKind::Root,
-    );
+async fn test_transform_with_nothing_to_do_succeeds_as_up_to_date() {
+    /// Case name and the planner's expectations for the derivative
+    type Case = (&'static str, fn(odf::DatasetAlias) -> MockTransformPlanner);
+    let cases: [Case; 2] = [
+        ("input_not_pulled", |alias| {
+            MockTransformPlanner::new().make_expect_elaborate_transform_error(alias, || {
+                InputNotPulledError {
+                    dataset_handle: odf::DatasetHandle::new(
+                        odf::DatasetID::new_seeded_ed25519(b"foo"),
+                        BaseRepoHarness::alias("foo"),
+                        odf::DatasetKind::Root,
+                    ),
+                }
+                .into()
+            })
+        }),
+        ("up_to_date", |alias| {
+            MockTransformPlanner::new().make_expect_elaborate_transform_up_to_date(alias)
+        }),
+    ];
 
-    let harness =
-        UpdateDatasetTaskRunnerHarness::new(UpdateDatasetTaskRunnerMocks {
-            mock_transform_planner: MockTransformPlanner::new()
-                .make_expect_elaborate_transform_error(alias_bar.clone(), move || {
-                    InputNotPulledError {
-                        dataset_handle: input_handle.clone(),
-                    }
-                    .into()
-                }),
+    for (case, make_mock_transform_planner) in cases {
+        let alias_bar = BaseRepoHarness::alias("bar");
+        let harness = UpdateDatasetTaskRunnerHarness::new(UpdateDatasetTaskRunnerMocks {
+            mock_transform_planner: make_mock_transform_planner(alias_bar.clone()),
             ..UpdateDatasetTaskRunnerMocks::default()
         });
-    let bar = harness.create_derivative(&alias_bar).await;
+        let bar = harness.create_derivative(&alias_bar).await;
 
-    let outcome = harness.run_transform_update(&bar).await;
+        let outcome = harness.run_transform_update(&bar).await;
 
-    assert_eq!(
-        TaskOutcome::Success(
-            TaskResultDatasetUpdate::UpToDate(PullResultUpToDate::Transform).into_task_result()
-        ),
-        outcome
-    );
-    assert_eq!(harness.get_head(&bar).await, bar.head);
+        assert_eq!(
+            TaskOutcome::Success(
+                TaskResultDatasetUpdate::UpToDate(PullResultUpToDate::Transform).into_task_result()
+            ),
+            outcome,
+            "{case}",
+        );
+        assert_eq!(harness.get_head(&bar).await, bar.head, "{case}");
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -406,30 +342,6 @@ async fn test_transform_execution_failure_fails_as_recoverable_as_its_error() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[tokio::test]
-async fn test_transform_up_to_date_reports_up_to_date() {
-    let alias_bar = BaseRepoHarness::alias("bar");
-
-    let harness = UpdateDatasetTaskRunnerHarness::new(UpdateDatasetTaskRunnerMocks {
-        mock_transform_planner: MockTransformPlanner::new()
-            .make_expect_elaborate_transform_up_to_date(alias_bar.clone()),
-        ..UpdateDatasetTaskRunnerMocks::default()
-    });
-    let bar = harness.create_derivative(&alias_bar).await;
-
-    let outcome = harness.run_transform_update(&bar).await;
-
-    assert_eq!(
-        TaskOutcome::Success(
-            TaskResultDatasetUpdate::UpToDate(PullResultUpToDate::Transform).into_task_result()
-        ),
-        outcome
-    );
-    assert_eq!(harness.get_head(&bar).await, bar.head);
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[tokio::test]
 async fn test_transform_not_defined_fails_unrecoverably() {
     let outcome = UpdateDatasetTaskRunnerHarness::run_transform_elaboration_failing_with(|_| {
         TransformNotDefinedError {}.into()
@@ -445,49 +357,53 @@ async fn test_transform_not_defined_fails_unrecoverably() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[tokio::test]
-async fn test_transform_ref_moved_concurrently_fails_recoverably() {
-    let (harness, bar, _) = UpdateDatasetTaskRunnerHarness::new_transforming_new_derivative(
-        &BaseRepoHarness::alias("bar"),
-    )
-    .await;
-    let concurrent_head = harness.append_unreferenced_block(&bar, "concurrent").await;
-    harness.move_reference_before_next_update(concurrent_head.clone());
+async fn test_update_ref_moved_concurrently_fails_recoverably() {
+    for kind in [UpdateKind::Ingest, UpdateKind::Transform, UpdateKind::Sync] {
+        let (harness, target, _) =
+            UpdateDatasetTaskRunnerHarness::new_updating_new_target(kind).await;
+        let concurrent_head = harness
+            .append_unreferenced_block(&target, "concurrent")
+            .await;
+        harness.move_reference_before_next_update(concurrent_head.clone());
 
-    let outcome = harness.run_transform_update(&bar).await;
+        let outcome = harness.run_update_of(kind, &target).await;
 
-    assert_eq!(
-        TaskOutcome::Failed(
-            TaskErrorDatasetCommit::RefMoved(DatasetRefMovedError {
-                dataset_id: bar.dataset_handle.id.clone(),
-                block_ref: odf::BlockRef::Head,
-                expected_block_hash: Some(bar.head.clone()),
-                actual_block_hash: Some(concurrent_head.clone()),
-            })
-            .into_task_error()
-        ),
-        outcome,
-    );
-    assert!(outcome.is_recoverable_failure());
-    assert_eq!(harness.get_head(&bar).await, concurrent_head);
+        assert_eq!(
+            TaskOutcome::Failed(
+                TaskErrorDatasetCommit::RefMoved(DatasetRefMovedError {
+                    dataset_id: target.dataset_handle.id.clone(),
+                    block_ref: odf::BlockRef::Head,
+                    expected_block_hash: Some(target.head.clone()),
+                    actual_block_hash: Some(concurrent_head.clone()),
+                })
+                .into_task_error()
+            ),
+            outcome,
+            "{kind:?}",
+        );
+        assert!(outcome.is_recoverable_failure(), "{kind:?}");
+        assert_eq!(harness.get_head(&target).await, concurrent_head, "{kind:?}");
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[tokio::test]
-async fn test_transform_commit_not_allowed_fails_unrecoverably() {
-    let (harness, bar, _) = UpdateDatasetTaskRunnerHarness::new_transforming_new_derivative(
-        &BaseRepoHarness::alias("bar"),
-    )
-    .await;
-    harness.deny_next_update();
+async fn test_update_commit_not_allowed_fails_unrecoverably() {
+    for kind in [UpdateKind::Ingest, UpdateKind::Transform, UpdateKind::Sync] {
+        let (harness, target, _) =
+            UpdateDatasetTaskRunnerHarness::new_updating_new_target(kind).await;
+        harness.deny_next_update();
 
-    let outcome = harness.run_transform_update(&bar).await;
+        let outcome = harness.run_update_of(kind, &target).await;
 
-    assert_eq!(
-        TaskOutcome::Failed(TaskError::empty_unrecoverable()),
-        outcome
-    );
-    assert_eq!(harness.get_head(&bar).await, bar.head);
+        assert_eq!(
+            TaskOutcome::Failed(TaskError::empty_unrecoverable()),
+            outcome,
+            "{kind:?}",
+        );
+        assert_eq!(harness.get_head(&target).await, target.head, "{kind:?}");
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -635,121 +551,6 @@ async fn test_sync_up_to_date() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[tokio::test]
-async fn test_sync_with_real_service_commits_and_reports_increment() {
-    let harness = UpdateDatasetTaskRunnerHarness::new_with_real_sync();
-    let foo = harness
-        .create_root_dataset_with_schema(&BaseRepoHarness::alias("foo"))
-        .await;
-    harness.push_to_repo(&foo).await;
-    let repo_head = harness.append_data_in_repo(&foo).await;
-
-    let outcome = harness.run_sync_update_from_repo(&foo).await;
-
-    assert_eq!(
-        TaskOutcome::Success(
-            TaskResultDatasetUpdate::Updated {
-                old_head: Some(foo.head.clone()),
-                new_head: repo_head.clone(),
-                has_more: false,
-                increment: odf::dataset::MetadataChainIncrementInterval {
-                    num_blocks: 1,
-                    num_records: 10,
-                    updated_watermark: None,
-                },
-            }
-            .into_task_result()
-        ),
-        outcome,
-    );
-    assert_eq!(harness.get_head(&foo).await, repo_head);
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[tokio::test]
-async fn test_sync_with_real_service_from_repo_in_sync_is_up_to_date() {
-    let harness = UpdateDatasetTaskRunnerHarness::new_with_real_sync();
-    let foo = harness
-        .create_root_dataset_with_schema(&BaseRepoHarness::alias("foo"))
-        .await;
-    harness.push_to_repo(&foo).await;
-
-    let outcome = harness.run_sync_update_from_repo(&foo).await;
-
-    assert_eq!(
-        TaskOutcome::Success(
-            TaskResultDatasetUpdate::UpToDate(PullResultUpToDate::Sync).into_task_result()
-        ),
-        outcome,
-    );
-    assert_eq!(harness.get_head(&foo).await, foo.head);
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[tokio::test]
-async fn test_sync_ref_moved_concurrently_fails_recoverably() {
-    let (harness, foo, _) =
-        UpdateDatasetTaskRunnerHarness::new_syncing_new_root(&BaseRepoHarness::alias("foo")).await;
-    let concurrent_head = harness.append_unreferenced_block(&foo, "concurrent").await;
-    harness.move_reference_before_next_update(concurrent_head.clone());
-
-    let outcome = harness.run_sync_update(&foo).await;
-
-    assert_eq!(
-        TaskOutcome::Failed(
-            TaskErrorDatasetCommit::RefMoved(DatasetRefMovedError {
-                dataset_id: foo.dataset_handle.id.clone(),
-                block_ref: odf::BlockRef::Head,
-                expected_block_hash: Some(foo.head.clone()),
-                actual_block_hash: Some(concurrent_head.clone()),
-            })
-            .into_task_error()
-        ),
-        outcome,
-    );
-    assert!(outcome.is_recoverable_failure());
-    assert_eq!(harness.get_head(&foo).await, concurrent_head);
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[tokio::test]
-async fn test_sync_commit_not_allowed_fails_unrecoverably() {
-    let (harness, foo, _) =
-        UpdateDatasetTaskRunnerHarness::new_syncing_new_root(&BaseRepoHarness::alias("foo")).await;
-    harness.deny_next_update();
-
-    let outcome = harness.run_sync_update(&foo).await;
-
-    assert_eq!(
-        TaskOutcome::Failed(TaskError::empty_unrecoverable()),
-        outcome
-    );
-    assert_eq!(harness.get_head(&foo).await, foo.head);
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[tokio::test]
-async fn test_ingest_commit_not_allowed_fails_unrecoverably() {
-    let (harness, foo, _) =
-        UpdateDatasetTaskRunnerHarness::new_ingesting_new_root(&BaseRepoHarness::alias("foo"))
-            .await;
-    harness.deny_next_update();
-
-    let outcome = harness.run_ingest_update(&foo).await;
-
-    assert_eq!(
-        TaskOutcome::Failed(TaskError::empty_unrecoverable()),
-        outcome
-    );
-    assert_eq!(harness.get_head(&foo).await, foo.head);
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[tokio::test]
 async fn test_sync_ref_moved_without_block_hashes_fails_recoverably() {
     let outcome = UpdateDatasetTaskRunnerHarness::run_sync_failing_with(|| {
         SyncError::RefMoved(SyncRefMovedError::unreported(odf::BlockRef::Head))
@@ -831,23 +632,6 @@ async fn test_update_of_deleted_dataset_fails_unrecoverably() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[tokio::test]
-async fn test_ingest_passes_resolved_env_vars_to_the_ingest() {
-    let alias_foo = BaseRepoHarness::alias("foo");
-
-    let harness = UpdateDatasetTaskRunnerHarness::new_ingesting_expecting_env_var(
-        &alias_foo,
-        ConstDatasetEnvVarResolver::KEY,
-    );
-    let foo = harness.create_root_dataset(&alias_foo).await;
-
-    let outcome = harness.run_ingest_update(&foo).await;
-
-    assert_matches!(outcome, TaskOutcome::Success(_));
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[tokio::test]
 async fn test_ingest_planning_failure_fails_recoverably() {
     let harness = UpdateDatasetTaskRunnerHarness::new(UpdateDatasetTaskRunnerMocks {
         env_var_resolution: Some(EnvVarResolution::Failing),
@@ -861,23 +645,6 @@ async fn test_ingest_planning_failure_fails_recoverably() {
 
     assert_eq!(TaskOutcome::Failed(TaskError::empty_recoverable()), outcome);
     assert_eq!(harness.get_head(&foo).await, foo.head);
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[tokio::test]
-async fn test_ingest_of_dataset_deleted_before_commit_fails_unrecoverably() {
-    let (harness, foo) = UpdateDatasetTaskRunnerHarness::new_ingesting_root_deleted_meanwhile(
-        &BaseRepoHarness::alias("foo"),
-    )
-    .await;
-
-    let outcome = harness.run_ingest_update(&foo).await;
-
-    assert_eq!(
-        TaskOutcome::Failed(TaskError::empty_unrecoverable()),
-        outcome
-    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -904,38 +671,11 @@ impl UpdateDatasetTaskRunnerHarness {
 
             match mocks.env_var_resolution {
                 None => {}
-                Some(EnvVarResolution::Const) => {
-                    b.add_value(SecretsEncryptionConfig::sample())
-                        .add::<ConstDatasetEnvVarResolver>();
-                }
                 Some(EnvVarResolution::Failing) => {
                     b.add_value(SecretsEncryptionConfig::sample())
                         .add::<FailingDatasetEnvVarResolver>();
                 }
             }
-        })
-    }
-
-    /// Expects one up-to-date ingest of `alias` that receives `env_var_key`,
-    /// resolved by [`ConstDatasetEnvVarResolver`]
-    fn new_ingesting_expecting_env_var(
-        alias: &odf::DatasetAlias,
-        env_var_key: &'static str,
-    ) -> Self {
-        let mut mock_polling_ingest_service = MockPollingIngestService::new();
-        let alias = alias.clone();
-        mock_polling_ingest_service
-            .expect_ingest()
-            .withf(move |target, _, _, env_vars, _, _| {
-                target.get_alias() == &alias && env_vars.as_map().contains_key(env_var_key)
-            })
-            .times(1)
-            .returning(|_, _, _, _, _, _| Ok(PollingIngestResult::UpToDate { uncacheable: false }));
-
-        Self::new(UpdateDatasetTaskRunnerMocks {
-            mock_polling_ingest_service,
-            env_var_resolution: Some(EnvVarResolution::Const),
-            ..UpdateDatasetTaskRunnerMocks::default()
         })
     }
 
@@ -992,34 +732,6 @@ impl UpdateDatasetTaskRunnerHarness {
         })
     }
 
-    /// Syncs with the real service from a `file://` repository in the
-    /// harness's directory, with the default ingest and transform mocks
-    fn new_with_real_sync() -> Self {
-        Self::build(|b, temp_dir| {
-            std::fs::create_dir(Self::repo_dir(temp_dir)).unwrap();
-
-            b.add::<SyncServiceImpl>()
-                .add::<SyncRequestBuilder>()
-                .add::<SimpleTransferProtocol>()
-                .add::<PulledSeedStore>()
-                .add::<DummySmartTransferProtocolClient>()
-                .add::<IpfsServiceImpl>()
-                .add_value(IpfsClient::default())
-                .add_value(odf::dataset::IpfsGateway::default())
-                .add::<odf::dataset::DatasetFactoryImpl>()
-                .add::<odf::dataset::DummyOdfServerAccessTokenResolver>()
-                .add::<RemoteDatasetUrlResolverImpl>()
-                .add::<RemoteRepositoryRegistryImpl>()
-                .add_value(RemoteReposDir::new_with_creation(temp_dir.join("repos")))
-                .add_value(MockPollingIngestService::new())
-                .bind::<dyn PollingIngestService, MockPollingIngestService>()
-                .add_value(MockTransformPlanner::new())
-                .bind::<dyn TransformPlanner, MockTransformPlanner>()
-                .add_value(MockTransformExecutor::new())
-                .bind::<dyn TransformExecutor, MockTransformExecutor>();
-        })
-    }
-
     /// `register_operations` registers the sync, ingest and transform
     /// services; it gets the harness's temporary directory. Tasks run as the
     /// node, which may run every operation
@@ -1046,63 +758,6 @@ impl UpdateDatasetTaskRunnerHarness {
             racing_reference_updater: catalog.get_one().unwrap(),
             catalog,
         }
-    }
-
-    fn repo_dir(temp_dir: &Path) -> PathBuf {
-        temp_dir.join("file_repo")
-    }
-
-    /// The copy of `alias` in the harness's `file://` repository
-    fn repo_dataset_url(&self, alias: &odf::DatasetAlias) -> Url {
-        Url::from_directory_path(Self::repo_dir(self.temp_dir_path()))
-            .unwrap()
-            .join(&format!("{}/", alias.dataset_name))
-            .unwrap()
-    }
-
-    async fn create_root_dataset_with_schema(
-        &self,
-        alias: &odf::DatasetAlias,
-    ) -> CreateDatasetResult {
-        self.create_root_dataset_with_events(
-            alias,
-            vec![MetadataFactory::set_data_schema().build().into()],
-        )
-        .await
-    }
-
-    async fn push_to_repo(&self, created: &CreateDatasetResult) {
-        let request = self
-            .catalog
-            .get_one::<SyncRequestBuilder>()
-            .unwrap()
-            .build_sync_request(
-                created.dataset_handle.as_local_ref(),
-                odf::DatasetRefRemote::from(&self.repo_dataset_url(&created.dataset_handle.alias)),
-                true,
-            )
-            .await
-            .unwrap();
-
-        self.catalog
-            .get_one::<dyn SyncService>()
-            .unwrap()
-            .sync_to(request, SyncOptions::default(), None)
-            .await
-            .unwrap();
-    }
-
-    /// Puts the repository copy one data block ahead and returns its head
-    async fn append_data_in_repo(&self, created: &CreateDatasetResult) -> odf::Multihash {
-        let repo_dataset = self
-            .catalog
-            .get_one::<dyn odf::dataset::DatasetFactory>()
-            .unwrap()
-            .get_dataset(&self.repo_dataset_url(&created.dataset_handle.alias), false)
-            .await
-            .unwrap();
-
-        DatasetTestHelper::append_random_data_to(repo_dataset.as_ref(), 32).await
     }
 
     /// Expects one sync of `alias` from its remote: up to date without
@@ -1286,59 +941,6 @@ impl UpdateDatasetTaskRunnerHarness {
         (harness, created, ingested_head)
     }
 
-    /// Creates root `alias` and expects one ingest of it reporting a new head,
-    /// during which another writer deletes the dataset
-    async fn new_ingesting_root_deleted_meanwhile(
-        alias: &odf::DatasetAlias,
-    ) -> (Self, CreateDatasetResult) {
-        let reported_heads = ReportedHeads::default();
-        let harness = Self::new(UpdateDatasetTaskRunnerMocks {
-            mock_polling_ingest_service: Self::ingest_deleting_target(alias, &reported_heads),
-            ..UpdateDatasetTaskRunnerMocks::default()
-        });
-        let created = harness.create_root_dataset(alias).await;
-        let ingested_head = harness
-            .append_unreferenced_block(&created, "ingested")
-            .await;
-        reported_heads.set(&created.head, &ingested_head);
-        (harness, created)
-    }
-
-    /// Expects one ingest of `alias` that deletes the dataset's storage
-    /// before it reports `heads`, as another writer deleting the dataset
-    /// would
-    fn ingest_deleting_target(
-        alias: &odf::DatasetAlias,
-        heads: &ReportedHeads,
-    ) -> MockPollingIngestService {
-        let alias = alias.clone();
-        let heads = heads.clone();
-        let mut mock_polling_ingest_service = MockPollingIngestService::new();
-        mock_polling_ingest_service
-            .expect_ingest()
-            .withf(move |target, _, _, _, _, _| target.get_alias() == &alias)
-            .times(1)
-            .returning(move |target, plan, _, _, _, _| {
-                std::fs::remove_dir_all(target.get_storage_internal_url().to_file_path().unwrap())
-                    .unwrap();
-                let (old_head, new_head) = heads.get();
-                Ok(PollingIngestResult::Updated {
-                    old_head,
-                    new_head,
-                    has_more: false,
-                    uncacheable: false,
-                    increment: odf::dataset::MetadataChainIncrementInterval {
-                        num_blocks: 1,
-                        num_records: 0,
-                        updated_watermark: None,
-                    },
-                    new_source_state: None,
-                    metadata_state: plan.into_metadata_state(),
-                })
-            });
-        mock_polling_ingest_service
-    }
-
     /// Creates root `alias` and expects one sync of it from its remote
     /// reporting a new head, appended unreferenced; returns the dataset and
     /// that head
@@ -1351,6 +953,23 @@ impl UpdateDatasetTaskRunnerHarness {
         let synced_head = harness.append_unreferenced_block(&created, "synced").await;
         synced_heads.set(&created.head, &synced_head);
         (harness, created, synced_head)
+    }
+
+    /// Creates a dataset that an update of `kind` applies to, as
+    /// [`Self::create_target`] does, and expects one update of it reporting a
+    /// new head, appended unreferenced; returns the dataset and that head
+    async fn new_updating_new_target(
+        kind: UpdateKind,
+    ) -> (Self, CreateDatasetResult, odf::Multihash) {
+        match kind {
+            UpdateKind::Ingest => {
+                Self::new_ingesting_new_root(&BaseRepoHarness::alias("foo")).await
+            }
+            UpdateKind::Transform => {
+                Self::new_transforming_new_derivative(&BaseRepoHarness::alias("bar")).await
+            }
+            UpdateKind::Sync => Self::new_syncing_new_root(&BaseRepoHarness::alias("foo")).await,
+        }
     }
 
     /// Creates derivative `alias` of a new root dataset `input`
@@ -1439,17 +1058,6 @@ impl UpdateDatasetTaskRunnerHarness {
         .await
     }
 
-    /// Syncs `created` from its copy in the harness's repository
-    async fn run_sync_update_from_repo(&self, created: &CreateDatasetResult) -> TaskOutcome {
-        self.run_update(DatasetUpdateJob::Sync {
-            target: created.dataset_handle.clone(),
-            remote_ref: odf::DatasetRefRemote::from(
-                &self.repo_dataset_url(&created.dataset_handle.alias),
-            ),
-        })
-        .await
-    }
-
     /// Converts a planned sync whose target `alias` does not exist yet into an
     /// update task job
     fn sync_job_into_new(
@@ -1496,7 +1104,6 @@ struct UpdateDatasetTaskRunnerMocks {
 
 /// The dataset env-var resolver registered with secrets enabled, if any
 enum EnvVarResolution {
-    Const,
     Failing,
 }
 
@@ -1506,49 +1113,6 @@ enum UpdateKind {
     Ingest,
     Transform,
     Sync,
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-/// Resolves one plain variable for every dataset
-#[dill::component]
-#[dill::interface(dyn DatasetEnvVarResolver)]
-struct ConstDatasetEnvVarResolver {}
-
-impl ConstDatasetEnvVarResolver {
-    const KEY: &'static str = "API_KEY";
-
-    fn env_var(dataset_id: &odf::DatasetID) -> DatasetEnvVar {
-        DatasetEnvVar::new(
-            Self::KEY,
-            Utc::now(),
-            &DatasetEnvVarValue::Regular("value".to_string()),
-            dataset_id,
-            "",
-        )
-        .unwrap()
-    }
-}
-
-#[async_trait::async_trait]
-impl DatasetEnvVarResolver for ConstDatasetEnvVarResolver {
-    async fn resolve_effective_env_vars(
-        &self,
-        dataset_id: &odf::DatasetID,
-    ) -> Result<HashMap<String, DatasetEnvVar>, InternalError> {
-        Ok(HashMap::from([(
-            Self::KEY.to_string(),
-            Self::env_var(dataset_id),
-        )]))
-    }
-
-    async fn get_env_var_by_entry_key(
-        &self,
-        dataset_id: &odf::DatasetID,
-        _entry_key: &str,
-    ) -> Result<DatasetEnvVar, GetDatasetEnvVarError> {
-        Ok(Self::env_var(dataset_id))
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

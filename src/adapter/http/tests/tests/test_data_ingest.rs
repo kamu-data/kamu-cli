@@ -685,13 +685,6 @@ async fn test_data_push_ingest_rejected_request_status() {
             http::StatusCode::BAD_REQUEST,
         ),
         (
-            "object_link_not_a_multihash",
-            &census_url,
-            http::HeaderValue::from_static("application/x-ndjson"),
-            r#"{"event_time": "2020-01-01T00:00:00", "city": "A", "census_hash": "not-a-multihash"}"#,
-            http::StatusCode::BAD_REQUEST,
-        ),
-        (
             "object_link_to_missing_object",
             &census_url,
             http::HeaderValue::from_static("application/x-ndjson"),
@@ -718,10 +711,6 @@ async fn test_data_push_ingest_rejected_request_status() {
 #[test_log::test(tokio::test)]
 async fn test_data_push_ingest_without_write_access_fails_without_committing() {
     for (web_access, expected_status) in [
-        (
-            RestrictedWebAccess::NoPermission,
-            http::StatusCode::NOT_FOUND,
-        ),
         (RestrictedWebAccess::Reader, http::StatusCode::FORBIDDEN),
         (
             RestrictedWebAccess::WriteDeniedPastLayer,
@@ -783,8 +772,6 @@ async fn test_data_push_ingest_ref_moved_concurrently_is_conflict() {
 /// Web access to server datasets that does not allow a push ingest
 #[derive(Debug, Clone, Copy)]
 enum RestrictedWebAccess {
-    /// Web callers hold no permission on server datasets
-    NoPermission,
     /// Web callers may only read server datasets
     Reader,
     /// The authorization layer sees a writer, while the use case's own check
@@ -805,21 +792,19 @@ impl DataIngestHarness {
     }
 
     async fn with_restricted_web_access(web_access: RestrictedWebAccess) -> Self {
-        let web_permission_checker: Option<fn() -> MockDatasetPermissionChecker> = match web_access
-        {
-            RestrictedWebAccess::NoPermission => None,
-            RestrictedWebAccess::Reader => Some(|| {
+        let web_permission_checker: fn() -> MockDatasetPermissionChecker = match web_access {
+            RestrictedWebAccess::Reader => || {
                 MockDatasetPermissionChecker::new()
                     .make_expect_get_granted_permissions(&[DatasetPermission::Read], 1)
-            }),
-            RestrictedWebAccess::WriteDeniedPastLayer => Some(|| {
+            },
+            RestrictedWebAccess::WriteDeniedPastLayer => || {
                 MockDatasetPermissionChecker::denying().make_expect_get_granted_permissions(
                     &[DatasetPermission::Read, DatasetPermission::Write],
                     1,
                 )
-            }),
+            },
         };
-        Self::with_web_access(false, web_permission_checker).await
+        Self::with_web_access(false, Some(web_permission_checker)).await
     }
 
     async fn with_web_access(

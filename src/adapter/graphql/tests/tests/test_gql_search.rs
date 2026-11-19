@@ -507,51 +507,31 @@ async fn test_name_lookup_accounts_with_excluding() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[tokio::test]
-async fn test_search_security_context_of_anonymous() {
-    let harness = SearchSecurityHarness::new(PredefinedAccountOpts::default()).await;
+async fn test_search_security_context_of_caller() {
+    for caller in SearchCaller::iter() {
+        let harness = SearchSecurityHarness::new(caller.predefined_account_opts()).await;
 
-    for search in [SearchKind::FullText, SearchKind::FullTextListing] {
-        assert_matches!(
-            harness.security_of_anonymous_search(search).await,
-            SearchSecurityContext::Anonymous,
-            "{search:?}"
-        );
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[tokio::test]
-async fn test_search_security_context_of_user() {
-    let harness = SearchSecurityHarness::new(PredefinedAccountOpts::default()).await;
-    let account_id = harness.logged_account_id();
-
-    for search in SearchKind::iter() {
-        assert_matches!(
-            harness.security_of_authorized_search(search).await,
-            SearchSecurityContext::Restricted { current_principal_ids }
-                if current_principal_ids == [account_id.clone()],
-            "{search:?}"
-        );
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[tokio::test]
-async fn test_search_security_context_of_admin() {
-    let harness = SearchSecurityHarness::new(PredefinedAccountOpts {
-        is_admin: true,
-        ..Default::default()
-    })
-    .await;
-
-    for search in SearchKind::iter() {
-        assert_matches!(
-            harness.security_of_authorized_search(search).await,
-            SearchSecurityContext::Unrestricted,
-            "{search:?}"
-        );
+        for search in caller.searches() {
+            let security = harness.security_of_search_by(caller, search).await;
+            match caller {
+                SearchCaller::Anonymous => assert_matches!(
+                    security,
+                    SearchSecurityContext::Anonymous,
+                    "{caller:?} {search:?}"
+                ),
+                SearchCaller::User => assert_matches!(
+                    security,
+                    SearchSecurityContext::Restricted { current_principal_ids }
+                        if current_principal_ids == [harness.logged_account_id()],
+                    "{caller:?} {search:?}"
+                ),
+                SearchCaller::Admin => assert_matches!(
+                    security,
+                    SearchSecurityContext::Unrestricted,
+                    "{caller:?} {search:?}"
+                ),
+            }
+        }
     }
 }
 
@@ -767,14 +747,16 @@ impl SearchSecurityHarness {
             .to_string()
     }
 
-    async fn security_of_anonymous_search(&self, search: SearchKind) -> SearchSecurityContext {
-        self.security_of_search(search, &self.catalog_anonymous)
-            .await
-    }
-
-    async fn security_of_authorized_search(&self, search: SearchKind) -> SearchSecurityContext {
-        self.security_of_search(search, &self.catalog_authorized)
-            .await
+    async fn security_of_search_by(
+        &self,
+        caller: SearchCaller,
+        search: SearchKind,
+    ) -> SearchSecurityContext {
+        let catalog = match caller {
+            SearchCaller::Anonymous => &self.catalog_anonymous,
+            SearchCaller::User | SearchCaller::Admin => &self.catalog_authorized,
+        };
+        self.security_of_search(search, catalog).await
     }
 
     /// Runs the search and returns the security context the search service
@@ -791,6 +773,36 @@ impl SearchSecurityHarness {
             .get_one::<SecurityRecordingSearchService>()
             .unwrap()
             .take_single_recorded()
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Who runs a search
+#[derive(Debug, Clone, Copy, EnumIter)]
+enum SearchCaller {
+    Anonymous,
+    User,
+    Admin,
+}
+
+impl SearchCaller {
+    fn predefined_account_opts(self) -> PredefinedAccountOpts {
+        match self {
+            Self::Anonymous | Self::User => PredefinedAccountOpts::default(),
+            Self::Admin => PredefinedAccountOpts {
+                is_admin: true,
+                ..Default::default()
+            },
+        }
+    }
+
+    /// The searches the caller may run
+    fn searches(self) -> Vec<SearchKind> {
+        match self {
+            Self::Anonymous => vec![SearchKind::FullText, SearchKind::FullTextListing],
+            Self::User | Self::Admin => SearchKind::iter().collect(),
+        }
     }
 }
 

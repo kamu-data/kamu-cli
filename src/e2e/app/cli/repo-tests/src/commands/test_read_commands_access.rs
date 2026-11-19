@@ -17,7 +17,7 @@ use kamu_cli_puppet::extensions::KamuCliPuppetExt;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn test_read_commands_deny_other_accounts_private_dataset(mut kamu: KamuCliPuppet) {
+pub async fn test_commands_deny_other_accounts_private_dataset(mut kamu: KamuCliPuppet) {
     let [alice, bob] = kamu.create_accounts(["alice", "bob"]).await;
 
     kamu.set_account(Some(bob));
@@ -41,17 +41,21 @@ pub async fn test_read_commands_deny_other_accounts_private_dataset(mut kamu: Ka
 
     kamu.set_account(Some(alice));
 
-    // Each command runs against both datasets, `<dataset>` stands for the alias
-    for (command, public_stdout_part, private_stderr) in [
+    // Each command runs against both datasets, `<dataset>` stands for the alias.
+    // Alice can read the public dataset but cannot write to it
+    let read_denied = "User has no 'read' permission in dataset";
+    for (command, stdin, public_expected, private_stderr) in [
         (
             vec!["log", "<dataset>"],
-            "AddData",
-            "User has no 'read' permission in dataset",
+            "",
+            PublicExpected::Succeeds("AddData"),
+            read_denied,
         ),
         (
             vec!["inspect", "query", "<dataset>"],
             "",
-            "User has no 'read' permission in dataset",
+            PublicExpected::Succeeds(""),
+            read_denied,
         ),
         (
             vec![
@@ -61,7 +65,8 @@ pub async fn test_read_commands_deny_other_accounts_private_dataset(mut kamu: Ka
                 "-c",
                 r#"select count(*) as cnt from "<dataset>""#,
             ],
-            "cnt\n2",
+            "",
+            PublicExpected::Succeeds("cnt\n2"),
             r"table 'kamu\.kamu\.bob/bob-private' not found",
         ),
         (
@@ -72,8 +77,15 @@ pub async fn test_read_commands_deny_other_accounts_private_dataset(mut kamu: Ka
                 "--output-format",
                 "shell",
             ],
-            "bob-public: Root",
-            "User has no 'read' permission in dataset",
+            "",
+            PublicExpected::Succeeds("bob-public: Root"),
+            read_denied,
+        ),
+        (
+            vec!["ingest", "<dataset>", "--stdin"],
+            DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_1,
+            PublicExpected::Fails("User has no 'write' permission in dataset 'bob/bob-public'"),
+            "Dataset not found: bob/bob-private",
         ),
     ] {
         let command_for = |dataset: &str| {
@@ -85,16 +97,43 @@ pub async fn test_read_commands_deny_other_accounts_private_dataset(mut kamu: Ka
         let public_cmd = command_for("bob/bob-public");
         let private_cmd = command_for("bob/bob-private");
 
-        let public_result = kamu.execute(&public_cmd).await.success();
-        let public_stdout = String::from_utf8_lossy(&public_result.get_output().stdout);
-        assert!(
-            public_stdout.contains(public_stdout_part),
-            "{public_cmd:?}: {public_stdout}"
-        );
+        match public_expected {
+            PublicExpected::Succeeds(stdout_part) => {
+                let public_result = kamu.execute_with_input(&public_cmd, stdin).await.success();
+                let public_stdout = String::from_utf8_lossy(&public_result.get_output().stdout);
+                assert!(
+                    public_stdout.contains(stdout_part),
+                    "{public_cmd:?}: {public_stdout}"
+                );
+            }
+            PublicExpected::Fails(stderr) => {
+                kamu.assert_failure_command_execution_with_input(
+                    &public_cmd,
+                    stdin,
+                    None,
+                    Some([stderr]),
+                )
+                .await;
+            }
+        }
 
-        kamu.assert_failure_command_execution(&private_cmd, None, Some([private_stderr]))
-            .await;
+        kamu.assert_failure_command_execution_with_input(
+            &private_cmd,
+            stdin,
+            None,
+            Some([private_stderr]),
+        )
+        .await;
     }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+enum PublicExpected {
+    /// The command succeeds and its stdout contains the text
+    Succeeds(&'static str),
+    /// The command fails with an error matching the pattern
+    Fails(&'static str),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

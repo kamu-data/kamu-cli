@@ -76,4 +76,3 @@ tokio = { version = "1", default-features = false, features = [
     "macros",
     "rt",
 ] }
-url = { version = "2", default-features = false }

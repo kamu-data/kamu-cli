@@ -68,6 +68,7 @@ kamu_cli_execute_command_e2e_test!(
     storage = postgres,
     fixture = kamu_cli_e2e_repo_tests::commands::test_pull_set_watermark_st,
     options = Options::default().with_frozen_system_time(),
+    extra_test_groups = "ingest, datafusion"
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -78,6 +79,7 @@ kamu_cli_execute_command_e2e_test!(
     options = Options::default()
         .with_multi_tenant()
         .with_frozen_system_time(),
+    extra_test_groups = "ingest, datafusion"
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -155,16 +157,6 @@ kamu_cli_execute_command_e2e_test!(
     fixture = kamu_cli_e2e_repo_tests::commands::test_pull_uncacheable_source,
     options = Options::default().with_frozen_system_time(),
     extra_test_groups = "engine, ingest, datafusion"
-);
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// test_pull_set_watermark_keeps_source_state
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-kamu_cli_execute_command_e2e_test!(
-    storage = postgres,
-    fixture = kamu_cli_e2e_repo_tests::commands::test_pull_set_watermark_keeps_source_state,
-    extra_test_groups = "ingest, datafusion"
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

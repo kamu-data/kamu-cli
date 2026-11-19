@@ -379,59 +379,6 @@ pub async fn test_pull_multiple_datasets_with_mixed_outcomes(mut kamu: KamuCliPu
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// test_pull_set_watermark_keeps_source_state
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub async fn test_pull_set_watermark_keeps_source_state(kamu: KamuCliPuppet) {
-    add_city_population_files_dataset(&kamu, "test.pull-from-files").await;
-    std::fs::write(
-        kamu.workspace_path().join("data-1.csv"),
-        "city,population\nA,1000\n",
-    )
-    .unwrap();
-
-    kamu.assert_success_command_execution(
-        ["pull", "test.pull-from-files"],
-        None,
-        Some([r#"1 dataset\(s\) updated"#]),
-    )
-    .await;
-    kamu.assert_success_command_execution(
-        [
-            "pull",
-            "test.pull-from-files",
-            "--set-watermark",
-            "2051-01-02T03:04:05Z",
-        ],
-        None,
-        Some(["Committed new block"]),
-    )
-    .await;
-
-    // The file read before the watermark was set is not read again. Without a
-    // source state the dataset would be uncacheable and a forced fetch would
-    // read it once more
-    kamu.assert_success_command_execution(
-        ["pull", "test.pull-from-files", "--fetch-uncacheable"],
-        None,
-        Some([r#"1 dataset\(s\) up-to-date"#]),
-    )
-    .await;
-    kamu.assert_success_command_execution(
-        [
-            "sql",
-            "--output-format",
-            "csv",
-            "-c",
-            r#"SELECT count(*) AS num_records FROM "test.pull-from-files""#,
-        ],
-        Some("num_records\n1"),
-        None::<Vec<&str>>,
-    )
-    .await;
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // test_pull_datasets_sharing_a_fetch_step_keep_own_source_state
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -617,23 +564,6 @@ pub async fn test_pull_derivative_after_inputs_changed_fails(kamu: KamuCliPuppet
         ]),
     )
     .await;
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// test_pull_derivative_leaves_no_working_files
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub async fn test_pull_derivative_leaves_no_working_files(kamu: KamuCliPuppet) {
-    add_player_scores_with_derivative(&kamu).await;
-
-    kamu.assert_success_command_execution(
-        ["pull", DATASET_DERIVATIVE_LEADERBOARD_NAME.as_str()],
-        None,
-        Some([r#"1 dataset\(s\) updated"#]),
-    )
-    .await;
-
-    pretty_assertions::assert_eq!(Vec::<PathBuf>::new(), kamu.list_run_dir());
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -928,26 +858,57 @@ async fn test_pull_derivative(kamu: KamuCliPuppet) {
         "#
     ))
     .await;
+
+    pretty_assertions::assert_eq!(Vec::<PathBuf>::new(), kamu.list_run_dir());
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 async fn test_pull_set_watermark(kamu: KamuCliPuppet) {
-    let dataset_name = DATASET_ROOT_PLAYER_NAME.clone();
+    add_city_population_files_dataset(&kamu, "test.pull-from-files").await;
+    std::fs::write(
+        kamu.workspace_path().join("data-1.csv"),
+        "city,population\nA,1000\n",
+    )
+    .unwrap();
 
-    kamu.execute_with_input(["add", "--stdin"], DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR)
-        .await
-        .success();
-
+    kamu.assert_success_command_execution(
+        ["pull", "test.pull-from-files"],
+        None,
+        Some([r#"1 dataset\(s\) updated"#]),
+    )
+    .await;
     kamu.assert_success_command_execution(
         [
             "pull",
-            dataset_name.as_str(),
+            "test.pull-from-files",
             "--set-watermark",
             "2051-01-02T03:04:05Z",
         ],
         None,
         Some(["Committed new block"]),
+    )
+    .await;
+
+    // The file read before the watermark was set is not read again. Without a
+    // source state the dataset would be uncacheable and a forced fetch would
+    // read it once more
+    kamu.assert_success_command_execution(
+        ["pull", "test.pull-from-files", "--fetch-uncacheable"],
+        None,
+        Some([r#"1 dataset\(s\) up-to-date"#]),
+    )
+    .await;
+    kamu.assert_success_command_execution(
+        [
+            "sql",
+            "--output-format",
+            "csv",
+            "-c",
+            r#"SELECT count(*) AS num_records FROM "test.pull-from-files""#,
+        ],
+        Some("num_records\n1"),
+        None::<Vec<&str>>,
     )
     .await;
 }

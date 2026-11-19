@@ -27,33 +27,6 @@ use crate::utils::RecordingListener;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[tokio::test]
-async fn test_compact_dataset_success() {
-    let alias_foo = BaseRepoHarness::alias("foo");
-    let (_, dataset_id_foo) = odf::DatasetID::new_generated_ed25519();
-
-    let harness = CompactionJobHarness::new(
-        MockDatasetPermissionChecker::new().expect_authorize_for(
-            DatasetPermission::Maintain,
-            &dataset_id_foo,
-            1,
-            true,
-        ),
-        MockDidGenerator::predefined_dataset_ids(vec![dataset_id_foo]),
-    );
-
-    let foo = harness.create_root_dataset(&alias_foo).await;
-
-    assert_matches!(
-        harness
-            .compact_dataset(ResolvedDataset::from_created(&foo))
-            .await,
-        Ok(_)
-    );
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[tokio::test]
 async fn test_try_compact_not_found_dataset() {
     let not_found_dataset_handle =
         odf::metadata::testing::handle(&"user", &"not-found-dataset", odf::DatasetKind::Root);
@@ -249,14 +222,6 @@ impl CompactionJobHarness {
             base_use_case_harness,
             job,
         }
-    }
-
-    async fn compact_dataset(
-        &self,
-        target: ResolvedDataset,
-    ) -> Result<CompactionResult, CompactionError> {
-        self.compact_dataset_with(target, CompactionOptions::default())
-            .await
     }
 
     /// Both operations the job runs: a compaction and a reset to

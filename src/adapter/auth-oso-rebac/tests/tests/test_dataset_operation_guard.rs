@@ -173,13 +173,20 @@ async fn test_missing_target_is_not_found() {
         OperationGuardHarness::new(CurrentAccountSubjectTestHelper::logged("owner")).await;
     let missing = odf::metadata::testing::handle(&"owner", &"missing", odf::DatasetKind::Root);
 
-    assert_matches!(
-        harness
-            .authorize("owner", &missing, DatasetOperation::PollingIngest)
-            .await,
-        Err(DatasetPermissionError::NotFound(e))
-            if e.dataset_ref == missing.as_local_ref()
-    );
+    for (principal, operation) in [
+        (
+            BaseOsoRebacHarness::user("owner"),
+            DatasetOperation::PollingIngest,
+        ),
+        (Principal::Node, DatasetOperation::Compaction),
+    ] {
+        assert_matches!(
+            harness.authorize_as(&principal, &missing, operation).await,
+            Err(DatasetPermissionError::NotFound(e))
+                if e.dataset_ref == missing.as_local_ref(),
+            "{principal:?}"
+        );
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -246,23 +253,6 @@ async fn test_node_may_run_every_operation() {
             "node running {operation:?}"
         );
     }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[test_log::test(tokio::test)]
-async fn test_missing_target_is_not_found_for_node() {
-    let harness =
-        OperationGuardHarness::new(CurrentAccountSubjectTestHelper::logged("owner")).await;
-    let missing = odf::metadata::testing::handle(&"owner", &"missing", odf::DatasetKind::Root);
-
-    assert_matches!(
-        harness
-            .authorize_as(&Principal::Node, &missing, DatasetOperation::Compaction)
-            .await,
-        Err(DatasetPermissionError::NotFound(e))
-            if e.dataset_ref == missing.as_local_ref()
-    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -15,7 +15,7 @@ use super::InMemoryDatasetRepositoriesHarness;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 database_transactional_test!(
-    storage = inmem_with_transaction,
+    storage = inmem,
     fixture = dataset_block_query_repo::test_list_blocks_unfiltered,
     harness = InMemoryDatasetRepositoriesHarness
 );
@@ -23,7 +23,7 @@ database_transactional_test!(
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 database_transactional_test!(
-    storage = inmem_with_transaction,
+    storage = inmem,
     fixture = dataset_block_query_repo::test_list_blocks_by_event_types,
     harness = InMemoryDatasetRepositoriesHarness
 );
@@ -31,7 +31,7 @@ database_transactional_test!(
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 database_transactional_test!(
-    storage = inmem_with_transaction,
+    storage = inmem,
     fixture = dataset_block_query_repo::test_list_blocks_by_hash_prefix,
     harness = InMemoryDatasetRepositoriesHarness
 );
@@ -39,7 +39,7 @@ database_transactional_test!(
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 database_transactional_test!(
-    storage = inmem_with_transaction,
+    storage = inmem,
     fixture = dataset_block_query_repo::test_list_blocks_paginated,
     harness = InMemoryDatasetRepositoriesHarness
 );
@@ -47,7 +47,7 @@ database_transactional_test!(
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 database_transactional_test!(
-    storage = inmem_with_transaction,
+    storage = inmem,
     fixture = dataset_block_query_repo::test_list_blocks_of_unknown_dataset,
     harness = InMemoryDatasetRepositoriesHarness
 );

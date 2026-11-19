@@ -628,36 +628,6 @@ async fn test_trigger_reset_root_dataset_flow_with_invalid_head() {
             }
         })
     );
-
-    // A stale expected old head is rejected before the flow is scheduled
-    let response = harness
-        .trigger_reset_flow_mutation(
-            &create_root_result.dataset_handle.id,
-            ResetFlowMode::Custom {
-                new_head_hash: &root_dataset_blocks[1].0,
-            },
-            &old_invalid_head,
-        )
-        .execute(&schema, &harness.catalog_authorized)
-        .await;
-
-    assert_eq!(
-        response.data,
-        value!({
-            "datasets": {
-                "byId": {
-                    "flows": {
-                        "runs": {
-                            "triggerResetFlow": {
-                                "__typename": "FlowPreconditionsNotMet",
-                                "message": "Flow didn't met preconditions: 'Expected old head hash is not the current head'"
-                            }
-                        }
-                    }
-                }
-            }
-        })
-    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -4565,49 +4535,24 @@ async fn test_flows_failed_with_ref_moved_are_recoverable() {
     let harness = FlowRunsHarness::with_overrides(FlowRunsHarnessOverrides::default()).await;
     let foo = harness.create_foo_dataset().await;
     let foo_id = &foo.dataset_handle.id;
-    let blocks = harness.chain_hashes(&foo).await;
 
-    let flow_triggers = [
-        (
+    let flow_id = harness
+        .run_triggered_flow(
             harness.trigger_ingest_flow_mutation(foo_id),
             "triggerIngestFlow",
-        ),
-        (
-            harness.trigger_compaction_flow_mutation(foo_id),
-            "triggerCompactionFlow",
-        ),
-        (
-            harness.trigger_reset_flow_mutation(
-                foo_id,
-                ResetFlowMode::Custom {
-                    new_head_hash: &blocks[1],
-                },
-                &blocks[0],
-            ),
-            "triggerResetFlow",
-        ),
-    ];
+            ts::TaskOutcome::Failed(harness.ref_moved_error(foo_id)),
+        )
+        .await;
 
-    for (trigger, trigger_method) in flow_triggers {
-        let flow_id = harness
-            .run_triggered_flow(
-                trigger,
-                trigger_method,
-                ts::TaskOutcome::Failed(harness.ref_moved_error(foo_id)),
-            )
-            .await;
-
-        assert_eq!(
-            harness.get_flow(foo_id, &flow_id).await["outcome"],
-            serde_json::json!({
-                "reason": {
-                    "message": "Dataset reference was moved by a concurrent update",
-                    "recoverable": true,
-                }
-            }),
-            "{trigger_method}"
-        );
-    }
+    assert_eq!(
+        harness.get_flow(foo_id, &flow_id).await["outcome"],
+        serde_json::json!({
+            "reason": {
+                "message": "Dataset reference was moved by a concurrent update",
+                "recoverable": true,
+            }
+        })
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -20,22 +20,15 @@ use tracing::{Dispatch, Event, Metadata, Subscriber};
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[tokio::test]
-async fn test_value_block_commits_and_yields_its_value() {
+async fn test_value_block_commits_its_value_and_question_mark_rolls_back() {
     let harness = TransactionBlockHarness::new();
 
     assert_eq!(harness.greeting_length(Step::Succeeds).await, Ok(5));
-    assert_eq!(harness.transaction_endings(), ["COMMIT"]);
-}
-
-#[tokio::test]
-async fn test_question_mark_rolls_back_and_leaves_the_function() {
-    let harness = TransactionBlockHarness::new();
-
     assert_eq!(
         harness.greeting_length(Step::Fails).await,
         Err("Internal error: step failed".to_string())
     );
-    assert_eq!(harness.transaction_endings(), ["ROLLBACK"]);
+    assert_eq!(harness.transaction_endings(), ["COMMIT", "ROLLBACK"]);
 }
 
 #[tokio::test]

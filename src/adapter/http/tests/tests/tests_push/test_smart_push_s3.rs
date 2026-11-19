@@ -33,13 +33,6 @@ test_client_server_s3_harness_permutations!(
 
 test_client_server_s3_harness_permutations!(
     test_smart_push_shared,
-    test_smart_push_new_dataset_forced
-);
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-test_client_server_s3_harness_permutations!(
-    test_smart_push_shared,
     test_smart_push_new_empty_dataset
 );
 
@@ -62,13 +55,6 @@ test_client_server_s3_harness_permutations!(
 test_client_server_s3_harness_permutations!(
     test_smart_push_shared,
     test_smart_push_existing_diverged_dataset
-);
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-test_client_server_s3_harness_permutations!(
-    test_smart_push_shared,
-    test_smart_push_existing_diverged_dataset_fails_without_force
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

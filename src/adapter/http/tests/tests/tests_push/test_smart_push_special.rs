@@ -129,23 +129,14 @@ async fn test_smart_push_new_dataset_wrong_user() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_smart_push_existing_dataset_unauthenticated() {
-    ExistingDatasetDeniedCase {
-        authenticated_remotely: false,
+async fn test_smart_push_existing_dataset_without_write_access_finds_no_dataset() {
+    for authenticated_remotely in [false, true] {
+        ExistingDatasetDeniedCase {
+            authenticated_remotely,
+        }
+        .assert_push_finds_no_dataset()
+        .await;
     }
-    .assert_push_finds_no_dataset()
-    .await;
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[test_log::test(tokio::test)]
-async fn test_smart_push_existing_dataset_unauthorized() {
-    ExistingDatasetDeniedCase {
-        authenticated_remotely: true,
-    }
-    .assert_push_finds_no_dataset()
-    .await;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -817,6 +808,7 @@ async fn test_smart_push_fails_on_unreadable_message_during_upload() {
 
 /// A push into an existing dataset the client may not write, which the server
 /// reports as missing whether or not the client is authenticated
+#[derive(Debug)]
 struct ExistingDatasetDeniedCase {
     authenticated_remotely: bool,
 }
@@ -850,7 +842,8 @@ impl ExistingDatasetDeniedCase {
             let dataset_result = &push_result.first().unwrap().result;
             assert_matches!(
                 dataset_result,
-                Err(PushError::SyncError(SyncError::DatasetNotFound(_)))
+                Err(PushError::SyncError(SyncError::DatasetNotFound(_))),
+                "{self:?}"
             );
         };
 

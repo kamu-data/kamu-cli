@@ -13,8 +13,7 @@ use kamu_cli_e2e_common::prelude::*;
 
 kamu_cli_execute_command_e2e_test!(
     storage = postgres,
-    fixture =
-        kamu_cli_e2e_repo_tests::commands::test_read_commands_deny_other_accounts_private_dataset,
+    fixture = kamu_cli_e2e_repo_tests::commands::test_commands_deny_other_accounts_private_dataset,
     options = Options::default()
         .with_multi_tenant()
         .with_kamu_config(MULTITENANT_KAMU_CONFIG_WITH_DEFAULT_USER),

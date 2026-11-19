@@ -7,7 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::assert_matches;
 use std::sync::Arc;
 
 use kamu::testing::{BaseRepoHarness, BaseUseCaseHarness, BaseUseCaseHarnessOptions};
@@ -37,55 +36,38 @@ use pretty_assertions::assert_eq;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[tokio::test]
-async fn test_root_dataset_plans_an_ingest() {
-    let alias_foo = BaseRepoHarness::alias("foo");
-    let harness = UpdateDatasetTaskPlannerHarness::new();
-    let foo = harness.create_root_dataset(&alias_foo).await;
+async fn test_planned_job_follows_dataset_kind_unless_pulled_from_remote() {
+    let cases = [
+        (odf::DatasetKind::Root, None, "Ingest"),
+        (odf::DatasetKind::Derivative, None, "Transform"),
+        (
+            odf::DatasetKind::Root,
+            Some("odf+http://example.com/foo"),
+            "Sync",
+        ),
+    ];
 
-    let job = harness.plan_update(&foo).await.unwrap();
+    for (kind, pull_alias, expected_job) in cases {
+        let harness = UpdateDatasetTaskPlannerHarness::new();
+        let target = harness.create_target(kind).await;
+        if let Some(pull_alias) = pull_alias {
+            harness
+                .add_remote_alias(&target.dataset_handle, pull_alias, RemoteAliasKind::Pull)
+                .await;
+        }
 
-    assert_matches!(job, DatasetUpdateJob::Ingest(target) if target == foo.dataset_handle);
-}
+        let job = harness.plan_update(&target).await.unwrap();
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[tokio::test]
-async fn test_derived_dataset_plans_a_transform() {
-    let alias_foo = BaseRepoHarness::alias("foo");
-    let alias_bar = BaseRepoHarness::alias("bar");
-    let harness = UpdateDatasetTaskPlannerHarness::new();
-    let foo = harness.create_root_dataset(&alias_foo).await;
-    let bar = harness
-        .create_derived_dataset(&alias_bar, vec![foo.dataset_handle.as_local_ref()])
-        .await;
-
-    let job = harness.plan_update(&bar).await.unwrap();
-
-    assert_matches!(job, DatasetUpdateJob::Transform(target) if target == bar.dataset_handle);
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[tokio::test]
-async fn test_dataset_with_one_pull_alias_plans_a_sync() {
-    let alias_foo = BaseRepoHarness::alias("foo");
-    let harness = UpdateDatasetTaskPlannerHarness::new();
-    let foo = harness.create_root_dataset(&alias_foo).await;
-    harness
-        .add_remote_alias(
-            &foo.dataset_handle,
-            "odf+http://example.com/foo",
-            RemoteAliasKind::Pull,
-        )
-        .await;
-
-    let job = harness.plan_update(&foo).await.unwrap();
-
-    assert_matches!(
-        job,
-        DatasetUpdateJob::Sync { target, remote_ref }
-        if target == foo.dataset_handle && remote_ref.to_string() == "odf+http://example.com/foo"
-    );
+        assert_eq!(
+            (
+                expected_job,
+                &target.dataset_handle,
+                pull_alias.map(str::to_string)
+            ),
+            UpdateDatasetTaskPlannerHarness::job_parts(&job),
+            "{kind:?} with pull alias {pull_alias:?}"
+        );
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -186,6 +168,34 @@ impl UpdateDatasetTaskPlannerHarness {
         Self {
             base_use_case_harness,
             planner: catalog.get_one().unwrap(),
+        }
+    }
+
+    /// Creates a dataset of `kind`: root `foo`, or derivative `bar` of it
+    async fn create_target(&self, kind: odf::DatasetKind) -> CreateDatasetResult {
+        let foo = self
+            .create_root_dataset(&BaseRepoHarness::alias("foo"))
+            .await;
+        match kind {
+            odf::DatasetKind::Root => foo,
+            odf::DatasetKind::Derivative => {
+                self.create_derived_dataset(
+                    &BaseRepoHarness::alias("bar"),
+                    vec![foo.dataset_handle.as_local_ref()],
+                )
+                .await
+            }
+        }
+    }
+
+    /// The job's variant name, its target, and the remote it syncs from
+    fn job_parts(job: &DatasetUpdateJob) -> (&'static str, &odf::DatasetHandle, Option<String>) {
+        match job {
+            DatasetUpdateJob::Ingest(target) => ("Ingest", target, None),
+            DatasetUpdateJob::Transform(target) => ("Transform", target, None),
+            DatasetUpdateJob::Sync { target, remote_ref } => {
+                ("Sync", target, Some(remote_ref.to_string()))
+            }
         }
     }
 

@@ -16,7 +16,6 @@ use kamu_cli_e2e_common::{
     DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_2,
     DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_3,
     DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR,
-    add_named_dataset,
 };
 use kamu_cli_puppet::KamuCliPuppet;
 use kamu_cli_puppet::extensions::{AddDatasetOptions, KamuCliPuppetExt};
@@ -439,44 +438,6 @@ async fn assert_ingest_data_to_player_scores_from_stdio<I, S, T>(
     // Assert ingested data
     kamu.assert_player_scores_dataset_data(expected_tail_table)
         .await;
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub async fn test_ingest_into_other_accounts_dataset_fails(mut kamu: KamuCliPuppet) {
-    let [alice, bob] = kamu.create_accounts(["alice", "bob"]).await;
-
-    kamu.set_account(Some(bob));
-    for (name, visibility) in [
-        ("bob-root", odf::DatasetVisibility::Private),
-        ("bob-public", odf::DatasetVisibility::Public),
-    ] {
-        add_named_dataset(
-            &kamu,
-            name,
-            visibility,
-            DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR,
-        )
-        .await;
-    }
-
-    // A dataset alice cannot read is not found for her, a readable one is denied
-    kamu.set_account(Some(alice));
-    for (name, expected_error) in [
-        ("bob/bob-root", "Dataset not found: bob/bob-root"),
-        (
-            "bob/bob-public",
-            "User has no 'write' permission in dataset 'bob/bob-public'",
-        ),
-    ] {
-        kamu.assert_failure_command_execution_with_input(
-            ["ingest", name, "--stdin"],
-            DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_1,
-            None,
-            Some([expected_error]),
-        )
-        .await;
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

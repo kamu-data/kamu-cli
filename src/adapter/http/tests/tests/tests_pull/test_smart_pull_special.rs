@@ -154,64 +154,35 @@ async fn test_smart_pull_of_missing_dataset_fails() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_smart_pull_without_referenced_objects_is_not_committed() {
-    // The new data block references a data file and a checkpoint, and neither is sent
-    ScriptedPullCase {
-        script: PullScript::Objects(ObjectsScript::Omit),
-        expected_message: "Server did not send 2 file(s)",
+async fn test_smart_pull_of_broken_transfer_is_not_committed() {
+    for case in [
+        // The new data block references a data file and a checkpoint, and
+        // neither is sent
+        ScriptedPullCase {
+            script: PullScript::Objects(ObjectsScript::Omit),
+            expected_message: "Server did not send 2 file(s)",
+        },
+        // The object type picks the repository a file is stored in, so a file
+        // sent as the other type does not count as sent
+        ScriptedPullCase {
+            script: PullScript::Objects(ObjectsScript::Mislabel),
+            expected_message: "Server did not send 2 file(s)",
+        },
+        ScriptedPullCase {
+            script: PullScript::Objects(ObjectsScript::Corrupt),
+            expected_message: "file hash didn't match the computed",
+        },
+        ScriptedPullCase {
+            script: PullScript::Metadata(MetadataScript::Undecodable),
+            expected_message: "Server sent a metadata batch that cannot be read",
+        },
+        ScriptedPullCase {
+            script: PullScript::Metadata(MetadataScript::NoBlocks),
+            expected_message: "Server sent no blocks for a non-empty transfer plan",
+        },
+    ] {
+        case.assert_pull_fails().await;
     }
-    .assert_pull_fails()
-    .await;
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-/// The object type picks the repository a file is stored in, so a file sent
-/// as the other type does not count as sent
-#[test_log::test(tokio::test)]
-async fn test_smart_pull_with_mislabeled_objects_is_not_committed() {
-    ScriptedPullCase {
-        script: PullScript::Objects(ObjectsScript::Mislabel),
-        expected_message: "Server did not send 2 file(s)",
-    }
-    .assert_pull_fails()
-    .await;
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[test_log::test(tokio::test)]
-async fn test_smart_pull_with_corrupted_objects_is_not_committed() {
-    ScriptedPullCase {
-        script: PullScript::Objects(ObjectsScript::Corrupt),
-        expected_message: "file hash didn't match the computed",
-    }
-    .assert_pull_fails()
-    .await;
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[test_log::test(tokio::test)]
-async fn test_smart_pull_with_undecodable_metadata_is_not_committed() {
-    ScriptedPullCase {
-        script: PullScript::Metadata(MetadataScript::Undecodable),
-        expected_message: "Server sent a metadata batch that cannot be read",
-    }
-    .assert_pull_fails()
-    .await;
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[test_log::test(tokio::test)]
-async fn test_smart_pull_without_planned_blocks_is_not_committed() {
-    ScriptedPullCase {
-        script: PullScript::Metadata(MetadataScript::NoBlocks),
-        expected_message: "Server sent no blocks for a non-empty transfer plan",
-    }
-    .assert_pull_fails()
-    .await;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -426,24 +397,16 @@ async fn test_smart_pull_metadata_ends_at_planned_head() {
 
 #[test_log::test(tokio::test)]
 async fn test_smart_pull_ref_moved_concurrently() {
-    RefMovedConcurrentlyCase { force: false }
-        .assert_pull_fails()
-        .await;
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[test_log::test(tokio::test)]
-async fn test_smart_pull_forced_ref_moved_concurrently() {
-    RefMovedConcurrentlyCase { force: true }
-        .assert_pull_fails()
-        .await;
+    for force in [false, true] {
+        RefMovedConcurrentlyCase { force }.assert_pull_fails().await;
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// `HEAD` moves after the pull read it: the commit fails and keeps the
 /// concurrent head, with or without `force`
+#[derive(Debug)]
 struct RefMovedConcurrentlyCase {
     force: bool,
 }
@@ -481,18 +444,20 @@ impl RefMovedConcurrentlyCase {
                 )
                 .await;
 
-            pretty_assertions::assert_eq!(pull_responses.len(), 1);
+            pretty_assertions::assert_eq!(pull_responses.len(), 1, "{self:?}");
             assert_matches!(
                 &pull_responses[0].result,
                 Err(PullError::RefMoved(e))
-                    if e.actual.as_ref() == Some(&concurrent_head)
+                    if e.actual.as_ref() == Some(&concurrent_head),
+                "{self:?}"
             );
             pretty_assertions::assert_eq!(
                 scenario
                     .client_harness
                     .stored_head(&dataset_handle.id)
                     .await,
-                concurrent_head
+                concurrent_head,
+                "{self:?}"
             );
         };
 
@@ -504,6 +469,7 @@ impl RefMovedConcurrentlyCase {
 
 /// A server whose transfer of a new dataset breaks the way the script says,
 /// the same way on every retry
+#[derive(Debug)]
 struct ScriptedPullCase {
     script: PullScript,
     expected_message: &'static str,
@@ -539,14 +505,16 @@ impl ScriptedPullCase {
             assert_matches!(
                 &pull_responses[0].result,
                 Err(PullError::SyncError(e @ SyncError::Corrupted(CorruptedSourceError { message, .. })))
-                    if message.contains(self.expected_message) && !e.is_recoverable()
+                    if message.contains(self.expected_message) && !e.is_recoverable(),
+                "{self:?}"
             );
             pretty_assertions::assert_eq!(
                 scenario
                     .client_harness
                     .find_stored_head(&scenario.server_dataset_handle.id)
                     .await,
-                None
+                None,
+                "{self:?}"
             );
         };
 

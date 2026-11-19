@@ -193,7 +193,7 @@ impl SyncServiceImpl {
             reason,
         };
 
-        let (Some(key_id), "" | "/") = (dst_url.host_str(), dst_url.path()) else {
+        let Some(key_id) = dst_url.host_str() else {
             return Err(invalid_destination("malformed IPFS URL".to_owned()).into());
         };
 
