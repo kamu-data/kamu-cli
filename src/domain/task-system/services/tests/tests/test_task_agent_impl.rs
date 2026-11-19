@@ -445,6 +445,39 @@ async fn test_task_that_cannot_be_planned_fails_and_the_next_task_runs() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[test_log::test(tokio::test)]
+async fn test_restart_after_a_failed_finish_clears_the_running_task() {
+    let mut mock_outbox = MockOutbox::new();
+    TaskAgentHarness::add_outbox_running_expectation(&mut mock_outbox, TaskID::new(0));
+    TaskAgentHarness::add_outbox_finished_expectation(&mut mock_outbox, TaskID::new(0), || {
+        Err(InternalError::new("outbox unavailable"))
+    });
+
+    let harness = TaskAgentHarness::new(
+        mock_outbox,
+        MockTaskDefinitionPlanner::new(),
+        MockTaskRunner::new(),
+    );
+    harness
+        .schedule_probe_task(LogicalPlanProbe::default())
+        .await;
+
+    // The finishing transaction fails, so the agent fails with the task's
+    // start still in the gauge
+    harness.task_agent.run_single_task().await.unwrap_err();
+    assert!(harness.is_task_running());
+
+    // The host's restart, shut down before any task is taken
+    let shutdown = CancellationToken::new();
+    shutdown.cancel();
+    harness.run_agent_to_end(shutdown).await.unwrap();
+
+    assert!(!harness.is_task_running());
+    assert_eq!(harness.finished_tasks("success"), 0);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 const LISTENING_TIMEOUT: Duration = Duration::from_mins(1);
 
 struct TaskAgentHarness {
@@ -615,6 +648,11 @@ impl TaskAgentHarness {
     }
 
     fn add_outbox_task_expectations(mock_outbox: &mut MockOutbox, a_task_id: TaskID) {
+        Self::add_outbox_running_expectation(mock_outbox, a_task_id);
+        Self::add_outbox_finished_expectation(mock_outbox, a_task_id, || Ok(()));
+    }
+
+    fn add_outbox_running_expectation(mock_outbox: &mut MockOutbox, a_task_id: TaskID) {
         mock_outbox
             .expect_post_message_as_json()
             .with(
@@ -632,7 +670,13 @@ impl TaskAgentHarness {
             )
             .times(1)
             .returning(|_, _, _| Ok(()));
+    }
 
+    fn add_outbox_finished_expectation(
+        mock_outbox: &mut MockOutbox,
+        a_task_id: TaskID,
+        post_result: fn() -> Result<(), InternalError>,
+    ) {
         mock_outbox
             .expect_post_message_as_json()
             .with(
@@ -649,7 +693,7 @@ impl TaskAgentHarness {
                 eq(1),
             )
             .times(1)
-            .returning(|_, _, _| Ok(()));
+            .returning(move |_, _, _| post_result());
     }
 }
 
