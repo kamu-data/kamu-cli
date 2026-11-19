@@ -90,6 +90,16 @@ impl TransformElaborateError {
             Self::InputNotPulled(_) | Self::Internal(_) => true,
         }
     }
+
+    /// The input dataset the error names, which the caller must be allowed to
+    /// read before it is shown
+    pub fn named_input(&self) -> Option<&odf::DatasetHandle> {
+        match self {
+            Self::InputNotPulled(e) => Some(&e.dataset_handle),
+            Self::InvalidInputInterval(e) => Some(&e.input_dataset),
+            Self::TransformNotDefined(_) | Self::InputsChanged(_) | Self::Internal(_) => None,
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

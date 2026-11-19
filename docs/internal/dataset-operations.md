@@ -83,6 +83,9 @@ flowchart LR
   it runs in the request's or the command's transaction ([push-ingest.md](push-ingest.md)).
 - **Task runners** map a task definition to a job and the job's result to a task outcome. They run
   as `Principal::Node` ([§5](#5-who-runs-it)).
+- **Telemetry:** each job records one `outcome` on its `<Job>Impl_run` span
+  ([`span_outcome.rs`](../../src/infra/core/src/utils/span_outcome.rs)). `dataset_deleted` also
+  covers a dataset the principal can no longer read, which the guard reports as not found.
 
 ---
 

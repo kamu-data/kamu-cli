@@ -121,7 +121,9 @@ the reference carries an alias.
   reference, for tests; it never opens the source.
 - `SyncRequestBuilder::build_sync_request(src, dst, create_dst_if_not_exists)` builds a push to a
   `DatasetRefRemote`, which `RemoteDatasetUrlResolver` resolves to a URL
-  ([§9](#9-remote-repositories-and-aliases)). The source must have a `HEAD`.
+  ([§9](#9-remote-repositories-and-aliases)). The source must have a `HEAD`. `SyncToJob` calls
+  its two halves apart: `resolve_sync_source` in its transaction, and `resolve_sync_destination`,
+  which may call the remote, after it.
 
 **Pull into a local dataset** (`SyncFromJob`) reads the target, transfers, then commits:
 
@@ -327,7 +329,9 @@ is merely ahead, `DatasetsDiverged` with the uncommon block counts, or `DatasetI
 the remote chain cannot be read, it reports `DatasetsDiverged` unless the IDs differ. With `force`
 the server sends the whole chain instead. When the chain it receives starts with a `Seed` and the
 target exists (with `force`, or without a `HEAD`), the client refuses a `Seed` of another dataset
-ID (`DatasetIdMismatch`) or of another kind (`OverwriteSeedBlock`).
+ID (`DatasetIdMismatch`) or of another kind (`OverwriteSeedBlock`). Without `force`, a batch whose
+first block does not follow the local `HEAD` is `Corrupted`: the commit compares `HEAD` only with
+`begin_after`, so such a batch would otherwise replace the local history.
 
 ### 7.2 Push flow
 
@@ -417,6 +421,7 @@ Before the blocks are committed, the side that receives them checks that every o
 reference is present: the pull client fails with `Corrupted` when the server did not offer
 one, and the push server, before its commit transaction, fails the push with `ObjectsNotUploaded`
 when the client did not upload one, so `HEAD` never points at a block whose objects are missing.
+The push server looks up only the objects it did not find stored when it planned the upload.
 
 ---
 

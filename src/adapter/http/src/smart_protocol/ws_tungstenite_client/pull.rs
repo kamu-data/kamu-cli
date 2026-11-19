@@ -403,6 +403,19 @@ impl WsSmartTransferProtocolClient {
                     });
                 }
 
+                // The commit only compares `HEAD` with the planned head, so without `force` the
+                // batch itself must start there, or it would replace the local history
+                if !transfer_options.force_update_if_diverged
+                    && let Some((_, first_block, _)) = new_blocks.front()
+                    && first_block.prev_block_hash.as_ref() != dst_head
+                {
+                    return Err(CorruptedSourceError {
+                        message: "Server sent blocks that do not extend the local head".to_owned(),
+                        source: None,
+                    }
+                    .into());
+                }
+
                 // The batch is non-empty: `new_head` was found in it
                 let TransferTarget {
                     storage: dst_storage,

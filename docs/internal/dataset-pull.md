@@ -356,7 +356,9 @@ input errors. Like a planning error, a denial fails the whole command before any
 Every operation job checks its own operation again when it runs, as the principal of the pull.
 `TransformJob` checks `Transform` with the inputs its elaboration actually read, which may differ
 from the planned ones when another writer changed them meanwhile, before using any result, and
-fails with `PullError::Access` if one is denied. Resetting the derivative on a diverged input drops
+fails with `PullError::Access` if one is denied. When the elaboration fails, it checks the input
+the error names (`TransformElaborateError::named_input`), so an unreadable one stays not found.
+Resetting the derivative on a diverged input drops
 its data, so `CompactionJob` checks `ResetToMetadata` (Maintain on the target) and the pull fails
 with `PullError::Access` without resetting when it is denied.
 

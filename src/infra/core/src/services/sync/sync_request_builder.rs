@@ -18,7 +18,7 @@ use kamu_core::{
     SyncToRequest,
     try_resolve_head,
 };
-use kamu_datasets::{DatasetRegistry, DatasetRegistryExt};
+use kamu_datasets::{DatasetRegistry, DatasetRegistryExt, ResolvedDataset};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -39,35 +39,47 @@ impl SyncRequestBuilder {
         dst_ref: odf::DatasetRefRemote,
         create_dst_if_not_exists: bool,
     ) -> Result<SyncToRequest, SyncError> {
-        let src = self.dataset_registry.get_dataset_by_ref(&src_ref).await?;
-        self.ensure_dataset_head_present(src_ref.as_any_ref(), src.as_ref())
-            .await?;
-
-        let dst = self
-            .resolve_dest_sync_ref_remote(dst_ref, create_dst_if_not_exists)
-            .await?;
+        let src = self.resolve_sync_source(src_ref).await?;
+        let dst = Self::resolve_sync_destination(
+            self.remote_dataset_url_resolver.as_ref(),
+            self.dataset_factory.as_ref(),
+            dst_ref,
+            create_dst_if_not_exists,
+        )
+        .await?;
 
         Ok(SyncToRequest { src, dst })
     }
 
-    async fn resolve_dest_sync_ref_remote(
+    /// The local dataset a push sends, in the caller's transaction
+    pub async fn resolve_sync_source(
         &self,
+        src_ref: odf::DatasetRef,
+    ) -> Result<ResolvedDataset, SyncError> {
+        let src = self.dataset_registry.get_dataset_by_ref(&src_ref).await?;
+        Self::ensure_dataset_head_present(src_ref.as_any_ref(), src.as_ref()).await?;
+        Ok(src)
+    }
+
+    /// The remote dataset a push sends to. Takes no transaction-scoped
+    /// component, as it may call the remote and so runs with no transaction
+    /// open
+    pub async fn resolve_sync_destination(
+        remote_dataset_url_resolver: &dyn RemoteDatasetUrlResolver,
+        dataset_factory: &dyn odf::dataset::DatasetFactory,
         remote_ref: odf::DatasetRefRemote,
         create_if_not_exists: bool,
     ) -> Result<SyncRefRemote, SyncError> {
-        let remote_dataset_url = self
-            .remote_dataset_url_resolver
+        let remote_dataset_url = remote_dataset_url_resolver
             .resolve_dataset_url(&remote_ref)
             .await?;
 
-        let dataset = self
-            .dataset_factory
+        let dataset = dataset_factory
             .get_dataset(&remote_dataset_url, create_if_not_exists)
             .await?;
 
         if !create_if_not_exists {
-            self.ensure_dataset_head_present(remote_ref.as_any_ref(), dataset.as_ref())
-                .await?;
+            Self::ensure_dataset_head_present(remote_ref.as_any_ref(), dataset.as_ref()).await?;
         }
 
         Ok(SyncRefRemote {
@@ -77,7 +89,6 @@ impl SyncRequestBuilder {
     }
 
     async fn ensure_dataset_head_present(
-        &self,
         dataset_ref: odf::DatasetRefAny,
         dataset: &dyn odf::Dataset,
     ) -> Result<(), SyncError> {

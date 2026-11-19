@@ -13,6 +13,7 @@ use axum::routing::get;
 use kamu_adapter_http::smart_protocol::messages::*;
 use kamu_adapter_http::smart_protocol::protocol_dataset_helper::prepare_dataset_metadata_batch;
 use kamu_datasets::{DatasetRegistry, ResolvedDataset};
+use odf::dataset::MetadataChainExt as _;
 use url::Url;
 
 use super::{ScriptedServerListener, ScriptedSocket};
@@ -55,6 +56,23 @@ impl ScriptedPullServer {
             )
             .await
             .unwrap(),
+            PullScript::Metadata(MetadataScript::AfterSeed) => {
+                let (seed_hash, _) = dataset
+                    .as_metadata_chain()
+                    .accept_one(odf::dataset::SearchSeedVisitor::new())
+                    .await
+                    .unwrap()
+                    .into_hashed_block()
+                    .unwrap();
+                prepare_dataset_metadata_batch(
+                    dataset.as_metadata_chain(),
+                    &head,
+                    Some(&seed_hash),
+                    false,
+                )
+                .await
+                .unwrap()
+            }
         };
 
         let listener = ScriptedServerListener::bind().await;
@@ -154,6 +172,10 @@ pub(crate) enum MetadataScript {
 
     /// An archive without blocks
     NoBlocks,
+
+    /// The blocks after the `Seed`, whatever head the client asked to continue
+    /// from
+    AfterSeed,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -16,6 +16,7 @@ use url::Url;
 
 /// The dataset a pull request points at, resolved before its update kind is
 /// known
+#[derive(Clone)]
 pub(super) enum PullTarget {
     /// A local request names an existing dataset
     Local(odf::DatasetHandle),

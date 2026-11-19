@@ -686,11 +686,14 @@ async fn test_pull_transform_diverged_input_fails_without_reset() {
     let alias_bar = BaseRepoHarness::alias("bar");
 
     let harness = PullUseCaseHarness::new(
-        PullUseCaseHarnessMocks::for_transform(&alias_foo, &alias_bar)
-            .with_transform_elaboration_mock(
-                MockTransformPlanner::new()
-                    .make_expect_elaborate_transform_diverged(alias_bar.clone()),
-            ),
+        PullUseCaseHarnessMocks::for_transform_with_input_checks(
+            &alias_foo,
+            &alias_bar,
+            CHECKED_BY_PLAN_AND_JOB,
+        )
+        .with_transform_elaboration_mock(
+            MockTransformPlanner::new().make_expect_elaborate_transform_diverged(alias_bar.clone()),
+        ),
     );
     let foo = harness.create_root_dataset(&alias_foo).await;
     let bar = harness
@@ -834,18 +837,22 @@ async fn test_pull_transform_input_not_pulled() {
     );
 
     let harness = PullUseCaseHarness::new(
-        PullUseCaseHarnessMocks::for_transform(&alias_foo, &alias_bar)
-            .with_transform_elaboration_mock(
-                MockTransformPlanner::new().make_expect_elaborate_transform_error(
-                    alias_bar.clone(),
-                    move || {
-                        InputNotPulledError {
-                            dataset_handle: foo_handle.clone(),
-                        }
-                        .into()
-                    },
-                ),
+        PullUseCaseHarnessMocks::for_transform_with_input_checks(
+            &alias_foo,
+            &alias_bar,
+            CHECKED_BY_PLAN_AND_JOB,
+        )
+        .with_transform_elaboration_mock(
+            MockTransformPlanner::new().make_expect_elaborate_transform_error(
+                alias_bar.clone(),
+                move || {
+                    InputNotPulledError {
+                        dataset_handle: foo_handle.clone(),
+                    }
+                    .into()
+                },
             ),
+        ),
     );
     let foo = harness.create_root_dataset(&alias_foo).await;
     let bar = harness
@@ -860,6 +867,53 @@ async fn test_pull_transform_input_not_pulled() {
             TransformElaborateError::InputNotPulled(e)
         )))
         if e.dataset_handle.alias == alias_foo
+    );
+    assert_eq!(harness.get_head(&bar).await, bar.head);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// An elaboration error names an input that pull planning may not have
+/// checked, so the job checks it before showing it
+#[tokio::test]
+async fn test_pull_transform_input_not_pulled_hides_unreadable_input() {
+    let alias_foo = BaseRepoHarness::alias("foo");
+    let alias_bar = BaseRepoHarness::alias("bar");
+    let alias_baz = BaseRepoHarness::alias("baz");
+    let baz_handle = odf::DatasetHandle::new(
+        odf::DatasetID::new_seeded_ed25519(b"baz"),
+        alias_baz.clone(),
+        odf::DatasetKind::Root,
+    );
+
+    let harness = PullUseCaseHarness::new(
+        PullUseCaseHarnessMocks::for_transform_with_input_checks(
+            &alias_foo,
+            &alias_bar,
+            CHECKED_BY_PLAN_AND_JOB,
+        )
+        .with_transform_elaboration_mock(
+            MockTransformPlanner::new().make_expect_elaborate_transform_error(
+                alias_bar.clone(),
+                move || {
+                    InputNotPulledError {
+                        dataset_handle: baz_handle.clone(),
+                    }
+                    .into()
+                },
+            ),
+        ),
+    );
+    let foo = harness.create_root_dataset(&alias_foo).await;
+    let bar = harness
+        .create_derived_dataset(&alias_bar, vec![foo.dataset_handle.as_local_ref()])
+        .await;
+
+    let pull_response = harness.pull_local(&alias_bar).await;
+
+    assert_matches!(
+        pull_response.result,
+        Err(PullError::NotFound(e)) if e.dataset_ref.to_string() == alias_baz.to_string()
     );
     assert_eq!(harness.get_head(&bar).await, bar.head);
 }
@@ -2471,6 +2525,18 @@ impl PullUseCaseHarnessMocks {
     /// Expects one pull of `bar` derived from `foo`, authorized. The mocked
     /// elaboration reads no inputs, so only the pull checks `foo`
     fn for_transform(alias_foo: &odf::DatasetAlias, alias_bar: &odf::DatasetAlias) -> Self {
+        Self::for_transform_with_input_checks(alias_foo, alias_bar, 1)
+    }
+
+    /// Like [`Self::for_transform`], with the inputs checked `input_checks`
+    /// times: the plan checks the planned ones, and the job checks those its
+    /// elaboration read or names in its error. `foo` and the diverged input of
+    /// [`MockTransformPlanner::diverged_input`] are readable
+    fn for_transform_with_input_checks(
+        alias_foo: &odf::DatasetAlias,
+        alias_bar: &odf::DatasetAlias,
+        input_checks: usize,
+    ) -> Self {
         Self::default().with_permission_checker_mock(
             MockDatasetPermissionChecker::new()
                 .make_expect_classify_datasets_by_allowance(
@@ -2480,8 +2546,11 @@ impl PullUseCaseHarnessMocks {
                 )
                 .make_expect_classify_datasets_by_allowance(
                     DatasetPermission::Read,
-                    1,
-                    HashSet::from_iter([alias_foo.clone()]),
+                    input_checks,
+                    HashSet::from_iter([
+                        alias_foo.clone(),
+                        MockTransformPlanner::diverged_input().alias,
+                    ]),
                 ),
         )
     }
@@ -2500,8 +2569,9 @@ impl PullUseCaseHarnessMocks {
         } else {
             HashSet::new()
         };
-        // A denied Maintain makes the guard check that `bar` is readable
-        let read_checks_of_bar = usize::from(!maintain_granted);
+        // The plan checks `foo`, the diverged transform checks the input its error names, and a
+        // denied Maintain makes the guard check that `bar` is readable
+        let read_checks = 2 + usize::from(!maintain_granted);
         Self::default().with_permission_checker_mock(
             MockDatasetPermissionChecker::new()
                 .make_expect_classify_datasets_by_allowance(
@@ -2511,18 +2581,17 @@ impl PullUseCaseHarnessMocks {
                 )
                 .make_expect_classify_datasets_by_allowance(
                     DatasetPermission::Read,
-                    1,
-                    HashSet::from_iter([alias_foo.clone()]),
+                    read_checks,
+                    HashSet::from_iter([
+                        alias_foo.clone(),
+                        alias_bar.clone(),
+                        MockTransformPlanner::diverged_input().alias,
+                    ]),
                 )
                 .make_expect_classify_datasets_by_allowance(
                     DatasetPermission::Maintain,
                     1,
                     maintainable,
-                )
-                .make_expect_classify_datasets_by_allowance(
-                    DatasetPermission::Read,
-                    read_checks_of_bar,
-                    HashSet::from_iter([alias_bar.clone()]),
                 ),
         )
     }

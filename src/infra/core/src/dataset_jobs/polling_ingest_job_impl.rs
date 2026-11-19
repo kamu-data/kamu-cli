@@ -123,8 +123,15 @@ impl PollingIngestJobImpl {
             Err(PollingIngestJobError::NotFound(_)) => SpanOutcome::DatasetDeleted,
             Err(PollingIngestJobError::RefCASFailed(_)) => SpanOutcome::RefMoved,
             Err(PollingIngestJobError::Access(_)) => SpanOutcome::NotAllowed,
+            // A dataset without a polling source has nothing to ingest, which its callers report
+            // as up to date
+            Err(PollingIngestJobError::Planning(PollingIngestPlanError::SourceNotDefined(_))) => {
+                SpanOutcome::UpToDate
+            }
             Err(
-                PollingIngestJobError::Planning(_)
+                PollingIngestJobError::Planning(
+                    PollingIngestPlanError::ScanMetadata(_) | PollingIngestPlanError::Internal(_),
+                )
                 | PollingIngestJobError::Ingest(_)
                 | PollingIngestJobError::Internal(_),
             ) => SpanOutcome::Failed,

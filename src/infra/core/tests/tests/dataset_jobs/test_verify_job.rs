@@ -84,6 +84,47 @@ async fn test_verify_replay_with_unreadable_input_replays_nothing() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// The integrity checks explain a broken range better than the replay
+/// planning that fails on it, so they run first
+#[tokio::test]
+async fn test_verify_replay_of_invalid_range_reports_integrity_error() {
+    let alias_foo = BaseRepoHarness::alias("foo");
+    let alias_bar = BaseRepoHarness::alias("bar");
+    let (_, dataset_id_foo) = odf::DatasetID::new_generated_ed25519();
+    let (_, dataset_id_bar) = odf::DatasetID::new_generated_ed25519();
+
+    let harness = VerifyJobHarness::new(
+        MockDatasetPermissionChecker::new().expect_authorize_for(
+            DatasetPermission::Read,
+            &dataset_id_bar,
+            1,
+            true,
+        ),
+        MockDidGenerator::predefined_dataset_ids(vec![dataset_id_foo, dataset_id_bar]),
+    );
+
+    let foo = harness.create_root_dataset(&alias_foo).await;
+    let bar = harness
+        .create_derived_dataset(&alias_bar, vec![foo.dataset_handle.as_local_ref()])
+        .await;
+    let tail_of_another_chain = harness.get_head(&foo).await;
+
+    assert_matches!(
+        harness
+            .verify_range_with_replay(
+                ResolvedDataset::from_created(&bar),
+                (Some(tail_of_another_chain), None),
+            )
+            .await,
+        VerificationResult {
+            dataset_handle: Some(dataset_handle),
+            outcome: Err(VerificationError::InvalidInterval(_)),
+        } if dataset_handle == bar.dataset_handle
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[tokio::test]
 async fn test_verify_unreadable_is_not_found() {
     let alias_foo = BaseRepoHarness::alias("foo");
@@ -158,11 +199,19 @@ impl VerifyJobHarness {
     }
 
     async fn verify_dataset_with_replay(&self, target: ResolvedDataset) -> VerificationResult {
+        self.verify_range_with_replay(target, (None, None)).await
+    }
+
+    async fn verify_range_with_replay(
+        &self,
+        target: ResolvedDataset,
+        block_range: (Option<odf::Multihash>, Option<odf::Multihash>),
+    ) -> VerificationResult {
         self.job
             .run(
                 VerificationRequest::<odf::DatasetHandle> {
                     target: target.take_handle(),
-                    block_range: (None, None),
+                    block_range,
                     options: VerificationOptions {
                         replay_transformations: true,
                         ..VerificationOptions::default()

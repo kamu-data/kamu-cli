@@ -13,6 +13,7 @@ use database_common::transaction;
 use dill::{component, interface};
 use kamu_accounts::Principal;
 use kamu_core::{
+    TransformElaborateError,
     TransformElaboration,
     TransformExecutor,
     TransformJob,
@@ -60,8 +61,8 @@ impl TransformJobImpl {
                 )
                 .await?;
 
-                // Access covers exactly what the elaboration read, and is checked
-                // before any of its results is used
+                // Access covers exactly what the elaboration read, or the input its error
+                // names, and is checked before any of its results is used
                 let elaboration = planner.elaborate_transform(target.clone()).await;
                 let inputs = match &elaboration {
                     Ok(TransformElaboration::Elaborated(plan)) => plan
@@ -70,7 +71,8 @@ impl TransformJobImpl {
                         .iter()
                         .map(|input| input.dataset_handle.clone())
                         .collect(),
-                    Ok(TransformElaboration::UpToDate) | Err(_) => Vec::new(),
+                    Ok(TransformElaboration::UpToDate) => Vec::new(),
+                    Err(e) => e.named_input().cloned().into_iter().collect(),
                 };
                 dataset_operation_guard
                     .check_operation(
@@ -132,8 +134,18 @@ impl TransformJobImpl {
             Err(TransformJobError::NotFound(_)) => SpanOutcome::DatasetDeleted,
             Err(TransformJobError::RefCASFailed(_)) => SpanOutcome::RefMoved,
             Err(TransformJobError::Access(_)) => SpanOutcome::NotAllowed,
+            // An input without new data leaves nothing to transform; a flow treats it as up to
+            // date, while `kamu pull` reports it
+            Err(TransformJobError::Elaborate(TransformElaborateError::InputNotPulled(_))) => {
+                SpanOutcome::UpToDate
+            }
             Err(
-                TransformJobError::Elaborate(_)
+                TransformJobError::Elaborate(
+                    TransformElaborateError::TransformNotDefined(_)
+                    | TransformElaborateError::InputsChanged(_)
+                    | TransformElaborateError::InvalidInputInterval(_)
+                    | TransformElaborateError::Internal(_),
+                )
                 | TransformJobError::Execute(_)
                 | TransformJobError::Internal(_),
             ) => SpanOutcome::Failed,

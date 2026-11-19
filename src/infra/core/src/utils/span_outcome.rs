@@ -19,6 +19,8 @@ use kamu_core::{PullError, PullResponse, PullResult, SyncError};
 pub(crate) enum SpanOutcome {
     Updated,
     UpToDate,
+    /// A verification found the dataset consistent
+    Verified,
     DatasetDeleted,
     RefMoved,
     NotAllowed,
@@ -104,6 +106,7 @@ mod tests {
         let names = [
             (SpanOutcome::Updated, "updated"),
             (SpanOutcome::UpToDate, "up_to_date"),
+            (SpanOutcome::Verified, "verified"),
             (SpanOutcome::DatasetDeleted, "dataset_deleted"),
             (SpanOutcome::RefMoved, "ref_moved"),
             (SpanOutcome::NotAllowed, "not_allowed"),

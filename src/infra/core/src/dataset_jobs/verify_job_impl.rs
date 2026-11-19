@@ -31,6 +31,7 @@ use kamu_datasets::{
 };
 
 use super::job_target::resolve_job_target;
+use crate::utils::span_outcome::SpanOutcome;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -57,26 +58,50 @@ impl VerifyJobImpl {
 
         let target =
             resolve_job_target::<VerificationError>(dataset_registry, &request.target).await?;
+        let request = VerificationRequest {
+            target,
+            block_range: request.block_range.clone(),
+            options: request.options.clone(),
+        };
 
-        if request.options.replay_transformations
-            && target.get_kind() == odf::DatasetKind::Derivative
-        {
-            let replayed_inputs = transform_planner
-                .get_verification_inputs(target.clone(), request.block_range.clone())
-                .await?;
-            self.authorize(dataset_operation_guard, &request.target, replayed_inputs)
-                .await?;
+        if VerificationPlan::replays_transforms(&request) {
+            match transform_planner
+                .get_verification_inputs(request.target.clone(), request.block_range.clone())
+                .await
+            {
+                Ok(replayed_inputs) => {
+                    self.authorize(
+                        dataset_operation_guard,
+                        request.target.get_handle(),
+                        replayed_inputs,
+                    )
+                    .await?;
+                }
+                // A replay that cannot be planned reads no input, so none is authorized
+                Err(e) => return VerificationPlan::with_unplanned_replay(request, e).await,
+            }
         }
 
-        VerificationPlan::build(
-            VerificationRequest {
-                target,
-                block_range: request.block_range.clone(),
-                options: request.options.clone(),
-            },
-            transform_planner,
-        )
-        .await
+        VerificationPlan::build(request, transform_planner).await
+    }
+
+    fn span_outcome(outcome: &Result<(), VerificationError>) -> SpanOutcome {
+        match outcome {
+            Ok(()) => SpanOutcome::Verified,
+            Err(VerificationError::DatasetNotFound(_)) => SpanOutcome::DatasetDeleted,
+            Err(VerificationError::Access(_)) => SpanOutcome::NotAllowed,
+            Err(
+                VerificationError::RefNotFound(_)
+                | VerificationError::BlockNotFound(_)
+                | VerificationError::BlockVersion(_)
+                | VerificationError::BlockMalformed(_)
+                | VerificationError::InvalidInterval(_)
+                | VerificationError::DataDoesNotMatchMetadata(_)
+                | VerificationError::CheckpointDoesNotMatchMetadata(_)
+                | VerificationError::VerifyTransform(_)
+                | VerificationError::Internal(_),
+            ) => SpanOutcome::Failed,
+        }
     }
 
     async fn authorize(
@@ -101,7 +126,7 @@ impl VerifyJobImpl {
 #[common_macros::method_names_consts]
 #[async_trait::async_trait]
 impl VerifyJob for VerifyJobImpl {
-    #[tracing::instrument(level = "info", name = VerifyJobImpl_run, skip_all, fields(target = %request.target, block_range = ?request.block_range))]
+    #[tracing::instrument(level = "info", name = VerifyJobImpl_run, skip_all, fields(target = %request.target, block_range = ?request.block_range, outcome))]
     async fn run(
         &self,
         request: VerificationRequest<odf::DatasetHandle>,
@@ -120,7 +145,7 @@ impl VerifyJob for VerifyJobImpl {
             .await
         });
 
-        match plan {
+        let result = match plan {
             // Integrity checks and the replay read storage only
             Ok(plan) => self.verification_service.verify(plan, maybe_listener).await,
             Err(e) => {
@@ -130,7 +155,9 @@ impl VerifyJob for VerifyJobImpl {
                 listener.error(&e);
                 VerificationResult::err(request.target, e)
             }
-        }
+        };
+        Self::span_outcome(&result.outcome).record();
+        result
     }
 }
 

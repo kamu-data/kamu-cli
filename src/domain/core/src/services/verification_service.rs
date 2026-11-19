@@ -48,8 +48,10 @@ pub struct VerificationRequest<TTarget> {
 pub struct VerificationPlan {
     pub request: VerificationRequest<ResolvedDataset>,
     /// The transforms to replay, when the request asks for it and the target
-    /// is a derivative
-    pub maybe_replay: Option<VerifyTransformOperation>,
+    /// is a derivative. A replay that could not be planned fails the
+    /// verification after the integrity checks, which explain a damaged chain
+    /// better
+    pub maybe_replay: Option<Result<VerifyTransformOperation, VerifyTransformPlanError>>,
 }
 
 impl VerificationPlan {
@@ -61,6 +63,43 @@ impl VerificationPlan {
         mut request: VerificationRequest<ResolvedDataset>,
         transform_planner: &dyn TransformPlanner,
     ) -> Result<Self, VerificationError> {
+        Self::pin_head(&mut request).await?;
+
+        let maybe_replay = if Self::replays_transforms(&request) {
+            Some(
+                transform_planner
+                    .build_transform_verification_plan(
+                        request.target.clone(),
+                        request.block_range.clone(),
+                    )
+                    .await,
+            )
+        } else {
+            None
+        };
+
+        Ok(Self::detached(request, maybe_replay))
+    }
+
+    /// A plan whose replay could not be planned, so that verifying it runs the
+    /// integrity checks before failing with `error`
+    pub async fn with_unplanned_replay(
+        mut request: VerificationRequest<ResolvedDataset>,
+        error: VerifyTransformPlanError,
+    ) -> Result<Self, VerificationError> {
+        Self::pin_head(&mut request).await?;
+        Ok(Self::detached(request, Some(Err(error))))
+    }
+
+    /// Whether verifying `request` replays the transforms of its target
+    pub fn replays_transforms(request: &VerificationRequest<ResolvedDataset>) -> bool {
+        request.options.replay_transformations
+            && request.target.get_kind() == odf::DatasetKind::Derivative
+    }
+
+    async fn pin_head(
+        request: &mut VerificationRequest<ResolvedDataset>,
+    ) -> Result<(), VerificationError> {
         if request.block_range.1.is_none() {
             let head = request
                 .target
@@ -69,31 +108,21 @@ impl VerificationPlan {
                 .await?;
             request.block_range.1 = Some(head);
         }
+        Ok(())
+    }
 
-        let maybe_replay = if request.target.get_kind() == odf::DatasetKind::Derivative
-            && request.options.replay_transformations
-        {
-            Some(
-                transform_planner
-                    .build_transform_verification_plan(
-                        request.target.clone(),
-                        request.block_range.clone(),
-                    )
-                    .await?,
-            )
-        } else {
-            None
-        };
-
+    fn detached(
+        request: VerificationRequest<ResolvedDataset>,
+        maybe_replay: Option<Result<VerifyTransformOperation, VerifyTransformPlanError>>,
+    ) -> Self {
         request.target.detach_from_transaction();
-        if let Some(replay) = &maybe_replay {
+        if let Some(Ok(replay)) = &maybe_replay {
             replay.datasets_map.detach_from_transaction();
         }
-
-        Ok(Self {
+        Self {
             request,
             maybe_replay,
-        })
+        }
     }
 }
 

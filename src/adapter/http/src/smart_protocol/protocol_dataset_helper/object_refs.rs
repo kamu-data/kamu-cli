@@ -7,11 +7,12 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::collections::VecDeque;
+use std::collections::{HashSet, VecDeque};
 
 use futures::TryStreamExt;
 use internal_error::{InternalError, ResultIntoInternal};
 
+use super::object_transfer::object_repo;
 use crate::smart_protocol::messages::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -118,6 +119,34 @@ async fn collect_object_references_from_block(
     }
 
     Ok(())
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// The objects `blocks` reference that `dataset` does not store, apart from
+/// those in `known_stored`, which are not looked up again
+pub(crate) async fn find_missing_object_references(
+    dataset: &dyn odf::Dataset,
+    blocks: &VecDeque<odf::dataset::HashedMetadataBlockBytesDecoded>,
+    known_stored: &HashSet<(ObjectType, odf::Multihash)>,
+) -> Result<Vec<ObjectFileReference>, InternalError> {
+    let mut missing = Vec::new();
+    for object_file in collect_object_references_from_metadata(dataset, blocks, false).await? {
+        if known_stored.contains(&(
+            object_file.object_type.clone(),
+            object_file.physical_hash.clone(),
+        )) {
+            continue;
+        }
+        if !object_repo(dataset, &object_file.object_type)
+            .contains(&object_file.physical_hash)
+            .await
+            .int_err()?
+        {
+            missing.push(object_file);
+        }
+    }
+    Ok(missing)
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

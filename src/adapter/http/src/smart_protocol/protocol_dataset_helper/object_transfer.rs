@@ -400,7 +400,7 @@ pub(crate) fn url_without_query(url: &Url) -> Url {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// The repository that stores objects of this type
-fn object_repo<'a>(
+pub(super) fn object_repo<'a>(
     dataset: &'a dyn odf::Dataset,
     object_type: &ObjectType,
 ) -> &'a dyn odf::storage::ObjectRepository {

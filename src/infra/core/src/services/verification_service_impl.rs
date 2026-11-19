@@ -309,6 +309,7 @@ impl VerificationService for VerificationServiceImpl {
             }
 
             if let Some(replay) = maybe_replay {
+                let replay = replay.map_err(VerificationError::from)?;
                 self.transform_executor
                     .execute_verify_transform(
                         request.target.clone(),

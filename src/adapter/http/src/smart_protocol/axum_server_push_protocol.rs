@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::collections::VecDeque;
+use std::collections::{HashSet, VecDeque};
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -51,6 +51,8 @@ pub struct AxumServerPushProtocolInstance {
     dataset_url: Url,
     maybe_bearer_header: Option<BearerHeader>,
     upload_progress_interval: Duration,
+    /// Objects found already stored when the client asked to upload them
+    stored_objects: HashSet<(ObjectType, odf::Multihash)>,
 }
 
 #[common_macros::method_names_consts]
@@ -72,6 +74,7 @@ impl AxumServerPushProtocolInstance {
             dataset_url,
             maybe_bearer_header,
             upload_progress_interval,
+            stored_objects: HashSet::new(),
         }
     }
 
@@ -497,6 +500,18 @@ impl AxumServerPushProtocolInstance {
 
         tracing::debug!("Object transfer strategies defined");
 
+        self.stored_objects.extend(
+            object_transfer_strategies
+                .iter()
+                .filter(|strategy| strategy.push_strategy == ObjectPushStrategy::SkipUpload)
+                .map(|strategy| {
+                    (
+                        strategy.object_file.object_type.clone(),
+                        strategy.object_file.physical_hash.clone(),
+                    )
+                }),
+        );
+
         axum_write_phase_payload::<DatasetPushObjectsTransferResponse>(
             &mut self.socket,
             Ok(DatasetPushObjectsTransferAccepted {
@@ -586,7 +601,8 @@ impl AxumServerPushProtocolInstance {
 
     /// The client chooses which objects to upload, so the blocks must not be
     /// committed until every file they reference is stored. Checked outside
-    /// the commit transaction, as each check may be a storage request
+    /// the commit transaction, as each check may be a storage request, and
+    /// only for objects not found stored when the upload was planned
     async fn ensure_objects_uploaded(
         &mut self,
         dataset_handle: &odf::DatasetHandle,
@@ -601,10 +617,13 @@ impl AxumServerPushProtocolInstance {
         )
         .protocol_int_err(PushPhase::CompleteRequest)?;
 
-        let missing =
-            collect_object_references_from_metadata(resolved_dataset.as_ref(), new_blocks, true)
-                .await
-                .protocol_int_err(PushPhase::CompleteRequest)?;
+        let missing = find_missing_object_references(
+            resolved_dataset.as_ref(),
+            new_blocks,
+            &self.stored_objects,
+        )
+        .await
+        .protocol_int_err(PushPhase::CompleteRequest)?;
         match missing.first() {
             None => Ok(()),
             Some(first_missing) => Err(PushServerError::ObjectsNotUploaded(

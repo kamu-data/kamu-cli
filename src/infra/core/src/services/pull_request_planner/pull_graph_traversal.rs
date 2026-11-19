@@ -24,6 +24,8 @@ pub(super) struct PullGraphDepthFirstTraversal<'a> {
     update_kind_resolver: &'a dyn DatasetUpdateKindResolver,
     recursive: bool,
     requested: HashMap<odf::DatasetAlias, PullRequest>,
+    /// Requests resolved up front, so a remote one is not looked up again
+    resolved_requests: Vec<(PullRequest, PullTarget)>,
     visited: HashMap<odf::DatasetAlias, PullItem>,
 }
 
@@ -42,6 +44,7 @@ impl<'a> PullGraphDepthFirstTraversal<'a> {
             update_kind_resolver,
             recursive,
             requested: HashMap::new(),
+            resolved_requests: Vec::new(),
             visited: HashMap::new(),
         }
     }
@@ -55,6 +58,7 @@ impl<'a> PullGraphDepthFirstTraversal<'a> {
                 self.requested
                     .entry(target.local_alias().clone())
                     .or_insert_with(|| request.clone());
+                self.resolved_requests.push((request.clone(), target));
             }
         }
     }
@@ -73,7 +77,14 @@ impl<'a> PullGraphDepthFirstTraversal<'a> {
     ) -> Result<i32, PullError> {
         tracing::debug!(?request, %referenced_explicitly, %traverse_dependencies, "Entering pull graph node");
 
-        let target = self.target_resolver.resolve(request).await?;
+        let target = match self
+            .resolved_requests
+            .iter()
+            .find(|(resolved_request, _)| resolved_request == request)
+        {
+            Some((_, target)) => target.clone(),
+            None => self.target_resolver.resolve(request).await?,
+        };
         let local_alias = target.local_alias().clone();
 
         if let Some(pi) = self.visited.get_mut(&local_alias) {

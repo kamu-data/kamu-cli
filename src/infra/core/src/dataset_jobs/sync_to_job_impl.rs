@@ -12,7 +12,16 @@ use std::sync::Arc;
 use database_common::transaction;
 use dill::{component, interface};
 use kamu_accounts::Principal;
-use kamu_core::{SyncError, SyncListener, SyncOptions, SyncResult, SyncService, SyncToJob};
+use kamu_core::{
+    RemoteDatasetUrlResolver,
+    SyncError,
+    SyncListener,
+    SyncOptions,
+    SyncResult,
+    SyncService,
+    SyncToJob,
+    SyncToRequest,
+};
 use kamu_datasets::{DatasetOperation, DatasetOperationGuard, DatasetOperationRequest};
 
 use crate::SyncRequestBuilder;
@@ -25,6 +34,8 @@ use crate::utils::span_outcome::SpanOutcome;
 pub struct SyncToJobImpl {
     catalog: dill::Catalog,
     sync_service: Arc<dyn SyncService>,
+    remote_dataset_url_resolver: Arc<dyn RemoteDatasetUrlResolver>,
+    dataset_factory: Arc<dyn odf::dataset::DatasetFactory>,
     principal: Arc<Principal>,
 }
 
@@ -36,8 +47,8 @@ impl SyncToJobImpl {
         options: SyncOptions,
         maybe_listener: Option<Arc<dyn SyncListener>>,
     ) -> Result<SyncResult, SyncError> {
-        // 1: Authorize and resolve the source and the destination
-        let request =
+        // 1: Authorize and resolve the source
+        let src_dataset =
             transaction!(|dataset_operation_guard: Arc<dyn DatasetOperationGuard>,
                           sync_request_builder: Arc<SyncRequestBuilder>| {
                 dataset_operation_guard
@@ -47,14 +58,26 @@ impl SyncToJobImpl {
                     )
                     .await?;
 
-                let request = sync_request_builder
-                    .build_sync_request(src.as_local_ref(), dst, options.create_if_not_exists)
+                let src_dataset = sync_request_builder
+                    .resolve_sync_source(src.as_local_ref())
                     .await?;
-                request.src.detach_from_transaction();
-                request
+                src_dataset.detach_from_transaction();
+                src_dataset
             });
 
-        // 2: Transfer, with no transaction open; the destination commits
+        // 2: Resolve the destination, which may call the remote
+        let request = SyncToRequest {
+            src: src_dataset,
+            dst: SyncRequestBuilder::resolve_sync_destination(
+                self.remote_dataset_url_resolver.as_ref(),
+                self.dataset_factory.as_ref(),
+                dst,
+                options.create_if_not_exists,
+            )
+            .await?,
+        };
+
+        // 3: Transfer, with no transaction open; the destination commits
         self.sync_service
             .sync_to(request, options, maybe_listener)
             .await

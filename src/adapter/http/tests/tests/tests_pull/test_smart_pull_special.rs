@@ -216,6 +216,54 @@ async fn test_smart_pull_without_planned_blocks_is_not_committed() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// The commit compares `HEAD` only with the head the pull started from, so a
+/// batch the server bases on an older block would replace the blocks after it
+#[test_log::test(tokio::test)]
+async fn test_smart_pull_of_blocks_not_extending_local_head_is_not_committed() {
+    let (client_harness, server_harness) = LocalFsTransferOptions {
+        client_tenancy: TenancyConfig::SingleTenant,
+        authenticated_remotely: false,
+        server_tenancy: TenancyConfig::SingleTenant,
+        authorized_writes: true,
+    }
+    .build()
+    .await;
+    let scenario =
+        SmartPullExistingDivergedDatasetScenario::prepare(client_harness, server_harness).await;
+    let dataset_id = &scenario.server_dataset_handle.id;
+    let client_head = scenario.client_harness.stored_head(dataset_id).await;
+    let server = ScriptedPullServer::new(
+        scenario.server_harness.cli_dataset_registry().as_ref(),
+        &scenario.server_dataset_handle,
+        PullScript::Metadata(MetadataScript::AfterSeed),
+    )
+    .await;
+    let server_dataset_url = server.dataset_url("foo");
+
+    let server_handle = server.run();
+
+    let client_handle = async {
+        let pull_responses = scenario
+            .client_harness
+            .pull_datasets(odf::DatasetRefAny::from(server_dataset_url), false)
+            .await;
+
+        assert_matches!(
+            &pull_responses[0].result,
+            Err(PullError::SyncError(SyncError::Corrupted(CorruptedSourceError { message, .. })))
+                if message.contains("Server sent blocks that do not extend the local head")
+        );
+        pretty_assertions::assert_eq!(
+            scenario.client_harness.stored_head(dataset_id).await,
+            client_head
+        );
+    };
+
+    await_client_server_flow!(server_handle, client_handle);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[test_log::test(tokio::test)]
 async fn test_smart_pull_into_existing_reports_increment() {
     let (client_harness, server_harness) = LocalFsTransferOptions {

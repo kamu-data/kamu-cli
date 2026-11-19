@@ -19,6 +19,7 @@ use kamu_core::{
     CompactionListener,
     CompactionOptions,
     CompactionPlanner,
+    CompactionPlanningError,
     CompactionResult,
     NullCompactionListener,
 };
@@ -113,9 +114,15 @@ impl CompactionJobImpl {
             Ok(CompactionResult::NothingToDo) => SpanOutcome::UpToDate,
             Err(CompactionError::NotFound(_)) => SpanOutcome::DatasetDeleted,
             Err(CompactionError::RefCASFailed(_)) => SpanOutcome::RefMoved,
-            Err(CompactionError::Access(_)) => SpanOutcome::NotAllowed,
             Err(
-                CompactionError::Planning(_)
+                CompactionError::Access(_)
+                | CompactionError::Planning(CompactionPlanningError::Access(_)),
+            ) => SpanOutcome::NotAllowed,
+            Err(
+                CompactionError::Planning(
+                    CompactionPlanningError::InvalidDatasetKind(_)
+                    | CompactionPlanningError::Internal(_),
+                )
                 | CompactionError::Execution(_)
                 | CompactionError::Internal(_),
             ) => SpanOutcome::Failed,

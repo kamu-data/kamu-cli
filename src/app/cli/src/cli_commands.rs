@@ -601,8 +601,11 @@ pub fn command_needs_transaction(args: &cli::Cli) -> bool {
                     Some(cli::SystemApiServerSubCommand::GqlQuery(_))
                 )
             }
-            // Run dataset jobs, which open short transactions of their own
-            cli::SystemSubCommand::Compact(_) | cli::SystemSubCommand::Diagnose(_) => false,
+            // Run dataset jobs, or resolve the dataset in a short transaction and upload it with
+            // none open, so they open short transactions of their own
+            cli::SystemSubCommand::Compact(_)
+            | cli::SystemSubCommand::Diagnose(_)
+            | cli::SystemSubCommand::Ipfs(_) => false,
             cli::SystemSubCommand::DebugToken(_)
             | cli::SystemSubCommand::Depgraph(_)
             | cli::SystemSubCommand::Decode(_)
@@ -610,7 +613,6 @@ pub fn command_needs_transaction(args: &cli::Cli) -> bool {
             | cli::SystemSubCommand::GenerateToken(_)
             | cli::SystemSubCommand::Gc(_)
             | cli::SystemSubCommand::Info(_)
-            | cli::SystemSubCommand::Ipfs(_)
             | cli::SystemSubCommand::UpgradeWorkspace(_) => true,
         },
         // False for set_watermark option

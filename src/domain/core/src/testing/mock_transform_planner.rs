@@ -67,14 +67,20 @@ impl MockTransformPlanner {
     }
 
     /// Reports an input whose history was rewritten
+    /// The input whose history diverged in
+    /// [`Self::make_expect_elaborate_transform_diverged`]
+    pub fn diverged_input() -> odf::DatasetHandle {
+        odf::DatasetHandle::new(
+            odf::DatasetID::new_seeded_ed25519(b"input"),
+            odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("input")),
+            odf::DatasetKind::Root,
+        )
+    }
+
     pub fn make_expect_elaborate_transform_diverged(self, target_alias: odf::DatasetAlias) -> Self {
         self.make_expect_elaborate_transform_error(target_alias, || {
             InvalidInputIntervalError {
-                input_dataset: odf::DatasetHandle::new(
-                    odf::DatasetID::new_seeded_ed25519(b"input"),
-                    odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("input")),
-                    odf::DatasetKind::Root,
-                ),
+                input_dataset: Self::diverged_input(),
                 head: odf::Multihash::from_digest_sha3_256(b"head"),
                 tail: odf::Multihash::from_digest_sha3_256(b"tail"),
             }

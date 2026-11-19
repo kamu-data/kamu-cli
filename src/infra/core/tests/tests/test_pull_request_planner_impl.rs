@@ -608,6 +608,48 @@ async fn test_pull_batching_complex_with_remote() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Finding the dataset a remote is pulled into may scan every dataset, so a
+/// plan of several requests resolves each of them once
+#[tokio::test]
+async fn test_remote_requests_are_resolved_once() {
+    let mut mock_pull_source_resolver = MockDatasetPullSourceResolver::new();
+    mock_pull_source_resolver
+        .expect_find_dataset_by_pull_alias()
+        .times(2)
+        .returning(|_| Ok(None));
+    let harness = PullTestHarness::with_pull_source_resolver(
+        TenancyConfig::SingleTenant,
+        mock_pull_source_resolver,
+    );
+
+    let res = harness
+        .pull_with_requests(
+            vec![
+                PullRequest::Remote(PullRequestRemote {
+                    maybe_local_alias: Some(n!("bar")),
+                    remote_ref: rr!("kamu.dev/foo"),
+                }),
+                PullRequest::Remote(PullRequestRemote {
+                    maybe_local_alias: Some(n!("qux")),
+                    remote_ref: rr!("kamu.dev/baz"),
+                }),
+            ],
+            PullOptions::default(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(
+        res,
+        vec![vec![
+            PullJob::Sync((rr!("kamu.dev/foo").into(), n!("bar").into())),
+            PullJob::Sync((rr!("kamu.dev/baz").into(), n!("qux").into())),
+        ]]
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[tokio::test]
 async fn test_sync_from() {
     let harness = PullTestHarness::new(TenancyConfig::SingleTenant, MockDatasetEntryWriter::new());
@@ -1119,6 +1161,25 @@ impl PullTestHarness {
         tenancy_config: TenancyConfig,
         mock_dataset_entry_writer: MockDatasetEntryWriter,
     ) -> Self {
+        Self::build(tenancy_config, mock_dataset_entry_writer, None)
+    }
+
+    fn with_pull_source_resolver(
+        tenancy_config: TenancyConfig,
+        mock_pull_source_resolver: MockDatasetPullSourceResolver,
+    ) -> Self {
+        Self::build(
+            tenancy_config,
+            MockDatasetEntryWriter::new(),
+            Some(mock_pull_source_resolver),
+        )
+    }
+
+    fn build(
+        tenancy_config: TenancyConfig,
+        mock_dataset_entry_writer: MockDatasetEntryWriter,
+        maybe_mock_pull_source_resolver: Option<MockDatasetPullSourceResolver>,
+    ) -> Self {
         let base_repo_harness = BaseRepoHarness::builder()
             .tenancy_config(tenancy_config)
             .build();
@@ -1135,7 +1196,6 @@ impl PullTestHarness {
             .add::<RemoteAliasesRegistryImpl>()
             .add::<PullRequestPlannerImpl>()
             .add::<DatasetUpdateKindResolverImpl>()
-            .add::<DatasetPullSourceResolverImpl>()
             .add::<TransformPlannerImpl>()
             .add::<ObjectStoreRegistryImpl>()
             .add::<SyncServiceImpl>()
@@ -1161,6 +1221,16 @@ impl PullTestHarness {
             .add::<DatasetReferenceServiceImpl>()
             .add::<DependencyGraphServiceImpl>()
             .add::<DependencyGraphIndexer>();
+
+        match maybe_mock_pull_source_resolver {
+            Some(mock_pull_source_resolver) => {
+                b.add_value(mock_pull_source_resolver)
+                    .bind::<dyn DatasetPullSourceResolver, MockDatasetPullSourceResolver>();
+            }
+            None => {
+                b.add::<DatasetPullSourceResolverImpl>();
+            }
+        }
 
         register_message_dispatcher::<DatasetReferenceMessage>(
             &mut b,

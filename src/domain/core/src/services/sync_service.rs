@@ -371,15 +371,15 @@ impl SyncError {
         use CreateDatasetError as E;
 
         match self {
-            // The dataset ID names the source's dataset, so a collision on it means a concurrent
-            // pull created that dataset first, and planning again finds it
+            // The dataset ID names the source's dataset, so a collision on it, whether storing its
+            // `Seed` or creating its entry, means a concurrent transfer created that dataset first,
+            // and planning again finds it
             Self::CreateDatasetFailed(e) => match e {
                 E::CASFailed(_) | E::RefCollision(_) | E::Internal(_) => true,
                 E::EmptyDataset | E::Access(_) | E::NameCollision(_) => false,
             },
 
             Self::DatasetNotFound(_)
-            | Self::RefCollision(_)
             | Self::NameCollision(_)
             | Self::UnsupportedProtocol(_)
             | Self::UnsupportedIpfsStorageType(_)
@@ -393,7 +393,7 @@ impl SyncError {
             | Self::Corrupted(_)
             | Self::Access(_) => false,
 
-            Self::RefMoved(_) | Self::Internal(_) => true,
+            Self::RefCollision(_) | Self::RefMoved(_) | Self::Internal(_) => true,
         }
     }
 }
@@ -761,7 +761,7 @@ mod tests {
                 SyncError::RefCollision(odf::dataset::RefCollisionError {
                     id: fixtures.dataset_id(b"foo"),
                 }),
-                false,
+                true,
             ),
             (
                 SyncError::NameCollision(NameCollisionError {
