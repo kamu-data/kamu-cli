@@ -13,7 +13,7 @@ use std::time::Duration;
 
 use background_agent_host::CancellationToken;
 use chrono::TimeDelta;
-use database_common::DatabaseTransactionRunner;
+use database_common::transaction;
 use dill::CatalogBuilder;
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu_resources::{
@@ -384,17 +384,16 @@ impl ControllerRuntimeHarness {
         let status_generation = self.version(id).await.status_generation;
         let patch = TestResourceControllerLogic::stage_patch(stage);
 
-        DatabaseTransactionRunner::new(self.catalog().clone())
-            .transactional_with(
-                |primitives: Arc<dyn ResourceLifecyclePrimitives<TestResource>>| async move {
-                    primitives
-                        .update_conditions(&id, status_generation, &patch)
-                        .await
-                        .int_err()
-                },
-            )
-            .await
-            .unwrap();
+        transaction!(
+            #[catalog(self.catalog())]
+            |primitives: Arc<dyn ResourceLifecyclePrimitives<TestResource>>| -> Result<_, InternalError> {
+                primitives
+                    .update_conditions(&id, status_generation, &patch)
+                    .await
+                    .int_err()
+            }
+        )
+        .unwrap();
     }
 
     pub async fn version(&self, id: ResourceID) -> ResourceVersion {

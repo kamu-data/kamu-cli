@@ -12,7 +12,7 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use chrono::{DateTime, TimeDelta, Utc};
-use database_common::DatabaseTransactionRunner;
+use database_common::transaction;
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu_resources::{
     DeclarativeResource,
@@ -434,11 +434,14 @@ impl TestResourceControllerLogic {
                 self.finish_at_current_version(id).await
             }
             TestControllerBehavior::Stepwise { step_wait } => {
-                self.in_transaction(|primitives, loader| async move {
-                    let resource = loader.load(&id).await.int_err()?;
-                    Self::next_step(primitives.as_ref(), resource, now + step_wait).await
-                })
-                .await
+                transaction!(
+                    |primitives: Arc<dyn ResourceLifecyclePrimitives<TestResource>>,
+                     loader: Arc<dyn ResourceAggregateLoader<TestResource>>|
+                     -> Result<_, InternalError> {
+                        let resource = loader.load(&id).await.int_err()?;
+                        Self::next_step(primitives.as_ref(), resource, now + step_wait).await
+                    }
+                )
             }
             TestControllerBehavior::RetryAfter(delay) => {
                 Ok(ResourceProcessOutcome::RetryAt(now + delay))
@@ -452,13 +455,14 @@ impl TestResourceControllerLogic {
         &self,
         id: ResourceID,
     ) -> Result<ResourceProcessOutcome, InternalError> {
-        self.in_transaction(|_, loader| async move {
-            let resource = loader.load(&id).await.int_err()?;
-            Ok(ResourceProcessOutcome::Done(ResourceVersion::from(
-                resource.headers(),
-            )))
-        })
-        .await
+        transaction!(
+            |loader: Arc<dyn ResourceAggregateLoader<TestResource>>| -> Result<_, InternalError> {
+                let resource = loader.load(&id).await.int_err()?;
+                Ok(ResourceProcessOutcome::Done(ResourceVersion::from(
+                    resource.headers(),
+                )))
+            }
+        )
     }
 
     /// One step of `TestControllerBehavior::Stepwise`
@@ -540,19 +544,6 @@ impl TestResourceControllerLogic {
         Ok(ResourceProcessOutcome::Done(ResourceVersion::from(
             completed.headers(),
         )))
-    }
-
-    async fn in_transaction<F, Fut>(&self, f: F) -> Result<ResourceProcessOutcome, InternalError>
-    where
-        F: FnOnce(
-            Arc<dyn ResourceLifecyclePrimitives<TestResource>>,
-            Arc<dyn ResourceAggregateLoader<TestResource>>,
-        ) -> Fut,
-        Fut: Future<Output = Result<ResourceProcessOutcome, InternalError>>,
-    {
-        DatabaseTransactionRunner::new(self.catalog.clone())
-            .transactional_with2(f)
-            .await
     }
 
     pub fn stage_of(resource: &TestResource) -> Option<String> {

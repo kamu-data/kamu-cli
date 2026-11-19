@@ -333,7 +333,7 @@ where
             ));
         }
 
-        let resource_schema = ResourceSchemaId::parse(R::schema().as_str()).int_err()?;
+        let resource_schema = ResourceSchemaId::parse(R::type_uri().as_str()).int_err()?;
         ResourceConditionPatchChecker::new(self.extension_schema_registry)
             .check(patch, &resource_schema)?;
 
@@ -386,7 +386,7 @@ where
             now,
             ResourceLifecycleMessageResourceRef {
                 id: *resource.id(),
-                schema: R::schema().clone(),
+                schema: R::type_uri().clone(),
                 headers: resource.headers().clone(),
             },
             new_status,

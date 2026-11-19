@@ -10,7 +10,7 @@
 use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
-use database_common::DatabaseTransactionRunner;
+use database_common::transaction;
 use internal_error::InternalError;
 use time_source::SystemTimeSource;
 use wakeup_listener::{WakeupListener, WakeupListenerConfig};
@@ -167,13 +167,11 @@ impl ResourceControllerLoop {
     /// Sets the gauge of failing resources from the bookkeeping storage
     async fn update_failing_resources(&self) -> Result<(), InternalError> {
         let controller_name = &self.registration.meta().controller_name;
-        let count = DatabaseTransactionRunner::new(self.catalog.clone())
-            .transactional_with(
-                |repository: Arc<dyn ResourceControllerStateRepository>| async move {
-                    repository.count_failing_resources(controller_name).await
-                },
-            )
-            .await?;
+        let count = transaction!(
+            |repository: Arc<dyn ResourceControllerStateRepository>| -> Result<_, InternalError> {
+                repository.count_failing_resources(controller_name).await
+            }
+        )?;
 
         self.metrics.set_failing_resources(controller_name, count);
         Ok(())

@@ -11,7 +11,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use chrono::{DateTime, Utc};
-use database_common::DatabaseTransactionRunner;
+use database_common::transaction;
 use internal_error::{InternalError, ResultIntoInternal};
 use time_source::SystemTimeSource;
 use wakeup_listener::{WakeHint, WakeupListener, WakeupListenerConfig};
@@ -140,13 +140,11 @@ impl<'a> ResourceControllerWait<'a> {
         drained: &ResourceControllerDrainReport,
     ) -> Result<Option<DateTime<Utc>>, InternalError> {
         let query = self.registration.actionable_query();
-        let stored = DatabaseTransactionRunner::new(self.catalog.clone())
-            .transactional_with(
-                |repository: Arc<dyn ResourceControllerStateRepository>| async move {
-                    repository.find_next_deadline(query).await
-                },
-            )
-            .await?;
+        let stored = transaction!(
+            |repository: Arc<dyn ResourceControllerStateRepository>| -> Result<_, InternalError> {
+                repository.find_next_deadline(query).await
+            }
+        )?;
 
         let extra = self
             .registration

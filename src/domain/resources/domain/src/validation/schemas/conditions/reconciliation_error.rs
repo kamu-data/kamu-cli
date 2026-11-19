@@ -24,7 +24,7 @@ impl ResourceValidateSchemaValue for ReconciliationErrorCondition {
     type ValidationError = ResourceExtensionValueError;
 
     fn validate(value: &serde_json::Value) -> Result<(), Self::ValidationError> {
-        odf::metadata::serde::yaml::resources::ReconciliationError::deserialize(value)
+        odf::meta::serde::yaml::resources::ReconciliationError::deserialize(value)
             .map(|_| ())
             .map_err(|err| {
                 ResourceExtensionValueError::new(format!("condition value is invalid: {err}"))

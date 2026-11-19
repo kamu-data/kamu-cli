@@ -10,7 +10,7 @@
 use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
-use database_common::DatabaseTransactionRunner;
+use database_common::transaction;
 use internal_error::InternalError;
 use retry_backoff::RetryBackoff;
 
@@ -51,18 +51,16 @@ impl<'a> ResourceControllerOutcomeRecorder<'a> {
     ) -> Result<(), InternalError> {
         let meta = self.registration.meta();
 
-        DatabaseTransactionRunner::new(self.catalog.clone())
-            .transactional_with(
-                |repository: Arc<dyn ResourceControllerStateRepository>| async move {
-                    // The previous row carries the failure count and what the
-                    // controller handled before, which a retry or failure keeps
-                    let previous = repository.get_state(&meta.controller_name, &id).await?;
-                    let state =
-                        attempt.next_state(meta, id, previous.as_ref(), now, self.failure_backoff);
-                    repository.upsert_state(&state).await
-                },
-            )
-            .await
+        transaction!(
+            |repository: Arc<dyn ResourceControllerStateRepository>| -> Result<_, InternalError> {
+                // The previous row carries the failure count and what the
+                // controller handled before, which a retry or failure keeps
+                let previous = repository.get_state(&meta.controller_name, &id).await?;
+                let state =
+                    attempt.next_state(meta, id, previous.as_ref(), now, self.failure_backoff);
+                repository.upsert_state(&state).await
+            }
+        )
     }
 }
 

@@ -33,12 +33,12 @@ pub enum ResourceEvent<TSpec> {
 pub struct ResourceEventCreated<TSpec> {
     pub event_time: DateTime<Utc>,
     pub id: ResourceID,
-    #[serde_as(as = "odf::metadata::serde::yaml::resources::ResourceHeadersInput")]
+    #[serde_as(as = "odf::meta::serde::yaml::resources::ResourceHeadersInput")]
     pub headers: ResourceHeadersInput,
     pub spec: TSpec,
     /// The conditions the resource type starts every new resource with, from
     /// `ResourceStatusRules::initial_conditions`; absent when there are none
-    #[serde_as(as = "Option<odf::metadata::serde::yaml::resources::ResourceConditions>")]
+    #[serde_as(as = "Option<odf::meta::serde::yaml::resources::ResourceConditions>")]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub initial_conditions: Option<ResourceConditions>,
 }
@@ -48,7 +48,7 @@ pub struct ResourceEventCreated<TSpec> {
 pub struct ResourceEventHeadersUpdated {
     pub event_time: DateTime<Utc>,
     pub id: ResourceID,
-    #[serde_as(as = "odf::metadata::serde::yaml::resources::ResourceHeadersInput")]
+    #[serde_as(as = "odf::meta::serde::yaml::resources::ResourceHeadersInput")]
     pub new_headers: ResourceHeadersInput,
     /// Absent in events stored before header updates bumped the generation;
     /// such events leave it unchanged.
@@ -70,7 +70,7 @@ pub struct ResourceEventSpecUpdated<TSpec> {
 pub struct ResourceEventStatusUpdated {
     pub event_time: DateTime<Utc>,
     pub id: ResourceID,
-    #[serde_as(as = "odf::metadata::serde::yaml::resources::ResourceStatus")]
+    #[serde_as(as = "odf::meta::serde::yaml::resources::ResourceStatus")]
     pub new_status: ResourceStatus,
 }
 

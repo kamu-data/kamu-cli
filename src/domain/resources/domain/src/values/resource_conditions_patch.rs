@@ -83,7 +83,7 @@ mod tests {
     use crate::empty_resource_conditions;
 
     fn key(name: &str) -> TypeUri {
-        TypeUri::new_unchecked(format!("https://test.kamu.dev/schemas/conditions/{name}"))
+        TypeUri::new_unchecked(&format!("https://test.kamu.dev/schemas/conditions/{name}"))
     }
 
     fn conditions(entries: &[(&str, serde_json::Value)]) -> ResourceConditions {

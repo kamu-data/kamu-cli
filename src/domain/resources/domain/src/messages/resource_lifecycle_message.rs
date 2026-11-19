@@ -178,7 +178,7 @@ impl ResourceLifecycleMessageStatusUpdated {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ResourceLifecycleMessageStatus {
-    #[serde_as(as = "odf::metadata::serde::yaml::resources::ResourcePhase")]
+    #[serde_as(as = "odf::meta::serde::yaml::resources::ResourcePhase")]
     pub phase: ResourcePhase,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub observed_generation: Option<u64>,
@@ -211,7 +211,7 @@ impl From<&ResourceStatus> for ResourceLifecycleMessageStatus {
 pub struct ResourceLifecycleMessageResourceRef {
     pub id: ResourceID,
     pub schema: TypeUri,
-    #[serde_as(as = "odf::metadata::serde::yaml::resources::ResourceHeaders")]
+    #[serde_as(as = "odf::meta::serde::yaml::resources::ResourceHeaders")]
     pub headers: ResourceHeaders,
 }
 

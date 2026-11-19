@@ -74,7 +74,7 @@ async fn test_deletion_requested_message_hints_once_per_batch() {
 
     assert_eq!(
         harness.hinted_schemas(),
-        vec![TestResource::schema().clone()]
+        vec![TestResource::type_uri().clone()]
     );
 }
 
@@ -93,7 +93,7 @@ async fn test_status_updated_message_hints_its_schema() {
 
     assert_eq!(
         harness.hinted_schemas(),
-        vec![TestResource::schema().clone()]
+        vec![TestResource::type_uri().clone()]
     );
 }
 
@@ -111,7 +111,7 @@ async fn test_deleted_message_hints_nothing() {
         .await
         .unwrap();
 
-    assert_eq!(harness.hinted_schemas(), vec![]);
+    assert_eq!(harness.hinted_schemas(), Vec::<TypeUri>::new());
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

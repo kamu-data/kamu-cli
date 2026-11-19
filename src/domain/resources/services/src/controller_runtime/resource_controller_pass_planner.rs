@@ -11,7 +11,7 @@ use std::collections::HashSet;
 use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
-use database_common::DatabaseTransactionRunner;
+use database_common::transaction;
 use internal_error::InternalError;
 
 use crate::controller_runtime::{
@@ -103,61 +103,59 @@ impl<'a> ResourceControllerPassPlanner<'a> {
 
         // Both sources are read in one transaction, so that the bookkeeping of
         // the extra resources and the eligibility query see the same state
-        DatabaseTransactionRunner::new(self.catalog.clone())
-            .transactional_with(
-                |repository: Arc<dyn ResourceControllerStateRepository>| async move {
-                    let mut pass = ResourceControllerPass::default();
-                    let mut selection = ExtrasSelection {
-                        listed: extras.len(),
-                        taken: 0,
-                    };
-                    // A resource can be both extra and eligible; it is processed
-                    // once. One the extras leave out stays open to the
-                    // eligibility predicates, which apply suppressions of their own
-                    let mut listed = HashSet::new();
-                    let mut planned = HashSet::new();
+        transaction!(
+            |repository: Arc<dyn ResourceControllerStateRepository>| -> Result<_, InternalError> {
+                let mut pass = ResourceControllerPass::default();
+                let mut selection = ExtrasSelection {
+                    listed: extras.len(),
+                    taken: 0,
+                };
+                // A resource can be both extra and eligible; it is processed
+                // once. One the extras leave out stays open to the
+                // eligibility predicates, which apply suppressions of their own
+                let mut listed = HashSet::new();
+                let mut planned = HashSet::new();
 
-                    for id in extras {
-                        if listed.insert(id)
-                            && self
-                                .plan_extra(repository.as_ref(), id, now, hold_back, &mut pass)
-                                .await?
-                        {
-                            planned.insert(id);
-                            selection.taken += 1;
-                        }
+                for id in extras {
+                    if listed.insert(id)
+                        && self
+                            .plan_extra(repository.as_ref(), id, now, hold_back, &mut pass)
+                            .await?
+                    {
+                        planned.insert(id);
+                        selection.taken += 1;
                     }
+                }
 
-                    // Held back resources may still be eligible: asking for as
-                    // many more rows keeps them from filling the batch, and the
-                    // rows they leave over are not taken past it
-                    let eligible = repository
-                        .find_actionable_resource_ids(
-                            self.registration.actionable_query(),
-                            now,
-                            self.batch_size + hold_back.len(),
-                        )
-                        .await?;
-                    let mut eligible_taken = 0;
-                    for id in eligible {
-                        if eligible_taken == self.batch_size {
-                            break;
-                        }
-                        if !planned.insert(id) {
-                            continue;
-                        }
-                        if hold_back.holds_back_eligible(&id) {
-                            pass.note_held_back();
-                        } else {
-                            pass.add_candidate(ResourceControllerCandidate::eligible(id));
-                            eligible_taken += 1;
-                        }
+                // Held back resources may still be eligible: asking for as
+                // many more rows keeps them from filling the batch, and the
+                // rows they leave over are not taken past it
+                let eligible = repository
+                    .find_actionable_resource_ids(
+                        self.registration.actionable_query(),
+                        now,
+                        self.batch_size + hold_back.len(),
+                    )
+                    .await?;
+                let mut eligible_taken = 0;
+                for id in eligible {
+                    if eligible_taken == self.batch_size {
+                        break;
                     }
+                    if !planned.insert(id) {
+                        continue;
+                    }
+                    if hold_back.holds_back_eligible(&id) {
+                        pass.note_held_back();
+                    } else {
+                        pass.add_candidate(ResourceControllerCandidate::eligible(id));
+                        eligible_taken += 1;
+                    }
+                }
 
-                    Ok((pass, selection))
-                },
-            )
-            .await
+                Ok((pass, selection))
+            }
+        )
     }
 
     /// Adds an extra resource to the pass, or defers it while it backs off.
