@@ -7,10 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::sync::Arc;
-
 use chrono::{DateTime, Utc};
-use database_common_macros::transactional_method1;
 use internal_error::InternalError;
 use retry_backoff::RetryBackoff;
 
@@ -21,31 +18,28 @@ use crate::domain::{ResourceControllerStateRepository, ResourceID};
 
 /// Writes the bookkeeping row of a finished attempt.
 ///
-/// It runs in a transaction of its own, after `process` committed its own
-/// work. A crash between the two loses only the record: the resource stays
+/// The caller runs it in a transaction of its own, after `process` committed
+/// its own work. A crash between the two loses only the record: the resource stays
 /// eligible and `process`, being idempotent, is asked again.
 pub(crate) struct ResourceControllerOutcomeRecorder<'a> {
     registration: &'a ResourceControllerRegistration,
-    catalog: &'a dill::Catalog,
     failure_backoff: &'a RetryBackoff,
 }
 
 impl<'a> ResourceControllerOutcomeRecorder<'a> {
     pub fn new(
         registration: &'a ResourceControllerRegistration,
-        catalog: &'a dill::Catalog,
         failure_backoff: &'a RetryBackoff,
     ) -> Self {
         Self {
             registration,
-            catalog,
             failure_backoff,
         }
     }
 
-    #[transactional_method1(repository: Arc<dyn ResourceControllerStateRepository>)]
     pub async fn record(
         &self,
+        repository: &dyn ResourceControllerStateRepository,
         id: ResourceID,
         attempt: &ResourceProcessAttempt,
         now: DateTime<Utc>,

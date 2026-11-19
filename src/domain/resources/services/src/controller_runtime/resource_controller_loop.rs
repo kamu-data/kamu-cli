@@ -112,7 +112,6 @@ impl ResourceControllerLoop {
             ResourceProcessExecutor::new(&self.registration, self.config.process_concurrency.get());
         let recorder = ResourceControllerOutcomeRecorder::new(
             &self.registration,
-            &self.catalog,
             &self.config.failure_backoff,
         );
 
@@ -153,9 +152,13 @@ impl ResourceControllerLoop {
             for (candidate, attempt) in &attempts {
                 // A failure to record fails the drain: the loop is then
                 // restarted, and the resource processed again
-                recorder
-                    .record(candidate.id(), attempt, self.time_source.now())
-                    .await?;
+                transaction!(
+                    |repository: Arc<dyn ResourceControllerStateRepository>| -> Result<_, InternalError> {
+                        recorder
+                            .record(repository.as_ref(), candidate.id(), attempt, self.time_source.now())
+                            .await
+                    }
+                )?;
             }
 
             if let Some(listener) = listener {
