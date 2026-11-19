@@ -38,7 +38,6 @@ chrono = { version = "0.4", default-features = false, features = [
     "clock",
 ] }
 database-common = { workspace = true }
-database-common-macros = { workspace = true }
 dill = { version = "0.17", default-features = false }
 email-utils = { workspace = true }
 enum-variants = { workspace = true }

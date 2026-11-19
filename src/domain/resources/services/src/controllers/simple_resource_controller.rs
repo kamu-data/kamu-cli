@@ -7,24 +7,33 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use chrono::{DateTime, Utc};
-use internal_error::{ErrorIntoInternal, InternalError};
+use std::marker::PhantomData;
+use std::sync::Arc;
+
+use database_common::transaction;
+use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
+use time_source::SystemTimeSource;
 
 use crate::domain::{
     EventSourcedResource,
-    ResourceCleanupFailure,
+    ResourceAggregateLoader,
     ResourceID,
+    ResourceLifecyclePrimitives,
     ResourceLifecycleTransitionError,
     ResourceProcessOutcome,
     ResourceReconcileError,
     ResourceStaleExpectationError,
     ResourceVersion,
     SimpleResourceDeletionError,
+    SimpleResourceReconciler,
     SimpleResourceReconciliationError,
 };
 use crate::{
     ResourceCleanupTransactionError,
+    SimpleResourceCleanupHelper,
     SimpleResourceCleanupOutcome,
+    SimpleResourceDeletionRecorder,
+    SimpleResourceReconciliationHelper,
     SimpleResourceReconciliationOutcome,
 };
 
@@ -33,7 +42,7 @@ use crate::{
 /// The next step for one resource of a type driven by a
 /// `SimpleResourceReconciler`, as the runtime asks for it.
 ///
-/// Each phase runs in a transaction of its own, which the implementor opens:
+/// Each phase runs in a transaction of its own:
 ///
 /// | State | Step | Outcome |
 /// | --- | --- | --- |
@@ -49,52 +58,33 @@ use crate::{
 /// the drain, which reads its current state.
 ///
 /// Public only for `declare_simple_resource_controller_adapter!`, which
-/// implements it in the crate of each type.
+/// registers it for each type in the crate of that type.
 #[doc(hidden)]
-#[async_trait::async_trait]
-pub trait SimpleResourceControllerSteps<R>: Sync
+pub struct SimpleResourceController<'a, R> {
+    catalog: &'a dill::Catalog,
+    time_source: &'a dyn SystemTimeSource,
+    _resource: PhantomData<fn() -> R>,
+}
+
+impl<'a, R> SimpleResourceController<'a, R>
 where
     R: EventSourcedResource + 'static,
     R::LifecycleError: std::error::Error + Send + Sync + 'static,
 {
-    fn now(&self) -> DateTime<Utc>;
+    pub fn new(catalog: &'a dill::Catalog, time_source: &'a dyn SystemTimeSource) -> Self {
+        Self {
+            catalog,
+            time_source,
+            _resource: PhantomData,
+        }
+    }
 
-    async fn load(&self, id: ResourceID) -> Result<R, InternalError>;
-
-    /// Returns `None` when the resource needs no reconciliation
-    async fn start_reconciliation(
-        &self,
-        id: ResourceID,
-    ) -> Result<Option<R>, ResourceLifecycleTransitionError<R>>;
-
-    /// Runs `reconcile` and records its outcome
-    async fn finish_reconciliation(
-        &self,
-        started: R,
-    ) -> Result<SimpleResourceReconciliationOutcome<R>, SimpleResourceReconciliationError<R>>;
-
-    async fn run_cleanup(
-        &self,
-        id: ResourceID,
-    ) -> Result<SimpleResourceCleanupOutcome, ResourceCleanupTransactionError<R>>;
-
-    /// Returns the resource in its new state, or `None` when its deletion
-    /// completed meanwhile
-    async fn complete_deletion(
-        &self,
-        id: ResourceID,
-    ) -> Result<Option<R>, SimpleResourceDeletionError<R>>;
-
-    async fn record_cleanup_failure(
-        &self,
-        failure: ResourceCleanupFailure,
-    ) -> Result<(), SimpleResourceDeletionError<R>>;
-
-    async fn process_resource(
-        &self,
-        id: ResourceID,
-    ) -> Result<ResourceProcessOutcome, InternalError> {
-        let resource = self.load(id).await?;
+    pub async fn process(&self, id: ResourceID) -> Result<ResourceProcessOutcome, InternalError> {
+        let resource = transaction!(
+            |loader: Arc<dyn ResourceAggregateLoader<R>>| -> Result<_, InternalError> {
+                loader.load(&id).await.int_err()
+            }
+        )?;
         let version = ResourceVersion::from(resource.headers());
 
         if resource.needs_cleanup() {
@@ -113,8 +103,17 @@ where
     ) -> Result<ResourceProcessOutcome, InternalError> {
         use ResourceLifecycleTransitionError as E;
         use ResourceStaleExpectationError as Stale;
+        use SimpleResourceReconciliationError as Failure;
+        use SimpleResourceReconciliationOutcome as Outcome;
 
-        let started = match self.start_reconciliation(id).await {
+        // 1: Start, committed before the reconciler runs, a stable hand-off
+        // point for the second phase
+        let started = transaction!(
+            |primitives: Arc<dyn ResourceLifecyclePrimitives<R>>| -> Result<_, E<R>> {
+                primitives.begin_reconciliation(&id, None).await
+            }
+        );
+        let started = match started {
             Ok(Some(started)) => started,
             Ok(None) => return Ok(ResourceProcessOutcome::Done(loaded)),
             Err(
@@ -130,10 +129,15 @@ where
             }
         };
 
-        use SimpleResourceReconciliationError as Failure;
-        use SimpleResourceReconciliationOutcome as Outcome;
-
-        match self.finish_reconciliation(started).await {
+        // 2: Reconcile and record the outcome
+        let finished = transaction!(|primitives: Arc<dyn ResourceLifecyclePrimitives<R>>,
+                                     reconciler: Arc<dyn SimpleResourceReconciler<R>>|
+         -> Result<_, Failure<R>> {
+            SimpleResourceReconciliationHelper::new(primitives.as_ref(), reconciler.as_ref())
+                .finish_reconciliation_phase(started)
+                .await
+        });
+        match finished {
             Ok(Outcome::Reconciled(reconciled)) => Ok(ResourceProcessOutcome::Done(
                 ResourceVersion::from(reconciled.headers()),
             )),
@@ -165,15 +169,40 @@ where
         use ResourceCleanupTransactionError as Cleanup;
         use SimpleResourceDeletionError as E;
 
-        match self.run_cleanup(id).await {
+        // 1: Clean up
+        let cleaned_up = transaction!(|loader: Arc<dyn ResourceAggregateLoader<R>>,
+                                       reconciler: Arc<dyn SimpleResourceReconciler<R>>|
+         -> Result<_, Cleanup<R>> {
+            SimpleResourceCleanupHelper::new(loader.as_ref(), reconciler.as_ref())
+                .cleanup(id)
+                .await
+        });
+        match cleaned_up {
             Ok(SimpleResourceCleanupOutcome::CleanedUp) => {}
-            // The deletion completed meanwhile
             Ok(SimpleResourceCleanupOutcome::NotAwaitingCleanup) => {
-                return self.done_at_current_version(id).await;
+                // The deletion completed meanwhile
+                let deleted = transaction!(
+                    |loader: Arc<dyn ResourceAggregateLoader<R>>| -> Result<_, InternalError> {
+                        loader.load(&id).await.int_err()
+                    }
+                )?;
+                return Ok(ResourceProcessOutcome::Done(ResourceVersion::from(
+                    deleted.headers(),
+                )));
             }
             Err(Cleanup::CleanupFailed(failure)) => {
                 let error = failure.error.clone();
-                match self.record_cleanup_failure(failure).await {
+
+                // 2a: Record the failure
+                let recorded = transaction!(|primitives: Arc<
+                    dyn ResourceLifecyclePrimitives<R>,
+                >|
+                 -> Result<_, E<R>> {
+                    SimpleResourceDeletionRecorder::new(primitives.as_ref())
+                        .record_cleanup_failure(failure)
+                        .await
+                });
+                match recorded {
                     Ok(()) | Err(E::ConcurrentModification(_)) => {}
                     Err(err @ (E::LoadFailed(_) | E::Internal(_) | E::Lifecycle(_))) => {
                         return Err(err.int_err());
@@ -186,30 +215,37 @@ where
             Err(Cleanup::Deletion(err)) => return Err(err.int_err()),
         }
 
-        match self.complete_deletion(id).await {
+        // 2b: Complete the deletion
+        let completed = transaction!(
+            |primitives: Arc<dyn ResourceLifecyclePrimitives<R>>| -> Result<_, E<R>> {
+                SimpleResourceDeletionRecorder::new(primitives.as_ref())
+                    .complete_deletion(id)
+                    .await
+            }
+        );
+        match completed {
             Ok(Some(deleted)) => Ok(ResourceProcessOutcome::Done(ResourceVersion::from(
                 deleted.headers(),
             ))),
-            // The deletion completed meanwhile
-            Ok(None) => self.done_at_current_version(id).await,
+            Ok(None) => {
+                // The deletion completed meanwhile
+                let deleted = transaction!(
+                    |loader: Arc<dyn ResourceAggregateLoader<R>>| -> Result<_, InternalError> {
+                        loader.load(&id).await.int_err()
+                    }
+                )?;
+                Ok(ResourceProcessOutcome::Done(ResourceVersion::from(
+                    deleted.headers(),
+                )))
+            }
             // Another writer saved the resource first
             Err(E::ConcurrentModification(_)) => Ok(self.retry_now()),
             Err(err @ (E::LoadFailed(_) | E::Internal(_) | E::Lifecycle(_))) => Err(err.int_err()),
         }
     }
 
-    async fn done_at_current_version(
-        &self,
-        id: ResourceID,
-    ) -> Result<ResourceProcessOutcome, InternalError> {
-        let resource = self.load(id).await?;
-        Ok(ResourceProcessOutcome::Done(ResourceVersion::from(
-            resource.headers(),
-        )))
-    }
-
     fn retry_now(&self) -> ResourceProcessOutcome {
-        ResourceProcessOutcome::RetryAt(self.now())
+        ResourceProcessOutcome::RetryAt(self.time_source.now())
     }
 }
 

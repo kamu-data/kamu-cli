@@ -676,9 +676,10 @@ This crate turns the domain traits into running code. Module layout: `services/`
   ([(c) Deletion](#c-deletion)).
 - **`SimpleResourceControllerAdapter`** — generated per type by
   `declare_simple_resource_controller_adapter!`: the type's main lifecycle controller on the
-  [controller runtime](#controller-runtime). Its `process` runs the reconciler and records the
-  outcome through the lifecycle primitives, owning the transactions of both
-  ([(b) Reconciliation](#b-reconciliation), [(c) Deletion](#c-deletion)).
+  [controller runtime](#controller-runtime), a component whose `process` runs
+  `SimpleResourceController<R>`. That runs the reconciler and records the outcome through the
+  lifecycle primitives; each of its transactions is a `transaction!` block in the method that runs
+  the phase ([(b) Reconciliation](#b-reconciliation), [(c) Deletion](#c-deletion)).
 
 **Two-phase apply.** `ApplyResourceUseCase<R>` separates *planning* (validate, diff, decide
 create/update/untouched, without writing) from *application* (persist + publish)
@@ -1608,27 +1609,31 @@ lines rather than two whole-object dumps — the property that motivated this de
 
 ```mermaid
 sequenceDiagram
-    participant A as SimpleResourceControllerAdapter (process)
+    participant A as SimpleResourceController<R> (process)
     participant Ctl as SimpleResourceReconciler<R>
     participant P as LifecyclePrimitives<R>
 
-    A->>P: begin_reconciliation(id) → StatusUpdated if the generation is not yet reconciled and not already Reconciling (status gen. N)
-    A->>Ctl: reconcile(resource)  %% e.g. SecretSet builds encrypted projection
-    alt success
-        A->>P: complete_reconciliation(id, generation, N) → StatusUpdated (Ready)
-    else failure
-        A->>P: fail_reconciliation(id, generation, N, error) → StatusUpdated (Failed or Degraded)
+    rect rgba(100, 150, 255, 0.15)
+        A->>P: begin_reconciliation(id) → StatusUpdated if the generation is not yet reconciled and not already Reconciling (status gen. N)
     end
-    alt Stale: deletion requested or generation moved
-        A->>A: discard the outcome
+    rect rgba(100, 150, 255, 0.15)
+        A->>Ctl: reconcile(resource)  %% e.g. SecretSet builds encrypted projection
+        alt success
+            A->>P: complete_reconciliation(id, generation, N) → StatusUpdated (Ready)
+        else failure
+            A->>P: fail_reconciliation(id, generation, N, error) → StatusUpdated (Failed or Degraded)
+        end
+        alt Stale: deletion requested or generation moved
+            A->>A: discard the outcome
+        end
     end
 ```
 
 Reconciliation is one `process` call of the type's controller on the
 [controller runtime](#controller-runtime), in **two separately-committed phases**, each writing the
-status at most once through a [lifecycle primitive](#lifecycle-primitives). The adapter owns both
-transactions
-([`controllers/simple_resource_controller_adapter.rs`](/src/domain/resources/services/src/controllers/simple_resource_controller_adapter.rs)):
+status at most once through a [lifecycle primitive](#lifecycle-primitives).
+`SimpleResourceController::process_reconciliation` opens both transactions
+([`controllers/simple_resource_controller.rs`](/src/domain/resources/services/src/controllers/simple_resource_controller.rs)):
 
 - **Phase 1** commits the `Reconciling` status, a stable hand-off point, which brings
   `statusGeneration` to some N. A resource already `Reconciling` keeps its status, and N is its
@@ -1661,7 +1666,7 @@ sequenceDiagram
     participant P as LifecyclePrimitives<R>
     participant OB as Outbox
     participant RT as Controller runtime
-    participant A as SimpleResourceControllerAdapter (process)
+    participant A as SimpleResourceController<R> (process)
     participant Ctl as SimpleResourceReconciler<R>
 
     RQ->>P: request_deletion(ids) → DeletionRequested (Deleting)
@@ -1684,7 +1689,7 @@ sequenceDiagram
 
 Deletion runs in two steps, as the ODF resource framework defines them
 ([`use_cases/request_deletion.rs`](/src/domain/resources/services/src/use_cases/request_deletion.rs),
-[`controllers/simple_resource_controller_adapter.rs`](/src/domain/resources/services/src/controllers/simple_resource_controller_adapter.rs)):
+[`controllers/simple_resource_controller.rs`](/src/domain/resources/services/src/controllers/simple_resource_controller.rs)):
 
 - **Requesting deletion** moves the resource to `Deleting` and frees its name
   ([§6](#6-persistence-model)). Its headers and spec can no longer change, and it is no longer
