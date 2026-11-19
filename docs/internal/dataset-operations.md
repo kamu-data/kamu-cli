@@ -104,8 +104,9 @@ sequenceDiagram
 
     rect rgba(100, 150, 255, 0.15)
     J->>G: check PollingIngest for the principal
-    J->>P: plan at current HEAD, resolve env vars
+    J->>P: plan at current HEAD
     P-->>J: plan, dataset detached
+    J->>J: resolve the source's env vars
     end
     J->>I: ingest: fetch, read, stage, append blocks
     I-->>J: Updated { old_head, new_head }

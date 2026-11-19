@@ -70,9 +70,7 @@ Recommendation: for ease of reading, use the following format:
 - `kamu pull --reset-derivatives-on-diverged-input` reports a reset derivative as updated, even when
   the transform that follows the reset has no new data to process
 - `kamu pull` of several datasets still pulls the others when the remote of one is unknown or
-  cannot be reached, or when the account may not update some of them, and reports every dataset.
-  Before, an unreachable remote pulled none of them, and a denied dataset was reported alone while
-  the rest were skipped
+  cannot be reached, and reports every dataset. Before, an unreachable remote pulled none of them
 - `kamu pull` without `--recursive` no longer fails a requested derivative because one of its
   inputs, which it does not pull, has an ambiguous or missing source
 - A slow or unreachable remote repository no longer delays other writers to the node's database
