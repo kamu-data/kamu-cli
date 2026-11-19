@@ -94,6 +94,13 @@ impl TaskAgentMetrics {
             .set(unix_timestamp_seconds(started_at));
     }
 
+    /// Clears the running task, without recording an execution
+    pub(crate) fn on_no_task_running(&self) {
+        self.running_task_started_timestamp_seconds
+            .with_label_values(&[MAIN_TASK_EXECUTOR])
+            .set(0.0);
+    }
+
     pub(crate) fn on_task_finished(
         &self,
         plan_type: &str,

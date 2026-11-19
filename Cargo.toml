@@ -109,6 +109,7 @@ members = [
     "src/odf/storage-lfs",
     "src/odf/storage-s3",
     "src/utils/async-utils",
+    "src/utils/background-agent-host",
     "src/utils/common-macros",
     "src/utils/container-runtime",
     "src/utils/crypto-eip712-utils",
@@ -132,6 +133,7 @@ members = [
     "src/utils/observability",
     "src/utils/random-strings",
     "src/utils/repo-tools",
+    "src/utils/retry-backoff",
     "src/utils/s3-utils",
     "src/utils/server-console",
     "src/utils/test-utils",
@@ -148,6 +150,7 @@ kamu-cli = { version = "0.272.1", path = "src/app/cli", default-features = false
 
 # Utils
 async-utils = { version = "0.272.1", path = "src/utils/async-utils", default-features = false }
+background-agent-host = { version = "0.272.1", path = "src/utils/background-agent-host", default-features = false }
 common-macros = { version = "0.272.1", path = "src/utils/common-macros", default-features = false }
 container-runtime = { version = "0.272.1", path = "src/utils/container-runtime", default-features = false }
 crypto-eip712-utils = { version = "0.272.1", path = "src/utils/crypto-eip712-utils", default-features = false }
@@ -170,6 +173,7 @@ messaging-outbox = { version = "0.272.1", path = "src/utils/messaging-outbox", d
 multiformats = { version = "0.272.1", path = "src/utils/multiformats", default-features = false }
 observability = { version = "0.272.1", path = "src/utils/observability", default-features = false }
 random-strings = { version = "0.272.1", path = "src/utils/random-strings", default-features = false }
+retry-backoff = { version = "0.272.1", path = "src/utils/retry-backoff", default-features = false }
 s3-utils = { version = "0.272.1", path = "src/utils/s3-utils", default-features = false }
 server-console = { version = "0.272.1", path = "src/utils/server-console", default-features = false }
 test-utils = { version = "0.272.1", path = "src/utils/test-utils", default-features = false }

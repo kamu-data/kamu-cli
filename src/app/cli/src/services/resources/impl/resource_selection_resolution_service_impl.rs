@@ -222,7 +222,7 @@ impl ResourceSelectionResolutionService for ResourceSelectionResolutionServiceIm
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// An id finds a resource being deleted, as the facade's lookups by id do, so
-/// that deleting it again retries its cleanup
+/// that deleting it again reports where its deletion stands
 const ID_LOOKUP_VISIBILITY: ResourceVisibility = ResourceVisibility::IncludeDeleting;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

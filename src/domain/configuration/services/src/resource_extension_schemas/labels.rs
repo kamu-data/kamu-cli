@@ -45,7 +45,8 @@ declare_resource_extension_schema_dispatcher!(
     schema_id = RESOURCE_LABEL_LEGACY_CONFIG_TARGET_DATASET_SCHEMA_URI,
     kind = ResourceExtensionKind::Label,
     document = Some(RESOURCE_LABEL_LEGACY_CONFIG_TARGET_DATASET_SCHEMA_DOC),
-    applications = LEGACY_CONFIG_TARGET_DATASET_APPLICATIONS
+    applications = LEGACY_CONFIG_TARGET_DATASET_APPLICATIONS,
+    condition = None
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

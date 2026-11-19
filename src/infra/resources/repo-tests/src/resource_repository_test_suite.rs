@@ -12,6 +12,12 @@ use std::sync::LazyLock;
 
 use chrono::{DateTime, TimeZone, Utc};
 use database_common::PaginationOpts;
+use database_common::testing::{
+    RacingTransactionOutcome,
+    in_committed_transaction,
+    in_rolled_back_transaction,
+    race_transactions,
+};
 use dill::Catalog;
 use event_sourcing::EventID;
 use futures::TryStreamExt;
@@ -3558,6 +3564,184 @@ pub async fn test_find_resource_ids_by_schema_and_label_any_account_discriminate
         vec![wanted],
         "spanning accounts must not relax the liveness or label-pair filters"
     );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_rolled_back_create_leaves_no_resource(catalog: &Catalog) {
+    let account_handle = odf::ResourceOwnerHandle::new_test("test-account");
+    let snapshot = make_test_snapshot(&account_handle, &TEST_KIND, "rolled-back");
+    let id = snapshot.id;
+
+    in_rolled_back_transaction(catalog, |catalog| async move {
+        let repo = catalog.get_one::<dyn ResourceRepository>().unwrap();
+        repo.create_resource(&snapshot).await.unwrap();
+    })
+    .await;
+
+    let (found, found_id) = in_committed_transaction(catalog, |catalog| async move {
+        let repo = catalog.get_one::<dyn ResourceRepository>().unwrap();
+        let found = repo.find_resource_snapshot_by_id(&id).await.unwrap();
+        let found_id = repo
+            .find_resource_id_by_name(
+                &account_handle.did,
+                &TEST_KIND,
+                &"rolled-back".parse().unwrap(),
+            )
+            .await
+            .unwrap();
+        (found, found_id)
+    })
+    .await;
+    assert_eq!(found, None);
+    assert_eq!(found_id, None);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_create_same_name_in_concurrent_transactions(catalog: &Catalog) {
+    let account_handle = odf::ResourceOwnerHandle::new_test("test-account");
+    let first = make_test_snapshot(&account_handle, &TEST_KIND, "contested");
+    let second = make_test_snapshot(&account_handle, &TEST_KIND, "contested");
+    let first_id = first.id;
+
+    let outcome = race_transactions(
+        catalog,
+        |catalog| async move {
+            let repo = catalog.get_one::<dyn ResourceRepository>().unwrap();
+            repo.create_resource(&first).await.unwrap();
+        },
+        move |catalog| async move {
+            let repo = catalog.get_one::<dyn ResourceRepository>().unwrap();
+            repo.create_resource(&second).await
+        },
+    )
+    .await;
+
+    assert_matches!(
+        outcome,
+        RacingTransactionOutcome::FailedAtWrite(CreateResourceError::Duplicate(_))
+            | RacingTransactionOutcome::FailedAtCommit(_)
+    );
+    let committed_id = in_committed_transaction(catalog, |catalog| async move {
+        catalog
+            .get_one::<dyn ResourceRepository>()
+            .unwrap()
+            .find_resource_id_by_name(
+                &account_handle.did,
+                &TEST_KIND,
+                &"contested".parse().unwrap(),
+            )
+            .await
+            .unwrap()
+    })
+    .await;
+    assert_eq!(committed_id, Some(first_id));
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_create_name_freed_by_concurrent_deletion_request(catalog: &Catalog) {
+    let account_handle = odf::ResourceOwnerHandle::new_test("test-account");
+    let holder = make_test_snapshot(&account_handle, &TEST_KIND, "contested");
+    let successor = make_test_snapshot(&account_handle, &TEST_KIND, "contested");
+    let (holder_id, successor_id) = (holder.id, successor.id);
+
+    in_committed_transaction(catalog, |catalog| async move {
+        let repo = catalog.get_one::<dyn ResourceRepository>().unwrap();
+        repo.create_resource(&holder).await.unwrap();
+    })
+    .await;
+
+    let outcome = race_transactions(
+        catalog,
+        |catalog| async move {
+            let repo = catalog.get_one::<dyn ResourceRepository>().unwrap();
+            let mut snapshot = repo
+                .find_resource_snapshot_by_id(&holder_id)
+                .await
+                .unwrap()
+                .unwrap();
+            snapshot.headers.deletion_requested_at = Some(Utc::now());
+            repo.update_resource(&snapshot, snapshot.last_event_id)
+                .await
+                .unwrap();
+        },
+        move |catalog| async move {
+            let repo = catalog.get_one::<dyn ResourceRepository>().unwrap();
+            repo.create_resource(&successor).await
+        },
+    )
+    .await;
+
+    assert_matches!(outcome, RacingTransactionOutcome::Committed);
+    let committed_id = in_committed_transaction(catalog, |catalog| async move {
+        catalog
+            .get_one::<dyn ResourceRepository>()
+            .unwrap()
+            .find_resource_id_by_name(
+                &account_handle.did,
+                &TEST_KIND,
+                &"contested".parse().unwrap(),
+            )
+            .await
+            .unwrap()
+    })
+    .await;
+    assert_eq!(committed_id, Some(successor_id));
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_create_name_twice_while_concurrent_deletion_request_frees_it(catalog: &Catalog) {
+    let account_handle = odf::ResourceOwnerHandle::new_test("test-account");
+    let holder = make_test_snapshot(&account_handle, &TEST_KIND, "contested");
+    let first_successor = make_test_snapshot(&account_handle, &TEST_KIND, "contested");
+    let second_successor = make_test_snapshot(&account_handle, &TEST_KIND, "contested");
+    let (holder_id, second_successor_id) = (holder.id, second_successor.id);
+
+    in_committed_transaction(catalog, |catalog| async move {
+        let repo = catalog.get_one::<dyn ResourceRepository>().unwrap();
+        repo.create_resource(&holder).await.unwrap();
+    })
+    .await;
+
+    let outcome = race_transactions(
+        catalog,
+        |catalog| async move {
+            let repo = catalog.get_one::<dyn ResourceRepository>().unwrap();
+            let mut snapshot = repo
+                .find_resource_snapshot_by_id(&holder_id)
+                .await
+                .unwrap()
+                .unwrap();
+            snapshot.headers.deletion_requested_at = Some(Utc::now());
+            repo.update_resource(&snapshot, snapshot.last_event_id)
+                .await
+                .unwrap();
+        },
+        move |catalog| async move {
+            let repo = catalog.get_one::<dyn ResourceRepository>().unwrap();
+            repo.create_resource(&first_successor).await.unwrap();
+            repo.create_resource(&second_successor).await
+        },
+    )
+    .await;
+
+    assert_matches!(
+        outcome,
+        RacingTransactionOutcome::FailedAtWrite(CreateResourceError::Duplicate(_))
+    );
+    let second_successor_found = in_committed_transaction(catalog, |catalog| async move {
+        catalog
+            .get_one::<dyn ResourceRepository>()
+            .unwrap()
+            .find_resource_snapshot_by_id(&second_successor_id)
+            .await
+            .unwrap()
+    })
+    .await;
+    assert_eq!(second_successor_found, None);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

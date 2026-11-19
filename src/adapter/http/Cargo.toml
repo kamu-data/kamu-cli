@@ -45,6 +45,7 @@ kamu-core = { workspace = true, features = [
     "utoipa",
 ] }
 kamu-datasets = { workspace = true }
+kamu-resources-services = { workspace = true }
 kamu-signing = { workspace = true, default-features = false, features = [
     "utoipa",
 ] }

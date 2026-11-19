@@ -12,13 +12,14 @@ use kamu_configuration_inmem::{
     InMemoryVariableSetProjectionRepository,
 };
 use kamu_core::TenancyConfig;
-use kamu_resources::{MESSAGE_PRODUCER_KAMU_RESOURCE_SERVICE, ResourceLifecycleMessage};
-use kamu_resources_inmem::{
-    InMemoryRawResourceEventStore,
-    InMemoryResourceLabelProjectionRepository,
-    InMemoryResourceRepository,
+use kamu_resources::{
+    MESSAGE_PRODUCER_KAMU_RESOURCE_SERVICE,
+    ResourceControllerRuntimeConfig,
+    ResourceLifecycleMessage,
 };
+use kamu_resources_services::{BackgroundWorkFinalizer, ResourceControllerRuntimeImpl};
 use messaging_outbox::{OutboxProvider, register_message_dispatcher};
+use wakeup_listener::{WakeupListenerConfig, WakeupListenerMetrics};
 
 use crate::utils::BaseGQLDatasetHarness;
 
@@ -41,14 +42,17 @@ impl BaseGQLResourceHarness {
     pub fn make_base_gql_resource_catalog(base_catalog: &dill::Catalog) -> dill::Catalog {
         let mut b = dill::CatalogBuilder::new_chained(base_catalog);
 
-        b.add::<InMemoryResourceRepository>()
-            .add::<InMemoryResourceLabelProjectionRepository>()
-            .add::<InMemoryRawResourceEventStore>()
-            .add::<InMemoryVariableSetProjectionRepository>()
+        kamu_resources_inmem::register_dependencies(&mut b);
+        b.add::<InMemoryVariableSetProjectionRepository>()
             .add::<InMemorySecretSetProjectionRepository>();
 
         kamu_resources_services::register_dependencies(&mut b);
+        // For the controller hint hub
+        b.add::<WakeupListenerMetrics>();
         kamu_configuration_services::register_dependencies(&mut b);
+        b.add::<ResourceControllerRuntimeImpl>()
+            .add_value(ResourceControllerRuntimeConfig::default())
+            .add_value(WakeupListenerConfig::local_default());
 
         register_message_dispatcher::<ResourceLifecycleMessage>(
             &mut b,
@@ -67,6 +71,15 @@ impl BaseGQLResourceHarness {
         let catalog_base = Self::make_base_gql_resource_catalog(base_gql_harness.catalog());
 
         Self::new(base_gql_harness, catalog_base)
+    }
+
+    /// See [`BackgroundWorkFinalizer`]. The outbox of this harness is
+    /// immediate, or drops the messages
+    pub async fn settle(&self) {
+        BackgroundWorkFinalizer::for_immediate_outbox()
+            .finalize(&self.catalog_base)
+            .await
+            .unwrap();
     }
 }
 

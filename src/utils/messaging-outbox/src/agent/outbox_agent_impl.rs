@@ -12,7 +12,7 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Duration;
 
-use async_utils::BackgroundAgent;
+use background_agent_host::{BackgroundAgent, CancellationToken};
 use database_common_macros::transactional_method;
 use dill::*;
 use init_on_startup::{InitOnStartup, InitOnStartupMeta};
@@ -123,45 +123,57 @@ impl OutboxAgentImpl {
         )
     }
 
-    async fn run_main_relay_loop(&self) -> Result<(), InternalError> {
+    async fn run_main_relay_loop(&self, shutdown: CancellationToken) -> Result<(), InternalError> {
         let wakeup_listener = self.outbox_message_bridge.new_wakeup_listener();
 
         // Initial catchup phase to process all existing messages
         // before starting the main loop
         let mut listening_timeout = self
-            .catch_up(wakeup_listener.as_ref())
+            .catch_up(wakeup_listener.as_ref(), &shutdown)
             .instrument(tracing::debug_span!("OutboxAgent::initial_catchup_phase"))
             .await?;
 
         loop {
             // Wait for push or timeout - let the store handle the backoff strategy
-            let hint = wakeup_listener
-                .wait_wake(listening_timeout, self.wakeup_config.min_debounce_interval)
-                .await?;
-            tracing::debug!(hint = ?hint, "Agent woke up with a hint");
+            let Some(hint) = wakeup_listener
+                .wait_wake_until_shutdown(
+                    listening_timeout,
+                    self.wakeup_config.min_debounce_interval,
+                    &shutdown,
+                )
+                .await?
+            else {
+                return Ok(());
+            };
+            tracing::debug!(?hint, "Agent woke up with a hint");
 
             // Process tasks while they are available, to make sure we process all messages
-            listening_timeout = self.catch_up(wakeup_listener.as_ref()).await?;
+            listening_timeout = self.catch_up(wakeup_listener.as_ref(), &shutdown).await?;
         }
     }
 
-    /// Processes the queue to its end and returns how long to wait for the next
-    /// wakeup. Held back messages are checked before processing: a commit that
-    /// releases them after the check is either seen by the processing, or
-    /// happens while the check still holds
+    /// Processes the queue to its end, or until `shutdown`, and returns how
+    /// long to wait for the next wakeup. Held back messages are checked before
+    /// processing: a commit that releases them after the check is either seen
+    /// by the processing, or happens while the check still holds
     async fn catch_up(
         &self,
         wakeup_listener: &dyn WakeupListener,
+        shutdown: &CancellationToken,
     ) -> Result<Duration, InternalError> {
         let listening_timeout = self.listening_timeout().await;
-        self.run_until_end_of_queue(Some(wakeup_listener)).await?;
+        self.run_until_end_of_queue(Some(wakeup_listener), Some(shutdown))
+            .await?;
         Ok(listening_timeout)
     }
 
-    /// Given the agent's listener, keeps its heartbeat going between batches
+    /// Given the agent's listener, keeps its heartbeat going between batches.
+    /// Given a shutdown token, stops between batches once it is cancelled, so
+    /// that messages arriving during a shutdown do not keep it going
     async fn run_until_end_of_queue(
         &self,
         wakeup_listener: Option<&dyn WakeupListener>,
+        shutdown: Option<&CancellationToken>,
     ) -> Result<(), InternalError> {
         loop {
             let processed_consumer_tasks_count = self
@@ -173,7 +185,9 @@ impl OutboxAgentImpl {
                 wakeup_listener.heartbeat();
             }
 
-            if processed_consumer_tasks_count == 0 {
+            if processed_consumer_tasks_count == 0
+                || shutdown.is_some_and(CancellationToken::is_cancelled)
+            {
                 break;
             }
         }
@@ -413,8 +427,8 @@ impl BackgroundAgent for OutboxAgentImpl {
         OUTBOX_AGENT_NAME
     }
 
-    async fn run(&self) -> Result<(), InternalError> {
-        self.run_main_relay_loop().await
+    async fn run(&self, shutdown: CancellationToken) -> Result<(), InternalError> {
+        self.run_main_relay_loop(shutdown).await
     }
 }
 
@@ -429,7 +443,7 @@ impl OutboxAgent for OutboxAgentImpl {
             // would miss a release landing in between and leave its messages
             let has_held_back_messages = self.has_held_back_messages().await?;
 
-            self.run_until_end_of_queue(None).await?;
+            self.run_until_end_of_queue(None, None).await?;
 
             if !has_held_back_messages {
                 return Ok(());

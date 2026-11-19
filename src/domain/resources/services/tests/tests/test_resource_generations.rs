@@ -9,10 +9,15 @@
 
 use std::assert_matches;
 
-use kamu_resources::{ResourcePhase, ResourceStatusConflictError};
+use kamu_resources::{ResourceEvent, ResourcePhase, ResourceStatusConflictError};
 use pretty_assertions::assert_eq;
 
-use crate::tests::utils::{ResourceLifecycleHarness, TestResourceLifecycleError};
+use crate::tests::utils::{
+    ResourceLifecycleHarness,
+    TestResourceLifecycleError,
+    make_id,
+    test_stage_condition_key,
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -22,6 +27,56 @@ fn test_new_resource_starts_both_generations_at_one() {
 
     assert_eq!(harness.generations(), (1, 1));
     assert_eq!(harness.phase(), ResourcePhase::Pending);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test]
+fn test_new_resource_starts_with_the_initial_conditions_of_its_type() {
+    let harness = ResourceLifecycleHarness::new_with_value("staged:queued");
+
+    assert_eq!(harness.generations(), (1, 1));
+    assert_eq!(harness.phase(), ResourcePhase::Pending);
+    assert_eq!(
+        harness.status().conditions.entries,
+        [(test_stage_condition_key(), serde_json::json!("queued"))].into()
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test]
+fn test_created_event_records_initial_conditions_only_when_there_are_some() {
+    let initial_conditions = |value| {
+        let ResourceEvent::Created(event) =
+            ResourceLifecycleHarness::created_event(make_id(), value)
+        else {
+            unreachable!()
+        };
+        event
+            .initial_conditions
+            .map(|conditions| conditions.entries)
+    };
+
+    assert_eq!(initial_conditions("v1"), None);
+    assert_eq!(
+        initial_conditions("staged:queued"),
+        Some([(test_stage_condition_key(), serde_json::json!("queued"))].into())
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test]
+fn test_stored_created_event_without_initial_conditions_starts_with_none() {
+    // Replaying history never adds the conditions the type sets today
+    let harness = ResourceLifecycleHarness::created_by_stored_event_without_initial_conditions(
+        "staged:queued",
+    );
+
+    assert_eq!(harness.generations(), (1, 1));
+    assert_eq!(harness.phase(), ResourcePhase::Pending);
+    assert_eq!(harness.status().conditions.entries, [].into());
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

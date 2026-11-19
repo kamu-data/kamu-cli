@@ -7,68 +7,57 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use database_common_macros::database_transactional_test;
-use dill::{Catalog, CatalogBuilder};
-use kamu_accounts_inmem::InMemoryAccountRepository;
-use kamu_resources_inmem::{InMemoryResourceLabelProjectionRepository, InMemoryResourceRepository};
+use database_common_macros::{database_concurrent_transactions_test, database_transactional_test};
 use kamu_resources_repo_tests::resource_label_projection_repository_test_suite as label_projection_repo_suite;
 
+use super::InMemoryResourceRepositoriesHarness;
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 database_transactional_test!(
-    storage = inmem,
+    storage = inmem_with_transaction,
     fixture = label_projection_repo_suite::test_no_entries_initially,
-    harness = InMemoryResourceLabelProjectionRepositoryHarness
+    harness = InMemoryResourceRepositoriesHarness
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 database_transactional_test!(
-    storage = inmem,
+    storage = inmem_with_transaction,
     fixture = label_projection_repo_suite::test_replace_entries_then_find,
-    harness = InMemoryResourceLabelProjectionRepositoryHarness
+    harness = InMemoryResourceRepositoriesHarness
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 database_transactional_test!(
-    storage = inmem,
+    storage = inmem_with_transaction,
     fixture = label_projection_repo_suite::test_replace_entries_overwrites_previous_set,
-    harness = InMemoryResourceLabelProjectionRepositoryHarness
+    harness = InMemoryResourceRepositoriesHarness
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 database_transactional_test!(
-    storage = inmem,
+    storage = inmem_with_transaction,
     fixture = label_projection_repo_suite::test_replace_entries_with_empty_slice_clears,
-    harness = InMemoryResourceLabelProjectionRepositoryHarness
+    harness = InMemoryResourceRepositoriesHarness
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 database_transactional_test!(
-    storage = inmem,
+    storage = inmem_with_transaction,
     fixture = label_projection_repo_suite::test_entries_isolated_by_resource_id,
-    harness = InMemoryResourceLabelProjectionRepositoryHarness
+    harness = InMemoryResourceRepositoriesHarness
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-struct InMemoryResourceLabelProjectionRepositoryHarness {
-    catalog: Catalog,
-}
-
-impl InMemoryResourceLabelProjectionRepositoryHarness {
-    pub fn new() -> Self {
-        let mut catalog_builder = CatalogBuilder::new();
-        catalog_builder.add::<InMemoryResourceLabelProjectionRepository>();
-        catalog_builder.add::<InMemoryResourceRepository>();
-        catalog_builder.add::<InMemoryAccountRepository>();
-        Self {
-            catalog: catalog_builder.build(),
-        }
-    }
-}
+database_concurrent_transactions_test!(
+    storage = inmem,
+    fixture = label_projection_repo_suite::test_rolled_back_replace_keeps_previous_entries,
+    harness = InMemoryResourceRepositoriesHarness
+);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -1,0 +1,21 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            SELECT MIN(s.not_before) AS \"not_before: DateTime<Utc>\"\n            FROM resource_controller_state AS s\n            JOIN resources AS r ON r.resource_id = s.resource_id\n            WHERE s.controller = $1\n              AND s.not_before IS NOT NULL\n              AND r.resource_schema = $2\n              AND r.deleted_at IS NULL\n              AND (\n                  r.deletion_requested_at IS NULL AND r.reconciled_generation < r.generation\n                  OR r.deletion_requested_at IS NOT NULL\n                  OR $3 AND s.handled_status_generation IS NOT r.status_generation\n              )\n            ",
+  "describe": {
+    "columns": [
+      {
+        "name": "not_before: DateTime<Utc>",
+        "ordinal": 0,
+        "type_info": "Null",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": [
+      true
+    ]
+  },
+  "hash": "42aa728cb32ac05c3b629da91da9b82f10fa422a7aa95679f4900a5188ca1653"
+}

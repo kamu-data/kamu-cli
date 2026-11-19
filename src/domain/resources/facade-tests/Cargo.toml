@@ -42,7 +42,9 @@ kamu-messaging-outbox-inmem = { workspace = true }
 kamu-resources = { workspace = true }
 kamu-resources-facade = { workspace = true }
 kamu-resources-inmem = { workspace = true }
-kamu-resources-services = { workspace = true }
+kamu-resources-services = { workspace = true, features = [
+    "testing",
+] }
 kamu-wakeup-listener-inmem = { workspace = true }
 messaging-outbox = { workspace = true }
 odf = { workspace = true }

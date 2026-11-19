@@ -13,7 +13,6 @@ use internal_error::{InternalError, ResultIntoInternal};
 use kamu_resources::{
     ResourceCrudDispatcher,
     ResourceDispatcherMeta,
-    ResourceLifecycleEventDispatcher,
     ResourcePresentationDispatcher,
     ResourceSpecViewDispatcher,
     TypeUri,
@@ -186,28 +185,6 @@ impl ResourceDispatcherFactory {
         )
         .ok()
         .flatten()
-    }
-
-    /// Resolves the lifecycle dispatcher for `schema` against an explicitly
-    /// supplied catalog.
-    ///
-    /// Associated-only on purpose: its caller is a message consumer that is
-    /// handed the per-message transaction catalog, so there is no instance form
-    /// that would be correct (see the type-level docs).
-    pub fn lifecycle_dispatcher_in(
-        target_catalog: &dill::Catalog,
-        schema: &TypeUri,
-    ) -> Result<Arc<dyn ResourceLifecycleEventDispatcher>, InternalError> {
-        Self::try_dispatcher_in::<dyn ResourceLifecycleEventDispatcher>(
-            target_catalog,
-            schema.as_str(),
-            "resource lifecycle dispatcher",
-        )?
-        .ok_or_else(|| {
-            InternalError::new(format!(
-                "No resource lifecycle dispatcher registered for schema='{schema}'"
-            ))
-        })
     }
 
     /// Constructs every registered presentation dispatcher.

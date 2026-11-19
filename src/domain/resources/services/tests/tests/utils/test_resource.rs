@@ -11,6 +11,8 @@ use event_sourcing::*;
 use kamu_resources::*;
 use serde::{Deserialize, Serialize};
 
+use crate::tests::utils::test_stage_condition_key;
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // TestResourceSpec
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -116,13 +118,20 @@ pub enum TestResourceReconcileError {
 
     #[error(transparent)]
     Internal(#[from] internal_error::InternalError),
+
+    /// Fails every reconciliation of the spec, so retrying does not help
+    #[error("Spec rejected: {0}")]
+    Rejected(String),
 }
+
+pub const TEST_RECONCILIATION_ERROR_CODE_REJECTED: &str = "test-rejected";
 
 impl ResourceReconcileError for TestResourceReconcileError {
     fn code(&self) -> &'static str {
         match self {
             Self::ConcurrentModification(_) => RECONCILIATION_ERROR_CODE_CONCURRENT_MODIFICATION,
             Self::Internal(_) => RECONCILIATION_ERROR_CODE_INTERNAL_ERROR,
+            Self::Rejected(_) => TEST_RECONCILIATION_ERROR_CODE_REJECTED,
         }
     }
 
@@ -132,11 +141,15 @@ impl ResourceReconcileError for TestResourceReconcileError {
                 "Resource was modified concurrently during reconciliation.".to_owned()
             }
             Self::Internal(e) => format!("Internal error: {e}"),
+            Self::Rejected(reason) => format!("Spec rejected: {reason}"),
         }
     }
 
     fn is_transient(&self) -> bool {
-        true
+        match self {
+            Self::ConcurrentModification(_) | Self::Internal(_) => true,
+            Self::Rejected(_) => false,
+        }
     }
 }
 
@@ -158,6 +171,14 @@ impl TestResource {
 
     pub const SELECTOR_ALIAS_STRS: &'static [&'static str] = &[];
     pub const SELECTOR_ALIASES: &'static [kamu_resources::ResourceSelectorName] = &[];
+
+    /// A spec value `staged:<stage>` starts the resource with that
+    /// `TestStage` condition
+    pub const STAGED_VALUE_PREFIX: &'static str = "staged:";
+
+    /// The `TestStage` a resource never leaves, as a task never leaves
+    /// `Finished`
+    pub const FINAL_STAGE: &'static str = "done";
 }
 
 impl ResourceSchemaProvider for TestResource {
@@ -174,6 +195,35 @@ impl DeclarativeResource for TestResource {
     type Spec = TestResourceSpec;
     type SpecInput = TestResourceSpec;
     type ResourceState = TestResourceState;
+}
+
+impl ResourceStatusRules for TestResource {
+    fn initial_conditions(spec: &TestResourceSpec) -> ResourceConditions {
+        let mut conditions = empty_resource_conditions();
+        if let Some(stage) = spec.value.strip_prefix(Self::STAGED_VALUE_PREFIX) {
+            conditions
+                .entries
+                .insert(test_stage_condition_key(), stage.into());
+        }
+        conditions
+    }
+
+    fn validate_status_change(
+        old: &ResourceStatus,
+        new: &ResourceStatus,
+    ) -> Result<(), ResourceStatusChangeRejectedError> {
+        let key = test_stage_condition_key();
+        let old_stage = old.conditions.entries.get(&key);
+        let final_stage = serde_json::Value::from(Self::FINAL_STAGE);
+
+        if old_stage == Some(&final_stage) && new.conditions.entries.get(&key) != old_stage {
+            return Err(ResourceStatusChangeRejectedError::new(format!(
+                "stage '{}' is final",
+                Self::FINAL_STAGE
+            )));
+        }
+        Ok(())
+    }
 }
 
 impl ResourcePresentation for TestResource {
@@ -242,11 +292,15 @@ impl ResourceSpecSanitizer<TestResource> for TestResourceSpecClearingSanitizer {
 // Service layer
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+pub const TEST_RESOURCE_SIMPLE_CONTROLLER_NAME: &str = "test-resource-simple-controller";
+
 kamu_resources_services::declare_resource_service_layer!(
     domain = crate::tests::utils,
     name = TestResource,
     resource = crate::tests::utils::TestResource,
-    state_model = crate::tests::utils::TestResourceStateModel
+    state_model = crate::tests::utils::TestResourceStateModel,
+    controller_name = TEST_RESOURCE_SIMPLE_CONTROLLER_NAME,
+    controller_revision = 1
 );
 
 kamu_resources_services::declare_resource_crud_dispatcher!(

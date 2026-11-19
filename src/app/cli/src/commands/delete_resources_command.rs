@@ -476,9 +476,9 @@ impl PostCommandAction for ReportDeletionPhases {
             summary.record_success(phase);
             DeleteResourcesPrinter::print_success(target, phase, self.output_config.as_ref());
             // Controllers had their chance to clean up, so a resource still
-            // being deleted is waiting for a retry
+            // being deleted waits for its cleanup to be retried
             if phase == ResourcePhase::Deleting {
-                DeleteResourcesPrinter::print_retry_hint(target, self.output_config.as_ref());
+                DeleteResourcesPrinter::print_retry_hint(self.output_config.as_ref());
             }
         }
         DeleteResourcesPrinter::print_summary(&summary, false);
@@ -619,15 +619,14 @@ impl DeleteResourcesPrinter {
         eprintln!("{label}: {}", target.display_name());
     }
 
-    fn print_retry_hint(target: &DeleteResourceTarget, output_config: &OutputConfig) {
+    fn print_retry_hint(output_config: &OutputConfig) {
         if output_config.quiet {
             return;
         }
 
         eprintln!(
-            "  {} its cleanup has not finished; `kamu delete {}` retries it",
+            "  {} its cleanup has not finished; a later command retries it once its backoff ends",
             console::style("hint").yellow().bold(),
-            target.id
         );
     }
 

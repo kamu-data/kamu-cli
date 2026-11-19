@@ -60,19 +60,22 @@ implement `From<InternalError>`, the error of opening or ending a transaction.
 
 ### 3.1 Who owns a transaction
 
-Transactions are opened at three levels only. Everything else runs in the caller's transaction.
+Transactions are opened at four levels only. Everything else runs in the caller's transaction.
 
 | Level | Opens | Never |
 |---|---|---|
 | **Boundary**: HTTP and GraphQL middleware, a transactional CLI command | one transaction for request-sized work | slow work: engines, fetching, transfers |
 | **Operation job**: one per dataset operation (`CompactionJob`, `TransformJob`, …) | the short plan and commit transactions of one operation on one dataset | a transaction held across the execution |
-| **Agent**: task, flow, outbox, webhooks | bookkeeping transactions around its own state | — |
+| **Resource controller**: `process` of one resource (`SimpleResourceController`) | the short phase transactions of one reconciliation or deletion, and its own planning reads | a transaction held across work outside the database |
+| **Agent**: task, flow, outbox, webhooks, the resource controller runtime | bookkeeping transactions around its own state | — |
 
 - **Orchestration** opens no transaction around an operation; it calls jobs. This covers dependency
   traversal, repeated ingest iterations, recovery policies, and work over several datasets. It opens a
   block only for its own planning reads, such as the pull plan.
 - **Domain services** (planners, executors, `DatasetReferenceUpdater`, repositories) always run in the
   caller's transaction.
+- The **controller runtime** calls `process` outside any transaction, so that a controller commits
+  each phase on its own ([resources framework](resources-framework.md#controller-runtime)).
 
 A job is the same code for the CLI and for flows: legacy task runners only map a task definition to
 a job and the job's result to a task outcome. Long-running work is headed for the task system. Task

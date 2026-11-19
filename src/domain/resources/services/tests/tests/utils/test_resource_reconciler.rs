@@ -1,0 +1,404 @@
+// Copyright Kamu Data, Inc. and contributors. All rights reserved.
+//
+// Use of this software is governed by the Business Source License
+// included in the LICENSE file.
+//
+// As of the Change Date specified in that file, in accordance with
+// the Business Source License, use of this software will be governed
+// by the Apache License, Version 2.0.
+
+use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
+
+use internal_error::ErrorIntoInternal;
+use kamu_resources::{
+    DeclarativeResource,
+    ManagedResource,
+    ResourceAggregateLoader,
+    ResourceCleanupError,
+    ResourceDeletionCompletion,
+    ResourceLifecyclePrimitives,
+    ResourcePersistenceService,
+    SimpleResourceReconciler,
+};
+
+use crate::tests::utils::{TestResource, TestResourceReconcileError};
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// TestResourceReconciler
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[dill::component(pub)]
+#[dill::interface(dyn SimpleResourceReconciler<TestResource>)]
+pub struct TestResourceReconciler;
+
+#[async_trait::async_trait]
+impl SimpleResourceReconciler<TestResource> for TestResourceReconciler {
+    async fn reconcile(&self, _resource: &TestResource) -> Result<(), TestResourceReconcileError> {
+        Ok(())
+    }
+
+    async fn cleanup(&self, _resource: &TestResource) -> Result<(), ResourceCleanupError> {
+        Ok(())
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// TestResourceFailingReconciler
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[dill::component(pub)]
+#[dill::interface(dyn SimpleResourceReconciler<TestResource>)]
+pub struct TestResourceFailingReconciler;
+
+#[async_trait::async_trait]
+impl SimpleResourceReconciler<TestResource> for TestResourceFailingReconciler {
+    async fn reconcile(&self, _resource: &TestResource) -> Result<(), TestResourceReconcileError> {
+        Err(TestResourceReconcileError::Internal(
+            "simulated reconcile failure".int_err(),
+        ))
+    }
+
+    async fn cleanup(&self, _resource: &TestResource) -> Result<(), ResourceCleanupError> {
+        Err(ResourceCleanupError::Internal(
+            "simulated cleanup failure".int_err(),
+        ))
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// TestResourceCountingReconciler
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// Not a #[dill::component] — always registered via add_value() so that the
+// Arc<AtomicU32> owned by the test is shared across all catalog resolutions.
+pub struct TestResourceCountingReconciler {
+    pub call_count: Arc<AtomicU32>,
+}
+
+#[async_trait::async_trait]
+impl SimpleResourceReconciler<TestResource> for TestResourceCountingReconciler {
+    async fn reconcile(&self, _resource: &TestResource) -> Result<(), TestResourceReconcileError> {
+        self.call_count.fetch_add(1, Ordering::SeqCst);
+        Ok(())
+    }
+
+    async fn cleanup(&self, _resource: &TestResource) -> Result<(), ResourceCleanupError> {
+        Ok(())
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// TestResourceSelectiveCleanupReconciler
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Fails the cleanup of the resource named `failing_name` only.
+pub struct TestResourceSelectiveCleanupReconciler {
+    pub failing_name: &'static str,
+}
+
+#[async_trait::async_trait]
+impl SimpleResourceReconciler<TestResource> for TestResourceSelectiveCleanupReconciler {
+    async fn reconcile(&self, _resource: &TestResource) -> Result<(), TestResourceReconcileError> {
+        Ok(())
+    }
+
+    async fn cleanup(&self, resource: &TestResource) -> Result<(), ResourceCleanupError> {
+        if resource.headers().name.as_str() == self.failing_name {
+            return Err(ResourceCleanupError::Internal(
+                "simulated cleanup failure".int_err(),
+            ));
+        }
+        Ok(())
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// TestResourceInterferingCleanupReconciler
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// During its first cleanup, plays another writer that updates the status of
+/// the resource being cleaned up, then fails that cleanup if asked to.
+#[dill::component(pub)]
+#[dill::interface(dyn SimpleResourceReconciler<TestResource>)]
+pub struct TestResourceInterferingCleanupReconciler {
+    catalog: dill::Catalog,
+    interference: Arc<TestCleanupInterference>,
+}
+
+pub struct TestCleanupInterference {
+    done: AtomicBool,
+    then_fails: bool,
+}
+
+#[async_trait::async_trait]
+impl SimpleResourceReconciler<TestResource> for TestResourceInterferingCleanupReconciler {
+    async fn reconcile(&self, _resource: &TestResource) -> Result<(), TestResourceReconcileError> {
+        Ok(())
+    }
+
+    async fn cleanup(&self, resource: &TestResource) -> Result<(), ResourceCleanupError> {
+        if self.interference.done.swap(true, Ordering::SeqCst) {
+            return Ok(());
+        }
+
+        AnotherStatusWriter {
+            catalog: &self.catalog,
+        }
+        .update_status(resource)
+        .await;
+
+        if self.interference.then_fails {
+            return Err(ResourceCleanupError::Internal(
+                "simulated cleanup failure".int_err(),
+            ));
+        }
+        Ok(())
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// TestResourceCompletingCleanupReconciler
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// During its cleanup, plays another writer that completes the deletion of the
+/// resource being cleaned up
+#[dill::component(pub)]
+#[dill::interface(dyn SimpleResourceReconciler<TestResource>)]
+pub struct TestResourceCompletingCleanupReconciler {
+    lifecycle_primitives: Arc<dyn ResourceLifecyclePrimitives<TestResource>>,
+}
+
+#[async_trait::async_trait]
+impl SimpleResourceReconciler<TestResource> for TestResourceCompletingCleanupReconciler {
+    async fn reconcile(&self, _resource: &TestResource) -> Result<(), TestResourceReconcileError> {
+        Ok(())
+    }
+
+    async fn cleanup(&self, resource: &TestResource) -> Result<(), ResourceCleanupError> {
+        self.lifecycle_primitives
+            .complete_deletion(&[ResourceDeletionCompletion {
+                id: *resource.id(),
+                expected_status_generation: None,
+            }])
+            .await
+            .unwrap();
+        Ok(())
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// TestResourceInterferingReconciler
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Writes to the status of the resource it reconciles, as another writer
+/// would, so the outcome recorded after it fails with a status conflict.
+#[dill::component(pub)]
+#[dill::interface(dyn SimpleResourceReconciler<TestResource>)]
+pub struct TestResourceInterferingReconciler {
+    catalog: dill::Catalog,
+}
+
+#[async_trait::async_trait]
+impl SimpleResourceReconciler<TestResource> for TestResourceInterferingReconciler {
+    async fn reconcile(&self, resource: &TestResource) -> Result<(), TestResourceReconcileError> {
+        AnotherStatusWriter {
+            catalog: &self.catalog,
+        }
+        .update_status(resource)
+        .await;
+        Ok(())
+    }
+
+    async fn cleanup(&self, _resource: &TestResource) -> Result<(), ResourceCleanupError> {
+        Ok(())
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// TestResourceFailingCleanupOnceReconciler
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Fails its first cleanup and succeeds on every later one.
+#[dill::component(pub)]
+#[dill::interface(dyn SimpleResourceReconciler<TestResource>)]
+pub struct TestResourceFailingCleanupOnceReconciler {
+    failure: Arc<TestCleanupFailureOnce>,
+}
+
+#[derive(Default)]
+pub struct TestCleanupFailureOnce {
+    done: AtomicBool,
+}
+
+#[async_trait::async_trait]
+impl SimpleResourceReconciler<TestResource> for TestResourceFailingCleanupOnceReconciler {
+    async fn reconcile(&self, _resource: &TestResource) -> Result<(), TestResourceReconcileError> {
+        Ok(())
+    }
+
+    async fn cleanup(&self, _resource: &TestResource) -> Result<(), ResourceCleanupError> {
+        if self.failure.done.swap(true, Ordering::SeqCst) {
+            return Ok(());
+        }
+
+        Err(ResourceCleanupError::Internal(
+            "simulated cleanup failure".int_err(),
+        ))
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// TestResourceRejectingReconciler
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Fails every reconciliation with an error that is not transient
+#[dill::component(pub)]
+#[dill::interface(dyn SimpleResourceReconciler<TestResource>)]
+pub struct TestResourceRejectingReconciler;
+
+#[async_trait::async_trait]
+impl SimpleResourceReconciler<TestResource> for TestResourceRejectingReconciler {
+    async fn reconcile(&self, _resource: &TestResource) -> Result<(), TestResourceReconcileError> {
+        Err(TestResourceReconcileError::Rejected(
+            "simulated invalid spec".to_string(),
+        ))
+    }
+
+    async fn cleanup(&self, _resource: &TestResource) -> Result<(), ResourceCleanupError> {
+        Ok(())
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// TestResourceFailingReconcileOnceReconciler
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Fails its first reconciliation with a transient error and succeeds on
+/// every later one
+#[dill::component(pub)]
+#[dill::interface(dyn SimpleResourceReconciler<TestResource>)]
+pub struct TestResourceFailingReconcileOnceReconciler {
+    failure: Arc<TestReconcileFailureOnce>,
+}
+
+#[derive(Default)]
+pub struct TestReconcileFailureOnce {
+    done: AtomicBool,
+}
+
+#[async_trait::async_trait]
+impl SimpleResourceReconciler<TestResource> for TestResourceFailingReconcileOnceReconciler {
+    async fn reconcile(&self, _resource: &TestResource) -> Result<(), TestResourceReconcileError> {
+        if self.failure.done.swap(true, Ordering::SeqCst) {
+            return Ok(());
+        }
+
+        Err(TestResourceReconcileError::Internal(
+            "simulated transient reconcile failure".int_err(),
+        ))
+    }
+
+    async fn cleanup(&self, _resource: &TestResource) -> Result<(), ResourceCleanupError> {
+        Ok(())
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Plays a writer other than the one running: saves a status update of a
+/// resource through the services of its catalog
+struct AnotherStatusWriter<'a> {
+    catalog: &'a dill::Catalog,
+}
+
+impl AnotherStatusWriter<'_> {
+    async fn update_status(&self, resource: &TestResource) {
+        let loader = self
+            .catalog
+            .get_one::<dyn ResourceAggregateLoader<TestResource>>()
+            .unwrap();
+        let persistence = self
+            .catalog
+            .get_one::<dyn ResourcePersistenceService<TestResource>>()
+            .unwrap();
+
+        let mut current = loader.load(resource.id()).await.unwrap();
+        let mut new_status = current.status().clone();
+        new_status.observed_at = Some(chrono::Utc::now());
+        let status_generation = current.headers().status_generation;
+        current
+            .try_update_status(chrono::Utc::now(), status_generation, new_status)
+            .unwrap();
+        persistence.save(&mut current).await.unwrap();
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Default)]
+pub enum TestResourceReconcilerProvider {
+    #[default]
+    Stub,
+    Failing,
+    Counting(Arc<AtomicU32>),
+    FailingCleanupOf(&'static str),
+    InterferingCleanup {
+        then_fails: bool,
+    },
+    CompletingCleanup,
+    FailingCleanupOnce,
+    InterferingReconcile,
+    Rejecting,
+    FailingReconcileOnce,
+}
+
+impl TestResourceReconcilerProvider {
+    pub fn embed_into_catalog(self, b: &mut dill::CatalogBuilder) {
+        match self {
+            TestResourceReconcilerProvider::Stub => {
+                b.add::<TestResourceReconciler>();
+            }
+            TestResourceReconcilerProvider::Failing => {
+                b.add::<TestResourceFailingReconciler>();
+            }
+            TestResourceReconcilerProvider::Counting(counter) => {
+                b.add_value(TestResourceCountingReconciler {
+                    call_count: counter,
+                })
+                .bind::<dyn SimpleResourceReconciler<TestResource>, TestResourceCountingReconciler>(
+                );
+            }
+            TestResourceReconcilerProvider::FailingCleanupOf(failing_name) => {
+                b.add_value(TestResourceSelectiveCleanupReconciler { failing_name })
+                    .bind::<dyn SimpleResourceReconciler<TestResource>, TestResourceSelectiveCleanupReconciler>();
+            }
+            TestResourceReconcilerProvider::InterferingCleanup { then_fails } => {
+                b.add_value(TestCleanupInterference {
+                    done: AtomicBool::new(false),
+                    then_fails,
+                });
+                b.add::<TestResourceInterferingCleanupReconciler>();
+            }
+            TestResourceReconcilerProvider::CompletingCleanup => {
+                b.add::<TestResourceCompletingCleanupReconciler>();
+            }
+            TestResourceReconcilerProvider::FailingCleanupOnce => {
+                b.add_value(TestCleanupFailureOnce::default());
+                b.add::<TestResourceFailingCleanupOnceReconciler>();
+            }
+            TestResourceReconcilerProvider::InterferingReconcile => {
+                b.add::<TestResourceInterferingReconciler>();
+            }
+            TestResourceReconcilerProvider::Rejecting => {
+                b.add::<TestResourceRejectingReconciler>();
+            }
+            TestResourceReconcilerProvider::FailingReconcileOnce => {
+                b.add_value(TestReconcileFailureOnce::default());
+                b.add::<TestResourceFailingReconcileOnceReconciler>();
+            }
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

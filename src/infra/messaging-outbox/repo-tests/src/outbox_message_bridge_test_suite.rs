@@ -7,8 +7,16 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::assert_matches;
+
 use chrono::Utc;
+use database_common::testing::{
+    RacingTransactionOutcome,
+    in_committed_transaction,
+    race_transactions,
+};
 use dill::Catalog;
+use internal_error::InternalError;
 use messaging_outbox::{
     Message,
     NewOutboxMessage,
@@ -673,6 +681,77 @@ fn find_consumption_boundary<'a>(
                  consumer={consumer_name}"
             )
         })
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Two transactions record the first boundary of one consumer at once: the
+/// higher one stays, whichever commits last
+pub async fn test_first_consumption_boundaries_in_concurrent_transactions(catalog: &Catalog) {
+    for (consumer_name, first_message_id, second_message_id) in
+        [("consumer-1", 20, 10), ("consumer-2", 10, 20)]
+    {
+        let outcome = race_transactions(
+            catalog,
+            move |catalog| async move {
+                mark_consumed(&catalog, consumer_name, first_message_id)
+                    .await
+                    .unwrap();
+            },
+            move |catalog| async move {
+                mark_consumed(&catalog, consumer_name, second_message_id).await
+            },
+        )
+        .await;
+        assert_matches!(outcome, RacingTransactionOutcome::Committed);
+    }
+
+    let mut consumed = in_committed_transaction(catalog, |catalog| async move {
+        catalog
+            .get_one::<dyn OutboxMessageBridge>()
+            .unwrap()
+            .list_consumption_boundaries(&catalog)
+            .await
+            .unwrap()
+            .into_iter()
+            .map(|boundary| {
+                (
+                    boundary.consumer_name,
+                    boundary.last_consumed_message_id.into_inner(),
+                )
+            })
+            .collect::<Vec<_>>()
+    })
+    .await;
+    consumed.sort();
+
+    assert_eq!(
+        consumed,
+        [
+            ("consumer-1".to_string(), 20),
+            ("consumer-2".to_string(), 20),
+        ]
+    );
+}
+
+async fn mark_consumed(
+    catalog: &Catalog,
+    consumer_name: &str,
+    message_id: i64,
+) -> Result<(), InternalError> {
+    catalog
+        .get_one::<dyn OutboxMessageBridge>()
+        .unwrap()
+        .mark_consumed(
+            catalog,
+            "A",
+            consumer_name,
+            OutboxMessageBoundary {
+                message_id: OutboxMessageID::new(message_id),
+                tx_id: 0,
+            },
+        )
+        .await
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

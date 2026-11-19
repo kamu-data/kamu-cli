@@ -27,6 +27,7 @@ default = [
 
 
 [dependencies]
+container-runtime = { workspace = true }
 database-common = { workspace = true, default-features = false }
 http-common = { workspace = true }
 kamu-accounts = { workspace = true }

@@ -12,6 +12,7 @@ use kamu_resources::{
     RESOURCE_ANNOTATION_DESCRIPTION_SCHEMA_URI,
     RESOURCE_CONDITION_RECONCILIATION_ERROR_SCHEMA_URI,
     RESOURCE_LABEL_ENVIRONMENT_SCHEMA_URI,
+    ResourceConditionSchemaMeta,
     ResourceExtensionApplicationMeta,
     ResourceExtensionKind,
     ResourceExtensionResolutionError,
@@ -23,7 +24,10 @@ use kamu_resources::{
     TypeRef,
     TypeUri,
 };
-use kamu_resources_services::ResourceExtensionSchemaRegistry;
+use kamu_resources_services::{
+    ResourceExtensionSchemaRegistration,
+    ResourceExtensionSchemaRegistry,
+};
 use pretty_assertions::assert_eq;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -208,6 +212,75 @@ fn test_duplicate_alias_registration_fails_registry_construction() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[test]
+fn test_condition_meta_by_registration_and_by_uri() {
+    let harness = ExtensionRegistryHarness::built_ins();
+    let reconciliation_error_meta = ResourceConditionSchemaMeta {
+        max_serialized_size: 16 * 1024,
+        carried: true,
+    };
+
+    let reconciliation_error = harness.resolve_uri(
+        ResourceExtensionKind::Condition,
+        RESOURCE_CONDITION_RECONCILIATION_ERROR_SCHEMA_URI,
+    );
+    let environment = harness.resolve_uri(
+        ResourceExtensionKind::Label,
+        RESOURCE_LABEL_ENVIRONMENT_SCHEMA_URI,
+    );
+    assert_eq!(
+        reconciliation_error.condition(),
+        Some(&reconciliation_error_meta)
+    );
+    assert_eq!(environment.condition(), None);
+
+    // By URI alone, without knowing the kind
+    assert_eq!(
+        harness.condition_meta(RESOURCE_CONDITION_RECONCILIATION_ERROR_SCHEMA_URI),
+        Some(reconciliation_error_meta)
+    );
+    assert_eq!(
+        harness.condition_meta(RESOURCE_LABEL_ENVIRONMENT_SCHEMA_URI),
+        None
+    );
+    assert_eq!(
+        harness.condition_meta("https://kamu.dev/schemas/resource/v1alpha1/conditions/Unknown"),
+        None
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test]
+#[should_panic(expected = "declares no condition metadata")]
+fn test_condition_without_condition_meta_fails_registry_construction() {
+    ExtensionRegistryHarness::with_test_dispatchers(|b| {
+        b.add::<ConditionWithoutMetaDispatcher>();
+    });
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test]
+#[should_panic(expected = "declares condition metadata but is not a condition")]
+fn test_label_with_condition_meta_fails_registry_construction() {
+    ExtensionRegistryHarness::with_test_dispatchers(|b| {
+        b.add::<LabelWithConditionMetaDispatcher>();
+    });
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test]
+#[should_panic(expected = "declares a zero size limit")]
+fn test_condition_with_zero_size_limit_fails_registry_construction() {
+    ExtensionRegistryHarness::with_test_dispatchers(|b| {
+        b.add::<ConditionWithZeroLimitDispatcher>();
+    });
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 struct ExtensionRegistryHarness {
     registry: std::sync::Arc<ResourceExtensionSchemaRegistry>,
     default_schema: ResourceSchemaId,
@@ -240,6 +313,23 @@ impl ExtensionRegistryHarness {
 
     fn uri_ref(&self, uri: &str) -> TypeRef {
         TypeRef::Uri(TypeUri::new_unchecked(uri))
+    }
+
+    fn resolve_uri(
+        &self,
+        kind: ResourceExtensionKind,
+        uri: &str,
+    ) -> std::sync::Arc<ResourceExtensionSchemaRegistration> {
+        self.registry
+            .resolve(kind, &self.uri_ref(uri), &self.default_schema)
+            .unwrap()
+            .unwrap()
+    }
+
+    fn condition_meta(&self, uri: &str) -> Option<ResourceConditionSchemaMeta> {
+        self.registry
+            .condition_meta(&TypeUri::new_unchecked(uri))
+            .copied()
     }
 
     fn assert_resolves_to_uri(
@@ -369,134 +459,170 @@ impl ResourceValidateSchemaValue for TestStringValue {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Declares a test dispatcher of [`TestStringValue`], without a document
+macro_rules! declare_test_dispatcher {
+    ($dispatcher:ident, $schema_id:expr, $kind:ident, $applications:expr) => {
+        declare_test_dispatcher!($dispatcher, $schema_id, $kind, $applications, None);
+    };
+    ($dispatcher:ident, $schema_id:expr, $kind:ident, $applications:expr, $condition:expr) => {
+        kamu_resources_services::declare_resource_extension_schema_dispatcher!(
+            dispatcher = $dispatcher,
+            value = TestStringValue,
+            schema_id = $schema_id,
+            kind = ResourceExtensionKind::$kind,
+            document = None,
+            applications = $applications,
+            condition = $condition
+        );
+    };
+}
+
+/// One application of an extension under `preferred_name`, without aliases
+const fn application(
+    scope: ResourceExtensionScopeMeta,
+    preferred_name: &'static str,
+) -> ResourceExtensionApplicationMeta {
+    ResourceExtensionApplicationMeta {
+        scope,
+        preferred_name: Some(preferred_name),
+        aliases: &[],
+    }
+}
+
+const WIDGET_SCOPE: ResourceExtensionScopeMeta = ResourceExtensionScopeMeta::ResourceType {
+    schema: "https://example.com/schemas/config/v1alpha1/Widget",
+};
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 const EXACT_ONLY_SCHEMA_ID: &str = "https://kamu.dev/schemas/resource/v1alpha1/labels/ExactOnly";
 const EXACT_ONLY_APPLICATIONS: &[ResourceExtensionApplicationMeta] =
-    &[ResourceExtensionApplicationMeta {
-        scope: ResourceExtensionScopeMeta::ResourceType {
-            schema: "https://example.com/schemas/config/v1alpha1/Widget",
-        },
-        preferred_name: Some("exactonly"),
-        aliases: &[],
-    }];
+    &[application(WIDGET_SCOPE, "exactonly")];
 
-kamu_resources_services::declare_resource_extension_schema_dispatcher!(
-    dispatcher = ExactOnlyDispatcher,
-    value = TestStringValue,
-    schema_id = EXACT_ONLY_SCHEMA_ID,
-    kind = ResourceExtensionKind::Label,
-    document = None,
-    applications = EXACT_ONLY_APPLICATIONS
+declare_test_dispatcher!(
+    ExactOnlyDispatcher,
+    EXACT_ONLY_SCHEMA_ID,
+    Label,
+    EXACT_ONLY_APPLICATIONS
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 const ANY_TIER_SCHEMA_ID: &str = "https://kamu.dev/schemas/resource/v1alpha1/labels/AnyTier";
 const ANY_TIER_APPLICATIONS: &[ResourceExtensionApplicationMeta] =
-    &[ResourceExtensionApplicationMeta {
-        scope: ResourceExtensionScopeMeta::AnyResource,
-        preferred_name: Some("tier"),
-        aliases: &[],
-    }];
+    &[application(ResourceExtensionScopeMeta::AnyResource, "tier")];
 
-kamu_resources_services::declare_resource_extension_schema_dispatcher!(
-    dispatcher = AnyTierDispatcher,
-    value = TestStringValue,
-    schema_id = ANY_TIER_SCHEMA_ID,
-    kind = ResourceExtensionKind::Label,
-    document = None,
-    applications = ANY_TIER_APPLICATIONS
+declare_test_dispatcher!(
+    AnyTierDispatcher,
+    ANY_TIER_SCHEMA_ID,
+    Label,
+    ANY_TIER_APPLICATIONS
 );
 
 const ANY_TIER_ALIAS_CONFLICT_SCHEMA_ID: &str =
     "https://kamu.dev/schemas/resource/v1alpha1/labels/AnyTierConflict";
 
-kamu_resources_services::declare_resource_extension_schema_dispatcher!(
-    dispatcher = AnyTierAliasConflictDispatcher,
-    value = TestStringValue,
-    schema_id = ANY_TIER_ALIAS_CONFLICT_SCHEMA_ID,
-    kind = ResourceExtensionKind::Label,
-    document = None,
-    applications = ANY_TIER_APPLICATIONS
+declare_test_dispatcher!(
+    AnyTierAliasConflictDispatcher,
+    ANY_TIER_ALIAS_CONFLICT_SCHEMA_ID,
+    Label,
+    ANY_TIER_APPLICATIONS
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 const CONTEXT_TIER_SCHEMA_ID: &str =
     "https://kamu.dev/schemas/resource/v1alpha1/labels/ContextTier";
-const CONTEXT_TIER_APPLICATIONS: &[ResourceExtensionApplicationMeta] =
-    &[ResourceExtensionApplicationMeta {
-        scope: ResourceExtensionScopeMeta::ResourceContext {
-            authority: "https://example.com/schemas",
-            context: "config",
-            version: None,
-        },
-        preferred_name: Some("tier"),
-        aliases: &[],
-    }];
+const CONTEXT_TIER_APPLICATIONS: &[ResourceExtensionApplicationMeta] = &[application(
+    ResourceExtensionScopeMeta::ResourceContext {
+        authority: "https://example.com/schemas",
+        context: "config",
+        version: None,
+    },
+    "tier",
+)];
 
-kamu_resources_services::declare_resource_extension_schema_dispatcher!(
-    dispatcher = ContextTierDispatcher,
-    value = TestStringValue,
-    schema_id = CONTEXT_TIER_SCHEMA_ID,
-    kind = ResourceExtensionKind::Label,
-    document = None,
-    applications = CONTEXT_TIER_APPLICATIONS
+declare_test_dispatcher!(
+    ContextTierDispatcher,
+    CONTEXT_TIER_SCHEMA_ID,
+    Label,
+    CONTEXT_TIER_APPLICATIONS
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 const VERSIONED_CONTEXT_TIER_SCHEMA_ID: &str =
     "https://kamu.dev/schemas/resource/v1alpha1/labels/VersionedContextTier";
-const VERSIONED_CONTEXT_TIER_APPLICATIONS: &[ResourceExtensionApplicationMeta] =
-    &[ResourceExtensionApplicationMeta {
-        scope: ResourceExtensionScopeMeta::ResourceContext {
-            authority: "https://example.com/schemas",
-            context: "config",
-            version: Some("v1alpha1"),
-        },
-        preferred_name: Some("tier"),
-        aliases: &[],
-    }];
+const VERSIONED_CONTEXT_TIER_APPLICATIONS: &[ResourceExtensionApplicationMeta] = &[application(
+    ResourceExtensionScopeMeta::ResourceContext {
+        authority: "https://example.com/schemas",
+        context: "config",
+        version: Some("v1alpha1"),
+    },
+    "tier",
+)];
 
-kamu_resources_services::declare_resource_extension_schema_dispatcher!(
-    dispatcher = VersionedContextTierDispatcher,
-    value = TestStringValue,
-    schema_id = VERSIONED_CONTEXT_TIER_SCHEMA_ID,
-    kind = ResourceExtensionKind::Label,
-    document = None,
-    applications = VERSIONED_CONTEXT_TIER_APPLICATIONS
+declare_test_dispatcher!(
+    VersionedContextTierDispatcher,
+    VERSIONED_CONTEXT_TIER_SCHEMA_ID,
+    Label,
+    VERSIONED_CONTEXT_TIER_APPLICATIONS
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 const EXACT_TIER_SCHEMA_ID: &str = "https://kamu.dev/schemas/resource/v1alpha1/labels/ExactTier";
 const EXACT_TIER_APPLICATIONS: &[ResourceExtensionApplicationMeta] =
-    &[ResourceExtensionApplicationMeta {
-        scope: ResourceExtensionScopeMeta::ResourceType {
-            schema: "https://example.com/schemas/config/v1alpha1/Widget",
-        },
-        preferred_name: Some("tier"),
-        aliases: &[],
-    }];
+    &[application(WIDGET_SCOPE, "tier")];
 
-kamu_resources_services::declare_resource_extension_schema_dispatcher!(
-    dispatcher = ExactTierDispatcher,
-    value = TestStringValue,
-    schema_id = EXACT_TIER_SCHEMA_ID,
-    kind = ResourceExtensionKind::Label,
-    document = None,
-    applications = EXACT_TIER_APPLICATIONS
+declare_test_dispatcher!(
+    ExactTierDispatcher,
+    EXACT_TIER_SCHEMA_ID,
+    Label,
+    EXACT_TIER_APPLICATIONS
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-kamu_resources_services::declare_resource_extension_schema_dispatcher!(
-    dispatcher = DuplicateEnvironmentDispatcher,
-    value = TestStringValue,
-    schema_id = RESOURCE_LABEL_ENVIRONMENT_SCHEMA_URI,
-    kind = ResourceExtensionKind::Label,
-    document = None,
-    applications = ANY_TIER_APPLICATIONS
+declare_test_dispatcher!(
+    DuplicateEnvironmentDispatcher,
+    RESOURCE_LABEL_ENVIRONMENT_SCHEMA_URI,
+    Label,
+    ANY_TIER_APPLICATIONS
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+const TEST_CONDITION_SCHEMA_ID: &str =
+    "https://kamu.dev/schemas/resource/v1alpha1/conditions/TestCondition";
+
+declare_test_dispatcher!(
+    ConditionWithoutMetaDispatcher,
+    TEST_CONDITION_SCHEMA_ID,
+    Condition,
+    ANY_TIER_APPLICATIONS
+);
+
+declare_test_dispatcher!(
+    ConditionWithZeroLimitDispatcher,
+    TEST_CONDITION_SCHEMA_ID,
+    Condition,
+    ANY_TIER_APPLICATIONS,
+    Some(ResourceConditionSchemaMeta {
+        max_serialized_size: 0,
+        carried: true,
+    })
+);
+
+declare_test_dispatcher!(
+    LabelWithConditionMetaDispatcher,
+    ANY_TIER_SCHEMA_ID,
+    Label,
+    ANY_TIER_APPLICATIONS,
+    Some(ResourceConditionSchemaMeta {
+        max_serialized_size: 64,
+        carried: true,
+    })
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

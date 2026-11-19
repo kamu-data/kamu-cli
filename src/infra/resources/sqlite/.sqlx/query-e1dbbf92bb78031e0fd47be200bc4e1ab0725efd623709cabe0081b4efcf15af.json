@@ -1,0 +1,26 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            SELECT resource_id AS \"resource_id!: uuid::Uuid\"\n            FROM (\n                SELECT resource_id FROM (\n                    SELECT r.resource_id\n                    FROM resources AS r\n                    LEFT JOIN resource_controller_state AS s\n                        ON s.controller = $1 AND s.resource_id = r.resource_id\n                    WHERE r.resource_schema = $2\n                      AND r.deletion_requested_at IS NULL\n                      AND r.reconciled_generation < r.generation\n                      AND NOT COALESCE(\n                          CASE\n                              WHEN s.not_before IS NOT NULL THEN s.not_before > $5\n                              ELSE s.controller_revision = $3\n                                   AND s.handled_generation = r.generation\n                                   AND s.handled_status_generation = r.status_generation\n                          END,\n                          FALSE\n                      )\n                    ORDER BY r.resource_id\n                    LIMIT $6\n                )\n                UNION\n                SELECT resource_id FROM (\n                    SELECT r.resource_id\n                    FROM resources AS r\n                    LEFT JOIN resource_controller_state AS s\n                        ON s.controller = $1 AND s.resource_id = r.resource_id\n                    WHERE r.resource_schema = $2\n                      AND r.deletion_requested_at IS NOT NULL\n                      AND r.deleted_at IS NULL\n                      AND NOT COALESCE(\n                          CASE\n                              WHEN s.not_before IS NOT NULL THEN s.not_before > $5\n                              ELSE s.controller_revision = $3\n                                   AND s.handled_generation = r.generation\n                                   AND s.handled_status_generation = r.status_generation\n                          END,\n                          FALSE\n                      )\n                    ORDER BY r.resource_id\n                    LIMIT $6\n                )\n                UNION\n                SELECT resource_id FROM (\n                    SELECT r.resource_id\n                    FROM resources AS r\n                    LEFT JOIN resource_controller_state AS s\n                        ON s.controller = $1 AND s.resource_id = r.resource_id\n                    WHERE $4\n                      AND r.resource_schema = $2\n                      AND r.deleted_at IS NULL\n                      AND s.handled_status_generation IS NOT r.status_generation\n                      AND NOT COALESCE(\n                          CASE\n                              WHEN s.not_before IS NOT NULL THEN s.not_before > $5\n                              ELSE s.controller_revision = $3\n                                   AND s.handled_generation = r.generation\n                                   AND s.handled_status_generation = r.status_generation\n                          END,\n                          FALSE\n                      )\n                    ORDER BY r.resource_id\n                    LIMIT $6\n                )\n            )\n            ORDER BY resource_id\n            LIMIT $6\n            ",
+  "describe": {
+    "columns": [
+      {
+        "name": "resource_id!: uuid::Uuid",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "resources",
+            "name": "resource_id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 6
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "e1dbbf92bb78031e0fd47be200bc4e1ab0725efd623709cabe0081b4efcf15af"
+}

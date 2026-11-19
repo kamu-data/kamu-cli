@@ -7,7 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use internal_error::{InternalError, ResultIntoInternal};
+use internal_error::InternalError;
+use kamu_resources_services::BackgroundWorkFinalizer;
 use messaging_outbox::register_message_dispatcher;
 use tracing::Instrument;
 
@@ -124,18 +125,12 @@ pub(crate) async fn process_outbox_after_command(
     background_catalog: &dill::Catalog,
     command_result: Result<(), CLIError>,
 ) -> Result<(), CLIError> {
-    let outbox_result = async {
-        let outbox_agent = background_catalog
-            .get_one::<dyn messaging_outbox::OutboxAgent>()
-            .int_err()?;
-        outbox_agent
-            .run_while_has_tasks()
-            .instrument(tracing::debug_span!(
-                "Consume accumulated the Outbox messages"
-            ))
-            .await
-    }
-    .await;
+    let outbox_result = BackgroundWorkFinalizer::for_dispatching_outbox()
+        .finalize(background_catalog)
+        .instrument(tracing::debug_span!(
+            "Consume accumulated the Outbox messages"
+        ))
+        .await;
 
     command_with_outbox_result(command_result, outbox_result)
 }

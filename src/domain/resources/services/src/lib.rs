@@ -14,6 +14,8 @@ pub use paste;
 #[cfg(feature = "testing")]
 pub mod testing;
 
+mod controller_runtime;
+mod controllers;
 mod crud_dispatchers;
 mod dependencies;
 mod event_stores;
@@ -23,6 +25,8 @@ mod resources;
 mod services;
 mod use_cases;
 
+pub use controller_runtime::*;
+pub use controllers::*;
 pub use crud_dispatchers::*;
 pub use dependencies::*;
 pub use event_stores::*;

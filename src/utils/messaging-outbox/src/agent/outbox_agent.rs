@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use async_utils::BackgroundAgent;
+use background_agent_host::BackgroundAgent;
 use init_on_startup::InitOnStartup;
 use internal_error::InternalError;
 

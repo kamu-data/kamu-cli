@@ -9,10 +9,14 @@
 
 mod harness_helpers;
 mod resource_lifecycle_harness;
+mod service_layer_test_harness;
+mod test_conditions;
 mod test_resource;
-mod test_resource_controller;
+mod test_resource_reconciler;
 
 pub use harness_helpers::*;
 pub use resource_lifecycle_harness::*;
+pub use service_layer_test_harness::*;
+pub use test_conditions::*;
 pub use test_resource::*;
-pub use test_resource_controller::*;
+pub use test_resource_reconciler::*;

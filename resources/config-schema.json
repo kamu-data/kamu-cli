@@ -159,6 +159,13 @@
           "format": "uint",
           "minimum": 0,
           "type": "integer"
+        },
+        "resourceControllers": {
+          "default": 20,
+          "description": "Resources a resource controller selects at once before processing\nthem. 0 is treated as 1",
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
         }
       },
       "type": "object"
@@ -169,6 +176,13 @@
         "outboxConsumers": {
           "default": 1,
           "description": "Outbox consumers running at once, in order per producer, each holding a\npooled connection: e.g. 8 with Postgres, 1 with `SQLite`. 0 is treated\nas 1",
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "resourceControllers": {
+          "default": 1,
+          "description": "Resources each resource controller processes at once, each in\ntransactions of its own: e.g. 4 with Postgres, 1 with `SQLite`. 0 is\ntreated as 1",
           "format": "uint",
           "minimum": 0,
           "type": "integer"
@@ -184,14 +198,16 @@
           "default": {
             "flowActivations": 20,
             "flowSystemEvents": 20,
-            "outboxMessages": 20
+            "outboxMessages": 20,
+            "resourceControllers": 20
           },
           "description": "Batch sizes of agents processing records in batches"
         },
         "concurrency": {
           "$ref": "#/$defs/BackgroundAgentsConcurrencyConfig",
           "default": {
-            "outboxConsumers": 1
+            "outboxConsumers": 1,
+            "resourceControllers": 1
           },
           "description": "Concurrency limits of agents processing records in parallel"
         },
@@ -204,6 +220,60 @@
           "$ref": "#/$defs/DurationString",
           "default": "20ms",
           "description": "How long agents absorb a burst of change signals before processing"
+        },
+        "resourceControllers": {
+          "$ref": "#/$defs/BackgroundAgentsResourceControllersConfig",
+          "default": {
+            "failureBackoff": {
+              "backoffType": "Exponential",
+              "maxDelay": "5m",
+              "minDelay": "1s"
+            },
+            "loopRestartBackoff": {
+              "backoffType": "Exponential",
+              "maxDelay": "1m",
+              "minDelay": "1s"
+            }
+          },
+          "description": "Retry delays of the resource controller runtime"
+        },
+        "restartBackoff": {
+          "$ref": "#/$defs/RestartBackoffConfig",
+          "default": {
+            "backoffType": "Exponential",
+            "maxDelay": "1m",
+            "minDelay": "1s"
+          },
+          "description": "Delay before an agent that failed, panicked or returned early is\nrestarted, growing with consecutive restarts. A run that lasted at\nleast `maxDelay` resets the count"
+        },
+        "shutdownTimeout": {
+          "$ref": "#/$defs/DurationString",
+          "default": "10s",
+          "description": "How long background agents and in-flight API requests get to finish\non a shutdown, before they are aborted"
+        }
+      },
+      "type": "object"
+    },
+    "BackgroundAgentsResourceControllersConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "failureBackoff": {
+          "$ref": "#/$defs/ResourceControllerFailureBackoffConfig",
+          "default": {
+            "backoffType": "Exponential",
+            "maxDelay": "5m",
+            "minDelay": "1s"
+          },
+          "description": "Delay before a resource whose processing failed is processed again,\ngrowing with consecutive failures"
+        },
+        "loopRestartBackoff": {
+          "$ref": "#/$defs/RestartBackoffConfig",
+          "default": {
+            "backoffType": "Exponential",
+            "maxDelay": "1m",
+            "minDelay": "1s"
+          },
+          "description": "Delay before a failed resource controller loop is restarted, growing\nwith consecutive failures"
         }
       },
       "type": "object"
@@ -914,6 +984,44 @@
       },
       "type": "object"
     },
+    "ResourceControllerFailureBackoffConfig": {
+      "additionalProperties": false,
+      "description": "Delay before a retry: a function of the attempt number, from `minDelay`\nup to `maxDelay`",
+      "properties": {
+        "backoffType": {
+          "$ref": "#/$defs/RetryPolicyConfigBackoffType",
+          "default": "Exponential"
+        },
+        "maxDelay": {
+          "$ref": "#/$defs/DurationString",
+          "default": "5m"
+        },
+        "minDelay": {
+          "$ref": "#/$defs/DurationString",
+          "default": "1s"
+        }
+      },
+      "type": "object"
+    },
+    "RestartBackoffConfig": {
+      "additionalProperties": false,
+      "description": "Delay before a retry: a function of the attempt number, from `minDelay`\nup to `maxDelay`",
+      "properties": {
+        "backoffType": {
+          "$ref": "#/$defs/RetryPolicyConfigBackoffType",
+          "default": "Exponential"
+        },
+        "maxDelay": {
+          "$ref": "#/$defs/DurationString",
+          "default": "1m"
+        },
+        "minDelay": {
+          "$ref": "#/$defs/DurationString",
+          "default": "1s"
+        }
+      },
+      "type": "object"
+    },
     "RetryPolicyConfig": {
       "additionalProperties": false,
       "properties": {
@@ -1236,15 +1344,35 @@
         "batching": {
           "flowActivations": 20,
           "flowSystemEvents": 20,
-          "outboxMessages": 20
+          "outboxMessages": 20,
+          "resourceControllers": 20
         },
         "concurrency": {
-          "outboxConsumers": 1
+          "outboxConsumers": 1,
+          "resourceControllers": 1
         },
         "maxListeningTimeout": "2s",
-        "minDebounceInterval": "20ms"
+        "minDebounceInterval": "20ms",
+        "resourceControllers": {
+          "failureBackoff": {
+            "backoffType": "Exponential",
+            "maxDelay": "5m",
+            "minDelay": "1s"
+          },
+          "loopRestartBackoff": {
+            "backoffType": "Exponential",
+            "maxDelay": "1m",
+            "minDelay": "1s"
+          }
+        },
+        "restartBackoff": {
+          "backoffType": "Exponential",
+          "maxDelay": "1m",
+          "minDelay": "1s"
+        },
+        "shutdownTimeout": "10s"
       },
-      "description": "Background agents configuration (outbox, flow system events, tasks)"
+      "description": "Background agents configuration (outbox, flow system events, tasks,\nresource controllers)"
     },
     "database": {
       "anyOf": [

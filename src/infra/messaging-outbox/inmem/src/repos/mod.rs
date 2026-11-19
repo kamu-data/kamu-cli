@@ -8,5 +8,6 @@
 // by the Apache License, Version 2.0.
 
 mod inmem_outbox_message_bridge;
+mod inmem_outbox_message_log;
 
 pub use inmem_outbox_message_bridge::*;
