@@ -84,12 +84,8 @@ impl ProducerConsumptionJob {
         &self,
         consumption_task: ProducerConsumptionTask,
     ) -> Result<ProcessedConsumerTasksCount, InternalError> {
-        // Clone names of failing consumers before this iteration.
-        let mut permanently_failed_consumer_names = {
-            let g_failed_consumer_names = self.failed_consumer_names.lock().unwrap();
-            g_failed_consumer_names.clone()
-        };
-        let mut blocked_consumer_names = permanently_failed_consumer_names.clone();
+        // Names of failing consumers before this iteration
+        let mut blocked_consumer_names = self.failed_consumer_names_snapshot();
 
         let mut processed_consumer_tasks_count = 0;
 
@@ -177,7 +173,13 @@ impl ProducerConsumptionJob {
                             .with_label_values(&[&self.producer_name, &err.task.consumer_name])
                             .set(1);
 
-                        permanently_failed_consumer_names.insert(err.task.consumer_name);
+                        // Recorded at once: a panic of another consumer may end
+                        // the iteration, and the agent's restart must keep this
+                        // consumer blocked
+                        self.failed_consumer_names
+                            .lock()
+                            .unwrap()
+                            .insert(err.task.consumer_name);
                     }
                 }
             }
@@ -193,10 +195,6 @@ impl ProducerConsumptionJob {
                 break;
             }
         }
-
-        // Update list of failing consumer names for this job
-        let mut g_failed_consumer_names = self.failed_consumer_names.lock().unwrap();
-        *g_failed_consumer_names = permanently_failed_consumer_names;
 
         Ok(processed_consumer_tasks_count)
     }

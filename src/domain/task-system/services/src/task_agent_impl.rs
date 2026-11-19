@@ -382,7 +382,9 @@ impl BackgroundAgent for TaskAgentImpl {
 
     async fn run(&self, shutdown: CancellationToken) -> Result<(), InternalError> {
         // A failure in the middle of a task leaves it running; the host
-        // restarts this loop, so each start requeues such tasks
+        // restarts this loop, so each start requeues such tasks. Nothing runs
+        // yet, whatever the failed run left in the gauge.
+        self.metrics.on_no_task_running();
         self.recover_running_tasks().await?;
 
         // Kept across iterations, so that no change is missed between them
