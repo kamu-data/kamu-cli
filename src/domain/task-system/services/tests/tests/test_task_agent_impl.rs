@@ -400,66 +400,47 @@ async fn test_planning_failure_finishes_task_with_its_error() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_task_without_planner_fails_instead_of_the_agent() {
-    let mut mock_outbox = MockOutbox::new();
-    TaskAgentHarness::add_outbox_task_expectations(&mut mock_outbox, TaskID::new(0));
+async fn test_task_that_cannot_be_planned_fails_and_the_next_task_runs() {
+    let failing_plan_types = [
+        // No planner is registered for it
+        "dev.kamu.tasks.test.unknown",
+        PANICKING_PLAN_TYPE,
+    ];
 
-    let harness = TaskAgentHarness::new(
-        mock_outbox,
-        MockTaskDefinitionPlanner::new(),
-        MockTaskRunner::new(),
-    );
-    let task_id = harness
-        .schedule_task(LogicalPlan {
-            plan_type: "dev.kamu.tasks.test.unknown".to_owned(),
-            payload: serde_json::Value::Null,
-        })
-        .await;
+    for plan_type in failing_plan_types {
+        let mut mock_outbox = MockOutbox::new();
+        TaskAgentHarness::add_outbox_task_expectations(&mut mock_outbox, TaskID::new(0));
+        TaskAgentHarness::add_outbox_task_expectations(&mut mock_outbox, TaskID::new(1));
 
-    harness.task_agent.run_single_task().await.unwrap();
+        let harness = TaskAgentHarness::new(
+            mock_outbox,
+            MockTaskDefinitionPlanner::new(),
+            MockTaskRunner::new(),
+        );
+        let failing_task_id = harness
+            .schedule_task(LogicalPlan {
+                plan_type: plan_type.to_owned(),
+                payload: serde_json::Value::Null,
+            })
+            .await;
+        let next_task_id = harness
+            .schedule_probe_task(LogicalPlanProbe::default())
+            .await;
 
-    let task = harness.get_task(task_id).await;
-    assert_eq!(task.status(), TaskStatus::Finished);
-    assert_eq!(
-        task.outcome(),
-        Some(&TaskOutcome::Failed(TaskError::empty_recoverable())),
-    );
-}
+        harness.task_agent.run_single_task().await.unwrap();
+        harness.task_agent.run_single_task().await.unwrap();
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[test_log::test(tokio::test)]
-async fn test_panicking_task_fails_and_the_next_task_runs() {
-    let mut mock_outbox = MockOutbox::new();
-    TaskAgentHarness::add_outbox_task_expectations(&mut mock_outbox, TaskID::new(0));
-    TaskAgentHarness::add_outbox_task_expectations(&mut mock_outbox, TaskID::new(1));
-
-    let harness = TaskAgentHarness::new(
-        mock_outbox,
-        MockTaskDefinitionPlanner::new(),
-        MockTaskRunner::new(),
-    );
-    let panicking_task_id = harness
-        .schedule_task(LogicalPlan {
-            plan_type: PANICKING_PLAN_TYPE.to_owned(),
-            payload: serde_json::Value::Null,
-        })
-        .await;
-    let next_task_id = harness
-        .schedule_probe_task(LogicalPlanProbe::default())
-        .await;
-
-    harness.task_agent.run_single_task().await.unwrap();
-    harness.task_agent.run_single_task().await.unwrap();
-
-    assert_eq!(
-        harness.get_task(panicking_task_id).await.outcome(),
-        Some(&TaskOutcome::Failed(TaskError::empty_recoverable())),
-    );
-    assert_eq!(
-        harness.get_task(next_task_id).await.outcome(),
-        Some(&TaskOutcome::Success(TaskResult::empty())),
-    );
+        assert_eq!(
+            harness.get_task(failing_task_id).await.outcome(),
+            Some(&TaskOutcome::Failed(TaskError::empty_recoverable())),
+            "{plan_type}"
+        );
+        assert_eq!(
+            harness.get_task(next_task_id).await.outcome(),
+            Some(&TaskOutcome::Success(TaskResult::empty())),
+            "{plan_type}"
+        );
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

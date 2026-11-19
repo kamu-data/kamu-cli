@@ -12,14 +12,11 @@ include = { workspace = true }
 edition = { workspace = true }
 publish = { workspace = true }
 
-
 [lints]
 workspace = true
 
-
 [lib]
 doctest = false
-
 
 [features]
 default = [
@@ -32,12 +29,19 @@ testing = [
     "messaging-outbox/testing",
 ]
 
-
 [dependencies]
+
+async-trait = { version = "0.1", default-features = false }
 async-utils = { workspace = true }
 background-agent-host = { workspace = true }
+chrono = { version = "0.4", default-features = false, features = [
+    "clock",
+] }
 database-common = { workspace = true }
+database-common-macros = { workspace = true }
+dill = { version = "0.17", default-features = false }
 email-utils = { workspace = true }
+enum-variants = { workspace = true }
 event-sourcing = { workspace = true }
 internal-error = { workspace = true }
 kamu-accounts = { workspace = true }
@@ -51,18 +55,9 @@ observability = { workspace = true, features = [
     "prometheus",
 ] }
 odf = { workspace = true }
-retry-backoff = { workspace = true }
-time-source = { workspace = true }
-wakeup-listener = { workspace = true }
-
-async-trait = { version = "0.1", default-features = false }
-chrono = { version = "0.4", default-features = false, features = [
-    "clock",
-] }
-dill = { version = "0.17", default-features = false }
-enum-variants = { workspace = true }
 paste = { version = "1", default-features = false }
 prometheus = { version = "0.14", default-features = false }
+retry-backoff = { workspace = true }
 serde = { version = "1.0", features = [
     "derive",
 ] }
@@ -73,6 +68,7 @@ strum = { version = "0.28", features = [
 thiserror = { version = "2", default-features = false, features = [
     "std",
 ] }
+time-source = { workspace = true }
 tokio = { version = "1", default-features = false, features = [
     "rt",
     "sync",
@@ -80,13 +76,12 @@ tokio = { version = "1", default-features = false, features = [
 tokio-stream = { version = "0.1", default-features = false }
 tracing = { version = "0.1", default-features = false }
 uuid = { version = "1", default-features = false }
-
+wakeup-listener = { workspace = true }
 
 [dev-dependencies]
 database-common = { workspace = true, features = [
     "testing",
 ] }
-database-common-macros = { workspace = true }
 email-utils = { workspace = true }
 event-sourcing = { workspace = true }
 kamu-accounts-inmem = { workspace = true }
@@ -101,10 +96,9 @@ kamu-resources-services = { workspace = true, features = [
 messaging-outbox = { workspace = true, features = [
     "testing",
 ] }
-odf = { workspace = true }
-time-source = { workspace = true }
 
 mockall = { version = "0.15", default-features = false }
+odf = { workspace = true }
 oop = "0.0.2"
 pretty_assertions = { version = "1", default-features = false, features = [
     "std",
@@ -113,6 +107,7 @@ pretty_assertions = { version = "1", default-features = false, features = [
 test-log = { version = "0.2", features = [
     "trace",
 ] }
+time-source = { workspace = true }
 tokio = { version = "1", default-features = false, features = [
     "macros",
     "rt",

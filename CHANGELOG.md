@@ -105,7 +105,8 @@ Recommendation: for ease of reading, use the following format:
 - `kamu system api-server` keeps running when a background agent fails, panics or stops: the
   agent is logged and restarted after a delay that grows with each consecutive failure, while the
   API and the other agents keep working. Before, the whole server shut down. The delay is
-  configured by `backgroundAgents.restartBackoff` (from 1s, doubling, up to 1m by default)
+  configured by `backgroundAgents.restartBackoff` (from 1s, doubling, up to 1m by default). A task
+  that panics is marked failed and the next task runs
 - `kamu system api-server` shuts down gracefully on Ctrl+C or SIGTERM: it stops accepting requests,
   and in-flight requests and background agents get `backgroundAgents.shutdownTimeout` (10s by
   default) to finish their current step before they are stopped; a second Ctrl+C or SIGTERM exits
