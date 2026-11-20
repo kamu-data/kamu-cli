@@ -51,6 +51,7 @@ These apply to `docs/internal/*.md`, `AGENTS.md`, `CLAUDE.md` and skills.
   that sentence is part of the change, not a follow-up.
 - **Route new documents.** A new `docs/internal/*.md` needs a row in AGENTS.md "What to load for
   which task". A new skill needs a row there too, plus its `.agents/skills` symlink.
+- **Do not hard-wrap Markdown.** Write each paragraph, list item and blockquote as one line and let the editor wrap it — manual line breaks make the text hard to edit. In a document that is already hard-wrapped, put new or rewritten paragraphs on one line, and leave untouched paragraphs as they are rather than reflowing them in an unrelated change.
 - **Prefer tables and checklists** for decisions and procedures. Prose is for the reasoning
   behind them.
 - **Record rejected approaches with the reason.** A "Rejected approaches" table stops the next
