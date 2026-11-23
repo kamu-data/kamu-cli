@@ -162,7 +162,7 @@ kamu_cli_execute_command_e2e_test!(
     options = Options::default()
         .with_multi_tenant()
         .with_kamu_config(MULTITENANT_KAMU_CONFIG_WITH_DEFAULT_USER),
-    extra_test_groups = "engine, ingest, datafusion"
+    extra_test_groups = "containerized, engine, ingest, transform, datafusion"
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
