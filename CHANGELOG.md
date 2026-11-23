@@ -13,7 +13,7 @@ Recommendation: for ease of reading, use the following format:
 ### Fixed
 -->
 
-## [Unreleased]
+## [0.273.0] - 2026-11-23
 ### Added
 - Config: `protocol.smartTransferProtocol.uploadProgressInterval` sets how often the server asks a
   pushing client for upload progress (default `10s`). Keep it below the idle timeout of load
@@ -86,6 +86,15 @@ Recommendation: for ease of reading, use the following format:
   records it added
 - GraphQL: a transform flow that found nothing to do reports `FlowDescriptionUpdateResultUpToDate`,
   as ingest flows do, instead of no result
+- An empty `KAMU_JWT_SECRET` is treated as unset, so a random secret is generated instead of
+  signing tokens with an empty key
+- Web UI 0.73.0 -> 0.74.1
+- Dependency updates:
+  - jsonwebtoken 11 -> 12
+  - jsonschema 0.58 -> 0.63
+  - libunftp 0.23 -> 0.25
+  - ringbuf 0.5 -> 0.6
+  - rstest 0.27 -> 0.29
 ### Fixed
 - A polling source with an unsupported URL scheme (such as `s3://`) or fetch kind, an invalid
   header, an MQTT port out of range, a files glob ordered by event time or matching a file name that
