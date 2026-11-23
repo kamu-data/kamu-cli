@@ -244,7 +244,7 @@ sequenceDiagram
     rect rgba(100, 150, 255, 0.15)
     U->>U: build the plan
     U->>G: authorize every job of the plan
-    G-->>U: denied jobs become failed responses
+    G-->>U: denied named jobs fail, denied dependencies leave the plan
     end
     Note over U: planning errors or denials: report them, run nothing
     loop each depth, until one has a failure
@@ -350,8 +350,11 @@ needs, and reports a dataset the account cannot read as not found:
 | Transform | `Transform { inputs }` | Write on the target, Read on every input (`PullTransformItem::input_handles`) |
 | Sync into an existing dataset | `SyncFrom` | Write on the target |
 
-Denied jobs leave the plan and join its errors, in job order; a job's target error comes before its
-input errors. Like a planning error, a denial fails the whole command before any job runs.
+A denied job reports one error, its target's before any of its inputs'. A denied job of a dataset
+the caller named joins the plan's errors, in job order; like a planning error, it fails the whole
+command before any job runs. A denied dependency, which `--recursive` added, leaves the plan
+instead, and its dependents read its current state. A dependent still needs Read on that input, so
+one the account cannot read denies the dependent too.
 
 Every operation job checks its own operation again when it runs, as the principal of the pull.
 `TransformJob` checks `Transform` with the inputs its elaboration actually read, which may differ
@@ -424,7 +427,8 @@ reporting it, so the deferred consumers of the datasets that did update run in t
 | Area | What happens |
 | --- | --- |
 | Stop on error | The first depth with an error is the last one run; later depths, including datasets unrelated to the failure, are not attempted |
-| Planning errors and denials | One unresolvable reference or denied job fails the whole command before anything runs |
+| Planning errors and denials | One unresolvable reference or denied job of a named dataset fails the whole command before anything runs |
+| Denied dependencies | A recursive pull skips a dependency the account may not update, and pulls its dependents on its current state |
 | Pull aliases | A dataset with a pull alias is synced, never ingested or transformed, even when it has a source or a transform ([`DatasetUpdateKindResolver`](#51-resolving-each-request)) |
 | Non-recursive multi-pull | Upstreams are traversed for ordering only; they are not pulled |
 | Hidden datasets | The CLI reports an unauthorized dataset as not found |

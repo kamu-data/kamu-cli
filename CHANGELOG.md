@@ -73,6 +73,9 @@ Recommendation: for ease of reading, use the following format:
   cannot be reached, and reports every dataset. Before, an unreachable remote pulled none of them
 - `kamu pull` without `--recursive` no longer fails a requested derivative because one of its
   inputs, which it does not pull, has an ambiguous or missing source
+- `kamu pull --recursive` skips an upstream dataset the account may not update and pulls the
+  datasets that depend on it, instead of failing them all. A denied dataset named in the command
+  still fails the pull
 - A slow or unreachable remote repository no longer delays other writers to the node's database
   while `kamu pull` or an update task prepares to pull from it
 - Engine names in a transform are case-insensitive (`Spark` works like `spark`)

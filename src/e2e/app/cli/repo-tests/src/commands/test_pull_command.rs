@@ -379,6 +379,63 @@ pub async fn test_pull_multiple_datasets_with_mixed_outcomes(mut kamu: KamuCliPu
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// test_pull_recursive_skips_upstream_of_another_account
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_pull_recursive_skips_upstream_of_another_account(mut kamu: KamuCliPuppet) {
+    let [alice, bob] = kamu.create_accounts(["alice", "bob"]).await;
+    let root_name = DATASET_ROOT_PLAYER_NAME.as_str();
+
+    kamu.set_account(Some(bob));
+    add_named_dataset(
+        &kamu,
+        root_name,
+        odf::DatasetVisibility::Public,
+        DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR,
+    )
+    .await;
+    kamu.ingest_data(
+        &DATASET_ROOT_PLAYER_NAME,
+        DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_1,
+    )
+    .await;
+
+    kamu.set_account(Some(alice));
+    add_named_dataset(
+        &kamu,
+        "leaderboard",
+        odf::DatasetVisibility::Public,
+        &DATASET_DERIVATIVE_LEADERBOARD_SNAPSHOT_STR
+            .replace("datasetRef: player-scores", "datasetRef: bob/player-scores"),
+    )
+    .await;
+
+    // Alice may read the upstream but not update it, so only her derivative runs
+    kamu.assert_success_command_execution(
+        ["pull", "--recursive", "alice/leaderboard"],
+        None,
+        Some([r#"1 dataset\(s\) updated"#]),
+    )
+    .await;
+
+    // Named in the command, the same upstream fails the pull
+    kamu.assert_failure_command_execution(
+        [
+            "pull",
+            "--recursive",
+            "bob/player-scores",
+            "alice/leaderboard",
+        ],
+        None,
+        Some([
+            r#"Failed to update 1 dataset\(s\)"#,
+            regex::escape("User has no 'write' permission in dataset 'bob/player-scores'").as_str(),
+        ]),
+    )
+    .await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // test_pull_datasets_sharing_a_fetch_step_keep_own_source_state
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

@@ -80,35 +80,40 @@ pub enum PullPlanIterationJob {
 }
 
 impl PullPlanIterationJob {
-    /// What running the job does to its target, for authorization. `None`
-    /// for a sync into a dataset that does not exist yet.
-    pub fn as_operation_request(&self) -> Option<DatasetOperationRequest> {
+    /// The dataset the job updates. `None` for a sync into a dataset that
+    /// does not exist yet.
+    pub fn existing_target(&self) -> Option<&odf::DatasetHandle> {
         match self {
-            Self::Ingest(pii) => Some(DatasetOperationRequest::new(
-                pii.target.clone(),
-                DatasetOperation::PollingIngest,
-            )),
-            Self::Transform(pti) => Some(DatasetOperationRequest::new(
-                pti.target.clone(),
-                DatasetOperation::Transform {
-                    inputs: pti.input_handles.clone(),
-                },
-            )),
+            Self::Ingest(pii) => Some(&pii.target),
+            Self::Transform(pti) => Some(&pti.target),
             Self::Sync(psi) => match &psi.local_target {
-                PullLocalTarget::Existing(hdl) => Some(DatasetOperationRequest::new(
-                    hdl.clone(),
-                    DatasetOperation::SyncFrom,
-                )),
+                PullLocalTarget::Existing(hdl) => Some(hdl),
                 PullLocalTarget::ToCreate(_) => None,
             },
         }
     }
 
-    pub fn into_original_pull_request(self) -> Option<PullRequest> {
+    /// What running the job does to its target, for authorization. `None`
+    /// for a sync into a dataset that does not exist yet.
+    pub fn as_operation_request(&self) -> Option<DatasetOperationRequest> {
+        let target = self.existing_target()?.clone();
+        let operation = match self {
+            Self::Ingest(_) => DatasetOperation::PollingIngest,
+            Self::Transform(pti) => DatasetOperation::Transform {
+                inputs: pti.input_handles.clone(),
+            },
+            Self::Sync(_) => DatasetOperation::SyncFrom,
+        };
+        Some(DatasetOperationRequest::new(target, operation))
+    }
+
+    /// The request that named the job's target. `None` for a dependency a
+    /// recursive pull added.
+    pub fn original_pull_request(&self) -> Option<&PullRequest> {
         match self {
-            Self::Ingest(pii) => pii.maybe_original_request,
-            Self::Transform(pti) => pti.maybe_original_request,
-            Self::Sync(psi) => psi.maybe_original_request,
+            Self::Ingest(pii) => pii.maybe_original_request.as_ref(),
+            Self::Transform(pti) => pti.maybe_original_request.as_ref(),
+            Self::Sync(psi) => psi.maybe_original_request.as_ref(),
         }
     }
 }

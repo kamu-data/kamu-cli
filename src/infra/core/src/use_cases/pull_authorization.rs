@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::collections::HashSet;
 use std::sync::Arc;
 
 use internal_error::InternalError;
@@ -35,69 +36,64 @@ impl PullAuthorization {
         }
     }
 
-    /// Removes the denied jobs from the plan and appends their responses to
-    /// its errors, in job order. A plan that already has errors will not run
-    /// and is returned unchecked. A sync into a dataset that does not exist
-    /// yet is not checked.
+    /// Checks every job of the plan. A denied job the caller named becomes an
+    /// error response of the plan. A denied dependency, which a recursive
+    /// pull added, leaves the plan, and its dependents read its current
+    /// state. A plan that already has errors will not run and is left
+    /// unchecked. A sync into a dataset that does not exist yet is not
+    /// checked.
     #[tracing::instrument(level = "debug", name = PullAuthorization_authorize, skip_all, fields(num_iterations = plan.iterations.len()))]
-    pub(crate) async fn authorize(&self, plan: PullPlan) -> Result<PullPlan, InternalError> {
+    pub(crate) async fn authorize(&self, plan: &mut PullPlan) -> Result<(), InternalError> {
         if !plan.errors.is_empty() {
-            return Ok(plan);
+            return Ok(());
         }
 
-        let PullPlan {
-            iterations,
-            mut errors,
-        } = plan;
-
-        let jobs_with_requests: Vec<_> = iterations
-            .into_iter()
-            .flat_map(|iteration| {
-                let depth = iteration.depth;
-                iteration.jobs.into_iter().map(move |job| {
-                    let maybe_request = job.as_operation_request();
-                    (depth, job, maybe_request)
-                })
-            })
-            .collect();
-
-        let requests: Vec<_> = jobs_with_requests
+        let checked_jobs: Vec<_> = plan
+            .iterations
             .iter()
-            .filter_map(|(_, _, maybe_request)| maybe_request.clone())
+            .flat_map(|iteration| &iteration.jobs)
+            .filter_map(|job| job.as_operation_request().map(|request| (job, request)))
             .collect();
-        let mut verdicts = self
+        let requests: Vec<_> = checked_jobs
+            .iter()
+            .map(|(_, request)| request.clone())
+            .collect();
+
+        let verdicts = self
             .dataset_operation_guard
             .check_operations(&self.principal, &requests)
-            .await?
-            .into_iter();
+            .await?;
 
-        let mut allowed_iterations: Vec<PullPlanIteration> = Vec::new();
-        for (depth, job, maybe_request) in jobs_with_requests {
-            if let Some(request) = maybe_request
-                && let Err(error) = verdicts.next().expect("one verdict per request")
-            {
-                errors.push(PullResponse {
+        let mut skipped_dependencies = HashSet::new();
+        for ((job, request), verdict) in checked_jobs.into_iter().zip(verdicts) {
+            let Err(error) = verdict else {
+                continue;
+            };
+            if let Some(original_request) = job.original_pull_request() {
+                plan.errors.push(PullResponse {
                     maybe_local_ref: Some(request.target.as_local_ref()),
                     maybe_remote_ref: None,
-                    maybe_original_request: job.into_original_pull_request(),
+                    maybe_original_request: Some(original_request.clone()),
                     result: Err(error.into()),
                 });
-                continue;
-            }
-
-            match allowed_iterations.last_mut() {
-                Some(iteration) if iteration.depth == depth => iteration.jobs.push(job),
-                Some(_) | None => allowed_iterations.push(PullPlanIteration {
-                    depth,
-                    jobs: vec![job],
-                }),
+            } else {
+                tracing::info!(dataset = %request.target, %error, "Skipping a dependency the caller may not pull");
+                skipped_dependencies.insert(request.target.id);
             }
         }
 
-        Ok(PullPlan {
-            iterations: allowed_iterations,
-            errors,
-        })
+        if !skipped_dependencies.is_empty() {
+            for iteration in &mut plan.iterations {
+                iteration.jobs.retain(|job| {
+                    job.existing_target()
+                        .is_none_or(|target| !skipped_dependencies.contains(&target.id))
+                });
+            }
+            plan.iterations
+                .retain(|iteration| !iteration.jobs.is_empty());
+        }
+
+        Ok(())
     }
 }
 

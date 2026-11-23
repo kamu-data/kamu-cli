@@ -1524,7 +1524,7 @@ async fn test_pull_recursive_stops_after_depth_with_failed_job() {
         .await;
     harness.index_dataset_dependencies().await;
 
-    let pull_responses = harness.pull_recursive(&alias_bar).await;
+    let pull_responses = harness.pull_multi_recursive(&[&alias_bar]).await;
 
     assert_matches!(
         pull_responses.as_slice(),
@@ -1539,7 +1539,30 @@ async fn test_pull_recursive_stops_after_depth_with_failed_job() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[tokio::test]
-async fn test_pull_recursive_with_denied_upstream_runs_no_job() {
+async fn test_pull_recursive_skips_denied_dependency() {
+    let alias_foo = BaseRepoHarness::alias("foo");
+    let alias_bar = BaseRepoHarness::alias("bar");
+    // Only `bar` is writable, so no ingest of `foo` is expected
+    let (harness, bar, transformed_head) =
+        PullUseCaseHarness::new_transforming_new_derivative(&alias_foo, &alias_bar).await;
+    harness.index_dataset_dependencies().await;
+
+    let pull_responses = harness.pull_multi_recursive(&[&alias_bar]).await;
+
+    assert_matches!(
+        pull_responses.as_slice(),
+        [PullResponse {
+            maybe_local_ref: Some(a_local_ref),
+            result: Ok(PullResult::Updated { new_head, .. }),
+            ..
+        }] if *a_local_ref == bar.dataset_handle.as_local_ref() && *new_head == transformed_head
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[tokio::test]
+async fn test_pull_recursive_with_denied_named_dependency_runs_no_job() {
     let alias_foo = BaseRepoHarness::alias("foo");
     let alias_bar = BaseRepoHarness::alias("bar");
 
@@ -1565,7 +1588,9 @@ async fn test_pull_recursive_with_denied_upstream_runs_no_job() {
         .await;
     harness.index_dataset_dependencies().await;
 
-    let pull_responses = harness.pull_recursive(&alias_bar).await;
+    let pull_responses = harness
+        .pull_multi_recursive(&[&alias_foo, &alias_bar])
+        .await;
 
     assert_matches!(
         pull_responses.as_slice(),
@@ -2245,11 +2270,14 @@ impl PullUseCaseHarness {
         (pull_response, listener.events())
     }
 
-    /// Pulls `alias` with everything it depends on
-    async fn pull_recursive(&self, alias: &odf::DatasetAlias) -> Vec<PullResponse> {
+    /// Pulls `aliases` with everything they depend on
+    async fn pull_multi_recursive(&self, aliases: &[&odf::DatasetAlias]) -> Vec<PullResponse> {
         self.use_case
             .execute_multi(
-                vec![PullRequest::Local(alias.as_local_ref())],
+                aliases
+                    .iter()
+                    .map(|alias| PullRequest::Local(alias.as_local_ref()))
+                    .collect(),
                 PullOptions {
                     recursive: true,
                     ..PullOptions::default()

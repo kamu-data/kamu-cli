@@ -171,18 +171,19 @@ impl PullDatasetUseCase for PullDatasetUseCaseImpl {
     ) -> Result<Vec<PullResponse>, InternalError> {
         tracing::info!(?requests, ?options, "Performing pull");
 
-        // The plan holds only the jobs the caller may run; the denied ones are
-        // among its errors
+        // A denied job the caller named fails the whole pull, like a request
+        // that could not be planned; a denied dependency is skipped
         let PullPlan { iterations, errors } =
             transaction!(|pull_request_planner: Arc<dyn PullRequestPlanner>,
                           dataset_operation_guard: Arc<dyn DatasetOperationGuard>,
                           principal: Arc<Principal>| {
-                let plan = pull_request_planner
+                let mut plan = pull_request_planner
                     .build_pull_multi_plan(&requests, &options, *self.tenancy_config)
                     .await;
                 PullAuthorization::new(dataset_operation_guard, principal)
-                    .authorize(plan)
-                    .await?
+                    .authorize(&mut plan)
+                    .await?;
+                plan
             });
 
         tracing::info!(
@@ -210,18 +211,19 @@ impl PullDatasetUseCase for PullDatasetUseCaseImpl {
     ) -> Result<Vec<PullResponse>, InternalError> {
         tracing::info!(?options, "Performing pull (all owned)");
 
-        // The plan holds only the jobs the caller may run; the denied ones are
-        // among its errors
+        // A denied job the caller named fails the whole pull, like a request
+        // that could not be planned; a denied dependency is skipped
         let PullPlan { iterations, errors } =
             transaction!(|pull_request_planner: Arc<dyn PullRequestPlanner>,
                           dataset_operation_guard: Arc<dyn DatasetOperationGuard>,
                           principal: Arc<Principal>| {
-                let plan = pull_request_planner
+                let mut plan = pull_request_planner
                     .build_pull_plan_all_owner_datasets(&options, *self.tenancy_config)
                     .await?;
                 PullAuthorization::new(dataset_operation_guard, principal)
-                    .authorize(plan)
-                    .await?
+                    .authorize(&mut plan)
+                    .await?;
+                plan
             });
 
         tracing::info!(
