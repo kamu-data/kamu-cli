@@ -51,12 +51,11 @@ use kamu_datasets::{
     CreateDatasetResult,
     DatasetEnvVar,
     DatasetEnvVarResolver,
-    DatasetReferenceUpdater,
     GetDatasetEnvVarError,
     SecretsEncryptionConfig,
 };
 use kamu_datasets_services::DatasetKeyValueServiceSysEnv;
-use kamu_datasets_services::testing::RacingDatasetReferenceUpdater;
+use kamu_datasets_services::testing::DatasetReferenceRace;
 use kamu_task_system::{TaskDefinition, TaskError, TaskOutcome, TaskRunner};
 use pretty_assertions::assert_eq;
 
@@ -654,7 +653,7 @@ struct UpdateDatasetTaskRunnerHarness {
     base_use_case_harness: BaseUseCaseHarness,
     catalog: dill::Catalog,
     runner: Arc<dyn TaskRunner>,
-    racing_reference_updater: Arc<RacingDatasetReferenceUpdater>,
+    reference_race: Arc<DatasetReferenceRace>,
 }
 
 impl UpdateDatasetTaskRunnerHarness {
@@ -736,8 +735,11 @@ impl UpdateDatasetTaskRunnerHarness {
     /// services; it gets the harness's temporary directory. Tasks run as the
     /// node, which may run every operation
     fn build(register_operations: impl FnOnce(&mut dill::CatalogBuilder, &Path)) -> Self {
-        let base_use_case_harness =
-            BaseUseCaseHarness::new(BaseUseCaseHarnessOptions::new().as_task_node());
+        let base_use_case_harness = BaseUseCaseHarness::new(
+            BaseUseCaseHarnessOptions::new()
+                .as_task_node()
+                .with_racing_references(),
+        );
 
         let mut b = dill::CatalogBuilder::new_chained(base_use_case_harness.catalog());
         b.add::<UpdateDatasetTaskRunner>()
@@ -745,9 +747,7 @@ impl UpdateDatasetTaskRunnerHarness {
             .add::<TransformJobImpl>()
             .add::<SyncFromJobImpl>()
             .add::<PollingIngestPlannerImpl>()
-            .add::<IngestEnvVarsResolver>()
-            .add_value(RacingDatasetReferenceUpdater::default())
-            .bind::<dyn DatasetReferenceUpdater, RacingDatasetReferenceUpdater>();
+            .add::<IngestEnvVarsResolver>();
         register_operations(&mut b, base_use_case_harness.temp_dir_path());
 
         let catalog = b.build();
@@ -755,7 +755,7 @@ impl UpdateDatasetTaskRunnerHarness {
         Self {
             base_use_case_harness,
             runner: catalog.get_one::<UpdateDatasetTaskRunner>().unwrap(),
-            racing_reference_updater: catalog.get_one().unwrap(),
+            reference_race: catalog.get_one().unwrap(),
             catalog,
         }
     }
@@ -982,12 +982,12 @@ impl UpdateDatasetTaskRunnerHarness {
     }
 
     fn move_reference_before_next_update(&self, concurrent_head: odf::Multihash) {
-        self.racing_reference_updater
+        self.reference_race
             .move_reference_before_next_update(&self.catalog, concurrent_head);
     }
 
     fn deny_next_update(&self) {
-        self.racing_reference_updater.deny_next_update();
+        self.reference_race.deny_next_update();
     }
 
     /// Writes the file a polling source reads, in the harness's directory

@@ -24,12 +24,7 @@ use kamu_core::{
     PollingIngestResult,
     PollingIngestService,
 };
-use kamu_datasets::{
-    DatasetOperation,
-    DatasetOperationGuard,
-    DatasetReferenceUpdater,
-    DatasetRegistry,
-};
+use kamu_datasets::{DatasetOperation, DatasetOperationGuard, DatasetRegistry};
 use random_strings::get_random_name;
 
 use super::job_target::{authorize_and_resolve_job_target, commit_job_head};
@@ -100,11 +95,9 @@ impl PollingIngestJobImpl {
             old_head, new_head, ..
         } = &result
         {
-            transaction!(|dataset_registry: Arc<dyn DatasetRegistry>,
-                          updater: Arc<dyn DatasetReferenceUpdater>| {
+            transaction!(|dataset_registry: Arc<dyn DatasetRegistry>| {
                 commit_job_head::<PollingIngestJobError>(
                     dataset_registry.as_ref(),
-                    updater.as_ref(),
                     target_handle,
                     Some(old_head),
                     new_head,

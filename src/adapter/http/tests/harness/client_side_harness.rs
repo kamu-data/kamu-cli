@@ -47,7 +47,10 @@ use kamu_auth_rebac_services::{
     RebacServiceImpl,
 };
 use kamu_datasets::*;
-use kamu_datasets_services::testing::RacingDatasetReferenceUpdater;
+use kamu_datasets_services::testing::{
+    DatasetReferenceRace,
+    RacingDatasetLfsBuilderDatabaseBacked,
+};
 use kamu_datasets_services::utils::CreateDatasetUseCaseHelper;
 use kamu_datasets_services::*;
 use messaging_outbox::{ConsumerFilter, Outbox, OutboxImmediateImpl, register_message_dispatcher};
@@ -83,7 +86,7 @@ pub(crate) struct ClientSideHarness {
     pull_dataset_use_case: Arc<dyn PullDatasetUseCase>,
     push_dataset_use_case: Arc<dyn PushDatasetUseCase>,
     access_token_resolver: Arc<dyn odf::dataset::OdfServerAccessTokenResolver>,
-    racing_reference_updater: Arc<RacingDatasetReferenceUpdater>,
+    reference_race: Arc<DatasetReferenceRace>,
     options: ClientSideHarnessOptions,
 }
 
@@ -158,7 +161,8 @@ impl ClientSideHarness {
         b.add_builder(odf::dataset::DatasetStorageUnitLocalFs::builder(
             datasets_dir,
         ));
-        b.add::<DatasetLfsBuilderDatabaseBackedImpl>();
+        b.add_value(DatasetReferenceRace::default())
+            .add::<RacingDatasetLfsBuilderDatabaseBacked>();
         b.add_value(MetadataChainDbBackedConfig::default());
 
         b.add::<RemoteRepositoryRegistryImpl>();
@@ -220,8 +224,6 @@ impl ClientSideHarness {
         b.add::<SyncToJobImpl>();
 
         b.add::<DatasetReferenceServiceImpl>();
-        b.add_value(RacingDatasetReferenceUpdater::default())
-            .bind::<dyn DatasetReferenceUpdater, RacingDatasetReferenceUpdater>();
         b.add::<CreateDatasetUseCaseHelper>();
         b.add::<DatasetEntryServiceImpl>();
 
@@ -271,7 +273,7 @@ impl ClientSideHarness {
             pull_dataset_use_case: catalog.get_one().unwrap(),
             push_dataset_use_case: catalog.get_one().unwrap(),
             access_token_resolver: catalog.get_one().unwrap(),
-            racing_reference_updater: catalog.get_one().unwrap(),
+            reference_race: catalog.get_one().unwrap(),
             catalog,
             options,
         }
@@ -332,7 +334,7 @@ impl ClientSideHarness {
     /// Arms the next `HEAD` commit to first move `HEAD` to `concurrent_head`,
     /// the way a concurrent writer would
     pub fn move_reference_before_next_update(&self, concurrent_head: odf::Multihash) {
-        self.racing_reference_updater
+        self.reference_race
             .move_reference_before_next_update(&self.catalog, concurrent_head);
     }
 

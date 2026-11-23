@@ -145,7 +145,7 @@ stage(df?, opts)                                   commit(staged)
 `write` is `stage` followed by `commit`. `write_watermark` commits an `AddData` that carries no data,
 only a watermark and optionally a source state. Ingest does not use it; `SetWatermarkExecutorImpl`
 (behind `SetWatermarkUseCase`) does, passing the previous source state on so the polling source
-resumes where it was. That executor moves `HEAD` through `DatasetReferenceUpdater` and fails with
+resumes where it was. That executor moves `HEAD` through `MetadataChain::set_ref` and fails with
 `SetWatermarkExecutionError::RefCASFailed` if `HEAD` moved after planning.
 
 `stage` reports no listener stage of its own: `Preprocess`, when the source has a preprocess query,

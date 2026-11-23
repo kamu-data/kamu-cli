@@ -14,7 +14,6 @@ use kamu_datasets::{
     DatasetOperationGuard,
     DatasetOperationRequest,
     DatasetPermissionError,
-    DatasetReferenceUpdater,
     DatasetRegistry,
     DatasetRegistryExt,
     ResolvedDataset,
@@ -70,7 +69,6 @@ where
 /// `old_head`, `HEAD` must not exist yet
 pub(crate) async fn commit_job_head<E>(
     dataset_registry: &dyn DatasetRegistry,
-    dataset_reference_updater: &dyn DatasetReferenceUpdater,
     target: &odf::DatasetHandle,
     old_head: Option<&odf::Multihash>,
     new_head: &odf::Multihash,
@@ -79,8 +77,16 @@ where
     E: From<odf::DatasetNotFoundError> + From<odf::dataset::SetChainRefError> + From<InternalError>,
 {
     let dataset = resolve_job_target::<E>(dataset_registry, target).await?;
-    dataset_reference_updater
-        .update_reference(&dataset, &odf::BlockRef::Head, old_head, new_head)
+    dataset
+        .as_metadata_chain()
+        .set_ref(
+            &odf::BlockRef::Head,
+            old_head,
+            new_head,
+            odf::dataset::SetRefOpts {
+                validate_block_present: true,
+            },
+        )
         .await?;
     Ok(())
 }

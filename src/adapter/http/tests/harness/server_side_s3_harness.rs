@@ -15,7 +15,6 @@ use kamu::*;
 use kamu_accounts_services::ModifyAccountPasswordUseCaseImpl;
 use kamu_datasets_services::{
     AppendDatasetMetadataBatchUseCaseImpl,
-    DatasetReferenceUpdaterImpl,
     DatasetS3BuilderDatabaseBackedImpl,
 };
 use test_utils::LocalS3Server;
@@ -55,7 +54,6 @@ impl ServerSideS3Harness {
                     Some(s3.secret_key.clone()),
                 ))
                 .add::<AppendDatasetMetadataBatchUseCaseImpl>()
-                .add::<DatasetReferenceUpdaterImpl>()
                 .add::<ModifyAccountPasswordUseCaseImpl>();
 
             NoOpDatabasePlugin::init_database_components(b);

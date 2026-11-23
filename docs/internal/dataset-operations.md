@@ -22,9 +22,9 @@ page describes only what is specific to it:
 
 - **Blocks first, `HEAD` last.** An operation appends its blocks and data files without moving
   `HEAD`. Until `HEAD` moves, no reader sees them.
-- **One way to move a reference.** `DatasetReferenceUpdater::update_reference` moves a dataset's
-  reference, such as `HEAD`, from an expected block to a new one inside the caller's
-  transaction, and fails when another writer moved it first. There is no unconditional move.
+- **One way to move a reference.** The dataset's `MetadataChain::set_ref` moves a reference, such
+  as `HEAD`, from an expected block to a new one inside the caller's transaction, and fails when
+  another writer moved it first. There is no unconditional move.
 - **No transaction around slow work.** Fetching, engines and transfers run for minutes; they run
   between two short transactions, never inside one.
 - **A lost race leaves garbage, not corruption.** The loser's blocks stay in storage unreferenced;
@@ -53,7 +53,7 @@ flowchart LR
     JOBS["Operation jobs<br/>authorize, short transactions"]
     PLAN["Planners<br/>ingest · transform · compaction · reset"]
     EXEC["Executors, no transaction<br/>ingest · transform · sync · compaction"]
-    COMMIT["DatasetReferenceUpdater<br/>CAS on HEAD"]
+    COMMIT["MetadataChain::set_ref<br/>CAS on HEAD"]
     OUTBOX[("Outbox:<br/>DatasetReferenceMessage")]
 
     CLI --> UC
@@ -100,7 +100,7 @@ sequenceDiagram
     participant G as DatasetOperationGuard
     participant P as PollingIngestPlanner
     participant I as PollingIngestService
-    participant C as DatasetReferenceUpdater
+    participant C as MetadataChain
 
     rect rgba(100, 150, 255, 0.15)
     J->>G: check PollingIngest for the principal
@@ -128,10 +128,10 @@ How each operation fills in the steps:
 
 | Operation | Job | Plan | Execute (writes blocks) | Commit |
 | --- | --- | --- | --- | --- |
-| Polling ingest | `PollingIngestJob` | `PollingIngestPlanner`, env vars | `PollingIngestService::ingest`, one iteration | `DatasetReferenceUpdater` |
-| Transform | `TransformJob` | `TransformPlanner::elaborate_transform` | `TransformExecutor` | `DatasetReferenceUpdater` |
-| Sync into a local dataset | `SyncFromJob` | reads the destination's head | `SyncService::sync_from` | `DatasetReferenceUpdater`, or `CreateDatasetUseCase` for a new dataset |
-| Hard compaction, reset to metadata | `CompactionJob` | `CompactionPlanner` | `CompactionExecutor` | `DatasetReferenceUpdater` |
+| Polling ingest | `PollingIngestJob` | `PollingIngestPlanner`, env vars | `PollingIngestService::ingest`, one iteration | `MetadataChain::set_ref` |
+| Transform | `TransformJob` | `TransformPlanner::elaborate_transform` | `TransformExecutor` | `MetadataChain::set_ref` |
+| Sync into a local dataset | `SyncFromJob` | reads the destination's head | `SyncService::sync_from` | `MetadataChain::set_ref`, or `CreateDatasetUseCase` for a new dataset |
+| Hard compaction, reset to metadata | `CompactionJob` | `CompactionPlanner` | `CompactionExecutor` | `MetadataChain::set_ref` |
 | Reset to a block | `ResetJob` | `ResetPlanner` | — (the block already exists) | `ResetExecutor`, in the same transaction as the plan |
 | Push ingest | — | `PushIngestPlanner` | the push ingest executor | in the same transaction as the plan: the request's or the command's |
 
@@ -144,19 +144,24 @@ The task-side view of the same table, with the outcome of each commit, is in
 
 ## 3. Committing `HEAD`
 
-`DatasetReferenceUpdater::update_reference(target, block_ref, expected_block_hash, new_block_hash)`
-is the single way to move a dataset's reference; the `reference_writes` lint in `kamu-repo-tools`
-rejects direct reference writes elsewhere. It runs in the caller's transaction, and:
+`target.as_metadata_chain().set_ref(block_ref, expected_block_hash, new_block_hash, opts)` moves a
+dataset's reference, in the caller's transaction. Commits pass
+`SetRefOpts { validate_block_present: true }`, and the call:
 
 - fails with `CASFailed` when `block_ref` no longer points at `expected_block_hash`, committing
   nothing;
 - fails with `BlockNotFound` when `new_block_hash` is not in the dataset's block store;
 - with `expected_block_hash = None`, requires the reference not to exist yet.
 
-The compare-and-swap belongs to ODF itself: `MetadataChain::set_ref` takes the expected block hash
-as an argument, and an append that moves a reference expects the block's previous block, so the
-chain API has no unconditional write. The updater is still the single entry point, for audit and
-for injecting races in tests (`RacingDatasetReferenceUpdater`).
+The compare-and-swap belongs to ODF itself: `set_ref` takes the expected block hash as an argument,
+and an append that moves a reference expects the block's previous block, so the chain API has no
+unconditional write. Going through the chain keeps its reference cache coherent; the
+`reference_writes` lint in `kamu-repo-tools` rejects writes below it
+(`DatasetReferenceService::set_reference`, `DatasetReferenceRepository::set_dataset_reference`)
+outside the chain's reference repository, the reference service and the startup indexer. Tests
+inject races at the chain: `RacingDatasetLfsBuilder` and `RacingDatasetLfsBuilderDatabaseBacked`
+build datasets whose `set_ref` first runs what a `DatasetReferenceRace` has armed (a concurrent
+move, a removal, or a refusal as by read-only storage).
 
 Every layer below the operation takes `block_ref`; the operation picks it. Every operation moves
 `HEAD`, the only reference ODF defines, and passes `odf::BlockRef::Head` where it calls the

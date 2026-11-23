@@ -7,33 +7,20 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::sync::Arc;
-
 use dill::{component, interface};
 use kamu_datasets::{
     AppendDatasetMetadataBatchUseCase,
     AppendDatasetMetadataBatchUseCaseError,
     AppendDatasetMetadataBatchUseCaseOptions,
-    DatasetReferenceUpdater,
     ResolvedDataset,
 };
 use odf::dataset::MetadataChainExt as _;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct AppendDatasetMetadataBatchUseCaseImpl {
-    dataset_reference_updater: Arc<dyn DatasetReferenceUpdater>,
-}
-
 #[component(pub)]
 #[interface(dyn AppendDatasetMetadataBatchUseCase)]
-impl AppendDatasetMetadataBatchUseCaseImpl {
-    pub fn new(dataset_reference_updater: Arc<dyn DatasetReferenceUpdater>) -> Self {
-        Self {
-            dataset_reference_updater,
-        }
-    }
-}
+pub struct AppendDatasetMetadataBatchUseCaseImpl {}
 
 #[common_macros::method_names_consts]
 #[async_trait::async_trait]
@@ -64,12 +51,15 @@ impl AppendDatasetMetadataBatchUseCase for AppendDatasetMetadataBatchUseCaseImpl
             .set_ref_check_ref_mode
             .expected_head(appended.base_head);
 
-        self.dataset_reference_updater
-            .update_reference(
-                target,
+        target
+            .as_metadata_chain()
+            .set_ref(
                 &odf::BlockRef::Head,
                 expected_head.as_ref(),
                 &appended.new_head,
+                odf::dataset::SetRefOpts {
+                    validate_block_present: true,
+                },
             )
             .await?;
 

@@ -29,7 +29,7 @@ use kamu_datasets::{
     DatasetReferenceRepository,
 };
 use kamu_datasets_services::DatasetOperationGuardImpl;
-use kamu_datasets_services::testing::RacingDatasetReferenceUpdater;
+use kamu_datasets_services::testing::DatasetReferenceRace;
 use messaging_outbox::OutboxProvider;
 use odf::metadata::testing::MetadataFactory;
 use pretty_assertions::{assert_eq, assert_ne};
@@ -131,7 +131,7 @@ async fn test_set_watermark_head_removed_concurrently() {
 struct SetWatermarkHarness {
     base_gql_harness: BaseGQLDatasetHarness,
     catalog_authorized: dill::Catalog,
-    racing_reference_updater: Arc<RacingDatasetReferenceUpdater>,
+    reference_race: Arc<DatasetReferenceRace>,
     dataset_ref_repo: Arc<dyn DatasetReferenceRepository>,
 }
 
@@ -142,7 +142,7 @@ impl SetWatermarkHarness {
             .outbox_provider(OutboxProvider::Immediate {
                 force_immediate: true,
             })
-            .racing_reference_updater(true)
+            .racing_references(true)
             .build();
 
         let base_catalog = dill::CatalogBuilder::new_chained(base_gql_harness.catalog())
@@ -165,7 +165,7 @@ impl SetWatermarkHarness {
 
         Self {
             base_gql_harness,
-            racing_reference_updater: catalog_authorized.get_one().unwrap(),
+            reference_race: catalog_authorized.get_one().unwrap(),
             dataset_ref_repo: catalog_authorized.get_one().unwrap(),
             catalog_authorized,
         }
@@ -203,12 +203,12 @@ impl SetWatermarkHarness {
     }
 
     fn move_reference_before_next_update(&self, concurrent_head: odf::Multihash) {
-        self.racing_reference_updater
+        self.reference_race
             .move_reference_before_next_update(&self.catalog_authorized, concurrent_head);
     }
 
     fn remove_reference_before_next_update(&self) {
-        self.racing_reference_updater
+        self.reference_race
             .remove_reference_before_next_update(&self.catalog_authorized);
     }
 

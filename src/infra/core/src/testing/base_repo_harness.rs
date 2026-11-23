@@ -24,6 +24,7 @@ use kamu_core::{
     TenancyConfig,
 };
 use kamu_datasets::{CreateDatasetResult, DatasetRegistry, DatasetRegistryExt, ResolvedDataset};
+use kamu_datasets_services::testing::{DatasetReferenceRace, RacingDatasetLfsBuilder};
 use odf::dataset::DatasetStorageUnitLocalFs;
 use odf::dataset::testing::create_test_dataset_from_snapshot;
 use odf::metadata::testing::{DatasetSnapshotBuilder, MetadataFactory};
@@ -53,6 +54,10 @@ impl BaseRepoHarness {
         /// for work that runs as the node
         principal: Option<Principal>,
         system_time_source_stub: Option<SystemTimeSourceStub>,
+        /// Builds datasets whose chains race a concurrent writer when armed
+        /// through `DatasetReferenceRace`
+        #[builder(default)]
+        racing_references: bool,
     ) -> Self {
         let temp_dir = tempfile::tempdir().unwrap();
 
@@ -68,8 +73,14 @@ impl BaseRepoHarness {
             b.add_value(RunInfoDir::new(run_info_dir))
                 .add_value(tenancy_config)
                 .add_builder(DatasetStorageUnitLocalFs::builder(datasets_dir))
-                .add::<odf::dataset::DatasetLfsBuilderDefault>()
                 .add::<DatasetRegistrySoloUnitBridge>();
+
+            if racing_references {
+                b.add_value(DatasetReferenceRace::default())
+                    .add::<RacingDatasetLfsBuilder>();
+            } else {
+                b.add::<odf::dataset::DatasetLfsBuilderDefault>();
+            }
 
             current_account_subject
                 .unwrap_or_else(CurrentAccountSubject::new_test)

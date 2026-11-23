@@ -7,19 +7,15 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::sync::Arc;
-
 use dill::*;
 use kamu_core::*;
-use kamu_datasets::{DatasetReferenceUpdater, ResolvedDataset};
+use kamu_datasets::ResolvedDataset;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[component(pub)]
 #[interface(dyn ResetExecutor)]
-pub struct ResetExecutorImpl {
-    dataset_reference_updater: Arc<dyn DatasetReferenceUpdater>,
-}
+pub struct ResetExecutorImpl {}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -32,12 +28,15 @@ impl ResetExecutor for ResetExecutorImpl {
         target: ResolvedDataset,
         plan: ResetPlan,
     ) -> Result<ResetResult, ResetExecutionError> {
-        self.dataset_reference_updater
-            .update_reference(
-                &target,
+        target
+            .as_metadata_chain()
+            .set_ref(
                 &odf::BlockRef::Head,
                 plan.old_head.as_ref(),
                 &plan.new_head,
+                odf::dataset::SetRefOpts {
+                    validate_block_present: true,
+                },
             )
             .await?;
 

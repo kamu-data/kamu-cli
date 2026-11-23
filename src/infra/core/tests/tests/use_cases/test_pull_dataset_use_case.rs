@@ -29,13 +29,12 @@ use kamu_datasets::{
     DatasetEnvVarValue,
     DatasetPermission,
     DatasetPermissionError,
-    DatasetReferenceUpdater,
     GetDatasetEnvVarError,
     MockDatasetPermissionChecker,
     ResolvedDataset,
     SecretsEncryptionConfig,
 };
-use kamu_datasets_services::testing::RacingDatasetReferenceUpdater;
+use kamu_datasets_services::testing::DatasetReferenceRace;
 use kamu_datasets_services::utils::CreateDatasetUseCaseHelper;
 use kamu_datasets_services::{
     CreateDatasetUseCaseImpl,
@@ -1810,11 +1809,8 @@ async fn test_pull_ingest_into_dataset_deleted_before_commit_is_not_found() {
 #[tokio::test]
 async fn test_pull_ingest_commit_not_allowed_is_access_error() {
     let alias_foo = BaseRepoHarness::alias("foo");
-    let (harness, foo, _) = PullUseCaseHarness::new_ingesting_new_root_with(
-        &alias_foo,
-        PullUseCaseHarnessMocks::with_reference_updates_denied,
-    )
-    .await;
+    let (harness, foo, _) = PullUseCaseHarness::new_ingesting_new_root(&alias_foo).await;
+    harness.deny_next_update();
 
     let (pull_response, events) = harness.pull_local_recording(&alias_foo).await;
 
@@ -1923,7 +1919,8 @@ struct PullUseCaseHarness {
 impl PullUseCaseHarness {
     fn new(mocks: PullUseCaseHarnessMocks) -> Self {
         let mut base_options = BaseUseCaseHarnessOptions::new()
-            .with_maybe_permission_checker(Some(mocks.mock_dataset_permission_checker));
+            .with_maybe_permission_checker(Some(mocks.mock_dataset_permission_checker))
+            .with_racing_references();
         if mocks.creates_dataset {
             let mut mock_outbox = MockOutbox::new();
             mock_outbox
@@ -2028,13 +2025,6 @@ impl PullUseCaseHarness {
                 .bind::<dyn DatasetEntryWriter, MockDatasetEntryWriter>();
         }
 
-        if mocks.reference_updates_denied {
-            b.add::<ReadOnlyDatasetReferenceUpdater>();
-        } else {
-            b.add_value(RacingDatasetReferenceUpdater::default())
-                .bind::<dyn DatasetReferenceUpdater, RacingDatasetReferenceUpdater>();
-        }
-
         match mocks.env_var_resolution {
             None => {}
             Some(EnvVarResolution::Failing) => {
@@ -2072,19 +2062,11 @@ impl PullUseCaseHarness {
     async fn new_ingesting_new_root(
         alias: &odf::DatasetAlias,
     ) -> (Self, CreateDatasetResult, odf::Multihash) {
-        Self::new_ingesting_new_root_with(alias, |mocks| mocks).await
-    }
-
-    /// [`Self::new_ingesting_new_root`] with the mocks adjusted by `configure`
-    async fn new_ingesting_new_root_with(
-        alias: &odf::DatasetAlias,
-        configure: impl FnOnce(PullUseCaseHarnessMocks) -> PullUseCaseHarnessMocks,
-    ) -> (Self, CreateDatasetResult, odf::Multihash) {
         let reported_heads = ReportedHeads::default();
-        let harness = Self::new(configure(PullUseCaseHarnessMocks::for_ingest_updated(
+        let harness = Self::new(PullUseCaseHarnessMocks::for_ingest_updated(
             alias,
             &reported_heads,
-        )));
+        ));
         let created = harness.create_root_dataset(alias).await;
         let ingested_head = harness
             .append_unreferenced_block(&created, "ingested")
@@ -2121,9 +2103,17 @@ impl PullUseCaseHarness {
     /// `concurrent_head` just before that commit
     fn move_reference_before_next_update(&self, concurrent_head: odf::Multihash) {
         self.catalog
-            .get_one::<RacingDatasetReferenceUpdater>()
+            .get_one::<DatasetReferenceRace>()
             .unwrap()
             .move_reference_before_next_update(&self.catalog, concurrent_head);
+    }
+
+    /// Refuses the next `HEAD` move, as a read-only storage does
+    fn deny_next_update(&self) {
+        self.catalog
+            .get_one::<DatasetReferenceRace>()
+            .unwrap()
+            .deny_next_update();
     }
 
     /// Number of polling ingest iterations planned from the dataset's `HEAD`
@@ -2459,8 +2449,6 @@ struct PullUseCaseHarnessMocks {
     real_transform_watermark: Option<DateTime<Utc>>,
     /// Enables dataset environment variables with this resolver
     env_var_resolution: Option<EnvVarResolution>,
-    /// Registers [`ReadOnlyDatasetReferenceUpdater`]
-    reference_updates_denied: bool,
 }
 
 impl PullUseCaseHarnessMocks {
@@ -2719,14 +2707,6 @@ impl PullUseCaseHarnessMocks {
         self.with_permission_checker_mock(checker)
     }
 
-    /// Every `HEAD` move is refused, as by a read-only storage
-    fn with_reference_updates_denied(self) -> Self {
-        Self {
-            reference_updates_denied: true,
-            ..self
-        }
-    }
-
     /// Like [`Self::for_ingest_updated`], with an ingest that deletes the
     /// dataset's storage before it reports the update
     fn for_ingest_deleting_target(
@@ -2934,30 +2914,7 @@ impl Default for PullUseCaseHarnessMocks {
             real_ingest: false,
             real_transform_watermark: None,
             env_var_resolution: None,
-            reference_updates_denied: false,
         }
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-/// Refuses every reference move, as a read-only storage does
-#[dill::component]
-#[dill::interface(dyn DatasetReferenceUpdater)]
-struct ReadOnlyDatasetReferenceUpdater {}
-
-#[async_trait::async_trait]
-impl DatasetReferenceUpdater for ReadOnlyDatasetReferenceUpdater {
-    async fn update_reference(
-        &self,
-        _target: &ResolvedDataset,
-        _block_ref: &odf::BlockRef,
-        _expected_block_hash: Option<&odf::Multihash>,
-        _new_block_hash: &odf::Multihash,
-    ) -> Result<(), odf::dataset::SetChainRefError> {
-        Err(odf::dataset::SetChainRefError::Access(
-            odf::AccessError::ReadOnly(None),
-        ))
     }
 }
 

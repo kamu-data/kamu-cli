@@ -26,7 +26,6 @@ use kamu_datasets::{
     DatasetOperation,
     DatasetOperationGuard,
     DatasetOperationRequest,
-    DatasetReferenceUpdater,
     DatasetRegistry,
 };
 use random_strings::get_random_name;
@@ -111,11 +110,9 @@ impl TransformJobImpl {
             old_head, new_head, ..
         } = &result
         {
-            transaction!(|dataset_registry: Arc<dyn DatasetRegistry>,
-                          updater: Arc<dyn DatasetReferenceUpdater>| {
+            transaction!(|dataset_registry: Arc<dyn DatasetRegistry>| {
                 commit_job_head::<TransformJobError>(
                     dataset_registry.as_ref(),
-                    updater.as_ref(),
                     target_handle,
                     Some(old_head),
                     new_head,

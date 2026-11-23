@@ -54,7 +54,7 @@ These apply to `docs/internal/*.md`, `AGENTS.md`, `CLAUDE.md` and skills.
 - **Prefer tables and checklists** for decisions and procedures. Prose is for the reasoning
   behind them.
 - **Lead with behaviour, then name the code.** "Each job commits its own `HEAD`
-  (`DatasetReferenceUpdater::update_reference`)" reads better than a sentence built from
+  (`MetadataChain::set_ref`)" reads better than a sentence built from
   identifiers. A table cell over about 25 words belongs in a subsection or a list instead.
 - **Diagrams are Mermaid,** small (about a dozen nodes), one per question. In sequence diagrams a
   shaded `rect rgba(100, 150, 255, 0.15)` marks a database transaction, and a call outside one

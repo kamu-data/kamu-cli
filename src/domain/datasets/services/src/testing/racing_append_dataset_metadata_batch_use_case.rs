@@ -7,14 +7,13 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::sync::{Arc, Mutex};
+use std::sync::Mutex;
 
 use dill::{component, interface, scope};
 use kamu_datasets::{
     AppendDatasetMetadataBatchUseCase,
     AppendDatasetMetadataBatchUseCaseError,
     AppendDatasetMetadataBatchUseCaseOptions,
-    DatasetReferenceUpdater,
     ResolvedDataset,
 };
 
@@ -26,7 +25,8 @@ use crate::AppendDatasetMetadataBatchUseCaseImpl;
 /// Appends like `AppendDatasetMetadataBatchUseCaseImpl`, but when armed first
 /// moves `HEAD` the way a concurrent writer would before the batch arrives, so
 /// the move lands before the commit decides which head it expects.
-/// `RacingDatasetReferenceUpdater` moves it later, after that decision
+/// [`DatasetReferenceRace`](super::DatasetReferenceRace) moves it later, after
+/// that decision
 pub struct RacingAppendDatasetMetadataBatchUseCase {
     inner: AppendDatasetMetadataBatchUseCaseImpl,
     concurrent_reference_move: Mutex<Option<ConcurrentReferenceMove>>,
@@ -36,9 +36,9 @@ pub struct RacingAppendDatasetMetadataBatchUseCase {
 #[interface(dyn AppendDatasetMetadataBatchUseCase)]
 #[scope(dill::Singleton)]
 impl RacingAppendDatasetMetadataBatchUseCase {
-    pub fn new(dataset_reference_updater: Arc<dyn DatasetReferenceUpdater>) -> Self {
+    pub fn new() -> Self {
         Self {
-            inner: AppendDatasetMetadataBatchUseCaseImpl::new(dataset_reference_updater),
+            inner: AppendDatasetMetadataBatchUseCaseImpl {},
             concurrent_reference_move: Mutex::new(None),
         }
     }
@@ -68,7 +68,7 @@ impl AppendDatasetMetadataBatchUseCase for RacingAppendDatasetMetadataBatchUseCa
         let concurrent_reference_move = self.concurrent_reference_move.lock().unwrap().take();
         if let Some(concurrent_reference_move) = concurrent_reference_move {
             concurrent_reference_move
-                .apply(target.get_handle(), &odf::BlockRef::Head)
+                .apply(target.get_id(), &odf::BlockRef::Head)
                 .await;
         }
 

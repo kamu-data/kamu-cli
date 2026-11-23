@@ -19,7 +19,6 @@ use kamu_datasets::{
     MockDatasetPermissionChecker,
     ResolvedDataset,
 };
-use kamu_datasets_services::DatasetReferenceUpdaterImpl;
 use pretty_assertions::assert_matches;
 
 use crate::utils::RecordingListener;
@@ -206,8 +205,7 @@ impl CompactionJobHarness {
         b.add::<CompactionJobImpl>()
             .add::<CompactionPlannerImpl>()
             .add_value(EngineConfigDatafusionEmbeddedCompaction::default())
-            .add::<ObjectStoreRegistryImpl>()
-            .add::<DatasetReferenceUpdaterImpl>();
+            .add::<ObjectStoreRegistryImpl>();
         if let Some(mock_compaction_executor) = maybe_mock_compaction_executor {
             b.add_value(mock_compaction_executor)
                 .bind::<dyn CompactionExecutor, MockCompactionExecutor>();

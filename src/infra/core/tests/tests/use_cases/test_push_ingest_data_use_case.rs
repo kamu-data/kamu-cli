@@ -27,11 +27,10 @@ use kamu_core::*;
 use kamu_datasets::{
     CreateDatasetResult,
     DatasetPermission,
-    DatasetReferenceUpdater,
     MockDatasetPermissionChecker,
     ResolvedDataset,
 };
-use kamu_datasets_services::testing::RacingDatasetReferenceUpdater;
+use kamu_datasets_services::testing::DatasetReferenceRace;
 use kamu_datasets_services::{
     AccountQuotaCheckerStorageImpl,
     DatasetStatisticsServiceImpl,
@@ -721,7 +720,7 @@ async fn test_push_ingest_data_execute_multi_counts_staged_slices_towards_quota(
 struct PushIngestDataUseCaseHarness {
     base_use_case_harness: BaseUseCaseHarness,
     use_case: Arc<dyn PushIngestDataUseCase>,
-    racing_reference_updater: Arc<RacingDatasetReferenceUpdater>,
+    reference_race: Arc<DatasetReferenceRace>,
     account_repo: Arc<dyn AccountRepository>,
 }
 
@@ -773,14 +772,13 @@ impl PushIngestDataUseCaseHarness {
     }
 
     fn new_with(options: BaseUseCaseHarnessOptions, quota_defaults: QuotaDefaultsConfig) -> Self {
-        let base_use_case_harness = BaseUseCaseHarness::new(options.without_outbox());
+        let base_use_case_harness =
+            BaseUseCaseHarness::new(options.without_outbox().with_racing_references());
 
         let mut b = dill::CatalogBuilder::new_chained(base_use_case_harness.catalog());
 
         kamu_datasets_inmem::register_dependencies(&mut b);
         b.add::<PushIngestDataUseCaseImpl>()
-            .add_value(RacingDatasetReferenceUpdater::default())
-            .bind::<dyn DatasetReferenceUpdater, RacingDatasetReferenceUpdater>()
             .add::<PushIngestPlannerImpl>()
             .add::<PushIngestExecutorImpl>()
             .add::<DataFormatRegistryImpl>()
@@ -811,17 +809,16 @@ impl PushIngestDataUseCaseHarness {
         Self {
             base_use_case_harness,
             use_case: catalog.get_one().unwrap(),
-            racing_reference_updater: catalog.get_one().unwrap(),
+            reference_race: catalog.get_one().unwrap(),
             account_repo: catalog.get_one().unwrap(),
         }
     }
 
     fn move_reference_before_next_update(&self, concurrent_head: odf::Multihash) {
-        self.racing_reference_updater
-            .move_reference_before_next_update(
-                self.base_use_case_harness.catalog(),
-                concurrent_head,
-            );
+        self.reference_race.move_reference_before_next_update(
+            self.base_use_case_harness.catalog(),
+            concurrent_head,
+        );
     }
 
     async fn ingest_data(

@@ -18,30 +18,16 @@ use regex::Regex;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Production code that may write a dataset reference directly. Everything
-/// else moves references through `DatasetReferenceUpdater`
+/// Production code that may write a dataset reference below the metadata
+/// chain. Everything else moves references through the dataset's
+/// `MetadataChain::set_ref`, which keeps the chain's reference cache coherent
+/// and, for every local dataset, writes through `DatasetReferenceService`
 const ALLOWED_REFERENCE_WRITES: &[AllowedReferenceWrite] = &[
-    AllowedReferenceWrite {
-        path: "src/domain/core/src/utils/metadata_chain_comparator.rs",
-        method: "set_ref",
-        reason: "wrapper that delegates to its inner chain",
-    },
     AllowedReferenceWrite {
         path: "src/domain/datasets/services/src/services/odf/\
                metadata_chain_ref_repo_db_backed_impl.rs",
         method: "set_reference",
         reason: "database-backed chain references, reached only through the chain's set_ref",
-    },
-    AllowedReferenceWrite {
-        path: "src/domain/datasets/services/src/services/odf/metadata_chain_db_backed/\
-               metadata_chain_db_backed_impl.rs",
-        method: "set_ref",
-        reason: "delegates to its inner chain",
-    },
-    AllowedReferenceWrite {
-        path: "src/domain/datasets/services/src/services/refs/dataset_reference_updater_impl.rs",
-        method: "set_ref",
-        reason: "the reference update primitive",
     },
     AllowedReferenceWrite {
         path: "src/domain/datasets/services/src/services/refs/dataset_reference_indexer.rs",
@@ -53,16 +39,6 @@ const ALLOWED_REFERENCE_WRITES: &[AllowedReferenceWrite] = &[
         method: "set_dataset_reference",
         reason: "the reference service writing its own repository",
     },
-    AllowedReferenceWrite {
-        path: "src/odf/dataset/",
-        method: "set_ref",
-        reason: "ODF layer: appending a batch to a chain whose HEAD is written directly",
-    },
-    AllowedReferenceWrite {
-        path: "src/odf/dataset-impl/",
-        method: "set_ref",
-        reason: "ODF storage layer that implements references",
-    },
 ];
 
 const TEST_CODE_PATH_PARTS: &[&str] = &["/tests/", "/testing/", "/repo-tests/", "/benches/"];
@@ -73,13 +49,13 @@ static TEST_MODULE_START: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"^(pub(\([^)]*\))?\s+)?mod\s").unwrap());
 
 static REFERENCE_WRITE_CALL: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"\.(set_ref|set_reference|set_dataset_reference)\s*(::<[^>]*>)?\(").unwrap()
+    Regex::new(r"\.(set_reference|set_dataset_reference)\s*(::<[^>]*>)?\(").unwrap()
 });
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test]
-fn check_reference_writes_go_through_reference_updater() {
+fn check_reference_writes_go_through_metadata_chain() {
     let violations: Vec<_> = find_all_reference_writes()
         .into_iter()
         .filter(|write| find_allowance(write).is_none())
@@ -102,9 +78,8 @@ fn check_reference_writes_go_through_reference_updater() {
         writeln!(stderr).unwrap();
         writeln!(
             stderr,
-            "Move references through `DatasetReferenceUpdater::update_reference` instead, see \
-             src/domain/datasets/domain/src/services/dataset_reference_updater.rs. Exceptions are \
-             listed in `ALLOWED_REFERENCE_WRITES` in \
+            "Move references through the dataset's `MetadataChain::set_ref` instead. Exceptions \
+             are listed in `ALLOWED_REFERENCE_WRITES` in \
              src/utils/repo-tools/tests/lints/reference_writes.rs"
         )
         .unwrap();
@@ -140,11 +115,11 @@ fn self_test() {
         // Licence header
 
         async fn commit(chain: &dyn MetadataChain) {
-            // Mentioning set_ref() in a comment is fine
-            chain.set_ref(&BlockRef::Head, &hash, opts).await.unwrap();
+            // Mentioning set_reference() in a comment is fine
+            chain.set_ref(&BlockRef::Head, None, &hash, opts).await.unwrap();
 
-            chain
-                .set_ref(&BlockRef::Head, &hash, opts)
+            service
+                .set_reference(&id, &BlockRef::Head, None, &hash)
                 .await
                 .unwrap();
 
@@ -153,19 +128,19 @@ fn self_test() {
             let r = resolver.dataset_ref(&alias);
         }
 
-        async fn set_ref(&self) {}
+        async fn set_reference(&self) {}
 
         #[cfg(test)]
         const TEST_ONLY: u8 = 0;
 
-        fn after_test_only_item(chain: &dyn MetadataChain) {
-            chain.set_ref(&BlockRef::Head, &hash, opts);
+        fn after_test_only_item(service: &dyn DatasetReferenceService) {
+            service.set_reference(&id, &BlockRef::Head, None, &hash);
         }
 
         #[cfg(test)]
         mod tests {
             fn test_commit() {
-                chain.set_ref(&BlockRef::Head, &hash, opts);
+                service.set_reference(&id, &BlockRef::Head, None, &hash);
             }
         }
         "#
@@ -182,26 +157,28 @@ fn self_test() {
     assert_eq!(
         violations("src/domain/foo/src/x.rs"),
         vec![
-            "5: set_ref",
-            "8: set_ref",
+            "8: set_reference",
             "12: set_reference",
             "13: set_dataset_reference",
-            "23: set_ref",
+            "23: set_reference",
         ]
     );
 
-    // The updater may call only `set_ref`
+    // The reference service may call only `set_dataset_reference`
     assert_eq!(
         violations(
-            "src/domain/datasets/services/src/services/refs/dataset_reference_updater_impl.rs"
+            "src/domain/datasets/services/src/services/refs/dataset_reference_service_impl.rs"
         ),
-        vec!["12: set_reference", "13: set_dataset_reference"]
+        vec!["8: set_reference", "12: set_reference", "23: set_reference"]
     );
 
-    // The storage layer is allowed by directory
+    // The chain's reference repository may call only `set_reference`
     assert_eq!(
-        violations("src/odf/dataset-impl/src/entities/metadata_chain_impl.rs"),
-        vec!["12: set_reference", "13: set_dataset_reference"]
+        violations(
+            "src/domain/datasets/services/src/services/odf/metadata_chain_ref_repo_db_backed_impl.\
+             rs"
+        ),
+        vec!["13: set_dataset_reference"]
     );
 
     // Test code is not checked
@@ -234,7 +211,6 @@ struct ReferenceWrite {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 struct AllowedReferenceWrite {
-    /// A file, or a directory when it ends with `/`
     path: &'static str,
     method: &'static str,
     reason: &'static str,
@@ -242,13 +218,7 @@ struct AllowedReferenceWrite {
 
 impl AllowedReferenceWrite {
     fn allows(&self, write: &ReferenceWrite) -> bool {
-        let path_matches = if self.path.ends_with('/') {
-            write.file_path_rel.starts_with(self.path)
-        } else {
-            write.file_path_rel == self.path
-        };
-
-        path_matches && write.method == self.method
+        write.file_path_rel == self.path && write.method == self.method
     }
 }
 

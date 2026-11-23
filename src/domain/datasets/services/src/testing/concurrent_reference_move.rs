@@ -9,7 +9,7 @@
 
 use database_common::{DatabaseTransactionManager, transaction};
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
-use kamu_datasets::{DatasetReferenceRepository, DatasetRegistry};
+use kamu_datasets::{DatasetReferenceRepository, DatasetRegistry, DatasetRegistryExt as _};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -39,7 +39,7 @@ impl ConcurrentReferenceMove {
         }
     }
 
-    pub async fn apply(self, dataset_handle: &odf::DatasetHandle, block_ref: &odf::BlockRef) {
+    pub async fn apply(self, dataset_id: &odf::DatasetID, block_ref: &odf::BlockRef) {
         // With no transaction manager there are no transactions to race with
         let has_transaction_manager = self
             .catalog
@@ -51,7 +51,7 @@ impl ConcurrentReferenceMove {
             |catalog| -> Result<_, InternalError> {
                 Self::move_reference(
                     &catalog,
-                    dataset_handle,
+                    dataset_id,
                     block_ref,
                     self.concurrent_block_hash.as_ref(),
                 )
@@ -63,7 +63,7 @@ impl ConcurrentReferenceMove {
 
     async fn move_reference(
         catalog: &dill::Catalog,
-        dataset_handle: &odf::DatasetHandle,
+        dataset_id: &odf::DatasetID,
         block_ref: &odf::BlockRef,
         concurrent_block_hash: Option<&odf::Multihash>,
     ) -> Result<(), InternalError> {
@@ -71,7 +71,7 @@ impl ConcurrentReferenceMove {
             return catalog
                 .get_one::<dyn DatasetReferenceRepository>()
                 .int_err()?
-                .remove_dataset_reference(&dataset_handle.id, block_ref)
+                .remove_dataset_reference(dataset_id, block_ref)
                 .await
                 .int_err();
         };
@@ -79,8 +79,9 @@ impl ConcurrentReferenceMove {
         let dataset = catalog
             .get_one::<dyn DatasetRegistry>()
             .int_err()?
-            .get_dataset_by_handle(dataset_handle)
-            .await;
+            .get_dataset_by_id(dataset_id)
+            .await
+            .int_err()?;
         let chain = dataset.as_metadata_chain();
         // A concurrent writer moves the reference from where it reads it
         let current_block_hash = match chain.resolve_ref(block_ref).await {

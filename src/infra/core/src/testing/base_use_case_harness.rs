@@ -31,6 +31,7 @@ pub struct BaseUseCaseHarnessOptions {
     maybe_system_time_source_stub: Option<SystemTimeSourceStub>,
     current_account_subject: CurrentAccountSubject,
     maybe_principal: Option<Principal>,
+    racing_references: bool,
 }
 
 impl BaseUseCaseHarnessOptions {
@@ -93,6 +94,13 @@ impl BaseUseCaseHarnessOptions {
         .with_principal(Principal::Node)
     }
 
+    /// Builds datasets whose chains race a concurrent writer when armed
+    /// through `DatasetReferenceRace`
+    pub fn with_racing_references(mut self) -> Self {
+        self.racing_references = true;
+        self
+    }
+
     pub fn with_system_time_source_stub(
         mut self,
         system_time_source_stub: SystemTimeSourceStub,
@@ -112,6 +120,7 @@ impl Default for BaseUseCaseHarnessOptions {
             maybe_system_time_source_stub: None,
             current_account_subject: CurrentAccountSubject::new_test(),
             maybe_principal: None,
+            racing_references: false,
         }
     }
 }
@@ -131,6 +140,7 @@ impl BaseUseCaseHarness {
             .maybe_mock_did_generator(options.maybe_mock_did_generator)
             .current_account_subject(options.current_account_subject)
             .maybe_principal(options.maybe_principal)
+            .racing_references(options.racing_references)
             .maybe_system_time_source_stub(options.maybe_system_time_source_stub);
 
         let base_repo_harness = base_repo_harness_builder.build();

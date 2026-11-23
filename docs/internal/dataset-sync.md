@@ -131,7 +131,7 @@ the reference carries an alias.
 | --- | --- | --- |
 | Target | one | `PullLocalTarget::resolve_sync_target` reads `expected_head`, then `SyncFrom` is authorized on the dataset found, even one created since planning; no remote is contacted |
 | Transfer | none held across it | `sync_from`: open the source, compare the chains, store a new dataset's `Seed`, copy objects, append blocks; no reference moves (`SyncFromTransfer`) |
-| Commit | a new one | an existing dataset's `HEAD` moves from `expected_head` (`DatasetReferenceUpdater`); a new dataset is created with `HEAD` at the new head (`CreateDatasetUseCase`, `initial_head`) |
+| Commit | a new one | an existing dataset's `HEAD` moves from `expected_head` (`MetadataChain::set_ref`); a new dataset is created with `HEAD` at the new head (`CreateDatasetUseCase`, `initial_head`) |
 
 Opening the source fails with `RepositoryNotFound` for an unknown repository,
 `RemoteByIdUnsupported` for a remote named only by ID, and `DatasetNotFound` for a source without

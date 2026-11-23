@@ -71,7 +71,7 @@ Transactions are opened at three levels only. Everything else runs in the caller
 - **Orchestration** opens no transaction around an operation; it calls jobs. This covers dependency
   traversal, repeated ingest iterations, recovery policies, and work over several datasets. It opens a
   block only for its own planning reads, such as the pull plan.
-- **Domain services** (planners, executors, `DatasetReferenceUpdater`, repositories) always run in the
+- **Domain services** (planners, executors, a dataset's `MetadataChain`, repositories) always run in the
   caller's transaction.
 
 A job is the same code for the CLI and for flows: legacy task runners only map a task definition to
@@ -114,8 +114,9 @@ let result = self.compaction_executor.execute(target, plan, None).await?;
 
 // 3: Commit, handling the error here
 let committed = transaction!(
-    |updater: Arc<dyn DatasetReferenceUpdater>| -> Result<_, odf::dataset::SetChainRefError> {
-        updater.update_reference(..).await
+    |dataset_registry: Arc<dyn DatasetRegistry>| -> Result<_, odf::dataset::SetChainRefError> {
+        let target = dataset_registry.get_dataset_by_handle(&handle).await;
+        target.as_metadata_chain().set_ref(..).await
     }
 );
 ```

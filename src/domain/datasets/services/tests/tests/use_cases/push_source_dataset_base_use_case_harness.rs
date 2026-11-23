@@ -46,11 +46,7 @@ use kamu_datasets::{
     MockDatasetPermissionChecker,
     ResolvedDataset,
 };
-use kamu_datasets_services::{
-    AccountQuotaCheckerStorageImpl,
-    DatasetReferenceUpdaterImpl,
-    DatasetStatisticsServiceImpl,
-};
+use kamu_datasets_services::{AccountQuotaCheckerStorageImpl, DatasetStatisticsServiceImpl};
 use messaging_outbox::DummyOutboxImpl;
 use odf::dataset::testing::create_test_dataset_from_snapshot;
 use time_source::SystemTimeSource;
@@ -84,7 +80,6 @@ impl PushSourceDatasetBaseUseCaseHarness {
 
         let catalog = b
             .add::<PushIngestDataUseCaseImpl>()
-            .add::<DatasetReferenceUpdaterImpl>()
             .add::<PushIngestExecutorImpl>()
             .add::<PushIngestPlannerImpl>()
             .add::<DataFormatRegistryImpl>()

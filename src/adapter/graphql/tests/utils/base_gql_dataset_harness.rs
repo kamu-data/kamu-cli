@@ -20,7 +20,10 @@ use kamu_adapter_graphql::data_loader::{account_entity_data_loader, dataset_hand
 use kamu_auth_rebac_services::RebacDatasetRegistryFacadeImpl;
 use kamu_core::{DidGeneratorDefault, RunInfoDir, TenancyConfig};
 use kamu_datasets::*;
-use kamu_datasets_services::testing::RacingDatasetReferenceUpdater;
+use kamu_datasets_services::testing::{
+    DatasetReferenceRace,
+    RacingDatasetLfsBuilderDatabaseBacked,
+};
 use kamu_datasets_services::utils::CreateDatasetUseCaseHelper;
 use kamu_datasets_services::{AccountQuotaCheckerStorageImpl, DatasetStatisticsServiceImpl, *};
 use messaging_outbox::*;
@@ -44,10 +47,10 @@ impl BaseGQLDatasetHarness {
         base_catalog: Option<&dill::Catalog>,
         outbox_provider: Option<OutboxProvider>,
         system_time_source_provider: Option<SystemTimeSourceProvider>,
-        /// Registers `RacingDatasetReferenceUpdater` in place of
-        /// `DatasetReferenceUpdaterImpl`
+        /// Builds datasets whose chains race a concurrent writer when armed
+        /// (`RacingDatasetLfsBuilderDatabaseBacked`)
         #[builder(default)]
-        racing_reference_updater: bool,
+        racing_references: bool,
     ) -> Self {
         let tempdir = tempfile::tempdir().unwrap();
 
@@ -72,7 +75,6 @@ impl BaseGQLDatasetHarness {
                 .add_builder(odf::dataset::DatasetStorageUnitLocalFs::builder(
                     datasets_dir,
                 ))
-                .add::<DatasetLfsBuilderDatabaseBackedImpl>()
                 .add_value(kamu_datasets_services::MetadataChainDbBackedConfig::default())
                 .add::<CreateDatasetFromSnapshotUseCaseImpl>()
                 .add::<CreateDatasetUseCaseImpl>()
@@ -94,11 +96,11 @@ impl BaseGQLDatasetHarness {
                 .add_value(QuotaDefaultsConfig::default())
                 .add_value(RunInfoDir::new(run_info_dir));
 
-            if racing_reference_updater {
-                b.add_value(RacingDatasetReferenceUpdater::default())
-                    .bind::<dyn DatasetReferenceUpdater, RacingDatasetReferenceUpdater>();
+            if racing_references {
+                b.add_value(DatasetReferenceRace::default())
+                    .add::<RacingDatasetLfsBuilderDatabaseBacked>();
             } else {
-                b.add::<DatasetReferenceUpdaterImpl>();
+                b.add::<DatasetLfsBuilderDatabaseBackedImpl>();
             }
 
             let outbox_provider = outbox_provider.unwrap_or_default();

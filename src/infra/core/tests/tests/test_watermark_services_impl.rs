@@ -35,7 +35,6 @@ use kamu_core::{
     TenancyConfig,
 };
 use kamu_datasets::ResolvedDataset;
-use kamu_datasets_services::DatasetReferenceUpdaterImpl;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -349,7 +348,6 @@ impl WatermarkTestHarness {
             .add::<odf::dataset::DummyOdfServerAccessTokenResolver>()
             .add::<SetWatermarkPlannerImpl>()
             .add::<SetWatermarkExecutorImpl>()
-            .add::<DatasetReferenceUpdaterImpl>()
             .add::<MetadataQueryServiceImpl>()
             .build();
 

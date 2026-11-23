@@ -33,7 +33,6 @@ use kamu_datasets::{
     DatasetOperation,
     DatasetOperationGuard,
     DatasetOperationRequest,
-    DatasetReferenceUpdater,
     DatasetRegistry,
 };
 
@@ -161,11 +160,9 @@ impl SyncFromJobImpl {
         expected_head: Option<&odf::Multihash>,
         new_head: &odf::Multihash,
     ) -> Result<(), SyncFromJobError> {
-        transaction!(|dataset_registry: Arc<dyn DatasetRegistry>,
-                      updater: Arc<dyn DatasetReferenceUpdater>| {
+        transaction!(|dataset_registry: Arc<dyn DatasetRegistry>| {
             commit_job_head::<SyncFromJobError>(
                 dataset_registry.as_ref(),
-                updater.as_ref(),
                 target,
                 expected_head,
                 new_head,

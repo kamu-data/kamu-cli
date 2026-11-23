@@ -29,8 +29,8 @@ use kamu_adapter_task_dataset::{
 };
 use kamu_core::testing::ReportedHeads;
 use kamu_core::*;
-use kamu_datasets::{CreateDatasetResult, DatasetReferenceUpdater};
-use kamu_datasets_services::testing::RacingDatasetReferenceUpdater;
+use kamu_datasets::CreateDatasetResult;
+use kamu_datasets_services::testing::DatasetReferenceRace;
 use kamu_task_system::{
     TaskDefinition,
     TaskError,
@@ -220,14 +220,17 @@ async fn test_hard_compact_with_nothing_to_do_succeeds_without_moving_head() {
 struct CompactionTaskRunnersHarness {
     base_use_case_harness: BaseUseCaseHarness,
     catalog: dill::Catalog,
-    racing_reference_updater: Arc<RacingDatasetReferenceUpdater>,
+    reference_race: Arc<DatasetReferenceRace>,
 }
 
 impl CompactionTaskRunnersHarness {
     /// Tasks run as the node, which may run every operation
     fn new(mock_compaction_executor: MockCompactionExecutor) -> Self {
-        let base_use_case_harness =
-            BaseUseCaseHarness::new(BaseUseCaseHarnessOptions::new().as_task_node());
+        let base_use_case_harness = BaseUseCaseHarness::new(
+            BaseUseCaseHarnessOptions::new()
+                .as_task_node()
+                .with_racing_references(),
+        );
 
         let mut b = dill::CatalogBuilder::new_chained(base_use_case_harness.catalog());
         b.add::<CompactionDatasetTaskRunner>()
@@ -235,8 +238,6 @@ impl CompactionTaskRunnersHarness {
             .add::<CompactionPlannerImpl>()
             .add_value(EngineConfigDatafusionEmbeddedCompaction::default())
             .add::<ObjectStoreRegistryImpl>()
-            .add_value(RacingDatasetReferenceUpdater::default())
-            .bind::<dyn DatasetReferenceUpdater, RacingDatasetReferenceUpdater>()
             .add_value(mock_compaction_executor)
             .bind::<dyn CompactionExecutor, MockCompactionExecutor>();
 
@@ -244,13 +245,13 @@ impl CompactionTaskRunnersHarness {
 
         Self {
             base_use_case_harness,
-            racing_reference_updater: catalog.get_one().unwrap(),
+            reference_race: catalog.get_one().unwrap(),
             catalog,
         }
     }
 
     fn deny_next_update(&self) {
-        self.racing_reference_updater.deny_next_update();
+        self.reference_race.deny_next_update();
     }
 
     /// Creates root `alias` and expects one compaction of it reporting a new

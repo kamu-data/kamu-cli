@@ -61,7 +61,6 @@ pub fn register_dependencies(
     b.add::<DatasetEntryServiceImpl>();
     b.add::<DependencyGraphServiceImpl>();
     b.add::<DatasetReferenceServiceImpl>();
-    b.add::<DatasetReferenceUpdaterImpl>();
     b.add::<DatasetStatisticsServiceImpl>();
     b.add::<DatasetBlocksQueryServiceImpl>();
     b.add::<DatasetIncrementQueryServiceImpl>();

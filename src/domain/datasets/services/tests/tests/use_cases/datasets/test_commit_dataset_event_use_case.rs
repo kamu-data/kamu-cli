@@ -458,7 +458,7 @@ impl CommitDatasetEventUseCaseHarness {
                 ),
                 maybe_mock_dataset_permission_checker: Some(mock_dataset_permission_checker),
                 maybe_mock_did_generator: Some(mock_did_generator),
-                racing_reference_updater: true,
+                racing_references: true,
                 ..DatasetBaseUseCaseHarnessOpts::default()
             })
             .await;

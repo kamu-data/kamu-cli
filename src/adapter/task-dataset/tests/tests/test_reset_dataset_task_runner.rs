@@ -19,8 +19,8 @@ use kamu_adapter_task_dataset::{
     TaskErrorDatasetCommit,
     TaskErrorDatasetReset,
 };
-use kamu_datasets::{CreateDatasetResult, DatasetReferenceUpdater};
-use kamu_datasets_services::testing::RacingDatasetReferenceUpdater;
+use kamu_datasets::CreateDatasetResult;
+use kamu_datasets_services::testing::DatasetReferenceRace;
 use kamu_task_system::{TaskDefinition, TaskError, TaskOutcome, TaskRunner};
 use pretty_assertions::assert_eq;
 
@@ -123,41 +123,42 @@ struct ResetDatasetTaskRunnerHarness {
     base_use_case_harness: BaseUseCaseHarness,
     catalog: dill::Catalog,
     runner: Arc<dyn TaskRunner>,
-    racing_reference_updater: Arc<RacingDatasetReferenceUpdater>,
+    reference_race: Arc<DatasetReferenceRace>,
 }
 
 impl ResetDatasetTaskRunnerHarness {
     /// Tasks run as the node, which may run every operation
     fn new() -> Self {
-        let base_use_case_harness =
-            BaseUseCaseHarness::new(BaseUseCaseHarnessOptions::new().as_task_node());
+        let base_use_case_harness = BaseUseCaseHarness::new(
+            BaseUseCaseHarnessOptions::new()
+                .as_task_node()
+                .with_racing_references(),
+        );
 
         let mut b = dill::CatalogBuilder::new_chained(base_use_case_harness.catalog());
         b.add::<ResetDatasetTaskRunner>()
             .add::<ResetJobImpl>()
             .add::<ResetPlannerImpl>()
-            .add::<ResetExecutorImpl>()
-            .add_value(RacingDatasetReferenceUpdater::default())
-            .bind::<dyn DatasetReferenceUpdater, RacingDatasetReferenceUpdater>();
+            .add::<ResetExecutorImpl>();
 
         let catalog = b.build();
 
         Self {
             base_use_case_harness,
             runner: catalog.get_one::<ResetDatasetTaskRunner>().unwrap(),
-            racing_reference_updater: catalog.get_one().unwrap(),
+            reference_race: catalog.get_one().unwrap(),
             catalog,
         }
     }
 
     fn deny_next_update(&self) {
-        self.racing_reference_updater.deny_next_update();
+        self.reference_race.deny_next_update();
     }
 
     /// Another writer moves `HEAD` to `concurrent_head` after the reset was
     /// planned
     fn move_head_before_next_update(&self, concurrent_head: odf::Multihash) {
-        self.racing_reference_updater
+        self.reference_race
             .move_reference_before_next_update(&self.catalog, concurrent_head);
     }
 

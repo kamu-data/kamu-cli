@@ -16,9 +16,10 @@ use kamu_accounts_inmem::InMemoryAccountQuotaEventStore;
 use kamu_accounts_services::AccountQuotaServiceImpl;
 use kamu_datasets::*;
 use kamu_datasets_services::testing::{
+    DatasetReferenceRace,
     FailingDatasetChangeListener,
     RacingAppendDatasetMetadataBatchUseCase,
-    RacingDatasetReferenceUpdater,
+    RacingDatasetLfsBuilderDatabaseBacked,
 };
 use kamu_datasets_services::*;
 use messaging_outbox::register_message_dispatcher;
@@ -58,10 +59,9 @@ impl ServerSideLocalFsHarness {
                 .add_builder(odf::dataset::DatasetStorageUnitLocalFs::builder(
                     datasets_dir,
                 ))
-                .add::<DatasetLfsBuilderDatabaseBackedImpl>()
+                .add_value(DatasetReferenceRace::default())
+                .add::<RacingDatasetLfsBuilderDatabaseBacked>()
                 .add::<RacingAppendDatasetMetadataBatchUseCase>()
-                .add_value(RacingDatasetReferenceUpdater::default())
-                .bind::<dyn DatasetReferenceUpdater, RacingDatasetReferenceUpdater>()
                 .add::<InMemoryAccountQuotaEventStore>()
                 .add::<AccountQuotaServiceImpl>()
                 .add::<DatasetStatisticsServiceImpl>()
@@ -92,7 +92,7 @@ impl ServerSideLocalFsHarness {
     /// `concurrent_head`, the way a concurrent writer would
     pub fn move_reference_before_next_update(&self, concurrent_head: odf::Multihash) {
         self.base_catalog()
-            .get_one::<RacingDatasetReferenceUpdater>()
+            .get_one::<DatasetReferenceRace>()
             .unwrap()
             .move_reference_before_next_update(&self.cli_catalog(), concurrent_head);
     }

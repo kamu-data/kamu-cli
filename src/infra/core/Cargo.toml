@@ -62,6 +62,7 @@ testing = [
     # Features
     "kamu-accounts/testing",
     "kamu-core/testing",
+    "kamu-datasets-services/testing",
     "kamu-datasets/testing",
     "messaging-outbox/testing",
     "odf/testing",

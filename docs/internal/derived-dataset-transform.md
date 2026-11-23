@@ -32,7 +32,7 @@ sequenceDiagram
     participant P as TransformPlanner
     participant X as TransformExecutor
     participant E as Engine container
-    participant C as DatasetReferenceUpdater
+    participant C as MetadataChain
 
     rect rgba(100, 150, 255, 0.15)
     J->>P: elaborate at current heads
@@ -241,7 +241,7 @@ re-resolves the target by ID in each of its transactions:
 | --- | --- | --- |
 | Authorize and elaborate | one, with the target and inputs resolved through `DatasetRegistry` inside it; `Transform` is checked with the inputs the elaboration read before any result is used | the expected head and every input head come from one database snapshot, and the inputs checked are exactly those read |
 | Execute | none; the target and the plan's datasets are detached first | the engine runs for minutes |
-| Commit | a new one, through `DatasetReferenceUpdater` with `old_head` (the request's `head`) as the expected head | the CAS fails if another writer moved `HEAD` since elaboration |
+| Commit | a new one, through `MetadataChain::set_ref` with `old_head` (the request's `head`) as the expected head | the CAS fails if another writer moved `HEAD` since elaboration |
 
 `kamu pull` and the update task both plan when the job runs, not when the pull or the task was
 planned ([§6](#6-entry-points)).

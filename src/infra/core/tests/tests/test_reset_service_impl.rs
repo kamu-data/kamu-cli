@@ -14,7 +14,6 @@ use kamu::domain::*;
 use kamu::testing::BaseRepoHarness;
 use kamu::*;
 use kamu_datasets::ResolvedDataset;
-use kamu_datasets_services::DatasetReferenceUpdaterImpl;
 use odf::metadata::testing::MetadataFactory;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -205,7 +204,6 @@ impl ResetTestHarness {
         let catalog = dill::CatalogBuilder::new_chained(base_repo_harness.catalog())
             .add::<ResetPlannerImpl>()
             .add::<ResetExecutorImpl>()
-            .add::<DatasetReferenceUpdaterImpl>()
             .build();
 
         let reset_planner = catalog.get_one::<dyn ResetPlanner>().unwrap();

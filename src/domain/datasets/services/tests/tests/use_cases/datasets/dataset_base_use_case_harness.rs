@@ -18,7 +18,11 @@ use kamu_accounts_services::AccountServiceImpl;
 use kamu_auth_rebac_services::RebacDatasetRegistryFacadeImpl;
 use kamu_core::*;
 use kamu_datasets::*;
-use kamu_datasets_services::testing::{RacingDatasetReferenceUpdater, TestDatasetOutboxListener};
+use kamu_datasets_services::testing::{
+    DatasetReferenceRace,
+    RacingDatasetLfsBuilderDatabaseBacked,
+    TestDatasetOutboxListener,
+};
 use kamu_datasets_services::utils::CreateDatasetUseCaseHelper;
 use kamu_datasets_services::*;
 use messaging_outbox::*;
@@ -35,7 +39,7 @@ pub struct DatasetBaseUseCaseHarness {
     system_time_source: Arc<dyn SystemTimeSource>,
     dataset_registry: Arc<dyn DatasetRegistry>,
     dataset_ref_repo: Arc<dyn DatasetReferenceRepository>,
-    racing_reference_updater: Option<Arc<RacingDatasetReferenceUpdater>>,
+    reference_race: Option<Arc<DatasetReferenceRace>>,
     test_dataset_outbox_listener: Arc<TestDatasetOutboxListener>,
 }
 
@@ -62,7 +66,6 @@ impl DatasetBaseUseCaseHarness {
                 .add_builder(odf::dataset::DatasetStorageUnitLocalFs::builder(
                     datasets_dir,
                 ))
-                .add::<DatasetLfsBuilderDatabaseBackedImpl>()
                 .add_value(kamu_datasets_services::MetadataChainDbBackedConfig::default())
                 .add::<DatasetEntryServiceImpl>()
                 .add::<InMemoryDidSecretKeyRepository>()
@@ -86,11 +89,11 @@ impl DatasetBaseUseCaseHarness {
                 b.add::<AlwaysHappyDatasetPermissionChecker>();
             }
 
-            if opts.racing_reference_updater {
-                b.add_value(RacingDatasetReferenceUpdater::default())
-                    .bind::<dyn DatasetReferenceUpdater, RacingDatasetReferenceUpdater>();
+            if opts.racing_references {
+                b.add_value(DatasetReferenceRace::default())
+                    .add::<RacingDatasetLfsBuilderDatabaseBacked>();
             } else {
-                b.add::<DatasetReferenceUpdaterImpl>();
+                b.add::<DatasetLfsBuilderDatabaseBackedImpl>();
             }
 
             if let Some(mock_did_generator) = opts.maybe_mock_did_generator {
@@ -144,8 +147,8 @@ impl DatasetBaseUseCaseHarness {
             system_time_source: intermediate_catalog.get_one().unwrap(),
             dataset_registry: intermediate_catalog.get_one().unwrap(),
             dataset_ref_repo: intermediate_catalog.get_one().unwrap(),
-            racing_reference_updater: opts
-                .racing_reference_updater
+            reference_race: opts
+                .racing_references
                 .then(|| intermediate_catalog.get_one().unwrap()),
             test_dataset_outbox_listener: intermediate_catalog.get_one().unwrap(),
             no_subject_catalog,
@@ -400,12 +403,12 @@ impl DatasetBaseUseCaseHarness {
             .unwrap()
     }
 
-    /// Arms the racing reference updater to move `HEAD` to `concurrent_head`
-    /// before the next update; needs `racing_reference_updater` in the options
+    /// Arms the reference race to move `HEAD` to `concurrent_head` before the
+    /// next update; needs `racing_references` in the options
     pub fn move_reference_before_next_update(&self, concurrent_head: odf::Multihash) {
-        self.racing_reference_updater
+        self.reference_race
             .as_ref()
-            .expect("Harness built without racing_reference_updater")
+            .expect("Harness built without racing_references")
             .move_reference_before_next_update(&self.intermediate_catalog, concurrent_head);
     }
 
@@ -427,9 +430,9 @@ pub struct DatasetBaseUseCaseHarnessOpts<'a> {
     pub maybe_mock_did_generator: Option<MockDidGenerator>,
     pub outbox_provider: OutboxProvider,
     pub system_time_source_provider: SystemTimeSourceProvider,
-    /// Registers `RacingDatasetReferenceUpdater` in place of
-    /// `DatasetReferenceUpdaterImpl`
-    pub racing_reference_updater: bool,
+    /// Builds datasets whose chains race a concurrent writer when armed
+    /// (`RacingDatasetLfsBuilderDatabaseBacked`)
+    pub racing_references: bool,
 }
 
 impl Default for DatasetBaseUseCaseHarnessOpts<'_> {
@@ -444,7 +447,7 @@ impl Default for DatasetBaseUseCaseHarnessOpts<'_> {
                 force_immediate: true,
             },
             system_time_source_provider: SystemTimeSourceProvider::Default,
-            racing_reference_updater: false,
+            racing_references: false,
         }
     }
 }

@@ -136,8 +136,8 @@ a target. That is how a breaking change is undone, since a compaction or an earl
 the blocks it replaced stored but outside the history of `HEAD`.
 
 **Execute.** `ResetExecutorImpl::execute` moves `HEAD` from the plan's `old_head` to its
-`new_head` through `DatasetReferenceUpdater`, which checks that the new block is present. "Present"
-means the block exists in the dataset's block store, which also holds blocks no longer reachable
+`new_head` through the dataset's `MetadataChain::set_ref`, which checks that the new block is
+present. "Present" means the block exists in the dataset's block store, which also holds blocks no longer reachable
 from `HEAD` (from an earlier reset, compaction, or an attempt that lost its `HEAD` swap). A `HEAD`
 moved after planning fails the swap as `SetReferenceFailed(CASFailed)` and nothing changes, in the
 CLI and in the reset task alike ([task-system.md](task-system.md#73-reset)).

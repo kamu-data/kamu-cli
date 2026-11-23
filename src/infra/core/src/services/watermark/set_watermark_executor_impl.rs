@@ -7,21 +7,17 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::sync::Arc;
-
 use dill::*;
 use internal_error::ErrorIntoInternal;
 use kamu_core::*;
-use kamu_datasets::{DatasetReferenceUpdater, ResolvedDataset};
+use kamu_datasets::ResolvedDataset;
 use kamu_ingest_datafusion::DataWriterDataFusion;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[component(pub)]
 #[interface(dyn SetWatermarkExecutor)]
-pub struct SetWatermarkExecutorImpl {
-    dataset_reference_updater: Arc<dyn DatasetReferenceUpdater>,
-}
+pub struct SetWatermarkExecutorImpl {}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -62,12 +58,15 @@ impl SetWatermarkExecutor for SetWatermarkExecutorImpl {
             .await
         {
             Ok(res) => {
-                self.dataset_reference_updater
-                    .update_reference(
-                        &target,
+                target
+                    .as_metadata_chain()
+                    .set_ref(
                         &odf::BlockRef::Head,
                         Some(&res.old_head),
                         &res.new_head,
+                        odf::dataset::SetRefOpts {
+                            validate_block_present: true,
+                        },
                     )
                     .await?;
 

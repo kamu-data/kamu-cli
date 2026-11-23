@@ -113,7 +113,6 @@ impl SyncWorkspaceCatalog {
             .add_value(self.dataset_entry_writer)
             .bind::<dyn DatasetEntryWriter, MockDatasetEntryWriter>()
             .add::<DatasetReferenceServiceImpl>()
-            .add::<DatasetReferenceUpdaterImpl>()
             .add::<RebacDatasetLifecycleMessageConsumer>()
             .add::<SetDatasetRebacPropertiesUseCaseImpl>()
             .add::<DeleteDatasetRebacPropertiesUseCaseImpl>()

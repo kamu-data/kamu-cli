@@ -12,7 +12,7 @@ use std::sync::Arc;
 use dill::{component, interface};
 use internal_error::{ErrorIntoInternal, ResultIntoInternal};
 use kamu_auth_rebac::{RebacDatasetRefUnresolvedError, RebacDatasetRegistryFacade};
-use kamu_datasets::{CommitDatasetEventUseCase, DatasetPermission, DatasetReferenceUpdater};
+use kamu_datasets::{CommitDatasetEventUseCase, DatasetPermission};
 use odf::dataset::{AppendError, CommitError, InvalidEventError};
 use odf::metadata::EnumWithVariants;
 use time_source::SystemTimeSource;
@@ -23,7 +23,6 @@ use time_source::SystemTimeSource;
 #[interface(dyn CommitDatasetEventUseCase)]
 pub struct CommitDatasetEventUseCaseImpl {
     rebac_dataset_registry_facade: Arc<dyn RebacDatasetRegistryFacade>,
-    dataset_reference_updater: Arc<dyn DatasetReferenceUpdater>,
     system_time_source: Arc<dyn SystemTimeSource>,
 }
 
@@ -108,12 +107,15 @@ impl CommitDatasetEventUseCase for CommitDatasetEventUseCaseImpl {
             )
             .await?;
 
-        self.dataset_reference_updater
-            .update_reference(
-                &resolved_dataset,
+        resolved_dataset
+            .as_metadata_chain()
+            .set_ref(
                 &odf::BlockRef::Head,
                 Some(&old_head),
                 &commit_result.new_head,
+                odf::dataset::SetRefOpts {
+                    validate_block_present: true,
+                },
             )
             .await?;
 

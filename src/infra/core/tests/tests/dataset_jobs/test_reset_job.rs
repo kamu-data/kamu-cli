@@ -13,7 +13,6 @@ use kamu::testing::{BaseRepoHarness, BaseUseCaseHarness, BaseUseCaseHarnessOptio
 use kamu::*;
 use kamu_core::*;
 use kamu_datasets::{DatasetPermission, MockDatasetPermissionChecker, ResolvedDataset};
-use kamu_datasets_services::DatasetReferenceUpdaterImpl;
 use odf::metadata::testing::MetadataFactory;
 use pretty_assertions::assert_matches;
 
@@ -140,8 +139,7 @@ impl ResetJobHarness {
         let mut b = dill::CatalogBuilder::new_chained(base_use_case_harness.catalog());
         b.add::<ResetJobImpl>()
             .add::<ResetPlannerImpl>()
-            .add::<ResetExecutorImpl>()
-            .add::<DatasetReferenceUpdaterImpl>();
+            .add::<ResetExecutorImpl>();
         let catalog = b.build();
 
         let job = catalog.get_one::<dyn ResetJob>().unwrap();

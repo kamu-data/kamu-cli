@@ -86,7 +86,7 @@ sequenceDiagram
     participant G as DatasetOperationGuard
     participant P as PushIngestPlanner
     participant E as PushIngestExecutor
-    participant C as DatasetReferenceUpdater
+    participant C as MetadataChain
 
     rect rgba(100, 150, 255, 0.15)
     U->>G: authorize PushIngest (Write)
@@ -127,7 +127,7 @@ or unreadable dataset `NotFound`. Both planner calls below reject a derived data
    `stage`, check the account storage quota on the staged file size unless `skip_quota_check`
    (always skipped in single-tenant workspaces), then `commit`. Event time missing from the input
    is the caller's event time, otherwise system time.
-4. **Finalize** — move `HEAD` from `old_head` to `new_head` through `DatasetReferenceUpdater` and post
+4. **Finalize** — move `HEAD` from `old_head` to `new_head` through `MetadataChain::set_ref` and post
    `DatasetExternallyChangedMessage::ingest_http`.
 
 The executor reports `begin` and the `Read`, `Preprocess` and `Commit` stages to the listener. The

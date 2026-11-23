@@ -36,7 +36,6 @@ use kamu_datasets::{
 use kamu_datasets_services::{
     AccountQuotaCheckerStorageImpl,
     DatasetOperationGuardImpl,
-    DatasetReferenceUpdaterImpl,
     DatasetStatisticsServiceImpl,
     QuotaDefaultsConfig,
 };
@@ -137,7 +136,6 @@ impl TransformTestHarness {
             .add::<PushIngestPlannerImpl>()
             .add::<PushIngestDataUseCaseImpl>()
             .add::<DatasetOperationGuardImpl>()
-            .add::<DatasetReferenceUpdaterImpl>()
             .add::<DummyOutboxImpl>()
             .add_value(engine_provisioner)
             .bind::<dyn EngineProvisioner, TEngineProvisioner>()

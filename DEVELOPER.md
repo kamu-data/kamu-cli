@@ -202,7 +202,7 @@ This will do a number of highly useful checks:
 * `Cargo.toml` sorting and formatting check (`cargo sort`, `taplo`)
 * License headers check
 * Dividing lines check (exactly 120 characters)
-* Dataset reference writes check (references move only through `DatasetReferenceUpdater`)
+* Dataset reference writes check (references move only through the dataset's `MetadataChain::set_ref`)
 * E2E storage wiring check (a fixture wired for one database says why)
 * Dependencies check: detecting issues with existing dependencies, detecting unused dependencies
 * Rust coding practices checks (`clippy`)
