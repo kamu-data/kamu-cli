@@ -12,7 +12,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-use async_utils::BackgroundAgent;
+use background_agent_host::{BackgroundAgent, CancellationToken};
 use database_common::NoOpDatabasePlugin;
 use dill::*;
 use internal_error::InternalError;
@@ -37,6 +37,7 @@ const TEST_PRODUCER_G: &str = "TEST-PRODUCER-G";
 const TEST_PRODUCER_H: &str = "TEST-PRODUCER-H";
 const TEST_PRODUCER_I: &str = "TEST-PRODUCER-I";
 const TEST_PRODUCER_J: &str = "TEST-PRODUCER-J";
+const TEST_PRODUCER_K: &str = "TEST-PRODUCER-K";
 
 const TEST_CONSUMER_A: &str = "TestMessageConsumerA";
 const TEST_CONSUMER_A1: &str = "TestMessageConsumerA1";
@@ -48,6 +49,7 @@ const TEST_CONSUMER_D_FAILING: &str = "TestMessageConsumerDFailing";
 const TEST_CONSUMER_E_FAILING: &str = "TestMessageConsumerEFailing";
 const TEST_CONSUMER_F_SELF_MANAGED: &str = "TestMessageConsumerFSelfManaged";
 const TEST_CONSUMER_G_SELF_MANAGED_FAILING: &str = "TestMessageConsumerGSelfManagedFailing";
+const TEST_CONSUMER_K_FAILING: &str = "TestMessageConsumerKFailing";
 
 test_message_type!(A);
 test_message_type!(B);
@@ -59,6 +61,7 @@ test_message_type!(G);
 test_message_type!(H);
 test_message_type!(I);
 test_message_type!(J);
+test_message_type!(K);
 
 test_message_consumer!(A, A, TEST_PRODUCER_A, TransactionalWrapped, All);
 test_message_consumer!(A, A1, TEST_PRODUCER_A, TransactionalWrapped, Latest);
@@ -68,6 +71,7 @@ test_message_consumer!(C, C2, TEST_PRODUCER_C, TransactionalWrapped, All);
 test_message_consumer!(D, DOk, TEST_PRODUCER_D, TransactionalWrapped, All);
 test_message_failing_consumer!(D, DFailing, TEST_PRODUCER_D, TransactionalWrapped, All);
 test_message_failing_consumer!(E, EFailing, TEST_PRODUCER_E, TransactionalWrapped, All);
+test_message_failing_consumer!(K, KFailing, TEST_PRODUCER_K, TransactionalWrapped, All);
 test_message_consumer!(
     F,
     FSelfManaged,
@@ -146,6 +150,50 @@ tracked_message_consumer!(H, H1, TEST_PRODUCER_H);
 tracked_message_consumer!(H, H2, TEST_PRODUCER_H);
 tracked_message_consumer!(H, H3, TEST_PRODUCER_H);
 tracked_message_consumer!(I, I, TEST_PRODUCER_I);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Panics on every message, once `TestMessageConsumerKFailing` failed on it or
+/// was not called
+struct TestMessageConsumerKPanicking {
+    failing: Arc<TestMessageConsumerKFailing>,
+}
+
+#[component(pub)]
+#[scope(Singleton)]
+#[interface(dyn MessageConsumer)]
+#[interface(dyn MessageConsumerT<TestMessageK>)]
+#[meta(MessageConsumerMeta {
+    consumer_name: "TestMessageConsumerKPanicking",
+    feeding_producers: &[TEST_PRODUCER_K],
+    consumption_mode: MessageConsumptionMode::TransactionalWrapped,
+    initial_consumer_boundary: InitialConsumerBoundary::All,
+})]
+impl TestMessageConsumerKPanicking {
+    fn new(failing: Arc<TestMessageConsumerKFailing>) -> Self {
+        Self { failing }
+    }
+}
+
+impl MessageConsumer for TestMessageConsumerKPanicking {}
+
+#[async_trait::async_trait]
+impl MessageConsumerT<TestMessageK> for TestMessageConsumerKPanicking {
+    async fn consume_message(&self, _: &Catalog, _: &TestMessageK) -> Result<(), InternalError> {
+        let attempts_before = self.failing.attempts();
+        for _ in 0..100 {
+            if self.failing.attempts() > attempts_before {
+                break;
+            }
+            tokio::task::yield_now().await;
+        }
+        // Lets the failure reach the agent first
+        for _ in 0..20 {
+            tokio::task::yield_now().await;
+        }
+        panic!("consumer bug");
+    }
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -990,6 +1038,45 @@ async fn test_all_consumers_failing_interrupts_and_stops_retries_until_restart()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
+async fn test_failed_consumer_stays_blocked_after_another_consumer_panics() {
+    let harness = OutboxAgentFailureHarness::new(20);
+    harness.outbox_agent.run_initialization().await.unwrap();
+
+    harness
+        .outbox
+        .post_message(
+            TEST_PRODUCER_K,
+            TestMessageK {
+                body: "k-1".to_string(),
+            },
+        )
+        .await
+        .unwrap();
+
+    // The panic fails the agent run after the other consumer failed; the
+    // host's restart runs the agent again
+    harness
+        .outbox_agent
+        .run_single_iteration_only()
+        .await
+        .unwrap_err();
+    harness
+        .outbox_agent
+        .run_single_iteration_only()
+        .await
+        .unwrap_err();
+
+    let k_fail = harness
+        .catalog
+        .get_one::<TestMessageConsumerKFailing>()
+        .unwrap();
+    assert_eq!(k_fail.attempts(), 1);
+    harness.check_metric_failed(TEST_PRODUCER_K, TEST_CONSUMER_K_FAILING, 1);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
 async fn test_self_managed_consumer_advances_boundary_after_success() {
     let harness = SelfManagedOutboxAgentHarness::new(false);
     harness.outbox_agent.run_initialization().await.unwrap();
@@ -1234,7 +1321,7 @@ async fn test_catchup_records_heartbeat_after_every_batch() {
 
     let agent = harness.catalog.get_one::<OutboxAgentImpl>().unwrap();
     tokio::select! {
-        res = agent.run() => panic!("Outbox agent stopped: {res:?}"),
+        res = agent.run(CancellationToken::new()) => panic!("Outbox agent stopped: {res:?}"),
         () = async {
             while harness.probe.heartbeats_seen().len() < 3 {
                 tokio::task::yield_now().await;
@@ -1244,6 +1331,42 @@ async fn test_catchup_records_heartbeat_after_every_batch() {
 
     // The first is covered by the listener's creation, the rest only by batches
     assert_eq!(harness.probe.heartbeats_seen(), [true, true, true]);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_shutdown_stops_catch_up_between_batches() {
+    let harness = OutboxAgentHeartbeatHarness::new();
+    harness.outbox_agent.run_initialization().await.unwrap();
+    harness.post_j_messages(3).await;
+
+    // Requested before the start: the batch in progress, of one message, is
+    // finished, then the agent returns with the rest left for the next run
+    let shutdown = CancellationToken::new();
+    shutdown.cancel();
+    harness.run_agent_to_end(shutdown).await.unwrap();
+
+    assert_eq!(harness.probe.heartbeats_seen().len(), 1);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_shutdown_ends_wait_for_messages() {
+    let harness = OutboxAgentHeartbeatHarness::new();
+    harness.outbox_agent.run_initialization().await.unwrap();
+    harness.post_j_messages(1).await;
+
+    let shutdown = CancellationToken::new();
+    let (result, ()) = tokio::join!(harness.run_agent_to_end(shutdown.clone()), async {
+        harness.wait_for_heartbeats(1).await;
+        // Real time, for the agent to finish the pass and reach its wait
+        tokio::time::sleep(Duration::from_millis(50)).await;
+        shutdown.cancel();
+    });
+
+    result.unwrap();
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1379,7 +1502,8 @@ impl OutboxAgentFailureHarness {
         b.add::<OutboxAgentImpl>();
         b.add_value(OutboxAgentConfig {
             batch_size: batch_size.try_into().unwrap(),
-            ..OutboxAgentConfig::local_default()
+            // Consumers of one message run at once, as in production
+            consumer_concurrency: NonZeroUsize::new(2).unwrap(),
         });
         b.add_value(WakeupListenerConfig {
             min_debounce_interval: Duration::from_millis(1),
@@ -1390,10 +1514,13 @@ impl OutboxAgentFailureHarness {
         b.add::<TestMessageConsumerDOk>();
         b.add::<TestMessageConsumerDFailing>();
         b.add::<TestMessageConsumerEFailing>();
+        b.add::<TestMessageConsumerKFailing>();
+        b.add::<TestMessageConsumerKPanicking>();
 
         register_message_dispatcher::<TestMessageA>(&mut b, TEST_PRODUCER_A);
         register_message_dispatcher::<TestMessageD>(&mut b, TEST_PRODUCER_D);
         register_message_dispatcher::<TestMessageE>(&mut b, TEST_PRODUCER_E);
+        register_message_dispatcher::<TestMessageK>(&mut b, TEST_PRODUCER_K);
 
         let catalog = b.build();
 
@@ -1618,6 +1745,35 @@ impl OutboxAgentHeartbeatHarness {
         Self {
             base_harness: BaseOutboxAgentHarness::from_catalog(catalog),
             probe,
+        }
+    }
+
+    async fn post_j_messages(&self, count: usize) {
+        for i in 1..=count {
+            self.outbox
+                .post_message(
+                    TEST_PRODUCER_J,
+                    TestMessageJ {
+                        body: format!("j-{i}"),
+                    },
+                )
+                .await
+                .unwrap();
+        }
+    }
+
+    /// Runs the agent until it returns; a run that outlives the test's bound
+    /// ignored its shutdown
+    async fn run_agent_to_end(&self, shutdown: CancellationToken) -> Result<(), InternalError> {
+        let agent = self.catalog.get_one::<OutboxAgentImpl>().unwrap();
+        tokio::time::timeout(Duration::from_secs(5), agent.run(shutdown))
+            .await
+            .expect("the agent ignored the shutdown")
+    }
+
+    async fn wait_for_heartbeats(&self, count: usize) {
+        while self.probe.heartbeats_seen().len() < count {
+            tokio::task::yield_now().await;
         }
     }
 }

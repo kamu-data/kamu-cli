@@ -10,6 +10,7 @@
 use std::time::Duration;
 
 use internal_error::InternalError;
+use tokio_util::sync::CancellationToken;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -27,6 +28,20 @@ pub trait WakeupListener: Send + Sync {
         timeout: Duration,
         min_debounce_interval: Duration,
     ) -> Result<WakeHint, InternalError>;
+
+    /// [`Self::wait_wake`] that a shutdown ends early: `None` once `shutdown`
+    /// is cancelled
+    async fn wait_wake_until_shutdown(
+        &self,
+        timeout: Duration,
+        min_debounce_interval: Duration,
+        shutdown: &CancellationToken,
+    ) -> Result<Option<WakeHint>, InternalError> {
+        shutdown
+            .run_until_cancelled(self.wait_wake(timeout, min_debounce_interval))
+            .await
+            .transpose()
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

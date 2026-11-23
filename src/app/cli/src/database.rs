@@ -112,17 +112,9 @@ pub fn configure_database_components(
             b.add::<kamu_accounts_postgres::PostgresDidSecretKeyRepository>();
             b.add::<kamu_accounts_postgres::PostgresAccountQuotaEventStore>();
 
-            b.add::<kamu_datasets_postgres::PostgresDatasetEntryRepository>();
-            b.add::<kamu_datasets_postgres::PostgresDatasetDependencyRepository>();
-            b.add::<kamu_datasets_postgres::PostgresDatasetReferenceRepository>();
-            b.add::<kamu_datasets_postgres::PostgresDatasetStatisticsRepository>();
-            b.add::<kamu_datasets_postgres::PostgresDatasetKeyBlockRepository>();
-            b.add::<kamu_datasets_postgres::PostgresDatasetDataBlockRepository>();
-            b.add::<kamu_datasets_postgres::PostgresDatasetBlockQueryRepository>();
+            kamu_datasets_postgres::register_dependencies(b);
 
-            b.add::<kamu_resources_postgres::PostgresRawResourceEventStore>();
-            b.add::<kamu_resources_postgres::PostgresResourceRepository>();
-            b.add::<kamu_resources_postgres::PostgresResourceLabelProjectionRepository>();
+            kamu_resources_postgres::register_dependencies(b);
 
             b.add::<kamu_configuration_postgres::PostgresVariableSetProjectionRepository>();
             b.add::<kamu_configuration_postgres::PostgresSecretSetProjectionRepository>();
@@ -161,17 +153,9 @@ pub fn configure_database_components(
             b.add::<kamu_accounts_sqlite::SqliteDidSecretKeyRepository>();
             b.add::<kamu_accounts_sqlite::SqliteAccountQuotaEventStore>();
 
-            b.add::<kamu_datasets_sqlite::SqliteDatasetEntryRepository>();
-            b.add::<kamu_datasets_sqlite::SqliteDatasetDependencyRepository>();
-            b.add::<kamu_datasets_sqlite::SqliteDatasetReferenceRepository>();
-            b.add::<kamu_datasets_sqlite::SqliteDatasetStatisticsRepository>();
-            b.add::<kamu_datasets_sqlite::SqliteDatasetKeyBlockRepository>();
-            b.add::<kamu_datasets_sqlite::SqliteDatasetDataBlockRepository>();
-            b.add::<kamu_datasets_sqlite::SqliteDatasetBlockQueryRepository>();
+            kamu_datasets_sqlite::register_dependencies(b);
 
-            b.add::<kamu_resources_sqlite::SqliteResourceRawEventStore>();
-            b.add::<kamu_resources_sqlite::SqliteResourceRepository>();
-            b.add::<kamu_resources_sqlite::SqliteResourceLabelProjectionRepository>();
+            kamu_resources_sqlite::register_dependencies(b);
 
             b.add::<kamu_configuration_sqlite::SqliteVariableSetProjectionRepository>();
             b.add::<kamu_configuration_sqlite::SqliteSecretSetProjectionRepository>();
@@ -234,9 +218,7 @@ pub fn configure_in_memory_components(b: &mut CatalogBuilder) {
 
     kamu_datasets_inmem::register_dependencies(b);
 
-    b.add::<kamu_resources_inmem::InMemoryRawResourceEventStore>();
-    b.add::<kamu_resources_inmem::InMemoryResourceRepository>();
-    b.add::<kamu_resources_inmem::InMemoryResourceLabelProjectionRepository>();
+    kamu_resources_inmem::register_dependencies(b);
 
     b.add::<kamu_configuration_inmem::InMemoryVariableSetProjectionRepository>();
     b.add::<kamu_configuration_inmem::InMemorySecretSetProjectionRepository>();

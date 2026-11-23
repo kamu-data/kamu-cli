@@ -11,11 +11,20 @@ use kamu_configuration::{SecretSetResource, SecretSetStateModel};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Persisted in the controller bookkeeping and used as a metric label: changing
+/// it orphans the bookkeeping of every resource of the type
+pub const SECRET_SET_CONTROLLER_NAME: &str = "dev.kamu.domain.configuration.SecretSetController";
+
 kamu_resources_services::declare_resource_service_layer!(
     domain = kamu_configuration,
     name = SecretSet,
     resource = SecretSetResource,
-    state_model = SecretSetStateModel
+    state_model = SecretSetStateModel,
+    controller_name = SECRET_SET_CONTROLLER_NAME,
+    // Bumped when the reconciler's semantics change: resources it finished
+    // with are processed again if a predicate still selects them, such as a
+    // pending deletion; reconciled resources stay quiet
+    controller_revision = 1
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

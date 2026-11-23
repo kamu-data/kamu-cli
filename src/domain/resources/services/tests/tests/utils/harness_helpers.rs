@@ -72,6 +72,7 @@ pub fn make_created_event(id: ResourceID, name: &str, value: &str) -> TestEvent 
         spec: TestResourceSpec {
             value: value.to_string(),
         },
+        initial_conditions: None,
     })
 }
 

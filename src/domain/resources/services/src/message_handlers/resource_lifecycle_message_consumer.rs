@@ -7,11 +7,14 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::sync::Arc;
+
 use dill::{Catalog, component, interface, meta};
 use internal_error::InternalError;
 use kamu_resources::{
     MESSAGE_CONSUMER_KAMU_RESOURCE_LIFECYCLE_EVENT_BRIDGE,
     MESSAGE_PRODUCER_KAMU_RESOURCE_SERVICE,
+    ResourceControllerHints,
     ResourceLifecycleMessage,
 };
 use messaging_outbox::{
@@ -22,10 +25,11 @@ use messaging_outbox::{
     MessageConsumptionMode,
 };
 
-use crate::ResourceDispatcherFactory;
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Hints the controller runtime of every change to a resource, except a
+/// completed deletion. The controllers find the work themselves: a hint only
+/// wakes the loop of the resource's type.
 #[component(pub)]
 #[interface(dyn MessageConsumer)]
 #[interface(dyn MessageConsumerT<ResourceLifecycleMessage>)]
@@ -37,7 +41,9 @@ use crate::ResourceDispatcherFactory;
     consumption_mode: MessageConsumptionMode::TransactionalSelfManaged,
     initial_consumer_boundary: InitialConsumerBoundary::Latest,
 })]
-pub struct ResourceLifecycleMessageConsumer {}
+pub struct ResourceLifecycleMessageConsumer {
+    hints: Arc<dyn ResourceControllerHints>,
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -54,74 +60,30 @@ impl MessageConsumerT<ResourceLifecycleMessage> for ResourceLifecycleMessageCons
     )]
     async fn consume_message(
         &self,
-        target_catalog: &Catalog,
+        _target_catalog: &Catalog,
         message: &ResourceLifecycleMessage,
     ) -> Result<(), InternalError> {
         tracing::debug!(received_message = ?message, "Received resource lifecycle message");
 
         match message {
             ResourceLifecycleMessage::Applied(applied_message) => {
-                let resource = &applied_message.resource;
-                let dispatcher = ResourceDispatcherFactory::lifecycle_dispatcher_in(
-                    target_catalog,
-                    &resource.schema,
-                )?;
-
-                dispatcher.handle_applied(resource).await
-            }
-            ResourceLifecycleMessage::ReconciliationSucceeded(succeeded_message) => {
-                let resource = &succeeded_message.resource;
-                let dispatcher = ResourceDispatcherFactory::lifecycle_dispatcher_in(
-                    target_catalog,
-                    &resource.schema,
-                )?;
-
-                dispatcher.handle_reconciliation_succeeded(resource).await
-            }
-            ResourceLifecycleMessage::ReconciliationFailed(failed_message) => {
-                let resource = &failed_message.resource;
-                let dispatcher = ResourceDispatcherFactory::lifecycle_dispatcher_in(
-                    target_catalog,
-                    &resource.schema,
-                )?;
-
-                dispatcher.handle_reconciliation_failed(resource).await
+                self.hints.hint(&applied_message.resource.schema);
             }
             ResourceLifecycleMessage::DeletionRequested(requested_message) => {
                 debug_assert!(
                     !requested_message.resources.is_empty(),
                     "deletion requested message must contain at least one resource"
                 );
-
-                let first = &requested_message.resources[0];
-                let dispatcher = ResourceDispatcherFactory::lifecycle_dispatcher_in(
-                    target_catalog,
-                    &first.schema,
-                )?;
-
-                dispatcher
-                    .handle_deletion_requested(&requested_message.resources)
-                    .await
+                self.hints.hint(&requested_message.resources[0].schema);
             }
-            ResourceLifecycleMessage::Deleted(deleted_message) => {
-                debug_assert!(
-                    !deleted_message.resources.is_empty(),
-                    "deleted message must contain at least one resource"
-                );
-
-                let first = &deleted_message.resources[0];
-                let dispatcher = ResourceDispatcherFactory::lifecycle_dispatcher_in(
-                    target_catalog,
-                    &first.schema,
-                )?;
-
-                for resource in &deleted_message.resources {
-                    dispatcher.handle_deleted(resource).await?;
-                }
-
-                Ok(())
+            ResourceLifecycleMessage::StatusUpdated(status_message) => {
+                self.hints.hint(&status_message.resource.schema);
             }
+            // Nothing is left to do for a resource whose deletion completed
+            ResourceLifecycleMessage::Deleted(_) => {}
         }
+
+        Ok(())
     }
 }
 

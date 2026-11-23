@@ -66,6 +66,17 @@ pub struct ResourceStatusConflictError {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// A transition was based on a generation that has been superseded since it
+/// was read.
+#[derive(thiserror::Error, Debug, Clone, Copy, PartialEq, Eq)]
+#[error("Resource was updated concurrently: expected generation {expected}, found {actual}")]
+pub struct ResourceGenerationConflictError {
+    pub expected: u64,
+    pub actual: u64,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 /// The resource is being deleted, so its headers and spec can no longer change.
 #[derive(thiserror::Error, Debug, Clone, Copy, PartialEq, Eq)]
 #[error("Resource {id} is being deleted")]

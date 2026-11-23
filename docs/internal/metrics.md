@@ -62,7 +62,21 @@ Recorded by the shared `HubWakeupListener` on every backend, so any wakeup-drive
 without code of its own ([wakeup-listeners.md](wakeup-listeners.md#monitoring)). `agent` is the
 name of the agent the wakeup source serves, the same as its `agent_name()`:
 `dev.kamu.utils.messaging.OutboxAgent`, `dev.kamu.domain.flow-system.FlowSystemEventAgent`,
-`dev.kamu.domain.flow-system.FlowAgent`, `dev.kamu.domain.task-system.TaskAgent`.
+`dev.kamu.domain.flow-system.FlowAgent`, `dev.kamu.domain.task-system.TaskAgent`. The resource
+controller runtime runs a loop per controller and labels each with the controller's name
+([wakeup-listeners.md](wakeup-listeners.md#monitoring)).
+
+### Background agent host
+
+| Metric | Type | Labels | Meaning |
+| --- | --- | --- | --- |
+| `background_agent_running` | gauge | `agent` | `1` while the agent runs; `0` while it waits to be restarted, or after it stopped |
+| `background_agent_restarts_total` | counter | `agent`, `reason` = `failed` / `panicked` / `completed` | Restarts of the agent after its run returned an error, panicked, or returned before a shutdown |
+| `background_agent_last_failure_timestamp_seconds` | gauge | `agent` | Unix time of the agent's last error or panic; `0` if it never failed |
+
+Recorded by `BackgroundAgentHost` for every agent it runs, with the same `agent` names as the
+wakeup listener metrics; label sets are pre-created at startup. How restarts work is in
+[background-agents.md](background-agents.md#3-supervision).
 
 ### Task agent
 
@@ -121,6 +135,18 @@ See [outbox.md §8](outbox.md#8-configuration--metrics) for how they are compute
 | `outbox_messages_pending_total` | gauge | `producer`, `consumer` | Best-effort backlog (latest message ID − consumed message ID) |
 | `outbox_failed_consumers_total` | gauge | `producer`, `consumer` | `1` while the consumer is failed; it stays failed until restart |
 
+### Resource controller runtime
+
+| Metric | Type | Labels | Meaning |
+| --- | --- | --- | --- |
+| `resource_controller_processed_total` | counter | `controller`, `outcome` | `process` calls; `outcome` is `done`, `retry_at` or `failed` (an error or a panic) |
+| `resource_controller_loop_restarts_total` | counter | `controller` | Times the controller's loop failed outside `process` (storage, a panic) and was restarted after a backoff |
+| `resource_controller_failing_resources` | gauge | `controller` | Resources, not deleted, whose last processing by the controller failed, as of its last drain. Each is retried after a growing backoff |
+
+`controller` is the controller's registered name (`ResourceControllerMeta::controller_name`);
+label sets are pre-created at startup for every registered controller. The loops are described
+in [resources-framework.md](resources-framework.md#controller-runtime).
+
 ### S3
 
 `S3Metrics` (`s3-utils`) records S3 API calls. kamu-cli itself does not register it; applications
@@ -136,9 +162,9 @@ embedding kamu that pass it to `S3Context` do.
 
 ## 3. Design decisions
 
-- **Measure silent degradation, not exits.** When any background agent's `run()` returns, the API
-  server shuts down (`api_server.rs`), so an exited agent already shows as a restarted pod. What
-  goes unnoticed is an agent that keeps running but is hung, saturated, lagging, or failing the
+- **Measure silent degradation, not exits.** An agent that exits is restarted by its host, which
+  `background_agent_running` and `background_agent_restarts_total` already show. What goes
+  unnoticed is an agent that keeps running but is hung, saturated, lagging, or failing the
   same work in a loop. Every agent metric answers one such question.
 - **One metric per question, few metrics overall.** Deliberately left out:
   - *queued task count* — needs a new store query; queue wait and the running task gauge already
@@ -215,6 +241,7 @@ Thresholds are starting points; tune them to the deployment (longest normal inge
 | Agent loop hung | `time() - wakeup_listener_last_heartbeat_timestamp_seconds{agent!="dev.kamu.domain.task-system.TaskAgent"} > 5 * <maxListeningTimeout>`, and for the task agent `time() - wakeup_listener_last_heartbeat_timestamp_seconds{agent="dev.kamu.domain.task-system.TaskAgent"} > 5 * <maxListeningTimeout> unless on() (max(task_agent_running_task_started_timestamp_seconds) > 0)`, `for: 2m` | Agents beat on every wait and batch; no heartbeat means the loop is blocked, even while draining a backlog. A task agent running a task does not beat, and "Task stuck" covers it. `for` rides over the gap between back-to-back tasks and over slow batches |
 | Projector failing | `flow_system_event_projector_failing > 0`, `for: 5m` | The projection is stuck on a batch: flow process states (UI, stop policies) or downstream flow links go stale, depending on `projector`. `for` rides over transient errors, as every wakeup retries |
 | Outbox consumer failed | `outbox_failed_consumers_total > 0` | The consumer stopped until restart; its producer's messages pile up for it |
+| Agent down | `background_agent_running == 0`, `for: 5m` | The agent keeps failing and waits between restarts, so its work is not done; a fatal agent stops the server instead. `for` rides over a restart delay, at most `restartBackoff.maxDelay` |
 | Metrics missing | `absent(wakeup_listener_last_heartbeat_timestamp_seconds)`, `for: 10m` | Scraping or wiring is broken — every other alert is silently off. `for` rides over startup, as the series appears once an agent's loop starts |
 
 ### Warning — degraded, still working
@@ -227,6 +254,9 @@ Thresholds are starting points; tune them to the deployment (longest normal inge
 | Scheduler lagging | `histogram_quantile(0.95, rate(flow_agent_activation_delay_seconds_bucket[10m])) > 60`, `for: 15m` | Slow database, exhausted connection pool, or a burst of due flows |
 | Task slot saturated | `histogram_quantile(0.95, rate(task_agent_task_queue_wait_seconds_bucket[30m])) > 900`, `for: 30m` | More work than one task slot handles — a capacity signal |
 | Outbox backlog growing | `outbox_messages_pending_total > 1000`, `for: 15m` | Consumers fall behind producers. Units are global message IDs, not messages of this producer: tune per deployment |
+| Resource controller failing | `resource_controller_failing_resources > 0`, `for: 15m` | Resources the controller keeps failing on stay unreconciled; their `last_error` is in the controller's bookkeeping. `for` rides over failures a retry fixes |
+| Agent restarting | `increase(background_agent_restarts_total[15m]) > 0` | The agent failed, panicked or returned and was restarted; its logs say why. `reason="completed"` is a bug in the agent |
+| Resource controller loop restarting | `increase(resource_controller_loop_restarts_total[15m]) > 0` | The runtime's own work fails for that controller, usually storage; it restarts with a growing delay, so its resources wait |
 
 ### Dashboards only
 
@@ -285,11 +315,13 @@ for durations, `_timestamp_seconds` for Unix times. The gauges `outbox_messages_
 | --- | --- |
 | `MetricsProvider`, `register_all`, `/system/metrics` handler | `src/utils/observability/src/metrics.rs` |
 | `WakeupListenerMetrics` | `src/utils/wakeup-listener/src/wakeup_listener_metrics.rs` (recorded in `hub_wakeup_listener.rs`) |
+| `BackgroundAgentHostMetrics` | `src/utils/background-agent-host/src/background_agent_host_metrics.rs` (recorded in `background_agent_supervisor.rs`) |
 | `TaskAgentMetrics` | `src/domain/task-system/services/src/task_agent_metrics.rs` |
 | `FlowAgentMetrics` | `src/domain/flow-system/services/src/flow/flow_agent_metrics.rs` |
 | `FlowCompletionMetrics` | `src/domain/flow-system/services/src/flow/flow_completion_metrics.rs` (recorded in `flow_agent_impl.rs`, `flow_abort_helper.rs`) |
 | `FlowSystemEventAgentMetrics` | `src/domain/flow-system/services/src/flow_system_events/flow_system_event_agent_metrics.rs` |
 | `OutboxAgentMetrics` | `src/utils/messaging-outbox/src/agent/outbox_agent_metrics.rs` |
+| `ResourceControllerRuntimeMetrics` | `src/domain/resources/services/src/controller_runtime/resource_controller_runtime_metrics.rs` (recorded in `resource_controller_loop.rs`, `resource_controller_supervisor.rs`) |
 | `S3Metrics` | `src/utils/s3-utils/src/s3_metrics.rs` |
 | Registry, `--metrics` dump | `src/app/cli/src/app.rs` |
 | Endpoint routing | `src/app/cli/src/explore/api_server.rs`, `web_ui_server.rs` |

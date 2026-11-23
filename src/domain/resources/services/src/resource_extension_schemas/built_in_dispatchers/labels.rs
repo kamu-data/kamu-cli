@@ -35,7 +35,8 @@ declare_resource_extension_schema_dispatcher!(
     schema_id = RESOURCE_LABEL_ENVIRONMENT_SCHEMA_URI,
     kind = ResourceExtensionKind::Label,
     document = Some(RESOURCE_LABEL_ENVIRONMENT_SCHEMA_DOC),
-    applications = ENVIRONMENT_APPLICATIONS
+    applications = ENVIRONMENT_APPLICATIONS,
+    condition = None
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

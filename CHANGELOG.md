@@ -13,6 +13,42 @@ Recommendation: for ease of reading, use the following format:
 ### Fixed
 -->
 
+## [Unreleased]
+### Added
+- Prometheus metrics of `kamu system api-server`'s background work: per agent
+  `background_agent_running`, `background_agent_restarts_total` by reason and
+  `background_agent_last_failure_timestamp_seconds`; per resource controller
+  `resource_controller_processed_total`, `resource_controller_failing_resources` and
+  `resource_controller_loop_restarts_total`
+- Config: `backgroundAgents.resourceControllers.failureBackoff` (from 1s, doubling, up to 5m by
+  default) sets how long a resource whose reconciliation or cleanup failed waits before it is
+  retried, `backgroundAgents.resourceControllers.loopRestartBackoff` how long a failing controller
+  loop waits before it restarts, and `backgroundAgents.batching.resourceControllers` and
+  `backgroundAgents.concurrency.resourceControllers` how many resources a controller selects and
+  processes at once
+### Changed
+- Resources (`VariableSet`, `SecretSet`, `Storage`) are reconciled by a background controller
+  that keeps trying, instead of once per change:
+  - a resource left `Reconciling` or `Deleting` by a crash is completed after a restart instead of
+    staying stuck
+  - a transient reconciliation failure is retried with a growing backoff instead of leaving the
+    resource `Failed` until the next apply, and a failed cleanup during deletion is retried the
+    same way
+  - a resource that keeps failing no longer delays the processing of other resources
+- `kamu system api-server` keeps running when a background agent fails, panics or stops: the
+  agent is logged and restarted after a delay that grows with each consecutive failure, while the
+  API and the other agents keep working. Before, the whole server shut down. The delay is
+  configured by `backgroundAgents.restartBackoff` (from 1s, doubling, up to 1m by default). A task
+  that panics is marked failed and the next task runs
+- `kamu system api-server` shuts down gracefully on Ctrl+C or SIGTERM: it stops accepting requests,
+  and in-flight requests and background agents get `backgroundAgents.shutdownTimeout` (10s by
+  default) to finish their current step before they are stopped; a second Ctrl+C or SIGTERM exits
+  at once. Before, the process was killed at once
+### Fixed
+- On Postgres, a resource whose reconciliation fails on a database error now shows `Failed` (or
+  `Degraded`) with that error in its status. Before, it stayed `Reconciling`, and the log showed
+  only "current transaction is aborted" instead of the real cause
+
 ## [0.273.0] - 2026-11-23
 ### Added
 - Config: `protocol.smartTransferProtocol.uploadProgressInterval` sets how often the server asks a

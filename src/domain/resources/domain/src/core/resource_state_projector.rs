@@ -18,7 +18,8 @@ use crate::{
     ResourceState,
     ResourceStateModel,
     ResourceStatusExt,
-    new_pending_resource_status,
+    empty_resource_conditions,
+    new_pending_resource_status_with,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -38,7 +39,10 @@ where
             e.id,
             ResourceHeaders::from_input(e.event_time, e.id, e.headers),
             TModel::Spec::from_input(e.spec),
-            new_pending_resource_status(),
+            new_pending_resource_status_with(
+                e.initial_conditions
+                    .unwrap_or_else(empty_resource_conditions),
+            ),
         )
         .into()),
 

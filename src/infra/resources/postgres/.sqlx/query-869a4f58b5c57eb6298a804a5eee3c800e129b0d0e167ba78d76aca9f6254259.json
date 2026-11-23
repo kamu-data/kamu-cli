@@ -1,0 +1,21 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            INSERT INTO resource_controller_state (\n                controller,\n                resource_id,\n                controller_revision,\n                handled_generation,\n                handled_status_generation,\n                not_before,\n                attempts,\n                last_error\n            )\n            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)\n            ON CONFLICT (controller, resource_id) DO UPDATE SET\n                controller_revision = EXCLUDED.controller_revision,\n                handled_generation = EXCLUDED.handled_generation,\n                handled_status_generation = EXCLUDED.handled_status_generation,\n                not_before = EXCLUDED.not_before,\n                attempts = EXCLUDED.attempts,\n                last_error = EXCLUDED.last_error\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Varchar",
+        "Uuid",
+        "Int4",
+        "Int8",
+        "Int8",
+        "Timestamptz",
+        "Int4",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "869a4f58b5c57eb6298a804a5eee3c800e129b0d0e167ba78d76aca9f6254259"
+}

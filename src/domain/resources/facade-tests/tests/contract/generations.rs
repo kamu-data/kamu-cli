@@ -47,7 +47,7 @@ pub async fn test_generations_count_desired_state_and_status_changes(
     // Created, then reconciled: one status update when reconciliation starts,
     // one with its outcome
     apply(facade.as_ref(), "one", None).await;
-    h.flush_outbox().await;
+    h.settle().await;
     assert_eq!(observe(facade.as_ref()).await, (1, 3, ResourcePhase::Ready));
 
     apply(facade.as_ref(), "two", None).await;
@@ -55,7 +55,7 @@ pub async fn test_generations_count_desired_state_and_status_changes(
         observe(facade.as_ref()).await,
         (2, 3, ResourcePhase::Pending)
     );
-    h.flush_outbox().await;
+    h.settle().await;
     assert_eq!(observe(facade.as_ref()).await, (2, 5, ResourcePhase::Ready));
 
     // A labels-only change is a change of the desired state too
@@ -64,11 +64,11 @@ pub async fn test_generations_count_desired_state_and_status_changes(
         observe(facade.as_ref()).await,
         (3, 5, ResourcePhase::Pending)
     );
-    h.flush_outbox().await;
+    h.settle().await;
     assert_eq!(observe(facade.as_ref()).await, (3, 7, ResourcePhase::Ready));
 
     apply(facade.as_ref(), "two", Some("data")).await;
-    h.flush_outbox().await;
+    h.settle().await;
     assert_eq!(observe(facade.as_ref()).await, (3, 7, ResourcePhase::Ready));
 }
 

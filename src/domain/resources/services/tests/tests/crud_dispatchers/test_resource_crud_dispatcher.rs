@@ -20,8 +20,7 @@ use kamu_resources::{
 };
 use kamu_resources_services::testing::BaseResourceServiceHarness;
 
-use crate::tests::use_cases::ResourceUseCaseBaseHarness;
-use crate::tests::utils::TestResource;
+use crate::tests::utils::{ServiceLayerTestHarness, TestResource};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Tests — spec decoding / validation
@@ -243,15 +242,15 @@ async fn test_apply_untouched_returns_applied_untouched() {
 // Harness
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[oop::extend(ResourceUseCaseBaseHarness, base)]
+#[oop::extend(ServiceLayerTestHarness, base)]
 struct ResourceCrudDispatcherHarness {
-    base: ResourceUseCaseBaseHarness,
+    base: ServiceLayerTestHarness,
 }
 
 impl ResourceCrudDispatcherHarness {
     fn new() -> Self {
         Self {
-            base: ResourceUseCaseBaseHarness::new(),
+            base: ServiceLayerTestHarness::new(),
         }
     }
 
