@@ -173,6 +173,7 @@ change invalidates what it says.
 | How background agents wake up, Postgres `LISTEN`/`NOTIFY`, SQLite polling, deadline-driven waits | [`docs/internal/wakeup-listeners.md`](docs/internal/wakeup-listeners.md) |
 | Exported Prometheus metrics, recommended alerts, adding metrics | [`docs/internal/metrics.md`](docs/internal/metrics.md) |
 | Task scheduling and execution, the task agent, planners and runners, new task types | [`docs/internal/task-system.md`](docs/internal/task-system.md) |
+| Redesigning tasks as RFC-019 resources: open questions and decisions | [`docs/internal/task-system-redesign.md`](docs/internal/task-system-redesign.md) |
 | Flows, triggers, configurations, scheduling, sensors, flow process state, new flow types | [`docs/internal/flow-system.md`](docs/internal/flow-system.md) |
 | Database transactions: how one opens and ends, `transaction!` versus the `#[transactional_*]` macros, where a transaction belongs in an algorithm, the managers, test helpers | [`docs/internal/database-transactions.md`](docs/internal/database-transactions.md) |
 | What every dataset operation shares: plan, execute and commit steps, `HEAD` CAS commits, races, who an operation runs as | [`docs/internal/dataset-operations.md`](docs/internal/dataset-operations.md) |
