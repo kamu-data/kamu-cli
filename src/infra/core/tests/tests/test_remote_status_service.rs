@@ -15,7 +15,6 @@ use datafusion::arrow::datatypes::{DataType, Field, Schema};
 use dill::CatalogBuilder;
 use kamu::testing::{BaseRepoHarness, DummySmartTransferProtocolClient};
 use kamu::utils::ipfs_wrapper::IpfsClient;
-use kamu::utils::local_sync_writes::PulledSeedStore;
 use kamu::utils::simple_transfer_protocol::SimpleTransferProtocol;
 use kamu::{
     IpfsServiceImpl,
@@ -264,7 +263,6 @@ impl RemoteStatusTestHarness {
             .add::<RemoteRepositoryRegistryImpl>()
             .add::<DummySmartTransferProtocolClient>()
             .add::<SimpleTransferProtocol>()
-            .add::<PulledSeedStore>()
             .add::<AppendDatasetMetadataBatchUseCaseImpl>()
             .add::<DatasetReferenceUpdaterImpl>()
             .add::<DependencyGraphServiceImpl>();

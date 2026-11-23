@@ -9,10 +9,9 @@
 
 use std::sync::Arc;
 
-use kamu_core::{SyncError, SyncFromTarget, SyncFromTransferredTarget};
-
-use super::PulledSeedStore;
-use super::stored_seed::StoredSeed;
+use database_common::transaction;
+use kamu_core::{CorruptedSourceError, SyncError, SyncFromTarget, SyncFromTransferredTarget};
+use odf::metadata::AsTypedBlock as _;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -28,7 +27,7 @@ impl TransferTarget {
     /// stored from the `Seed` that `take_seed` removes from the transferred
     /// blocks
     pub async fn prepare(
-        seed_store: &PulledSeedStore,
+        catalog: &dill::Catalog,
         dst: &SyncFromTarget,
         visibility_for_created_dataset: odf::DatasetVisibility,
         take_seed: impl FnOnce() -> odf::dataset::HashedMetadataBlockBytesDecoded,
@@ -45,22 +44,63 @@ impl TransferTarget {
                 },
             }),
             SyncFromTarget::New(alias) => {
-                let StoredSeed {
-                    dataset,
-                    seed_block,
-                    seed_block_bytes,
-                } = seed_store.store(take_seed()).await?;
-                Ok(Self {
-                    storage: dataset,
-                    target: SyncFromTransferredTarget::New {
-                        alias: alias.clone(),
-                        seed_block,
-                        seed_block_bytes,
-                        visibility: visibility_for_created_dataset,
-                    },
-                })
+                Self::store_seed(catalog, alias, visibility_for_created_dataset, take_seed()).await
             }
         }
+    }
+
+    /// Stores a new dataset from the source's `Seed`, taking over one an earlier
+    /// failed pull left without `HEAD`. Its transaction is its own, so the
+    /// transfer protocols hold none, and it writes nothing to the database.
+    async fn store_seed(
+        catalog: &dill::Catalog,
+        alias: &odf::DatasetAlias,
+        visibility: odf::DatasetVisibility,
+        (seed_hash, seed, seed_block_bytes): odf::dataset::HashedMetadataBlockBytesDecoded,
+    ) -> Result<Self, SyncError> {
+        let seed_block = seed.into_typed().ok_or_else(|| CorruptedSourceError {
+            message: "First metadata block is not Seed".to_owned(),
+            source: None,
+        })?;
+
+        let stored = transaction!(
+            #[catalog(catalog)]
+            |writer: Arc<dyn odf::dataset::DatasetStorageUnitWriter>| {
+                let stored = writer
+                    .store_dataset(
+                        seed_block.clone(),
+                        odf::dataset::StoreDatasetOpts {
+                            seed_block_bytes: Some(seed_block_bytes.clone()),
+                        },
+                    )
+                    .await?;
+                stored.dataset.detach_from_transaction();
+                stored
+            }
+        );
+
+        if stored.seed != seed_hash {
+            return Err(CorruptedSourceError {
+                message: format!(
+                    "Seed block hash declared by the source {seed_hash} didn't match the computed \
+                     {} - this may be an indication of hashing algorithm mismatch or an attempt \
+                     to tamper data",
+                    stored.seed
+                ),
+                source: None,
+            }
+            .into());
+        }
+
+        Ok(Self {
+            storage: stored.dataset,
+            target: SyncFromTransferredTarget::New {
+                alias: alias.clone(),
+                seed_block,
+                seed_block_bytes,
+                visibility,
+            },
+        })
     }
 }
 

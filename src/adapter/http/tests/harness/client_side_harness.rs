@@ -17,7 +17,6 @@ use futures::TryStreamExt;
 use headers::Header;
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu::domain::*;
-use kamu::utils::local_sync_writes::PulledSeedStore;
 use kamu::utils::simple_transfer_protocol::SimpleTransferProtocol;
 use kamu::utils::url_utils::{ensure_trailing_slash, odf_to_transport_protocol};
 use kamu::*;
@@ -186,7 +185,6 @@ impl ClientSideHarness {
 
         b.add::<SmartTransferProtocolClientWs>();
         b.add::<SimpleTransferProtocol>();
-        b.add::<PulledSeedStore>();
 
         b.add::<SyncServiceImpl>();
 

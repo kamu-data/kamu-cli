@@ -136,7 +136,7 @@ registration treated as "off". Regroup instead:
 | Work with no transaction plus a step that needs one | The transactional step moves to the component that opens the transaction, as a `transaction!` block or `#[transactional_methodN]` injecting its own dependencies | `SyncFromJobImpl`: the `SyncService` transfer holds none, the commit runs in the job's own blocks |
 | An authorized operation plus a system path that skips authorization | The use case keeps only the authorized path; the shared work goes into a plain helper both callers build | `UpdateAccountUseCase` and `UpdateAccountUseCaseHelper` |
 | Core work plus an optional feature enabled by registration | The feature becomes its own component taking `Option<Arc<T>>` dependencies | `IngestEnvVarsResolver` |
-| A transaction-free component that needs one transactional write | That write becomes a small component that opens the transaction, injected instead of a catalog | `PulledSeedStore` in the transfer protocols |
+| A transaction-free component that needs one transactional write | It holds a catalog and opens that one `transaction!` block where the write happens; a component made only to wrap the block adds a registration to every catalog of its callers | The transfer protocols storing a pulled `Seed` (`TransferTarget::prepare`) |
 | Branches whose dependencies differ (create versus update) | One transactional method per branch, each injecting only its own | `SyncFromJobImpl::{commit_into_existing, commit_into_new}` |
 
 Holding a catalog is right to open transactions with `transaction!` or `#[transactional_methodN]`
