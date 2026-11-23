@@ -9,3 +9,4 @@
 
 mod test_entity_page_streamer;
 mod test_sqlite_plugin;
+mod test_transaction_block;

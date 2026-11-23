@@ -842,6 +842,35 @@ async fn test_iter_blocks_interval_single_block() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[tokio::test]
+async fn test_iter_blocks_interval_after_iterating_an_earlier_interval() {
+    let harness = IterateWithHintsHarness::new().await;
+
+    let alias = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let foo_created = harness.create_root_dataset(&alias).await;
+    let dataset = foo_created.dataset.as_ref();
+
+    let block_6_hash = harness.prev_block_hash(dataset, &foo_created.head).await;
+    let block_5_hash = harness.prev_block_hash(dataset, &block_6_hash).await;
+
+    // Caches the page of data blocks up to block 6
+    pretty_assertions::assert_eq!(
+        harness
+            .iter_blocks_interval_through(dataset, &block_6_hash, Some(&block_5_hash), false)
+            .await,
+        vec![(6, odf::metadata::MetadataEventTypeFlags::ADD_DATA)]
+    );
+
+    pretty_assertions::assert_eq!(
+        harness
+            .iter_blocks_interval_through(dataset, &foo_created.head, Some(&block_6_hash), false)
+            .await,
+        vec![(7, odf::metadata::MetadataEventTypeFlags::ADD_DATA)]
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[tokio::test]
 async fn test_iter_blocks_interval_page_caching_stress() {
     let harness = IterateWithHintsHarness::new().await;
 
@@ -1533,6 +1562,21 @@ impl IterateWithHintsHarness {
         }
 
         panic!("Block with sequence number {sequence_number} not found");
+    }
+
+    /// Reads a single block, which loads no page of data blocks into the cache
+    async fn prev_block_hash(
+        &self,
+        dataset: &dyn odf::Dataset,
+        block_hash: &odf::Multihash,
+    ) -> odf::Multihash {
+        dataset
+            .as_metadata_chain()
+            .get_block(block_hash)
+            .await
+            .unwrap()
+            .prev_block_hash
+            .unwrap()
     }
 }
 

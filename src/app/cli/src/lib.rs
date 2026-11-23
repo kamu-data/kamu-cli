@@ -20,6 +20,7 @@ pub mod database;
 pub mod error;
 pub(crate) mod error_fmt;
 pub mod explore;
+pub(crate) mod outbox;
 pub mod output;
 pub mod services;
 

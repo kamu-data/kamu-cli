@@ -10,8 +10,12 @@
 #![feature(iter_intersperse)]
 
 // Re-exports
+pub use database_common_macros::transaction;
 pub use sqlx::postgres::PgPoolOptions;
 pub use sqlx::sqlite::SqlitePoolOptions;
+// For `transaction!`, which creates its span at the call site
+#[doc(hidden)]
+pub use tracing as __tracing;
 
 mod db_connection_settings;
 mod db_credentials;
@@ -20,8 +24,11 @@ mod db_provider;
 mod entities;
 
 mod helpers;
+mod in_memory;
 mod password;
 mod plugins;
+#[cfg(feature = "testing")]
+pub mod testing;
 mod transactions;
 
 pub use db_connection_settings::*;
@@ -30,6 +37,7 @@ pub use db_error::*;
 pub use db_provider::*;
 pub use entities::*;
 pub use helpers::*;
+pub use in_memory::*;
 pub use password::*;
 pub use plugins::*;
 pub use transactions::*;

@@ -34,19 +34,6 @@ impl ParquetReaderHelper {
             .root_schema()
     }
 
-    #[deprecated(note = "Use [`Self::get_schema`] in combination with \
-                         [`odf::utils::testing::assert_parquet_schema_eq`]")]
-    pub fn get_column_names(&self) -> Vec<String> {
-        self.reader
-            .metadata()
-            .file_metadata()
-            .schema_descr()
-            .columns()
-            .iter()
-            .map(|cd| cd.path().string())
-            .collect()
-    }
-
     #[deprecated(note = "use [`Self::get_batches`] in combination with \
                          [`odf::utils::testing::assert_data_batches_eq`]")]
     pub fn get_row_iter(&self) -> RowIter<'_> {

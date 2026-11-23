@@ -19,12 +19,7 @@ use database_common::{
     PaginationOpts,
 };
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
-use kamu_accounts::{
-    AccountNotFoundByNameError,
-    AccountService,
-    CurrentAccountSubject,
-    GetAccountByNameError,
-};
+use kamu_accounts::{AccountNotFoundByNameError, AccountService, GetAccountByNameError, Principal};
 use kamu_core::TenancyConfig;
 use kamu_datasets::*;
 use thiserror::Error;
@@ -39,7 +34,7 @@ pub struct DatasetEntryServiceImpl {
     dataset_entry_repo: Arc<dyn DatasetEntryRepository>,
     dataset_storage_unit: Arc<dyn odf::DatasetStorageUnit>,
     account_svc: Arc<dyn AccountService>,
-    current_account_subject: Arc<CurrentAccountSubject>,
+    principal: Arc<Principal>,
     tenancy_config: Arc<TenancyConfig>,
     cache: Arc<RwLock<Cache>>,
 }
@@ -79,7 +74,7 @@ impl DatasetEntryServiceImpl {
         dataset_entry_repo: Arc<dyn DatasetEntryRepository>,
         dataset_storage_unit: Arc<dyn odf::DatasetStorageUnit>,
         account_svc: Arc<dyn AccountService>,
-        current_account_subject: Arc<CurrentAccountSubject>,
+        principal: Arc<Principal>,
         tenancy_config: Arc<TenancyConfig>,
     ) -> Self {
         Self {
@@ -87,7 +82,7 @@ impl DatasetEntryServiceImpl {
             dataset_entry_repo,
             dataset_storage_unit,
             account_svc,
-            current_account_subject,
+            principal,
             tenancy_config,
             cache: Arc::new(RwLock::new(Cache::default())),
         }
@@ -104,6 +99,18 @@ impl DatasetEntryServiceImpl {
                 .entries_by_id
                 .insert(entry.id.clone(), entry.clone());
         }
+    }
+
+    /// The account owning the dataset an alias names; `None` when the alias is
+    /// bare and the principal has no account to scope it
+    fn alias_owner_name<'a>(
+        &'a self,
+        alias: &'a odf::DatasetAlias,
+    ) -> Option<&'a odf::AccountName> {
+        alias
+            .account_name
+            .as_ref()
+            .or_else(|| self.tenancy_config.bare_alias_account_name(&self.principal))
     }
 
     fn entries_as_handles(&self, entries: &[DatasetEntry]) -> Vec<odf::DatasetHandle> {
@@ -123,13 +130,10 @@ impl DatasetEntryServiceImpl {
         handles
     }
 
-    async fn resolve_account_id_by_maybe_name(
+    async fn resolve_account_id_by_name(
         &self,
-        maybe_account_name: Option<&odf::AccountName>,
+        account_name: &odf::AccountName,
     ) -> Result<odf::AccountID, ResolveAccountIdByNameError> {
-        let account_name = maybe_account_name
-            .unwrap_or_else(|| self.current_account_subject.account_name_or_default());
-
         let maybe_cached_id = {
             let readable_cache = self.cache.read().unwrap();
             readable_cache.accounts.names2ids.get(account_name).cloned()
@@ -158,37 +162,10 @@ impl DatasetEntryServiceImpl {
         }
     }
 
-    fn group_aliases_by_resolved_owner_account_name<'a>(
-        &'a self,
-        dataset_aliases: &'a [&'a odf::DatasetAlias],
-    ) -> HashMap<&'a odf::AccountName, Vec<&'a odf::DatasetAlias>> {
-        let mut res = HashMap::with_capacity(dataset_aliases.len());
-
-        for dataset_alias in dataset_aliases {
-            let account_name = dataset_alias
-                .account_name
-                .as_ref()
-                .unwrap_or_else(|| self.current_account_subject.account_name_or_default());
-
-            let owner_dataset_aliases = res.entry(account_name).or_insert_with(Vec::new);
-            owner_dataset_aliases.push(*dataset_alias);
-        }
-
-        res
-    }
-
-    async fn resolve_account_ids_by_maybe_names(
+    async fn resolve_account_ids_by_names(
         &self,
-        maybe_account_names: &[Option<&odf::AccountName>],
-    ) -> Result<ResolveAccountIdsByMaybeNamesResponse, InternalError> {
-        let account_names = maybe_account_names
-            .iter()
-            .map(|maybe_account_name| {
-                maybe_account_name
-                    .unwrap_or_else(|| self.current_account_subject.account_name_or_default())
-            })
-            .collect::<Vec<_>>();
-
+        account_names: &[&odf::AccountName],
+    ) -> Result<ResolveAccountIdsByNamesResponse, InternalError> {
         // 1. Read all available data from the cache
         let cached_name_id_pairs = {
             let readable_cache = self.cache.read().unwrap();
@@ -214,7 +191,7 @@ impl DatasetEntryServiceImpl {
         if account_names.len() != resolved_account_ids.len() {
             let mut account_names_to_request =
                 Vec::with_capacity(account_names.len() - resolved_account_ids.len());
-            for account_name in account_names {
+            for &account_name in account_names {
                 if !cached_name_id_pairs.contains_key(account_name) {
                     account_names_to_request.push(account_name);
                 }
@@ -251,7 +228,7 @@ impl DatasetEntryServiceImpl {
                 .collect::<Vec<_>>();
         }
 
-        Ok(ResolveAccountIdsByMaybeNamesResponse {
+        Ok(ResolveAccountIdsByNamesResponse {
             resolved_account_ids,
             unresolved_account_names,
         })
@@ -381,17 +358,28 @@ impl DatasetEntryServiceImpl {
         let mut resolved_handles = Vec::with_capacity(dataset_aliases.len());
         let mut unresolved_refs = Vec::with_capacity(dataset_aliases.len());
 
-        // First, we attempt to resolve accounts
-        let owner_name_dataset_aliases_mapping =
-            self.group_aliases_by_resolved_owner_account_name(dataset_aliases);
-        let maybe_owner_names = dataset_aliases
-            .iter()
-            .map(|alias| alias.account_name.as_ref())
+        // First, we attempt to resolve accounts; a bare alias without an account to
+        // scope it names no dataset
+        let mut owner_name_dataset_aliases_mapping: HashMap<_, Vec<_>> =
+            HashMap::with_capacity(dataset_aliases.len());
+        for dataset_alias in dataset_aliases {
+            if let Some(owner_name) = self.alias_owner_name(dataset_alias) {
+                owner_name_dataset_aliases_mapping
+                    .entry(owner_name)
+                    .or_default()
+                    .push(*dataset_alias);
+            } else {
+                let dataset_ref = dataset_alias.as_local_ref();
+                let e = odf::DatasetNotFoundError::new(dataset_ref.clone());
+                unresolved_refs.push((dataset_ref, e.into()));
+            }
+        }
+        let owner_names = owner_name_dataset_aliases_mapping
+            .keys()
+            .copied()
             .collect::<Vec<_>>();
 
-        let owner_ids_resolution_by_names = self
-            .resolve_account_ids_by_maybe_names(&maybe_owner_names)
-            .await?;
+        let owner_ids_resolution_by_names = self.resolve_account_ids_by_names(&owner_names).await?;
 
         for (unresolved_owner_name, _) in owner_ids_resolution_by_names.unresolved_account_names {
             // If a dataset owner account not found, then no datasets
@@ -645,8 +633,15 @@ impl odf::dataset::DatasetHandleResolver for DatasetEntryServiceImpl {
         match dataset_ref {
             odf::DatasetRef::Handle(h) => Ok(h.clone()),
             odf::DatasetRef::Alias(alias) => {
+                let Some(owner_name) = self.alias_owner_name(alias) else {
+                    return Err(odf::DatasetRefUnresolvedError::NotFound(
+                        odf::DatasetNotFoundError {
+                            dataset_ref: dataset_ref.clone(),
+                        },
+                    ));
+                };
                 let owner_id = self
-                    .resolve_account_id_by_maybe_name(alias.account_name.as_ref())
+                    .resolve_account_id_by_name(owner_name)
                     .await
                     .map_err(|e| match e {
                         ResolveAccountIdByNameError::NotFound(_) => {
@@ -779,10 +774,7 @@ impl DatasetRegistry for DatasetEntryServiceImpl {
 
         EntityPageStreamer::default().into_stream(
             move || async move {
-                let owner_id = match self
-                    .resolve_account_id_by_maybe_name(Some(&owner_name))
-                    .await
-                {
+                let owner_id = match self.resolve_account_id_by_name(&owner_name).await {
                     Ok(owner_id) => Some(owner_id),
                     Err(ResolveAccountIdByNameError::NotFound(_)) => None,
                     Err(e) => return Err(e.int_err()),
@@ -810,10 +802,7 @@ impl DatasetRegistry for DatasetEntryServiceImpl {
         owner_name: &odf::AccountName,
         pagination: PaginationOpts,
     ) -> Result<Vec<odf::DatasetHandle>, InternalError> {
-        let owner_id = match self
-            .resolve_account_id_by_maybe_name(Some(owner_name))
-            .await
-        {
+        let owner_id = match self.resolve_account_id_by_name(owner_name).await {
             Ok(id) => id,
             Err(ResolveAccountIdByNameError::NotFound(_)) => return Ok(Vec::new()),
             Err(e) => return Err(e.int_err()),
@@ -1068,7 +1057,7 @@ impl DatasetEntryWriter for DatasetEntryServiceImpl {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-struct ResolveAccountIdsByMaybeNamesResponse {
+struct ResolveAccountIdsByNamesResponse {
     resolved_account_ids: Vec<(odf::AccountName, odf::AccountID)>,
     unresolved_account_names: Vec<(odf::AccountName, ResolveAccountIdByNameError)>,
 }

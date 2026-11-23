@@ -10,13 +10,21 @@
 use internal_error::InternalError;
 use thiserror::Error;
 
+use crate::ResolvedDataset;
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
 pub trait AppendDatasetMetadataBatchUseCase: Send + Sync {
+    /// Appends the blocks to the metadata chain of `target` and moves its
+    /// `HEAD` to the last one, in the current transaction. Returns the new
+    /// `HEAD`, or `None` for an empty batch.
+    ///
+    /// Fails with `SetRefError(CASFailed)` when `HEAD` is not where
+    /// `options.set_ref_check_ref_mode` expects it.
     async fn execute(
         &self,
-        dataset: &dyn odf::Dataset,
+        target: &ResolvedDataset,
         new_blocks_into_it: Box<
             dyn Iterator<Item = odf::dataset::HashedMetadataBlockBytesDecoded> + Send,
         >,
@@ -26,33 +34,38 @@ pub trait AppendDatasetMetadataBatchUseCase: Send + Sync {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Which `HEAD` the batch commit expects to replace
+#[derive(Default)]
 pub enum SetRefCheckRefMode {
-    ForceUpdateIfDiverged(bool),
+    /// The block the batch is appended to, so the batch must extend `HEAD`
+    #[default]
+    ExtendsBase,
+    /// The given head; `None` means the dataset has no `HEAD` yet
     Explicit(Option<odf::Multihash>),
+}
+
+impl SetRefCheckRefMode {
+    /// The `HEAD` that committing a batch appended to `base_head` replaces
+    pub fn expected_head(self, base_head: Option<odf::Multihash>) -> Option<odf::Multihash> {
+        match self {
+            Self::ExtendsBase => base_head,
+            Self::Explicit(head) => head,
+        }
+    }
 }
 
 #[derive(Default)]
 pub struct AppendDatasetMetadataBatchUseCaseOptions {
-    pub set_ref_check_ref_mode: Option<SetRefCheckRefMode>,
-    pub trust_source_hashes: Option<bool>,
-    pub append_validation: Option<odf::dataset::AppendValidation>,
-    pub on_append_metadata_block_callback: Option<Box<dyn Fn() + Send>>,
+    pub set_ref_check_ref_mode: SetRefCheckRefMode,
+    pub append_opts: odf::dataset::AppendBatchOpts,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Error)]
-#[error("Failed to append block {block_sequence_number} ({block_hash}): {append_error}")]
-pub struct AppendDatasetMetadataBatchUseCaseBlockAppendError {
-    pub append_error: odf::dataset::AppendError,
-    pub block_sequence_number: u64,
-    pub block_hash: odf::Multihash,
-}
-
 #[derive(Error, Debug)]
 pub enum AppendDatasetMetadataBatchUseCaseError {
     #[error(transparent)]
-    BlockAppendError(#[from] AppendDatasetMetadataBatchUseCaseBlockAppendError),
+    BlockAppendError(#[from] odf::dataset::AppendBatchError),
     #[error(transparent)]
     SetRefError(#[from] odf::dataset::SetChainRefError),
     #[error(transparent)]

@@ -14,7 +14,7 @@ This skill covers five key aspects of dill usage:
 1. **Defining Components**: How to mark structs or impl blocks for DI injection
 2. **Scopes**: Controlling whether components are transient (new per request) or singletons (shared)
 3. **Registration**: Adding components, values, and builders to a catalog
-4. **Chaining Catalogs**: Creating child catalogs that inherit and override parent registrations
+4. **Chaining Catalogs**: Creating child catalogs that inherit parent registrations and add their own
 5. **Resolving Components**: Looking up components from the catalog at runtime
 
 ## Defining a Component
@@ -61,7 +61,7 @@ impl MyCache {
 }
 ```
 
-Singletons are scoped to the catalog in which the component is registered. Child (chained) catalogs that do not override the component will always resolve to the same instance from the parent catalog.
+Singletons are scoped to the catalog in which the component is registered. Child (chained) catalogs always resolve to the same instance from the parent catalog.
 
 Singletons are expected when a global shared state is needed.
 
@@ -120,6 +120,64 @@ To audit, parse `#[component]` / `#[interface(dyn ...)]` / `#[scope(Singleton)]`
 treat any component whose body mentions `TransactionRef` as transaction-scoped,
 and walk singleton dependencies transitively through the trait -> impl map.
 
+## Grouping: one dependency scope per component
+
+A component's methods should all run with the same dependencies available. When one method needs
+something the others must not require — an open transaction, the acting `Principal`, a config
+that is only sometimes registered — the component mixes responsibilities. Split it so that each
+part injects exactly what it uses in its constructor.
+
+The signal is a dependency fetched at call time to keep the constructor resolvable everywhere:
+a `dill::Lazy` field, a held `Catalog` queried with `get_one` inside a method, or a missing
+registration treated as "off". Regroup instead:
+
+| Mix | Regrouping | Precedent |
+|---|---|---|
+| Work with no transaction plus a step that needs one | The transactional step moves to the component that opens the transaction, as a `transaction!` block or `#[transactional_methodN]` injecting its own dependencies | `SyncFromJobImpl`: the `SyncService` transfer holds none, the commit runs in the job's own blocks |
+| An authorized operation plus a system path that skips authorization | The use case keeps only the authorized path; the shared work goes into a plain helper both callers build | `UpdateAccountUseCase` and `UpdateAccountUseCaseHelper` |
+| Core work plus an optional feature enabled by registration | The feature becomes its own component taking `Option<Arc<T>>` dependencies | `IngestEnvVarsResolver` |
+| A transaction-free component that needs one transactional write | It holds a catalog and opens that one `transaction!` block where the write happens; a component made only to wrap the block adds a registration to every catalog of its callers | The transfer protocols storing a pulled `Seed` (`TransferTarget::prepare`) |
+| Branches whose dependencies differ (create versus update) | One transactional method per branch, each injecting only its own | `SyncFromJobImpl::{commit_into_existing, commit_into_new}` |
+
+Holding a catalog is right to open transactions with `transaction!` or `#[transactional_methodN]`
+(both declare what they inject; where each goes is in
+[database-transactions.md](../../../docs/internal/database-transactions.md#3-where-a-transaction-opens)),
+in request handlers and agents that work on a per-request or
+background catalog by design, and in a singleton that resolves repositories per call
+([Singletons must not depend on repositories](#singletons-must-not-depend-on-repositories)).
+
+### Helpers are never components
+
+A helper — a type named `…Helper` holding shared logic for a few callers — is a plain struct:
+each caller builds it in its own constructor from dependencies the caller already injects.
+Registering it would make it a service without saying so, and every catalog that resolves its
+callers would have to register it too.
+
+```rust
+pub struct UpdateAccountUseCaseImpl {
+    helper: UpdateAccountUseCaseHelper,
+    // ...
+}
+
+#[dill::component(pub)]
+#[dill::interface(dyn UpdateAccountUseCase)]
+impl UpdateAccountUseCaseImpl {
+    pub fn new(
+        account_service: Arc<dyn AccountService>,
+        outbox: Arc<dyn Outbox>,
+        time_source: Arc<dyn SystemTimeSource>,
+        // ...
+    ) -> Self {
+        Self {
+            helper: UpdateAccountUseCaseHelper::new(account_service, outbox, time_source),
+            // ...
+        }
+    }
+}
+```
+
+If the shared logic deserves to be injected on its own, it is a service: name it for what it does.
+
 ## Registration
 
 ```rust
@@ -143,13 +201,17 @@ use dill::Component as _;
 
 ## Chaining Catalogs
 
-`CatalogBuilder::new_chained(&parent)` creates a child catalog that inherits all registrations from `parent`. Components added to the child override the parent; everything else is resolved from the parent.
+`CatalogBuilder::new_chained(&parent)` creates a child catalog that inherits all registrations from `parent`.
+
+A child **cannot override** a registration of its parent. Resolution looks across the whole chain,
+so registering a type the parent already provides makes `get_one` fail with `Ambiguous` (an
+`AllOf` sees both). To vary a value, build a sibling catalog on a common parent that holds neither
+(precedent: the background catalog in `app.rs`, [identity](../../../docs/internal/identity.md)).
 
 ```rust
-let child = CatalogBuilder::new_chained(&base_catalog)
-    .add_value(CurrentAccountSubject::new_test_with("alice"))
-    .add::<SomePerRequestService>()
-    .build();
+let mut b = CatalogBuilder::new_chained(&base_catalog);
+CurrentAccountSubject::new_test_with(&"alice").register(&mut b);
+let child = b.add::<SomePerRequestService>().build();
 ```
 
 The parent catalog's singletons remain alive as long as the parent `Catalog` object is kept alive. Dropping the parent while child catalogs are still in use will cause the child catalogs to panic when attempting to access inherited singletons.
@@ -174,9 +236,12 @@ Do not re-propose these without new evidence.
 |---|---|
 | A `Singleton` holding `Arc<dyn SomeRepository>` (directly or via a dependency) | Pins one transaction for the process lifetime; trips the leak guard far from the cause. Use `CatalogWeakRef`. |
 | Silencing the leak-guard panic | It is the only signal of a leaked transaction; the leak itself corrupts transaction boundaries. |
+| `dill::Lazy` fields or `catalog.get_one` inside a method, so a component whose methods need different dependencies stays resolvable everywhere | Hides that the component mixes responsibilities and turns missing registrations into runtime errors; split it by the dependencies each part needs ([Grouping](#grouping-one-dependency-scope-per-component)). |
+| A `…Helper` registered as a dill component | Makes shared logic a hidden service that every catalog must register; build helpers in the callers' constructors ([Helpers](#helpers-are-never-components)). |
 
 ## What lives elsewhere
 
 - Wiring components in tests (harness catalogs, per-account isolation): `kamu-test-harness`.
 - Which repositories and services exist per bounded context: `kamu-domain-design`.
 - Full-app catalog wiring lives in `src/app/cli/src/app.rs` and `database.rs`.
+- Opening and ending transactions, where they belong in an algorithm, the managers: [`docs/internal/database-transactions.md`](../../../docs/internal/database-transactions.md).

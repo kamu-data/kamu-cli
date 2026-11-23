@@ -13,7 +13,7 @@ use std::sync::Arc;
 
 use datafusion::prelude::SessionContext;
 use internal_error::*;
-use kamu_datasets::{DatasetActionUnauthorizedError, ResolvedDataset};
+use kamu_datasets::{DatasetPermissionError, ResolvedDataset};
 use odf::utils::data::DataFrameExt;
 use thiserror::Error;
 
@@ -23,7 +23,8 @@ use thiserror::Error;
 #[cfg_attr(feature = "testing", mockall::automock)]
 #[async_trait::async_trait]
 pub trait QueryService: Send + Sync {
-    /// Creates an SQL session for the current user
+    /// Creates an SQL session with the datasets the current principal may
+    /// read
     async fn create_session(&self) -> Result<SessionContext, CreateSessionError>;
 
     /// Returns the specified number of the latest records in the dataset
@@ -485,15 +486,9 @@ impl From<odf::DatasetRefUnresolvedError> for QueryError {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl From<DatasetActionUnauthorizedError> for QueryError {
-    fn from(v: DatasetActionUnauthorizedError) -> Self {
-        use DatasetActionUnauthorizedError as E;
-
-        match v {
-            E::NotFound(e) => Self::DatasetNotFound(e),
-            E::Access(e) => Self::Access(e),
-            e @ E::Internal(_) => Self::Internal(e.int_err()),
-        }
+impl From<DatasetPermissionError> for QueryError {
+    fn from(v: DatasetPermissionError) -> Self {
+        v.into_error()
     }
 }
 

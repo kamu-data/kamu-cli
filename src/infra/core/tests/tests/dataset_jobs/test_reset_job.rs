@@ -1,0 +1,154 @@
+// Copyright Kamu Data, Inc. and contributors. All rights reserved.
+//
+// Use of this software is governed by the Business Source License
+// included in the LICENSE file.
+//
+// As of the Change Date specified in that file, in accordance with
+// the Business Source License, use of this software will be governed
+// by the Apache License, Version 2.0.
+
+use std::sync::Arc;
+
+use kamu::testing::{BaseRepoHarness, BaseUseCaseHarness, BaseUseCaseHarnessOptions};
+use kamu::*;
+use kamu_core::*;
+use kamu_datasets::{DatasetPermission, MockDatasetPermissionChecker, ResolvedDataset};
+use odf::metadata::testing::MetadataFactory;
+use pretty_assertions::assert_matches;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[tokio::test]
+async fn test_reset_success() {
+    let alias_foo = BaseRepoHarness::alias("foo");
+    let (_, dataset_id_foo) = odf::DatasetID::new_generated_ed25519();
+
+    let harness = ResetJobHarness::new(
+        MockDatasetPermissionChecker::new().expect_authorize_for(
+            DatasetPermission::Maintain,
+            &dataset_id_foo,
+            1,
+            true,
+        ),
+        MockDidGenerator::predefined_dataset_ids(vec![dataset_id_foo]),
+    );
+
+    let foo = harness.create_root_dataset(&alias_foo).await;
+    foo.dataset
+        .commit_event(
+            odf::MetadataEvent::SetInfo(MetadataFactory::set_info().description("test").build()),
+            odf::dataset::CommitOpts::default(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(
+        harness
+            .num_blocks(ResolvedDataset::from_created(&foo))
+            .await,
+        3
+    );
+
+    let reset_result = harness
+        .job
+        .run(&foo.dataset_handle, Some(&foo.head), None)
+        .await
+        .unwrap();
+
+    assert_eq!(reset_result.new_head, foo.head);
+    assert_eq!(
+        harness
+            .num_blocks(ResolvedDataset::from_created(&foo))
+            .await,
+        2
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[tokio::test]
+async fn test_try_reset_not_found_dataset() {
+    let not_found_dataset_handle =
+        odf::metadata::testing::handle(&"user", &"not-found-dataset", odf::DatasetKind::Root);
+
+    let harness = ResetJobHarness::new(
+        MockDatasetPermissionChecker::new().expect_authorize_for_not_found(
+            DatasetPermission::Maintain,
+            &not_found_dataset_handle.id,
+            1,
+        ),
+        MockDidGenerator::new(),
+    );
+
+    assert_matches!(
+        harness
+            .job
+            .run(&not_found_dataset_handle, None, None)
+            .await,
+        Err(ResetError::NotFound(e))
+            if e.dataset_ref == not_found_dataset_handle.as_local_ref()
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[tokio::test]
+async fn test_reset_dataset_unauthorized() {
+    let alias_foo = BaseRepoHarness::alias("foo");
+    let (_, dataset_id_foo) = odf::DatasetID::new_generated_ed25519();
+
+    let harness = ResetJobHarness::new(
+        MockDatasetPermissionChecker::new().expect_denied_but_readable(
+            DatasetPermission::Maintain,
+            &dataset_id_foo,
+            1,
+        ),
+        MockDidGenerator::predefined_dataset_ids(vec![dataset_id_foo]),
+    );
+
+    let foo = harness.create_root_dataset(&alias_foo).await;
+
+    assert_matches!(
+        harness
+            .job
+            .run(&foo.dataset_handle, Some(&foo.head), None)
+            .await,
+        Err(ResetError::Access(_))
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[oop::extend(BaseUseCaseHarness, base_use_case_harness)]
+struct ResetJobHarness {
+    base_use_case_harness: BaseUseCaseHarness,
+    job: Arc<dyn ResetJob>,
+}
+
+impl ResetJobHarness {
+    fn new(
+        mock_dataset_permission_checker: MockDatasetPermissionChecker,
+        mock_did_generator: MockDidGenerator,
+    ) -> Self {
+        let base_use_case_harness = BaseUseCaseHarness::new(
+            BaseUseCaseHarnessOptions::new()
+                .with_maybe_permission_checker(Some(mock_dataset_permission_checker))
+                .with_maybe_mock_did_generator(Some(mock_did_generator)),
+        );
+
+        let mut b = dill::CatalogBuilder::new_chained(base_use_case_harness.catalog());
+        b.add::<ResetJobImpl>()
+            .add::<ResetPlannerImpl>()
+            .add::<ResetExecutorImpl>();
+        let catalog = b.build();
+
+        let job = catalog.get_one::<dyn ResetJob>().unwrap();
+
+        Self {
+            base_use_case_harness,
+            job,
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

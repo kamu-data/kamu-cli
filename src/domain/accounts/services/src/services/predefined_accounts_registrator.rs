@@ -20,7 +20,11 @@ use kamu_auth_rebac::{
     RebacService,
     boolean_property_value,
 };
+use messaging_outbox::Outbox;
 use secrecy::{ExposeSecret, SecretString};
+use time_source::SystemTimeSource;
+
+use crate::utils::UpdateAccountUseCaseHelper;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -31,7 +35,7 @@ pub struct PredefinedAccountsRegistrator {
     account_service: Arc<dyn AccountService>,
     rebac_service: Arc<dyn RebacService>,
     default_account_properties: Arc<AccountProperties>,
-    update_account_use_case: Arc<dyn UpdateAccountUseCase>,
+    update_account_helper: UpdateAccountUseCaseHelper,
     create_account_use_case: Arc<dyn CreateAccountUseCase>,
     did_secret_key_repo: Arc<dyn DidSecretKeyRepository>,
     did_secret_encryption_key: Option<SecretString>,
@@ -54,17 +58,22 @@ impl PredefinedAccountsRegistrator {
         account_service: Arc<dyn AccountService>,
         rebac_service: Arc<dyn RebacService>,
         default_account_properties: Arc<AccountProperties>,
-        update_account_use_case: Arc<dyn UpdateAccountUseCase>,
+        outbox: Arc<dyn Outbox>,
+        time_source: Arc<dyn SystemTimeSource>,
         create_account_use_case: Arc<dyn CreateAccountUseCase>,
         did_secret_key_repo: Arc<dyn DidSecretKeyRepository>,
         did_secret_encryption_config: Arc<DidSecretEncryptionConfig>,
     ) -> Self {
         Self {
             predefined_accounts_config,
+            update_account_helper: UpdateAccountUseCaseHelper::new(
+                account_service.clone(),
+                outbox,
+                time_source,
+            ),
             account_service,
             rebac_service,
             default_account_properties,
-            update_account_use_case,
             create_account_use_case,
             did_secret_key_repo,
             did_secret_encryption_key: did_secret_encryption_config
@@ -288,8 +297,8 @@ impl PredefinedAccountsRegistrator {
                  {updated_account:?}",
             );
 
-            self.update_account_use_case
-                .execute_internal(&updated_account, &original_account)
+            self.update_account_helper
+                .update(&updated_account, &original_account)
                 .await
                 .int_err()?;
         }

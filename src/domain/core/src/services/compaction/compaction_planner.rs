@@ -65,13 +65,6 @@ pub struct CompactionPlan {
     pub data_slice_batches: Vec<CompactionDataSliceBatch>,
 }
 
-impl CompactionPlan {
-    pub fn has_no_effect(&self) -> bool {
-        // slices amount +1(seed block) eq to amount of blocks we should not compact
-        self.data_slice_batches.len() + 1 == self.old_num_blocks
-    }
-}
-
 #[derive(Debug)]
 pub enum CompactionDataSliceBatch {
     CompactedBatch(CompactionDataSliceBatchInfo),
@@ -126,10 +119,21 @@ pub enum CompactionPlanningError {
     Internal(#[from] InternalError),
 }
 
+impl CompactionPlanningError {
+    /// Whether planning the same compaction again could succeed. Only a
+    /// root dataset can be compacted, and access is not gained by retrying.
+    pub fn is_recoverable(&self) -> bool {
+        match self {
+            Self::InvalidDatasetKind(_) | Self::Access(_) => false,
+            Self::Internal(_) => true,
+        }
+    }
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Error, Debug)]
-#[error("Dataset '{dataset_alias}' in not root kind")]
+#[error("Dataset '{dataset_alias}' is not a root dataset")]
 pub struct InvalidDatasetKindError {
     pub dataset_alias: odf::DatasetAlias,
 }

@@ -12,7 +12,7 @@ use futures::future;
 use indoc::indoc;
 use kamu_core::*;
 use kamu_datasets::*;
-use kamu_datasets_services::*;
+use kamu_datasets_services::{DatasetOperationGuardImpl, *};
 use messaging_outbox::OutboxProvider;
 use odf::dataset::MetadataChainExt;
 use pretty_assertions::assert_eq;
@@ -1070,12 +1070,12 @@ impl GraphQLDatasetsHarness {
     pub async fn new(
         tenancy_config: TenancyConfig,
         outbox_provider: Option<OutboxProvider>,
-        mock_dataset_action_authorizer: Option<MockDatasetActionAuthorizer>,
+        mock_dataset_permission_checker: Option<MockDatasetPermissionChecker>,
     ) -> Self {
         let base_gql_harness = BaseGQLDatasetHarness::builder()
             .tenancy_config(tenancy_config)
             .maybe_outbox_provider(outbox_provider)
-            .maybe_mock_dataset_action_authorizer(mock_dataset_action_authorizer)
+            .maybe_mock_dataset_permission_checker(mock_dataset_permission_checker)
             .build();
 
         let cache_dir = base_gql_harness.temp_dir().join("cache");
@@ -1097,6 +1097,7 @@ impl GraphQLDatasetsHarness {
             .add::<kamu::PushIngestDataUseCaseImpl>()
             .add::<FindCollectionEntriesUseCaseImpl>()
             .add::<UpdateCollectionEntriesUseCaseImpl>()
+            .add::<DatasetOperationGuardImpl>()
             .add::<ViewCollectionEntriesUseCaseImpl>()
             .build();
 

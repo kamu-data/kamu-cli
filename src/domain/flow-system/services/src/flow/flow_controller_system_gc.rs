@@ -40,6 +40,7 @@ impl FlowController for FlowControllerSystemGC {
             dataset_id: None,
             busy_time: Some(std::time::Duration::from_secs(20)),
             end_with_outcome: Some(ts::TaskOutcome::Success(ts::TaskResult::empty())),
+            fail_planning_with: None,
         }
         .into_logical_plan())
     }

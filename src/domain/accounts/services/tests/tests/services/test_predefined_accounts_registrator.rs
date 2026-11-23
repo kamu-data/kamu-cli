@@ -992,7 +992,6 @@ impl PredefinedAccountsRegistratorHarness {
             b.add::<kamu_accounts_services::AccountServiceImpl>();
             b.add::<kamu_auth_rebac_services::RebacServiceImpl>();
             b.add_value(kamu_auth_rebac_services::DefaultAccountProperties::default());
-            b.add::<kamu_accounts_services::UpdateAccountUseCaseImpl>();
             b.add::<kamu_accounts_services::CreateAccountUseCaseImpl>();
             b.add::<kamu_accounts_inmem::InMemoryDidSecretKeyRepository>();
             b.add_value(kamu_accounts::DidSecretEncryptionConfig::sample());
@@ -1004,12 +1003,10 @@ impl PredefinedAccountsRegistratorHarness {
             b.add::<kamu_auth_rebac_inmem::InMemoryRebacRepository>();
             b.add_value(kamu_auth_rebac_services::DefaultDatasetProperties::default());
 
-            // UpdateAccountUseCaseImpl
+            // Account updates and creations
             b.add_value(mock_outbox)
                 .bind::<dyn messaging_outbox::Outbox, MockOutbox>();
             b.add::<time_source::SystemTimeSourceDefault>();
-            b.add_value(kamu_accounts_services::utils::MockAccountAuthorizationHelper::new())
-                .bind::<dyn kamu_accounts_services::utils::AccountAuthorizationHelper, kamu_accounts_services::utils::MockAccountAuthorizationHelper>();
 
             b.build()
         };

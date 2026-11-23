@@ -10,7 +10,7 @@
 use std::sync::Arc;
 
 use internal_error::ResultIntoInternal;
-use kamu_accounts::{AccountHandle, AccountService, CurrentAccountSubject};
+use kamu_accounts::{AccountHandle, AccountService, Principal};
 use kamu_auth_rebac::{RebacService, RebacServiceExt};
 use kamu_resources::ResourceOwnerRef;
 
@@ -21,7 +21,6 @@ use crate::{ResolveManifestAccountError, ResourceAccountAccessError, ResourceAcc
 #[dill::component]
 #[dill::interface(dyn ResourceAccountResolver)]
 pub(crate) struct ResourceAccountResolverImpl {
-    current_account_subject: Arc<CurrentAccountSubject>,
     account_service: Arc<dyn AccountService>,
     rebac_service: Arc<dyn RebacService>,
 }
@@ -32,10 +31,11 @@ pub(crate) struct ResourceAccountResolverImpl {
 impl ResourceAccountResolver for ResourceAccountResolverImpl {
     async fn resolve_target_account(
         &self,
+        principal: &Principal,
         selector: Option<&ResourceOwnerRef>,
     ) -> Result<odf::ResourceOwnerHandle, ResolveManifestAccountError> {
-        let target_account = self.resolve_account(selector).await?;
-        self.ensure_can_use_account_resources(&target_account)
+        let target_account = self.resolve_account(principal, selector).await?;
+        self.ensure_can_use_account_resources(principal, &target_account)
             .await?;
         Ok(target_account)
     }
@@ -46,10 +46,11 @@ impl ResourceAccountResolver for ResourceAccountResolverImpl {
 impl ResourceAccountResolverImpl {
     async fn resolve_account(
         &self,
+        principal: &Principal,
         selector: Option<&ResourceOwnerRef>,
     ) -> Result<odf::ResourceOwnerHandle, ResolveManifestAccountError> {
         let Some(selector) = selector else {
-            return self.resolve_current_subject_account();
+            return Self::resolve_principal_account(principal);
         };
 
         let account = match (&selector.did, &selector.name) {
@@ -89,31 +90,30 @@ impl ResourceAccountResolverImpl {
         Ok(AccountHandle::from(&account).into())
     }
 
-    fn resolve_current_subject_account(
-        &self,
+    /// The account a manifest without a selector is placed in: the principal's
+    /// own; the node has none, so it must name one
+    fn resolve_principal_account(
+        principal: &Principal,
     ) -> Result<odf::ResourceOwnerHandle, ResolveManifestAccountError> {
-        match self.current_account_subject.as_ref() {
-            CurrentAccountSubject::Logged(account) => Ok((&account.account_handle).into()),
-            CurrentAccountSubject::Anonymous(_) => {
-                Err(ResourceAccountAccessError::AnonymousSubject.into())
-            }
+        match principal {
+            Principal::User(account) => Ok(account.into()),
+            Principal::Node => Err(ResolveManifestAccountError::empty_selector()),
+            Principal::Anonymous => Err(ResourceAccountAccessError::AnonymousSubject.into()),
         }
     }
 
     async fn ensure_can_use_account_resources(
         &self,
+        principal: &Principal,
         target_account: &odf::ResourceOwnerHandle,
     ) -> Result<(), ResolveManifestAccountError> {
-        match self.current_account_subject.as_ref() {
-            CurrentAccountSubject::Logged(current)
-                if current.account_handle.did == target_account.did =>
-            {
-                Ok(())
-            }
-            CurrentAccountSubject::Logged(current) => {
+        match principal {
+            Principal::Node => Ok(()),
+            Principal::User(account_handle) if account_handle.did == target_account.did => Ok(()),
+            Principal::User(account_handle) => {
                 let is_admin = self
                     .rebac_service
-                    .is_account_admin(&current.account_handle.did)
+                    .is_account_admin(&account_handle.did)
                     .await
                     .int_err()?;
                 if is_admin {
@@ -131,9 +131,7 @@ impl ResourceAccountResolverImpl {
                     )
                 }
             }
-            CurrentAccountSubject::Anonymous(_) => {
-                Err(ResourceAccountAccessError::AnonymousSubject.into())
-            }
+            Principal::Anonymous => Err(ResourceAccountAccessError::AnonymousSubject.into()),
         }
     }
 }

@@ -19,15 +19,11 @@ use kamu::testing::{BaseRepoHarness, *};
 use kamu::utils::ipfs_wrapper::IpfsClient;
 use kamu::utils::simple_transfer_protocol::SimpleTransferProtocol;
 use kamu::*;
-use kamu_accounts::CurrentAccountSubject;
+use kamu_accounts::{CurrentAccountSubject, Principal};
 use kamu_datasets::{
     DatasetReferenceMessage,
     DatasetRegistry,
     MESSAGE_PRODUCER_KAMU_DATASET_REFERENCE_SERVICE,
-};
-use kamu_datasets_inmem::{
-    InMemoryDatasetDependencyRepository,
-    InMemoryDatasetReferenceRepository,
 };
 use kamu_datasets_services::utils::CreateDatasetUseCaseHelper;
 use kamu_datasets_services::{
@@ -42,6 +38,8 @@ use kamu_datasets_services::{
 use messaging_outbox::{ConsumerFilter, Outbox, OutboxImmediateImpl, register_message_dispatcher};
 use odf::dataset::testing::create_test_dataset_from_snapshot;
 use odf::metadata::testing::MetadataFactory;
+
+use crate::utils::LocalSyncHelper;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -149,6 +147,8 @@ async fn create_graph(
     }
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 // Adding a remote dataset is a bit of a pain.
 // We cannot add a local dataset and then add a pull alias without adding all of
 // its dependencies too. So instead we're creating a repository based on temp
@@ -165,15 +165,15 @@ async fn create_graph_remote(
     let tmp_registry_dir = tempfile::tempdir().unwrap();
 
     let (tmp_dataset_registry, tmp_storage_unit) = {
-        let catalog = dill::CatalogBuilder::new()
-            .add_builder(odf::dataset::DatasetStorageUnitLocalFs::builder(
-                tmp_registry_dir.path().to_owned(),
-            ))
-            .add::<odf::dataset::DatasetLfsBuilderDefault>()
-            .add::<DatasetRegistrySoloUnitBridge>()
-            .add_value(CurrentAccountSubject::new_test())
-            .add_value(TenancyConfig::SingleTenant)
-            .build();
+        let mut b = dill::CatalogBuilder::new();
+        b.add_builder(odf::dataset::DatasetStorageUnitLocalFs::builder(
+            tmp_registry_dir.path().to_owned(),
+        ))
+        .add::<odf::dataset::DatasetLfsBuilderDefault>()
+        .add::<DatasetRegistrySoloUnitBridge>();
+        CurrentAccountSubject::new_test().register(&mut b);
+        b.add_value(TenancyConfig::SingleTenant);
+        let catalog = b.build();
 
         (
             catalog.get_one::<dyn DatasetRegistry>().unwrap(),
@@ -223,15 +223,11 @@ async fn create_graph_remote(
     for import_alias in to_import {
         let remote_alias = import_alias.as_remote_alias(tmp_repo_name.clone());
         harness
-            .sync_service
-            .sync(
-                harness
-                    .sync_request_builder
-                    .build_sync_request(remote_alias.as_any_ref(), import_alias.as_any_ref(), true)
-                    .await
-                    .unwrap(),
+            .local_sync_helper
+            .pull(
+                remote_alias.as_remote_ref(),
+                import_alias.as_local_ref(),
                 SyncOptions::default(),
-                None,
             )
             .await
             .unwrap();
@@ -610,6 +606,48 @@ async fn test_pull_batching_complex_with_remote() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Finding the dataset a remote is pulled into may scan every dataset, so a
+/// plan of several requests resolves each of them once
+#[tokio::test]
+async fn test_remote_requests_are_resolved_once() {
+    let mut mock_pull_source_resolver = MockDatasetPullSourceResolver::new();
+    mock_pull_source_resolver
+        .expect_find_dataset_by_pull_alias()
+        .times(2)
+        .returning(|_| Ok(None));
+    let harness = PullTestHarness::with_pull_source_resolver(
+        TenancyConfig::SingleTenant,
+        mock_pull_source_resolver,
+    );
+
+    let res = harness
+        .pull_with_requests(
+            vec![
+                PullRequest::Remote(PullRequestRemote {
+                    maybe_local_alias: Some(n!("bar")),
+                    remote_ref: rr!("kamu.dev/foo"),
+                }),
+                PullRequest::Remote(PullRequestRemote {
+                    maybe_local_alias: Some(n!("qux")),
+                    remote_ref: rr!("kamu.dev/baz"),
+                }),
+            ],
+            PullOptions::default(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(
+        res,
+        vec![vec![
+            PullJob::Sync((rr!("kamu.dev/foo").into(), n!("bar").into())),
+            PullJob::Sync((rr!("kamu.dev/baz").into(), n!("qux").into())),
+        ]]
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[tokio::test]
 async fn test_sync_from() {
     let harness = PullTestHarness::new(TenancyConfig::SingleTenant, MockDatasetEntryWriter::new());
@@ -755,6 +793,84 @@ async fn test_sync_from_url_only_multi_tenant_case() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// In multi-tenant mode a URL pull without a local alias lands in the account
+/// of the acting principal
+#[tokio::test]
+async fn test_sync_from_url_only_multi_tenant_names_account_by_principal() {
+    let cases = [
+        (PullTestHarness::user("alice"), Some(mn!("alice/bar"))),
+        (Principal::Anonymous, Some(mn!("kamu/bar"))),
+        (Principal::Node, None),
+    ];
+
+    for (principal, expected_alias) in cases {
+        let harness =
+            PullTestHarness::with_principal(TenancyConfig::MultiTenant, principal.clone());
+
+        let res = harness
+            .pull_with_requests(
+                vec![PullRequest::Remote(PullRequestRemote {
+                    maybe_local_alias: None,
+                    remote_ref: rr!("http://example.com/bar"),
+                })],
+                PullOptions::default(),
+            )
+            .await;
+
+        match expected_alias {
+            Some(alias) => assert_eq!(
+                res.unwrap(),
+                vec![vec![PullJob::Sync((
+                    rr!("http://example.com/bar").into(),
+                    alias.into()
+                ))]],
+                "{principal:?}"
+            ),
+            None => {
+                let responses = res.unwrap_err();
+                assert_eq!(1, responses.len());
+                assert_matches!(
+                    responses[0].result,
+                    Err(PullError::CannotInferLocalName(_)),
+                    "{principal:?}"
+                );
+            }
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Pulling all owned datasets pulls those of the acting principal's account;
+/// the node owns none
+#[tokio::test]
+async fn test_pull_all_owned_multi_tenant_by_principal() {
+    let cases = [
+        (PullTestHarness::user("alice"), mnames!["alice/foo"]),
+        (Principal::Anonymous, mnames!["kamu/bar"]),
+        (Principal::Node, mnames![]),
+    ];
+
+    for (principal, expected_ingested) in cases {
+        let harness =
+            PullTestHarness::with_principal(TenancyConfig::MultiTenant, principal.clone());
+        create_graph(
+            harness.dataset_registry(),
+            harness.dataset_storage_unit_writer(),
+            vec![(mn!("alice/foo"), mnames![]), (mn!("kamu/bar"), mnames![])],
+        )
+        .await;
+
+        let expected: Vec<Vec<PullJob>> = expected_ingested
+            .into_iter()
+            .map(|alias| vec![PullJob::Ingest(alias.as_any_ref())])
+            .collect();
+        assert_eq!(harness.pull_all_owned().await, expected, "{principal:?}");
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[tokio::test]
 async fn test_sync_from_url_same_id_different_aliases() {
     let mut mock_dataset_entry_writer = MockDatasetEntryWriter::new();
@@ -833,12 +949,282 @@ async fn test_sync_from_same_url_different_accounts() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[tokio::test]
+async fn test_pull_dataset_with_several_pull_aliases_is_ambiguous() {
+    let harness = PullTestHarness::new(TenancyConfig::SingleTenant, MockDatasetEntryWriter::new());
+
+    create_graph(
+        harness.dataset_registry(),
+        harness.dataset_storage_unit_writer(),
+        vec![(n!("a"), names![])],
+    )
+    .await;
+
+    harness
+        .add_pull_aliases(&rl!("a"), &["kamu.dev/a", "other.dev/a"])
+        .await;
+
+    let responses = harness
+        .pull(refs!["a"], PullOptions::default())
+        .await
+        .unwrap_err();
+
+    assert_eq!(1, responses.len());
+    assert_matches!(responses[0].result, Err(PullError::AmbiguousSource(_)));
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[tokio::test]
+async fn test_pull_without_recursion_skips_upstream_that_cannot_be_planned() {
+    let harness = PullTestHarness::new(TenancyConfig::SingleTenant, MockDatasetEntryWriter::new());
+
+    // A - B, C
+    create_graph(
+        harness.dataset_registry(),
+        harness.dataset_storage_unit_writer(),
+        vec![
+            (n!("a"), names![]),
+            (n!("b"), names!["a"]),
+            (n!("c"), names![]),
+        ],
+    )
+    .await;
+    harness.index_dataset_dependencies().await;
+    harness
+        .add_pull_aliases(&rl!("a"), &["kamu.dev/a", "other.dev/a"])
+        .await;
+
+    assert_eq!(
+        harness
+            .pull(refs!["b", "c"], PullOptions::default())
+            .await
+            .unwrap(),
+        vec![vec![
+            PullJob::Transform(ar!["b"]),
+            PullJob::Ingest(ar!["c"])
+        ]],
+    );
+
+    let responses = harness
+        .pull(
+            refs!["b"],
+            PullOptions {
+                recursive: true,
+                ..PullOptions::default()
+            },
+        )
+        .await
+        .unwrap_err();
+    assert_matches!(responses[0].result, Err(PullError::AmbiguousSource(_)));
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[tokio::test]
+async fn test_pull_requested_upstream_is_planned_from_its_request_in_any_order() {
+    let harness = PullTestHarness::new(TenancyConfig::SingleTenant, MockDatasetEntryWriter::new());
+
+    // A - B, where A has two pull aliases and is requested from one of them
+    create_graph(
+        harness.dataset_registry(),
+        harness.dataset_storage_unit_writer(),
+        vec![(n!("a"), names![]), (n!("b"), names!["a"])],
+    )
+    .await;
+    harness.index_dataset_dependencies().await;
+    harness
+        .add_pull_aliases(&rl!("a"), &["kamu.dev/a", "other.dev/a"])
+        .await;
+
+    let expected = vec![
+        vec![PullJob::Sync((rr!("kamu.dev/a").into(), n!("a").into()))],
+        vec![PullJob::Transform(ar!["b"])],
+    ];
+    for refs in [refs!["b", "kamu.dev/a"], refs!["kamu.dev/a", "b"]] {
+        for recursive in [false, true] {
+            assert_eq!(
+                harness
+                    .pull(
+                        refs.clone(),
+                        PullOptions {
+                            recursive,
+                            ..PullOptions::default()
+                        },
+                    )
+                    .await
+                    .unwrap(),
+                expected,
+                "refs: {refs:?}, recursive: {recursive}",
+            );
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[tokio::test]
+async fn test_sync_from_unknown_repository_is_planned_without_resolving_it() {
+    let harness = PullTestHarness::new(TenancyConfig::SingleTenant, MockDatasetEntryWriter::new());
+
+    assert_eq!(
+        harness
+            .pull_with_requests(
+                vec![PullRequest::Remote(PullRequestRemote {
+                    maybe_local_alias: Some(n!("bar")),
+                    remote_ref: rr!("missing/foo"),
+                })],
+                PullOptions::default(),
+            )
+            .await
+            .unwrap(),
+        vec![vec![PullJob::Sync((
+            rr!("missing/foo").into(),
+            n!("bar").into()
+        ))]],
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[tokio::test]
+async fn test_sync_from_remote_id_without_local_alias_fails_planning() {
+    let harness = PullTestHarness::new(TenancyConfig::SingleTenant, MockDatasetEntryWriter::new());
+
+    let responses = harness
+        .pull_with_requests(
+            vec![PullRequest::Remote(PullRequestRemote {
+                maybe_local_alias: None,
+                remote_ref: odf::DatasetRefRemote::ID(
+                    None,
+                    odf::DatasetID::new_seeded_ed25519(b"bar"),
+                ),
+            })],
+            PullOptions::default(),
+        )
+        .await
+        .unwrap_err();
+
+    assert_eq!(1, responses.len());
+    assert_matches!(responses[0].result, Err(PullError::CannotInferLocalName(_)));
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[tokio::test]
+async fn test_sync_from_url_without_path_is_named_after_its_domain() {
+    let harness = PullTestHarness::new(TenancyConfig::SingleTenant, MockDatasetEntryWriter::new());
+
+    let res = harness
+        .pull_with_requests(
+            vec![PullRequest::Remote(PullRequestRemote {
+                maybe_local_alias: None,
+                remote_ref: rr!("http://example.com/"),
+            })],
+            PullOptions::default(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(
+        res,
+        vec![vec![PullJob::Sync((
+            rr!("http://example.com/").into(),
+            n!("example.com").into()
+        ))]]
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[tokio::test]
+async fn test_sync_from_url_with_ip_host_and_no_path_fails_planning() {
+    let harness = PullTestHarness::new(TenancyConfig::SingleTenant, MockDatasetEntryWriter::new());
+
+    let responses = harness
+        .pull_with_requests(
+            vec![PullRequest::Remote(PullRequestRemote {
+                maybe_local_alias: None,
+                remote_ref: rr!("http://127.0.0.1/"),
+            })],
+            PullOptions::default(),
+        )
+        .await
+        .unwrap_err();
+
+    assert_eq!(1, responses.len());
+    assert_matches!(responses[0].result, Err(PullError::CannotInferLocalName(_)));
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[tokio::test]
+async fn test_sync_into_missing_dataset_without_auto_create_fails_before_naming_it() {
+    let harness = PullTestHarness::new(TenancyConfig::SingleTenant, MockDatasetEntryWriter::new());
+
+    let responses = harness
+        .pull_with_requests(
+            vec![PullRequest::Remote(PullRequestRemote {
+                maybe_local_alias: None,
+                remote_ref: odf::DatasetRefRemote::ID(
+                    None,
+                    odf::DatasetID::new_seeded_ed25519(b"bar"),
+                ),
+            })],
+            PullOptions {
+                sync_options: SyncOptions {
+                    create_if_not_exists: false,
+                    ..SyncOptions::default()
+                },
+                ..PullOptions::default()
+            },
+        )
+        .await
+        .unwrap_err();
+
+    assert_eq!(1, responses.len());
+    assert_matches!(responses[0].result, Err(PullError::AutoCreateDisabled));
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[tokio::test]
+async fn test_pull_derivative_without_transform_with_dependencies_fails_planning() {
+    let harness = PullTestHarness::new(TenancyConfig::SingleTenant, MockDatasetEntryWriter::new());
+
+    create_graph(
+        harness.dataset_registry(),
+        harness.dataset_storage_unit_writer(),
+        vec![(n!("a"), names![])],
+    )
+    .await;
+    harness.create_derivative_without_transform(&n!("d")).await;
+
+    harness.index_dataset_dependencies().await;
+
+    // Pulling several datasets traverses dependencies, where a derivative without
+    // inputs has the same depth as a root
+    let responses = harness
+        .pull(refs!["d", "a"], PullOptions::default())
+        .await
+        .unwrap_err();
+
+    assert_eq!(1, responses.len());
+    assert_matches!(
+        responses[0].result,
+        Err(PullError::TransformError(TransformError::Plan(
+            TransformPlanError::TransformNotDefined(_)
+        )))
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[oop::extend(BaseRepoHarness, base_repo_harness)]
 struct PullTestHarness {
     base_repo_harness: BaseRepoHarness,
     calls: Arc<Mutex<Vec<Vec<PullJob>>>>,
-    sync_service: Arc<dyn SyncService>,
-    sync_request_builder: Arc<SyncRequestBuilder>,
+    local_sync_helper: LocalSyncHelper,
     remote_repo_reg: Arc<RemoteRepositoryRegistryImpl>,
     remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
     pull_request_planner: Arc<dyn PullRequestPlanner>,
@@ -851,8 +1237,45 @@ impl PullTestHarness {
         tenancy_config: TenancyConfig,
         mock_dataset_entry_writer: MockDatasetEntryWriter,
     ) -> Self {
+        Self::build(tenancy_config, mock_dataset_entry_writer, None, None)
+    }
+
+    /// Plans as `principal` instead of the subject's own
+    fn with_principal(tenancy_config: TenancyConfig, principal: Principal) -> Self {
+        Self::build(
+            tenancy_config,
+            MockDatasetEntryWriter::new(),
+            None,
+            Some(principal),
+        )
+    }
+
+    /// The principal of a logged-in `account_name`
+    fn user(account_name: &str) -> Principal {
+        Principal::from(&CurrentAccountSubject::new_test_with(&account_name))
+    }
+
+    fn with_pull_source_resolver(
+        tenancy_config: TenancyConfig,
+        mock_pull_source_resolver: MockDatasetPullSourceResolver,
+    ) -> Self {
+        Self::build(
+            tenancy_config,
+            MockDatasetEntryWriter::new(),
+            Some(mock_pull_source_resolver),
+            None,
+        )
+    }
+
+    fn build(
+        tenancy_config: TenancyConfig,
+        mock_dataset_entry_writer: MockDatasetEntryWriter,
+        maybe_mock_pull_source_resolver: Option<MockDatasetPullSourceResolver>,
+        maybe_principal: Option<Principal>,
+    ) -> Self {
         let base_repo_harness = BaseRepoHarness::builder()
             .tenancy_config(tenancy_config)
+            .maybe_principal(maybe_principal)
             .build();
 
         let calls = Arc::new(Mutex::new(Vec::new()));
@@ -861,14 +1284,18 @@ impl PullTestHarness {
         std::fs::create_dir(&repos_dir).unwrap();
 
         let mut b = dill::CatalogBuilder::new_chained(base_repo_harness.catalog());
+        kamu_datasets_inmem::register_dependencies(&mut b);
         b.add::<RemoteRepositoryRegistryImpl>()
             .add_value(RemoteReposDir::new(repos_dir))
             .add::<RemoteAliasesRegistryImpl>()
             .add::<PullRequestPlannerImpl>()
-            .add::<TransformRequestPlannerImpl>()
+            .add::<DatasetUpdateKindResolverImpl>()
+            .add::<TransformPlannerImpl>()
             .add::<ObjectStoreRegistryImpl>()
             .add::<SyncServiceImpl>()
+            .add::<IpfsServiceImpl>()
             .add::<RemoteAliasResolverImpl>()
+            .add::<RemoteDatasetUrlResolverImpl>()
             .add::<SyncRequestBuilder>()
             .add::<odf::dataset::DatasetFactoryImpl>()
             .add::<odf::dataset::DummyOdfServerAccessTokenResolver>()
@@ -884,10 +1311,18 @@ impl PullTestHarness {
             .add_value(mock_dataset_entry_writer)
             .bind::<dyn DatasetEntryWriter, MockDatasetEntryWriter>()
             .add::<DatasetReferenceServiceImpl>()
-            .add::<InMemoryDatasetReferenceRepository>()
             .add::<DependencyGraphServiceImpl>()
-            .add::<InMemoryDatasetDependencyRepository>()
             .add::<DependencyGraphIndexer>();
+
+        match maybe_mock_pull_source_resolver {
+            Some(mock_pull_source_resolver) => {
+                b.add_value(mock_pull_source_resolver)
+                    .bind::<dyn DatasetPullSourceResolver, MockDatasetPullSourceResolver>();
+            }
+            None => {
+                b.add::<DatasetPullSourceResolverImpl>();
+            }
+        }
 
         register_message_dispatcher::<DatasetReferenceMessage>(
             &mut b,
@@ -901,8 +1336,7 @@ impl PullTestHarness {
         Self {
             base_repo_harness,
             calls,
-            sync_service: catalog.get_one().unwrap(),
-            sync_request_builder: catalog.get_one().unwrap(),
+            local_sync_helper: LocalSyncHelper::new(&catalog),
             remote_repo_reg: catalog.get_one().unwrap(),
             remote_alias_reg: catalog.get_one().unwrap(),
             pull_request_planner: catalog.get_one().unwrap(),
@@ -938,7 +1372,7 @@ impl PullTestHarness {
         requests: Vec<PullRequest>,
         options: PullOptions,
     ) -> Result<Vec<Vec<PullJob>>, Vec<PullResponse>> {
-        let (plan_iterations, errors) = self
+        let PullPlan { iterations, errors } = self
             .pull_request_planner
             .build_pull_multi_plan(&requests, &options, self.tenancy_config)
             .await;
@@ -946,31 +1380,28 @@ impl PullTestHarness {
             return Err(errors);
         }
 
-        for iteration in plan_iterations {
-            let mut jobs = Vec::new();
-            for job in iteration.jobs {
-                match job {
-                    PullPlanIterationJob::Ingest(pii) => {
-                        jobs.push(PullJob::Ingest(pii.target.get_handle().as_any_ref()));
-                    }
-                    PullPlanIterationJob::Transform(pti) => {
-                        jobs.push(PullJob::Transform(pti.target.get_handle().as_any_ref()));
-                    }
-                    PullPlanIterationJob::Sync(psi) => {
-                        jobs.push(PullJob::Sync((
-                            psi.sync_request.src.as_user_friendly_any_ref(),
-                            psi.sync_request.dst.as_user_friendly_any_ref(),
-                        )));
-                    }
-                }
-            }
-
+        for iteration in iterations {
+            let jobs = iteration.jobs.into_iter().map(PullJob::from).collect();
             self.calls.lock().unwrap().push(jobs);
         }
 
         tokio::time::sleep(Duration::from_millis(1)).await;
 
         Ok(self.collect_calls())
+    }
+
+    /// Jobs of pulling all datasets the acting principal owns, per iteration
+    async fn pull_all_owned(&self) -> Vec<Vec<PullJob>> {
+        let PullPlan { iterations, errors } = self
+            .pull_request_planner
+            .build_pull_plan_all_owner_datasets(&PullOptions::default(), self.tenancy_config)
+            .await
+            .unwrap();
+        assert!(errors.is_empty());
+        iterations
+            .into_iter()
+            .map(|iteration| iteration.jobs.into_iter().map(PullJob::from).collect())
+            .collect()
     }
 
     async fn get_remote_aliases(&self, dataset_ref: &odf::DatasetRef) -> Box<dyn RemoteAliases> {
@@ -983,6 +1414,31 @@ impl PullTestHarness {
             .get_remote_aliases(&hdl)
             .await
             .unwrap()
+    }
+
+    async fn add_pull_aliases(&self, dataset_ref: &odf::DatasetRef, remote_refs: &[&str]) {
+        let mut aliases = self.get_remote_aliases(dataset_ref).await;
+        for remote_ref in remote_refs {
+            aliases
+                .add(&rr!(*remote_ref), RemoteAliasKind::Pull)
+                .await
+                .unwrap();
+        }
+    }
+
+    async fn create_derivative_without_transform(&self, alias: &odf::DatasetAlias) {
+        create_test_dataset_from_snapshot(
+            self.dataset_registry(),
+            self.dataset_storage_unit_writer(),
+            MetadataFactory::dataset_snapshot()
+                .name(alias.clone())
+                .kind(odf::DatasetKind::Derivative)
+                .build(),
+            odf::DatasetID::new_generated_ed25519().1,
+            Utc::now(),
+        )
+        .await
+        .unwrap();
     }
 
     async fn index_dataset_dependencies(&self) {
@@ -1001,6 +1457,19 @@ enum PullJob {
     Ingest(odf::DatasetRefAny),
     Transform(odf::DatasetRefAny),
     Sync((odf::DatasetRefAny, odf::DatasetRefAny)),
+}
+
+impl From<PullPlanIterationJob> for PullJob {
+    fn from(job: PullPlanIterationJob) -> Self {
+        match job {
+            PullPlanIterationJob::Ingest(pii) => Self::Ingest(pii.target.as_any_ref()),
+            PullPlanIterationJob::Transform(pti) => Self::Transform(pti.target.as_any_ref()),
+            PullPlanIterationJob::Sync(psi) => Self::Sync((
+                psi.remote_ref.as_any_ref(),
+                psi.local_target.as_local_ref().as_any_ref(),
+            )),
+        }
+    }
 }
 
 impl PullJob {

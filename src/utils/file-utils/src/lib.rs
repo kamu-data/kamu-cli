@@ -9,8 +9,10 @@
 
 mod dir_copy;
 mod media_type;
+mod owned_dir;
 mod owned_file;
 
 pub use dir_copy::*;
 pub use media_type::*;
+pub use owned_dir::*;
 pub use owned_file::*;

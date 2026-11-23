@@ -144,9 +144,9 @@ fn test_matches_remote_ref_pattern() {
 async fn test_get_local_datasets_stream_single_tenant() {
     let harness = DatasetFilteringHarness::new(TenancyConfig::SingleTenant);
 
-    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
-    let alias_bar = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("bar"));
-    let alias_baz = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("baz"));
+    let alias_foo = BaseRepoHarness::alias("foo");
+    let alias_bar = BaseRepoHarness::alias("bar");
+    let alias_baz = BaseRepoHarness::alias("baz");
 
     let foo = harness.create_root_dataset(&alias_foo).await;
     let bar = harness.create_root_dataset(&alias_bar).await;

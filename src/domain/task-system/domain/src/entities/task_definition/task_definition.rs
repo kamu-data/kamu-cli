@@ -32,26 +32,20 @@ impl TaskDefinition {
         self.inner.as_any().downcast_ref::<T>()
     }
 
-    /// Owned downcast (consumes self)
+    /// Owned downcast (consumes self). Returns the definition unchanged when
+    /// it is not a `T`.
     pub fn downcast<T: 'static>(self) -> Result<Box<T>, Self> {
-        // Step 1: convert to Box<dyn Any> early
-        let boxed_any = self.inner.into_any();
-
-        // Step 2: try downcast
-        match boxed_any.downcast::<T>() {
-            Ok(b) => Ok(b),
-            Err(failed) => Err(TaskDefinition {
-                inner: failed
-                    .downcast::<Box<dyn TaskDefinitionInner>>()
-                    .map(|b| *b)
-                    .unwrap_or_else(|_| {
-                        panic!(
-                            "Infallible invariant: boxed_any was not created from \
-                             TaskDefinitionInner"
-                        )
-                    }),
-            }),
+        // Once converted to `Box<dyn Any>`, the definition cannot be turned back
+        // into a `TaskDefinitionInner`, so the type is checked before converting
+        if !self.inner.as_any().is::<T>() {
+            return Err(self);
         }
+
+        Ok(self
+            .inner
+            .into_any()
+            .downcast::<T>()
+            .unwrap_or_else(|_| unreachable!("Type was checked before the downcast")))
     }
 }
 
@@ -64,6 +58,58 @@ pub trait TaskDefinitionInner: Send + Sync + std::fmt::Debug {
     fn into_any(self: Box<Self>) -> Box<dyn Any>;
 
     fn task_type(&self) -> &'static str;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::task_definition_struct;
+
+    task_definition_struct! {
+        struct TaskDefinitionFoo {
+            value: u32,
+        }
+        => "test.foo"
+    }
+
+    task_definition_struct! {
+        struct TaskDefinitionBar {
+            name: String,
+        }
+        => "test.bar"
+    }
+
+    #[test]
+    fn test_downcast_to_own_type() {
+        let foo = TaskDefinition::new(TaskDefinitionFoo { value: 42 })
+            .downcast::<TaskDefinitionFoo>()
+            .unwrap();
+
+        assert_eq!(foo.value, 42);
+
+        let bar = TaskDefinition::new(TaskDefinitionBar {
+            name: String::from("bar"),
+        })
+        .downcast::<TaskDefinitionBar>()
+        .unwrap();
+
+        assert_eq!(bar.name, "bar");
+    }
+
+    #[test]
+    fn test_downcast_to_other_type_returns_definition_unchanged() {
+        let definition = TaskDefinition::new(TaskDefinitionFoo { value: 42 })
+            .downcast::<TaskDefinitionBar>()
+            .unwrap_err();
+
+        assert_eq!(definition.task_type(), TaskDefinitionFoo::TASK_TYPE);
+        assert_eq!(
+            definition.downcast::<TaskDefinitionFoo>().unwrap().value,
+            42
+        );
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

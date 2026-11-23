@@ -127,6 +127,9 @@
   &quot;ipfs&quot;: {
     &quot;httpGateway&quot;: &quot;http:&#x2F;&#x2F;localhost:8080&#x2F;&quot;,
     &quot;preResolveDnslink&quot;: true
+  },
+  &quot;smartTransferProtocol&quot;: {
+    &quot;uploadProgressInterval&quot;: &quot;10s&quot;
   }
 }</code></pre></td>
 <td>Network protocols configuration</td>
@@ -835,7 +838,12 @@ Base type: `string`
 <td><code>maxConcurrency</code></td>
 <td><code>integer</code></td>
 <td><code class="language-json">null</code></td>
-<td>Maximum number of engine operations that can be performed concurrently</td>
+<td>
+
+Maximum number of engine operations that can be performed concurrently.
+Defaults to the number of CPU cores, and is always one with host networking
+
+</td>
 </tr>
 <tr>
 <td><code>networkNs</code></td>
@@ -1403,6 +1411,14 @@ Base type: `string`
 }</code></pre></td>
 <td>IPFS configuration</td>
 </tr>
+<tr>
+<td><code>smartTransferProtocol</code></td>
+<td><a href="#smarttransferprotocolconfig"><code>SmartTransferProtocolConfig</code></a></td>
+<td><pre><code class="language-json">{
+  &quot;uploadProgressInterval&quot;: &quot;10s&quot;
+}</code></pre></td>
+<td>Smart transfer protocol configuration</td>
+</tr>
 </tbody>
 </table>
 
@@ -1669,6 +1685,26 @@ To generate use:
 ```sh
 tr -dc 'A-Za-z0-9' < /dev/urandom | head -c 32; echo
 ```
+
+</td>
+</tr>
+</tbody>
+</table>
+
+## `SmartTransferProtocolConfig`
+
+<table>
+<thead><tr><th>Field</th><th>Type</th><th>Default</th><th>Description</th></tr></thead>
+<tbody>
+<tr>
+<td><code>uploadProgressInterval</code></td>
+<td><a href="#durationstring"><code>DurationString</code></a></td>
+<td><code class="language-json">&quot;10s&quot;</code></td>
+<td>
+
+How often the server asks a pushing client for upload progress. Keep it
+below the idle timeout of load balancers in front of the server, or
+they close the connection during long uploads
 
 </td>
 </tr>

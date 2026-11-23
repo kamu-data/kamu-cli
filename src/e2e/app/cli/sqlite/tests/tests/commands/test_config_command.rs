@@ -13,21 +13,24 @@ use kamu_cli_e2e_common::prelude::*;
 
 kamu_cli_execute_command_e2e_test!(
     storage = sqlite,
-    fixture = kamu_cli_e2e_repo_tests::commands::test_config_set_value
+    fixture = kamu_cli_e2e_repo_tests::commands::test_config_set_value,
+    sqlite_only = "reads and writes the CLI config file only"
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 kamu_cli_execute_command_e2e_test!(
     storage = sqlite,
-    fixture = kamu_cli_e2e_repo_tests::commands::test_config_reset_key
+    fixture = kamu_cli_e2e_repo_tests::commands::test_config_reset_key,
+    sqlite_only = "reads and writes the CLI config file only"
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 kamu_cli_execute_command_e2e_test!(
     storage = sqlite,
-    fixture = kamu_cli_e2e_repo_tests::commands::test_config_get_with_default
+    fixture = kamu_cli_e2e_repo_tests::commands::test_config_get_with_default,
+    sqlite_only = "reads and writes the CLI config file only"
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -47,7 +50,8 @@ kamu_cli_execute_command_e2e_test!(
                   maxFileSizeInMb: 42
             "#
         )
-    )
+    ),
+    sqlite_only = "reads and writes the CLI config file only"
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

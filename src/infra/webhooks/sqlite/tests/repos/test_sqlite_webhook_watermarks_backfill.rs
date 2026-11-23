@@ -7,13 +7,9 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::sync::Arc;
-
-use database_common::{DatabaseTransactionRunner, SqliteTransactionManager};
+use database_common::SqliteTransactionManager;
 use dill::{Catalog, CatalogBuilder};
-use internal_error::InternalError;
 use kamu_datasets_sqlite::{SqliteDatasetEntryRepository, SqliteDatasetReferenceRepository};
-use kamu_webhooks::*;
 use kamu_webhooks_repo_tests::WebhookWatermarksBackfillScenario;
 use kamu_webhooks_sqlite::*;
 use sqlx::SqlitePool;
@@ -31,17 +27,11 @@ const BACKFILL_MIGRATION: &str = include_str!(
 async fn test_backfill_starts_watermarks_of_existing_subscriptions(sqlite_pool: SqlitePool) {
     let harness = WebhookWatermarksBackfillHarness::new(sqlite_pool);
 
-    let scenario = harness.write_scenario().await;
+    let scenario = WebhookWatermarksBackfillScenario::write_committed(&harness.catalog).await;
 
     harness.run_backfill().await;
 
-    for (subscription_id, expected_watermark) in scenario.expected_watermarks {
-        assert_eq!(
-            harness.find_watermark(subscription_id).await,
-            expected_watermark,
-            "watermark of subscription {subscription_id}"
-        );
-    }
+    scenario.assert_watermarks(&harness.catalog).await;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -68,43 +58,11 @@ impl WebhookWatermarksBackfillHarness {
         }
     }
 
-    fn transaction_runner(&self) -> DatabaseTransactionRunner {
-        DatabaseTransactionRunner::new(self.catalog.clone())
-    }
-
-    async fn write_scenario(&self) -> WebhookWatermarksBackfillScenario {
-        self.transaction_runner()
-            .transactional(|catalog| async move {
-                Ok::<_, InternalError>(WebhookWatermarksBackfillScenario::write(&catalog).await)
-            })
-            .await
-            .unwrap()
-    }
-
     async fn run_backfill(&self) {
         sqlx::raw_sql(BACKFILL_MIGRATION)
             .execute(&self.sqlite_pool)
             .await
             .unwrap();
-    }
-
-    async fn find_watermark(
-        &self,
-        subscription_id: WebhookSubscriptionID,
-    ) -> Option<WebhookWatermark> {
-        self.transaction_runner()
-            .transactional_with(
-                |watermark_repo: Arc<dyn WebhookWatermarkRepository>| async move {
-                    watermark_repo
-                        .find_watermark(
-                            subscription_id,
-                            &WebhookEventTypeCatalog::dataset_ref_updated(),
-                        )
-                        .await
-                },
-            )
-            .await
-            .unwrap()
     }
 }
 

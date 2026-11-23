@@ -43,6 +43,15 @@ impl FakeDatasetReferenceService {
             .unwrap()
             .insert((dataset_id.clone(), odf::BlockRef::Head), head.clone());
     }
+
+    /// The head of the dataset, if it has one
+    pub fn head(&self, dataset_id: &odf::DatasetID) -> Option<odf::Multihash> {
+        self.references
+            .lock()
+            .unwrap()
+            .get(&(dataset_id.clone(), odf::BlockRef::Head))
+            .cloned()
+    }
 }
 
 #[async_trait::async_trait]

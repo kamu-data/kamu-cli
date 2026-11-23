@@ -13,8 +13,8 @@ use std::sync::{Arc, Mutex};
 
 use async_utils::BackgroundAgent;
 use chrono::{DateTime, Utc};
-use database_common::PaginationOpts;
-use database_common_macros::{transactional_method, transactional_method1};
+use database_common::{PaginationOpts, transaction};
+use database_common_macros::transactional_method;
 use dill::*;
 use futures::TryStreamExt;
 use init_on_startup::{InitOnStartup, InitOnStartupMeta};
@@ -272,9 +272,10 @@ impl FlowAgentImpl {
 
         let mut page_after = None;
         loop {
-            let page = self
-                .load_flows_due_for_activation(current_time, page_after)
-                .await?;
+            let page = transaction!(|flow_event_store: Arc<dyn FlowEventStore>| {
+                self.load_flows_due_for_activation(&flow_event_store, current_time, page_after)
+                    .await?
+            });
             self.activate_flows(page.flows).await;
             wakeup_listener.heartbeat();
 
@@ -288,18 +289,24 @@ impl FlowAgentImpl {
     /// Each flow gets its own transaction, so a failure rolls back only its own
     /// changes and does not hold back the others
     async fn activate_flows(&self, flows: Vec<(Flow, DateTime<Utc>)>) {
-        for (flow, activation_time) in flows {
+        for (mut flow, activation_time) in flows {
             let flow_id = flow.flow_id;
             let flow_type = flow.flow_binding.flow_type.clone();
 
-            let result = self
-                .activate_flow(flow, activation_time)
-                .instrument(observability::tracing::root_span!(
+            // If the flow changed since it was loaded, the save fails as a
+            // concurrent modification and the transaction rolls back
+            let result = transaction!(
+                #[span(observability::tracing::root_span!(
                     "FlowAgent::activation",
                     %flow_id,
                     %activation_time
-                ))
-                .await;
+                ))]
+                |catalog| -> Result<_, ActivateFlowError> {
+                    self.schedule_flow_task(catalog, &mut flow, activation_time)
+                        .await?;
+                    Ok(())
+                }
+            );
             self.metrics.on_activation(
                 &flow_type,
                 &result,
@@ -330,9 +337,9 @@ impl FlowAgentImpl {
 
     /// Loads a page of due flows. Pages by key rather than from the first due
     /// flow: flows that failed to activate stay due and would come first
-    #[transactional_method1(flow_event_store: Arc<dyn FlowEventStore>)]
     async fn load_flows_due_for_activation(
         &self,
+        flow_event_store: &Arc<dyn FlowEventStore>,
         current_time: DateTime<Utc>,
         page_after: Option<DueFlowActivation>,
     ) -> Result<DueFlowsPage, InternalError> {
@@ -376,18 +383,16 @@ impl FlowAgentImpl {
         })
     }
 
-    #[transactional_method1(flow_event_store: Arc<dyn FlowEventStore>)]
-    async fn nearest_flow_activation_moment(&self) -> Result<Option<DateTime<Utc>>, InternalError> {
-        flow_event_store.nearest_flow_activation_moment().await
-    }
-
     /// Sleeps until the nearest activation moment, or until a flow might have
     /// been scheduled for activation, whichever comes first
     async fn wait_for_next_activation(
         &self,
         wakeup_listener: &dyn WakeupListener,
     ) -> Result<(), InternalError> {
-        let maybe_nearest_activation_moment = self.nearest_flow_activation_moment().await?;
+        let maybe_nearest_activation_moment =
+            transaction!(|flow_event_store: Arc<dyn FlowEventStore>| {
+                flow_event_store.nearest_flow_activation_moment().await?
+            });
 
         let wait_signal = wakeup_listener.wait_wake(
             self.wakeup_config.max_listening_timeout,
@@ -421,19 +426,6 @@ impl FlowAgentImpl {
             "Flow agent woke up with a hint"
         );
 
-        Ok(())
-    }
-
-    /// Activates a flow loaded beforehand; if it changed since, the save fails
-    /// as a concurrent modification and the transaction rolls back
-    #[transactional_method]
-    async fn activate_flow(
-        &self,
-        mut flow: Flow,
-        activation_time: DateTime<Utc>,
-    ) -> Result<(), ActivateFlowError> {
-        self.schedule_flow_task(transaction_catalog, &mut flow, activation_time)
-            .await?;
         Ok(())
     }
 

@@ -134,6 +134,38 @@ async fn test_reset_dataset_with_default_seed_block() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[test_log::test(tokio::test)]
+async fn test_reset_dataset_ref_moved_after_planning() {
+    let harness = ResetTestHarness::new();
+    let test_case = harness.a_chain_with_2_blocks().await;
+
+    let reset_plan = harness
+        .plan_reset(&test_case.dataset_handle, &test_case.hash_seed_block)
+        .await;
+    let concurrent_head = harness.commit_info_block(&test_case.dataset_handle).await;
+
+    let result = harness
+        .execute_reset(&test_case.dataset_handle, reset_plan)
+        .await;
+
+    assert_matches!(
+        result,
+        Err(ResetExecutionError::SetReferenceFailed(
+            odf::dataset::SetChainRefError::CASFailed(odf::dataset::RefCASError {
+                expected: Some(expected),
+                actual: Some(actual),
+                ..
+            })
+        )) if expected == test_case.hash_polling_source_block && actual == concurrent_head
+    );
+    assert_eq!(
+        concurrent_head,
+        harness.get_dataset_head(&test_case.dataset_handle).await
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 struct ChainWith2BlocksTestCase {
     dataset_handle: odf::DatasetHandle,
     hash_seed_block: odf::Multihash,
@@ -207,10 +239,10 @@ impl ResetTestHarness {
             .as_metadata_chain()
             .set_ref(
                 &odf::BlockRef::Head,
+                None,
                 &stored.seed,
                 odf::dataset::SetRefOpts {
                     validate_block_present: true,
-                    check_ref_is: Some(None),
                 },
             )
             .await
@@ -249,6 +281,47 @@ impl ResetTestHarness {
         let reset_result = self.reset_executor.execute(target, reset_plan).await?;
 
         Ok(reset_result)
+    }
+
+    async fn plan_reset(
+        &self,
+        dataset_handle: &odf::DatasetHandle,
+        new_head: &odf::Multihash,
+    ) -> ResetPlan {
+        self.reset_planner
+            .plan_reset(
+                self.resolve_dataset(dataset_handle).await,
+                Some(new_head),
+                None,
+            )
+            .await
+            .unwrap()
+    }
+
+    async fn execute_reset(
+        &self,
+        dataset_handle: &odf::DatasetHandle,
+        reset_plan: ResetPlan,
+    ) -> Result<ResetResult, ResetExecutionError> {
+        self.reset_executor
+            .execute(self.resolve_dataset(dataset_handle).await, reset_plan)
+            .await
+    }
+
+    async fn commit_info_block(&self, dataset_handle: &odf::DatasetHandle) -> odf::Multihash {
+        self.resolve_dataset(dataset_handle)
+            .await
+            .commit_event(
+                odf::MetadataEvent::SetInfo(
+                    MetadataFactory::set_info()
+                        .description("concurrent")
+                        .build(),
+                ),
+                odf::dataset::CommitOpts::default(),
+            )
+            .await
+            .unwrap()
+            .new_head
     }
 
     async fn get_dataset_head(&self, dataset_handle: &odf::DatasetHandle) -> odf::Multihash {

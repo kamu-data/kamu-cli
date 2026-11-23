@@ -9,7 +9,7 @@
 
 use std::path::Path;
 
-use internal_error::{BoxedError, InternalError};
+use internal_error::InternalError;
 use odf::utils::data::DataFrameExt;
 use thiserror::Error;
 
@@ -60,14 +60,6 @@ impl Default for ExportOptions {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Errors
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug, Error)]
-#[error("Invalid SQL query: {context}")]
-pub struct ExportQueryError {
-    pub context: String,
-    #[source]
-    pub source: BoxedError,
-}
 
 #[derive(Debug, Error)]
 pub enum ExportError {

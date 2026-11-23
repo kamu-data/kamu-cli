@@ -13,13 +13,8 @@ use crate::{Account, UpdateAccountError};
 
 #[async_trait::async_trait]
 pub trait UpdateAccountUseCase: Send + Sync {
+    /// Updates `account` if the principal may modify it
     async fn execute(&self, account: &Account) -> Result<(), UpdateAccountError>;
-
-    async fn execute_internal(
-        &self,
-        account: &Account,
-        original_account: &Account,
-    ) -> Result<(), UpdateAccountError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

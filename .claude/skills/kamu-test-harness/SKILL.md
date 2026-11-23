@@ -4,7 +4,8 @@ description: >
     Test organization, harness design, and DI wiring patterns for Kamu CLI tests.
     Use this skill whenever writing, editing, or reviewing any test code in the Kamu
     codebase — including unit tests, integration tests, or test helpers. Covers:
-    harness struct design, dill catalog wiring, per-account service isolation,
+    choosing between an inline unit test and an integration test, harness struct
+    design, dill catalog wiring, per-account service isolation,
     temporary directories, in-memory test doubles, cross-crate reusable harnesses,
     and keeping test bodies high-level and readable. Always consult this skill before
     writing a new test, adding a helper function, or structuring a new test module.
@@ -18,7 +19,7 @@ See also: `kamu-dill-di` for general dill patterns.
 
 ## Core Philosophy
 
-Tests in this codebase follow two non-negotiable rules:
+Tests in this codebase follow these non-negotiable rules:
 
 **Rule 1 — Test bodies must be high-level.**
 A test body reads like a specification: arrange, act, assert — with no
@@ -30,6 +31,12 @@ resolution, and service construction never appear inside a `#[test]` or
 There are no free `async fn` helpers, no `mod utils` full of functions that take
 a service or catalog as an argument. All reusable operations are methods on the
 harness struct. This keeps test code discoverable, namespaced, and self-contained.
+
+**Rule 3 — Reuse the harnesses that exist before adding to them.**
+Before writing a setup sequence, a builder of expected values or a mock expectation, look in the
+base harnesses (`BaseRepoHarness`, `BaseUseCaseHarness`, the crate's `testing` module) and in the
+suite's sibling files. Extend a shared harness rather than copying its setup into a new suite.
+When cases differ only by data, write one table-driven test instead of near-identical copies.
 
 ### What a well-written test looks like
 
@@ -72,6 +79,29 @@ mod utils {
     pub async fn create_dataset(catalog: &dill::Catalog, name: &str) { ... }
 }
 ```
+
+---
+
+## Unit or integration test
+
+Choose by what the code under test touches, not by how small the test is.
+
+| The code under test | Test it | Where |
+|---|---|---|
+| Computes values from values in memory: parsing, formatting, conversions, query or filter builders, matching rules, state transitions | Unit test | `#[cfg(test)] mod tests` at the bottom of its own file |
+| Reads or writes files (temp files and directories included), datasets, databases, containers or the network, or needs a DI catalog | Integration test | the crate's `tests/` tree, through the crate's public API, with a harness from the scopes below |
+| Is a whole command or API scenario | E2E test | `kamu-cli-e2e-tests` |
+
+- A unit test needs no `tempfile`, no catalog and no container. If it does, it is an integration
+  test in the wrong place.
+- Async is not a reason to move a test: `#[tokio::test]` in a unit test is fine while everything
+  stays in memory.
+- If an integration test can only reach the logic through a private item, the logic is usually a
+  concept of its own. Extract it into a public type with a narrow API and test that from `tests/`,
+  rather than testing the private item inline or widening visibility only for the test. Example:
+  `EngineTransformOutput` checks an engine's output files against its response as a public type
+  tested from `tests/`, instead of a private `ODFEngine` method tested inline with temp files.
+- Pure helpers private to a module stay private and get an inline unit test.
 
 ---
 
@@ -131,11 +161,10 @@ so state written through one account's service is visible from another's.
 impl MyHarness {
     // Build a fresh chained catalog for this account. Cheap — call freely.
     fn catalog_for(&self, account_name: &str) -> dill::Catalog {
-        CatalogBuilder::new_chained(&self.base_catalog)
-            .add_value(CurrentAccountSubject::new_test_with(account_name))
-            .add::<FooRegistryService>()
-            .add::<FooStateService>()
-            .build()
+        let mut b = CatalogBuilder::new_chained(&self.base_catalog);
+        CurrentAccountSubject::new_test_with(&account_name).register(&mut b);
+        b.add::<FooRegistryService>().add::<FooStateService>();
+        b.build()
     }
 
     // Shortcut accessor — hides catalog resolution from test bodies
@@ -324,6 +353,14 @@ impl DatasetEnvVarServiceHarness {
 [dev-dependencies]
 kamu-configuration-services = { workspace = true, features = ["testing"] }
 ```
+
+## Rejected approaches
+
+Do not re-propose these without new evidence.
+
+| Approach | Why it was rejected |
+|---|---|
+| An inline `#[cfg(test)]` module that writes temp files to reach a private method | It is an integration test hidden in a source file, coupled to private internals, and it keeps the logic from being reused; the fix is in [Unit or integration test](#unit-or-integration-test). |
 
 ## What lives elsewhere
 

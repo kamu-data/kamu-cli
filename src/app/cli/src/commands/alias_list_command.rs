@@ -12,7 +12,7 @@ use std::sync::Arc;
 use datafusion::arrow::array::{RecordBatch, StringArray};
 use datafusion::arrow::datatypes::{DataType, Field, Schema};
 use futures::TryStreamExt;
-use internal_error::{InternalError, ResultIntoInternal};
+use internal_error::InternalError;
 use kamu::domain::*;
 use kamu_datasets::DatasetRegistry;
 
@@ -40,11 +40,7 @@ impl AliasListCommand {
         let mut col_alias = Vec::new();
 
         for hdl in datasets {
-            let aliases = self
-                .remote_alias_reg
-                .get_remote_aliases(hdl)
-                .await
-                .int_err()?;
+            let aliases = self.remote_alias_reg.get_remote_aliases(hdl).await?;
             let mut pull_aliases: Vec<_> = aliases
                 .get_by_kind(RemoteAliasKind::Pull)
                 .map(ToString::to_string)

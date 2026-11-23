@@ -205,9 +205,8 @@ async fn test_dataset_metadata(
         odf::DatasetAlias::new(maybe_account_name, DATASET_ROOT_PLAYER_NAME.clone());
     let head_hash = kamu_api_server_client
         .odf_transfer()
-        .metadata_block_hash_by_ref(&dataset_alias, odf::BlockRef::Head)
-        .await
-        .unwrap();
+        .head(&dataset_alias)
+        .await;
     let expected_refs = vec![MetadataOutputRef {
         name: odf::BlockRef::Head.as_str().into(),
         block_hash: head_hash,

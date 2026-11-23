@@ -16,12 +16,12 @@ use kamu_datasets::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct InMemoryDatasetBlockQueryRepository {
+pub(crate) struct InMemoryDatasetBlockQueryRepository {
     key_block_repo: Arc<dyn DatasetKeyBlockRepository>,
     data_block_repo: Arc<dyn DatasetDataBlockRepository>,
 }
 
-#[component(pub)]
+#[component(pub(crate))]
 #[interface(dyn DatasetBlockQueryRepository)]
 impl InMemoryDatasetBlockQueryRepository {
     pub fn new(

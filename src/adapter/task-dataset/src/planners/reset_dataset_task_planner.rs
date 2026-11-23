@@ -9,16 +9,17 @@
 
 use std::sync::Arc;
 
-use database_common_macros::transactional_method2;
-use internal_error::InternalError;
-use kamu_core::ResetPlanner;
-use kamu_datasets::{DatasetRegistry, DatasetRegistryExt};
+use database_common_macros::transactional_method1;
+use kamu_datasets::DatasetRegistry;
 use kamu_task_system::*;
 
+use super::task_planning::resolve_task_dataset;
 use crate::{LogicalPlanDatasetReset, TaskDefinitionDatasetReset};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Prepares reset tasks. The runner's `ResetJob` checks the expected old head;
+/// a dataset deleted before the task starts fails it here
 #[dill::component(pub)]
 #[dill::interface(dyn TaskDefinitionPlanner)]
 #[dill::meta(TaskDefinitionPlannerMeta {
@@ -29,32 +30,12 @@ pub struct ResetDatasetTaskPlanner {
 }
 
 impl ResetDatasetTaskPlanner {
-    #[transactional_method2(dataset_registry: Arc<dyn DatasetRegistry>, reset_planner: Arc<dyn ResetPlanner>)]
-    #[tracing::instrument(level = "debug", skip_all, fields(?args))]
-    async fn plan_reset(
+    #[transactional_method1(dataset_registry: Arc<dyn DatasetRegistry>)]
+    async fn resolve_target(
         &self,
-        args: &LogicalPlanDatasetReset,
-    ) -> Result<TaskDefinition, InternalError> {
-        let target = dataset_registry
-            .get_dataset_by_ref(&args.dataset_id.as_local_ref())
-            .await
-            .int_err()?;
-
-        let reset_plan = reset_planner
-            .plan_reset(
-                target.clone(),
-                args.new_head_hash.as_ref(),
-                args.old_head_hash.as_ref(),
-            )
-            .await
-            .int_err()?;
-
-        target.detach_from_transaction();
-
-        Ok(TaskDefinition::new(TaskDefinitionDatasetReset {
-            dataset_handle: target.take_handle(),
-            reset_plan,
-        }))
+        dataset_id: &odf::DatasetID,
+    ) -> Result<odf::DatasetHandle, PrepareTaskDefinitionError> {
+        resolve_task_dataset(dataset_registry.as_ref(), dataset_id).await
     }
 }
 
@@ -66,15 +47,21 @@ impl TaskDefinitionPlanner for ResetDatasetTaskPlanner {
         &self,
         _task_id: TaskID,
         logical_plan: &LogicalPlan,
-    ) -> Result<TaskDefinition, InternalError> {
+    ) -> Result<TaskDefinition, PrepareTaskDefinitionError> {
         assert_eq!(
             logical_plan.plan_type,
             LogicalPlanDatasetReset::TYPE_ID,
             "ResetDatasetTaskPlanner received an unsupported logical plan type: {logical_plan:?}",
         );
 
-        let reset_plan = LogicalPlanDatasetReset::from_logical_plan(logical_plan)?;
-        self.plan_reset(&reset_plan).await
+        let args = LogicalPlanDatasetReset::from_logical_plan(logical_plan)?;
+        let dataset_handle = self.resolve_target(&args.dataset_id).await?;
+
+        Ok(TaskDefinition::new(TaskDefinitionDatasetReset {
+            dataset_handle,
+            new_head_hash: args.new_head_hash,
+            old_head_hash: args.old_head_hash,
+        }))
     }
 }
 

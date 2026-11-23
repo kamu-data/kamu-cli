@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use dill::*;
-use internal_error::{ErrorIntoInternal, ResultIntoInternal};
+use internal_error::ErrorIntoInternal;
 use kamu_core::*;
 use kamu_datasets::ResolvedDataset;
 use kamu_ingest_datafusion::DataWriterDataFusion;
@@ -21,10 +21,12 @@ pub struct SetWatermarkExecutorImpl {}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[common_macros::method_names_consts]
 #[async_trait::async_trait]
 impl SetWatermarkExecutor for SetWatermarkExecutorImpl {
     #[tracing::instrument(
-        level = "debug",
+        name = SetWatermarkExecutorImpl_execute,
+        level = "info",
         skip_all,
         fields(
             target=%target.get_handle(),
@@ -36,6 +38,9 @@ impl SetWatermarkExecutor for SetWatermarkExecutorImpl {
         target: ResolvedDataset,
         plan: SetWatermarkPlan,
     ) -> Result<SetWatermarkResult, SetWatermarkExecutionError> {
+        // The source state is carried over: an `AddData` without one resets it
+        let new_source_state = plan.metadata_state.prev_source_state.clone();
+
         let mut writer = DataWriterDataFusion::from_metadata_state(
             datafusion::prelude::SessionContext::new(),
             target.clone(),
@@ -47,7 +52,7 @@ impl SetWatermarkExecutor for SetWatermarkExecutorImpl {
                 plan.new_watermark,
                 WriteWatermarkOpts {
                     system_time: plan.system_time,
-                    new_source_state: None,
+                    new_source_state,
                 },
             )
             .await
@@ -57,14 +62,13 @@ impl SetWatermarkExecutor for SetWatermarkExecutorImpl {
                     .as_metadata_chain()
                     .set_ref(
                         &odf::BlockRef::Head,
+                        Some(&res.old_head),
                         &res.new_head,
                         odf::dataset::SetRefOpts {
                             validate_block_present: true,
-                            check_ref_is: Some(Some(&res.old_head)),
                         },
                     )
-                    .await
-                    .int_err()?;
+                    .await?;
 
                 Ok(SetWatermarkResult::Updated {
                     old_head: Some(res.old_head),

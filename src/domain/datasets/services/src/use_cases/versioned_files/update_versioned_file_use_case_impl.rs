@@ -170,6 +170,8 @@ impl UpdateVersionedFileUseCase for UpdateVersionedFileUseCaseImpl {
             Err(
                 err @ (PushIngestDataError::Planning(_)
                 | PushIngestDataError::Execution(_)
+                | PushIngestDataError::NotFound(_)
+                | PushIngestDataError::Access(_)
                 | PushIngestDataError::Internal(_)),
             ) => {
                 return Err(UpdateVersionFileUseCaseError::Internal(err.int_err()));

@@ -15,6 +15,7 @@ kamu_cli_execute_command_e2e_test!(
     storage = sqlite,
     fixture = kamu_cli_e2e_repo_tests::commands::test_account_argument_is_not_valid_account_name_mt,
     options = Options::default().with_multi_tenant(),
+    sqlite_only = "checks a CLI error message; the repository type cannot change it"
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -30,7 +31,8 @@ kamu_cli_execute_command_e2e_test!(
 kamu_cli_execute_command_e2e_test!(
     storage = sqlite,
     fixture =
-        kamu_cli_e2e_repo_tests::commands::test_account_argument_accepts_only_default_account_st
+        kamu_cli_e2e_repo_tests::commands::test_account_argument_accepts_only_default_account_st,
+    sqlite_only = "checks a CLI error message; the repository type cannot change it"
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

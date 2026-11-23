@@ -115,13 +115,6 @@ impl Default for PushMultiOptions {
 
 #[derive(Debug, Error)]
 pub enum PushError {
-    #[error(transparent)]
-    SourceNotFound(
-        #[from]
-        #[backtrace]
-        odf::DatasetNotFoundError,
-    ),
-
     #[error("Destination is not specified and there is no associated push alias")]
     NoTarget,
 
@@ -134,6 +127,9 @@ pub enum PushError {
 
     #[error("Cannot choose between multiple push aliases")]
     AmbiguousTarget,
+
+    #[error("Cannot choose between multiple repositories, specify the destination")]
+    AmbiguousRepository,
 
     #[error(transparent)]
     SyncError(

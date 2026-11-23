@@ -9,6 +9,7 @@
 
 use std::assert_matches;
 
+use database_common::testing::RacingTransactionOutcome;
 use dill::Catalog;
 use kamu_datasets::*;
 
@@ -17,6 +18,7 @@ use crate::helpers::{
     init_test_account,
     make_add_data_block,
     make_execute_transform_block,
+    race_block_saves,
     remove_dataset_entry,
 };
 
@@ -495,6 +497,61 @@ pub async fn test_remove_dataset_entry_removes_data_blocks(catalog: &Catalog) {
             .await
             .unwrap()
     );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Two transactions save different data blocks at the same sequence number:
+/// the one that commits first stores its block, the other never commits
+pub async fn test_save_same_sequence_number_in_concurrent_transactions(catalog: &Catalog) {
+    let first_block = make_add_data_block(1);
+    let first_hash = first_block.block_hash.clone();
+
+    let race = race_block_saves(
+        catalog,
+        first_block,
+        make_execute_transform_block(1),
+        save_data_block,
+        committed_data_block_hashes,
+    )
+    .await;
+
+    assert_matches!(
+        race.outcome,
+        RacingTransactionOutcome::FailedAtWrite(
+            DatasetDataBlockSaveError::DuplicateSequenceNumber(_)
+        ) | RacingTransactionOutcome::FailedAtCommit(_)
+    );
+    pretty_assertions::assert_eq!(race.committed_hashes, vec![first_hash]);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+async fn save_data_block(
+    catalog: Catalog,
+    dataset_id: odf::DatasetID,
+    block: DatasetBlock,
+) -> Result<(), DatasetDataBlockSaveError> {
+    catalog
+        .get_one::<dyn DatasetDataBlockRepository>()
+        .unwrap()
+        .save_data_blocks_batch(&dataset_id, &odf::BlockRef::Head, &[block])
+        .await
+}
+
+async fn committed_data_block_hashes(
+    catalog: Catalog,
+    dataset_id: odf::DatasetID,
+) -> Vec<odf::Multihash> {
+    catalog
+        .get_one::<dyn DatasetDataBlockRepository>()
+        .unwrap()
+        .get_all_data_blocks(&dataset_id, &odf::BlockRef::Head)
+        .await
+        .unwrap()
+        .into_iter()
+        .map(|block| block.block_hash)
+        .collect()
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

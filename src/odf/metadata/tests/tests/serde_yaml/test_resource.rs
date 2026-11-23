@@ -10,6 +10,8 @@
 use std::assert_matches;
 use std::collections::BTreeMap;
 
+use ::serde::Serialize;
+use ::serde::de::DeserializeOwned;
 use indoc::indoc;
 use opendatafabric_metadata::auth::*;
 use opendatafabric_metadata::config::*;
@@ -38,47 +40,25 @@ fn test_serde_resource_input_generics() {
     );
 
     // Read only header ignoring the rest
-    let val = serde_yaml::from_str::<serde::resources::ResourceInput<Ignore>>(data)
-        .unwrap()
-        .into_dto()
-        .unwrap();
+    let val = read_resource::<Ignore>(data);
 
     pretty_assertions::assert_eq!(
         val,
         ResourceInput {
             schema: SecretSet::type_uri().cheap_clone(),
-            headers: ResourceHeadersInput {
-                id: None,
-                name: "my-secret".parse().unwrap(),
-                account: None,
-                labels: None,
-                annotations: None,
-                owner_references: None,
-            },
+            headers: headers("my-secret", None),
             spec: Ignore,
         }
     );
 
     // Read & write typed spec
-    let val = serde_yaml::from_str::<
-        serde::resources::ResourceInput<serde::config::SecretSetSpecInput>,
-    >(data)
-    .unwrap()
-    .into_dto()
-    .unwrap();
+    let val = read_resource::<serde::config::SecretSetSpecInput>(data);
 
     pretty_assertions::assert_eq!(
         val,
         ResourceInput {
             schema: SecretSet::type_uri().cheap_clone(),
-            headers: ResourceHeadersInput {
-                id: None,
-                name: "my-secret".parse().unwrap(),
-                account: None,
-                labels: None,
-                annotations: None,
-                owner_references: None,
-            },
+            headers: headers("my-secret", None),
             spec: SecretSetSpecInput {
                 secrets: Secrets {
                     entries: BTreeMap::from_iter([(
@@ -94,31 +74,18 @@ fn test_serde_resource_input_generics() {
     );
 
     pretty_assertions::assert_eq!(
-        serde_yaml::to_string(&serde::resources::ResourceInput::<
-            serde::config::SecretSetSpecInput,
-        >::from(val))
-        .unwrap(),
+        write_resource::<serde::config::SecretSetSpecInput, _>(val),
         data
     );
 
     // Read & write generic spec
-    let val = serde_yaml::from_str::<serde::resources::ResourceInput<serde_json::Value>>(data)
-        .unwrap()
-        .into_dto()
-        .unwrap();
+    let val = read_resource::<serde_json::Value>(data);
 
     pretty_assertions::assert_eq!(
         val,
         ResourceInput {
             schema: SecretSet::type_uri().cheap_clone(),
-            headers: ResourceHeadersInput {
-                id: None,
-                name: "my-secret".parse().unwrap(),
-                account: None,
-                labels: None,
-                annotations: None,
-                owner_references: None,
-            },
+            headers: headers("my-secret", None),
             spec: json!({
                 "secrets": {
                     "tls": {
@@ -129,13 +96,7 @@ fn test_serde_resource_input_generics() {
         }
     );
 
-    pretty_assertions::assert_eq!(
-        serde_yaml::to_string(&serde::resources::ResourceInput::<serde_json::Value>::from(
-            val
-        ))
-        .unwrap(),
-        data
-    );
+    pretty_assertions::assert_eq!(write_resource::<serde_json::Value, _>(val), data);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -172,10 +133,7 @@ fn test_serde_resource_input_short_forms() {
         "#
     );
 
-    let val = serde_yaml::from_str::<serde::resources::ResourceInput<MySpec>>(data)
-        .unwrap()
-        .into_dto()
-        .unwrap();
+    let val = read_resource::<MySpec>(data);
 
     pretty_assertions::assert_eq!(
         val,
@@ -183,14 +141,7 @@ fn test_serde_resource_input_short_forms() {
             schema: "https://kamu.dev/schemas/core/v1/MyResource"
                 .parse()
                 .unwrap(),
-            headers: ResourceHeadersInput {
-                id: None,
-                name: "my-thing".parse().unwrap(),
-                account: Some("sergiimk".parse().unwrap()),
-                labels: None,
-                annotations: None,
-                owner_references: None,
-            },
+            headers: headers("my-thing", Some("sergiimk")),
             spec: MySpec {
                 secrets: Secrets {
                     entries: BTreeMap::from_iter([(
@@ -212,7 +163,7 @@ fn test_serde_resource_input_short_forms() {
     );
 
     pretty_assertions::assert_eq!(
-        serde_yaml::to_string(&serde::resources::ResourceInput::<MySpec>::from(val)).unwrap(),
+        write_resource::<MySpec, _>(val),
         indoc!(
             r#"
             $schema: https://kamu.dev/schemas/core/v1/MyResource
@@ -255,25 +206,13 @@ fn test_serde_resource_input_refs() {
         "#
     );
 
-    let val = serde_yaml::from_str::<
-        serde::resources::ResourceInput<serde::auth::PolicyBindingSpecInput>,
-    >(data)
-    .unwrap()
-    .into_dto()
-    .unwrap();
+    let val = read_resource::<serde::auth::PolicyBindingSpecInput>(data);
 
     pretty_assertions::assert_eq!(
         val,
         ResourceInput {
             schema: PolicyBinding::type_uri().cheap_clone(),
-            headers: ResourceHeadersInput {
-                id: None,
-                name: "alice-bob".parse().unwrap(),
-                account: None,
-                labels: None,
-                annotations: None,
-                owner_references: None,
-            },
+            headers: headers("alice-bob", None),
             spec: PolicyBindingSpecInput {
                 policy: PolicyRef {
                     account: None,
@@ -304,10 +243,7 @@ fn test_serde_resource_input_refs() {
     );
 
     pretty_assertions::assert_eq!(
-        serde_yaml::to_string(&serde::resources::ResourceInput::<
-            serde::auth::PolicyBindingSpecInput,
-        >::from(val))
-        .unwrap(),
+        write_resource::<serde::auth::PolicyBindingSpecInput, _>(val),
         indoc!(
             r#"
             $schema: https://opendatafabric.org/schemas/auth/v1alpha1/PolicyBinding
@@ -478,10 +414,7 @@ fn test_serde_resource_canonical() {
     let ival: ResourceInput<SecretSetSpecInput> = val.into();
 
     pretty_assertions::assert_eq!(
-        serde_yaml::to_string(&serde::resources::ResourceInput::<
-            serde::config::SecretSetSpecInput,
-        >::from(ival))
-        .unwrap(),
+        write_resource::<serde::config::SecretSetSpecInput, _>(ival),
         indoc!(
             r#"
             $schema: https://opendatafabric.org/schemas/config/v1alpha1/SecretSet
@@ -670,6 +603,40 @@ fn test_serde_policy_ref_rejects_short_form() {
         serde_yaml::from_str::<serde::StructOrString<serde::auth::PolicyRef>>("dataset-maintainer"),
         Err(_)
     );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Helpers
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Reads a `ResourceInput` whose spec has the YAML form `S`
+fn read_resource<S>(yaml: &str) -> <serde::resources::ResourceInput<S> as IntoDto>::Dto
+where
+    serde::resources::ResourceInput<S>: IntoDto + DeserializeOwned,
+{
+    serde_yaml::from_str::<serde::resources::ResourceInput<S>>(yaml)
+        .unwrap()
+        .into_dto()
+        .unwrap()
+}
+
+/// Writes a `ResourceInput` with its spec in the YAML form `S`
+fn write_resource<S, T>(val: ResourceInput<T>) -> String
+where
+    S: From<T> + Serialize,
+{
+    serde_yaml::to_string(&serde::resources::ResourceInput::<S>::from(val)).unwrap()
+}
+
+fn headers(name: &str, account: Option<&str>) -> ResourceHeadersInput {
+    ResourceHeadersInput {
+        id: None,
+        name: name.parse().unwrap(),
+        account: account.map(|account| account.parse().unwrap()),
+        labels: None,
+        annotations: None,
+        owner_references: None,
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

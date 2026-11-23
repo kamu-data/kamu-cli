@@ -13,9 +13,9 @@ use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
 use container_runtime::*;
-use internal_error::{ErrorIntoInternal, ResultIntoInternal};
+use internal_error::ErrorIntoInternal;
 use kamu_core::*;
-use kamu_datasets::{DatasetEnvVar, DatasetKeyValueService};
+use kamu_datasets::{DatasetEnvVar, DatasetKeyValueService, FindDatasetEnvVarError};
 use odf::metadata::FetchStep;
 use url::Url;
 
@@ -120,12 +120,17 @@ impl FetchService {
                             if #[cfg(feature = "ingest-ftp")] {
                                 Self::fetch_ftp(url, target_path, system_time, &listener).await
                             } else {
-                                unimplemented!("Kamu was compiled without FTP support")
+                                Err(InvalidFetchStepError::new(
+                                    "Kamu was compiled without FTP support",
+                                )
+                                .into())
                             }
                         }
                     }
-                    // TODO: Replace with proper error type
-                    scheme => unimplemented!("Unsupported scheme: {}", scheme),
+                    scheme => Err(InvalidFetchStepError::new(format!(
+                        "Unsupported URL scheme: {scheme}"
+                    ))
+                    .into()),
                 }
             }
             FetchStep::Container(fetch) => {
@@ -158,7 +163,10 @@ impl FetchService {
                     )
                     .await
                 } else {
-                    unimplemented!("Kamu was compiled without MQTT support")
+                    Err(InvalidFetchStepError::new(
+                        "Kamu was compiled without MQTT support",
+                    )
+                    .into())
                 }}
             }
             FetchStep::EthereumLogs(fetch) => {
@@ -174,7 +182,10 @@ impl FetchService {
                         .await
                     }
                     else {
-                        unimplemented!("Kamu was compiled without Ethereum support")
+                        Err(InvalidFetchStepError::new(
+                            "Kamu was compiled without Ethereum support",
+                        )
+                        .into())
                     }
                 }
             }
@@ -187,7 +198,7 @@ impl FetchService {
         dataset_env_vars: &HashMap<String, DatasetEnvVar>,
     ) -> Result<Url, PollingIngestError> {
         let url = self.template_string(url_tpl, dataset_env_vars)?;
-        Ok(Url::parse(&url).int_err()?)
+        Url::parse(&url).map_err(|e| InvalidFetchStepError::new(e).into())
     }
 
     pub(super) fn template_headers(
@@ -212,13 +223,17 @@ impl FetchService {
         s: &'a str,
         dataset_env_vars: &'a HashMap<String, DatasetEnvVar>,
     ) -> Result<String, PollingIngestError> {
-        let lookup_fn = |env_name: &str| -> Option<String> {
-            self.dataset_key_value_svc
+        let lookup_fn = |env_name: &str| -> Result<Option<String>, PollingIngestError> {
+            match self
+                .dataset_key_value_svc
                 .find_dataset_env_var_value_by_key(env_name, dataset_env_vars)
-                .ok()
-                .map(|v| v.get_exposed_value().to_string())
+            {
+                Ok(value) => Ok(Some(value.get_exposed_value().to_string())),
+                Err(FindDatasetEnvVarError::NotFound(_)) => Ok(None),
+                Err(FindDatasetEnvVarError::Internal(e)) => Err(e.into()),
+            }
         };
-        template_string(s, &lookup_fn).map_err(PollingIngestError::TemplateError)
+        template_string(s, &lookup_fn)
     }
 }
 
@@ -317,7 +332,7 @@ pub struct EventTimeSourceExtractError {
 
 impl std::convert::From<EventTimeSourceError> for PollingIngestError {
     fn from(e: EventTimeSourceError) -> Self {
-        Self::Internal(e.int_err())
+        Self::InvalidFetchStep(InvalidFetchStepError::new(e))
     }
 }
 

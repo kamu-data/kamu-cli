@@ -140,7 +140,7 @@ impl FlowSystemEventAgentImpl {
     }
 
     #[transactional_method]
-    #[tracing::instrument(level = "debug", skip_all, fields(projector = builder.instance_type().name))]
+    #[tracing::instrument(level = "debug", skip_all, fields(projector = projector_builder.instance_type().name))]
     async fn apply_batch_to_projector(
         &self,
         projector_builder: &dill::TypecastBuilder<'_, dyn FlowSystemEventProjector>,

@@ -63,10 +63,10 @@ pub async fn create_test_dataset_from_snapshot(
     chain
         .set_ref(
             &BlockRef::Head,
+            None,
             &append_result.proposed_head,
             SetRefOpts {
                 validate_block_present: false,
-                check_ref_is: None,
             },
         )
         .await

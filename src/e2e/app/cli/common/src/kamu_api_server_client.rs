@@ -9,13 +9,15 @@
 
 use std::path::{Path, PathBuf};
 
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, TimeDelta, Utc};
 use internal_error::{InternalError, ResultIntoInternal};
 use reqwest::{Method, StatusCode, Url};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use tokio_retry::Retry;
 use tokio_retry::strategy::FixedInterval;
+
+use crate::FROZEN_SYSTEM_TIME;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -348,6 +350,12 @@ impl E2EApi<'_> {
 
             panic!("Unexpected set system time response status: {status}, {response_data}");
         }
+    }
+
+    /// Sets the system time `hours` past [`FROZEN_SYSTEM_TIME`]
+    pub async fn advance_frozen_system_time(&self, hours: u32) {
+        self.set_system_time(*FROZEN_SYSTEM_TIME + TimeDelta::hours(i64::from(hours)))
+            .await;
     }
 }
 

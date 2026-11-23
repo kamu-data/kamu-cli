@@ -44,7 +44,35 @@ serde = { version = "1", features = [
     "derive",
 ] }
 serde_json = { version = "1", default-features = false }
+strum = { version = "0.28", features = [
+    "derive",
+] }
+thiserror = { version = "2", default-features = false }
 tracing = "0.1"
 
 
 [dev-dependencies]
+container-runtime = { workspace = true }
+kamu = { workspace = true, features = [
+    "testing",
+] }
+kamu-accounts = { workspace = true }
+kamu-core = { workspace = true, features = [
+    "testing",
+] }
+kamu-datasets = { workspace = true, features = [
+    "testing",
+] }
+kamu-datasets-inmem = { workspace = true }
+kamu-datasets-services = { workspace = true, features = [
+    "testing",
+] }
+
+chrono = { version = "0.4", default-features = false }
+datafusion = { version = "55", default-features = false }
+oop = "0.0.2"
+pretty_assertions = { version = "1" }
+tokio = { version = "1", default-features = false, features = [
+    "macros",
+    "rt",
+] }

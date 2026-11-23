@@ -7,8 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use proc_macro::{Span, TokenStream};
-use quote::quote;
+use proc_macro::TokenStream;
+use quote::{format_ident, quote};
 use syn::parse::{Parse, ParseStream};
 use syn::{
     ExprArray,
@@ -25,8 +25,13 @@ use syn::{
     Type,
     TypePath,
     parse_macro_input,
+    parse_quote,
     parse_str,
 };
+
+mod transaction_block;
+
+use transaction_block::{Binding, TransactionBlock};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -46,23 +51,14 @@ pub fn transactional_handler(_attr: TokenStream, item: TokenStream) -> TokenStre
         panic!("{function_name}(): the expected argument \"{CATALOG_ARGUMENT}\" was not found!");
     }
 
-    let function_signature = &input.sig;
-    let function_body = &input.block;
-    let function_visibility = &input.vis;
-
-    let updated_function = quote! {
-        #function_visibility #function_signature {
-            use tracing::Instrument;
-            ::database_common::DatabaseTransactionRunner::from(catalog)
-                .transactional(|catalog: ::dill::Catalog| async move {
-                    #function_body
-                })
-                .instrument(tracing::debug_span!(stringify!(#function_name)))
-                .await
-        }
-    };
-
-    TokenStream::from(updated_function)
+    // The transaction catalog shadows the request catalog in the body
+    TransactionBlock::wrap_function(
+        parse_quote!(catalog),
+        vec![Binding::transaction_catalog("catalog")],
+        input,
+    )
+    .unwrap_or_else(syn::Error::into_compile_error)
+    .into()
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -179,158 +175,6 @@ fn is_catalog_type(type_path: &TypePath) -> bool {
 // Transactional methods
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-struct CatalogItem1 {
-    item_name: Ident,
-    item_type: Type,
-}
-
-impl Parse for CatalogItem1 {
-    fn parse(input: ParseStream) -> syn::Result<Self> {
-        let item_name: Ident = input.parse()?;
-
-        input.parse::<Token![:]>()?;
-
-        let item_type: Type = input.parse()?;
-
-        Ok(Self {
-            item_name,
-            item_type,
-        })
-    }
-}
-
-struct CatalogItem2 {
-    item1_name: Ident,
-    item1_type: Type,
-    item2_name: Ident,
-    item2_type: Type,
-}
-
-impl Parse for CatalogItem2 {
-    fn parse(input: ParseStream) -> syn::Result<Self> {
-        let item1_name: Ident = input.parse()?;
-
-        input.parse::<Token![:]>()?;
-
-        let item1_type: Type = input.parse()?;
-
-        input.parse::<Token![,]>()?;
-
-        let item2_name: Ident = input.parse()?;
-
-        input.parse::<Token![:]>()?;
-
-        let item2_type: Type = input.parse()?;
-
-        Ok(Self {
-            item1_name,
-            item1_type,
-            item2_name,
-            item2_type,
-        })
-    }
-}
-
-struct CatalogItem3 {
-    item1_name: Ident,
-    item1_type: Type,
-    item2_name: Ident,
-    item2_type: Type,
-    item3_name: Ident,
-    item3_type: Type,
-}
-
-impl Parse for CatalogItem3 {
-    fn parse(input: ParseStream) -> syn::Result<Self> {
-        let item1_name: Ident = input.parse()?;
-
-        input.parse::<Token![:]>()?;
-
-        let item1_type: Type = input.parse()?;
-
-        input.parse::<Token![,]>()?;
-
-        let item2_name: Ident = input.parse()?;
-
-        input.parse::<Token![:]>()?;
-
-        let item2_type: Type = input.parse()?;
-
-        input.parse::<Token![,]>()?;
-
-        let item3_name: Ident = input.parse()?;
-
-        input.parse::<Token![:]>()?;
-
-        let item3_type: Type = input.parse()?;
-
-        Ok(Self {
-            item1_name,
-            item1_type,
-            item2_name,
-            item2_type,
-            item3_name,
-            item3_type,
-        })
-    }
-}
-
-struct CatalogItem4 {
-    item1_name: Ident,
-    item1_type: Type,
-    item2_name: Ident,
-    item2_type: Type,
-    item3_name: Ident,
-    item3_type: Type,
-    item4_name: Ident,
-    item4_type: Type,
-}
-
-impl Parse for CatalogItem4 {
-    fn parse(input: ParseStream) -> syn::Result<Self> {
-        let item1_name: Ident = input.parse()?;
-
-        input.parse::<Token![:]>()?;
-
-        let item1_type: Type = input.parse()?;
-
-        input.parse::<Token![,]>()?;
-
-        let item2_name: Ident = input.parse()?;
-
-        input.parse::<Token![:]>()?;
-
-        let item2_type: Type = input.parse()?;
-
-        input.parse::<Token![,]>()?;
-
-        let item3_name: Ident = input.parse()?;
-
-        input.parse::<Token![:]>()?;
-
-        let item3_type: Type = input.parse()?;
-
-        input.parse::<Token![,]>()?;
-
-        let item4_name: Ident = input.parse()?;
-
-        input.parse::<Token![:]>()?;
-
-        let item4_type: Type = input.parse()?;
-
-        Ok(Self {
-            item1_name,
-            item1_type,
-            item2_name,
-            item2_type,
-            item3_name,
-            item3_type,
-            item4_name,
-            item4_type,
-        })
-    }
-}
-
 #[proc_macro_attribute]
 /// Encrusting the method with a transactional Catalog.
 /// The structure must contain the Catalog as a field
@@ -345,24 +189,13 @@ impl Parse for CatalogItem4 {
 pub fn transactional_method(_attr: TokenStream, item: TokenStream) -> TokenStream {
     let input = parse_macro_input!(item as ItemFn);
 
-    let method_signature = &input.sig;
-    let method_name = &method_signature.ident;
-    let method_body = &input.block;
-    let method_visibility = &input.vis;
-
-    let updated_method = quote! {
-        #method_visibility #method_signature {
-            use tracing::Instrument;
-            ::database_common::DatabaseTransactionRunner::from(self.catalog.clone())
-                .transactional(|transaction_catalog: ::dill::Catalog| async move {
-                    #method_body
-                })
-                .instrument(tracing::debug_span!(stringify!(#method_name)))
-                .await
-        }
-    };
-
-    TokenStream::from(updated_method)
+    TransactionBlock::wrap_function(
+        parse_quote!(self.catalog),
+        vec![Binding::transaction_catalog("transaction_catalog")],
+        input,
+    )
+    .unwrap_or_else(syn::Error::into_compile_error)
+    .into()
 }
 
 #[proc_macro_attribute]
@@ -378,30 +211,7 @@ pub fn transactional_method(_attr: TokenStream, item: TokenStream) -> TokenStrea
 /// }
 /// ```
 pub fn transactional_method1(attr: TokenStream, item: TokenStream) -> TokenStream {
-    let CatalogItem1 {
-        item_name: catalog_item_name,
-        item_type: catalog_item_type,
-    } = parse_macro_input!(attr as CatalogItem1);
-    let input = parse_macro_input!(item as ItemFn);
-
-    let method_signature = &input.sig;
-    let method_name = &method_signature.ident;
-    let method_body = &input.block;
-    let method_visibility = &input.vis;
-
-    let updated_method = quote! {
-        #method_visibility #method_signature {
-            use tracing::Instrument;
-            ::database_common::DatabaseTransactionRunner::from(self.catalog.clone())
-                .transactional_with(|#catalog_item_name: #catalog_item_type| async move {
-                    #method_body
-                })
-                .instrument(tracing::debug_span!(stringify!(#method_name)))
-                .await
-        }
-    };
-
-    TokenStream::from(updated_method)
+    transactional_method_with(1, attr, item)
 }
 
 #[proc_macro_attribute]
@@ -417,32 +227,7 @@ pub fn transactional_method1(attr: TokenStream, item: TokenStream) -> TokenStrea
 /// }
 /// ```
 pub fn transactional_method2(attr: TokenStream, item: TokenStream) -> TokenStream {
-    let CatalogItem2 {
-        item1_name: catalog_item1_name,
-        item1_type: catalog_item1_type,
-        item2_name: catalog_item2_name,
-        item2_type: catalog_item2_type,
-    } = parse_macro_input!(attr as CatalogItem2);
-    let input = parse_macro_input!(item as ItemFn);
-
-    let method_signature = &input.sig;
-    let method_name = &method_signature.ident;
-    let method_body = &input.block;
-    let method_visibility = &input.vis;
-
-    let updated_method = quote! {
-        #method_visibility #method_signature {
-            use tracing::Instrument;
-            ::database_common::DatabaseTransactionRunner::from(self.catalog.clone())
-                .transactional_with2(|#catalog_item1_name: #catalog_item1_type, #catalog_item2_name: #catalog_item2_type| async move {
-                    #method_body
-                })
-                .instrument(tracing::debug_span!(stringify!(#method_name)))
-                .await
-        }
-    };
-
-    TokenStream::from(updated_method)
+    transactional_method_with(2, attr, item)
 }
 
 #[proc_macro_attribute]
@@ -458,34 +243,7 @@ pub fn transactional_method2(attr: TokenStream, item: TokenStream) -> TokenStrea
 /// }
 /// ```
 pub fn transactional_method3(attr: TokenStream, item: TokenStream) -> TokenStream {
-    let CatalogItem3 {
-        item1_name: catalog_item1_name,
-        item1_type: catalog_item1_type,
-        item2_name: catalog_item2_name,
-        item2_type: catalog_item2_type,
-        item3_name: catalog_item3_name,
-        item3_type: catalog_item3_type,
-    } = parse_macro_input!(attr as CatalogItem3);
-    let input = parse_macro_input!(item as ItemFn);
-
-    let method_signature = &input.sig;
-    let method_name = &method_signature.ident;
-    let method_body = &input.block;
-    let method_visibility = &input.vis;
-
-    let updated_method = quote! {
-        #method_visibility #method_signature {
-            use tracing::Instrument;
-            ::database_common::DatabaseTransactionRunner::from(self.catalog.clone())
-                .transactional_with3(|#catalog_item1_name: #catalog_item1_type, #catalog_item2_name: #catalog_item2_type, #catalog_item3_name: #catalog_item3_type| async move {
-                    #method_body
-                })
-                .instrument(tracing::debug_span!(stringify!(#method_name)))
-                .await
-        }
-    };
-
-    TokenStream::from(updated_method)
+    transactional_method_with(3, attr, item)
 }
 
 #[proc_macro_attribute]
@@ -501,246 +259,69 @@ pub fn transactional_method3(attr: TokenStream, item: TokenStream) -> TokenStrea
 /// }
 /// ```
 pub fn transactional_method4(attr: TokenStream, item: TokenStream) -> TokenStream {
-    let CatalogItem4 {
-        item1_name: catalog_item1_name,
-        item1_type: catalog_item1_type,
-        item2_name: catalog_item2_name,
-        item2_type: catalog_item2_type,
-        item3_name: catalog_item3_name,
-        item3_type: catalog_item3_type,
-        item4_name: catalog_item4_name,
-        item4_type: catalog_item4_type,
-    } = parse_macro_input!(attr as CatalogItem4);
-    let input = parse_macro_input!(item as ItemFn);
-
-    let method_signature = &input.sig;
-    let method_name = &method_signature.ident;
-    let method_body = &input.block;
-    let method_visibility = &input.vis;
-
-    let updated_method = quote! {
-        #method_visibility #method_signature {
-            use tracing::Instrument;
-            ::database_common::DatabaseTransactionRunner::from(self.catalog.clone())
-                .transactional_with4(|#catalog_item1_name: #catalog_item1_type, #catalog_item2_name: #catalog_item2_type, #catalog_item3_name: #catalog_item3_type, #catalog_item4_name: #catalog_item4_type| async move {
-                    #method_body
-                })
-                .instrument(tracing::debug_span!(stringify!(#method_name)))
-                .await
-        }
-    };
-
-    TokenStream::from(updated_method)
+    transactional_method_with(4, attr, item)
 }
 
-#[proc_macro_attribute]
-/// Encrusting the method with a transactional Catalog.
-/// The method must contain the Catalog as a parameter
+fn transactional_method_with(arity: usize, attr: TokenStream, item: TokenStream) -> TokenStream {
+    let input = parse_macro_input!(item as ItemFn);
+
+    Binding::parse_exactly(arity, attr.into())
+        .and_then(|bindings| {
+            TransactionBlock::wrap_function(parse_quote!(self.catalog), bindings, input)
+        })
+        .unwrap_or_else(syn::Error::into_compile_error)
+        .into()
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// transaction!
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Runs a block of code in a transaction of the catalog's
+/// `DatabaseTransactionManager`: the transaction commits when the block
+/// succeeds and rolls back when it fails. Write one block per transaction of an
+/// algorithm that runs several in sequence. The block borrows the locals it uses,
+/// as straight-line code does.
+///
+/// The bindings of the closure-shaped body are resolved from the transaction:
+/// `name: Arc<dyn Iface>` is a component, and a bare `name` is the transaction
+/// catalog.
+///
+/// Without a return type the block evaluates to the body's value, and `?` in it
+/// leaves the enclosing function, whose error type must implement
+/// `From<InternalError>`; `return` is refused there. With `-> Result<T, E>` the
+/// block evaluates to the body's `Result`, and `return` leaves the body.
+///
+/// The transaction comes from `self.catalog` unless attributes before the body
+/// say otherwise:
+/// - `#[catalog(<dill::Catalog>)]` opens it from another catalog;
+/// - `#[when(<bool>)]` opens it only when true; otherwise the body runs on the catalog as given;
+/// - `#[span(<tracing::Span>)]` replaces the block's span, by default a debug span named
+///   `transaction` at the call site.
 ///
 /// # Examples
 /// ```compile_fail
-/// #[transactional_static_method()]
-/// async fn set_system_flow_schedule(catalog: dill::Catalog) {
-///     // `transaction_catalog` is available inside the method body
-/// }
-/// ```
-pub fn transactional_static_method(_attr: TokenStream, item: TokenStream) -> TokenStream {
-    let input = parse_macro_input!(item as ItemFn);
-
-    let method_signature = &input.sig;
-    let method_name = &method_signature.ident;
-    let method_body = &input.block;
-    let method_visibility = &input.vis;
-
-    let updated_method = quote! {
-        #method_visibility #method_signature {
-            use tracing::Instrument;
-            ::database_common::DatabaseTransactionRunner::from(catalog.clone())
-                .transactional(|transaction_catalog: Catalog| async move {
-                    #method_body
-                })
-                .instrument(tracing::debug_span!(stringify!(#method_name)))
-                .await
-        }
-    };
-
-    TokenStream::from(updated_method)
-}
-
-#[proc_macro_attribute]
-/// Encrusting the method with a transactional Catalog.
-/// The method must contain the Catalog as a parameter
+/// // 1: Plan
+/// let plan = transaction!(|planner: Arc<dyn Planner>| {
+///     planner.plan(&request).await?
+/// });
 ///
-/// # Examples
-/// ```compile_fail
-/// // `service` request from a transactional Catalog
-/// #[transactional_static_method1(service1: Arc<dyn Service1>)]
-/// async fn set_system_flow_schedule(catalog: dill::Catalog) {
-///     // `service1` are available inside the method body
-/// }
-/// ```
-pub fn transactional_static_method1(attr: TokenStream, item: TokenStream) -> TokenStream {
-    let CatalogItem1 {
-        item_name: catalog_item_name,
-        item_type: catalog_item_type,
-    } = parse_macro_input!(attr as CatalogItem1);
-    let input = parse_macro_input!(item as ItemFn);
-
-    let method_signature = &input.sig;
-    let method_name = &method_signature.ident;
-    let method_body = &input.block;
-    let method_visibility = &input.vis;
-
-    let catalog_ident = syn::Ident::new("catalog", Span::call_site().into());
-
-    let updated_method = quote! {
-        #method_visibility #method_signature {
-            use tracing::Instrument;
-            ::database_common::DatabaseTransactionRunner::from(#catalog_ident.clone())
-                .transactional_with(|#catalog_item_name: #catalog_item_type| async move {
-                    #method_body
-                })
-                .instrument(tracing::debug_span!(stringify!(#method_name)))
-                .await
-        }
-    };
-
-    TokenStream::from(updated_method)
-}
-
-#[proc_macro_attribute]
-/// Encrusting the method with a transactional Catalog.
-/// The method must contain the Catalog as a parameter
+/// // 2: Run, outside any transaction
+/// let response = self.engine.execute(&plan).await?;
 ///
-/// # Examples
-/// ```compile_fail
-/// // `service` request from a transactional Catalog
-/// #[transactional_static_method2(service1: Arc<dyn Service1>, service2: Arc<dyn Service2>)]
-/// async fn set_system_flow_schedule(catalog: dill::Catalog) {
-///     // `service1` and `service2` are available inside the method body
-/// }
+/// // 3: Commit, handling the error here
+/// let committed = transaction!(
+///     #[catalog(base_catalog)]
+///     |committer: Arc<dyn Committer>| -> Result<_, CommitError> {
+///         committer.commit(&response).await
+///     }
+/// );
 /// ```
-pub fn transactional_static_method2(attr: TokenStream, item: TokenStream) -> TokenStream {
-    let CatalogItem2 {
-        item1_name: catalog_item1_name,
-        item1_type: catalog_item1_type,
-        item2_name: catalog_item2_name,
-        item2_type: catalog_item2_type,
-    } = parse_macro_input!(attr as CatalogItem2);
-    let input = parse_macro_input!(item as ItemFn);
-
-    let method_signature = &input.sig;
-    let method_name = &method_signature.ident;
-    let method_body = &input.block;
-    let method_visibility = &input.vis;
-
-    let catalog_ident = syn::Ident::new("catalog", Span::call_site().into());
-
-    let updated_method = quote! {
-        #method_visibility #method_signature {
-            use tracing::Instrument;
-            ::database_common::DatabaseTransactionRunner::from(#catalog_ident.clone())
-                .transactional_with2(|#catalog_item1_name: #catalog_item1_type, #catalog_item2_name: #catalog_item2_type| async move {
-                    #method_body
-                })
-                .instrument(tracing::debug_span!(stringify!(#method_name)))
-                .await
-        }
-    };
-
-    TokenStream::from(updated_method)
-}
-
-#[proc_macro_attribute]
-/// Encrusting the method with a transactional Catalog.
-/// The method must contain the Catalog as a parameter
-///
-/// # Examples
-/// ```compile_fail
-/// // `service` request from a transactional Catalog
-/// #[transactional_static_method2(service1: Arc<dyn Service1>, service2: Arc<dyn Service2>, service3: Arc<dyn Service3>)]
-/// async fn set_system_flow_schedule(catalog: dill::Catalog) {
-///     // `service1`, `service2` and `service3` are available inside the method body
-/// }
-/// ```
-pub fn transactional_static_method3(attr: TokenStream, item: TokenStream) -> TokenStream {
-    let CatalogItem3 {
-        item1_name: catalog_item1_name,
-        item1_type: catalog_item1_type,
-        item2_name: catalog_item2_name,
-        item2_type: catalog_item2_type,
-        item3_name: catalog_item3_name,
-        item3_type: catalog_item3_type,
-    } = parse_macro_input!(attr as CatalogItem3);
-    let input = parse_macro_input!(item as ItemFn);
-
-    let method_signature = &input.sig;
-    let method_name = &method_signature.ident;
-    let method_body = &input.block;
-    let method_visibility = &input.vis;
-
-    let catalog_ident = syn::Ident::new("catalog", Span::call_site().into());
-
-    let updated_method = quote! {
-        #method_visibility #method_signature {
-            use tracing::Instrument;
-            ::database_common::DatabaseTransactionRunner::from(#catalog_ident.clone())
-                .transactional_with3(|#catalog_item1_name: #catalog_item1_type, #catalog_item2_name: #catalog_item2_type, #catalog_item3_name: #catalog_item3_type| async move {
-                    #method_body
-                })
-                .instrument(tracing::debug_span!(stringify!(#method_name)))
-                .await
-        }
-    };
-
-    TokenStream::from(updated_method)
-}
-
-#[proc_macro_attribute]
-/// Encrusting the method with a transactional Catalog.
-/// The method must contain the Catalog as a parameter
-///
-/// # Examples
-/// ```compile_fail
-/// // `service` request from a transactional Catalog
-/// #[transactional_static_method4(service1: Arc<dyn Service1>, service2: Arc<dyn Service2>, service3: Arc<dyn Service3>, service4: Arc<dyn Service4>)]
-/// async fn set_system_flow_schedule(catalog: dill::Catalog) {
-///     // `service1`, `service2`, `service3`, and `service4` are available inside the method body
-/// }
-/// ```
-pub fn transactional_static_method4(attr: TokenStream, item: TokenStream) -> TokenStream {
-    let CatalogItem4 {
-        item1_name: catalog_item1_name,
-        item1_type: catalog_item1_type,
-        item2_name: catalog_item2_name,
-        item2_type: catalog_item2_type,
-        item3_name: catalog_item3_name,
-        item3_type: catalog_item3_type,
-        item4_name: catalog_item4_name,
-        item4_type: catalog_item4_type,
-    } = parse_macro_input!(attr as CatalogItem4);
-    let input = parse_macro_input!(item as ItemFn);
-
-    let method_signature = &input.sig;
-    let method_name = &method_signature.ident;
-    let method_body = &input.block;
-    let method_visibility = &input.vis;
-
-    let catalog_ident = syn::Ident::new("catalog", Span::call_site().into());
-
-    let updated_method = quote! {
-        #method_visibility #method_signature {
-            use tracing::Instrument;
-            ::database_common::DatabaseTransactionRunner::from(#catalog_ident.clone())
-                .transactional_with4(|#catalog_item1_name: #catalog_item1_type, #catalog_item2_name: #catalog_item2_type, #catalog_item3_name: #catalog_item3_type, #catalog_item4_name: #catalog_item4_type| async move {
-                    #method_body
-                })
-                .instrument(tracing::debug_span!(stringify!(#method_name)))
-                .await
-        }
-    };
-
-    TokenStream::from(updated_method)
+#[proc_macro]
+pub fn transaction(input: TokenStream) -> TokenStream {
+    parse_macro_input!(input as TransactionBlock)
+        .expand()
+        .into()
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -749,15 +330,7 @@ pub fn transactional_static_method4(attr: TokenStream, item: TokenStream) -> Tok
 
 #[proc_macro]
 pub fn database_transactional_test(input: TokenStream) -> TokenStream {
-    // Preliminary actions to clean up tables as migrations add rows.
-    let tables_for_cleanup = parse_str::<ExprArray>(
-        r#"
-        [
-            "outbox_message_consumptions",
-        ]
-        "#,
-    )
-    .unwrap();
+    let tables_for_cleanup = tables_for_cleanup();
 
     let DatabaseTransactionalTestInputArgs {
         storage,
@@ -784,6 +357,35 @@ pub fn database_transactional_test(input: TokenStream) -> TokenStream {
                 #fixture (&harness.catalog).await;
             }
         },
+        // Runs the fixture both as `inmem` and inside one transaction of
+        // `InMemoryTransactionManager`, which the harness registers in `new_transactional()`
+        "inmem_with_transaction" => {
+            let in_transaction_function_name = format_ident!("{test_function_name}_in_transaction");
+            quote! {
+                #[test_group::group(#extra_test_groups)]
+                #[test_log::test(tokio::test)]
+                async fn #test_function_name () {
+                    let harness = #harness ::new();
+
+                    #fixture (&harness.catalog).await;
+                }
+
+                #[test_group::group(#extra_test_groups)]
+                #[test_log::test(tokio::test)]
+                async fn #in_transaction_function_name () {
+                    let harness = #harness ::new_transactional();
+
+                    database_common::DatabaseTransactionRunner::from(harness.catalog)
+                        .transactional(|catalog| async move {
+                            #fixture (&catalog).await;
+
+                            Ok::<_, internal_error::InternalError>(())
+                        })
+                        .await
+                        .unwrap();
+                }
+            }
+        }
         "postgres" => quote! {
             #[test_group::group(database, postgres, #extra_test_groups)]
             #[test_log::test(sqlx::test(migrations = "../../../../migrations/postgres"))]
@@ -833,12 +435,91 @@ pub fn database_transactional_test(input: TokenStream) -> TokenStream {
         unexpected => {
             panic!(
                 "Unexpected E2E test storage: \"{unexpected}\"!\nAllowable values: \"inmem\", \
-                 \"postgres\", and \"sqlite\"."
+                 \"inmem_with_transaction\", \"postgres\", and \"sqlite\"."
             );
         }
     };
 
     output.into()
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// #[database_concurrent_transactions_test]
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Like `database_transactional_test!`, but the fixture runs outside any
+/// transaction and gets the harness catalog with its transaction manager, to
+/// open several transactions itself. `storage` is `inmem`, which builds the
+/// harness with `new_transactional()`, or `postgres`; there is no `sqlite`, as
+/// SQLite serialises writers and a race there reduces to a sequential test.
+#[proc_macro]
+pub fn database_concurrent_transactions_test(input: TokenStream) -> TokenStream {
+    let tables_for_cleanup = tables_for_cleanup();
+
+    let DatabaseTransactionalTestInputArgs {
+        storage,
+        fixture,
+        harness,
+        extra_test_groups,
+    } = parse_macro_input!(input as DatabaseTransactionalTestInputArgs);
+
+    let test_function_name = fixture.segments.last().unwrap().ident.clone();
+
+    let extra_test_groups = if let Some(extra_test_groups) = extra_test_groups {
+        parse_str(extra_test_groups.value().as_str()).unwrap()
+    } else {
+        quote! {}
+    };
+
+    let output = match storage.to_string().as_str() {
+        "inmem" => quote! {
+            #[test_group::group(#extra_test_groups)]
+            #[test_log::test(tokio::test)]
+            async fn #test_function_name () {
+                let harness = #harness ::new_transactional();
+
+                #fixture (&harness.catalog).await;
+            }
+        },
+        "postgres" => quote! {
+            #[test_group::group(database, postgres, #extra_test_groups)]
+            #[test_log::test(sqlx::test(migrations = "../../../../migrations/postgres"))]
+            async fn #test_function_name (pg_pool: sqlx::PgPool) {
+                for table in #tables_for_cleanup {
+                    sqlx::query(sqlx::AssertSqlSafe(format!("DELETE FROM {table}")))
+                    .execute(&pg_pool)
+                    .await
+                    .unwrap();
+                }
+
+                let harness = #harness ::new(pg_pool);
+
+                #fixture (&harness.catalog).await;
+            }
+        },
+        unexpected => {
+            panic!(
+                "Unexpected storage: \"{unexpected}\"!\nAllowable values: \"inmem\" and \
+                 \"postgres\"."
+            );
+        }
+    };
+
+    output.into()
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Tables to clean up before a database test, as migrations add rows to them
+fn tables_for_cleanup() -> ExprArray {
+    parse_str::<ExprArray>(
+        r#"
+        [
+            "outbox_message_consumptions",
+        ]
+        "#,
+    )
+    .unwrap()
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

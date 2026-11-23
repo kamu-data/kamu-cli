@@ -37,6 +37,23 @@ impl StagingFile {
         })
     }
 
+    /// Creates the file at `path`, failing with `AlreadyExists` if it exists,
+    /// which makes it usable as a lock that only one writer can hold
+    pub(crate) fn create_new(path: PathBuf) -> std::io::Result<(Self, std::fs::File)> {
+        let file = std::fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&path)?;
+
+        Ok((
+            Self {
+                path,
+                committed: false,
+            },
+            file,
+        ))
+    }
+
     pub(crate) fn path(&self) -> &Path {
         &self.path
     }

@@ -168,9 +168,6 @@ impl VerificationListener for VerificationProgress {
             VerificationError::DataDoesNotMatchMetadata(..) => {
                 "Validation error (data doesn't match metadata)".to_string()
             }
-            VerificationError::DataNotReproducible(..) => {
-                "Validation error (data is not reproducible)".to_string()
-            }
             VerificationError::DatasetNotFound(_)
             | VerificationError::RefNotFound(_)
             | VerificationError::BlockNotFound(_)

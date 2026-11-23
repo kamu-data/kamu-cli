@@ -7,7 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use internal_error::InternalError;
 use kamu_task_system::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -24,7 +23,11 @@ impl ProbeTaskPlanner {
     async fn plan_probe(
         &self,
         probe_plan: &LogicalPlanProbe,
-    ) -> Result<TaskDefinition, InternalError> {
+    ) -> Result<TaskDefinition, PrepareTaskDefinitionError> {
+        if let Some(task_error) = &probe_plan.fail_planning_with {
+            return Err(PrepareTaskDefinitionError::Failed(task_error.clone()));
+        }
+
         Ok(TaskDefinition::new(TaskDefinitionProbe {
             probe: probe_plan.clone(),
         }))
@@ -39,7 +42,7 @@ impl TaskDefinitionPlanner for ProbeTaskPlanner {
         &self,
         _task_id: TaskID,
         logical_plan: &LogicalPlan,
-    ) -> Result<TaskDefinition, InternalError> {
+    ) -> Result<TaskDefinition, PrepareTaskDefinitionError> {
         assert_eq!(
             logical_plan.plan_type,
             LogicalPlanProbe::TYPE_ID,

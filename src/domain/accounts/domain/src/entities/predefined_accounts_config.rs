@@ -12,7 +12,7 @@ use email_utils::Email;
 use internal_error::BatchError;
 use url::Url;
 
-use super::{DUMMY_EMAIL_ADDRESS, LoggedAccount};
+use super::{AccountHandle, DUMMY_EMAIL_ADDRESS};
 use crate::{
     AccountDisplayName,
     AccountProvider,
@@ -217,14 +217,14 @@ impl AccountConfig {
     }
 
     #[cfg(any(feature = "testing", test))]
-    pub fn test_config_from_subject(subject: LoggedAccount) -> Self {
-        let email = Email::parse(&format!("{}@example.com", subject.account_handle.name)).unwrap();
-        let password = Self::generate_password(&subject.account_handle.name);
+    pub fn test_config_from_subject(subject: AccountHandle) -> Self {
+        let email = Email::parse(&format!("{}@example.com", subject.name)).unwrap();
+        let password = Self::generate_password(&subject.name);
 
         Self {
-            id: Some(subject.account_handle.did),
+            id: Some(subject.did),
             private_key: None,
-            account_name: subject.account_handle.name,
+            account_name: subject.name,
             password,
             email,
             display_name: None,

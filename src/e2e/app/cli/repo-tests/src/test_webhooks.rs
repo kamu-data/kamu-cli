@@ -551,9 +551,8 @@ impl WebhookScenario {
     async fn head(&self) -> odf::Multihash {
         self.client
             .odf_transfer()
-            .metadata_block_hash_by_ref(&self.dataset.dataset_alias, odf::BlockRef::Head)
+            .head(&self.dataset.dataset_alias)
             .await
-            .unwrap()
     }
 
     fn succeeded_flow(task_count: usize) -> WebhookFlowSummary {

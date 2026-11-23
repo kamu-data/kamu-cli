@@ -11,7 +11,7 @@ use std::fmt::Display;
 use std::sync::Arc;
 
 use internal_error::{ErrorIntoInternal, InternalError};
-use kamu_datasets::{DatasetActionUnauthorizedError, ResolvedDataset};
+use kamu_datasets::{DatasetPermissionError, ResolvedDataset};
 use thiserror::Error;
 
 use crate::*;
@@ -22,17 +22,12 @@ use crate::*;
 
 #[async_trait::async_trait]
 pub trait VerificationService: Send + Sync {
+    /// Verifies as planned. Reads only storage, so it needs no transaction
     async fn verify(
         &self,
-        request: VerificationRequest<ResolvedDataset>,
+        plan: VerificationPlan,
         listener: Option<Arc<dyn VerificationListener>>,
     ) -> VerificationResult;
-
-    async fn verify_multi(
-        &self,
-        requests: Vec<VerificationRequest<ResolvedDataset>>,
-        listener: Option<Arc<dyn VerificationMultiListener>>,
-    ) -> Vec<VerificationResult>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -44,6 +39,91 @@ pub struct VerificationRequest<TTarget> {
     pub target: TTarget,
     pub block_range: (Option<odf::Multihash>, Option<odf::Multihash>),
     pub options: VerificationOptions,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// What a verification checks, read in a transaction and detached from it
+#[derive(Debug)]
+pub struct VerificationPlan {
+    pub request: VerificationRequest<ResolvedDataset>,
+    /// The transforms to replay, when the request asks for it and the target
+    /// is a derivative. A replay that could not be planned fails the
+    /// verification after the integrity checks, which explain a damaged chain
+    /// better
+    pub maybe_replay: Option<Result<VerifyTransformOperation, VerifyTransformPlanError>>,
+}
+
+impl VerificationPlan {
+    /// Reads what verifying `request` needs, in the caller's transaction: pins
+    /// the end of the block range to the current `HEAD`, which storage may
+    /// not reflect yet, and plans the transform replay of a derivative. The
+    /// plan comes back detached from the transaction
+    pub async fn build(
+        mut request: VerificationRequest<ResolvedDataset>,
+        transform_planner: &dyn TransformPlanner,
+    ) -> Result<Self, VerificationError> {
+        Self::pin_head(&mut request).await?;
+
+        let maybe_replay = if Self::replays_transforms(&request) {
+            Some(
+                transform_planner
+                    .build_transform_verification_plan(
+                        request.target.clone(),
+                        request.block_range.clone(),
+                    )
+                    .await,
+            )
+        } else {
+            None
+        };
+
+        Ok(Self::detached(request, maybe_replay))
+    }
+
+    /// A plan whose replay could not be planned, so that verifying it runs the
+    /// integrity checks before failing with `error`
+    pub async fn with_unplanned_replay(
+        mut request: VerificationRequest<ResolvedDataset>,
+        error: VerifyTransformPlanError,
+    ) -> Result<Self, VerificationError> {
+        Self::pin_head(&mut request).await?;
+        Ok(Self::detached(request, Some(Err(error))))
+    }
+
+    /// Whether verifying `request` replays the transforms of its target
+    pub fn replays_transforms(request: &VerificationRequest<ResolvedDataset>) -> bool {
+        request.options.replay_transformations
+            && request.target.get_kind() == odf::DatasetKind::Derivative
+    }
+
+    async fn pin_head(
+        request: &mut VerificationRequest<ResolvedDataset>,
+    ) -> Result<(), VerificationError> {
+        if request.block_range.1.is_none() {
+            let head = request
+                .target
+                .as_metadata_chain()
+                .resolve_ref(&odf::BlockRef::Head)
+                .await?;
+            request.block_range.1 = Some(head);
+        }
+        Ok(())
+    }
+
+    fn detached(
+        request: VerificationRequest<ResolvedDataset>,
+        maybe_replay: Option<Result<VerifyTransformOperation, VerifyTransformPlanError>>,
+    ) -> Self {
+        request.target.detach_from_transaction();
+        if let Some(Ok(replay)) = &maybe_replay {
+            replay.datasets_map.detach_from_transaction();
+        }
+        Self {
+            request,
+            maybe_replay,
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -210,12 +290,6 @@ pub enum VerificationError {
         #[backtrace]
         DataDoesNotMatchMetadata,
     ),
-    #[error("Data is not reproducible")]
-    DataNotReproducible(
-        #[from]
-        #[backtrace]
-        DataNotReproducible,
-    ),
     #[error("Checkpoint doesn't match metadata")]
     CheckpointDoesNotMatchMetadata(
         #[from]
@@ -275,15 +349,9 @@ impl From<odf::IterBlocksError> for VerificationError {
     }
 }
 
-impl From<DatasetActionUnauthorizedError> for VerificationError {
-    fn from(v: DatasetActionUnauthorizedError) -> Self {
-        use DatasetActionUnauthorizedError as E;
-
-        match v {
-            E::NotFound(e) => Self::DatasetNotFound(e),
-            E::Access(e) => Self::Access(e),
-            e @ E::Internal(_) => Self::Internal(e.int_err()),
-        }
+impl From<DatasetPermissionError> for VerificationError {
+    fn from(v: DatasetPermissionError) -> Self {
+        v.into_error()
     }
 }
 
@@ -296,6 +364,12 @@ impl From<odf::GetBlockError> for VerificationError {
             odf::GetBlockError::Access(e) => Self::Internal(e.int_err()),
             odf::GetBlockError::Internal(e) => Self::Internal(e),
         }
+    }
+}
+
+impl From<VerifyTransformPlanError> for VerificationError {
+    fn from(v: VerifyTransformPlanError) -> Self {
+        Self::VerifyTransform(VerifyTransformError::Plan(v))
     }
 }
 

@@ -10,12 +10,23 @@
 use async_graphql::value;
 use indoc::indoc;
 use kamu_accounts::*;
-use kamu_adapter_graphql::data_loader::account_entity_data_loader;
+use kamu_accounts_inmem::{InMemoryAccessTokenRepository, InMemoryOAuthDeviceCodeRepository};
+use kamu_accounts_services::utils::AccountAuthorizationHelperImpl;
+use kamu_accounts_services::{
+    AccessTokenServiceImpl,
+    AuthenticationServiceImpl,
+    DeleteAccountUseCaseImpl,
+    ModifyAccountPasswordUseCaseImpl,
+    OAuthDeviceCodeGeneratorDefault,
+    OAuthDeviceCodeServiceImpl,
+};
 use kamu_adapter_graphql::traits::ResponseExt;
+use kamu_core::TenancyConfig;
+use messaging_outbox::OutboxProvider;
 use pretty_assertions::assert_eq;
 use serde_json::json;
 
-use crate::utils::{PredefinedAccountOpts, authentication_catalogs};
+use crate::utils::{BaseGQLDatasetHarness, PredefinedAccountOpts, authentication_catalogs};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -1249,8 +1260,9 @@ async fn test_revoke_access_token() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[oop::extend(BaseGQLDatasetHarness, base_gql_harness)]
 struct GraphQLAccountsHarness {
-    schema: kamu_adapter_graphql::Schema,
+    base_gql_harness: BaseGQLDatasetHarness,
     catalog_anonymous: dill::Catalog,
     catalog_authorized: dill::Catalog,
 }
@@ -1259,43 +1271,32 @@ struct GraphQLAccountsHarness {
 impl GraphQLAccountsHarness {
     #[builder]
     pub async fn new(predefined_account_opts: Option<PredefinedAccountOpts>) -> Self {
-        let mut b = dill::CatalogBuilder::new();
-        database_common::NoOpDatabasePlugin::init_database_components(&mut b);
+        let base_gql_harness = BaseGQLDatasetHarness::builder()
+            .tenancy_config(TenancyConfig::MultiTenant)
+            .outbox_provider(OutboxProvider::Immediate {
+                force_immediate: true,
+            })
+            .build();
 
-        let base_catalog = b.build();
-        let catalog = {
-            let mut b = dill::CatalogBuilder::new_chained(&base_catalog);
-
-            b.add_value(kamu_core::TenancyConfig::MultiTenant)
-                .add::<kamu_accounts_inmem::InMemoryAccessTokenRepository>()
-                .add::<kamu_accounts_inmem::InMemoryDidSecretKeyRepository>()
-                .add::<kamu_accounts_inmem::InMemoryOAuthDeviceCodeRepository>()
-                .add::<kamu_accounts_services::AccessTokenServiceImpl>()
-                .add::<kamu_accounts_services::AuthenticationServiceImpl>()
-                .add::<kamu_accounts_services::CreateAccountUseCaseImpl>()
-                .add::<kamu_accounts_services::ModifyAccountPasswordUseCaseImpl>()
-                .add::<kamu_accounts_services::DeleteAccountUseCaseImpl>()
-                .add::<kamu_accounts_services::UpdateAccountUseCaseImpl>()
-                .add::<kamu_accounts_services::OAuthDeviceCodeGeneratorDefault>()
-                .add::<kamu_accounts_services::OAuthDeviceCodeServiceImpl>()
-                .add::<kamu_accounts_services::utils::AccountAuthorizationHelperImpl>()
-                .add::<kamu_auth_rebac_services::RebacDatasetRegistryFacadeImpl>()
-                .add::<time_source::SystemTimeSourceDefault>()
-                .add_value(JwtAuthenticationConfig::default())
-                .add_value(AuthConfig::sample())
-                .add_builder(messaging_outbox::OutboxImmediateImpl::builder(
-                    messaging_outbox::ConsumerFilter::AllConsumers,
-                ))
-                .bind::<dyn messaging_outbox::Outbox, messaging_outbox::OutboxImmediateImpl>();
-
-            b.build()
-        };
+        let catalog = dill::CatalogBuilder::new_chained(base_gql_harness.catalog())
+            .add::<InMemoryAccessTokenRepository>()
+            .add::<InMemoryOAuthDeviceCodeRepository>()
+            .add::<AccessTokenServiceImpl>()
+            .add::<AuthenticationServiceImpl>()
+            .add::<ModifyAccountPasswordUseCaseImpl>()
+            .add::<DeleteAccountUseCaseImpl>()
+            .add::<OAuthDeviceCodeGeneratorDefault>()
+            .add::<OAuthDeviceCodeServiceImpl>()
+            .add::<AccountAuthorizationHelperImpl>()
+            .add_value(JwtAuthenticationConfig::default())
+            .add_value(AuthConfig::sample())
+            .build();
 
         let (catalog_anonymous, catalog_authorized) =
             authentication_catalogs(&catalog, predefined_account_opts.unwrap_or_default()).await;
 
         Self {
-            schema: kamu_adapter_graphql::schema_quiet(),
+            base_gql_harness,
             catalog_anonymous,
             catalog_authorized,
         }
@@ -1305,28 +1306,14 @@ impl GraphQLAccountsHarness {
         &self,
         query: impl Into<async_graphql::Request>,
     ) -> async_graphql::Response {
-        self.schema
-            .execute(
-                query
-                    .into()
-                    .data(account_entity_data_loader(&self.catalog_authorized))
-                    .data(self.catalog_authorized.clone()),
-            )
-            .await
+        self.execute_query(query, &self.catalog_authorized).await
     }
 
     pub async fn execute_anonymous_query(
         &self,
         query: impl Into<async_graphql::Request>,
     ) -> async_graphql::Response {
-        self.schema
-            .execute(
-                query
-                    .into()
-                    .data(account_entity_data_loader(&self.catalog_authorized))
-                    .data(self.catalog_anonymous.clone()),
-            )
-            .await
+        self.execute_query(query, &self.catalog_anonymous).await
     }
 }
 

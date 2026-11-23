@@ -9,7 +9,7 @@
 
 use chrono::{DateTime, Utc};
 use internal_error::InternalError;
-use kamu_datasets::DatasetActionUnauthorizedError;
+use kamu_datasets::DatasetPermissionError;
 use thiserror::Error;
 
 use crate::{SetWatermarkExecutionError, SetWatermarkPlanningError, SetWatermarkResult};
@@ -55,15 +55,9 @@ pub enum SetWatermarkError {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl From<DatasetActionUnauthorizedError> for SetWatermarkError {
-    fn from(v: DatasetActionUnauthorizedError) -> Self {
-        use DatasetActionUnauthorizedError as E;
-
-        match v {
-            E::NotFound(e) => Self::NotFound(e),
-            E::Access(e) => Self::Access(e),
-            E::Internal(e) => Self::Internal(e),
-        }
+impl From<DatasetPermissionError> for SetWatermarkError {
+    fn from(v: DatasetPermissionError) -> Self {
+        v.into_error()
     }
 }
 

@@ -75,31 +75,37 @@ impl FetchService {
         let resume_from_state = match prev_source_state {
             None => None,
             Some(PollingSourceState::ETag(s)) => {
-                let Some((num, _hash)) = s.split_once('@') else {
-                    panic!("Malformed ETag: {s}");
-                };
-                Some(StreamState {
-                    last_seen_block: num.parse().unwrap(),
-                })
+                let last_seen_block = s
+                    .split_once('@')
+                    .and_then(|(num, _hash)| num.parse().ok())
+                    .ok_or_else(|| format!("Malformed ETag: {s}").int_err())?;
+                Some(StreamState { last_seen_block })
             }
-            _ => panic!("EthereumLogs should only use ETag state"),
+            Some(PollingSourceState::LastModified(_)) => {
+                return Err("EthereumLogs should only use ETag state".int_err().into());
+            }
         };
 
         // Setup node RPC client
-        let node_url = if let Some(url) = &fetch.node_url {
-            self.template_url(url, dataset_env_vars)?
-        } else if let Some(ep) = self
-            .eth_source_config
-            .get_endpoint_by_chain_id(fetch.chain_id.unwrap())
-        {
-            ep.node_url.clone()
-        } else {
-            Err(EthereumRpcError::new(format!(
-                "Ethereum node RPC URL is not provided in the source manifest and no default node \
-                 configured for chain ID {}",
-                fetch.chain_id.unwrap()
-            ))
-            .int_err())?
+        let node_url = match (&fetch.node_url, fetch.chain_id) {
+            (Some(url), _) => self.template_url(url, dataset_env_vars)?,
+            (None, Some(chain_id)) => {
+                if let Some(ep) = self.eth_source_config.get_endpoint_by_chain_id(chain_id) {
+                    ep.node_url.clone()
+                } else {
+                    Err(EthereumRpcError::new(format!(
+                        "Ethereum node RPC URL is not provided in the source manifest and no \
+                         default node configured for chain ID {chain_id}"
+                    ))
+                    .int_err())?
+                }
+            }
+            (None, None) => {
+                return Err(InvalidFetchStepError::new(
+                    "Ethereum logs source needs a node URL or a chain ID",
+                )
+                .into());
+            }
         };
 
         let rpc_client = ProviderBuilder::new_with_network::<alloy::network::any::AnyNetwork>()
@@ -242,7 +248,9 @@ impl FetchService {
             return Ok(FetchResult::UpToDate);
         }
 
-        let state = state.unwrap();
+        let Some(state) = state else {
+            return Err("The stream made progress without a state".int_err().into());
+        };
 
         // Record scanning state
         // TODO: Reorg tolerance
@@ -250,7 +258,9 @@ impl FetchService {
             .get_block(state.last_seen_block.into())
             .await
             .int_err()?
-            .unwrap();
+            .ok_or_else(|| {
+                format!("Block {} not found on the node", state.last_seen_block).int_err()
+            })?;
 
         tracing::info!(
             blocks_scanned = state.last_seen_block - block_range_unprocessed.0 + 1,

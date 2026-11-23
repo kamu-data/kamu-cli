@@ -35,7 +35,7 @@ impl StorageResource {
     /// Canonical schema URL as a `&'static str`.
     ///
     /// Used as the const dill-registry key (dill `#[meta]` requires a const);
-    /// the typed identity is [`Self::schema`] returning a `TypeUri` derived
+    /// the typed identity is [`Self::type_uri`] returning a `TypeUri` derived
     /// from this same const. There is no ODF-generated `Storage` type yet, so
     /// the literal lives here.
     pub const SCHEMA_STR: &'static str =

@@ -14,10 +14,12 @@ use chrono::{DateTime, SecondsFormat, Utc};
 use console::style;
 use internal_error::ResultIntoInternal;
 use kamu_auth_rebac::RebacDatasetRegistryFacade;
-use kamu_datasets::{DatasetAction, ResolvedDataset};
+use kamu_datasets::{DatasetPermission, ResolvedDataset};
 
 use super::{CLIError, Command};
 use crate::{OutputConfig, WritePager};
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[dill::component]
 #[dill::interface(dyn Command)]
@@ -168,7 +170,7 @@ impl Command for InspectQueryCommand {
     async fn run(&self) -> Result<(), CLIError> {
         let resolved_dataset = self
             .rebac_dataset_registry_facade
-            .resolve_dataset_by_ref(&self.dataset_ref, DatasetAction::Read)
+            .resolve_dataset_by_ref(&self.dataset_ref, DatasetPermission::Read)
             .await?;
 
         if self.output_config.is_tty && self.output_config.verbosity_level == 0 {

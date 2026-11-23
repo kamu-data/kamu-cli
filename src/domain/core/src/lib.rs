@@ -8,14 +8,16 @@
 // by the Apache License, Version 2.0.
 
 #![feature(error_generic_member_access)]
+pub mod dataset_jobs;
 pub mod entities;
 pub mod jobs;
 pub mod services;
 #[cfg(feature = "testing")]
-mod testing;
+pub mod testing;
 pub mod use_cases;
 pub mod utils;
 
+pub use dataset_jobs::*;
 pub use entities::*;
 pub use jobs::*;
 pub use services::*;

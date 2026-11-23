@@ -19,7 +19,6 @@ use super::{
     FLOW_SYSTEM_TEST_LISTENER_NAME,
     FlowHarness,
     FlowHarnessOverrides,
-    FlowSystemTestListener,
     HeartbeatProbeFlowSystemEventProjector,
     TaskDriverArgs,
 };
@@ -77,7 +76,7 @@ async fn test_failing_projector_reported_without_blocking_others() {
     assert!(harness.is_projector_failing(FAILING_PROJECTOR_NAME));
     assert!(!harness.is_projector_failing(FLOW_SYSTEM_TEST_LISTENER_NAME));
 
-    let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
+    let test_flow_listener = harness.flow_listener();
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
     assert!(
         format!("{}", test_flow_listener.as_ref()).contains("Finished Success"),
@@ -138,7 +137,7 @@ async fn test_projector_recovers_after_failed_batch() {
     assert!(harness.has_flaky_projector_applied_failed_event());
     assert!(!harness.is_projector_failing(FLAKY_PROJECTOR_NAME));
 
-    let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
+    let test_flow_listener = harness.flow_listener();
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
     assert!(
         format!("{}", test_flow_listener.as_ref()).contains("Finished Success"),

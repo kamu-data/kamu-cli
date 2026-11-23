@@ -9,6 +9,7 @@
 
 use std::sync::Arc;
 
+use database_common::transaction;
 use kamu::domain::*;
 use kamu_datasets::{DatasetRegistry, DatasetRegistryExt};
 
@@ -21,8 +22,8 @@ use super::{CLIError, Command};
 #[dill::component]
 #[dill::interface(dyn Command)]
 pub struct SystemIpfsAddCommand {
-    dataset_registry: Arc<dyn DatasetRegistry>,
-    sync_svc: Arc<dyn SyncService>,
+    catalog: dill::Catalog,
+    ipfs_service: Arc<dyn IpfsService>,
 
     #[dill::component(explicit)]
     dataset_ref: odf::DatasetRef,
@@ -31,15 +32,20 @@ pub struct SystemIpfsAddCommand {
 #[async_trait::async_trait(?Send)]
 impl Command for SystemIpfsAddCommand {
     async fn run(&self) -> Result<(), CLIError> {
-        let resolved_dataset = self
-            .dataset_registry
-            .get_dataset_by_ref(&self.dataset_ref)
-            .await
-            .map_err(CLIError::failure)?;
+        let resolved_dataset = transaction!(
+            |dataset_registry: Arc<dyn DatasetRegistry>| -> Result<_, CLIError> {
+                let resolved_dataset = dataset_registry
+                    .get_dataset_by_ref(&self.dataset_ref)
+                    .await
+                    .map_err(CLIError::failure)?;
+                resolved_dataset.detach_from_transaction();
+                Ok(resolved_dataset)
+            }
+        )?;
 
         let cid = self
-            .sync_svc
-            .ipfs_add(resolved_dataset)
+            .ipfs_service
+            .add_dataset(resolved_dataset)
             .await
             .map_err(CLIError::failure)?;
 
@@ -48,3 +54,5 @@ impl Command for SystemIpfsAddCommand {
         Ok(())
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

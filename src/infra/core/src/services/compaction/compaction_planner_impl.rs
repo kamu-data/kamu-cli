@@ -7,13 +7,13 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::cmp::Ordering;
 use std::sync::Arc;
 
 use dill::{component, interface};
 use internal_error::*;
 use kamu_core::*;
 use kamu_datasets::ResolvedDataset;
+use url::Url;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -21,8 +21,10 @@ use kamu_datasets::ResolvedDataset;
 #[interface(dyn CompactionPlanner)]
 pub struct CompactionPlannerImpl {}
 
+#[common_macros::method_names_consts]
 impl CompactionPlannerImpl {
     #[tracing::instrument(
+        name = CompactionPlannerImpl_plan_dataset_compaction,
         level = "debug",
         skip_all,
         fields(
@@ -42,18 +44,11 @@ impl CompactionPlannerImpl {
     ) -> Result<CompactionPlan, CompactionPlanningError> {
         listener.begin_phase(CompactionPhase::GatherChainInfo);
 
-        // Declare mut values for result
-
         let mut old_num_blocks: usize = 0;
         let mut maybe_seed: Option<odf::Multihash> = None;
-
-        let mut current_hash: Option<odf::Multihash> = None;
         let mut vocab_event: Option<odf::metadata::SetVocab> = None;
-        let mut data_slice_batch_info = CompactionDataSliceBatchInfo::default();
         let mut data_slice_batches: Vec<CompactionDataSliceBatch> = vec![];
-        let (mut batch_size, mut batch_records) = (0u64, 0u64);
-
-        ////////////////////////////////////////////////////////////////////////////////
+        let mut batch = BatchBuilder::default();
 
         let chain = target.as_metadata_chain();
         let head = chain.resolve_ref(&odf::BlockRef::Head).await?;
@@ -66,84 +61,30 @@ impl CompactionPlannerImpl {
             while let Some((block_hash, block)) = block_stream.try_next().await? {
                 old_num_blocks += 1;
                 match block.event {
+                    // Compacting to metadata only drops every data block
+                    odf::MetadataEvent::AddData(_) | odf::MetadataEvent::ExecuteTransform(_)
+                        if keep_metadata_only => {}
                     odf::MetadataEvent::AddData(add_data_event) => {
-                        if !keep_metadata_only && let Some(output_slice) = &add_data_event.new_data
-                        {
-                            let data_slice_url = object_data_repo
-                                .get_internal_url(&output_slice.physical_hash)
-                                .await;
-
-                            // Setting the end offset interval needs to be here because we
-                            // have to get it at the beginning of iteration unlike
-                            // other values which will be set at the end of iteration
-                            if data_slice_batch_info.data_slices_batch.is_empty() {
-                                data_slice_batch_info.upper_bound.end_offset =
-                                    output_slice.offset_interval.end;
-                            }
-
-                            let current_records = output_slice.num_records();
-
-                            if batch_size + output_slice.size > max_slice_size
-                                || batch_records + current_records > max_slice_records
-                            {
-                                let is_appended = self.append_add_data_batch_to_chain_info(
-                                    &mut data_slice_batches,
-                                    current_hash.as_ref(),
-                                    &mut data_slice_batch_info,
-                                );
-                                if is_appended {
-                                    // Reset values for next batch
-                                    data_slice_batch_info = CompactionDataSliceBatchInfo::default();
-                                    data_slice_batch_info.upper_bound.end_offset =
-                                        output_slice.offset_interval.end;
+                        let maybe_data_slice_url = match &add_data_event.new_data {
+                            Some(output_slice) => {
+                                if batch.overflows_with(
+                                    output_slice,
+                                    max_slice_size,
+                                    max_slice_records,
+                                ) {
+                                    batch.close(&mut data_slice_batches);
                                 }
-
-                                data_slice_batch_info.data_slices_batch = vec![data_slice_url];
-                                batch_size = output_slice.size;
-                                batch_records = current_records;
-                            } else {
-                                data_slice_batch_info.data_slices_batch.push(data_slice_url);
-                                batch_size += output_slice.size;
-                                batch_records += current_records;
+                                Some(
+                                    object_data_repo
+                                        .get_internal_url(&output_slice.physical_hash)
+                                        .await,
+                                )
                             }
-
-                            // Set lower bound values
-                            data_slice_batch_info.lower_bound.prev_checkpoint =
-                                add_data_event.prev_checkpoint;
-                            data_slice_batch_info.lower_bound.prev_offset =
-                                add_data_event.prev_offset;
-                            data_slice_batch_info.lower_bound.start_offset =
-                                output_slice.offset_interval.start;
-                            current_hash = Some(block_hash);
-                        }
-                        // Set upper bound values
-                        if data_slice_batch_info.upper_bound.new_checkpoint.is_none() {
-                            data_slice_batch_info.upper_bound.new_checkpoint =
-                                add_data_event.new_checkpoint;
-                        }
-                        if data_slice_batch_info.upper_bound.new_source_state.is_none() {
-                            data_slice_batch_info.upper_bound.new_source_state =
-                                add_data_event.new_source_state;
-                        }
-                        if data_slice_batch_info.upper_bound.new_watermark.is_none() {
-                            data_slice_batch_info.upper_bound.new_watermark =
-                                add_data_event.new_watermark;
-                        }
-                        let extra = add_data_event.extra.unwrap_or_default();
-                        if let Some(attr) = extra
-                            .get::<odf::schema::ext::AttrLinkedObjects>()
-                            .int_err()?
-                        {
-                            let mut linked_objects =
-                                data_slice_batch_info.linked_objects.unwrap_or_default();
-                            linked_objects.num_objects_naive +=
-                                attr.linked_objects.num_objects_naive;
-                            linked_objects.size_naive += attr.linked_objects.size_naive;
-                            data_slice_batch_info.linked_objects = Some(linked_objects);
-                        }
+                            None => None,
+                        };
+                        batch.add(block_hash, &add_data_event, maybe_data_slice_url)?;
                     }
                     odf::MetadataEvent::Seed(_) => maybe_seed = Some(block_hash),
-                    odf::MetadataEvent::ExecuteTransform(_) if keep_metadata_only => {}
                     event @ (odf::MetadataEvent::ExecuteTransform(_)
                     | odf::MetadataEvent::SetPollingSource(_)
                     | odf::MetadataEvent::SetTransform(_)
@@ -158,19 +99,12 @@ impl CompactionPlannerImpl {
                         if let odf::MetadataEvent::SetVocab(set_vocab_event) = event {
                             vocab_event = Some(set_vocab_event);
                         }
-                        let is_appended = self.append_add_data_batch_to_chain_info(
-                            &mut data_slice_batches,
-                            current_hash.as_ref(),
-                            &mut data_slice_batch_info,
-                        );
-                        data_slice_batches
-                            .push(CompactionDataSliceBatch::SingleBlock(block_hash.clone()));
-                        if is_appended {
-                            data_slice_batch_info = CompactionDataSliceBatchInfo::default();
-                        }
+                        batch.close(&mut data_slice_batches);
+                        data_slice_batches.push(CompactionDataSliceBatch::SingleBlock(block_hash));
                     }
                 }
             }
+            batch.close(&mut data_slice_batches);
         }
 
         let vocab: odf::metadata::DatasetVocabulary = vocab_event.unwrap_or_default().into();
@@ -183,35 +117,14 @@ impl CompactionPlannerImpl {
             old_num_blocks,
         })
     }
-
-    fn append_add_data_batch_to_chain_info(
-        &self,
-        data_slice_batches: &mut Vec<CompactionDataSliceBatch>,
-        hash: Option<&odf::Multihash>,
-        data_slice_batch_info: &mut CompactionDataSliceBatchInfo,
-    ) -> bool {
-        match data_slice_batch_info.data_slices_batch.len().cmp(&1) {
-            Ordering::Equal => {
-                data_slice_batches
-                    .push(CompactionDataSliceBatch::SingleBlock(hash.unwrap().clone()));
-                true
-            }
-            Ordering::Greater => {
-                data_slice_batches.push(CompactionDataSliceBatch::CompactedBatch(
-                    data_slice_batch_info.clone(),
-                ));
-                true
-            }
-            Ordering::Less => false,
-        }
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[common_macros::method_names_consts]
 #[async_trait::async_trait]
 impl CompactionPlanner for CompactionPlannerImpl {
-    #[tracing::instrument(level = "debug", skip_all, fields(target=%target.get_handle(), ?options))]
+    #[tracing::instrument(name = CompactionPlannerImpl_plan_compaction, level = "debug", skip_all, fields(target=%target.get_handle(), ?options))]
     async fn plan_compaction(
         &self,
         target: ResolvedDataset,
@@ -233,7 +146,7 @@ impl CompactionPlanner for CompactionPlannerImpl {
             .max_slice_records
             .unwrap_or(DEFAULT_MAX_SLICE_RECORDS);
 
-        match self
+        let plan = self
             .plan_dataset_compaction(
                 target,
                 max_slice_size,
@@ -241,16 +154,93 @@ impl CompactionPlanner for CompactionPlannerImpl {
                 options.keep_metadata_only,
                 listener.clone(),
             )
-            .await
+            .await?;
+        listener.end_phase(CompactionPhase::GatherChainInfo);
+        listener.plan_success(&plan);
+        Ok(plan)
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// The `AddData` blocks gathered for one batch, visited newest first
+#[derive(Default)]
+struct BatchBuilder {
+    info: CompactionDataSliceBatchInfo,
+    /// Every block of the batch, with or without a data slice, newest first
+    block_hashes: Vec<odf::Multihash>,
+    size: u64,
+    records: u64,
+}
+
+impl BatchBuilder {
+    /// Whether adding the slice would take a batch that already has data past
+    /// a limit
+    fn overflows_with(&self, slice: &odf::DataSlice, max_size: u64, max_records: u64) -> bool {
+        !self.info.data_slices_batch.is_empty()
+            && (self.size + slice.size > max_size
+                || self.records + slice.num_records() > max_records)
+    }
+
+    fn add(
+        &mut self,
+        block_hash: odf::Multihash,
+        add_data: &odf::metadata::AddData,
+        maybe_data_slice_url: Option<Url>,
+    ) -> Result<(), InternalError> {
+        // Each block carries the checkpoint, watermark and source state forward, so
+        // the newest one holds what the whole batch leaves behind, an absent value
+        // included
+        if self.block_hashes.is_empty() {
+            self.info.upper_bound = CompactionDataSliceBatchUpperBound {
+                new_source_state: add_data.new_source_state.clone(),
+                new_watermark: add_data.new_watermark,
+                new_checkpoint: add_data.new_checkpoint.clone(),
+                end_offset: 0,
+            };
+        }
+        self.block_hashes.push(block_hash);
+        self.info
+            .lower_bound
+            .prev_checkpoint
+            .clone_from(&add_data.prev_checkpoint);
+        self.info.lower_bound.prev_offset = add_data.prev_offset;
+
+        if let (Some(slice), Some(data_slice_url)) = (&add_data.new_data, maybe_data_slice_url) {
+            if self.info.data_slices_batch.is_empty() {
+                self.info.upper_bound.end_offset = slice.offset_interval.end;
+            }
+            self.info.data_slices_batch.push(data_slice_url);
+            self.info.lower_bound.start_offset = slice.offset_interval.start;
+            self.size += slice.size;
+            self.records += slice.num_records();
+        }
+
+        if let Some(extra) = &add_data.extra
+            && let Some(attr) = extra
+                .get::<odf::schema::ext::AttrLinkedObjects>()
+                .int_err()?
         {
-            Ok(plan) => {
-                listener.plan_success(&plan);
-                Ok(plan)
-            }
-            Err(err) => {
-                listener.plan_error(&err);
-                Err(err)
-            }
+            let linked_objects = self.info.linked_objects.get_or_insert_default();
+            linked_objects.num_objects_naive += attr.linked_objects.num_objects_naive;
+            linked_objects.size_naive += attr.linked_objects.size_naive;
+        }
+        Ok(())
+    }
+
+    /// Adds the batch to the plan and starts a new one. Only two or more data
+    /// slices are merged; any other batch keeps its blocks as they are
+    fn close(&mut self, data_slice_batches: &mut Vec<CompactionDataSliceBatch>) {
+        let batch = std::mem::take(self);
+        if batch.info.data_slices_batch.len() > 1 {
+            data_slice_batches.push(CompactionDataSliceBatch::CompactedBatch(batch.info));
+        } else {
+            data_slice_batches.extend(
+                batch
+                    .block_hashes
+                    .into_iter()
+                    .map(CompactionDataSliceBatch::SingleBlock),
+            );
         }
     }
 }

@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n                    INSERT INTO dataset_references (dataset_id, block_ref_name, block_hash_bin)\n                        VALUES ($1, $2, $3)\n                        ON CONFLICT(dataset_id, block_ref_name) DO NOTHING\n                    ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Varchar",
+        "Varchar",
+        "Bytea"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "d33a0dacc94d8a106c1c4b03fb0fff3892c0de3de1062403a4376867568660a2"
+}

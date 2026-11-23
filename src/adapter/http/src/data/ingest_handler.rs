@@ -15,14 +15,14 @@ use file_utils::MediaType;
 use http::HeaderMap;
 use http_common::*;
 use internal_error::ErrorIntoInternal;
-use kamu_auth_rebac::{RebacDatasetRefUnresolvedError, RebacDatasetRegistryFacade};
+use kamu_accounts::QuotaError;
 use kamu_core::services::upload_service::{
     UploadService,
     UploadTokenBase64Json,
     UploadTokenIntoStreamError,
 };
 use kamu_core::*;
-use kamu_datasets::DatasetAction;
+use kamu_datasets::{DatasetRegistry, DatasetRegistryExt};
 use time_source::SystemTimeSource;
 use tokio::io::AsyncRead;
 
@@ -105,7 +105,9 @@ pub async fn dataset_ingest_handler(
     } else {
         let media_type = headers
             .get(http::header::CONTENT_TYPE)
-            .map(|h| MediaType(h.to_str().unwrap().to_string()));
+            .map(|h| h.to_str().map(|v| MediaType(v.to_string())))
+            .transpose()
+            .map_err(ApiError::bad_request)?;
 
         let data: Box<dyn AsyncRead + Send + Unpin> =
             Box::new(crate::axum_utils::body_into_async_read(body));
@@ -122,17 +124,16 @@ pub async fn dataset_ingest_handler(
                 Some(time_source.now())
             });
 
-    // Resolve dataset
-    let rebac_dataset_registry_facade =
-        catalog.get_one::<dyn RebacDatasetRegistryFacade>().unwrap();
+    // Resolve dataset; the use case checks the write permission
+    let dataset_registry = catalog.get_one::<dyn DatasetRegistry>().unwrap();
 
-    let target_dataset = rebac_dataset_registry_facade
-        .resolve_dataset_by_ref(&dataset_ref, DatasetAction::Write)
+    let target_dataset = dataset_registry
+        .get_dataset_by_ref(&dataset_ref)
         .await
         .map_err(|e| {
-            use RebacDatasetRefUnresolvedError as E;
+            use odf::DatasetRefUnresolvedError as E;
             match e {
-                E::NotFound(_) | E::Access(_) => ApiError::not_found_without_reason(),
+                E::NotFound(_) => ApiError::not_found_without_reason(),
                 e @ E::Internal(_) => e.int_err().api_err(),
             }
         })?;
@@ -153,23 +154,41 @@ pub async fn dataset_ingest_handler(
             None,
         )
         .await
-        .map_err(|err| match err {
-            PushIngestDataError::Planning(PushIngestPlanningError::SourceNotFound(e)) => {
-                ApiError::bad_request(e)
+        .map_err(|err| {
+            use PushIngestDataError as E;
+            use PushIngestError as X;
+            use PushIngestPlanningError as P;
+
+            match err {
+                E::Planning(P::SourceNotFound(e)) => ApiError::bad_request(e),
+                E::Planning(P::InvalidDatasetKind(e)) => ApiError::bad_request(e),
+                E::Planning(P::UnsupportedMediaType(_))
+                | E::Execution(X::UnsupportedMediaType(_)) => {
+                    ApiError::new_unsupported_media_type()
+                }
+                E::Execution(X::ReadError(e)) => ApiError::bad_request(e),
+                E::Execution(X::BadInputSchema(e)) => ApiError::bad_request(e),
+                E::Execution(X::IncompatibleSchema(e)) => ApiError::bad_request(e),
+                E::Execution(X::ExecutionError(e)) => ApiError::bad_request(e),
+                E::Execution(X::DataValidation(e)) => ApiError::bad_request(e),
+                E::Execution(X::CommitError(odf::dataset::CommitError::MetadataAppendError(
+                    odf::dataset::AppendError::RefCASFailed(e),
+                ))) => ApiError::new(e, http::StatusCode::CONFLICT),
+                E::Execution(X::QuotaExceeded(QuotaError::Exceeded(_))) => {
+                    ApiError::new_forbidden()
+                }
+                E::NotFound(_) | E::Access(_) => ApiError::not_found_without_reason(),
+                e @ (E::Planning(P::HeadNotFound(_) | P::Internal(_))
+                | E::Execution(
+                    X::QuotaExceeded(QuotaError::NotConfigured | QuotaError::Internal(_))
+                    | X::EngineError(_)
+                    | X::MergeError(_)
+                    | X::CommitError(_)
+                    | X::Access(_)
+                    | X::Internal(_),
+                )
+                | E::Internal(_)) => e.int_err().api_err(),
             }
-            PushIngestDataError::Planning(PushIngestPlanningError::UnsupportedMediaType(_))
-            | PushIngestDataError::Execution(PushIngestError::UnsupportedMediaType(_)) => {
-                ApiError::new_unsupported_media_type()
-            }
-            PushIngestDataError::Execution(PushIngestError::ReadError(e)) => {
-                ApiError::bad_request(e)
-            }
-            PushIngestDataError::Execution(PushIngestError::QuotaExceeded(_)) => {
-                ApiError::new_forbidden()
-            }
-            e @ (PushIngestDataError::Planning(_)
-            | PushIngestDataError::Execution(_)
-            | PushIngestDataError::Internal(_)) => e.int_err().api_err(),
         })?;
 
     Ok(())

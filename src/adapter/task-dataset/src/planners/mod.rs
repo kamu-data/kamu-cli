@@ -7,12 +7,11 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-mod hard_compact_dataset_task_planner;
+mod compaction_dataset_task_planner;
 mod reset_dataset_task_planner;
-mod reset_to_metadata_dataset_task_planner;
+mod task_planning;
 mod update_dataset_task_planner;
 
-pub use hard_compact_dataset_task_planner::*;
+pub use compaction_dataset_task_planner::*;
 pub use reset_dataset_task_planner::*;
-pub use reset_to_metadata_dataset_task_planner::*;
 pub use update_dataset_task_planner::*;

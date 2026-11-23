@@ -9,7 +9,7 @@
 
 use kamu_adapter_auth_oso_rebac::{DatasetResource, KamuAuthOso, UserActor};
 use kamu_auth_rebac::AccountToDatasetRelation as Role;
-use kamu_datasets::DatasetAction;
+use kamu_datasets::DatasetPermission;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -41,12 +41,12 @@ async fn test_owner_can_read_and_write() {
 
     let write_result = oso.is_allowed(
         owner_user_actor.clone(),
-        DatasetAction::Write,
+        DatasetPermission::Write,
         owned_dataset_resource.clone(),
     );
     let read_result = oso.is_allowed(
         owner_user_actor.clone(),
-        DatasetAction::Read,
+        DatasetPermission::Read,
         owned_dataset_resource.clone(),
     );
 
@@ -70,12 +70,12 @@ async fn test_unrelated_can_read_public() {
 
     let write_result = oso.is_allowed(
         unrelated_user_actor.clone(),
-        DatasetAction::Write,
+        DatasetPermission::Write,
         public_dataset_resource.clone(),
     );
     let read_result = oso.is_allowed(
         unrelated_user_actor.clone(),
-        DatasetAction::Read,
+        DatasetPermission::Read,
         public_dataset_resource.clone(),
     );
 
@@ -99,12 +99,12 @@ async fn test_unrelated_cannot_read_private() {
 
     let write_result = oso.is_allowed(
         unrelated_user_actor.clone(),
-        DatasetAction::Write,
+        DatasetPermission::Write,
         private_dataset_resource.clone(),
     );
     let read_result = oso.is_allowed(
         unrelated_user_actor.clone(),
-        DatasetAction::Read,
+        DatasetPermission::Read,
         private_dataset_resource.clone(),
     );
 
@@ -130,12 +130,12 @@ async fn test_having_explicit_read_permission_in_private_dataset() {
 
     let write_result = oso.is_allowed(
         reader_user_actor.clone(),
-        DatasetAction::Write,
+        DatasetPermission::Write,
         private_dataset_resource.clone(),
     );
     let read_result = oso.is_allowed(
         reader_user_actor.clone(),
-        DatasetAction::Read,
+        DatasetPermission::Read,
         private_dataset_resource.clone(),
     );
 
@@ -161,12 +161,12 @@ async fn test_having_explicit_write_permission_in_private_dataset() {
 
     let write_result = oso.is_allowed(
         editor_user_actor.clone(),
-        DatasetAction::Write,
+        DatasetPermission::Write,
         private_dataset_resource.clone(),
     );
     let read_result = oso.is_allowed(
         editor_user_actor.clone(),
-        DatasetAction::Read,
+        DatasetPermission::Read,
         private_dataset_resource.clone(),
     );
 
@@ -190,12 +190,12 @@ async fn test_admin_can_read_and_write_another_private_dataset() {
 
     let write_result = oso.is_allowed(
         admin_user_actor.clone(),
-        DatasetAction::Write,
+        DatasetPermission::Write,
         dataset_resource.clone(),
     );
     let read_result = oso.is_allowed(
         admin_user_actor.clone(),
-        DatasetAction::Read,
+        DatasetPermission::Read,
         dataset_resource.clone(),
     );
 

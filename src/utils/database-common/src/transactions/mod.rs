@@ -12,9 +12,13 @@ mod db_transaction_manager;
 mod no_op_transaction_manager;
 mod postgres_transaction_manager;
 mod sqlite_transaction_manager;
+mod transaction_id;
+mod transaction_scope;
 
 pub use db_transaction::*;
 pub use db_transaction_manager::*;
 pub use no_op_transaction_manager::*;
 pub use postgres_transaction_manager::*;
 pub use sqlite_transaction_manager::*;
+pub use transaction_id::*;
+pub use transaction_scope::*;

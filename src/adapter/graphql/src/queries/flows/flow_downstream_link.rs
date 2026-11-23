@@ -13,7 +13,7 @@ use chrono::{DateTime, Utc};
 use kamu_adapter_flow_dataset as afs;
 use kamu_adapter_flow_dataset::FLOW_SCOPE_TYPE_DATASET;
 use kamu_adapter_flow_webhook::FLOW_SCOPE_TYPE_WEBHOOK_SUBSCRIPTION;
-use kamu_datasets::DatasetAction;
+use kamu_datasets::DatasetPermission;
 use kamu_flow_system as fs;
 
 use super::Flow;
@@ -146,9 +146,9 @@ impl FlowDownstreamLink {
         Ok(match flow_state.flow_binding.scope.scope_type() {
             FLOW_SCOPE_TYPE_DATASET => true,
             FLOW_SCOPE_TYPE_WEBHOOK_SUBSCRIPTION => readable_dataset
-                .allowed_dataset_actions(ctx)
+                .granted_dataset_permissions(ctx)
                 .await?
-                .contains(&DatasetAction::Maintain),
+                .contains(&DatasetPermission::Maintain),
             _ => false,
         })
     }

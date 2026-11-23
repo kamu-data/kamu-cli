@@ -22,6 +22,17 @@ pub trait ReferenceRepository {
     /// Update reference to point at the specified object hash
     async fn set(&self, r: &str, hash: &Multihash) -> Result<(), SetRefError>;
 
+    /// Points the reference at `hash` only if it currently points at
+    /// `expected`, or does not exist when `expected` is `None`, as one atomic
+    /// step. Storage that cannot do that returns `NotSupported` without
+    /// writing anything
+    async fn compare_and_set(
+        &self,
+        r: &str,
+        expected: Option<&Multihash>,
+        hash: &Multihash,
+    ) -> Result<(), CompareAndSetRefError>;
+
     /// Deletes specified reference
     async fn delete(&self, r: &str) -> Result<(), DeleteRefError>;
 }
@@ -64,6 +75,36 @@ pub enum SetRefError {
         #[backtrace]
         InternalError,
     ),
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Error, Debug)]
+pub enum CompareAndSetRefError {
+    #[error(transparent)]
+    Mismatch(RefMismatchError),
+    #[error("Storage does not support conditional writes")]
+    NotSupported,
+    #[error(transparent)]
+    Access(
+        #[from]
+        #[backtrace]
+        AccessError,
+    ),
+    #[error(transparent)]
+    Internal(
+        #[from]
+        #[backtrace]
+        InternalError,
+    ),
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Error, Debug)]
+#[error("Reference does not point at the expected block: {block_ref_name}")]
+pub struct RefMismatchError {
+    pub block_ref_name: String,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

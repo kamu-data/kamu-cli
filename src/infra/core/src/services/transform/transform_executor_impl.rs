@@ -11,10 +11,14 @@ use std::sync::Arc;
 
 use dill::*;
 use engine::{TransformRequestExt, TransformResponseExt};
-use internal_error::ResultIntoInternal;
+use file_utils::OwnedDir;
+use internal_error::{ErrorIntoInternal, ResultIntoInternal};
 use kamu_core::*;
 use kamu_datasets::{ResolvedDataset, ResolvedDatasetsMap};
 use kamu_ingest_datafusion::DataWriterDataFusion;
+use odf::dataset::MetadataChainExt;
+use odf::metadata::EnumWithVariants;
+use random_strings::get_random_name;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -22,6 +26,7 @@ pub struct TransformExecutorImpl {
     engine_provisioner: Arc<dyn EngineProvisioner>,
 }
 
+#[common_macros::method_names_consts]
 #[component(pub)]
 #[interface(dyn TransformExecutor)]
 impl TransformExecutorImpl {
@@ -30,10 +35,11 @@ impl TransformExecutorImpl {
     }
 
     // Note: Can be called from multiple threads
-    #[tracing::instrument(level = "info", skip_all, fields(operation_id = %request.operation_id))]
+    #[tracing::instrument(name = TransformExecutorImpl_do_transform, level = "info", skip_all, fields(%operation_id))]
     async fn do_transform<CommitFn, Fut>(
         engine_provisioner: Arc<dyn EngineProvisioner>,
         request: TransformRequestExt,
+        operation_id: &str,
         datasets_map: &ResolvedDatasetsMap,
         commit_fn: CommitFn,
         listener: Arc<dyn TransformListener>,
@@ -49,6 +55,7 @@ impl TransformExecutorImpl {
         match Self::do_transform_inner(
             engine_provisioner,
             request,
+            operation_id,
             datasets_map,
             commit_fn,
             listener.clone(),
@@ -57,12 +64,10 @@ impl TransformExecutorImpl {
         {
             Ok(res) => {
                 tracing::info!("Transform successful");
-                listener.success(&res);
                 Ok(res)
             }
             Err(err) => {
                 tracing::error!(error = ?err, error_msg = %err, "Transform failed");
-                listener.execute_error(&err);
                 Err(err)
             }
         }
@@ -72,6 +77,7 @@ impl TransformExecutorImpl {
     async fn do_transform_inner<CommitFn, Fut>(
         engine_provisioner: Arc<dyn EngineProvisioner>,
         request: TransformRequestExt,
+        operation_id: &str,
         datasets_map: &ResolvedDatasetsMap,
         commit_fn: CommitFn,
         listener: Arc<dyn TransformListener>,
@@ -90,14 +96,27 @@ impl TransformExecutorImpl {
             .await?;
 
         let response = engine
-            .execute_transform(request.clone(), datasets_map)
+            .execute_transform(request.clone(), operation_id, datasets_map)
             .await?;
         assert_eq!(
             response.new_offset_interval.is_some(),
             response.new_data.is_some()
         );
 
-        commit_fn(request, response).await
+        let run_dir = response
+            .run_dir
+            .clone()
+            .map(|dir| OwnedDir::new(dir, "engine run directory"));
+        let result = commit_fn(request, response).await;
+
+        // A failed run keeps its directory, which holds the engine logs its error points at
+        if result.is_err()
+            && let Some(run_dir) = run_dir
+        {
+            run_dir.keep();
+        }
+
+        result
     }
 
     async fn commit_execute_transform(
@@ -115,8 +134,7 @@ impl TransformExecutorImpl {
         if let Some(orig_schema) = request.schema {
             // Validate schema
             if let Some(new_schema) = response.output_schema {
-                DataWriterDataFusion::validate_schema_compatible(&orig_schema, &new_schema)
-                    .int_err()?;
+                DataWriterDataFusion::validate_schema_compatible(&orig_schema, &new_schema)?;
             }
         } else {
             // Set schema upon first transform
@@ -145,6 +163,7 @@ impl TransformExecutorImpl {
             }
         }
 
+        let new_offset_interval = response.new_offset_interval.clone();
         let params = odf::dataset::ExecuteTransformParams {
             query_inputs: request.inputs.iter().map(|i| i.clone().into()).collect(),
             prev_checkpoint: request.prev_checkpoint,
@@ -182,24 +201,39 @@ impl TransformExecutorImpl {
             Err(err) => Err(err),
         }?;
 
-        assert_ne!(
-            old_head, new_head,
-            "Commit did not update neither schema nor data"
-        );
+        // The engine produced nothing that advances the chain
+        if new_head == old_head {
+            return Ok(TransformResult::UpToDate);
+        }
 
-        Ok(TransformResult::Updated { old_head, new_head })
+        // Computed here, where the appended blocks are known, so that callers
+        // need not query the chain again
+        let increment = resolved_dataset
+            .as_metadata_chain()
+            .get_increment_for_interval(Some(&old_head), &new_head)
+            .await
+            .int_err()?;
+
+        Ok(TransformResult::Updated {
+            old_head,
+            new_head,
+            new_offset_interval,
+            increment,
+        })
     }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[common_macros::method_names_consts]
 #[async_trait::async_trait]
 impl TransformExecutor for TransformExecutorImpl {
-    #[tracing::instrument(level = "info", skip_all, fields(target=%target.get_handle()))]
+    #[tracing::instrument(name = TransformExecutorImpl_execute_transform, level = "info", skip_all, fields(target=%target.get_handle()))]
     async fn execute_transform(
         &self,
         target: ResolvedDataset,
-        plan: TransformPlan,
+        plan: TransformExecutionPlan,
+        operation_id: &str,
         maybe_listener: Option<Arc<dyn TransformListener>>,
     ) -> (
         ResolvedDataset,
@@ -212,6 +246,7 @@ impl TransformExecutor for TransformExecutorImpl {
             Self::do_transform(
                 self.engine_provisioner.clone(),
                 plan.request,
+                operation_id,
                 &plan.datasets_map,
                 |request, response| async move {
                     Self::commit_execute_transform(target, request, response).await
@@ -222,7 +257,7 @@ impl TransformExecutor for TransformExecutorImpl {
         )
     }
 
-    #[tracing::instrument(level = "info", skip_all, fields(target=%target.get_handle()))]
+    #[tracing::instrument(name = TransformExecutorImpl_execute_verify_transform, level = "info", skip_all, fields(target=%target.get_handle()))]
     async fn execute_verify_transform(
         &self,
         target: ResolvedDataset,
@@ -234,7 +269,6 @@ impl TransformExecutor for TransformExecutorImpl {
         let num_steps = verification_operation.steps.len();
         listener.begin_phase(VerificationPhase::ReplayTransform);
 
-        use odf::metadata::EnumWithVariants;
         for (step_index, step) in verification_operation.steps.into_iter().enumerate() {
             let request = step.request;
 
@@ -271,11 +305,14 @@ impl TransformExecutor for TransformExecutorImpl {
             let result = TransformResult::Updated {
                 old_head: expected_block.prev_block_hash.clone().unwrap(),
                 new_head: block_hash.clone(),
+                new_offset_interval: None,
+                increment: odf::dataset::MetadataChainIncrementInterval::default(),
             };
 
             Self::do_transform(
                 self.engine_provisioner.clone(),
                 request,
+                &get_random_name(None, 10),
                 &verification_operation.datasets_map,
                 |request, response| async move {
                     let params = odf::dataset::ExecuteTransformParams {
@@ -314,6 +351,10 @@ impl TransformExecutor for TransformExecutorImpl {
                     VerifyTransformExecuteError::EngineError(e)
                 }
                 TransformExecuteError::CommitError(_) => unreachable!(),
+                // Replay builds the event without checking it against the schema
+                TransformExecuteError::IncompatibleSchema(e) => {
+                    VerifyTransformExecuteError::Internal(e.int_err())
+                }
                 TransformExecuteError::Internal(e) => VerifyTransformExecuteError::Internal(e),
             })?;
 

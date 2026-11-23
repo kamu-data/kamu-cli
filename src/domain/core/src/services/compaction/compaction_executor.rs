@@ -18,6 +18,7 @@ use crate::{CompactionListener, CompactionPlan};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[cfg_attr(feature = "testing", mockall::automock)]
 #[async_trait::async_trait]
 pub trait CompactionExecutor: Send + Sync {
     /// Executes the compacting accordingly to the plan.

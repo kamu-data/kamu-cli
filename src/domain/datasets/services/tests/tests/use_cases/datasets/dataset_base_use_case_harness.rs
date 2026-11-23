@@ -18,8 +18,11 @@ use kamu_accounts_services::AccountServiceImpl;
 use kamu_auth_rebac_services::RebacDatasetRegistryFacadeImpl;
 use kamu_core::*;
 use kamu_datasets::*;
-use kamu_datasets_inmem::*;
-use kamu_datasets_services::testing::TestDatasetOutboxListener;
+use kamu_datasets_services::testing::{
+    DatasetReferenceRace,
+    RacingDatasetLfsBuilderDatabaseBacked,
+    TestDatasetOutboxListener,
+};
 use kamu_datasets_services::utils::CreateDatasetUseCaseHelper;
 use kamu_datasets_services::*;
 use messaging_outbox::*;
@@ -35,6 +38,8 @@ pub struct DatasetBaseUseCaseHarness {
     _did_generator: Arc<dyn DidGenerator>,
     system_time_source: Arc<dyn SystemTimeSource>,
     dataset_registry: Arc<dyn DatasetRegistry>,
+    dataset_ref_repo: Arc<dyn DatasetReferenceRepository>,
+    reference_race: Option<Arc<DatasetReferenceRace>>,
     test_dataset_outbox_listener: Arc<TestDatasetOutboxListener>,
 }
 
@@ -55,37 +60,40 @@ impl DatasetBaseUseCaseHarness {
                 CatalogBuilder::new()
             };
 
+            kamu_datasets_inmem::register_dependencies(&mut b);
             b.add_value(RunInfoDir::new(run_info_dir))
                 .add_value(opts.tenancy_config)
                 .add_builder(odf::dataset::DatasetStorageUnitLocalFs::builder(
                     datasets_dir,
                 ))
-                .add::<DatasetLfsBuilderDatabaseBackedImpl>()
                 .add_value(kamu_datasets_services::MetadataChainDbBackedConfig::default())
                 .add::<DatasetEntryServiceImpl>()
-                .add::<InMemoryDatasetEntryRepository>()
                 .add::<InMemoryDidSecretKeyRepository>()
                 .add_value(DidSecretEncryptionConfig::sample())
                 .add::<DatasetAliasUpdateHandler>()
                 .add::<AccountServiceImpl>()
                 .add::<InMemoryAccountRepository>()
                 .add::<DatasetReferenceServiceImpl>()
-                .add::<InMemoryDatasetReferenceRepository>()
                 .add::<DependencyGraphServiceImpl>()
-                .add::<InMemoryDatasetDependencyRepository>()
-                .add::<InMemoryDatasetKeyBlockRepository>()
-                .add::<InMemoryDatasetDataBlockRepository>()
                 .add::<DatasetBlockUpdateHandler>()
                 .add::<DependencyGraphImmediateListener>()
                 .add::<RebacDatasetRegistryFacadeImpl>()
                 .add::<TestDatasetOutboxListener>();
 
-            if let Some(mock_dataset_action_authorizer) = opts.maybe_mock_dataset_action_authorizer
+            if let Some(mock_dataset_permission_checker) =
+                opts.maybe_mock_dataset_permission_checker
             {
-                b.add_value(mock_dataset_action_authorizer)
-                    .bind::<dyn DatasetActionAuthorizer, MockDatasetActionAuthorizer>();
+                b.add_value(mock_dataset_permission_checker)
+                    .bind::<dyn DatasetPermissionChecker, MockDatasetPermissionChecker>();
             } else {
-                b.add::<AlwaysHappyDatasetActionAuthorizer>();
+                b.add::<AlwaysHappyDatasetPermissionChecker>();
+            }
+
+            if opts.racing_references {
+                b.add_value(DatasetReferenceRace::default())
+                    .add::<RacingDatasetLfsBuilderDatabaseBacked>();
+            } else {
+                b.add::<DatasetLfsBuilderDatabaseBackedImpl>();
             }
 
             if let Some(mock_did_generator) = opts.maybe_mock_did_generator {
@@ -124,7 +132,7 @@ impl DatasetBaseUseCaseHarness {
 
         let intermediate_catalog = {
             let mut b = CatalogBuilder::new_chained(&no_subject_catalog);
-            b.add_value(CurrentAccountSubject::new_test());
+            CurrentAccountSubject::new_test().register(&mut b);
             b.build()
         };
 
@@ -138,6 +146,10 @@ impl DatasetBaseUseCaseHarness {
             _did_generator: intermediate_catalog.get_one().unwrap(),
             system_time_source: intermediate_catalog.get_one().unwrap(),
             dataset_registry: intermediate_catalog.get_one().unwrap(),
+            dataset_ref_repo: intermediate_catalog.get_one().unwrap(),
+            reference_race: opts
+                .racing_references
+                .then(|| intermediate_catalog.get_one().unwrap()),
             test_dataset_outbox_listener: intermediate_catalog.get_one().unwrap(),
             no_subject_catalog,
             intermediate_catalog,
@@ -284,7 +296,7 @@ impl DatasetBaseUseCaseHarness {
         // Execute append use case
         use_case
             .execute(
-                dataset.as_ref(),
+                &dataset,
                 Box::new(new_hashed_blocks.into_iter()),
                 AppendDatasetMetadataBatchUseCaseOptions::default(),
             )
@@ -345,6 +357,61 @@ impl DatasetBaseUseCaseHarness {
         use_case.execute_plan(plan).await.unwrap();
     }
 
+    /// Appends a `SetInfo` block after `prev_block_hash` without moving any
+    /// reference.
+    pub async fn append_unreferenced_block(
+        &self,
+        dataset: &CreateDatasetResult,
+        prev_block_hash: &odf::Multihash,
+        description: &str,
+    ) -> odf::Multihash {
+        BaseRepoHarness::append_unreferenced_set_info(
+            dataset.dataset.as_metadata_chain(),
+            prev_block_hash,
+            description,
+            Some(self.system_time_source.now()),
+        )
+        .await
+    }
+
+    /// A `SetInfo` block on top of the dataset's initial `HEAD`, not appended
+    pub async fn set_info_block_on_initial_head(
+        &self,
+        dataset: &CreateDatasetResult,
+        description: &str,
+    ) -> odf::MetadataBlock {
+        let head_block = dataset
+            .dataset
+            .as_metadata_chain()
+            .get_block(&dataset.head)
+            .await
+            .unwrap();
+
+        BaseRepoHarness::set_info_block(
+            &dataset.head,
+            head_block.sequence_number,
+            description,
+            self.system_time_source.now(),
+        )
+    }
+
+    /// The `HEAD` the repository stores for the dataset
+    pub async fn stored_head(&self, dataset: &CreateDatasetResult) -> odf::Multihash {
+        self.dataset_ref_repo
+            .get_dataset_reference(&dataset.dataset_handle.id, &odf::BlockRef::Head)
+            .await
+            .unwrap()
+    }
+
+    /// Arms the reference race to move `HEAD` to `concurrent_head` before the
+    /// next update; needs `racing_references` in the options
+    pub fn move_reference_before_next_update(&self, concurrent_head: odf::Multihash) {
+        self.reference_race
+            .as_ref()
+            .expect("Harness built without racing_references")
+            .move_reference_before_next_update(&self.intermediate_catalog, concurrent_head);
+    }
+
     pub fn collected_outbox_messages(&self) -> String {
         format!("{}", self.test_dataset_outbox_listener.as_ref())
     }
@@ -359,10 +426,13 @@ impl DatasetBaseUseCaseHarness {
 pub struct DatasetBaseUseCaseHarnessOpts<'a> {
     pub maybe_base_catalog: Option<&'a dill::Catalog>,
     pub tenancy_config: TenancyConfig,
-    pub maybe_mock_dataset_action_authorizer: Option<MockDatasetActionAuthorizer>,
+    pub maybe_mock_dataset_permission_checker: Option<MockDatasetPermissionChecker>,
     pub maybe_mock_did_generator: Option<MockDidGenerator>,
     pub outbox_provider: OutboxProvider,
     pub system_time_source_provider: SystemTimeSourceProvider,
+    /// Builds datasets whose chains race a concurrent writer when armed
+    /// (`RacingDatasetLfsBuilderDatabaseBacked`)
+    pub racing_references: bool,
 }
 
 impl Default for DatasetBaseUseCaseHarnessOpts<'_> {
@@ -370,13 +440,14 @@ impl Default for DatasetBaseUseCaseHarnessOpts<'_> {
         Self {
             maybe_base_catalog: None,
             tenancy_config: TenancyConfig::SingleTenant,
-            maybe_mock_dataset_action_authorizer: None,
+            maybe_mock_dataset_permission_checker: None,
             maybe_mock_did_generator: None,
             // Use immediate outbox in all dataset use case harnesses
             outbox_provider: OutboxProvider::Immediate {
                 force_immediate: true,
             },
             system_time_source_provider: SystemTimeSourceProvider::Default,
+            racing_references: false,
         }
     }
 }

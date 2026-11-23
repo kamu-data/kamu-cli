@@ -7,15 +7,20 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+mod dataset_jobs;
 mod engine;
 mod ingest;
 mod queries;
 mod test_compaction_services_impl;
+mod test_dataset_pull_source_resolver_impl;
+mod test_dataset_update_kind_resolver_impl;
 mod test_datasets_filtering;
 mod test_metadata_chain_comparator;
 mod test_object_store_s3;
+mod test_provenance_service_impl;
 mod test_pull_request_planner_impl;
 mod test_push_request_planner_impl;
+mod test_remote_aliases_registry_impl;
 mod test_remote_status_service;
 mod test_reset_service_impl;
 mod test_resource_loader_impl;
@@ -23,6 +28,9 @@ mod test_schema_utils;
 mod test_search_service_remote_impl;
 mod test_setup;
 mod test_sync_service_impl;
+mod test_sync_service_ipns_push;
+mod test_sync_service_local_commit;
+mod test_sync_service_remote_ref_moved;
 mod test_transform_services_impl;
 mod test_verification_service_impl;
 mod test_watermark_services_impl;

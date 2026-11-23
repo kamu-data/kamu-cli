@@ -11,7 +11,7 @@ use std::io::Read as _;
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use database_common_macros::{transactional_method1, transactional_method2};
+use database_common::transaction;
 use internal_error::{BoxedError, ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_resources::{
     ApplyManifestRejection,
@@ -144,15 +144,12 @@ impl ApplyCommand {
         Ok(manifests)
     }
 
-    /// Applies a single manifest in its own transaction, so previously-applied
-    /// items survive a later rejection or failure. Committed on `Accepted`;
-    /// rolled back on rejection/error, carrying the outcome out for reporting.
-    #[transactional_method2(
-        resource_facade_factory: Arc<dyn ResourceFacadeFactory>,
-        execution_service: Arc<dyn ResourceManifestExecutionService>
-    )]
+    /// Applies a single manifest. A rejection is an error carrying the
+    /// outcome, so the transaction rolls back and the outcome is still reported
     async fn apply_single_manifest(
         &self,
+        resource_facade_factory: &dyn ResourceFacadeFactory,
+        execution_service: &dyn ResourceManifestExecutionService,
         manifest: &DiscoveredResourceManifest,
     ) -> Result<ExecuteResourceManifestOutcome, ExecuteSingleManifestError> {
         let resource_facade = resource_facade_factory
@@ -164,11 +161,10 @@ impl ApplyCommand {
             .await
             .map_err(ExecuteSingleManifestError::Execute)?;
 
-        // Roll back rejections (nothing to commit), carrying the outcome out.
         match outcome {
             outcome @ ExecuteResourceManifestOutcome::Accepted(_) => Ok(outcome),
             rejected @ ExecuteResourceManifestOutcome::Rejected(_) => {
-                Err(ExecuteSingleManifestError::Rejected(rejected))
+                Err(ExecuteSingleManifestError::Rejected(Box::new(rejected)))
             }
         }
     }
@@ -190,9 +186,9 @@ impl ApplyCommand {
         }
     }
 
-    /// Existing per-item transactional loop: each manifest is independently
-    /// transacted (see `apply_single_manifest`), so earlier successes survive
-    /// a later rejection/failure and the loop keeps going past failures.
+    /// Each manifest is applied in a transaction of its own, so earlier
+    /// successes survive a later rejection or failure and the loop keeps going
+    /// past failures.
     async fn apply_manifests_per_item(
         &self,
         printer: &ApplyPrinter<'_>,
@@ -207,12 +203,23 @@ impl ApplyCommand {
 
             // Flatten the rollback control-flow back into the outcome/error
             // shape the reporting below expects.
-            let outcome: Result<ExecuteResourceManifestOutcome, BoxedError> =
-                match self.apply_single_manifest(&manifest).await {
-                    Ok(outcome) | Err(ExecuteSingleManifestError::Rejected(outcome)) => Ok(outcome),
-                    Err(ExecuteSingleManifestError::Execute(err)) => Err(Box::new(err)),
-                    Err(ExecuteSingleManifestError::Internal(err)) => Err(Box::new(err)),
-                };
+            let applied =
+                transaction!(|resource_facade_factory: Arc<dyn ResourceFacadeFactory>,
+                              execution_service: Arc<dyn ResourceManifestExecutionService>|
+                 -> Result<_, ExecuteSingleManifestError> {
+                    self.apply_single_manifest(
+                        resource_facade_factory.as_ref(),
+                        execution_service.as_ref(),
+                        &manifest,
+                    )
+                    .await
+                });
+            let outcome: Result<ExecuteResourceManifestOutcome, BoxedError> = match applied {
+                Ok(outcome) => Ok(outcome),
+                Err(ExecuteSingleManifestError::Rejected(outcome)) => Ok(*outcome),
+                Err(ExecuteSingleManifestError::Execute(err)) => Err(Box::new(err)),
+                Err(ExecuteSingleManifestError::Internal(err)) => Err(Box::new(err)),
+            };
 
             match outcome {
                 Ok(ExecuteResourceManifestOutcome::Accepted(result)) => {
@@ -257,12 +264,11 @@ impl ApplyCommand {
         Ok(())
     }
 
-    /// Opens exactly one transaction for the whole batch: the first
-    /// rejection/failure rolls back everything, including earlier items in
-    /// the same invocation that would otherwise have succeeded.
-    #[transactional_method1(resource_facade_factory: Arc<dyn ResourceFacadeFactory>)]
+    /// Applies all manifests, failing with `Rejected` unless every one is
+    /// accepted
     async fn apply_manifest_batch(
         &self,
+        resource_facade_factory: &dyn ResourceFacadeFactory,
         manifests: &[DiscoveredResourceManifest],
     ) -> Result<ApplyManifestBatchResponse<ExecuteResourceManifestOutcome>, ExecuteBatchError> {
         let resource_facade = resource_facade_factory
@@ -312,8 +318,9 @@ impl ApplyCommand {
         }
     }
 
-    /// New atomic path: a single call to the batch facade method wraps the
-    /// *entire* batch in one transaction.
+    /// Applies the whole batch in one transaction: the first rejection or
+    /// failure rolls back everything, including earlier items that would
+    /// otherwise have succeeded
     async fn apply_manifests_as_one_batch(
         &self,
         printer: &ApplyPrinter<'_>,
@@ -322,7 +329,14 @@ impl ApplyCommand {
         summary: &mut ApplySummary,
         errors: &mut Vec<(BoxedError, String)>,
     ) -> Result<(), CLIError> {
-        let (response, committed) = match self.apply_manifest_batch(&manifests).await {
+        let applied = transaction!(
+            |resource_facade_factory: Arc<dyn ResourceFacadeFactory>|
+             -> Result<_, ExecuteBatchError> {
+                self.apply_manifest_batch(resource_facade_factory.as_ref(), &manifests)
+                    .await
+            }
+        );
+        let (response, committed) = match applied {
             Ok(response) => (response, true),
             Err(ExecuteBatchError::Rejected(response)) => (response, false),
             Err(ExecuteBatchError::ReadManifest(err)) => {
@@ -568,12 +582,12 @@ impl From<ApplyManifestRejection> for ApplyRejectedError {
 /// `Rejected` carries the outcome out of a rolled-back transaction for
 /// reporting; `Execute`/`Internal` are genuine failures.
 enum ExecuteSingleManifestError {
-    Rejected(ExecuteResourceManifestOutcome),
+    Rejected(Box<ExecuteResourceManifestOutcome>),
     Execute(ExecuteResourceManifestError),
     Internal(InternalError),
 }
 
-// Required by `transactional_method2`.
+// Required by `transaction!`: opening or ending the transaction fails as `InternalError`
 impl From<InternalError> for ExecuteSingleManifestError {
     fn from(value: InternalError) -> Self {
         Self::Internal(value)
@@ -592,7 +606,7 @@ enum ExecuteBatchError {
     Internal(InternalError),
 }
 
-// Required by `transactional_method1`.
+// Required by `transaction!`: opening or ending the transaction fails as `InternalError`
 impl From<InternalError> for ExecuteBatchError {
     fn from(value: InternalError) -> Self {
         Self::Internal(value)

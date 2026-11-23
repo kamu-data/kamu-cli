@@ -27,7 +27,6 @@ use kamu_auth_rebac_services::{
     RebacServiceImpl,
 };
 use kamu_datasets::*;
-use kamu_datasets_inmem::InMemoryDatasetStatisticsRepository;
 use kamu_datasets_services::{
     AccountQuotaCheckerStorageImpl,
     DatasetStatisticsServiceImpl,
@@ -101,6 +100,7 @@ async fn test_ingest_push_url_stream() {
         )
         .await
         .unwrap();
+    assert_eq!(harness.ingest_dirs_left(), Vec::<String>::new());
 
     data_helper
         .assert_last_data_eq(
@@ -1322,6 +1322,28 @@ async fn test_ingest_push_deprecated_ddl_schema() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[test_group::group(engine, ingest, datafusion)]
+#[test_log::test(tokio::test)]
+async fn test_ingest_push_failure_keeps_its_directory() {
+    let harness = IngestTestHarness::new();
+    let target = harness.create_csv_push_dataset().await;
+    let data = std::io::Cursor::new("city,population\nA,not-a-number\n");
+
+    let res = harness
+        .ingest_from(
+            target,
+            None,
+            DataSource::Stream(Box::new(data)),
+            PushIngestOpts::default(),
+        )
+        .await;
+
+    assert_matches!(res, Err(PushIngestError::ExecutionError(_)));
+    assert_eq!(harness.ingest_dirs_left().len(), 1);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 struct IngestTestHarness {
     temp_dir: TempDir,
     dataset_registry: Arc<dyn DatasetRegistry>,
@@ -1343,12 +1365,14 @@ impl IngestTestHarness {
         std::fs::create_dir(&cache_dir).unwrap();
         std::fs::create_dir(&datasets_dir).unwrap();
 
-        let catalog = dill::CatalogBuilder::new()
-            .add::<DidGeneratorDefault>()
+        let mut b = dill::CatalogBuilder::new();
+        kamu_datasets_inmem::register_dependencies(&mut b);
+        b.add::<DidGeneratorDefault>()
             .add_value(RunInfoDir::new(run_info_dir))
-            .add_value(CacheDir::new(cache_dir))
-            .add_value(CurrentAccountSubject::new_test())
-            .add::<AlwaysHappyDatasetActionAuthorizer>()
+            .add_value(CacheDir::new(cache_dir));
+        CurrentAccountSubject::new_test().register(&mut b);
+        let catalog = b
+            .add::<AlwaysHappyDatasetPermissionChecker>()
             .add_value(TenancyConfig::SingleTenant)
             .add_builder(odf::dataset::DatasetStorageUnitLocalFs::builder(
                 datasets_dir,
@@ -1365,7 +1389,6 @@ impl IngestTestHarness {
             .add::<InMemoryAccountRepository>()
             .add::<InMemoryAccountQuotaEventStore>()
             .add::<AccountQuotaServiceImpl>()
-            .add::<InMemoryDatasetStatisticsRepository>()
             .add::<DatasetStatisticsServiceImpl>()
             .add_value(QuotaDefaultsConfig::default())
             .add::<AccountQuotaCheckerStorageImpl>()
@@ -1407,6 +1430,38 @@ impl IngestTestHarness {
         .unwrap()
     }
 
+    /// A root dataset with a CSV push source of `city` and `population`
+    async fn create_csv_push_dataset(&self) -> ResolvedDataset {
+        let dataset_snapshot = MetadataFactory::dataset_snapshot()
+            .name("foo")
+            .kind(odf::DatasetKind::Root)
+            .push_event(
+                MetadataFactory::add_push_source()
+                    .read(odf::metadata::ReadStepCsv {
+                        header: Some(true),
+                        schema: Some(odf::schema::DataSchema::new(vec![
+                            odf::schema::DataField::string("city"),
+                            odf::schema::DataField::i64("population"),
+                        ])),
+                        ..odf::metadata::ReadStepCsv::default()
+                    })
+                    .build(),
+            )
+            .build();
+
+        let dataset_alias = dataset_snapshot.name.clone();
+        let stored = self.create_dataset(dataset_snapshot).await;
+        ResolvedDataset::from_stored(&stored, &dataset_alias)
+    }
+
+    fn ingest_dirs_left(&self) -> Vec<String> {
+        std::fs::read_dir(self.temp_dir.path().join("run"))
+            .unwrap()
+            .map(|entry| entry.unwrap().file_name().to_string_lossy().into_owned())
+            .filter(|name| name.starts_with("ingest-"))
+            .collect()
+    }
+
     async fn dataset_data_helper(&self, dataset_alias: &odf::DatasetAlias) -> DatasetDataHelper {
         let resolved_dataset = self
             .dataset_registry
@@ -1443,10 +1498,10 @@ impl IngestTestHarness {
                 .as_metadata_chain()
                 .set_ref(
                     &odf::BlockRef::Head,
+                    Some(old_head),
                     new_head,
                     odf::dataset::SetRefOpts {
                         validate_block_present: true,
-                        check_ref_is: Some(Some(old_head)),
                     },
                 )
                 .await

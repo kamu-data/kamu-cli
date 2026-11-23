@@ -19,6 +19,7 @@ use kamu_datasets::{
     WriteCheckedDataset,
 };
 
+use crate::mutations::{CAS_FAILED_MESSAGE, CasFailedHeads};
 use crate::prelude::*;
 use crate::queries::DatasetRequestState;
 
@@ -88,12 +89,18 @@ impl<'a> CollectionMut<'a> {
                     path: not_found.path.into(),
                 }),
             ),
-            Err(UpdateCollectionEntriesUseCaseError::RefCASFailed(err)) => Ok(
-                CollectionUpdateResult::CasFailed(CollectionUpdateErrorCasFailed {
-                    expected_head: err.expected.unwrap().into(),
-                    actual_head: err.actual.map(Into::into),
-                }),
-            ),
+            Err(UpdateCollectionEntriesUseCaseError::RefCASFailed(err)) => {
+                let CasFailedHeads {
+                    expected_head,
+                    actual_head,
+                } = CasFailedHeads::try_from(err)?;
+                Ok(CollectionUpdateResult::CasFailed(
+                    CollectionUpdateErrorCasFailed {
+                        expected_head,
+                        actual_head,
+                    },
+                ))
+            }
             Err(UpdateCollectionEntriesUseCaseError::Access(err)) => Err(err.int_err().into()),
             Err(UpdateCollectionEntriesUseCaseError::QuotaExceeded(err)) => match err {
                 QuotaError::Exceeded(e) => Ok(CollectionUpdateResult::QuotaExceeded(
@@ -346,7 +353,7 @@ impl CollectionUpdateErrorCasFailed {
     }
     /// Human-readable error message
     async fn message(&self) -> String {
-        "Expected head didn't match, dataset was likely updated concurrently".to_string()
+        CAS_FAILED_MESSAGE.to_string()
     }
 }
 

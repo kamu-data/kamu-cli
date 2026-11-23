@@ -52,6 +52,7 @@ base32 = { version = "0.5" }
 bon = { version = "3", default-features = false }
 chrono = { version = "0.4", default-features = false }
 crc32fast = { version = "1.5" }
+dill = { version = "0.17", default-features = false }
 futures = { version = "0.3", default-features = false }
 jsonwebtoken = { version = "11", default-features = false, features = [
     "rust_crypto",

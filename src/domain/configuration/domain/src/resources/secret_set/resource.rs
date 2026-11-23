@@ -35,7 +35,7 @@ impl SecretSetResource {
     /// Canonical schema URL as a `&'static str`, sourced from the ODF codegen.
     ///
     /// Used as the const dill-registry key (dill `#[meta]` requires a const);
-    /// the typed identity is [`Self::schema`] returning a `TypeUri`.
+    /// the typed identity is [`Self::type_uri`] returning a `TypeUri`.
     pub const SCHEMA_STR: &'static str = odf::metadata::config::SecretSet::type_uri_str();
 
     // "secretset" (lowercase-of-canonical) is deliberately omitted: matching is

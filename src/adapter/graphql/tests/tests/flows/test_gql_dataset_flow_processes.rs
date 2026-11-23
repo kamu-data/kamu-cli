@@ -12,7 +12,7 @@ use std::sync::Arc;
 
 use async_graphql::value;
 use kamu_adapter_task_dataset::TaskResultDatasetUpdate;
-use kamu_core::{PullResult, TenancyConfig};
+use kamu_core::TenancyConfig;
 use kamu_datasets::MockDatasetIncrementQueryService;
 use kamu_flow_system::*;
 use kamu_task_system::*;
@@ -298,13 +298,15 @@ async fn test_ingest_process_several_runs() {
         .mimic_flow_run_with_outcome(
             "0",
             TaskOutcome::Success(
-                TaskResultDatasetUpdate {
-                    pull_result: PullResult::Updated {
-                        old_head: Some(odf::Multihash::from_digest_sha3_256(b"old-slice")),
-                        new_head: odf::Multihash::from_digest_sha3_256(b"new-slice"),
-                        has_more: false,
+                TaskResultDatasetUpdate::Updated {
+                    old_head: Some(odf::Multihash::from_digest_sha3_256(b"old-slice")),
+                    new_head: odf::Multihash::from_digest_sha3_256(b"new-slice"),
+                    has_more: false,
+                    increment: MetadataChainIncrementInterval {
+                        num_blocks: 1,
+                        num_records: 10,
+                        updated_watermark: None,
                     },
-                    data_increment: None,
                 }
                 .into_task_result(),
             ),
@@ -388,13 +390,15 @@ async fn test_ingest_process_several_runs() {
         .mimic_flow_run_with_outcome(
             "3",
             TaskOutcome::Success(
-                TaskResultDatasetUpdate {
-                    pull_result: PullResult::Updated {
-                        old_head: Some(odf::Multihash::from_digest_sha3_256(b"new-slice")),
-                        new_head: odf::Multihash::from_digest_sha3_256(b"new-slice-2"),
-                        has_more: false,
+                TaskResultDatasetUpdate::Updated {
+                    old_head: Some(odf::Multihash::from_digest_sha3_256(b"new-slice")),
+                    new_head: odf::Multihash::from_digest_sha3_256(b"new-slice-2"),
+                    has_more: false,
+                    increment: MetadataChainIncrementInterval {
+                        num_blocks: 1,
+                        num_records: 10,
+                        updated_watermark: None,
                     },
-                    data_increment: None,
                 }
                 .into_task_result(),
             ),

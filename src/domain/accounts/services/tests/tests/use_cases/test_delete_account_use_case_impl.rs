@@ -91,6 +91,33 @@ async fn test_admin_delete_other_account() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
+async fn test_node_delete_other_account() {
+    let mut outbox = MockOutbox::new();
+    DeleteAccountUseCaseImplHarness::expect_outbox_account_deleted(&mut outbox);
+
+    let harness = DeleteAccountUseCaseImplHarness::new_with_principal(
+        CurrentAccountSubject::anonymous(AnonymousAccountReason::NoAuthenticationProvided),
+        Some(Principal::Node),
+        outbox,
+    )
+    .await;
+
+    let regular_user_account = harness.get_account_by_name(&REGULAR_USER).await;
+
+    assert_matches!(
+        harness
+            .delete_account_use_case
+            .execute(&regular_user_account)
+            .await,
+        Ok(())
+    );
+
+    assert!(!harness.account_exists(&REGULAR_USER).await);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
 async fn test_anonymous_try_to_delete_account() {
     let harness = DeleteAccountUseCaseImplHarness::new(
         CurrentAccountSubject::anonymous(AnonymousAccountReason::NoAuthenticationProvided),
@@ -135,7 +162,15 @@ struct DeleteAccountUseCaseImplHarness {
 }
 
 impl DeleteAccountUseCaseImplHarness {
-    async fn new(current_account_subject: CurrentAccountSubject, mut outbox: MockOutbox) -> Self {
+    async fn new(current_account_subject: CurrentAccountSubject, outbox: MockOutbox) -> Self {
+        Self::new_with_principal(current_account_subject, None, outbox).await
+    }
+
+    async fn new_with_principal(
+        current_account_subject: CurrentAccountSubject,
+        principal: Option<Principal>,
+        mut outbox: MockOutbox,
+    ) -> Self {
         let predefined_account_config = {
             let mut p = PredefinedAccountsConfig::new();
             p.predefined = vec![
@@ -151,6 +186,8 @@ impl DeleteAccountUseCaseImplHarness {
 
         let account_base_harness = AccountBaseUseCaseHarness::new(AccountBaseUseCaseHarnessOpts {
             maybe_predefined_accounts_config: Some(predefined_account_config),
+            current_account_subject: Some(current_account_subject),
+            principal,
             ..Default::default()
         });
 
@@ -158,7 +195,6 @@ impl DeleteAccountUseCaseImplHarness {
 
         b.add_value(outbox);
         b.bind::<dyn Outbox, MockOutbox>();
-        b.add_value(current_account_subject);
 
         database_common::NoOpDatabasePlugin::init_database_components(&mut b);
 

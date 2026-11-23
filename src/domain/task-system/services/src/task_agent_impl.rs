@@ -10,7 +10,7 @@
 use std::sync::Arc;
 
 use async_utils::BackgroundAgent;
-use database_common::PaginationOpts;
+use database_common::{PaginationOpts, transaction};
 use database_common_macros::transactional_method2;
 use dill::*;
 use init_on_startup::{InitOnStartup, InitOnStartupMeta};
@@ -107,7 +107,11 @@ impl TaskAgentImpl {
             ))
             .await?;
 
-        let task = self.process_task_outcome(task, task_outcome).await?;
+        let task = transaction!(|task_event_store: Arc<dyn TaskEventStore>,
+                                 outbox: Arc<dyn Outbox>| {
+            self.finish_task(&task_event_store, outbox.as_ref(), task, task_outcome)
+                .await?
+        });
         if let Some(outcome) = &task.outcome {
             let now = self.time_source.now();
             self.metrics.on_task_finished(
@@ -180,7 +184,13 @@ impl TaskAgentImpl {
 
     async fn take_task(&self, wakeup_listener: &dyn WakeupListener) -> Result<Task, InternalError> {
         loop {
-            let maybe_task = match self.take_task_non_blocking().await {
+            let take_result = transaction!(|task_scheduler: Arc<dyn TaskScheduler>,
+                                            outbox: Arc<dyn Outbox>|
+             -> Result<_, TakeTaskError> {
+                self.take_next_task(task_scheduler.as_ref(), outbox.as_ref())
+                    .await
+            });
+            let maybe_task = match take_result {
                 Ok(maybe_task) => maybe_task,
                 Err(TakeTaskError::ConcurrentModification { task_id }) => {
                     // Rolled back, and the queue already reflects the change
@@ -207,8 +217,11 @@ impl TaskAgentImpl {
         }
     }
 
-    #[transactional_method2(task_scheduler: Arc<dyn TaskScheduler>, outbox: Arc<dyn Outbox>)]
-    async fn take_task_non_blocking(&self) -> Result<Option<Task>, TakeTaskError> {
+    async fn take_next_task(
+        &self,
+        task_scheduler: &dyn TaskScheduler,
+        outbox: &dyn Outbox,
+    ) -> Result<Option<Task>, TakeTaskError> {
         let maybe_task = task_scheduler.try_take().await?;
         let Some(task) = maybe_task else {
             return Ok(None);
@@ -244,7 +257,15 @@ impl TaskAgentImpl {
             .await
         {
             Ok(task_definition) => task_definition,
-            Err(e) => {
+            Err(PrepareTaskDefinitionError::Failed(task_error)) => {
+                tracing::warn!(
+                    task_id = %task.task_id,
+                    ?task_error,
+                    "Task planning failed"
+                );
+                return Ok(TaskOutcome::Failed(task_error));
+            }
+            Err(PrepareTaskDefinitionError::Internal(e)) => {
                 tracing::error!(
                     task = ?task,
                     error = ?e,
@@ -284,9 +305,10 @@ impl TaskAgentImpl {
         Ok(task_outcome)
     }
 
-    #[transactional_method2(event_store: Arc<dyn TaskEventStore>, outbox: Arc<dyn Outbox>)]
-    async fn process_task_outcome(
+    async fn finish_task(
         &self,
+        event_store: &Arc<dyn TaskEventStore>,
+        outbox: &dyn Outbox,
         mut task: Task,
         task_outcome: TaskOutcome,
     ) -> Result<Task, InternalError> {

@@ -9,7 +9,7 @@
 
 use internal_error::ErrorIntoInternal;
 use kamu_core::QueryError;
-use kamu_datasets::{DatasetAction, ResolvedDataset};
+use kamu_datasets::{DatasetPermission, ResolvedDataset};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -18,7 +18,7 @@ pub(crate) async fn resolve_dataset_for_querying(
     dataset_ref: &odf::DatasetRef,
 ) -> Result<ResolvedDataset, QueryError> {
     let resolved_dataset = rebac_dataset_registry_facade
-        .resolve_dataset_by_ref(dataset_ref, DatasetAction::Read)
+        .resolve_dataset_by_ref(dataset_ref, DatasetPermission::Read)
         .await
         .map_err(|e| {
             use kamu_auth_rebac::RebacDatasetRefUnresolvedError as E;

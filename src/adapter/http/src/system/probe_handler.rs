@@ -7,7 +7,13 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use axum::extract::{Extension, Query};
+use axum::response::Json;
+use database_common::{TransactionRef, transaction};
+use dill::specs::{Maybe, OneOf};
+use http_common::ApiError;
 use internal_error::*;
+use setty::types::DurationString;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -18,7 +24,7 @@ pub struct ProbeRequest {
     db_transaction: Option<bool>,
 
     #[serde(default)]
-    sleep: Option<setty::types::DurationString>,
+    sleep: Option<DurationString>,
 
     #[serde(default)]
     error: Option<ProbeError>,
@@ -37,17 +43,14 @@ pub enum ProbeError {
 }
 
 pub async fn probe_handler(
-    axum::Extension(catalog): axum::Extension<dill::Catalog>,
-    axum::extract::Query(req): axum::extract::Query<ProbeRequest>,
-) -> Result<axum::Json<ProbeResponse>, http_common::ApiError> {
-    let tx_runner = database_common::DatabaseTransactionRunner::new(catalog);
-
-    tx_runner
-        .maybe_transactional(req.db_transaction.unwrap_or(false), |cat| async move {
-            if let Some(tx) = cat
-                .get::<dill::specs::Maybe<dill::specs::OneOf<database_common::TransactionRef>>>()
-                .int_err()?
-            {
+    Extension(catalog): Extension<dill::Catalog>,
+    Query(req): Query<ProbeRequest>,
+) -> Result<Json<ProbeResponse>, ApiError> {
+    transaction!(
+        #[catalog(catalog)]
+        #[when(req.db_transaction.unwrap_or(false))]
+        |cat| -> Result<_, ApiError> {
+            if let Some(tx) = cat.get::<Maybe<OneOf<TransactionRef>>>().int_err()? {
                 // Open DB transaction manually, as normally it's allocated lazily
                 tx.begin().await?;
             }
@@ -61,15 +64,13 @@ pub async fn probe_handler(
                 Some(ProbeError::Panic) => panic!("Probe panic"),
                 Some(ProbeError::Internal) => return Err("Probe internal error".int_err().into()),
                 Some(ProbeError::Api) => {
-                    return Err(http_common::ApiError::bad_request_with_message(
-                        "Probe API error",
-                    ));
+                    return Err(ApiError::bad_request_with_message("Probe API error"));
                 }
             }
 
-            Ok(axum::Json(ProbeResponse {}))
-        })
-        .await
+            Ok(Json(ProbeResponse {}))
+        }
+    )
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -14,7 +14,7 @@ use std::sync::Arc;
 
 use container_runtime::*;
 use datafusion::config::{ParquetOptions, TableParquetOptions};
-use file_utils::OwnedFile;
+use file_utils::OwnedDir;
 use internal_error::ResultIntoInternal;
 use kamu_core::engine::*;
 use kamu_core::*;
@@ -24,6 +24,9 @@ use odf::metadata::engines::{EngineGrpcClient, ExecuteRawQueryError, ExecuteTran
 use super::ODFEngineConfig;
 use super::engine_container::{EngineContainer, LogsConfig};
 use super::engine_io_strategy::*;
+use super::engine_transform_output::EngineTransformOutput;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct ODFEngine {
     container_runtime: Arc<ContainerRuntime>,
@@ -32,6 +35,7 @@ pub struct ODFEngine {
     run_info_dir: Arc<RunInfoDir>,
 }
 
+#[common_macros::method_names_consts]
 impl ODFEngine {
     pub fn new(
         container_runtime: Arc<ContainerRuntime>,
@@ -60,7 +64,7 @@ impl ODFEngine {
         }
     }
 
-    #[tracing::instrument(level = "info", skip_all, fields(container_name = engine_container.container_name()))]
+    #[tracing::instrument(name = ODFEngine_execute_raw_query, level = "info", skip_all, fields(container_name = engine_container.container_name()))]
     async fn execute_raw_query(
         &self,
         engine_container: &EngineContainer,
@@ -111,7 +115,7 @@ impl ODFEngine {
         })
     }
 
-    #[tracing::instrument(level = "info", skip_all, fields(container_name = engine_container.container_name()))]
+    #[tracing::instrument(name = ODFEngine_execute_transform, level = "info", skip_all, fields(container_name = engine_container.container_name()))]
     async fn execute_transform(
         &self,
         engine_container: &EngineContainer,
@@ -161,78 +165,6 @@ impl ODFEngine {
             ExecuteTransformError::InternalError(e) => {
                 EngineError::internal(e, engine_container.log_files())
             }
-        })
-    }
-
-    pub fn materialize_response(
-        &self,
-        engine_response: odf::metadata::TransformResponseSuccess,
-        new_data_path: PathBuf,
-        new_checkpoint_path: PathBuf,
-    ) -> Result<TransformResponseExt, EngineError> {
-        let (new_data, output_schema) = if new_data_path.exists() {
-            if new_data_path.is_symlink() || !new_data_path.is_file() {
-                return Err(EngineError::contract_error(
-                    "Engine wrote data not as a plain file",
-                    Vec::new(),
-                ));
-            }
-
-            // Read output schema
-            let output_schema =
-                datafusion::parquet::arrow::arrow_reader::ArrowReaderMetadata::load(
-                    &std::fs::File::open(&new_data_path).int_err()?,
-                    Default::default(),
-                )
-                .int_err()?
-                .schema()
-                .clone();
-
-            let new_data = OwnedFile::new(new_data_path);
-
-            // Clean up the data file if it's empty - it was produced only to provide us the
-            // schema
-            let new_data = if engine_response.new_offset_interval.is_none() {
-                None
-            } else {
-                Some(new_data)
-            };
-
-            (new_data, Some(output_schema))
-        } else {
-            if engine_response.new_offset_interval.is_some() {
-                return Err(EngineError::contract_error(
-                    "Engine did not write a response data file",
-                    Vec::new(),
-                ));
-            }
-
-            tracing::warn!(
-                "Engine didn't write a data file when output slice is empty - in future this will \
-                 be considered an error"
-            );
-
-            (None, None)
-        };
-
-        let new_checkpoint = if new_checkpoint_path.exists() {
-            if new_checkpoint_path.is_symlink() || !new_checkpoint_path.is_file() {
-                return Err(EngineError::contract_error(
-                    "Engine wrote checkpoint not as a plain file",
-                    Vec::new(),
-                ));
-            }
-            Some(OwnedFile::new(new_checkpoint_path))
-        } else {
-            None
-        };
-
-        Ok(TransformResponseExt {
-            new_offset_interval: engine_response.new_offset_interval,
-            new_watermark: engine_response.new_watermark,
-            output_schema,
-            new_checkpoint,
-            new_data,
         })
     }
 }
@@ -352,18 +284,21 @@ impl Engine for ODFEngine {
     async fn execute_transform(
         &self,
         request: TransformRequestExt,
+        operation_id: &str,
         datasets_map: &ResolvedDatasetsMap,
     ) -> Result<TransformResponseExt, EngineError> {
-        let operation_id = request.operation_id.clone();
-        let operation_dir = self
-            .run_info_dir
-            .join(format!("transform-{}", request.operation_id));
+        let operation_dir = self.run_info_dir.join(format!("transform-{operation_id}"));
         let logs_dir = operation_dir.join("logs");
         std::fs::create_dir(&operation_dir).int_err()?;
         std::fs::create_dir(&logs_dir).int_err()?;
 
         let target = datasets_map.get_by_handle(&request.dataset_handle);
         let io_strategy = self.get_io_strategy(target.as_ref());
+
+        // Copies of the inputs are not needed once the engine has stopped, so a run that failed at
+        // any step keeps only its logs and output. Declared before the container, so on every
+        // exit the container stops first
+        let _input_dir = OwnedDir::new(operation_dir.join("in"), "engine input directory");
 
         let materialized_request = io_strategy
             .materialize_request(request, datasets_map, &operation_dir)
@@ -376,7 +311,7 @@ impl Engine for ODFEngine {
             LogsConfig::new(&logs_dir),
             &self.image,
             materialized_request.volumes,
-            &operation_id,
+            operation_id,
         )
         .await?;
 
@@ -392,10 +327,14 @@ impl Engine for ODFEngine {
 
         engine_container.terminate().await?;
 
-        self.materialize_response(
-            engine_response?,
-            materialized_request.out_data_path,
-            materialized_request.out_checkpoint_path,
-        )
+        let mut response = EngineTransformOutput {
+            data_path: materialized_request.out_data_path,
+            checkpoint_path: materialized_request.out_checkpoint_path,
+        }
+        .into_response(engine_response?)?;
+        response.run_dir = Some(operation_dir);
+        Ok(response)
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

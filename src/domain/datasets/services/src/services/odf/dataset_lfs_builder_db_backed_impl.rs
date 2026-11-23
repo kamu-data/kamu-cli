@@ -21,12 +21,19 @@ use crate::{
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[component(pub)]
-#[interface(dyn odf::dataset::DatasetLfsBuilder)]
-
 pub struct DatasetLfsBuilderDatabaseBackedImpl {
     catalog: Catalog,
     config: Arc<MetadataChainDbBackedConfig>,
+}
+
+#[component(pub)]
+#[interface(dyn odf::dataset::DatasetLfsBuilder)]
+impl DatasetLfsBuilderDatabaseBackedImpl {
+    /// A constructor rather than field injection, so a test double registered
+    /// in its place can build one to delegate to
+    pub fn new(catalog: Catalog, config: Arc<MetadataChainDbBackedConfig>) -> Self {
+        Self { catalog, config }
+    }
 }
 
 impl odf::dataset::DatasetLfsBuilder for DatasetLfsBuilderDatabaseBackedImpl {

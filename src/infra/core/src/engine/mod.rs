@@ -14,9 +14,11 @@ mod engine_datafusion_inproc;
 mod engine_io_strategy;
 mod engine_odf;
 mod engine_provisioner_local;
+mod engine_transform_output;
 
 pub use engine_config::*;
 pub use engine_config_embedded::*;
 pub use engine_datafusion_inproc::*;
 pub use engine_io_strategy::*;
 pub use engine_provisioner_local::*;
+pub use engine_transform_output::*;

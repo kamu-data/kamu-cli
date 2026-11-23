@@ -17,9 +17,14 @@ pub(crate) use axum_server_protocol_common::*;
 pub(crate) use axum_server_pull_protocol::*;
 pub(crate) use axum_server_push_protocol::*;
 
+pub(crate) mod error_close;
+pub use error_close::ErrorReplyClose;
 mod errors;
 pub mod messages;
-mod phases;
+pub(crate) mod phases;
 mod remote_dataset_id;
+mod smart_transfer_protocol_server_config;
+
+pub use smart_transfer_protocol_server_config::*;
 
 pub mod ws_tungstenite_client;

@@ -12,6 +12,23 @@ see. This skill owns the rest.
 
 ## Rules
 
+### Leave no dead or duplicate code
+
+Clippy sees unused private items only. Everything else is on whoever changes the code:
+
+- **Removing or replacing a caller removes what only it used:** functions and trait methods,
+  error variants nothing constructs any more, mock helpers, `#[automock]` attributes, `pub`
+  test-only helpers, config fields, and `Cargo.toml` dependencies. `git grep -w <name>` over the
+  whole repository is the check; `cargo udeps` misses a dependency that another dependency's API
+  also pulls in.
+- **Before writing a helper, a conversion or a test setup, search for an existing one** (a `From`
+  impl for the same source error, a harness method, a `testing` module helper) and use or extend
+  it. A second copy of the same mapping drifts from the first.
+- **Code a later stage needs is not dead:** check the plan before removing it, and say in its doc
+  comment what it is for.
+- Deduplication stops at a visible transaction block
+  ([database-transactions.md §3.2](../../../docs/internal/database-transactions.md#32-inside-a-level)).
+
 ### Imports and paths
 
 Import items with `use`; never spell out crate paths inline:
@@ -29,15 +46,17 @@ b.add::<WakeupListenerMetrics>();
 
 Qualify a name only to resolve a clash. Two exceptions:
 
-- **App wiring** (`src/app/cli/src/app.rs`, `database.rs`) integrates every crate, so it qualifies
-  components explicitly to show where each comes from.
+- **App wiring** (`src/app/cli/src/app.rs`, `database.rs`, `outbox.rs`) integrates every crate, so
+  it qualifies components explicitly to show where each comes from.
 - **Open Data Fabric types are always written with the `odf::` prefix, never imported:**
   `odf::DatasetID`, `odf::metadata::MetadataEvent`, `odf::dataset::MetadataChain`. The prefix marks
   a protocol-level type at every use and keeps it apart from same-named Kamu types. Reach ODF
   through the `odf` facade crate, not the `odf-*` sub-crates (code inside `src/odf/` aside).
   Import from `odf` only what cannot be used qualified — extension traits needed for method
   syntax (`use odf::utils::data::DataFrameExt;`) — and test helpers such as
-  `odf::metadata::testing::MetadataFactory`.
+  `odf::metadata::testing::MetadataFactory`. Inside one function, a `use` that shortens a match
+  or a case table is fine: `use odf::dataset::SetChainRefError as E;`,
+  `use odf::DatasetVisibility::{Private, Public};`.
 
 ```rust
 // No
@@ -149,6 +168,8 @@ siblings" is not a reason. Ask the user before adding a new suppression (AGENTS.
 ### Formatting
 
 Inline captured identifiers: `format!("value={value}")`, not `format!("value={}", value)`.
+Clippy's `uninlined_format_args` checks only the standard formatting macros, so `tracing::*!`
+and our own macros are on review.
 
 ### Macros
 
@@ -162,7 +183,8 @@ macro calls — macro bodies are hard to read, debug and test.
 - Order model files top-down: the highest-level result/union type first, then the structs and
   enums it references, each type's `impl` blocks immediately after the type.
 - When a function repeats a logical section, extract a named helper for it if it represents a
-  coherent concept.
+  coherent concept. A transaction block is not such a section
+  ([rule](#leave-no-dead-or-duplicate-code)).
 - `mod.rs` holds no code: only submodule declarations, re-exports and an optional `//!` module
   doc. Types, functions and constants live in named files. The exception is a `macro_rules!`
   macro the module exports.
@@ -173,10 +195,41 @@ macro calls — macro bodies are hard to read, debug and test.
 - One concept per file. A module that grows several independent concepts becomes a directory with
   a file per type, with its errors and its tests in files of their own.
 
+### Dividing lines
+
+A dividing line is a comment line of exactly 120 `/` characters; the `dividing_lines` repo lint
+refuses any other length. It marks the units of a file:
+
+- A file with items has one right after the `use` block and one closing the file.
+- One separates each top-level unit from the next. A unit is a function, a test, or a type
+  with its `impl` blocks; whether a line also separates the `impl`s from the type and from each
+  other is a matter of taste.
+- A named section is a dividing line, a `// Name` line and another dividing line, e.g.
+  `// Harness` above a test file's harness.
+
+The lint checks only the length; placement is on review.
+
+### No extension traits for convenience methods
+
+A trait that only adds methods to an existing type (`FooExt for Bar`) saves no code: every caller
+must import the trait, and a reader cannot tell where the method comes from.
+
+| The helper is about | Write |
+|---|---|
+| A type of ours | An inherent method on it: `CurrentAccountSubject::register(self, &mut CatalogBuilder)`, not a `CatalogBuilder` extension |
+| A foreign type | A free function: `add_player_scores_with_derivative(&kamu)` in the e2e common crate |
+
+A blanket extension over a trait of ours (`impl<T: Trait + ?Sized> TraitExt for T`) stays
+legitimate when its helpers must not be part of the trait, e.g. because `mockall::automock`
+would mock provided methods away (`DatasetPermissionCheckerExt`).
+
 ### Visibility and re-exports
 
 - Default to the tightest visibility: private, then `pub(crate)`. Use `pub` only at a real crate
   boundary.
+- The crate's own `tests/` tree is outside the crate: an item its integration tests use stays
+  `pub`. After narrowing an item, a `private_interfaces` warning means a `pub` signature still
+  exposes it.
 - Do not publicly re-export internal helper modules unless external consumers or macro expansion
   truly require it.
 
@@ -193,11 +246,12 @@ Do not re-propose these without new evidence.
 | Hand-written `match` for enum ↔ string | Drifts from the variants; `strum` derives stay in sync. |
 | Catch-all `_` arm on an enum we own, "to keep the match short" | A new variant silently takes the fallback path instead of failing to compile where a decision is needed. |
 | One file of free functions passing the same data along, "since it is only a few helpers" | Reads as a procedure and hides which concepts exist; a type per concept, in its own file, names them and keeps each one's parsing and checks together. |
+| An extension trait to attach helpers to a type, "so calls read as methods" | Callers import the trait anyway and the method's origin is hidden; use an inherent method on our types and a free function on foreign ones ([rule](#no-extension-traits-for-convenience-methods)). |
 | Silencing a lint instead of fixing it, or without a `reason` | Hides the problem; most suppressions removed in the cleanup turned out to be fixable or stale. |
 
 ## What lives elsewhere
 
-- Comments, doc comments, dividing lines: `kamu-prose-and-comments`.
+- Comments and doc comments: `kamu-prose-and-comments`.
 - Test structure and assertions: `kamu-test-harness`.
 - DI components and scopes: `kamu-dill-di`.
 - Error types and domain modelling: `kamu-domain-design`.

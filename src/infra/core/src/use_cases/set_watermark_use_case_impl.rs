@@ -11,10 +11,14 @@ use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
 use dill::{component, interface};
-use internal_error::ErrorIntoInternal;
-use kamu_auth_rebac::RebacDatasetRegistryFacade;
+use kamu_accounts::Principal;
 use kamu_core::*;
-use kamu_datasets::DatasetAction;
+use kamu_datasets::{
+    DatasetOperation,
+    DatasetOperationGuard,
+    DatasetOperationRequest,
+    DatasetRegistry,
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -23,7 +27,9 @@ use kamu_datasets::DatasetAction;
 pub struct SetWatermarkUseCaseImpl {
     set_watermark_planner: Arc<dyn SetWatermarkPlanner>,
     set_watermark_executor: Arc<dyn SetWatermarkExecutor>,
-    rebac_dataset_registry_facade: Arc<dyn RebacDatasetRegistryFacade>,
+    dataset_operation_guard: Arc<dyn DatasetOperationGuard>,
+    dataset_registry: Arc<dyn DatasetRegistry>,
+    principal: Arc<Principal>,
 }
 
 #[common_macros::method_names_consts]
@@ -33,27 +39,27 @@ impl SetWatermarkUseCase for SetWatermarkUseCaseImpl {
         level = "info",
         name = SetWatermarkUseCaseImpl_execute,
         skip_all,
-        fields(dataset_handle, new_watermark)
+        fields(target = %dataset_handle, %new_watermark)
     )]
     async fn execute(
         &self,
         dataset_handle: &odf::DatasetHandle,
         new_watermark: DateTime<Utc>,
     ) -> Result<SetWatermarkResult, SetWatermarkError> {
-        // Resolve dataset
-        let target = self
-            .rebac_dataset_registry_facade
-            .resolve_dataset_by_handle(dataset_handle, DatasetAction::Write)
-            .await
-            .map_err(|e| {
-                use kamu_auth_rebac::RebacDatasetIdUnresolvedError as E;
+        self.dataset_operation_guard
+            .check_operation(
+                &self.principal,
+                &DatasetOperationRequest::new(
+                    dataset_handle.clone(),
+                    DatasetOperation::SetWatermark,
+                ),
+            )
+            .await?;
 
-                match e {
-                    E::NotFound(e) => SetWatermarkError::NotFound(e),
-                    E::Access(e) => SetWatermarkError::Access(e),
-                    e @ E::Internal(_) => SetWatermarkError::Internal(e.int_err()),
-                }
-            })?;
+        let target = self
+            .dataset_registry
+            .get_dataset_by_handle(dataset_handle)
+            .await;
 
         // Make a plan
         let plan = self

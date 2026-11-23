@@ -117,7 +117,8 @@ kamu_cli_run_api_server_e2e_test!(
 
 kamu_cli_execute_command_e2e_test!(
     storage = sqlite,
-    fixture = kamu_cli_e2e_repo_tests::commands::test_delete_args_validation
+    fixture = kamu_cli_e2e_repo_tests::commands::test_delete_args_validation,
+    sqlite_only = "checks a CLI error message; the repository type cannot change it"
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
