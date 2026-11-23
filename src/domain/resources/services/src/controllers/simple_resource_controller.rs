@@ -30,11 +30,12 @@ use crate::domain::{
 };
 use crate::{
     ResourceCleanupTransactionError,
+    ResourceReconcileTransactionError,
     SimpleResourceCleanupHelper,
     SimpleResourceCleanupOutcome,
     SimpleResourceDeletionRecorder,
-    SimpleResourceReconciliationHelper,
     SimpleResourceReconciliationOutcome,
+    SimpleResourceReconciliationRecorder,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -48,8 +49,8 @@ use crate::{
 /// | --- | --- | --- |
 /// | Deletion requested | `cleanup`, then `complete_deletion` | `Done` |
 /// | Cleanup failed | `record_cleanup_failure` | an error, retried with backoff |
-/// | Needs reconciliation | `begin_reconciliation`, `reconcile`, `complete_reconciliation` | `Done` |
-/// | Reconcile failed | `fail_reconciliation` | `Done`, or an error when the failure is transient |
+/// | Needs reconciliation | `begin_reconciliation`, then `reconcile` and `complete_reconciliation` | `Done` |
+/// | Reconcile failed | rollback, then `fail_reconciliation` | `Done`, or an error when the failure is transient |
 /// | Deleted meanwhile | nothing | `Done` |
 /// | Changed meanwhile by another writer | nothing | `RetryAt(now)` |
 /// | Anything else | nothing | `Done` |
@@ -102,6 +103,7 @@ where
         loaded: ResourceVersion,
     ) -> Result<ResourceProcessOutcome, InternalError> {
         use ResourceLifecycleTransitionError as E;
+        use ResourceReconcileTransactionError as Reconcile;
         use ResourceStaleExpectationError as Stale;
         use SimpleResourceReconciliationError as Failure;
         use SimpleResourceReconciliationOutcome as Outcome;
@@ -129,14 +131,35 @@ where
             }
         };
 
-        // 2: Reconcile and record the outcome
-        let finished = transaction!(|primitives: Arc<dyn ResourceLifecyclePrimitives<R>>,
-                                     reconciler: Arc<dyn SimpleResourceReconciler<R>>|
-         -> Result<_, Failure<R>> {
-            SimpleResourceReconciliationHelper::new(primitives.as_ref(), reconciler.as_ref())
-                .finish_reconciliation_phase(started)
+        let started_version = ResourceVersion::from(started.headers());
+
+        // 2: Reconcile and complete
+        let reconciled = transaction!(|primitives: Arc<dyn ResourceLifecyclePrimitives<R>>,
+                                       reconciler: Arc<dyn SimpleResourceReconciler<R>>|
+         -> Result<_, Reconcile<R>> {
+            reconciler
+                .reconcile(&started)
                 .await
+                .map_err(Reconcile::ReconcileFailed)?;
+            SimpleResourceReconciliationRecorder::new(primitives.as_ref())
+                .complete_reconciliation(id, started_version)
+                .await
+                .map_err(Reconcile::Reconciliation)
         });
+        let finished = match reconciled {
+            Ok(outcome) => Ok(outcome),
+            Err(Reconcile::ReconcileFailed(error)) => {
+                // 2a: Record the failure
+                transaction!(
+                    |primitives: Arc<dyn ResourceLifecyclePrimitives<R>>| -> Result<_, Failure<R>> {
+                        SimpleResourceReconciliationRecorder::new(primitives.as_ref())
+                            .fail_reconciliation(id, started_version, error)
+                            .await
+                    }
+                )
+            }
+            Err(Reconcile::Reconciliation(err)) => Err(err),
+        };
         match finished {
             Ok(Outcome::Reconciled(reconciled)) => Ok(ResourceProcessOutcome::Done(
                 ResourceVersion::from(reconciled.headers()),

@@ -192,11 +192,17 @@ impl SimpleResourceReconciler<TestResource> for TestResourceCompletingCleanupRec
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// Writes to the status of the resource it reconciles, as another writer
-/// would, so the outcome recorded after it fails with a status conflict.
+/// would, so the outcome recorded after it fails with a status conflict. Then
+/// fails the reconciliation, if asked to, with an error that is not transient.
 #[dill::component(pub)]
 #[dill::interface(dyn SimpleResourceReconciler<TestResource>)]
 pub struct TestResourceInterferingReconciler {
     catalog: dill::Catalog,
+    interference: Arc<TestReconcileInterference>,
+}
+
+pub struct TestReconcileInterference {
+    then_fails: bool,
 }
 
 #[async_trait::async_trait]
@@ -207,6 +213,12 @@ impl SimpleResourceReconciler<TestResource> for TestResourceInterferingReconcile
         }
         .update_status(resource)
         .await;
+
+        if self.interference.then_fails {
+            return Err(TestResourceReconcileError::Rejected(
+                "simulated invalid spec".to_string(),
+            ));
+        }
         Ok(())
     }
 
@@ -348,7 +360,9 @@ pub enum TestResourceReconcilerProvider {
     },
     CompletingCleanup,
     FailingCleanupOnce,
-    InterferingReconcile,
+    InterferingReconcile {
+        then_fails: bool,
+    },
     Rejecting,
     FailingReconcileOnce,
 }
@@ -387,7 +401,8 @@ impl TestResourceReconcilerProvider {
                 b.add_value(TestCleanupFailureOnce::default());
                 b.add::<TestResourceFailingCleanupOnceReconciler>();
             }
-            TestResourceReconcilerProvider::InterferingReconcile => {
+            TestResourceReconcilerProvider::InterferingReconcile { then_fails } => {
+                b.add_value(TestReconcileInterference { then_fails });
                 b.add::<TestResourceInterferingReconciler>();
             }
             TestResourceReconcilerProvider::Rejecting => {

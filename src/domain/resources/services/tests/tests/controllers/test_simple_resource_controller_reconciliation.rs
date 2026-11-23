@@ -21,7 +21,6 @@ use kamu_resources::{
     ResourceProcessOutcome,
     ResourceStatusConflictError,
     ResourceVersion,
-    SimpleResourceReconciler,
     SimpleResourceReconciliationError,
 };
 use kamu_resources_services::testing::{
@@ -29,8 +28,8 @@ use kamu_resources_services::testing::{
     BaseResourceServiceHarnessOpts,
 };
 use kamu_resources_services::{
-    SimpleResourceReconciliationHelper,
     SimpleResourceReconciliationOutcome,
+    SimpleResourceReconciliationRecorder,
 };
 use messaging_outbox::{MockOutbox, OutboxProvider};
 
@@ -310,7 +309,7 @@ async fn test_non_transient_failure_posts_status_updates_to_failed() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_finish_phase_discards_outcome_of_superseded_generation() {
+async fn test_completion_discards_outcome_of_superseded_generation() {
     // A concurrent apply between the two reconcile phases bumps the generation.
     // The outcome computed for the old generation is dropped, and the
     // runtime reconciles the new generation.
@@ -325,7 +324,7 @@ async fn test_finish_phase_discards_outcome_of_superseded_generation() {
         .update_spec(&account_handle, id, "res-a", "updated-concurrently")
         .await;
 
-    let outcome = harness.finish_reconciliation_phase(started).await.unwrap();
+    let outcome = harness.complete_reconciliation(started).await.unwrap();
 
     assert_matches!(outcome, SimpleResourceReconciliationOutcome::Superseded);
     let snapshot = harness.get_snapshot_by_id(&id).await.unwrap();
@@ -343,7 +342,9 @@ async fn test_reconciler_write_rolls_back_when_outcome_is_not_recorded() {
     // here it updates the status, so recording the outcome fails and the
     // transaction discards both
     let harness =
-        ReconcileTestHarness::transactional(TestResourceReconcilerProvider::InterferingReconcile);
+        ReconcileTestHarness::transactional(TestResourceReconcilerProvider::InterferingReconcile {
+            then_fails: false,
+        });
 
     let account_handle = odf::ResourceOwnerHandle::new_test("test-owner");
     let id = harness.apply_and_get_id(&account_handle, "res-a").await;
@@ -368,6 +369,40 @@ async fn test_reconciler_write_rolls_back_when_outcome_is_not_recorded() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
+async fn test_failed_reconcile_is_recorded_after_its_writes_roll_back() {
+    // A database may refuse every further statement of a transaction in which
+    // one failed, so the failure is recorded in a transaction of its own, after
+    // the reconciler's writes are discarded
+    let harness =
+        ReconcileTestHarness::transactional(TestResourceReconcilerProvider::InterferingReconcile {
+            then_fails: true,
+        });
+
+    let account_handle = odf::ResourceOwnerHandle::new_test("test-owner");
+    let id = harness.apply_and_get_id(&account_handle, "res-a").await;
+
+    let outcome = harness.process(&id).await.unwrap();
+
+    let snapshot = harness.get_snapshot_by_id(&id).await.unwrap();
+    let status = snapshot.basic_status().unwrap();
+    assert_eq!(
+        outcome,
+        ResourceProcessOutcome::Done(ResourceVersion::from(&snapshot.headers))
+    );
+    assert_eq!(status.phase, ResourcePhase::Failed);
+    assert_eq!(
+        snapshot.headers.status_generation, 3,
+        "one status update when reconciliation starts, one with its failure"
+    );
+    BaseResourceServiceHarness::assert_reconciliation_error(
+        &status,
+        Some(TEST_RECONCILIATION_ERROR_CODE_REJECTED),
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
 async fn test_overlapping_reconciliations_of_one_generation_record_one_outcome() {
     let harness = ReconcileTestHarness::dispatching(TestResourceReconcilerProvider::Stub);
 
@@ -378,8 +413,8 @@ async fn test_overlapping_reconciliations_of_one_generation_record_one_outcome()
     // Already `Reconciling`, so the second start writes no status
     let second = harness.start_reconciliation_phase(id).await;
 
-    harness.finish_reconciliation_phase(first).await.unwrap();
-    let result = harness.finish_reconciliation_phase(second).await;
+    harness.complete_reconciliation(first).await.unwrap();
+    let result = harness.complete_reconciliation(second).await;
 
     assert_matches!(
         result,
@@ -424,7 +459,7 @@ async fn test_process_of_resource_being_deleted_completes_its_deletion_without_r
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_finish_phase_discards_outcome_of_resource_being_deleted() {
+async fn test_completion_discards_outcome_of_resource_being_deleted() {
     let harness = ReconcileTestHarness::dispatching(TestResourceReconcilerProvider::Stub);
 
     let account_handle = odf::ResourceOwnerHandle::new_test("test-owner");
@@ -436,7 +471,7 @@ async fn test_finish_phase_discards_outcome_of_resource_being_deleted() {
         .request_resources_deletion(account_handle.did, vec![id])
         .await;
 
-    let outcome = harness.finish_reconciliation_phase(started).await.unwrap();
+    let outcome = harness.complete_reconciliation(started).await.unwrap();
 
     assert_matches!(outcome, SimpleResourceReconciliationOutcome::Superseded);
     let resource = harness.load(&id).await;
@@ -454,7 +489,6 @@ struct ReconcileTestHarness {
     base: ServiceLayerTestHarness,
     loader: Arc<dyn ResourceAggregateLoader<TestResource>>,
     lifecycle_primitives: Arc<dyn ResourceLifecyclePrimitives<TestResource>>,
-    reconciler: Arc<dyn SimpleResourceReconciler<TestResource>>,
 }
 
 impl ReconcileTestHarness {
@@ -493,7 +527,6 @@ impl ReconcileTestHarness {
         Self {
             loader: catalog.get_one().unwrap(),
             lifecycle_primitives: catalog.get_one().unwrap(),
-            reconciler: catalog.get_one().unwrap(),
             base,
         }
     }
@@ -512,21 +545,18 @@ impl ReconcileTestHarness {
             .expect("resource should need reconciliation")
     }
 
-    /// The second phase of the reconciliation `started`, without the
+    /// Records the success of the reconciliation `started`, without the
     /// transaction of the controller
-    async fn finish_reconciliation_phase(
+    async fn complete_reconciliation(
         &self,
         started: TestResource,
     ) -> Result<
         SimpleResourceReconciliationOutcome<TestResource>,
         SimpleResourceReconciliationError<TestResource>,
     > {
-        SimpleResourceReconciliationHelper::new(
-            self.lifecycle_primitives.as_ref(),
-            self.reconciler.as_ref(),
-        )
-        .finish_reconciliation_phase(started)
-        .await
+        SimpleResourceReconciliationRecorder::new(self.lifecycle_primitives.as_ref())
+            .complete_reconciliation(*started.id(), ResourceVersion::from(started.headers()))
+            .await
     }
 }
 

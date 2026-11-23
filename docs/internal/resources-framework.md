@@ -1618,15 +1618,15 @@ sequenceDiagram
     end
     rect rgba(100, 150, 255, 0.15)
         A->>Ctl: reconcile(resource)  %% e.g. SecretSet builds encrypted projection
-        alt success
-            A->>P: complete_reconciliation(id, generation, N) → StatusUpdated (Ready)
-        else failure
+        A->>P: complete_reconciliation(id, generation, N) → StatusUpdated (Ready)
+        Note over A,Ctl: a failed reconcile rolls its transaction back
+    end
+    opt reconcile failed
+        rect rgba(100, 150, 255, 0.15)
             A->>P: fail_reconciliation(id, generation, N, error) → StatusUpdated (Failed or Degraded)
         end
-        alt Stale: deletion requested or generation moved
-            A->>A: discard the outcome
-        end
     end
+    Note over A,P: Stale (deletion requested or generation moved): the outcome is discarded
 ```
 
 Reconciliation is one `process` call of the type's controller on the
@@ -1638,9 +1638,13 @@ status at most once through a [lifecycle primitive](#lifecycle-primitives).
 - **Phase 1** commits the `Reconciling` status, a stable hand-off point, which brings
   `statusGeneration` to some N. A resource already `Reconciling` keeps its status, and N is its
   current `statusGeneration`.
-- **Phase 2** runs the `SimpleResourceReconciler<R>` on that resource, then commits the outcome
-  (`Ready`, `Failed` or `Degraded`) in a separate transaction, conditional on the generation and
-  `statusGeneration` still being the ones phase 1 left.
+- **Phase 2** runs the `SimpleResourceReconciler<R>` on that resource and commits `Ready` in a
+  separate transaction, conditional on the generation and `statusGeneration` still being the ones
+  phase 1 left.
+- **A failed reconcile rolls phase 2 back**, discarding whatever the reconciler wrote, and its
+  failure (`Failed` or `Degraded`, under the same conditions) is recorded in a transaction of its
+  own: after a failed statement Postgres refuses every further one in the same transaction, so
+  the failure could not be written there.
 - **A changed generation between the phases** (any apply between them) discards the outcome without
   saving or posting anything: it was computed for a superseded generation, and the next pass of the
   drain reconciles the new one. A `StatusUpdated` recording its reconciliation would also make the
