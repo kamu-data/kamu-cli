@@ -222,7 +222,6 @@ criterion = { version = "0.8", features = [
 datafusion = { version = "55", default-features = false, features = [
     "parquet",
 ] }
-filetime = "0.2"
 indoc = "2"
 libunftp = { version = "0.23", default-features = false, features = [
     "aws_lc_rs",

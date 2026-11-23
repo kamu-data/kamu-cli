@@ -9,7 +9,9 @@
 
 use std::assert_matches;
 use std::collections::HashMap;
+use std::fs::File;
 use std::sync::{Arc, Mutex};
+use std::time::SystemTime;
 
 use chrono::Utc;
 use chrono::prelude::*;
@@ -106,7 +108,12 @@ async fn test_fetch_url_file() {
     assert_matches!(res2, FetchResult::UpToDate);
 
     // Fetches again if mtime changed
-    filetime::set_file_mtime(&src_path, filetime::FileTime::from_unix_time(0, 0)).unwrap();
+    File::options()
+        .write(true)
+        .open(&src_path)
+        .unwrap()
+        .set_modified(SystemTime::UNIX_EPOCH)
+        .unwrap();
     let res3 = harness
         .fetch_svc
         .fetch(
@@ -270,7 +277,12 @@ async fn test_fetch_url_http_ok() {
     assert_matches!(res_repeat, FetchResult::UpToDate);
     assert!(target_path.exists());
 
-    filetime::set_file_mtime(&src_path, filetime::FileTime::from_unix_time(0, 0)).unwrap();
+    File::options()
+        .write(true)
+        .open(&src_path)
+        .unwrap()
+        .set_modified(SystemTime::UNIX_EPOCH)
+        .unwrap();
     let res_touch = harness
         .fetch_svc
         .fetch(
@@ -601,7 +613,12 @@ async fn test_fetch_files_glob() {
     assert_matches!(res2, FetchResult::UpToDate);
 
     // Doesn't fetch again if mtime changed
-    filetime::set_file_mtime(&src_path_1, filetime::FileTime::from_unix_time(0, 0)).unwrap();
+    File::options()
+        .write(true)
+        .open(&src_path_1)
+        .unwrap()
+        .set_modified(SystemTime::UNIX_EPOCH)
+        .unwrap();
     let res3 = harness
         .fetch_svc
         .fetch(
