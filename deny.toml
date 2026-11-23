@@ -93,60 +93,20 @@ ignore = [
     # rsa crate vulnerability (used by jsonwebtoken), no fix available yet
     # https://rustsec.org/advisories/RUSTSEC-2023-0071.html
     "RUSTSEC-2023-0071",
-    # Unmaintained: proc-macro-error
-    # https://rustsec.org/advisories/RUSTSEC-2024-0370.html
-    "RUSTSEC-2024-0370",
-    # Unmaintained: instant
-    # Dependency of `backoff`
-    # https://rustsec.org/advisories/RUSTSEC-2024-0384
-    "RUSTSEC-2024-0384",
     # Unmaintained: paste
     # https://rustsec.org/advisories/RUSTSEC-2024-0436
     "RUSTSEC-2024-0436",
-    # Unmaintained: unsafe-libyaml
-    # Used by serde_yaml_ng, both directly and via `setty` (fmt-yaml); migrating to
-    # serde-saphyr requires a `setty` release first
-    # https://rustsec.org/advisories/RUSTSEC-2024-0449
-    "RUSTSEC-2024-0449",
-    # Unmaintained: backoff
-    # Used by async-openai; newer versions drop it but require reqwest 0.13
-    # https://rustsec.org/advisories/RUSTSEC-2025-0012
-    "RUSTSEC-2025-0012",
     # quick-xml 0.39, pulled via object_store 0.13 (DataFusion stack); object_store 0.14 requires
     # quick-xml 0.41 and comes with the next DataFusion upgrade
     # https://rustsec.org/advisories/RUSTSEC-2026-0194
     # https://rustsec.org/advisories/RUSTSEC-2026-0195
     "RUSTSEC-2026-0194",
     "RUSTSEC-2026-0195",
-    # Unmaintained: smallstr
-    # Waiting for upstream crates to migrate to other implementation
-    # https://rustsec.org/advisories/RUSTSEC-2026-0215
-    "RUSTSEC-2026-0215",
-    # Unmaintained: bitmaps
-    # Dependency of the unmaintained `im` crate
-    # https://rustsec.org/advisories/RUSTSEC-2026-0247
-    "RUSTSEC-2026-0247",
-    # Unmaintained: im
-    # https://rustsec.org/advisories/RUSTSEC-2026-0248
-    "RUSTSEC-2026-0248",
-    # Unmaintained: sized-chunks
-    # Dependency of the unmaintained `im` crate
-    # https://rustsec.org/advisories/RUSTSEC-2026-0251
-    "RUSTSEC-2026-0251",
     # crypto-bigint 0.5: timing side channels, fixed only in 0.7.6+
     # Pulled via alloy -> k256 0.13 / elliptic-curve 0.13; no alloy release uses 0.14 yet
     # https://rustsec.org/advisories/RUSTSEC-2026-0387
     "RUSTSEC-2026-0387",
-    # Because chrono is now unmaintained and humantime wraps chrono, it is also unmaintained; all versions are affected.
-    # https://rustsec.org/advisories/RUSTSEC-2026-0542
-    "RUSTSEC-2026-0542",
     # The chrono crate is unmaintained; all versions are affected.
     # https://rustsec.org/advisories/RUSTSEC-2026-0543
     "RUSTSEC-2026-0543",
-    # The chrono-tz crate is unmaintained; all versions are affected.
-    # https://rustsec.org/advisories/RUSTSEC-2026-0555
-    "RUSTSEC-2026-0555",
-    # The chrono-tz-build crate is unmaintained; all versions are affected.
-    # https://rustsec.org/advisories/RUSTSEC-2026-0559
-    "RUSTSEC-2026-0559",
 ]
