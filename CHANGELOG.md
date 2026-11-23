@@ -44,6 +44,10 @@ Recommendation: for ease of reading, use the following format:
   and in-flight requests and background agents get `backgroundAgents.shutdownTimeout` (10s by
   default) to finish their current step before they are stopped; a second Ctrl+C or SIGTERM exits
   at once. Before, the process was killed at once
+### Fixed
+- On Postgres, a resource whose reconciliation fails on a database error now shows `Failed` (or
+  `Degraded`) with that error in its status. Before, it stayed `Reconciling`, and the log showed
+  only "current transaction is aborted" instead of the real cause
 
 ## [0.273.0] - 2026-11-23
 ### Added
