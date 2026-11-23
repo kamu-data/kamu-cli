@@ -90,9 +90,6 @@ unused-ignored-advisory = "deny"
 
 # TODO: Remove when patches are available
 ignore = [
-    # rsa crate vulnerability (used by jsonwebtoken), no fix available yet
-    # https://rustsec.org/advisories/RUSTSEC-2023-0071.html
-    "RUSTSEC-2023-0071",
     # Unmaintained: paste
     # https://rustsec.org/advisories/RUSTSEC-2024-0436
     "RUSTSEC-2024-0436",

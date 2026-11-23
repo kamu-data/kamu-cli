@@ -17,16 +17,18 @@ const ENV_VAR_KAMU_JWT_SECRET: &str = "KAMU_JWT_SECRET";
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Default)]
 pub struct JwtAuthenticationConfig {
     pub jwt_secret: String,
     pub maybe_dummy_token_account: Option<Account>,
 }
 
 impl JwtAuthenticationConfig {
+    /// An absent or empty secret is replaced with a random one: HMAC keys must
+    /// not be empty
     pub fn new(maybe_jwt_secret: Option<String>) -> Self {
         Self {
             jwt_secret: maybe_jwt_secret
+                .filter(|secret| !secret.is_empty())
                 .unwrap_or_else(|| get_random_string(None, 64, &AllowedSymbols::Alphanumeric)),
             maybe_dummy_token_account: None,
         }
@@ -34,6 +36,12 @@ impl JwtAuthenticationConfig {
 
     pub fn load_from_env() -> Self {
         Self::new(std::env::var(ENV_VAR_KAMU_JWT_SECRET).ok())
+    }
+}
+
+impl Default for JwtAuthenticationConfig {
+    fn default() -> Self {
+        Self::new(None)
     }
 }
 

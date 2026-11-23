@@ -40,8 +40,14 @@ pub struct FileDownloadServiceJwt {
 }
 
 impl FileDownloadServiceJwt {
-    fn jwt_secret(&self) -> &[u8] {
-        self.jwt_config.jwt_secret.as_bytes()
+    fn encoding_key(&self) -> EncodingKey {
+        EncodingKey::from_secret(self.jwt_config.jwt_secret.as_bytes())
+            .expect("JwtAuthenticationConfig guarantees a non-empty secret")
+    }
+
+    fn decoding_key(&self) -> DecodingKey {
+        DecodingKey::from_secret(self.jwt_config.jwt_secret.as_bytes())
+            .expect("JwtAuthenticationConfig guarantees a non-empty secret")
     }
 }
 
@@ -67,7 +73,7 @@ impl FileDownloadService for FileDownloadServiceJwt {
         let token = encode(
             &Header::new(DOWNLOAD_TOKEN_ALGORITHM),
             &claims,
-            &EncodingKey::from_secret(self.jwt_secret()),
+            &self.encoding_key(),
         )
         .int_err()?;
 
@@ -89,19 +95,15 @@ impl FileDownloadService for FileDownloadServiceJwt {
         validation.set_issuer(&[DOWNLOAD_TOKEN_ISSUER]);
         validation.set_required_spec_claims(&["exp", "iss"]);
 
-        let claims = decode::<FileDownloadClaims>(
-            token,
-            &DecodingKey::from_secret(self.jwt_secret()),
-            &validation,
-        )
-        .map_err(|e| {
-            if matches!(e.kind(), ErrorKind::ExpiredSignature) {
-                DecodeDownloadTokenError::Expired(ExpiredDownloadTokenError {})
-            } else {
-                invalid_token(e)
-            }
-        })?
-        .claims;
+        let claims = decode::<FileDownloadClaims>(token, &self.decoding_key(), &validation)
+            .map_err(|e| {
+                if matches!(e.kind(), ErrorKind::ExpiredSignature) {
+                    DecodeDownloadTokenError::Expired(ExpiredDownloadTokenError {})
+                } else {
+                    invalid_token(e)
+                }
+            })?
+            .claims;
 
         Ok(FileDownload {
             dataset_id: odf::DatasetID::from_did_str(&claims.dataset_id).map_err(invalid_token)?,

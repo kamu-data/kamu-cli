@@ -76,8 +76,10 @@ impl AuthenticationServiceImpl {
 
         Self {
             time_source,
-            encoding_key: EncodingKey::from_secret(config.jwt_secret.as_bytes()),
-            decoding_key: DecodingKey::from_secret(config.jwt_secret.as_bytes()),
+            encoding_key: EncodingKey::from_secret(config.jwt_secret.as_bytes())
+                .expect("JwtAuthenticationConfig guarantees a non-empty secret"),
+            decoding_key: DecodingKey::from_secret(config.jwt_secret.as_bytes())
+                .expect("JwtAuthenticationConfig guarantees a non-empty secret"),
             authentication_providers_by_method,
             account_service,
             access_token_svc,
