@@ -198,6 +198,7 @@ impl ResourceFacade for LocalResourceFacadeImpl {
             .resolve_target_account(&self.principal, None)
             .await?;
 
+        let owner_id = self.resolve_owner(request.owner).await?;
         let scope = self.resolve_scope(request.selectors).await?;
 
         if scope.is_vacuous() {
@@ -216,12 +217,18 @@ impl ResourceFacade for LocalResourceFacadeImpl {
                 &target_account.did,
                 &scope,
                 request.visibility,
+                owner_id,
                 request.pagination,
             )
             .await?;
         let total_count = self
             .generic_resource_query_service
-            .count_search_resource_handles(&target_account.did, &scope, request.visibility)
+            .count_search_resource_handles(
+                &target_account.did,
+                &scope,
+                request.visibility,
+                owner_id,
+            )
             .await?;
 
         let items = self.summary_views_with_columns(snapshots)?;
@@ -240,6 +247,7 @@ impl ResourceFacade for LocalResourceFacadeImpl {
             .resolve_target_account(&self.principal, None)
             .await?;
 
+        let owner_id = self.resolve_owner(request.owner).await?;
         let scope = self.resolve_scope(request.selectors).await?;
 
         // Empty exact-name/id queries are vacuous.
@@ -256,17 +264,23 @@ impl ResourceFacade for LocalResourceFacadeImpl {
                 &target_account.did,
                 &scope,
                 request.visibility,
+                owner_id,
                 request.pagination,
             )
             .await?;
         let total_count = self
             .generic_resource_query_service
-            .count_search_resource_handles(&target_account.did, &scope, request.visibility)
+            .count_search_resource_handles(
+                &target_account.did,
+                &scope,
+                request.visibility,
+                owner_id,
+            )
             .await?;
 
         let items = rows
             .into_iter()
-            .map(resource_handle_from_row)
+            .map(ResourceHandleRow::into_handle)
             .collect::<Vec<_>>();
 
         Ok(SearchResourceHandlesResponse { items, total_count })
@@ -290,7 +304,7 @@ impl ResourceFacade for LocalResourceFacadeImpl {
         Ok(match plan {
             ApplyManifestPlanningDecision::Planned(mut plan) => {
                 plan.warnings.splice(0..0, prepared.header_warnings);
-                plan.resource.headers.account = prepared.target_account;
+                plan.resource.headers.set_account(prepared.target_account);
 
                 ApplyManifestPlanningDecision::Planned(plan)
             }
@@ -318,7 +332,7 @@ impl ResourceFacade for LocalResourceFacadeImpl {
         Ok(match result {
             ApplyManifestApplicationDecision::Applied(mut result) => {
                 result.warnings.splice(0..0, prepared.header_warnings);
-                result.resource.headers.account = prepared.target_account;
+                result.resource.headers.set_account(prepared.target_account);
 
                 ApplyManifestApplicationDecision::Applied(result)
             }
@@ -734,6 +748,40 @@ impl LocalResourceFacadeImpl {
             .collect()
     }
 
+    /// Resolves the owner that narrows a search. One given by ID need not exist
+    /// any more, but if it does, the other parts of the reference must match.
+    async fn resolve_owner(
+        &self,
+        maybe_owner: Option<ResourceRef>,
+    ) -> Result<Option<ResourceID>, ListResourcesError> {
+        let Some(owner) = maybe_owner else {
+            return Ok(None);
+        };
+
+        validate_ref(&owner)?;
+
+        let owner_id = owner.id;
+        let response = self
+            .get_handles(vec![owner], ResourceVisibility::Active)
+            .await?;
+
+        if let Some(owner) = response.successes.into_iter().next() {
+            return Ok(Some(owner.item.id));
+        }
+
+        match (response.problems.into_iter().next(), owner_id) {
+            (Some(problem), Some(_))
+                if matches!(problem.error, ResourceLookupProblem::IDNotFound(_)) =>
+            {
+                Ok(owner_id)
+            }
+            (Some(problem), _) => Err(ListResourcesError::OwnerLookup(problem.error)),
+            (None, _) => Err(ListResourcesError::Internal(InternalError::new(
+                "Owner lookup gave neither a resource nor a problem",
+            ))),
+        }
+    }
+
     /// Resolves a request's selectors into a repository scope, each carrying
     /// its own resolved label pairs.
     ///
@@ -960,13 +1008,12 @@ impl LocalResourceFacadeImpl {
                         }
                         Ok(snapshot)
                     }) {
-                    Ok(snapshot) => {
+                    Ok(mut snapshot) => {
+                        snapshot.headers.set_account(group.account.clone());
+
                         let resource = Resource {
                             schema: snapshot.schema,
-                            headers: kamu_resources::ResourceHeaders {
-                                account: group.account.clone(),
-                                ..snapshot.headers
-                            },
+                            headers: snapshot.headers,
                             spec: snapshot.spec,
                             status: snapshot.status.unwrap_or_else(new_pending_resource_status),
                         };
@@ -1060,7 +1107,7 @@ impl LocalResourceFacadeImpl {
                 )
             }) {
                 Ok(row) => {
-                    let handle = resource_handle_from_row(row);
+                    let handle = row.into_handle();
                     handles.push(IndexedResource {
                         request_index,
                         item: handle,
@@ -1212,6 +1259,7 @@ impl LocalResourceFacadeImpl {
             &target_account,
             canonical_labels.entries,
             canonical_annotations.entries,
+            self.canonicalize_owner_references(manifest.headers.owner_references)?,
         )?;
 
         self.ensure_manifest_id_is_accessible(
@@ -1229,6 +1277,40 @@ impl LocalResourceFacadeImpl {
             target_account,
             spec: manifest.spec,
         })
+    }
+
+    /// Replaces the type names by schemas. An ID finds the owner without its
+    /// type, so there the type may remain a name, even an unknown one.
+    fn canonicalize_owner_references(
+        &self,
+        owner_references: Vec<ResourceRef>,
+    ) -> Result<Vec<ResourceRef>, ResourceHeadersValidationError> {
+        if owner_references.is_empty() {
+            return Ok(owner_references);
+        }
+
+        let descriptors = self.list_resource_type_descriptors();
+
+        owner_references
+            .into_iter()
+            .map(|mut owner_reference| {
+                if let Some(r#type) = owner_reference.r#type.take() {
+                    owner_reference.r#type = Some(
+                        match resolve_schema_in_descriptors::<UnsupportedResourceSelectorError>(
+                            &descriptors,
+                            &r#type,
+                        ) {
+                            Ok(schema) => schema.into(),
+                            Err(_) if owner_reference.id.is_some() => r#type,
+                            Err(_) => {
+                                return Err(InvalidOwnerReferenceError::UnknownType(r#type).into());
+                            }
+                        },
+                    );
+                }
+                Ok(owner_reference)
+            })
+            .collect()
     }
 
     fn try_resolve_spec_view_dispatcher(

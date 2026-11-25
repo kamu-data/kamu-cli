@@ -18,7 +18,6 @@ use kamu_resources::{
 use serde::Serialize;
 use time_source::SystemTimeSource;
 
-use crate::GENERATED_NAME_SUFFIX_LENGTH;
 use crate::domain::{
     ApplyResourceAction,
     ApplyResourceHeaders,
@@ -43,11 +42,13 @@ use crate::domain::{
     ResourceLoadError,
     ResourceName,
     ResourceNameSuffixGenerator,
+    ResourceRef,
     ResourceSchemaProvider,
     ResourceSpecFromInput,
     ResourceValidateSpec,
     TypedResourceQueryService,
 };
+use crate::{GENERATED_NAME_SUFFIX_LENGTH, OwnerReferenceResolver, ResolveOwnerReferencesError};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -152,8 +153,15 @@ where
         let Some(resource) = maybe_existing else {
             return match precondition {
                 ApplyResourcePrecondition::None | ApplyResourcePrecondition::Absent => {
-                    self.plan_create_resource(params, now, omitted_name_handling)
-                        .await
+                    match self.resolve_owner_references(params, None).await? {
+                        OwnerReferencesResolution::Resolved(params) => {
+                            self.plan_create_resource(params, now, omitted_name_handling)
+                                .await
+                        }
+                        OwnerReferencesResolution::Rejected(rejection) => {
+                            Ok(PlannedApplyResourceDecision::Rejected(rejection))
+                        }
+                    }
                 }
                 ApplyResourcePrecondition::Generation(_) => {
                     Err(ApplyResourceUseCaseError::ConcurrentModification(
@@ -176,7 +184,54 @@ where
             ));
         }
 
-        self.plan_update_resource(resource, params, now)
+        match self
+            .resolve_owner_references(params, Some(&resource))
+            .await?
+        {
+            OwnerReferencesResolution::Resolved(params) => {
+                self.plan_update_resource(resource, params, now)
+            }
+            OwnerReferencesResolution::Rejected(rejection) => {
+                Ok(PlannedApplyResourceDecision::Rejected(rejection))
+            }
+        }
+    }
+
+    async fn resolve_owner_references(
+        &self,
+        mut params: ApplyResourceParams<R>,
+        maybe_existing: Option<&R>,
+    ) -> Result<OwnerReferencesResolution<R>, ApplyResourceUseCaseError<R>> {
+        // Events record an empty list as no list
+        let Some(owner_references) = params
+            .headers
+            .owner_references
+            .take()
+            .filter(|owner_references| !owner_references.is_empty())
+        else {
+            return Ok(OwnerReferencesResolution::Resolved(params));
+        };
+
+        let resolver = OwnerReferenceResolver {
+            generic_resource_query_service: self.generic_resource_query_service,
+            account: params.headers.resolved_account(),
+            owned_id: maybe_existing.map(|resource| *resource.id()),
+            current_owners: maybe_existing
+                .and_then(|resource| resource.headers().owner_references.as_deref())
+                .unwrap_or_default(),
+        };
+
+        use ResolveOwnerReferencesError as E;
+        match resolver.resolve(&owner_references).await {
+            Ok(owners) => {
+                params.headers.owner_references =
+                    Some(owners.into_iter().map(ResourceRef::from).collect());
+                Ok(OwnerReferencesResolution::Resolved(params))
+            }
+            Err(E::Rejected(err)) => Ok(OwnerReferencesResolution::Rejected(err.into())),
+            Err(E::InvalidHeaders(err)) => Err(err.into()),
+            Err(E::Internal(err)) => Err(err.into()),
+        }
     }
 
     /// Fails for an omitted name that the type does not generate
@@ -469,6 +524,13 @@ where
             }
         }
     }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+enum OwnerReferencesResolution<R: DeclarativeResource> {
+    Resolved(ApplyResourceParams<R>),
+    Rejected(ApplyResourceRejection),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

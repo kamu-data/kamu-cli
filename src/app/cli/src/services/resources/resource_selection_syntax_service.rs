@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_resources::{ResourceID, ResourceName, ResourceTypeDescriptor};
+use kamu_resources::{ResourceID, ResourceName, ResourceRef, ResourceTypeDescriptor, TypeUri};
 
 use crate::CLIError;
 
@@ -25,6 +25,22 @@ use crate::CLIError;
 pub enum ExactResourceRef {
     ById(ResourceID),
     ByName(ResourceName),
+}
+
+impl ExactResourceRef {
+    pub fn into_resource_ref(self, r#type: Option<TypeUri>) -> ResourceRef {
+        let (id, name) = match self {
+            Self::ById(id) => (Some(id), None),
+            Self::ByName(name) => (None, Some(name)),
+        };
+        ResourceRef {
+            account: None,
+            r#type: r#type.map(Into::into),
+            id,
+            did: None,
+            name,
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -50,6 +66,14 @@ pub trait ResourceSelectionSyntaxService: Send + Sync {
         explicit_context_name: Option<&str>,
         args: &[String],
     ) -> Result<ResourceSelectionSyntax, CLIError>;
+
+    /// Parses the value of `--owner`, which names one resource: `type/name`,
+    /// `type/<id>` or `<id>`
+    async fn parse_owner(
+        &self,
+        explicit_context_name: Option<&str>,
+        owner: &str,
+    ) -> Result<ResourceRef, CLIError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

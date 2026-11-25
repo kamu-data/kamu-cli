@@ -67,6 +67,10 @@ pub enum ResourceHeaderValidationProblemCode {
     TooManyAnnotations,
     /// The same annotation key appears more than once
     DuplicateAnnotationKey,
+    /// Number of owner references exceeds the maximum
+    TooManyOwnerReferences,
+    /// An owner reference has an unsupported form or an unknown type
+    InvalidOwnerReference,
     /// A label or annotation key could not be resolved to a registered
     /// extension schema, or its value is invalid for it
     ResourceExtensionSchema,
@@ -92,6 +96,10 @@ impl From<kamu_resources_facade::ResourceInvalidHeadersError> for ResourceInvali
             C::DuplicateAnnotationKey => {
                 ResourceHeaderValidationProblemCode::DuplicateAnnotationKey
             }
+            C::TooManyOwnerReferences => {
+                ResourceHeaderValidationProblemCode::TooManyOwnerReferences
+            }
+            C::InvalidOwnerReference => ResourceHeaderValidationProblemCode::InvalidOwnerReference,
             C::ResourceExtensionSchema => {
                 ResourceHeaderValidationProblemCode::ResourceExtensionSchema
             }

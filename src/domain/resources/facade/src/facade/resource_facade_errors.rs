@@ -42,6 +42,8 @@ pub enum ResourceHeadersValidationProblemCode {
     DuplicateLabelKey,
     TooManyAnnotations,
     DuplicateAnnotationKey,
+    TooManyOwnerReferences,
+    InvalidOwnerReference,
     ResourceExtensionSchema,
 }
 
@@ -65,6 +67,8 @@ impl From<ResourceHeadersValidationError> for ResourceInvalidHeadersError {
             E::DuplicateLabelKey { .. } => C::DuplicateLabelKey,
             E::TooManyAnnotations { .. } => C::TooManyAnnotations,
             E::DuplicateAnnotationKey { .. } => C::DuplicateAnnotationKey,
+            E::TooManyOwnerReferences { .. } => C::TooManyOwnerReferences,
+            E::InvalidOwnerReference(_) => C::InvalidOwnerReference,
         };
         Self {
             code,
@@ -326,6 +330,10 @@ pub enum ListResourcesError {
     #[error(transparent)]
     UnrepresentableScope(#[from] UnrepresentableScopeError),
 
+    /// The owner to search by does not resolve to a resource
+    #[error("Cannot search by owner: {0}")]
+    OwnerLookup(#[source] ResourceLookupProblem),
+
     /// A selector set an ODF field the facade cannot honour. Rejected rather
     /// than ignored: a dropped narrowing constraint widens the result set
     /// without the caller being able to tell.
@@ -357,6 +365,22 @@ pub enum ResourcesSummaryError {
 
     #[error(transparent)]
     Internal(#[from] InternalError),
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl From<BatchResourceError> for ListResourcesError {
+    fn from(err: BatchResourceError) -> Self {
+        use BatchResourceError as E;
+        match err {
+            E::UnsupportedSelector(err) => Self::UnsupportedSelector(err),
+            E::AccountResolution(err) => Self::AccountResolution(err),
+            E::AccountAccess(err) => Self::AccountAccess(err),
+            E::InvalidLabelFilter(err) => Self::InvalidLabelFilter(err),
+            E::RemoteRequest(err) => Self::RemoteRequest(err),
+            E::Internal(err) => Self::Internal(err),
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

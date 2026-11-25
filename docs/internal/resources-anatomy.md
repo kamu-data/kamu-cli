@@ -25,12 +25,13 @@ pub struct ResourceManifestHeaders {
     pub name: Option<String>,                // required, unless the type generates names
     pub labels: Vec<(TypeRef, serde_json::Value)>,
     pub annotations: Vec<(TypeRef, serde_json::Value)>,
+    pub owner_references: Vec<ResourceRef>,
 }
 ```
 
-A user may write **only**: `$schema`, `headers.{id?, account?, name?, labels, annotations}`, and
-`spec`. `deny_unknown_fields` means a manifest **cannot** carry `status`, timestamps, or
-`generation` — those are server-owned.
+A user may write **only**: `$schema`, `headers.{id?, account?, name?, labels, annotations,
+ownerReferences}`, and `spec`. `deny_unknown_fields` means a manifest **cannot** carry `status`,
+timestamps, or `generation` — those are server-owned.
 
 > **Well-known annotations.** `description` is not a dedicated header field — it is the *first*
 > well-known entry in `headers.annotations`, establishing the pattern future well-known annotations
@@ -82,6 +83,7 @@ pub struct ResourceHeaders {
     pub name: ResourceName,                  // (authored)
     pub labels: ResourceLabels,              // (authored) BTreeMap<TypeRef, serde_json::Value>
     pub annotations: ResourceAnnotations,    // (authored) BTreeMap<TypeRef, serde_json::Value>
+    pub owner_references: Option<Vec<ResourceHandle>>, // (authored) resolved owners
     pub generation: u64,                     // generated — bumps once per apply that changes headers or spec
     pub status_generation: u64,              // generated — bumps on every status update, deletion request and deletion
     pub created_at: DateTime<Utc>,           // generated

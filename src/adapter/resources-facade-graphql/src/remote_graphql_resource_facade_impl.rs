@@ -30,6 +30,7 @@ use kamu_resources_facade::{
     SearchResourcesRequest,
     SearchResourcesResponse,
     SpecViewOpts,
+    validate_ref,
     validate_selector,
 };
 use url::Url;
@@ -182,6 +183,9 @@ impl ResourceFacade for RemoteGraphqlResourceFacadeImpl {
         for selector in &request.selectors {
             validate_selector(selector)?;
         }
+        if let Some(owner) = &request.owner {
+            validate_ref(owner)?;
+        }
 
         let variables =
             Operation::SearchVariables::new(&request).map_err(ListResourcesError::Internal)?;
@@ -202,6 +206,9 @@ impl ResourceFacade for RemoteGraphqlResourceFacadeImpl {
 
         for selector in &request.selectors {
             validate_selector(selector)?;
+        }
+        if let Some(owner) = &request.owner {
+            validate_ref(owner)?;
         }
 
         let variables = SearchOperation::SearchHandlesVariables::new(&request)

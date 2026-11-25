@@ -135,6 +135,7 @@ pub async fn test_delete_by_name(h: &impl FacadeContractHarness) {
     // Resource must not appear in list
     let list = facade
         .search(SearchResourcesRequest {
+            owner: None,
             visibility: ResourceVisibility::Active,
             selectors: vec![ResourceSelector::of_type(
                 VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
@@ -942,6 +943,7 @@ fn search_request(visibility: ResourceVisibility) -> SearchResourcesRequest {
         selectors: vec![ResourceSelector::of_type(
             VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
         )],
+        owner: None,
         visibility,
         pagination: PaginationOpts {
             limit: 100,

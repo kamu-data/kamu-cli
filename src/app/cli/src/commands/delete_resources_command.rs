@@ -102,6 +102,7 @@ impl DeleteResourcesCommand {
                     ignore_not_found: self.ignore_not_found,
                     max_expanded_results: None,
                     label_filter: self.label_filter.clone(),
+                    owner: None,
                     visibility: ResourceVisibility::Active,
                     // Deleting a resource being deleted again reports where
                     // its deletion stands

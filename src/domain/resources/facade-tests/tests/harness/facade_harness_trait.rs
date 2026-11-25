@@ -55,6 +55,10 @@ pub trait FacadeContractHarness: Send + Sync {
     /// Returns the stable `AccountName` for the given fixture account.
     fn account_name(&self, account: TestAccount) -> odf::AccountName;
 
+    /// Renames the account. [`Self::account_name`] and the subjects the facades
+    /// act for keep the old name, so address it by ID.
+    async fn rename_account(&self, account: TestAccount, new_name: &odf::AccountName);
+
     /// Runs the background work that follows a write: delivers the pending
     /// outbox messages, then lets the resource controllers reconcile and
     /// complete deletions, until nothing is left to do.

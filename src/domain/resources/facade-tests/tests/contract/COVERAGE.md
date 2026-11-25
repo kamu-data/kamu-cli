@@ -164,3 +164,10 @@ Each `RF-*` contract scenario is listed with its status. Test code and comments 
 | RF-188 | generated_names.rs | Active | Planning a manifest without a name reports the name as pending | A placeholder in `resource`, no name in the `after` document |
 | RF-189 | generated_names.rs | Active | A manifest with an `id` and without a name keeps the name of the resource | Plan and apply alike |
 | RF-190 | generated_names.rs | Active | A manifest without a name is refused for a type that does not generate names | Omitted, `null`, and with an `id`; `InvalidHeaders` from plan, apply and batch apply |
+| RF-191 | owner_references.rs | Active | Owners are stored as handles and rendered in the manifest | Short form and id; the rendered manifest re-applies as `Untouched` |
+| RF-192 | owner_references.rs | Active | Plan and apply reject a reference that does not name an owner | Missing, in another account, being deleted, mismatching type or name, repeated, the resource itself |
+| RF-193 | owner_references.rs | Active | Owner references without a resolvable form are `InvalidHeaders` | Also too many of them |
+| RF-194 | owner_references.rs | Active | A resource keeps the reference to its deleted owner through updates | Omitting `ownerReferences` drops it |
+| RF-195 | owner_references.rs | Active | Search by owner narrows the selectors, with any visibility | By id, by name, and by both; `search` and `search_handles` agree, account-scoped |
+| RF-196 | owner_references.rs | Active | The owner to search by is found by id even when gone, by name only when live | Lookup problems and unresolvable forms are typed errors |
+| RF-197 | owner_references.rs | Active | Owners carry the current name of a renamed account | In plan, apply and get |

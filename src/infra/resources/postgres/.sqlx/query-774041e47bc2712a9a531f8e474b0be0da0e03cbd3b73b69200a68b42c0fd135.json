@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            INSERT INTO resource_owners_projection (resource_id, owner_id)\n            SELECT $1, owner_id\n            FROM UNNEST($2::uuid[]) AS o(owner_id)\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "UuidArray"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "774041e47bc2712a9a531f8e474b0be0da0e03cbd3b73b69200a68b42c0fd135"
+}

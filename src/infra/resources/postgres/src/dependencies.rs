@@ -18,6 +18,7 @@ pub fn register_dependencies(b: &mut CatalogBuilder) {
     b.add::<PostgresRawResourceEventStore>();
     b.add::<PostgresResourceRepository>();
     b.add::<PostgresResourceLabelProjectionRepository>();
+    b.add::<PostgresResourceOwnerProjectionRepository>();
     b.add::<PostgresResourceControllerStateRepository>();
 }
 

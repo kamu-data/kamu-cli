@@ -21,6 +21,7 @@ use crate::{
     TypeRef,
     validate_entry_counts,
     validate_name,
+    validate_owner_references,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -64,6 +65,18 @@ impl ApplyResourceHeaders {
         })
     }
 
+    pub fn try_with_owner_references(
+        self,
+        owner_references: Vec<ResourceRef>,
+    ) -> Result<Self, ResourceHeadersValidationError> {
+        validate_owner_references(&owner_references)?;
+
+        Ok(Self {
+            owner_references: Some(owner_references),
+            ..self
+        })
+    }
+
     fn parse_name(name: &str) -> Result<ResourceName, ResourceHeadersValidationError> {
         if name.is_empty() {
             return Err(ResourceHeadersValidationError::EmptyName);
@@ -83,9 +96,16 @@ impl ApplyResourceHeaders {
     /// [`ApplyResourceUseCase`](crate::ApplyResourceUseCase), which takes them
     /// with the account resolved
     pub fn resolved_account_id(&self) -> &odf::AccountID {
+        self.resolved_account()
+            .did
+            .as_ref()
+            .expect("resource headers must carry a resolved account by apply time")
+    }
+
+    /// See [`Self::resolved_account_id`]
+    pub fn resolved_account(&self) -> &auth::ResourceOwnerRef {
         self.account
             .as_ref()
-            .and_then(|account| account.did.as_ref())
             .expect("resource headers must carry a resolved account by apply time")
     }
 
@@ -155,7 +175,7 @@ mod tests {
     use pretty_assertions::assert_matches;
 
     use super::*;
-    use crate::{MAX_ANNOTATIONS, MAX_LABELS};
+    use crate::{MAX_ANNOTATIONS, MAX_LABELS, MAX_OWNER_REFERENCES, ResourceID};
 
     fn account() -> auth::ResourceOwnerRef {
         auth::ResourceOwnerRef {
@@ -289,6 +309,26 @@ mod tests {
         assert_eq!(
             headers.labels.unwrap().entries.get(&"big".parse().unwrap()),
             Some(&large_value)
+        );
+    }
+
+    #[test]
+    fn rejects_too_many_owner_references() {
+        let owner_references = vec![
+            ResourceRef {
+                id: Some(ResourceID::new(uuid::Uuid::new_v4())),
+                ..ResourceRef::default()
+            };
+            MAX_OWNER_REFERENCES + 1
+        ];
+
+        let result = ApplyResourceHeaders::try_new(Some(account()), Some("n"), vec![], vec![])
+            .unwrap()
+            .try_with_owner_references(owner_references);
+        assert_matches!(
+            result,
+            Err(ResourceHeadersValidationError::TooManyOwnerReferences { actual, max })
+                if actual == MAX_OWNER_REFERENCES + 1 && max == MAX_OWNER_REFERENCES
         );
     }
 }

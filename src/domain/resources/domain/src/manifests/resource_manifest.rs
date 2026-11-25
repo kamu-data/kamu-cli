@@ -10,11 +10,20 @@
 use std::collections::BTreeSet;
 
 use internal_error::{InternalError, ResultIntoInternal};
+use odf::metadata::serde::yaml::StructOrString;
 use serde::de::{MapAccess, SeqAccess, Visitor};
 use serde::ser::SerializeMap;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-use crate::{Resource, ResourceID, ResourceOwnerRef, ResourceSchemaId, TypeRef};
+use crate::{
+    Resource,
+    ResourceHandle,
+    ResourceID,
+    ResourceOwnerRef,
+    ResourceRef,
+    ResourceSchemaId,
+    TypeRef,
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -30,7 +39,7 @@ pub struct ResourceManifest {
 impl ResourceManifest {
     /// Reduces a stored resource to its **canonical manifest form**: the subset
     /// of fields a user actually authors (`$schema` + `headers.{account, name,
-    /// labels, annotations}` + `spec`).
+    /// labels, annotations, ownerReferences}` + `spec`).
     ///
     /// Server-owned state is deliberately dropped — `headers.id`, `generation`,
     /// `created_at`/`updated_at`/`deleted_at`, and the whole `status`. Two
@@ -74,6 +83,12 @@ impl ResourceManifest {
                     .entries
                     .iter()
                     .map(|(key, value)| (key.clone(), value.clone()))
+                    .collect(),
+                owner_references: headers
+                    .owner_references
+                    .iter()
+                    .flatten()
+                    .map(owner_reference_from_handle)
                     .collect(),
             },
             spec: spec.clone(),
@@ -122,6 +137,58 @@ pub struct ResourceManifestHeaders {
         deserialize_with = "deserialize_entries"
     )]
     pub annotations: Vec<(TypeRef, serde_json::Value)>,
+    #[serde(
+        default,
+        skip_serializing_if = "Vec::is_empty",
+        serialize_with = "serialize_owner_references",
+        deserialize_with = "deserialize_owner_references"
+    )]
+    pub owner_references: Vec<ResourceRef>,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+fn serialize_owner_references<S>(
+    owner_references: &[ResourceRef],
+    serializer: S,
+) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    serializer.collect_seq(
+        owner_references
+            .iter()
+            .cloned()
+            .map(odf::metadata::serde::yaml::resources::ResourceRef::from),
+    )
+}
+
+/// Accepts the short `Type:name` form as well
+fn deserialize_owner_references<'de, D>(deserializer: D) -> Result<Vec<ResourceRef>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let proxies = Option::<
+        Vec<StructOrString<odf::metadata::serde::yaml::resources::ResourceRef>>,
+    >::deserialize(deserializer)?;
+
+    proxies
+        .unwrap_or_default()
+        .into_iter()
+        .map(|proxy| ResourceRef::try_from(proxy).map_err(serde::de::Error::custom))
+        .collect()
+}
+
+/// The owner as a manifest names it: without the account, which is that of the
+/// resource
+fn owner_reference_from_handle(handle: &ResourceHandle) -> ResourceRef {
+    ResourceRef {
+        account: None,
+        r#type: Some(handle.r#type.clone().into()),
+        id: Some(handle.id),
+        did: handle.did.clone(),
+        name: Some(handle.name.clone()),
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -256,6 +323,62 @@ mod tests {
             round_tripped.account,
             Some(ResourceOwnerRef { did: Some(actual), .. }) if actual == did
         );
+    }
+
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+    #[test]
+    fn owner_references_accept_short_and_full_forms() {
+        let id = ResourceID::new(uuid::Uuid::new_v4());
+        let json = serde_json::json!({
+            "name": "n",
+            "ownerReferences": [
+                "VariableSet:my-vars",
+                { "type": "SecretSet", "name": "my-secrets" },
+                { "id": id },
+            ],
+        });
+
+        let headers: ResourceManifestHeaders = serde_json::from_value(json).unwrap();
+        let round_tripped: ResourceManifestHeaders =
+            serde_json::from_value(serde_json::to_value(&headers).unwrap()).unwrap();
+
+        for headers in [headers, round_tripped] {
+            assert_eq!(
+                headers.owner_references,
+                vec![
+                    ResourceRef {
+                        r#type: Some("VariableSet".parse().unwrap()),
+                        name: Some("my-vars".parse().unwrap()),
+                        ..ResourceRef::default()
+                    },
+                    ResourceRef {
+                        r#type: Some("SecretSet".parse().unwrap()),
+                        name: Some("my-secrets".parse().unwrap()),
+                        ..ResourceRef::default()
+                    },
+                    ResourceRef {
+                        id: Some(id),
+                        ..ResourceRef::default()
+                    },
+                ]
+            );
+        }
+    }
+
+    #[test]
+    fn no_owner_references_are_omitted() {
+        for json in [
+            r#"{"name": "n"}"#,
+            r#"{"name": "n", "ownerReferences": null}"#,
+            r#"{"name": "n", "ownerReferences": []}"#,
+        ] {
+            let headers: ResourceManifestHeaders = serde_json::from_str(json).unwrap();
+            assert_eq!(headers.owner_references, vec![]);
+
+            let serialized = serde_json::to_string(&headers).unwrap();
+            assert!(!serialized.contains("ownerReferences"), "{serialized}");
+        }
     }
 
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

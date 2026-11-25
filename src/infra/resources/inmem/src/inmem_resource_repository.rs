@@ -21,6 +21,7 @@ use kamu_resources::{
     CreateResourceError,
     ResourceDuplicateError,
     ResourceHandleRow,
+    ResourceHeadersExt,
     ResourceID,
     ResourceLabelPair,
     ResourceName,
@@ -39,6 +40,7 @@ use kamu_resources::{
     UpdateResourceError,
     deleted_account_name_sentinel,
     deleted_account_resource_id_sentinel,
+    owner_ids,
     string_label_entries,
 };
 
@@ -92,11 +94,10 @@ impl InMemoryResourceRepository {
     /// outbox-driven cleanup), so a missing account falls back to sentinels
     /// instead of failing the read.
     async fn resolve_snapshot(&self, mut snapshot: ResourceSnapshot) -> ResourceSnapshot {
-        let (resource_id, name) = self
+        let (id, name) = self
             .resolve_account_identity(&snapshot.headers.account.did)
             .await;
-        snapshot.headers.account.id = resource_id;
-        snapshot.headers.account.name = name;
+        set_account_identity(&mut snapshot, id, name);
         snapshot
     }
 
@@ -143,8 +144,7 @@ impl InMemoryResourceRepository {
                             deleted_account_name_sentinel(),
                         )
                     });
-                snapshot.headers.account.id = resource_id;
-                snapshot.headers.account.name = name;
+                set_account_identity(&mut snapshot, resource_id, name);
                 snapshot
             })
             .collect()
@@ -413,6 +413,7 @@ impl ResourceRepository for InMemoryResourceRepository {
         account_id: &odf::AccountID,
         scope: &ResourceScope,
         visibility: ResourceVisibility,
+        owner_id: Option<ResourceID>,
         pagination: PaginationOpts,
     ) -> Result<Vec<ResourceHandleRow>, InternalError> {
         if scope.is_vacuous() {
@@ -421,7 +422,7 @@ impl ResourceRepository for InMemoryResourceRepository {
 
         let mut snapshots = {
             self.state.read(self.transaction_id, |state| {
-                filter_scoped_snapshots(state, account_id, scope, visibility)
+                filter_scoped_snapshots(state, account_id, scope, visibility, owner_id)
             })
         };
 
@@ -440,13 +441,14 @@ impl ResourceRepository for InMemoryResourceRepository {
         account_id: &odf::AccountID,
         scope: &ResourceScope,
         visibility: ResourceVisibility,
+        owner_id: Option<ResourceID>,
     ) -> Result<usize, InternalError> {
         if scope.is_vacuous() {
             return Ok(0);
         }
 
         Ok(self.state.read(self.transaction_id, |state| {
-            filter_scoped_snapshots(state, account_id, scope, visibility).len()
+            filter_scoped_snapshots(state, account_id, scope, visibility, owner_id).len()
         }))
     }
 
@@ -544,6 +546,7 @@ impl ResourceRepository for InMemoryResourceRepository {
         account_id: &odf::AccountID,
         scope: &ResourceScope,
         visibility: ResourceVisibility,
+        owner_id: Option<ResourceID>,
         pagination: PaginationOpts,
     ) -> ResourceSnapshotStream<'_> {
         let account_id = account_id.clone();
@@ -552,7 +555,7 @@ impl ResourceRepository for InMemoryResourceRepository {
         let stream = futures::stream::once(async move {
             let mut snapshots_page: Vec<_> = {
                 self.state.read(self.transaction_id, |state| {
-                    filter_scoped_snapshots(state, &account_id, &scope, visibility)
+                    filter_scoped_snapshots(state, &account_id, &scope, visibility, owner_id)
                 })
             };
 
@@ -718,11 +721,27 @@ fn resource_name_matches_pattern(name: &str, pattern: &str) -> bool {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+fn set_account_identity(
+    snapshot: &mut ResourceSnapshot,
+    id: odf::ResourceID,
+    name: odf::AccountName,
+) {
+    let account = odf::ResourceOwnerHandle {
+        id,
+        name,
+        ..snapshot.headers.account.clone()
+    };
+    snapshot.headers.set_account(account);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 fn filter_scoped_snapshots(
     state: &ResourceStateView<'_, '_>,
     account_id: &odf::AccountID,
     scope: &ResourceScope,
     visibility: ResourceVisibility,
+    owner_id: Option<ResourceID>,
 ) -> Vec<ResourceSnapshot> {
     state
         .snapshots()
@@ -736,6 +755,11 @@ fn filter_scoped_snapshots(
         // may name its own account and carry its own label pairs, and
         // `account_id` is only the default for rows that do not.
         .filter(|snapshot| snapshot_matches_scope(snapshot, scope, account_id))
+        .filter(|snapshot| {
+            owner_id.is_none_or(|owner_id| {
+                owner_ids(snapshot.headers.owner_references.as_ref()).contains(&owner_id)
+            })
+        })
         .cloned()
         .collect()
 }

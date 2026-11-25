@@ -206,6 +206,7 @@ impl From<domain::ResourceVisibility> for ResourceVisibilityInput {
 #[cynic(graphql_type = "SearchResourcesInput")]
 pub(crate) struct SearchResourcesInput {
     pub selectors: Option<Vec<ResourceSelectorInput>>,
+    pub owner: Option<ResourceRefInput>,
     pub visibility: ResourceVisibilityInput,
 }
 
@@ -218,6 +219,7 @@ impl TryFrom<&SearchResourcesRequest> for SearchResourcesInput {
             // spans every type, but the facade has already resolved that to a
             // concrete selector list by this point.
             selectors: Some(resource_selector_inputs(&value.selectors)),
+            owner: value.owner.as_ref().map(Into::into),
             visibility: value.visibility.into(),
         })
     }

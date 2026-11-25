@@ -577,6 +577,7 @@ pub async fn test_account_resolution_taxonomy(h: &impl FacadeContractHarness) {
     // --- search ---
     let result = facade
         .search(SearchResourcesRequest {
+            owner: None,
             visibility: ResourceVisibility::Active,
             selectors: vec![ResourceSelector {
                 account: Some(unknown_account.clone()),
@@ -594,6 +595,7 @@ pub async fn test_account_resolution_taxonomy(h: &impl FacadeContractHarness) {
     // --- search_handles ---
     let result = facade
         .search_handles(SearchResourcesRequest {
+            owner: None,
             visibility: ResourceVisibility::Active,
             pagination: PaginationOpts::from_max_results(1),
             selectors: vec![ResourceSelector {

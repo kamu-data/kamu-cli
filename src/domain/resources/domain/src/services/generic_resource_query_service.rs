@@ -63,6 +63,7 @@ pub trait GenericResourceQueryService: Send + Sync {
         account_id: &odf::AccountID,
         scope: &ResourceScope,
         visibility: ResourceVisibility,
+        owner_id: Option<ResourceID>,
         pagination: PaginationOpts,
     ) -> Result<Vec<ResourceHandleRow>, InternalError>;
 
@@ -71,6 +72,7 @@ pub trait GenericResourceQueryService: Send + Sync {
         account_id: &odf::AccountID,
         scope: &ResourceScope,
         visibility: ResourceVisibility,
+        owner_id: Option<ResourceID>,
     ) -> Result<usize, InternalError>;
 
     /// A deleted resource is not found.
@@ -107,6 +109,7 @@ pub trait GenericResourceQueryService: Send + Sync {
         account_id: &odf::AccountID,
         scope: &ResourceScope,
         visibility: ResourceVisibility,
+        owner_id: Option<ResourceID>,
         pagination: PaginationOpts,
     ) -> Result<Vec<ResourceSnapshot>, InternalError>;
 

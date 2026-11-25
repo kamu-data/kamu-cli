@@ -314,6 +314,7 @@ impl From<ListResourcesError> for CLIError {
             | E::AccountAccess(_)
             | E::InvalidLabelFilter(_)
             | E::UnrepresentableScope(_)
+            | E::OwnerLookup(_)
             | E::UnsupportedSelectorField(_)) => Self::failure(e),
             E::RemoteRequest(err) => Self::from(err),
             E::Internal(err) => Self::critical(err),

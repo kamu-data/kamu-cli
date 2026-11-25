@@ -8,12 +8,16 @@
 // by the Apache License, Version 2.0.
 
 use crate::{
+    InvalidOwnerReferenceError,
+    MAX_OWNER_REFERENCES,
     ResourceAnnotations,
     ResourceLabels,
     ResourceName,
+    ResourceRef,
     ResourceValidateHeaders,
     TypeRef,
     TypeUri,
+    validate_owner_reference,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -47,7 +51,8 @@ impl ResourceValidateHeaders for ResourceHeadersInput {
 
     fn validate(&self) -> Result<(), Self::ValidationError> {
         validate_name(&self.name)?;
-        validate_entry_counts(self.labels.as_ref(), self.annotations.as_ref())
+        validate_entry_counts(self.labels.as_ref(), self.annotations.as_ref())?;
+        validate_owner_references(self.owner_references.as_deref().unwrap_or_default())
     }
 }
 
@@ -93,6 +98,23 @@ pub(crate) fn validate_entry_counts(
     Ok(())
 }
 
+pub(crate) fn validate_owner_references(
+    owner_references: &[ResourceRef],
+) -> Result<(), ResourceHeadersValidationError> {
+    if owner_references.len() > MAX_OWNER_REFERENCES {
+        return Err(ResourceHeadersValidationError::TooManyOwnerReferences {
+            actual: owner_references.len(),
+            max: MAX_OWNER_REFERENCES,
+        });
+    }
+
+    for owner_reference in owner_references {
+        validate_owner_reference(owner_reference)?;
+    }
+
+    Ok(())
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, thiserror::Error)]
@@ -120,6 +142,12 @@ pub enum ResourceHeadersValidationError {
 
     #[error("duplicate annotation key '{key}'")]
     DuplicateAnnotationKey { key: String },
+
+    #[error("too many owner references: got {actual}, max is {max}")]
+    TooManyOwnerReferences { actual: usize, max: usize },
+
+    #[error("invalid owner reference: {0}")]
+    InvalidOwnerReference(#[from] InvalidOwnerReferenceError),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

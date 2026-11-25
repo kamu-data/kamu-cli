@@ -7154,7 +7154,7 @@ type ResourceHandleEdge {
 """
 Result of listing resource handles by selectors
 """
-union ResourceHandleListOutcome = ResourceHandleConnection | ResourceUnsupportedSelectorProblem | ResourceAccountResolutionProblem | ResourceInvalidLabelFilterProblem
+union ResourceHandleListOutcome = ResourceHandleConnection | ResourceUnsupportedSelectorProblem | ResourceAccountResolutionProblem | ResourceInvalidLabelFilterProblem | ResourceOwnerLookupProblem
 
 """
 Kind of resource header validation failure
@@ -7192,6 +7192,14 @@ enum ResourceHeaderValidationProblemCode {
 	The same annotation key appears more than once
 	"""
 	DUPLICATE_ANNOTATION_KEY
+	"""
+	Number of owner references exceeds the maximum
+	"""
+	TOO_MANY_OWNER_REFERENCES
+	"""
+	An owner reference has an unsupported form or an unknown type
+	"""
+	INVALID_OWNER_REFERENCE
 	"""
 	A label or annotation key could not be resolved to a registered
 	extension schema, or its value is invalid for it
@@ -7459,7 +7467,7 @@ enum ResourceListColumnVisibility {
 """
 Result of listing resources by selectors
 """
-union ResourceListOutcome = ResourceConnection | ResourceUnsupportedSelectorProblem | ResourceAccountResolutionProblem | ResourceInvalidLabelFilterProblem
+union ResourceListOutcome = ResourceConnection | ResourceUnsupportedSelectorProblem | ResourceAccountResolutionProblem | ResourceInvalidLabelFilterProblem | ResourceOwnerLookupProblem
 
 """
 Reason a resource reference could not be resolved
@@ -7549,6 +7557,16 @@ type ResourceOwnerHandle {
 	Name of the account.
 	"""
 	name: AccountName!
+}
+
+"""
+The owner to search by could not be resolved
+"""
+type ResourceOwnerLookupProblem {
+	"""
+	Why the reference to the owner could not be resolved
+	"""
+	problem: ResourceLookupProblem!
 }
 
 """
@@ -8240,10 +8258,10 @@ enum SearchEntityName {
 Selects resources to search, for both `search` and `searchHandles` — only
 the response shape differs.
 
-Every narrowing lives on the selectors, accounts included: there is no
-call-level `account` or `labelFilter`. A uniform filter is the special case
-where every selector carries the same one, and selectors being OR'd makes
-that exactly equivalent.
+Accounts and labels live on the selectors: there is no call-level `account`
+or `labelFilter`. A uniform filter is the special case where every selector
+carries the same one, and selectors being OR'd makes that exactly
+equivalent.
 """
 input SearchResourcesInput {
 	"""
@@ -8252,6 +8270,11 @@ input SearchResourcesInput {
 	narrowing to zero, not a widening to everything.
 	"""
 	selectors: [ResourceSelectorInput!]
+	"""
+	Matches only the resources this one owns. By ID the owner may be in any
+	state, even purged; by name it must be live.
+	"""
+	owner: ResourceRefInput
 	"""
 	Which resources to match
 	"""

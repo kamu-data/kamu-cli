@@ -11,6 +11,7 @@ use internal_error::{InternalError, ResultIntoInternal};
 use kamu_resources::{
     ApplyResourceHeaders,
     ResourceManifest,
+    ResourceRef,
     ResourceWarning,
     description_annotation_type_ref,
     resource_label_not_indexed_warning,
@@ -46,6 +47,7 @@ pub(crate) fn make_apply_headers(
     target_account: &odf::ResourceOwnerHandle,
     labels: Vec<(kamu_resources::TypeRef, serde_json::Value)>,
     annotations: Vec<(kamu_resources::TypeRef, serde_json::Value)>,
+    owner_references: Vec<ResourceRef>,
 ) -> Result<ApplyResourceHeaders, ApplyManifestError> {
     ApplyResourceHeaders::try_new(
         Some(target_account.clone().into()),
@@ -53,6 +55,7 @@ pub(crate) fn make_apply_headers(
         labels,
         annotations,
     )
+    .and_then(|headers| headers.try_with_owner_references(owner_references))
     .map_err(Into::into)
 }
 

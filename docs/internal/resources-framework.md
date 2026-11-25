@@ -62,6 +62,7 @@ make clippy
   - [4. Layered architecture](#4-layered-architecture)
   - [5. Domain model (`kamu-resources`)](#5-domain-model-kamu-resources)
     - [Core traits](#core-traits)
+    - [Owner references](#owner-references)
     - [Events](#events)
     - [Repository](#repository)
     - [Dispatchers](#dispatchers)
@@ -392,6 +393,42 @@ included, with the category `ImmutableFieldChanged`, in plan and apply alike.
 - The projector refuses a `SpecUpdated` event of an immutable type, so such a stream does not load.
   A type whose specs were ever updated therefore cannot become immutable.
 
+### Owner references
+
+`headers.ownerReferences` names the resources that own a resource, up to `MAX_OWNER_REFERENCES`. It
+is a record for lineage and for controllers that act on what a resource owns; the framework itself
+neither deletes nor blocks anything by it. Accounts are a different kind of owner.
+
+- **A manifest names an owner** by ID, or by type and name, also as `Type:name`. The account, if
+  given, must be that of the resource, which is the default. ODF has no such rule.
+- **The facade replaces type names by schemas, and the planner resolves the owners**
+  ([`owner_reference_resolver.rs`](/src/domain/resources/services/src/services/owner_reference_resolver.rs)),
+  so plan and apply decide alike. Events and headers carry full handles only. A handle records what
+  the owner was like when it was added, so its name may be out of date. Its account is always that of
+  the resource (`ResourceHeadersExt::set_account`).
+- **A new owner must be a live resource of the same account,** other than the resource itself, named
+  once, and it must match every given part of the reference. Anything else rejects the apply. The
+  check is not a lock: the owner may be deleted right after.
+- **An owner the resource already has is kept without being looked up,** whatever became of it, if
+  it is referenced by ID. A resource therefore stays updatable after its owner is renamed, deleted
+  or purged. Of the other parts, the account and the type must match, since they never change; the
+  name is not checked. A reference by name is always resolved, since another resource may have taken
+  the name.
+- **The set of owner IDs is what counts as the value:** another order changes nothing. A changed set
+  bumps the generation like any headers change.
+- **An apply that omits the references clears them,** as it does labels. Code that rebuilds the
+  headers of an existing resource carries them over, as `DatasetEnvVarMutationAdapter` does.
+- **A dry run of a batch does not see the resources the batch creates,** so it rejects a resource
+  owned by one of them, which applying the batch accepts.
+
+- **The references form a graph that may have cycles.** Only a resource owning itself is rejected:
+  two resources may own each other, and a check at apply could not exclude that, since it locks
+  nothing. Whatever follows the references, such as a cascade, must remember what it has visited.
+
+`resource_owners_projection` indexes the owners for
+[searches by owner](#10-facade-kamu-resources-facade). `ResourcePersistenceServiceHelper` writes it
+when the owners change. The owned resource must exist; the owner may be gone.
+
 ### Events
 
 `ResourceEvent<TSpec>` is the event-sourcing alphabet:
@@ -459,6 +496,7 @@ their counts take a `ResourceVisibility`:
 
 **Label filters apply only to scoped searches**, never to direct identity reads: the scoped calls
 carry their pairs per row inside `ResourceScope`, while the by-id/by-name reads take none at all.
+The same calls take an optional owner ID, which narrows every row.
 
 `ResourceControllerStateRepository` (`repo/`) stores the controller runtime's bookkeeping and finds
 the resources a controller must act on; see [Controller bookkeeping](#controller-bookkeeping).
@@ -488,8 +526,8 @@ which takes a `ResourceScope` and answers a multi-type request in one query.
 ### 5a. Resource anatomy — input vs auto-generated
 
 Only a subset of a resource is user-authored: a manifest carries `$schema`,
-`headers.{id?, account?, name?, labels, annotations}` and `spec`, and nothing else —
-`deny_unknown_fields` rejects `status`, timestamps and `generation`, which are server-owned. The
+`headers.{id?, account?, name?, labels, annotations, ownerReferences}` and `spec`, and nothing else
+— `deny_unknown_fields` rejects `status`, timestamps and `generation`, which are server-owned. The
 framework generates the remaining headers (`id`, resolved `account`, `generation`,
 `status_generation`, `created_at`/`updated_at`/`deletion_requested_at`/`deleted_at`) and the whole
 `status`. `SecretSet` goes further: authored
@@ -517,8 +555,8 @@ and the later `*_resource_*` migrations (SQLite mirrors alongside).
 
 - **`resources`** — one row per resource (the snapshot): `resource_id` (UUID, **PK**),
   `account_id`, `resource_schema`, `resource_name`, `labels`/`annotations`
-  (JSONB), `spec` (JSONB), `status` (JSONB, nullable), `generation`, `status_generation`,
-  `created_at`/`updated_at`,
+  (JSONB), `owner_references` (JSONB, nullable), `spec` (JSONB), `status` (JSONB, nullable),
+  `generation`, `status_generation`, `created_at`/`updated_at`,
   `deletion_requested_at`/`deleted_at` (nullable), `last_event_id`. **Uniqueness:** a unique index
   on `(account_id, resource_schema, resource_name)`, case-insensitive, partial
   `WHERE deletion_requested_at IS NULL`.
@@ -557,7 +595,8 @@ it ([§8](#8-rename--conflict-rules)).
   carries it.
 - Completing the deletion sets `deleted_at`. The deleted resource keeps its name, so several
   deleted resources and a live one may carry the same name.
-- A deleted resource keeps its rows in `resource_labels_projection`, so label selectors find it.
+- A deleted resource keeps its rows in `resource_labels_projection` and
+  `resource_owners_projection`, so label selectors and searches by owner find it.
 - Names, searches and listings hide resources whose deletion was requested unless asked; see
   [Repository](#repository). The summary counts them as `deleting` and `deleted`, and the total
   includes both.
@@ -1291,7 +1330,8 @@ the normal per-item `data` is unavailable (see `GqlError::gql_extended` /
   a `ResourceAccountResolver`, `GenericResourceQueryService`, and
   `ResourceExtensionSchemaResolver`. For `plan_apply_manifest` / `apply_manifest`, the shared
   preparation step parses the manifest, resolves the account, resolves the CRUD dispatcher,
-  canonicalizes and validates labels/annotations, collects header warnings, then builds
+  canonicalizes and validates labels/annotations, replaces type names in owner references by
+  schemas, collects header warnings, then builds
   `ApplyResourceHeaders`; this is why plan/apply accept, reject, and warn identically.
 - **`RemoteGraphqlResourceFacadeImpl`** — a `cynic`-based GraphQL client that issues the queries /
   mutations of a remote server (whose resolvers use a *local* facade there). It lives in the
@@ -1305,14 +1345,21 @@ the normal per-item `data` is unavailable (see `GqlError::gql_extended` /
 on demand by the CLI for remote contexts — see [§12](#12-cli).)
 
 **Label filtering** rides on the selectors themselves: each `ResourceSelector` carries an optional
-`labels`, and there is **no** call-level filter — search requests carry only `selectors`, `account`
-and `pagination`, while the batch ref calls take a bare `Vec<ResourceRef>`, which has no `labels`
-field at all. A uniform filter is just the case where every selector carries the same labels; what
-per-selector labels add is two selectors filtering *differently* in one call.
+`labels`, and there is **no** call-level label filter — search requests carry only `selectors`,
+`owner`, `visibility` and `pagination`, while the batch ref calls take a bare `Vec<ResourceRef>`,
+which has no `labels` field at all. A uniform filter is just the case where every selector carries
+the same labels; what per-selector labels add is two selectors filtering *differently* in one call.
 
 **→ [Resource label filtering](resources-label-filtering.md)** — the full path: resolution through
 `ResourceExtensionSchemaResolver`, the AND-only evaluation boundary in `flatten_conjunction`,
 per-row scope pairs, the `resource_labels_projection` table, and the known rebuild gap.
+
+**Searching by owner** is the one call-level filter: `SearchResourcesRequest.owner` narrows every
+selector to the resources that one resource [owns](#owner-references), since the ODF
+`ResourceSelector` has no such field. An owner given by ID may be in any state or gone; the rest of
+the reference is checked only against a live resource with that ID. One given by name must be live,
+whatever the visibility. The lookup covers the reference's account, by default the caller's,
+whatever accounts the selectors name. A failed one is `ListResourcesError::OwnerLookup`.
 
 ---
 
@@ -1388,9 +1435,9 @@ benefit of the ODF-shaped API. Naming an account you are not allowed to read den
 call rather than dropping that selector (RF-105).
 
 **Accounts live on the selectors, at one level only.** There is no call-level `account`:
-`SearchResourcesInput` carries nothing but `selectors`, and a selector naming no account resolves to
-the calling subject's own. A type-less selector may name one, which is how an all-types listing is
-scoped to an account. Per-row mechanics are in
+beside `selectors`, `SearchResourcesInput` carries only `owner` and `visibility`, and a selector
+naming no account resolves to the calling subject's own. A type-less selector may name one, which
+is how an all-types listing is scoped to an account. Per-row mechanics are in
 [resources-label-filtering.md](resources-label-filtering.md).
 
 RFC-018 specifies no search-request type at all, so `SearchResourcesInput` is ours; accepting a
@@ -1474,7 +1521,7 @@ implementations under `impl/`):
 | `ResourceManifestDiscoveryService` | Finds `.yaml`/`.yml`/`.json` manifests from paths/stdin (recursive optional). |
 | `ResourceManifestExecutionService` | Reads a discovered manifest and calls `plan_apply_manifest` / `apply_manifest`. |
 | `ResourceTypeLookupService` | Resolves a resource type by selector name/alias/raw string; caches `list_supported_resource_types` per context. |
-| `ResourceSelectionSyntaxService` | Parses the `get`/`delete` selector grammar. |
+| `ResourceSelectionSyntaxService` | Parses the `get`/`delete` selector grammar, and the value of `--owner`. |
 | `ResourceLabelSelectorParser` | Parses `--label`/`-l` arguments into the wire-level `ResourceLabelFilterInput` (scanner + parser pair). Passes keys/values through verbatim — alias resolution and schema validation belong to the facade. |
 | `ResourceSelectionResolutionService` | Expands parsed selectors into concrete targets via facade queries. |
 | `ResourceSelectorResolutionService` | Resolves a single selector string to a `ResourceRef`. |
@@ -1494,8 +1541,9 @@ themselves are agnostic. Selector grammar is specified below, after the semantic
 | May return / act on multiple | yes (per manifest) | **yes, but bounded** — selector-driven, capped by `max_results`, `--unbounded` to lift | yes (bounded by `--max-results`/`--unbounded`) | yes |
 | Output modes | summary + canonical diff (dry-run *and* live apply)/warnings; verbose | `-o name` \| `-o json` \| `-o yaml`; `--spec` for apply-compatible spec | Table/CSV/JSON/Parquet (via `OutputConfig`), `-w` for wider detail | summary / dry-run preview |
 | Default secret visibility | n/a | **`Encrypted`** (ciphertext); `--revealed` to decrypt | secrets not expanded in list columns | n/a |
-| Relevant flags | `--dry-run`, `--recursive`, `--stdin`, `--continue-on-error` | `--ignore-not-found`, `--spec`, `--revealed`, `--max-results`/`--unbounded`, `--label`/`-l` | `--max-results`/`--unbounded`, `-w`, `-o`, `--label`/`-l` | `--force`, `--ignore-not-found`, `--dry-run`, `--label`/`-l` |
+| Relevant flags | `--dry-run`, `--recursive`, `--stdin`, `--continue-on-error` | `--ignore-not-found`, `--spec`, `--revealed`, `--max-results`/`--unbounded`, `--label`/`-l`, `--owner` | `--max-results`/`--unbounded`, `-w`, `-o`, `--label`/`-l`, `--owner` | `--force`, `--ignore-not-found`, `--dry-run`, `--label`/`-l` |
 | Label filtering | n/a | `-l` narrows the selector expansion | `-l` narrows the listing (incl. `list %`) | `-l` narrows what `--all`/patterns resolve to |
+| Filtering by owner | n/a | `--owner` narrows the selector expansion, exact names and ids included | `--owner` narrows the listing; refused for `datasets` | n/a |
 | Resources being deleted | a manifest taking the name of one creates a new resource and warns | hidden; `--include-deleting` shows them, and a name may then match several; an id finds them | hidden; `--include-deleting` lists them, as does a list of ids alone | names select live resources only; an id selects a resource being deleted again |
 | Deleted resources | a manifest taking the name of one creates a new resource | hidden; `--include-deleted` shows them, `--deleted` only them and those being deleted; an id finds them; `--revealed` is refused | as `get`; `--include-deleted` lists the live ones by name, then the others newest deletion first | never selected |
 | Flag semantics | default: whole batch is one transaction, a rejection/failure rolls back every manifest including earlier successes; `--continue-on-error`: apply each manifest independently so earlier successes survive a later failure; `--dry-run`: plan only, no writes | `--ignore-not-found`: skip missing selectors instead of erroring | — | `--force`: skip confirmation prompt; `--ignore-not-found`: exit OK if absent; `--dry-run`: preview resolved deletions |
@@ -1619,7 +1667,7 @@ mixed dataset+resource form) are rejected — datasets carry no labels, and filt
 resource half of a mixed delete would still delete every named dataset unfiltered.
 
 **`-l` narrows the whole invocation, which the CLI expresses per selector.** The facade has no
-call-level filter, so the CLI stamps the parsed filter onto *every* selector it builds — in
+call-level label filter, so the CLI stamps the parsed filter onto *every* selector it builds — in
 `selectors_for_query` for `list`, and via `with_labels` in the selection-resolution service for
 `get`/`delete`. Because selectors are OR'd, `(A ∧ L) ∨ (B ∧ L)` is exactly `(A ∨ B) ∧ L`, so
 `kamu list vs/a-% ss/b-% -l env=prod` runs the same query a call-level filter would. The CLI has
@@ -1674,8 +1722,8 @@ they get from `kamu get -o yaml` provably agree, and the parity is pinned by the
 `apply_documents_match_rendered_manifest`.
 
 The canonical form is the authored subset — `$schema` + `headers.{account, name, labels,
-annotations}` + `spec` — deliberately excluding `headers.id`, `generation`, the timestamps, and
-`status`. Two consequences follow directly:
+annotations, ownerReferences}` + `spec` — deliberately excluding `headers.id`, `generation`, the
+timestamps, and `status`. Two consequences follow directly:
 
 - **An unchanged apply yields byte-identical documents** (`before == Some(after)`, which
   `ApplyManifestDocuments::has_changes()` reports). There are no spurious differences to normalize:

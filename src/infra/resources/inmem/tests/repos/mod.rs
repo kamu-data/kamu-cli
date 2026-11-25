@@ -13,4 +13,5 @@ use in_memory_resource_repositories_harness::*;
 mod test_inmem_raw_resource_event_store;
 mod test_inmem_resource_controller_state_repository;
 mod test_inmem_resource_label_projection_repository;
+mod test_inmem_resource_owner_projection_repository;
 mod test_inmem_resource_repository;

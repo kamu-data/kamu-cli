@@ -14,6 +14,7 @@ use internal_error::InternalError;
 use thiserror::Error;
 
 use crate::{
+    ResourceHandle,
     ResourceHeaders,
     ResourceID,
     ResourceName,
@@ -132,12 +133,16 @@ pub trait ResourceRepository: Send + Sync {
     /// Label filtering rides on `scope`: each row carries the pairs it must
     /// satisfy, so one call may filter differently per type.
     ///
+    /// An `owner_id` narrows every row to the resources it owns, whether or not
+    /// the owner still exists.
+    ///
     /// Orders as [`Self::list_resource_snapshots`] does.
     async fn search_resource_handles(
         &self,
         account_id: &odf::AccountID,
         scope: &ResourceScope,
         visibility: ResourceVisibility,
+        owner_id: Option<ResourceID>,
         pagination: PaginationOpts,
     ) -> Result<Vec<ResourceHandleRow>, InternalError>;
 
@@ -146,6 +151,7 @@ pub trait ResourceRepository: Send + Sync {
         account_id: &odf::AccountID,
         scope: &ResourceScope,
         visibility: ResourceVisibility,
+        owner_id: Option<ResourceID>,
     ) -> Result<usize, InternalError>;
 
     /// Returns the resource in any state.
@@ -178,7 +184,7 @@ pub trait ResourceRepository: Send + Sync {
     ) -> Result<Vec<ResourceSnapshot>, InternalError>;
 
     /// Spans the schemas named by `scope`, each with its own query and label
-    /// pairs.
+    /// pairs. Takes `owner_id` as [`Self::search_resource_handles`] does.
     ///
     /// Orders by last update, newest first. When deleted resources are visible,
     /// the live ones keep that order and come first; the others follow, newest
@@ -189,6 +195,7 @@ pub trait ResourceRepository: Send + Sync {
         account_id: &odf::AccountID,
         scope: &ResourceScope,
         visibility: ResourceVisibility,
+        owner_id: Option<ResourceID>,
         pagination: PaginationOpts,
     ) -> ResourceSnapshotStream<'_>;
 
@@ -502,6 +509,18 @@ impl ResourceHandleRow {
             name: odf::AccountName::new_unchecked(&self.account_name),
         }
     }
+
+    pub fn into_handle(self) -> ResourceHandle {
+        ResourceHandle {
+            account: self.account_handle(),
+            r#type: TypeUri::new_unchecked(&self.schema),
+            id: ResourceID::new(self.id),
+            // TODO: temporary until we support DID-aware resource types; once we do,
+            // this must be populated instead of always `None`.
+            did: None,
+            name: ResourceName::new_unchecked(&self.name),
+        }
+    }
 }
 
 impl From<&ResourceSnapshot> for ResourceHandleRow {
@@ -533,6 +552,7 @@ pub struct ResourceSnapshotRow {
     pub resource_name: String,
     pub labels: serde_json::Value,
     pub annotations: serde_json::Value,
+    pub owner_references: Option<serde_json::Value>,
     pub spec: serde_json::Value,
     pub status: Option<serde_json::Value>,
     pub generation: i64,
@@ -547,19 +567,19 @@ pub struct ResourceSnapshotRow {
 impl ResourceSnapshotRow {
     pub fn into_snapshot(self) -> ResourceSnapshot {
         let id = ResourceID::new(self.id);
+        let account = odf::ResourceOwnerHandle {
+            // TODO: Support Org accounts
+            r#type: odf::metadata::auth::User::type_uri().cheap_clone(),
+            id: ResourceID::new(self.account_resource_id),
+            did: self.account_id,
+            name: odf::AccountName::new_unchecked(&self.account_name),
+        };
 
         ResourceSnapshot {
             id,
             schema: TypeUri::new_unchecked(&self.resource_schema),
             headers: ResourceHeaders {
                 id,
-                account: odf::ResourceOwnerHandle {
-                    // TODO: Support Org accounts
-                    r#type: odf::metadata::auth::User::type_uri().cheap_clone(),
-                    id: ResourceID::new(self.account_resource_id),
-                    did: self.account_id,
-                    name: odf::AccountName::new_unchecked(&self.account_name),
-                },
                 name: ResourceName::new_unchecked(&self.resource_name),
                 labels: crate::resource_labels_from_json(self.labels),
                 annotations: crate::resource_annotations_from_json(self.annotations),
@@ -569,7 +589,11 @@ impl ResourceSnapshotRow {
                 updated_at: self.updated_at,
                 deletion_requested_at: self.deletion_requested_at,
                 deleted_at: self.deleted_at,
-                owner_references: None,
+                owner_references: crate::resource_owner_references_from_json(
+                    self.owner_references,
+                    &account,
+                ),
+                account,
             },
             spec: self.spec,
             status: self

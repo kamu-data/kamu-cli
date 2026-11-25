@@ -14,6 +14,7 @@ use database_common::{PaginationOpts, sql_like_escape_literal};
 use internal_error::InternalError;
 use kamu_resources::{
     ResourceHandle,
+    ResourceRef,
     ResourceSelector,
     ResourceTypeDescriptor,
     ResourceVisibility,
@@ -71,6 +72,7 @@ impl ResourceSelectionResolutionService for ResourceSelectionResolutionServiceIm
             &selection,
             resource_facade,
             options.label_filter.as_ref(),
+            options.owner.as_ref(),
             options.id_visibility,
         )
         .await?;
@@ -336,6 +338,7 @@ impl ResourceSelectionResolutionServiceImpl {
                             ResourceSelector::ids_of_type(&schema.clone().into(), ids),
                             label_filter,
                         ),
+                        owner: options.owner.clone(),
                         visibility: options.id_visibility,
                         pagination: PaginationOpts {
                             limit: by_id.len(),
@@ -361,18 +364,18 @@ impl ResourceSelectionResolutionServiceImpl {
             }
 
             if !by_name.is_empty() {
-                // Two paths, because the ref API carries no label filter.
+                // Two paths, because the ref API carries no label or owner filter.
                 //
                 // Unfiltered, exact names go through the ref API rather than
                 // selectors: a selector's `name` is a `LIKE` pattern by ODF
                 // definition, so routing names through it would turn one
                 // batched `ExactNames` row into one `ILIKE` row per name.
                 //
-                // With a label filter there is no ref-API equivalent, so names
+                // With a filter there is no ref-API equivalent, so names
                 // are escaped into wildcard-free patterns and searched. That
                 // costs one `ILIKE` row per name, which is the price of
                 // filtering; correctness wins over the batching.
-                let found = if let Some(label_filter) = label_filter {
+                let found = if label_filter.is_some() || options.owner.is_some() {
                     Self::search_all_handles(
                         resource_facade,
                         with_labels(
@@ -385,8 +388,9 @@ impl ResourceSelectionResolutionServiceImpl {
                                     )
                                 })
                                 .collect(),
-                            Some(label_filter),
+                            label_filter,
                         ),
+                        options.owner.as_ref(),
                         options.visibility,
                         by_name.len(),
                     )
@@ -444,6 +448,7 @@ impl ResourceSelectionResolutionServiceImpl {
         selection: &ResourceSelectionSyntax,
         resource_facade: &dyn ResourceFacade,
         label_filter: Option<&kamu_resources::ResourceLabelFilterInput>,
+        owner: Option<&ResourceRef>,
         visibility: ResourceVisibility,
     ) -> Result<Vec<Result<ResourceHandle, GetResourceError>>, CLIError> {
         let ids = selection
@@ -470,6 +475,7 @@ impl ResourceSelectionResolutionServiceImpl {
         let found = resource_facade
             .search_handles(SearchResourcesRequest {
                 selectors: with_labels(ResourceSelector::any_type_ids(ids.clone()), label_filter),
+                owner: owner.cloned(),
                 visibility,
                 pagination: PaginationOpts {
                     limit: ids.len(),
@@ -565,6 +571,7 @@ impl ResourceSelectionResolutionServiceImpl {
                                 vec![ResourceSelector::default()],
                                 request_label_filter.as_ref(),
                             ),
+                            owner: options.owner.clone(),
                             visibility: options.visibility,
                             pagination,
                         })
@@ -634,6 +641,7 @@ impl ResourceSelectionResolutionServiceImpl {
                                 )],
                                 request_label_filter.as_ref(),
                             ),
+                            owner: options.owner.clone(),
                             visibility: options.visibility,
                             pagination,
                         })
@@ -684,6 +692,7 @@ impl ResourceSelectionResolutionServiceImpl {
                                 )],
                                 request_label_filter.as_ref(),
                             ),
+                            owner: options.owner.clone(),
                             visibility: options.visibility,
                             pagination,
                         })
@@ -762,6 +771,7 @@ impl ResourceSelectionResolutionServiceImpl {
                                 vec![request_selector],
                                 request_label_filter.as_ref(),
                             ),
+                            owner: options.owner.clone(),
                             visibility,
                             pagination,
                         })
@@ -822,6 +832,7 @@ impl ResourceSelectionResolutionServiceImpl {
                                 )],
                                 request_label_filter.as_ref(),
                             ),
+                            owner: options.owner.clone(),
                             visibility: options.visibility,
                             pagination,
                         })
@@ -939,12 +950,14 @@ impl ResourceSelectionResolutionServiceImpl {
     async fn search_all_handles(
         resource_facade: &dyn ResourceFacade,
         selectors: Vec<ResourceSelector>,
+        owner: Option<&ResourceRef>,
         visibility: ResourceVisibility,
         expected_count: usize,
     ) -> Result<Vec<ResourceHandle>, CLIError> {
         let search = |limit| {
             resource_facade.search_handles(SearchResourcesRequest {
                 selectors: selectors.clone(),
+                owner: owner.cloned(),
                 visibility,
                 pagination: PaginationOpts { limit, offset: 0 },
             })
@@ -987,6 +1000,7 @@ impl ResourceSelectionResolutionServiceImpl {
         let leading_ids = resource_facade
             .search_handles(SearchResourcesRequest {
                 selectors: ResourceSelector::any_type_ids(ids),
+                owner: None,
                 visibility: leading_visibility,
                 pagination: PaginationOpts {
                     limit: handles.len(),

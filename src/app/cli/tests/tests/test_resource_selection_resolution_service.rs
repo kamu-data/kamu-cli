@@ -163,6 +163,7 @@ async fn resolves_exact_type_name_patterns_via_search() {
                 ignore_not_found: false,
                 max_expanded_results: Some(10),
                 label_filter: None,
+                owner: None,
             },
         )
         .await
@@ -209,6 +210,7 @@ async fn ignores_unmatched_name_patterns_when_requested() {
                 ignore_not_found: true,
                 max_expanded_results: Some(10),
                 label_filter: None,
+                owner: None,
             },
         )
         .await
@@ -247,6 +249,7 @@ async fn errors_on_unmatched_name_patterns_by_default() {
                 ignore_not_found: false,
                 max_expanded_results: Some(10),
                 label_filter: None,
+                owner: None,
             },
         )
         .await
@@ -298,6 +301,7 @@ async fn exact_any_type_searches_across_every_supported_type() {
                 ignore_not_found: false,
                 max_expanded_results: Some(10),
                 label_filter: None,
+                owner: None,
             },
         )
         .await
@@ -350,6 +354,7 @@ async fn ids_are_searched_with_their_own_visibility() {
                 ignore_not_found: false,
                 max_expanded_results: Some(10),
                 label_filter: None,
+                owner: None,
             },
         )
         .await
@@ -388,6 +393,7 @@ async fn exact_any_type_not_found_errors_by_default() {
                 ignore_not_found: false,
                 max_expanded_results: Some(10),
                 label_filter: None,
+                owner: None,
             },
         )
         .await;
@@ -446,6 +452,7 @@ async fn resolves_any_type_exact_ref_across_every_supported_type() {
                 ignore_not_found: false,
                 max_expanded_results: Some(10),
                 label_filter: None,
+                owner: None,
             },
         )
         .await
@@ -552,6 +559,7 @@ async fn resolves_any_type_name_pattern_via_a_single_search() {
                 ignore_not_found: false,
                 max_expanded_results: Some(10),
                 label_filter: Some(environment_label_filter()),
+                owner: None,
             },
         )
         .await
@@ -609,6 +617,7 @@ async fn ignores_unmatched_any_type_selectors_when_requested() {
                 ignore_not_found: true,
                 max_expanded_results: Some(10),
                 label_filter: None,
+                owner: None,
             },
         )
         .await
@@ -640,6 +649,7 @@ async fn any_type_miss_message(item: ResourceSelectionItem) -> String {
                 ignore_not_found: false,
                 max_expanded_results: Some(10),
                 label_filter: None,
+                owner: None,
             },
         )
         .await
@@ -733,6 +743,7 @@ async fn deduplicates_overlapping_name_patterns_before_counting_max_results() {
                 ignore_not_found: false,
                 max_expanded_results: Some(1),
                 label_filter: None,
+                owner: None,
             },
         )
         .await
@@ -798,6 +809,7 @@ async fn errors_when_unique_targets_exceed_max_results_after_deduplication() {
                 ignore_not_found: false,
                 max_expanded_results: Some(1),
                 label_filter: None,
+                owner: None,
             },
         )
         .await
@@ -847,6 +859,7 @@ async fn passes_the_label_filter_to_pattern_expansion() {
                 ignore_not_found: false,
                 max_expanded_results: Some(10),
                 label_filter: Some(environment_label_filter()),
+                owner: None,
             },
         )
         .await
@@ -891,6 +904,7 @@ async fn passes_the_label_filter_to_the_all_selector() {
                 ignore_not_found: false,
                 max_expanded_results: Some(10),
                 label_filter: Some(environment_label_filter()),
+                owner: None,
             },
         )
         .await
@@ -937,6 +951,7 @@ async fn narrows_exact_selectors_by_the_label_filter() {
                 ignore_not_found: true,
                 max_expanded_results: Some(10),
                 label_filter: Some(environment_label_filter()),
+                owner: None,
             },
         )
         .await
@@ -987,6 +1002,7 @@ async fn leaves_exact_selectors_untouched_without_a_label_filter() {
                 ignore_not_found: false,
                 max_expanded_results: Some(10),
                 label_filter: None,
+                owner: None,
             },
         )
         .await
@@ -1034,6 +1050,7 @@ async fn resolves_exact_name_to_every_resource_holding_it_when_including_deletin
                 ignore_not_found: false,
                 max_expanded_results: Some(10),
                 label_filter: None,
+                owner: None,
             },
         )
         .await
@@ -1086,6 +1103,7 @@ async fn labelled_exact_name_lists_live_resource_first_when_including_deleting()
                 ignore_not_found: false,
                 max_expanded_results: Some(10),
                 label_filter: Some(environment_label_filter()),
+                owner: None,
             },
         )
         .await
@@ -1136,6 +1154,7 @@ async fn labelled_exact_name_lists_deleted_resources_last() {
                 ignore_not_found: false,
                 max_expanded_results: Some(10),
                 label_filter: Some(environment_label_filter()),
+                owner: None,
             },
         )
         .await
@@ -1187,6 +1206,7 @@ async fn any_type_exact_name_lists_live_resource_first_when_including_deleting()
                 ignore_not_found: false,
                 max_expanded_results: Some(10),
                 label_filter: None,
+                owner: None,
             },
         )
         .await

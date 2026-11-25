@@ -51,6 +51,7 @@ impl RequestAccountResourcesDeletionUseCaseImpl {
                     account_id,
                     &ResourceScope::default(),
                     ResourceVisibility::IncludeDeleting,
+                    None,
                     pagination,
                 )
                 .await

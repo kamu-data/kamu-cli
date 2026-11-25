@@ -13,6 +13,7 @@ use dill::{Catalog, CatalogBuilder};
 use kamu_accounts_postgres::PostgresAccountRepository;
 use kamu_resources_postgres::{
     PostgresResourceLabelProjectionRepository,
+    PostgresResourceOwnerProjectionRepository,
     PostgresResourceRepository,
 };
 use kamu_resources_repo_tests::resource_repository_test_suite as resource_repo_suite;
@@ -393,6 +394,7 @@ impl PostgresResourceRepositoryHarness {
         catalog_builder.add::<PostgresTransactionManager>();
         catalog_builder.add::<PostgresResourceRepository>();
         catalog_builder.add::<PostgresResourceLabelProjectionRepository>();
+        catalog_builder.add::<PostgresResourceOwnerProjectionRepository>();
         catalog_builder.add::<PostgresAccountRepository>();
         Self {
             catalog: catalog_builder.build(),
@@ -457,6 +459,22 @@ database_transactional_test!(
     storage = postgres,
     fixture =
         resource_repo_suite::test_find_resource_ids_by_schema_and_label_any_account_discriminates,
+    harness = PostgresResourceRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = postgres,
+    fixture = resource_repo_suite::test_owner_references_round_trip,
+    harness = PostgresResourceRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = postgres,
+    fixture = resource_repo_suite::test_search_by_owner,
     harness = PostgresResourceRepositoryHarness
 );
 

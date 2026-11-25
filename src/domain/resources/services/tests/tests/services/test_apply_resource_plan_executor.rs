@@ -21,9 +21,12 @@ use kamu_resources::{
     DeclarativeResource,
     ManagedResource,
     ResourceAggregateLoader,
+    ResourceID,
     ResourceLifecycleMessageOutcome,
     ResourcePersistenceService,
+    ResourceRef,
     TypedResourceQueryService,
+    owner_ids,
 };
 use kamu_resources_services::testing::{
     BaseResourceServiceHarness,
@@ -224,7 +227,8 @@ async fn test_generated_name_taken_after_planning_is_replaced() {
         ApplyResourcePlanExecutorHarness::mock_outbox_for_create(),
         ["first0", "second"],
     );
-    let plan = harness.make_nameless_plan().await;
+    let owner = harness.store("owner").await;
+    let plan = harness.make_nameless_plan_owned_by(*owner.id()).await;
     let winner = harness.store("plain-first0").await;
 
     let result = harness.execute(plan).await;
@@ -232,6 +236,10 @@ async fn test_generated_name_taken_after_planning_is_replaced() {
     // A resource of its own, rather than an update of the winner
     assert_eq!(result.outcome, ApplyResourceOutcome::Created);
     assert_eq!(result.state.headers.name.as_str(), "plain-second");
+    assert_eq!(
+        owner_ids(result.state.headers.owner_references.as_ref()),
+        [*owner.id()]
+    );
     harness.assert_untouched(&winner).await;
 }
 
@@ -350,18 +358,21 @@ impl ApplyResourcePlanExecutorHarness {
         self.persistence_svc.save(&mut resource).await.unwrap();
     }
 
-    async fn plan_nameless(
-        &self,
-    ) -> Result<PlannedApplyResourceDecision<TestResource>, ApplyResourceUseCaseError<TestResource>>
-    {
-        self.plan(ApplyResourceParams {
+    fn make_nameless_params() -> ApplyResourceParams<TestResource> {
+        ApplyResourceParams {
             id: None,
             headers: BaseResourceServiceHarness::make_nameless_headers(Self::account_handle()),
             spec: TestResourceSpec {
                 value: "nameless".to_string(),
             },
-        })
-        .await
+        }
+    }
+
+    async fn plan_nameless(
+        &self,
+    ) -> Result<PlannedApplyResourceDecision<TestResource>, ApplyResourceUseCaseError<TestResource>>
+    {
+        self.plan(Self::make_nameless_params()).await
     }
 
     async fn plan(
@@ -377,7 +388,26 @@ impl ApplyResourcePlanExecutorHarness {
     }
 
     async fn make_nameless_plan(&self) -> PlannedApplyResource<TestResource> {
-        match self.plan_nameless().await.unwrap() {
+        self.make_plan_of(Self::make_nameless_params()).await
+    }
+
+    async fn make_nameless_plan_owned_by(
+        &self,
+        owner_id: ResourceID,
+    ) -> PlannedApplyResource<TestResource> {
+        let mut params = Self::make_nameless_params();
+        params.headers.owner_references = Some(vec![ResourceRef {
+            id: Some(owner_id),
+            ..ResourceRef::default()
+        }]);
+        self.make_plan_of(params).await
+    }
+
+    async fn make_plan_of(
+        &self,
+        params: ApplyResourceParams<TestResource>,
+    ) -> PlannedApplyResource<TestResource> {
+        match self.plan(params).await.unwrap() {
             PlannedApplyResourceDecision::Planned(plan) => plan,
             PlannedApplyResourceDecision::Rejected(r) => panic!("plan rejected: {}", r.message),
         }

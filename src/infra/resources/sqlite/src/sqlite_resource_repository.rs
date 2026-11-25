@@ -26,7 +26,6 @@ use kamu_resources::{
     DELETED_ACCOUNT_NAME_SENTINEL,
     ResourceDuplicateError,
     ResourceHandleRow,
-    ResourceHeaders,
     ResourceID,
     ResourceLabelPair,
     ResourceName,
@@ -76,6 +75,9 @@ impl ResourceRepository for SqliteResourceRepository {
         let labels = kamu_resources::resource_labels_to_json(&resource_snapshot.headers.labels);
         let annotations =
             kamu_resources::resource_annotations_to_json(&resource_snapshot.headers.annotations);
+        let owner_references = kamu_resources::resource_owner_references_to_json(
+            resource_snapshot.headers.owner_references.as_ref(),
+        );
         let generation = i64::try_from(resource_snapshot.headers.generation).unwrap();
         let status_generation = i64::try_from(resource_snapshot.headers.status_generation).unwrap();
         let last_event_id = resource_snapshot.last_event_id.map(EventID::into_inner);
@@ -102,9 +104,10 @@ impl ResourceRepository for SqliteResourceRepository {
                 deleted_at,
                 last_event_id,
                 status_generation,
-                deletion_requested_at
+                deletion_requested_at,
+                owner_references
             )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
             ON CONFLICT (account_id, resource_schema, resource_name)
                 WHERE deletion_requested_at IS NULL
                 DO NOTHING
@@ -124,6 +127,7 @@ impl ResourceRepository for SqliteResourceRepository {
             last_event_id,
             status_generation,
             resource_snapshot.headers.deletion_requested_at,
+            owner_references,
         )
         .execute(connection_mut)
         .await
@@ -155,6 +159,9 @@ impl ResourceRepository for SqliteResourceRepository {
         let labels = kamu_resources::resource_labels_to_json(&resource_snapshot.headers.labels);
         let annotations =
             kamu_resources::resource_annotations_to_json(&resource_snapshot.headers.annotations);
+        let owner_references = kamu_resources::resource_owner_references_to_json(
+            resource_snapshot.headers.owner_references.as_ref(),
+        );
         let generation = i64::try_from(resource_snapshot.headers.generation).unwrap();
         let status_generation = i64::try_from(resource_snapshot.headers.status_generation).unwrap();
         let last_event_id = resource_snapshot.last_event_id.map(EventID::into_inner);
@@ -181,7 +188,8 @@ impl ResourceRepository for SqliteResourceRepository {
                 deleted_at = $11,
                 last_event_id = $12,
                 status_generation = $14,
-                deletion_requested_at = $15
+                deletion_requested_at = $15,
+                owner_references = $16
             WHERE resource_id = $1
               AND (
                     last_event_id IS NULL AND CAST($13 as INT8) IS NULL OR
@@ -203,6 +211,7 @@ impl ResourceRepository for SqliteResourceRepository {
             expected_last_event_id,
             status_generation,
             resource_snapshot.headers.deletion_requested_at,
+            owner_references,
         )
         .execute(connection_mut)
         .await
@@ -382,6 +391,7 @@ impl ResourceRepository for SqliteResourceRepository {
         account_id: &odf::AccountID,
         scope: &ResourceScope,
         visibility: ResourceVisibility,
+        owner_id: Option<ResourceID>,
         pagination: PaginationOpts,
     ) -> Result<Vec<ResourceHandleRow>, InternalError> {
         if scope.is_vacuous() {
@@ -416,6 +426,7 @@ impl ResourceRepository for SqliteResourceRepository {
 
         query_builder.push(visibility_predicate(visibility));
         push_scope_predicate(&mut query_builder, scope, account_id);
+        push_owner_predicate(&mut query_builder, owner_id);
 
         query_builder
             .push(" ORDER BY ")
@@ -437,6 +448,7 @@ impl ResourceRepository for SqliteResourceRepository {
         account_id: &odf::AccountID,
         scope: &ResourceScope,
         visibility: ResourceVisibility,
+        owner_id: Option<ResourceID>,
     ) -> Result<usize, InternalError> {
         if scope.is_vacuous() {
             return Ok(0);
@@ -454,6 +466,7 @@ impl ResourceRepository for SqliteResourceRepository {
 
         query_builder.push(visibility_predicate(visibility));
         push_scope_predicate(&mut query_builder, scope, account_id);
+        push_owner_predicate(&mut query_builder, owner_id);
 
         let row = query_builder
             .build_query_scalar::<i64>()
@@ -473,7 +486,8 @@ impl ResourceRepository for SqliteResourceRepository {
 
         let query_id: &uuid::Uuid = query.id.as_ref();
         let query_schema = query.schema.as_str();
-        let maybe_row = sqlx::query!(
+        let maybe_row = sqlx::query_as!(
+            ResourceSnapshotRow,
             r#"
             SELECT
                 r.resource_id as "id: uuid::Uuid",
@@ -484,6 +498,7 @@ impl ResourceRepository for SqliteResourceRepository {
                 r.resource_name,
                 r.labels as "labels: serde_json::Value",
                 r.annotations as "annotations: serde_json::Value",
+                r.owner_references as "owner_references: serde_json::Value",
                 r.spec as "spec: serde_json::Value",
                 r.status as "status: serde_json::Value",
                 r.generation,
@@ -506,36 +521,7 @@ impl ResourceRepository for SqliteResourceRepository {
         .await
         .int_err()?;
 
-        Ok(maybe_row.map(|row| ResourceSnapshot {
-            id: ResourceID::new(row.id),
-            schema: TypeUri::new_unchecked(&row.resource_schema),
-            headers: ResourceHeaders {
-                id: ResourceID::new(row.id),
-                account: odf::ResourceOwnerHandle {
-                    // TODO: Support Org accounts
-                    r#type: odf::metadata::auth::User::type_uri().cheap_clone(),
-                    id: ResourceID::new(row.account_resource_id),
-                    did: row.account_id,
-                    name: odf::AccountName::new_unchecked(&row.account_name),
-                },
-                name: kamu_resources::ResourceName::new_unchecked(&row.resource_name),
-                labels: kamu_resources::resource_labels_from_json(row.labels),
-                annotations: kamu_resources::resource_annotations_from_json(row.annotations),
-                owner_references: None, // TODO
-                generation: u64::try_from(row.generation).unwrap(),
-                status_generation: u64::try_from(row.status_generation).unwrap(),
-                created_at: row.created_at,
-                updated_at: row.updated_at,
-                deletion_requested_at: row.deletion_requested_at,
-                deleted_at: row.deleted_at,
-            },
-            spec: row.spec,
-            status: row
-                .status
-                .as_ref()
-                .and_then(ResourceSnapshot::basic_status_from_json),
-            last_event_id: row.last_event_id.map(EventID::new),
-        }))
+        Ok(maybe_row.map(ResourceSnapshotRow::into_snapshot))
     }
 
     async fn find_resource_ids_by_schema_and_label(
@@ -642,6 +628,7 @@ impl ResourceRepository for SqliteResourceRepository {
                 r.resource_name,
                 r.labels,
                 r.annotations,
+                r.owner_references,
                 r.spec,
                 r.status,
                 r.generation,
@@ -686,7 +673,8 @@ impl ResourceRepository for SqliteResourceRepository {
         let connection_mut = tr.connection_mut().await?;
 
         let resource_id: &uuid::Uuid = id.as_ref();
-        let maybe_row = sqlx::query!(
+        let maybe_row = sqlx::query_as!(
+            ResourceSnapshotRow,
             r#"
             SELECT
                 r.resource_id as "id: uuid::Uuid",
@@ -697,6 +685,7 @@ impl ResourceRepository for SqliteResourceRepository {
                 r.resource_name,
                 r.labels as "labels: serde_json::Value",
                 r.annotations as "annotations: serde_json::Value",
+                r.owner_references as "owner_references: serde_json::Value",
                 r.spec as "spec: serde_json::Value",
                 r.status as "status: serde_json::Value",
                 r.generation,
@@ -717,36 +706,7 @@ impl ResourceRepository for SqliteResourceRepository {
         .await
         .int_err()?;
 
-        Ok(maybe_row.map(|row| ResourceSnapshot {
-            id: ResourceID::new(row.id),
-            schema: TypeUri::new_unchecked(&row.resource_schema),
-            headers: ResourceHeaders {
-                id: ResourceID::new(row.id),
-                account: odf::ResourceOwnerHandle {
-                    // TODO: Support Org accounts
-                    r#type: odf::metadata::auth::User::type_uri().cheap_clone(),
-                    id: ResourceID::new(row.account_resource_id),
-                    did: row.account_id,
-                    name: odf::AccountName::new_unchecked(&row.account_name),
-                },
-                name: kamu_resources::ResourceName::new_unchecked(&row.resource_name),
-                labels: kamu_resources::resource_labels_from_json(row.labels),
-                annotations: kamu_resources::resource_annotations_from_json(row.annotations),
-                owner_references: None, // TODO
-                generation: u64::try_from(row.generation).unwrap(),
-                status_generation: u64::try_from(row.status_generation).unwrap(),
-                created_at: row.created_at,
-                updated_at: row.updated_at,
-                deletion_requested_at: row.deletion_requested_at,
-                deleted_at: row.deleted_at,
-            },
-            spec: row.spec,
-            status: row
-                .status
-                .as_ref()
-                .and_then(ResourceSnapshot::basic_status_from_json),
-            last_event_id: row.last_event_id.map(EventID::new),
-        }))
+        Ok(maybe_row.map(ResourceSnapshotRow::into_snapshot))
     }
 
     async fn find_resource_snapshots_by_ids(
@@ -778,6 +738,7 @@ impl ResourceRepository for SqliteResourceRepository {
                 r.resource_name,
                 r.labels,
                 r.annotations,
+                r.owner_references,
                 r.spec,
                 r.status,
                 r.generation,
@@ -814,6 +775,7 @@ impl ResourceRepository for SqliteResourceRepository {
         account_id: &odf::AccountID,
         scope: &ResourceScope,
         visibility: ResourceVisibility,
+        owner_id: Option<ResourceID>,
         pagination: PaginationOpts,
     ) -> ResourceSnapshotStream<'_> {
         let account_id = account_id.clone();
@@ -841,6 +803,7 @@ impl ResourceRepository for SqliteResourceRepository {
                     r.resource_name,
                     r.labels,
                     r.annotations,
+                    r.owner_references,
                     r.spec,
                     r.status,
                     r.generation,
@@ -857,6 +820,7 @@ impl ResourceRepository for SqliteResourceRepository {
 
             query_builder.push(visibility_predicate(visibility));
             push_scope_predicate(&mut query_builder, &scope, &account_id);
+            push_owner_predicate(&mut query_builder, owner_id);
 
             query_builder
                 .push(" ORDER BY ")
@@ -1121,6 +1085,24 @@ fn push_label_filter_predicates(
         query_builder.push_bind(value.clone());
         query_builder.push(")");
     }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+fn push_owner_predicate(
+    query_builder: &mut sqlx::QueryBuilder<sqlx::Sqlite>,
+    owner_id: Option<ResourceID>,
+) {
+    let Some(owner_id) = owner_id else {
+        return;
+    };
+
+    query_builder.push(
+        " AND EXISTS (SELECT 1 FROM resource_owners_projection ro WHERE ro.resource_id = \
+         r.resource_id AND ro.owner_id = ",
+    );
+    query_builder.push_bind(*owner_id.as_ref());
+    query_builder.push(")");
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

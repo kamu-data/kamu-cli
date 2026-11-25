@@ -24,6 +24,7 @@ use crate::resources::{
     ResourceFacadeFactory,
     ResourceLabelSelectorParser,
     ResourceSelectionScanner,
+    ResourceSelectionSyntaxService,
     ResourceTypeLookupErrorOptions,
     ResourceTypeLookupService,
     is_dataset_target,
@@ -42,6 +43,7 @@ pub struct ListCommand {
     remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
     rebac_service: Arc<dyn kamu_auth_rebac::RebacService>,
     resource_facade_factory: Arc<dyn ResourceFacadeFactory>,
+    resource_selection_syntax_service: Arc<dyn ResourceSelectionSyntaxService>,
     resource_type_lookup_service: Arc<dyn ResourceTypeLookupService>,
     resource_context_resolver: Arc<ResourceContextResolver>,
     resource_context_reporter: Arc<ResourceContextReporter>,
@@ -72,6 +74,9 @@ pub struct ListCommand {
 
     #[dill::component(explicit)]
     label_selectors: Vec<String>,
+
+    #[dill::component(explicit)]
+    owner: Option<String>,
 
     #[dill::component(explicit)]
     visibility: ResourceVisibility,
@@ -228,6 +233,15 @@ impl ListCommand {
             .resource_facade_factory
             .get_resource_facade(self.explicit_context_name.as_deref())?;
 
+        let owner = match &self.owner {
+            Some(owner) => Some(
+                self.resource_selection_syntax_service
+                    .parse_owner(self.explicit_context_name.as_deref(), owner)
+                    .await?,
+            ),
+            None => None,
+        };
+
         let scope = match mode {
             ListMode::ResourcesAll(query) => ListResourcesScope::All(query),
             ListMode::ResourcesByTypes(type_queries) => {
@@ -255,6 +269,7 @@ impl ListCommand {
                 self.max_results
             },
             ResourceLabelSelectorParser::parse(&self.label_selectors)?,
+            owner,
             self.visibility,
         ))
     }
@@ -290,6 +305,12 @@ impl Command for ListCommand {
                 if !self.label_selectors.is_empty() {
                     return Err(CLIError::usage_error(
                         "Label selectors are not supported when listing datasets",
+                    ));
+                }
+
+                if self.owner.is_some() {
+                    return Err(CLIError::usage_error(
+                        "--owner is supported only when listing resources",
                     ));
                 }
 

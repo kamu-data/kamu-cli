@@ -57,6 +57,7 @@ pub struct ListResourcesCommand {
     detail_level: u8,
     max_results: Option<NonZeroUsize>,
     label_filter: Option<kamu_resources::ResourceLabelFilterInput>,
+    owner: Option<kamu_resources::ResourceRef>,
     visibility: ResourceVisibility,
 }
 
@@ -73,6 +74,7 @@ impl ListResourcesCommand {
         detail_level: u8,
         max_results: Option<NonZeroUsize>,
         label_filter: Option<kamu_resources::ResourceLabelFilterInput>,
+        owner: Option<kamu_resources::ResourceRef>,
         visibility: ResourceVisibility,
     ) -> Self {
         let visibility = scope.effective_visibility(visibility);
@@ -86,6 +88,7 @@ impl ListResourcesCommand {
             detail_level,
             max_results,
             label_filter,
+            owner,
             visibility,
         }
     }
@@ -299,6 +302,7 @@ impl ListResourcesCommand {
                 .resource_facade
                 .search(kamu_resources_facade::SearchResourcesRequest {
                     selectors: selectors.to_vec(),
+                    owner: self.owner.clone(),
                     visibility: self.visibility,
                     pagination: PaginationOpts::from_max_results(max_results.get()),
                 })
@@ -310,6 +314,7 @@ impl ListResourcesCommand {
                     .resource_facade
                     .search(kamu_resources_facade::SearchResourcesRequest {
                         selectors: selectors.to_vec(),
+                        owner: self.owner.clone(),
                         visibility: self.visibility,
                         pagination,
                     })

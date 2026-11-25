@@ -28,6 +28,7 @@ mod test_resources_label_filters;
 mod test_resources_list_selectors;
 mod test_resources_multitenant_isolation;
 mod test_resources_output_formats;
+mod test_resources_owner_references;
 mod test_resources_secretset;
 mod test_resources_variableset;
 
@@ -52,5 +53,6 @@ pub use test_resources_label_filters::*;
 pub use test_resources_list_selectors::*;
 pub use test_resources_multitenant_isolation::*;
 pub use test_resources_output_formats::*;
+pub use test_resources_owner_references::*;
 pub use test_resources_secretset::*;
 pub use test_resources_variableset::*;

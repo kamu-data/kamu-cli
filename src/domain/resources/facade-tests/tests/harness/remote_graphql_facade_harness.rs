@@ -184,6 +184,10 @@ impl FacadeContractHarness for RemoteGraphqlFacadeHarness {
         self.local.account_name(account)
     }
 
+    async fn rename_account(&self, account: TestAccount, new_name: &odf::AccountName) {
+        self.local.rename_account(account, new_name).await;
+    }
+
     async fn settle(&self) {
         self.local.settle().await;
     }

@@ -9,5 +9,6 @@
 
 pub mod resource_controller_state_repository_test_suite;
 pub mod resource_label_projection_repository_test_suite;
+pub mod resource_owner_projection_repository_test_suite;
 pub mod resource_raw_event_store_test_suite;
 pub mod resource_repository_test_suite;

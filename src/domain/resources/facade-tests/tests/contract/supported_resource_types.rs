@@ -129,6 +129,7 @@ pub async fn test_selector_aliases_resolve_consistently(h: &impl FacadeContractH
     // Canonical selector name works for search, search_handles, and get
     let summaries = facade
         .search(SearchResourcesRequest {
+            owner: None,
             visibility: ResourceVisibility::Active,
             selectors: vec![ResourceSelector::of_type(
                 VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
@@ -147,6 +148,7 @@ pub async fn test_selector_aliases_resolve_consistently(h: &impl FacadeContractH
 
     let handles = facade
         .search_handles(SearchResourcesRequest {
+            owner: None,
             visibility: ResourceVisibility::Active,
             selectors: vec![ResourceSelector::of_type(
                 VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
@@ -188,6 +190,7 @@ pub async fn test_selector_aliases_resolve_consistently(h: &impl FacadeContractH
     // Short name "vs" resolves to the canonical VariableSet schema.
     let short_name_summaries = facade
         .search(SearchResourcesRequest {
+            owner: None,
             visibility: ResourceVisibility::Active,
             selectors: vec![ResourceSelector::of_type("vs".parse().unwrap())],
             pagination: PaginationOpts::from_max_results(1000),
@@ -207,6 +210,7 @@ pub async fn test_selector_aliases_resolve_consistently(h: &impl FacadeContractH
     // canonical/alias selector.
     let type_name_summaries = facade
         .search(SearchResourcesRequest {
+            owner: None,
             visibility: ResourceVisibility::Active,
             selectors: vec![ResourceSelector::of_type("VariableSet".parse().unwrap())],
             pagination: PaginationOpts::from_max_results(1000),
@@ -225,6 +229,7 @@ pub async fn test_selector_aliases_resolve_consistently(h: &impl FacadeContractH
     // (selectors are exact registered strings, not inflected).
     let bad_result = facade
         .search(SearchResourcesRequest {
+            owner: None,
             visibility: ResourceVisibility::Active,
             selectors: vec![ResourceSelector::of_type(
                 "NoSuchResourceTypeXYZ".parse().unwrap(),
@@ -323,6 +328,7 @@ pub async fn test_unsupported_schema_rejected_consistently(h: &impl FacadeContra
     // search — UnsupportedSelector (type validated before DB query)
     let list_result = facade
         .search(SearchResourcesRequest {
+            owner: None,
             visibility: ResourceVisibility::Active,
             selectors: vec![ResourceSelector::of_type(bad_type.parse().unwrap())],
             pagination: PaginationOpts::from_max_results(1000),
@@ -340,6 +346,7 @@ pub async fn test_unsupported_schema_rejected_consistently(h: &impl FacadeContra
     // search_handles — UnsupportedSelector
     let li_result = facade
         .search_handles(SearchResourcesRequest {
+            owner: None,
             visibility: ResourceVisibility::Active,
             selectors: vec![ResourceSelector::of_type(bad_type.parse().unwrap())],
             pagination: PaginationOpts::from_max_results(1000),

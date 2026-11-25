@@ -233,16 +233,19 @@ pub(crate) fn any_resource_selector() -> kamu_resources::ResourceSelector {
 /// Selects resources to search, for both `search` and `searchHandles` — only
 /// the response shape differs.
 ///
-/// Every narrowing lives on the selectors, accounts included: there is no
-/// call-level `account` or `labelFilter`. A uniform filter is the special case
-/// where every selector carries the same one, and selectors being OR'd makes
-/// that exactly equivalent.
+/// Accounts and labels live on the selectors: there is no call-level `account`
+/// or `labelFilter`. A uniform filter is the special case where every selector
+/// carries the same one, and selectors being OR'd makes that exactly
+/// equivalent.
 #[derive(InputObject, Debug, Clone)]
 pub struct SearchResourcesInput {
     /// Several selectors act as a logical OR, while the fields within one are a
     /// conjunction. Omitted spans every type; an empty list matches nothing — a
     /// narrowing to zero, not a widening to everything.
     pub selectors: Option<Vec<ResourceSelectorInput>>,
+    /// Matches only the resources this one owns. By ID the owner may be in any
+    /// state, even purged; by name it must be live.
+    pub owner: Option<ResourceRefInput>,
     /// Which resources to match
     #[graphql(default)]
     pub visibility: ResourceVisibility,
@@ -258,6 +261,7 @@ impl SearchResourcesInput {
                 Some(selectors) => into_resource_selectors(selectors)?,
                 None => vec![any_resource_selector()],
             },
+            owner: self.owner.map(TryInto::try_into).transpose()?,
             visibility: self.visibility.into(),
             pagination,
         })
@@ -608,6 +612,23 @@ impl From<kamu_resources_facade::ResourceLookupProblem> for ResourceLookupProble
                     message: e.to_string(),
                 })
             }
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// The owner to search by could not be resolved
+#[derive(SimpleObject, Debug, Clone)]
+pub struct ResourceOwnerLookupProblem {
+    /// Why the reference to the owner could not be resolved
+    pub problem: ResourceLookupProblem,
+}
+
+impl From<kamu_resources_facade::ResourceLookupProblem> for ResourceOwnerLookupProblem {
+    fn from(value: kamu_resources_facade::ResourceLookupProblem) -> Self {
+        Self {
+            problem: value.into(),
         }
     }
 }

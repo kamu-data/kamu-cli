@@ -20,6 +20,7 @@ use crate::queries::{
     ResourceHandleConnection,
     ResourceInvalidLabelFilterProblem,
     ResourceManifestFormat,
+    ResourceOwnerLookupProblem,
     ResourceOwnerRefInput,
     ResourceRefInput,
     ResourceSummary,
@@ -215,6 +216,9 @@ impl Resources {
             Err(kamu_resources_facade::ListResourcesError::InvalidLabelFilter(error)) => {
                 Ok(ResourceListOutcome::InvalidLabelFilter(error.into()))
             }
+            Err(kamu_resources_facade::ListResourcesError::OwnerLookup(problem)) => {
+                Ok(ResourceListOutcome::OwnerLookup(problem.into()))
+            }
             Err(error) => Err(map_list_resources_error(error)),
         }
     }
@@ -258,6 +262,9 @@ impl Resources {
             }
             Err(kamu_resources_facade::ListResourcesError::InvalidLabelFilter(error)) => {
                 Ok(ResourceHandleListOutcome::InvalidLabelFilter(error.into()))
+            }
+            Err(kamu_resources_facade::ListResourcesError::OwnerLookup(problem)) => {
+                Ok(ResourceHandleListOutcome::OwnerLookup(problem.into()))
             }
             Err(error) => Err(map_list_resources_error(error)),
         }
@@ -323,6 +330,7 @@ pub enum ResourceListOutcome {
     UnsupportedSelector(ResourceUnsupportedSelectorProblem),
     AccountResolution(ResourceAccountResolutionProblem),
     InvalidLabelFilter(ResourceInvalidLabelFilterProblem),
+    OwnerLookup(ResourceOwnerLookupProblem),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -334,6 +342,7 @@ pub enum ResourceHandleListOutcome {
     UnsupportedSelector(ResourceUnsupportedSelectorProblem),
     AccountResolution(ResourceAccountResolutionProblem),
     InvalidLabelFilter(ResourceInvalidLabelFilterProblem),
+    OwnerLookup(ResourceOwnerLookupProblem),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -362,6 +371,7 @@ fn map_list_resources_error(error: kamu_resources_facade::ListResourcesError) ->
         E::AccountAccess(error) => map_account_access_error(error),
         E::InvalidLabelFilter(error) => GqlError::gql(error.to_string()),
         E::UnrepresentableScope(error) => GqlError::gql(error.to_string()),
+        error @ E::OwnerLookup(_) => GqlError::gql(error.to_string()),
         E::UnsupportedSelectorField(error) => GqlError::gql(error.to_string()),
         E::RemoteRequest(error) => error.int_err().into(),
         E::Internal(error) => error.into(),

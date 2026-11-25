@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+mod test_apply_owner_references;
 mod test_apply_resource_plan_executor;
 mod test_apply_resource_planner;
 mod test_apply_resource_runner;

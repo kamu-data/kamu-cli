@@ -199,6 +199,13 @@ pub(crate) enum ResourceLookupProblem {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(cynic::QueryFragment, Debug, Clone)]
+pub(crate) struct ResourceOwnerLookupProblem {
+    pub problem: ResourceLookupProblem,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(cynic::QueryFragment, Debug, Clone)]
 pub(crate) struct ResourceInvalidLabelFilterProblem {
     pub code: ResourceLabelFilterProblemCode,
     pub message: String,

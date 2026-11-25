@@ -166,6 +166,8 @@ pub(crate) enum ResourceHeaderValidationProblemCode {
     DuplicateLabelKey,
     TooManyAnnotations,
     DuplicateAnnotationKey,
+    TooManyOwnerReferences,
+    InvalidOwnerReference,
     ResourceExtensionSchema,
 }
 
@@ -183,6 +185,8 @@ impl From<ResourceHeaderValidationProblemCode>
             C::DuplicateLabelKey => Self::DuplicateLabelKey,
             C::TooManyAnnotations => Self::TooManyAnnotations,
             C::DuplicateAnnotationKey => Self::DuplicateAnnotationKey,
+            C::TooManyOwnerReferences => Self::TooManyOwnerReferences,
+            C::InvalidOwnerReference => Self::InvalidOwnerReference,
             C::ResourceExtensionSchema => Self::ResourceExtensionSchema,
         }
     }

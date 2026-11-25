@@ -54,10 +54,12 @@ use kamu_resources::{
     ResourceCrudDispatcher,
     ResourceCrudDispatcherApplyRequest,
     ResourceCrudDispatcherDeletionRequest,
+    ResourceHeaders,
     ResourceHeadersExt,
     ResourceHeadersInput,
     ResourceID,
     ResourceName,
+    ResourceRef,
     ResourceSchemaProvider,
     ResourceSnapshot,
     ResourceSpecFromInput,
@@ -294,6 +296,7 @@ impl DatasetEnvVarMutationAdapterImpl {
             id: existing_id,
             precondition,
             entries: mut variables,
+            owner_references,
         } = self.load_variable_set(account_did, &resource_name).await?;
 
         let exists_as_variable = variables.contains_key(key);
@@ -345,6 +348,7 @@ impl DatasetEnvVarMutationAdapterImpl {
                 account_name.clone(),
                 resource_name,
                 dataset_id,
+                owner_references,
             )
             .await?;
 
@@ -395,6 +399,7 @@ impl DatasetEnvVarMutationAdapterImpl {
             id: existing_id,
             precondition,
             entries: mut secrets,
+            owner_references,
         } = self.load_secret_set(account_did, &resource_name).await?;
 
         let exists_as_secret = secrets.contains_key(key);
@@ -447,6 +452,7 @@ impl DatasetEnvVarMutationAdapterImpl {
                 account_name.clone(),
                 resource_name,
                 dataset_id,
+                owner_references,
             )
             .await?;
 
@@ -719,12 +725,14 @@ impl DatasetEnvVarMutationAdapterImpl {
 
         let snapshot = self.load_snapshot(&id).await?;
         let generation = snapshot.headers.generation;
+        let owner_references = Self::make_owner_references(&snapshot.headers);
         let spec: VariableSetSpec = serde_json::from_value(snapshot.spec).int_err()?;
 
         Ok(LoadedEnvVarSet {
             id: Some(id),
             precondition: ApplyResourcePrecondition::Generation(generation),
             entries: spec.into_dto().variables.entries,
+            owner_references,
         })
     }
 
@@ -743,6 +751,7 @@ impl DatasetEnvVarMutationAdapterImpl {
 
         let snapshot = self.load_snapshot(&id).await?;
         let generation = snapshot.headers.generation;
+        let owner_references = Self::make_owner_references(&snapshot.headers);
         let spec: SecretSetSpec = serde_json::from_value(snapshot.spec).int_err()?;
 
         let entries = self
@@ -763,6 +772,7 @@ impl DatasetEnvVarMutationAdapterImpl {
             id: Some(id),
             precondition: ApplyResourcePrecondition::Generation(generation),
             entries,
+            owner_references,
         })
     }
 
@@ -816,6 +826,19 @@ impl DatasetEnvVarMutationAdapterImpl {
         Ok(decrypted)
     }
 
+    /// The owners by ID, which keeps the references as they are
+    fn make_owner_references(headers: &ResourceHeaders) -> Option<Vec<ResourceRef>> {
+        headers.owner_references.as_ref().map(|owners| {
+            owners
+                .iter()
+                .map(|owner| ResourceRef {
+                    id: Some(owner.id),
+                    ..ResourceRef::default()
+                })
+                .collect()
+        })
+    }
+
     /// Builds headers for an auto-managed legacy resource, stamped with the
     /// `legacy-config-target-dataset` label that associates it with its
     /// dataset. The label is what the resolver reads; without it the resource
@@ -826,6 +849,7 @@ impl DatasetEnvVarMutationAdapterImpl {
         account_name: odf::AccountName,
         resource_name: ResourceName,
         dataset_id: &odf::DatasetID,
+        owner_references: Option<Vec<ResourceRef>>,
     ) -> Result<ResourceHeadersInput, InternalError> {
         let account = self.account_service.get_account_by_id(&account_did).await;
         let account_resource_id = match account {
@@ -855,7 +879,7 @@ impl DatasetEnvVarMutationAdapterImpl {
             annotations: Some(kamu_resources::ResourceAnnotations {
                 entries: BTreeMap::new(),
             }),
-            owner_references: None,
+            owner_references,
         })
     }
 }
@@ -868,6 +892,8 @@ struct LoadedEnvVarSet<T> {
     id: Option<ResourceID>,
     precondition: ApplyResourcePrecondition,
     entries: BTreeMap<String, T>,
+    /// Carried over by a write, which rebuilds the headers
+    owner_references: Option<Vec<ResourceRef>>,
 }
 
 impl<T> LoadedEnvVarSet<T> {
@@ -876,6 +902,7 @@ impl<T> LoadedEnvVarSet<T> {
             id: None,
             precondition: ApplyResourcePrecondition::Absent,
             entries: BTreeMap::new(),
+            owner_references: None,
         }
     }
 }

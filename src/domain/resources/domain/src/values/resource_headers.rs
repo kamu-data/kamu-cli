@@ -10,7 +10,7 @@
 use chrono::{DateTime, Utc};
 use odf::metadata::auth;
 
-use crate::{ResourceHeadersInput, ResourceID};
+use crate::{ResourceHeadersInput, ResourceID, have_same_owners, owner_handles_from_input};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -78,6 +78,9 @@ pub trait ResourceHeadersExt {
     fn to_input(&self) -> ResourceHeadersInput;
     fn is_equivalent_to(&self, input: &ResourceHeadersInput) -> bool;
     fn apply_update(&mut self, now: DateTime<Utc>, input: ResourceHeadersInput);
+
+    /// Replaces the account of the resource and of its owners, which share it
+    fn set_account(&mut self, account: auth::ResourceOwnerHandle);
 }
 
 impl ResourceHeadersExt for ResourceHeaders {
@@ -110,14 +113,8 @@ impl ResourceHeadersExt for ResourceHeaders {
     fn from_input(now: DateTime<Utc>, id: ResourceID, input: ResourceHeadersInput) -> Self {
         let account = account_handle_from_input(input.account.as_ref());
 
-        assert!(
-            input.owner_references.is_none(),
-            "Owner referece resolution is not yet supported"
-        );
-
         Self {
             id,
-            account,
             name: input.name,
             labels: input
                 .labels
@@ -129,7 +126,8 @@ impl ResourceHeadersExt for ResourceHeaders {
                     entries: std::collections::BTreeMap::new(),
                 }
             }),
-            owner_references: None,
+            owner_references: owner_handles_from_input(input.owner_references, &account),
+            account,
             generation: 1,
             status_generation: INITIAL_STATUS_GENERATION,
             created_at: now,
@@ -164,14 +162,14 @@ impl ResourceHeadersExt for ResourceHeaders {
             .as_ref()
             .map_or(&empty_map, |a| &a.entries);
 
-        if self.owner_references.is_some() || input.owner_references.is_some() {
-            unimplemented!("Owner references are not yet supported");
-        }
-
         self.account == account_handle_from_input(input.account.as_ref())
             && self.name == input.name
             && self.labels.entries == *input_labels
             && self.annotations.entries == *input_annotations
+            && have_same_owners(
+                self.owner_references.as_ref(),
+                input.owner_references.as_ref(),
+            )
     }
 
     fn apply_update(&mut self, now: DateTime<Utc>, input: ResourceHeadersInput) {
@@ -188,8 +186,16 @@ impl ResourceHeadersExt for ResourceHeaders {
                 .unwrap_or_else(|| odf::metadata::resources::ResourceAnnotations {
                     entries: std::collections::BTreeMap::new(),
                 });
+        self.owner_references = owner_handles_from_input(input.owner_references, &self.account);
 
         self.updated_at = now;
+    }
+
+    fn set_account(&mut self, account: auth::ResourceOwnerHandle) {
+        for owner in self.owner_references.iter_mut().flatten() {
+            owner.account = account.clone();
+        }
+        self.account = account;
     }
 }
 

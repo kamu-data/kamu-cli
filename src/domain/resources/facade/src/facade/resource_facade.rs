@@ -239,9 +239,12 @@ pub struct SearchResourcesRequest {
     /// Label filtering and account scoping ride here too: each selector carries
     /// its own `labels` and `account`, so one call may filter differently per
     /// type and span several accounts. There is deliberately no call-level
-    /// filter or account — a uniform one is the special case where every
+    /// label filter or account — a uniform one is the special case where every
     /// selector carries the same.
     pub selectors: Vec<ResourceSelector>,
+    /// Only the resources this one owns, among those the selectors match. By ID
+    /// it may be in any state, even purged; by name it must be live.
+    pub owner: Option<ResourceRef>,
     pub visibility: ResourceVisibility,
     pub pagination: PaginationOpts,
 }

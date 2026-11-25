@@ -895,6 +895,16 @@ CREATE TABLE public.resource_labels_projection (
 
 
 --
+-- Name: resource_owners_projection; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.resource_owners_projection (
+    resource_id uuid NOT NULL,
+    owner_id uuid NOT NULL
+);
+
+
+--
 -- Name: resources; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -913,7 +923,8 @@ CREATE TABLE public.resources (
     deleted_at timestamp with time zone,
     last_event_id bigint,
     status_generation bigint DEFAULT 1 NOT NULL,
-    deletion_requested_at timestamp with time zone
+    deletion_requested_at timestamp with time zone,
+    owner_references jsonb
 );
 
 
@@ -1233,6 +1244,14 @@ ALTER TABLE ONLY public.resource_events
 
 ALTER TABLE ONLY public.resource_labels_projection
     ADD CONSTRAINT resource_labels_projection_pkey PRIMARY KEY (resource_id, label_key);
+
+
+--
+-- Name: resource_owners_projection resource_owners_projection_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.resource_owners_projection
+    ADD CONSTRAINT resource_owners_projection_pkey PRIMARY KEY (resource_id, owner_id);
 
 
 --
@@ -1764,6 +1783,13 @@ CREATE INDEX idx_resource_labels_projection_key_value_resource_id ON public.reso
 
 
 --
+-- Name: idx_resource_owners_projection_owner_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_resource_owners_projection_owner_id ON public.resource_owners_projection USING btree (owner_id, resource_id);
+
+
+--
 -- Name: idx_resources_account_schema_name_ci; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -2011,6 +2037,14 @@ ALTER TABLE ONLY public.resource_events
 
 ALTER TABLE ONLY public.resource_labels_projection
     ADD CONSTRAINT fk_resource_labels_projection_resource_id FOREIGN KEY (resource_id) REFERENCES public.resources(resource_id) ON DELETE CASCADE;
+
+
+--
+-- Name: resource_owners_projection fk_resource_owners_projection_resource_id; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.resource_owners_projection
+    ADD CONSTRAINT fk_resource_owners_projection_resource_id FOREIGN KEY (resource_id) REFERENCES public.resources(resource_id) ON DELETE CASCADE;
 
 
 --

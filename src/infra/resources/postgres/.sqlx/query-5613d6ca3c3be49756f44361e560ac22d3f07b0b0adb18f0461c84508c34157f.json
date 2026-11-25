@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n            SELECT\n                r.resource_id as \"id: uuid::Uuid\",\n                r.account_id as \"account_id: odf::AccountID\",\n                -- LEFT JOIN: a.resource_id is NULL only when the owning account\n                -- row is gone (deletion racing async cleanup), same case the\n                -- account_name sentinel covers. Substitute the nil resource id.\n                COALESCE(a.resource_id, '00000000-0000-0000-0000-000000000000'::uuid) as \"account_resource_id!: uuid::Uuid\",\n                COALESCE(a.account_name, $2) as \"account_name!\",\n                r.resource_schema,\n                r.resource_name,\n                r.labels,\n                r.annotations,\n                r.spec,\n                r.status,\n                r.generation,\n                r.status_generation,\n                r.created_at,\n                r.updated_at,\n                r.deletion_requested_at,\n                r.deleted_at,\n                r.last_event_id\n            FROM resources r\n            LEFT JOIN accounts a ON a.id = r.account_id\n            WHERE r.resource_id = $1\n            ",
+  "query": "\n            SELECT\n                r.resource_id as \"id: uuid::Uuid\",\n                r.account_id as \"account_id: odf::AccountID\",\n                -- LEFT JOIN: a.resource_id is NULL only when the owning account\n                -- row is gone (deletion racing async cleanup), same case the\n                -- account_name sentinel covers. Substitute the nil resource id.\n                COALESCE(a.resource_id, '00000000-0000-0000-0000-000000000000'::uuid) as \"account_resource_id!: uuid::Uuid\",\n                COALESCE(a.account_name, $2) as \"account_name!\",\n                r.resource_schema,\n                r.resource_name,\n                r.labels,\n                r.annotations,\n                r.owner_references,\n                r.spec,\n                r.status,\n                r.generation,\n                r.status_generation,\n                r.created_at,\n                r.updated_at,\n                r.deletion_requested_at,\n                r.deleted_at,\n                r.last_event_id\n            FROM resources r\n            LEFT JOIN accounts a ON a.id = r.account_id\n            WHERE r.resource_id = $1\n            ",
   "describe": {
     "columns": [
       {
@@ -83,6 +83,17 @@
       },
       {
         "ordinal": 8,
+        "name": "owner_references",
+        "type_info": "Jsonb",
+        "origin": {
+          "Table": {
+            "table": "resources",
+            "name": "owner_references"
+          }
+        }
+      },
+      {
+        "ordinal": 9,
         "name": "spec",
         "type_info": "Jsonb",
         "origin": {
@@ -93,7 +104,7 @@
         }
       },
       {
-        "ordinal": 9,
+        "ordinal": 10,
         "name": "status",
         "type_info": "Jsonb",
         "origin": {
@@ -104,7 +115,7 @@
         }
       },
       {
-        "ordinal": 10,
+        "ordinal": 11,
         "name": "generation",
         "type_info": "Int8",
         "origin": {
@@ -115,7 +126,7 @@
         }
       },
       {
-        "ordinal": 11,
+        "ordinal": 12,
         "name": "status_generation",
         "type_info": "Int8",
         "origin": {
@@ -126,7 +137,7 @@
         }
       },
       {
-        "ordinal": 12,
+        "ordinal": 13,
         "name": "created_at",
         "type_info": "Timestamptz",
         "origin": {
@@ -137,7 +148,7 @@
         }
       },
       {
-        "ordinal": 13,
+        "ordinal": 14,
         "name": "updated_at",
         "type_info": "Timestamptz",
         "origin": {
@@ -148,7 +159,7 @@
         }
       },
       {
-        "ordinal": 14,
+        "ordinal": 15,
         "name": "deletion_requested_at",
         "type_info": "Timestamptz",
         "origin": {
@@ -159,7 +170,7 @@
         }
       },
       {
-        "ordinal": 15,
+        "ordinal": 16,
         "name": "deleted_at",
         "type_info": "Timestamptz",
         "origin": {
@@ -170,7 +181,7 @@
         }
       },
       {
-        "ordinal": 16,
+        "ordinal": 17,
         "name": "last_event_id",
         "type_info": "Int8",
         "origin": {
@@ -196,6 +207,7 @@
       false,
       false,
       false,
+      true,
       false,
       true,
       false,
@@ -207,5 +219,5 @@
       true
     ]
   },
-  "hash": "5489fd2caa64d1c3c0a724e322402238fb87f5a89252142cb06ffd45101b85e3"
+  "hash": "5613d6ca3c3be49756f44361e560ac22d3f07b0b0adb18f0461c84508c34157f"
 }

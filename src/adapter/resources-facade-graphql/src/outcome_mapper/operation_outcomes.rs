@@ -28,6 +28,7 @@ use super::batch_helpers::{
 };
 use super::problem_mappers::{
     account_resolution_problem_error,
+    map_batch_lookup_problem,
     unsupported_selector_problem_error,
 };
 use crate::cynic_api;
@@ -85,6 +86,9 @@ pub(crate) fn map_search_outcome(
         O::ResourceInvalidLabelFilterProblem(problem) => {
             Err(ListResourcesError::InvalidLabelFilter(problem.into()))
         }
+        O::ResourceOwnerLookupProblem(problem) => Err(ListResourcesError::OwnerLookup(
+            map_batch_lookup_problem(problem.problem)?,
+        )),
         O::Unknown => Err(ListResourcesError::Internal(InternalError::new(
             "Remote search returned an unrecognized ResourceListOutcome variant",
         ))),
@@ -121,6 +125,9 @@ pub(crate) fn map_search_handles_outcome(
         O::ResourceInvalidLabelFilterProblem(problem) => {
             Err(ListResourcesError::InvalidLabelFilter(problem.into()))
         }
+        O::ResourceOwnerLookupProblem(problem) => Err(ListResourcesError::OwnerLookup(
+            map_batch_lookup_problem(problem.problem)?,
+        )),
         O::Unknown => Err(ListResourcesError::Internal(InternalError::new(
             "Remote search returned an unrecognized ResourceHandleListOutcome variant",
         ))),

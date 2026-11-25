@@ -85,10 +85,11 @@ impl GenericResourceQueryService for GenericResourceQueryServiceImpl {
         account_id: &odf::AccountID,
         scope: &ResourceScope,
         visibility: ResourceVisibility,
+        owner_id: Option<ResourceID>,
         pagination: PaginationOpts,
     ) -> Result<Vec<ResourceHandleRow>, InternalError> {
         self.resource_repository
-            .search_resource_handles(account_id, scope, visibility, pagination)
+            .search_resource_handles(account_id, scope, visibility, owner_id, pagination)
             .await
     }
 
@@ -97,9 +98,10 @@ impl GenericResourceQueryService for GenericResourceQueryServiceImpl {
         account_id: &odf::AccountID,
         scope: &ResourceScope,
         visibility: ResourceVisibility,
+        owner_id: Option<ResourceID>,
     ) -> Result<usize, InternalError> {
         self.resource_repository
-            .count_search_resource_handles(account_id, scope, visibility)
+            .count_search_resource_handles(account_id, scope, visibility, owner_id)
             .await
     }
 
@@ -226,11 +228,12 @@ impl GenericResourceQueryService for GenericResourceQueryServiceImpl {
         account_id: &odf::AccountID,
         scope: &ResourceScope,
         visibility: ResourceVisibility,
+        owner_id: Option<ResourceID>,
         pagination: PaginationOpts,
     ) -> Result<Vec<ResourceSnapshot>, InternalError> {
         let mut resource_snapshots_stream = self
             .resource_repository
-            .list_resource_snapshots(account_id, scope, visibility, pagination);
+            .list_resource_snapshots(account_id, scope, visibility, owner_id, pagination);
 
         use tokio_stream::StreamExt;
 

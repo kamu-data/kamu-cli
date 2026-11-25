@@ -12,7 +12,11 @@ use database_common_macros::{database_concurrent_transactions_test, database_tra
 use dill::{Catalog, CatalogBuilder};
 use kamu_accounts_sqlite::SqliteAccountRepository;
 use kamu_resources_repo_tests::resource_repository_test_suite as resource_repo_suite;
-use kamu_resources_sqlite::{SqliteResourceLabelProjectionRepository, SqliteResourceRepository};
+use kamu_resources_sqlite::{
+    SqliteResourceLabelProjectionRepository,
+    SqliteResourceOwnerProjectionRepository,
+    SqliteResourceRepository,
+};
 use sqlx::SqlitePool;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -365,6 +369,7 @@ impl SqliteResourceRepositoryHarness {
         catalog_builder.add::<SqliteTransactionManager>();
         catalog_builder.add::<SqliteResourceRepository>();
         catalog_builder.add::<SqliteResourceLabelProjectionRepository>();
+        catalog_builder.add::<SqliteResourceOwnerProjectionRepository>();
         catalog_builder.add::<SqliteAccountRepository>();
         Self {
             catalog: catalog_builder.build(),
@@ -429,6 +434,22 @@ database_transactional_test!(
     storage = sqlite,
     fixture =
         resource_repo_suite::test_find_resource_ids_by_schema_and_label_any_account_discriminates,
+    harness = SqliteResourceRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = sqlite,
+    fixture = resource_repo_suite::test_owner_references_round_trip,
+    harness = SqliteResourceRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = sqlite,
+    fixture = resource_repo_suite::test_search_by_owner,
     harness = SqliteResourceRepositoryHarness
 );
 

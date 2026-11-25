@@ -71,6 +71,9 @@ pub struct GetResourceCommand {
     label_selectors: Vec<String>,
 
     #[dill::component(explicit)]
+    owner: Option<String>,
+
+    #[dill::component(explicit)]
     visibility: ResourceVisibility,
 }
 
@@ -79,7 +82,16 @@ pub struct GetResourceCommand {
 impl GetResourceCommand {
     const MATERIALIZATION_BATCH_SIZE: usize = 100;
 
-    fn resolution_options(&self) -> Result<ResourceSelectionResolutionOptions, CLIError> {
+    async fn resolution_options(&self) -> Result<ResourceSelectionResolutionOptions, CLIError> {
+        let owner = match &self.owner {
+            Some(owner) => Some(
+                self.resource_selection_syntax_service
+                    .parse_owner(self.explicit_context_name.as_deref(), owner)
+                    .await?,
+            ),
+            None => None,
+        };
+
         Ok(ResourceSelectionResolutionOptions {
             ignore_not_found: self.ignore_not_found,
             max_expanded_results: if self.unbounded {
@@ -88,6 +100,7 @@ impl GetResourceCommand {
                 Some(self.max_results.get())
             },
             label_filter: ResourceLabelSelectorParser::parse(&self.label_selectors)?,
+            owner,
             visibility: self.visibility,
             id_visibility: self.visibility.of_ids(),
         })
@@ -343,7 +356,7 @@ impl Command for GetResourceCommand {
             .resolve(
                 syntax,
                 resource_facade.as_ref(),
-                &self.resolution_options()?,
+                &self.resolution_options().await?,
             )
             .await?;
 

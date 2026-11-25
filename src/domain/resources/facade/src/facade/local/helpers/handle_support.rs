@@ -7,28 +7,9 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_resources::{ResourceHandle, ResourceHandleRow, ResourceID, ResourceName, TypeUri};
+use kamu_resources::{ResourceHandleRow, ResourceID, ResourceName, TypeUri};
 
 use crate::{ResourceLookupProblem, ResourceNameMismatchError};
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-/// Builds a handle from a storage row.
-#[expect(clippy::needless_pass_by_value, reason = "consume the row")]
-pub(crate) fn resource_handle_from_row(row: ResourceHandleRow) -> ResourceHandle {
-    let account = row.account_handle();
-    let schema = TypeUri::new_unchecked(&row.schema);
-
-    ResourceHandle {
-        r#type: schema,
-        // TODO: temporary until we support DID-aware resource types; once we do,
-        // this must be populated instead of always `None`.
-        did: None,
-        account,
-        id: ResourceID::new(row.id),
-        name: ResourceName::new_unchecked(&row.name),
-    }
-}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

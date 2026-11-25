@@ -15,6 +15,7 @@ use crate::cynic_api::fragments::{
     ResourceAccountResolutionProblem,
     ResourceConnection,
     ResourceInvalidLabelFilterProblem,
+    ResourceOwnerLookupProblem,
     ResourceUnsupportedSelectorProblem,
 };
 use crate::cynic_api::inputs::SearchResourcesInput;
@@ -43,6 +44,7 @@ pub(crate) enum ResourceListOutcome {
     ResourceUnsupportedSelectorProblem(ResourceUnsupportedSelectorProblem),
     ResourceAccountResolutionProblem(ResourceAccountResolutionProblem),
     ResourceInvalidLabelFilterProblem(ResourceInvalidLabelFilterProblem),
+    ResourceOwnerLookupProblem(ResourceOwnerLookupProblem),
     #[cynic(fallback)]
     Unknown,
 }

@@ -363,7 +363,7 @@ pub async fn test_resources_label_filter_any_type_multitype(ctx: ResourceCtx) {
 
 /// `-l` narrows **every** selector when several are given at once.
 ///
-/// The facade has no call-level filter, so the CLI stamps the parsed filter
+/// The facade has no call-level label filter, so the CLI stamps the parsed filter
 /// onto each selector it builds. Every other test here passes a single
 /// selector, which cannot distinguish "applied to all" from "applied to the
 /// first".

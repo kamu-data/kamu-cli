@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            INSERT INTO resources (\n                resource_id,\n                account_id,\n                resource_schema,\n                resource_name,\n                labels,\n                annotations,\n                spec,\n                status,\n                generation,\n                created_at,\n                updated_at,\n                deleted_at,\n                last_event_id,\n                status_generation,\n                deletion_requested_at,\n                owner_references\n            )\n            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)\n            ON CONFLICT (account_id, resource_schema, resource_name)\n                WHERE deletion_requested_at IS NULL\n                DO NOTHING\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 16
+    },
+    "nullable": []
+  },
+  "hash": "5702dd01463231ce212935c977d999da30eb9cad335c5ca1dbec5446f5bf519c"
+}

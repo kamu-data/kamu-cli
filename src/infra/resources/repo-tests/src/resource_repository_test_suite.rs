@@ -24,12 +24,14 @@ use futures::TryStreamExt;
 use kamu_accounts::{Account, AccountRepository, AccountType};
 use kamu_resources::{
     CreateResourceError,
+    ResourceHandle,
     ResourceHeaders,
     ResourceHeadersExt,
     ResourceID,
     ResourceLabelPair,
     ResourceLabelProjectionRepository,
     ResourceName,
+    ResourceOwnerProjectionRepository,
     ResourcePhase,
     ResourcePhaseCounts,
     ResourceQuery,
@@ -47,6 +49,7 @@ use kamu_resources::{
     description_annotation_type_ref,
     get_description,
     new_pending_resource_status,
+    owner_ids,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -96,6 +99,7 @@ pub async fn test_no_resources_initially(catalog: &Catalog) {
             &account_id,
             &ResourceScope::default(),
             ResourceVisibility::Active,
+            None,
             PaginationOpts::from_max_results(100),
         )
         .try_collect()
@@ -452,6 +456,7 @@ pub async fn test_search_resource_handles(catalog: &Catalog) {
                 Some(ResourceQuery::NamePattern("app-%".to_string())),
             ),
             ResourceVisibility::Active,
+            None,
             PaginationOpts::from_max_results(10),
         )
         .await
@@ -467,6 +472,7 @@ pub async fn test_search_resource_handles(catalog: &Catalog) {
                 Some(ResourceQuery::NamePattern("APP-%".to_string())),
             ),
             ResourceVisibility::Active,
+            None,
             PaginationOpts::from_max_results(10),
         )
         .await
@@ -485,6 +491,7 @@ pub async fn test_search_resource_handles(catalog: &Catalog) {
                 ])),
             ),
             ResourceVisibility::Active,
+            None,
             PaginationOpts::from_max_results(10),
         )
         .await
@@ -504,6 +511,7 @@ pub async fn test_search_resource_handles(catalog: &Catalog) {
                 ])),
             ),
             ResourceVisibility::Active,
+            None,
             PaginationOpts::from_max_results(10),
         )
         .await
@@ -530,6 +538,7 @@ pub async fn test_search_resource_handles(catalog: &Catalog) {
                 },
             ]),
             ResourceVisibility::Active,
+            None,
             PaginationOpts::from_max_results(10),
         )
         .await
@@ -549,6 +558,7 @@ pub async fn test_search_resource_handles(catalog: &Catalog) {
                 Some(ResourceQuery::NamePattern("%".to_string())),
             ),
             ResourceVisibility::Active,
+            None,
             PaginationOpts::from_max_results(10),
         )
         .await
@@ -563,6 +573,7 @@ pub async fn test_search_resource_handles(catalog: &Catalog) {
                 Some(ResourceQuery::NamePattern("app-other-%".to_string())),
             ),
             ResourceVisibility::Active,
+            None,
             PaginationOpts::from_max_results(10),
         )
         .await
@@ -577,6 +588,7 @@ pub async fn test_search_resource_handles(catalog: &Catalog) {
                 Some(ResourceQuery::NamePattern(String::new())),
             ),
             ResourceVisibility::Active,
+            None,
             PaginationOpts::from_max_results(10),
         )
         .await
@@ -600,6 +612,7 @@ pub async fn test_search_resource_handles_exact_ids(catalog: &Catalog) {
                 Some(ResourceQuery::ExactIds(vec![ids.app_alpha])),
             ),
             ResourceVisibility::Active,
+            None,
             PaginationOpts::from_max_results(10),
         )
         .await
@@ -615,6 +628,7 @@ pub async fn test_search_resource_handles_exact_ids(catalog: &Catalog) {
                 Some(ResourceQuery::ExactIds(vec![ids.app_alpha, ids.db_alpha])),
             ),
             ResourceVisibility::Active,
+            None,
             PaginationOpts::from_max_results(10),
         )
         .await
@@ -632,6 +646,7 @@ pub async fn test_search_resource_handles_exact_ids(catalog: &Catalog) {
                 Some(ResourceQuery::ExactIds(vec![ids.app_alpha, missing_id])),
             ),
             ResourceVisibility::Active,
+            None,
             PaginationOpts::from_max_results(10),
         )
         .await
@@ -647,6 +662,7 @@ pub async fn test_search_resource_handles_exact_ids(catalog: &Catalog) {
                 Some(ResourceQuery::ExactIds(vec![ids.app_alpha])),
             ),
             ResourceVisibility::Active,
+            None,
             PaginationOpts::from_max_results(10),
         )
         .await
@@ -661,6 +677,7 @@ pub async fn test_search_resource_handles_exact_ids(catalog: &Catalog) {
                 Some(ResourceQuery::ExactIds(vec![ids.other_account])),
             ),
             ResourceVisibility::Active,
+            None,
             PaginationOpts::from_max_results(10),
         )
         .await
@@ -685,6 +702,7 @@ pub async fn test_search_resource_handles_exact_ids(catalog: &Catalog) {
                 },
             ]),
             ResourceVisibility::Active,
+            None,
             PaginationOpts::from_max_results(10),
         )
         .await
@@ -698,6 +716,7 @@ pub async fn test_search_resource_handles_exact_ids(catalog: &Catalog) {
             &account_handle.did,
             &ResourceScope::one_type(TEST_KIND.clone(), Some(ResourceQuery::ExactIds(vec![]))),
             ResourceVisibility::Active,
+            None,
             PaginationOpts::from_max_results(10),
         )
         .await
@@ -752,6 +771,7 @@ pub async fn test_search_resource_handles_partially_vacuous_scope(catalog: &Cata
                 &account_handle.did,
                 &scope,
                 ResourceVisibility::Active,
+                None,
                 PaginationOpts::from_max_results(10),
             )
             .await
@@ -766,7 +786,12 @@ pub async fn test_search_resource_handles_partially_vacuous_scope(catalog: &Cata
 
         // The count shares the scope predicate, so it must agree.
         let count = repo
-            .count_search_resource_handles(&account_handle.did, &scope, ResourceVisibility::Active)
+            .count_search_resource_handles(
+                &account_handle.did,
+                &scope,
+                ResourceVisibility::Active,
+                None,
+            )
             .await
             .unwrap();
         assert_eq!(count, 2);
@@ -792,6 +817,7 @@ pub async fn test_search_resource_handles_any_type(catalog: &Catalog) {
                 label_pairs: vec![],
             },
             ResourceVisibility::Active,
+            None,
             PaginationOpts::from_max_results(10),
         )
         .await
@@ -815,6 +841,7 @@ pub async fn test_search_resource_handles_any_type(catalog: &Catalog) {
                 label_pairs: vec![],
             },
             ResourceVisibility::Active,
+            None,
             PaginationOpts::from_max_results(10),
         )
         .await
@@ -830,6 +857,7 @@ pub async fn test_search_resource_handles_any_type(catalog: &Catalog) {
                 label_pairs: vec![],
             },
             ResourceVisibility::Active,
+            None,
             PaginationOpts::from_max_results(10),
         )
         .await
@@ -851,6 +879,7 @@ pub async fn test_search_resource_handles_any_type(catalog: &Catalog) {
                 label_pairs: vec![],
             },
             ResourceVisibility::Active,
+            None,
         )
         .await
         .unwrap();
@@ -873,6 +902,7 @@ pub async fn test_count_search_resource_handles_exact_ids(catalog: &Catalog) {
                 Some(ResourceQuery::ExactIds(vec![ids.app_alpha, ids.db_alpha])),
             ),
             ResourceVisibility::Active,
+            None,
         )
         .await
         .unwrap();
@@ -887,6 +917,7 @@ pub async fn test_count_search_resource_handles_exact_ids(catalog: &Catalog) {
                 Some(ResourceQuery::ExactIds(vec![ids.app_alpha, missing_id])),
             ),
             ResourceVisibility::Active,
+            None,
         )
         .await
         .unwrap();
@@ -897,6 +928,7 @@ pub async fn test_count_search_resource_handles_exact_ids(catalog: &Catalog) {
             &account_handle.did,
             &ResourceScope::one_type(TEST_KIND.clone(), Some(ResourceQuery::ExactIds(vec![]))),
             ResourceVisibility::Active,
+            None,
         )
         .await
         .unwrap();
@@ -928,6 +960,7 @@ pub async fn test_search_resource_handles_pattern_special_characters(catalog: &C
                 Some(ResourceQuery::NamePattern("a_b".to_string())),
             ),
             ResourceVisibility::Active,
+            None,
             PaginationOpts::from_max_results(10),
         )
         .await
@@ -943,6 +976,7 @@ pub async fn test_search_resource_handles_pattern_special_characters(catalog: &C
                 Some(ResourceQuery::NamePattern("a-b-%".to_string())),
             ),
             ResourceVisibility::Active,
+            None,
             PaginationOpts::from_max_results(10),
         )
         .await
@@ -981,6 +1015,7 @@ pub async fn test_count_search_resource_handles(catalog: &Catalog) {
                 Some(ResourceQuery::NamePattern("app-%".to_string())),
             ),
             ResourceVisibility::Active,
+            None,
         )
         .await
         .unwrap();
@@ -997,6 +1032,7 @@ pub async fn test_count_search_resource_handles(catalog: &Catalog) {
                 ])),
             ),
             ResourceVisibility::Active,
+            None,
         )
         .await
         .unwrap();
@@ -1020,6 +1056,7 @@ pub async fn test_count_search_resource_handles(catalog: &Catalog) {
                 },
             ]),
             ResourceVisibility::Active,
+            None,
         )
         .await
         .unwrap();
@@ -1033,6 +1070,7 @@ pub async fn test_count_search_resource_handles(catalog: &Catalog) {
                 Some(ResourceQuery::NamePattern("app-other-%".to_string())),
             ),
             ResourceVisibility::Active,
+            None,
         )
         .await
         .unwrap();
@@ -1043,6 +1081,7 @@ pub async fn test_count_search_resource_handles(catalog: &Catalog) {
             &account_handle.did,
             &ResourceScope::one_type(TEST_KIND.clone(), Some(ResourceQuery::ExactNames(vec![]))),
             ResourceVisibility::Active,
+            None,
         )
         .await
         .unwrap();
@@ -1134,6 +1173,7 @@ pub async fn test_resource_name_case_insensitive(catalog: &Catalog) {
                 ])),
             ),
             ResourceVisibility::Active,
+            None,
             PaginationOpts::from_max_results(10),
         )
         .await
@@ -1149,6 +1189,7 @@ pub async fn test_resource_name_case_insensitive(catalog: &Catalog) {
                 Some(ResourceQuery::NamePattern("MY-%".to_string())),
             ),
             ResourceVisibility::Active,
+            None,
             PaginationOpts::from_max_results(10),
         )
         .await
@@ -1279,6 +1320,7 @@ pub async fn test_search_resource_handles_per_row_labels(catalog: &Catalog) {
             &account_handle.did,
             &scope,
             ResourceVisibility::Active,
+            None,
             PaginationOpts::from_max_results(100),
         )
         .await
@@ -1293,7 +1335,12 @@ pub async fn test_search_resource_handles_per_row_labels(catalog: &Catalog) {
 
     // The count must agree with the rows, or pagination totals drift.
     let count = repo
-        .count_search_resource_handles(&account_handle.did, &scope, ResourceVisibility::Active)
+        .count_search_resource_handles(
+            &account_handle.did,
+            &scope,
+            ResourceVisibility::Active,
+            None,
+        )
         .await
         .unwrap();
     assert_eq!(count, 2);
@@ -1319,6 +1366,7 @@ pub async fn test_search_resource_handles_per_row_labels(catalog: &Catalog) {
             &account_handle.did,
             &mixed_scope,
             ResourceVisibility::Active,
+            None,
             PaginationOpts::from_max_results(100),
         )
         .await
@@ -1337,6 +1385,7 @@ pub async fn test_search_resource_handles_per_row_labels(catalog: &Catalog) {
             &account_handle.did,
             &scope,
             ResourceVisibility::Active,
+            None,
             PaginationOpts::from_max_results(100),
         )
         .try_collect::<Vec<_>>()
@@ -1388,6 +1437,7 @@ pub async fn test_search_resource_handles_any_type_labels(catalog: &Catalog) {
             &account_handle.did,
             &scope,
             ResourceVisibility::Active,
+            None,
             PaginationOpts::from_max_results(100),
         )
         .await
@@ -1401,7 +1451,12 @@ pub async fn test_search_resource_handles_any_type_labels(catalog: &Catalog) {
     );
 
     let count = repo
-        .count_search_resource_handles(&account_handle.did, &scope, ResourceVisibility::Active)
+        .count_search_resource_handles(
+            &account_handle.did,
+            &scope,
+            ResourceVisibility::Active,
+            None,
+        )
         .await
         .unwrap();
     assert_eq!(count, 2);
@@ -1437,6 +1492,7 @@ async fn filtered_list_names(
             &account_handle.did,
             &one_type_scope_with_labels(label_pairs),
             ResourceVisibility::Active,
+            None,
             PaginationOpts::from_max_results(10),
         )
         .try_collect::<Vec<_>>()
@@ -1527,6 +1583,7 @@ pub async fn test_search_resource_handles_label_filtering(catalog: &Catalog) {
             &account_handle.did,
             &scope_with_pattern("%"),
             ResourceVisibility::Active,
+            None,
             PaginationOpts::from_max_results(10),
         )
         .await
@@ -1540,6 +1597,7 @@ pub async fn test_search_resource_handles_label_filtering(catalog: &Catalog) {
             &account_handle.did,
             &scope_with_pattern("%"),
             ResourceVisibility::Active,
+            None,
         )
         .await
         .unwrap();
@@ -1550,6 +1608,7 @@ pub async fn test_search_resource_handles_label_filtering(catalog: &Catalog) {
             &account_handle.did,
             &scope_with_pattern("%-infra"),
             ResourceVisibility::Active,
+            None,
             PaginationOpts::from_max_results(10),
         )
         .await
@@ -1586,6 +1645,7 @@ pub async fn test_search_resource_handles_per_row_account(catalog: &Catalog) {
                 &account_handle.did,
                 &scope,
                 ResourceVisibility::Active,
+                None,
                 PaginationOpts::from_max_results(100),
             )
             .await
@@ -1698,6 +1758,7 @@ pub async fn test_search_resource_handles_per_row_account(catalog: &Catalog) {
                 label_pairs: vec![],
             }]),
             ResourceVisibility::Active,
+            None,
         )
         .await
         .unwrap();
@@ -1902,6 +1963,7 @@ pub async fn test_status_generation_round_trips(catalog: &Catalog) {
                 &account_handle.did,
                 &ResourceScope::default(),
                 ResourceVisibility::Active,
+                None,
                 PaginationOpts::from_max_results(100),
             )
             .try_collect()
@@ -2175,6 +2237,7 @@ pub async fn test_list_resource_snapshots_by_scope(catalog: &Catalog) {
             &account_handle.did,
             &ResourceScope::one_type(KIND_A.clone(), None),
             ResourceVisibility::Active,
+            None,
             PaginationOpts::from_max_results(100),
         )
         .try_collect()
@@ -2188,6 +2251,7 @@ pub async fn test_list_resource_snapshots_by_scope(catalog: &Catalog) {
             &account_handle.did,
             &ResourceScope::one_type(KIND_B.clone(), None),
             ResourceVisibility::Active,
+            None,
             PaginationOpts::from_max_results(100),
         )
         .try_collect()
@@ -2201,6 +2265,7 @@ pub async fn test_list_resource_snapshots_by_scope(catalog: &Catalog) {
             &account_handle.did,
             &ResourceScope::one_type(KIND_C.clone(), None),
             ResourceVisibility::Active,
+            None,
             PaginationOpts::from_max_results(100),
         )
         .try_collect()
@@ -2246,6 +2311,7 @@ pub async fn test_list_resource_snapshots_with_queries(catalog: &Catalog) {
                 Some(ResourceQuery::NamePattern("app-%".to_string())),
             ),
             ResourceVisibility::Active,
+            None,
             PaginationOpts::from_max_results(100),
         )
         .try_collect()
@@ -2259,6 +2325,7 @@ pub async fn test_list_resource_snapshots_with_queries(catalog: &Catalog) {
             &account_handle.did,
             &ResourceScope::one_type(KIND_A.clone(), Some(ResourceQuery::ExactIds(vec![db_a.id]))),
             ResourceVisibility::Active,
+            None,
             PaginationOpts::from_max_results(100),
         )
         .try_collect()
@@ -2272,6 +2339,7 @@ pub async fn test_list_resource_snapshots_with_queries(catalog: &Catalog) {
             &account_handle.did,
             &ResourceScope::one_type(KIND_B.clone(), Some(ResourceQuery::ExactIds(vec![db_a.id]))),
             ResourceVisibility::Active,
+            None,
             PaginationOpts::from_max_results(100),
         )
         .try_collect()
@@ -2298,6 +2366,7 @@ pub async fn test_list_resource_snapshots_with_queries(catalog: &Catalog) {
                 },
             ]),
             ResourceVisibility::Active,
+            None,
             PaginationOpts::from_max_results(100),
         )
         .try_collect()
@@ -2324,6 +2393,7 @@ pub async fn test_list_resource_snapshots_with_queries(catalog: &Catalog) {
                 },
             ]),
             ResourceVisibility::Active,
+            None,
             PaginationOpts::from_max_results(100),
         )
         .try_collect()
@@ -2337,6 +2407,7 @@ pub async fn test_list_resource_snapshots_with_queries(catalog: &Catalog) {
             &account_handle.did,
             &ResourceScope::any_type_with_query(ResourceQuery::NamePattern("app-%".to_string())),
             ResourceVisibility::Active,
+            None,
             PaginationOpts::from_max_results(100),
         )
         .try_collect()
@@ -2353,6 +2424,7 @@ pub async fn test_list_resource_snapshots_with_queries(catalog: &Catalog) {
                 "app-beta".parse().unwrap(),
             ])),
             ResourceVisibility::Active,
+            None,
             PaginationOpts::from_max_results(100),
         )
         .try_collect()
@@ -2379,6 +2451,7 @@ pub async fn test_list_resource_snapshots_with_queries(catalog: &Catalog) {
                 },
             ]),
             ResourceVisibility::Active,
+            None,
             PaginationOpts::from_max_results(100),
         )
         .try_collect()
@@ -2407,6 +2480,7 @@ pub async fn test_list_resource_snapshots_with_queries(catalog: &Catalog) {
                 },
             ]),
             ResourceVisibility::Active,
+            None,
             PaginationOpts::from_max_results(100),
         )
         .try_collect()
@@ -2434,6 +2508,7 @@ pub async fn test_list_resource_snapshots_with_queries(catalog: &Catalog) {
                 },
             ]),
             ResourceVisibility::Active,
+            None,
             PaginationOpts::from_max_results(100),
         )
         .try_collect()
@@ -2451,6 +2526,7 @@ pub async fn test_list_resource_snapshots_with_queries(catalog: &Catalog) {
             &account_handle.did,
             &ResourceScope::Types(Vec::new()),
             ResourceVisibility::Active,
+            None,
             PaginationOpts::from_max_results(100),
         )
         .try_collect()
@@ -2464,6 +2540,7 @@ pub async fn test_list_resource_snapshots_with_queries(catalog: &Catalog) {
             &account_handle.did,
             &ResourceScope::any_type_with_query(ResourceQuery::NamePattern("app-%".to_string())),
             ResourceVisibility::Active,
+            None,
             PaginationOpts {
                 limit: 1,
                 offset: 0,
@@ -2504,6 +2581,7 @@ pub async fn test_list_all_resource_snapshots(catalog: &Catalog) {
             &account_handle.did,
             &ResourceScope::default(),
             ResourceVisibility::Active,
+            None,
             PaginationOpts::from_max_results(100),
         )
         .try_collect()
@@ -2644,6 +2722,7 @@ pub async fn test_deleted_resource_round_trips(catalog: &Catalog) {
             &account_handle.did,
             &ResourceScope::one_type(TEST_KIND.clone(), None),
             ResourceVisibility::DeletedOnly,
+            None,
             PaginationOpts::from_max_results(10),
         )
         .try_collect()
@@ -2678,6 +2757,7 @@ pub async fn test_deleted_resource_round_trips(catalog: &Catalog) {
             &account_handle.did,
             &ResourceScope::one_type(TEST_KIND.clone(), None),
             ResourceVisibility::DeletedOnly,
+            None,
             PaginationOpts::from_max_results(10),
         )
         .await
@@ -2741,6 +2821,7 @@ pub async fn test_resource_being_deleted_round_trips(catalog: &Catalog) {
             &account_handle.did,
             &ResourceScope::one_type(TEST_KIND.clone(), None),
             ResourceVisibility::IncludeDeleting,
+            None,
             PaginationOpts::from_max_results(10),
         )
         .try_collect()
@@ -2849,6 +2930,7 @@ pub async fn test_visibility_by_deletion_state(catalog: &Catalog) {
                     &account_handle.did,
                     scope,
                     visibility,
+                    None,
                     PaginationOpts::from_max_results(10),
                 )
                 .await
@@ -2863,7 +2945,7 @@ pub async fn test_visibility_by_deletion_state(catalog: &Catalog) {
             );
 
             let count = repo
-                .count_search_resource_handles(&account_handle.did, scope, visibility)
+                .count_search_resource_handles(&account_handle.did, scope, visibility, None)
                 .await
                 .unwrap();
             assert_eq!(
@@ -2877,6 +2959,7 @@ pub async fn test_visibility_by_deletion_state(catalog: &Catalog) {
                     &account_handle.did,
                     scope,
                     visibility,
+                    None,
                     PaginationOpts::from_max_results(10),
                 )
                 .try_collect()
@@ -3086,14 +3169,14 @@ pub async fn test_listings_with_deleted_resources_run_newest_deletion_first(cata
         for offset in (0..expected.len()).step_by(2) {
             let page = PaginationOpts { limit: 2, offset };
             searched.extend(
-                repo.search_resource_handles(&account_handle.did, &scope, visibility, page)
+                repo.search_resource_handles(&account_handle.did, &scope, visibility, None, page)
                     .await
                     .unwrap()
                     .into_iter()
                     .map(|row| ResourceID::new(row.id)),
             );
             let snapshots: Vec<_> = repo
-                .list_resource_snapshots(&account_handle.did, &scope, visibility, page)
+                .list_resource_snapshots(&account_handle.did, &scope, visibility, None, page)
                 .try_collect()
                 .await
                 .unwrap();
@@ -3251,6 +3334,7 @@ pub async fn test_account_rename_reflected_immediately_in_headers(catalog: &Cata
 
     let mut snapshot = make_test_snapshot(&original_handle, &TEST_KIND, "owned-resource");
     snapshot.id = repo.new_resource_id().await.unwrap();
+    snapshot.headers.owner_references = Some(vec![make_owner_handle(&original_handle, "owner")]);
     let id = snapshot.id;
     repo.create_resource(&snapshot).await.unwrap();
 
@@ -3279,6 +3363,10 @@ pub async fn test_account_rename_reflected_immediately_in_headers(catalog: &Cata
         after_rename.headers.account.name, new_name,
         "account rename must be reflected immediately on re-read, without any resource-side update"
     );
+
+    for owner in after_rename.headers.owner_references.iter().flatten() {
+        assert_eq!(owner.account, after_rename.headers.account);
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -3967,6 +4055,222 @@ pub async fn test_create_name_twice_while_concurrent_deletion_request_frees_it(c
     })
     .await;
     assert_eq!(second_successor_found, None);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+fn make_owner_handle(account_handle: &odf::ResourceOwnerHandle, name: &str) -> ResourceHandle {
+    ResourceHandle {
+        account: account_handle.clone(),
+        r#type: TEST_KIND.clone(),
+        id: ResourceID::new(uuid::Uuid::new_v4()),
+        did: None,
+        name: name.parse().unwrap(),
+    }
+}
+
+pub async fn test_owner_references_round_trip(catalog: &Catalog) {
+    let repo = catalog.get_one::<dyn ResourceRepository>().unwrap();
+    let account_handle = odf::ResourceOwnerHandle::new_test("test-account");
+    catalog
+        .get_one::<dyn AccountRepository>()
+        .unwrap()
+        .save_account(&make_test_account(&account_handle))
+        .await
+        .unwrap();
+
+    let mut snapshot = make_test_snapshot(&account_handle, &TEST_KIND, "owned");
+    snapshot.headers.owner_references = Some(vec![
+        make_owner_handle(&account_handle, "first"),
+        make_owner_handle(&account_handle, "second"),
+    ]);
+    repo.create_resource(&snapshot).await.unwrap();
+    assert_owner_references(repo.as_ref(), &snapshot).await;
+
+    snapshot.headers.owner_references = None;
+    repo.update_resource(&snapshot, None).await.unwrap();
+    assert_owner_references(repo.as_ref(), &snapshot).await;
+
+    snapshot.headers.owner_references = Some(vec![make_owner_handle(&account_handle, "third")]);
+    repo.update_resource(&snapshot, None).await.unwrap();
+    assert_owner_references(repo.as_ref(), &snapshot).await;
+}
+
+/// Checks every read that returns snapshots
+async fn assert_owner_references(repo: &dyn ResourceRepository, expected: &ResourceSnapshot) {
+    let account_id = &expected.headers.account.did;
+    let ids = [expected.id];
+
+    let mut found = vec![
+        repo.find_resource_snapshot(&ResourceRawEventQuery {
+            schema: expected.schema.clone(),
+            id: expected.id,
+        })
+        .await
+        .unwrap()
+        .unwrap(),
+        repo.find_resource_snapshot_by_id(&expected.id)
+            .await
+            .unwrap()
+            .unwrap(),
+    ];
+    found.extend(
+        repo.find_resource_snapshots_by_schema_and_ids(&expected.schema, &ids)
+            .await
+            .unwrap(),
+    );
+    found.extend(
+        repo.find_resource_snapshots_by_ids(account_id, &ids)
+            .await
+            .unwrap(),
+    );
+    found.extend(
+        repo.list_resource_snapshots(
+            account_id,
+            &ResourceScope::default(),
+            ResourceVisibility::Active,
+            None,
+            PaginationOpts::from_max_results(10),
+        )
+        .try_collect::<Vec<_>>()
+        .await
+        .unwrap(),
+    );
+
+    let found = found
+        .into_iter()
+        .map(|snapshot| snapshot.headers.owner_references)
+        .collect::<Vec<_>>();
+    assert_eq!(found, vec![expected.headers.owner_references.clone(); 5]);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_search_by_owner(catalog: &Catalog) {
+    let repo = catalog.get_one::<dyn ResourceRepository>().unwrap();
+    let account = odf::ResourceOwnerHandle::new_test("test-account");
+    let other_account = odf::ResourceOwnerHandle::new_test("other-account");
+
+    let first = make_owner_handle(&account, "first");
+    let second = make_owner_handle(&account, "second");
+
+    for (account, schema, name, owners, deleted) in [
+        (&account, &*TEST_KIND, "of-first", vec![&first], false),
+        (
+            &account,
+            &*OTHER_KIND,
+            "of-both",
+            vec![&first, &second],
+            false,
+        ),
+        (&account, &*TEST_KIND, "of-second", vec![&second], false),
+        (&account, &*TEST_KIND, "of-none", vec![], false),
+        (
+            &account,
+            &*TEST_KIND,
+            "deleted-of-first",
+            vec![&first],
+            true,
+        ),
+        (
+            &other_account,
+            &*TEST_KIND,
+            "of-other-account",
+            vec![&first],
+            false,
+        ),
+    ] {
+        create_owned_resource(catalog, account, schema, name, &owners, deleted).await;
+    }
+
+    use ResourceVisibility as V;
+    let any_type = ResourceScope::any_type();
+    let one_type = ResourceScope::one_type(TEST_KIND.clone(), None);
+    let unknown = ResourceID::new(uuid::Uuid::new_v4());
+    for (owner_id, scope, visibility, expected) in [
+        (first.id, &any_type, V::Active, vec!["of-both", "of-first"]),
+        (first.id, &one_type, V::Active, vec!["of-first"]),
+        (
+            first.id,
+            &one_type,
+            V::IncludeDeleted,
+            vec!["deleted-of-first", "of-first"],
+        ),
+        (
+            first.id,
+            &any_type,
+            V::DeletedOnly,
+            vec!["deleted-of-first"],
+        ),
+        (
+            second.id,
+            &any_type,
+            V::Active,
+            vec!["of-both", "of-second"],
+        ),
+        (unknown, &any_type, V::IncludeDeleted, vec![]),
+    ] {
+        let pagination = PaginationOpts::from_max_results(10);
+
+        let mut handles = repo
+            .search_resource_handles(&account.did, scope, visibility, Some(owner_id), pagination)
+            .await
+            .unwrap()
+            .into_iter()
+            .map(|row| row.name)
+            .collect::<Vec<_>>();
+        handles.sort();
+        assert_eq!(handles, expected);
+
+        let mut listed = repo
+            .list_resource_snapshots(&account.did, scope, visibility, Some(owner_id), pagination)
+            .map_ok(|snapshot| snapshot.headers.name.to_string())
+            .try_collect::<Vec<_>>()
+            .await
+            .unwrap();
+        listed.sort();
+        assert_eq!(listed, expected);
+
+        let count = repo
+            .count_search_resource_handles(&account.did, scope, visibility, Some(owner_id))
+            .await
+            .unwrap();
+        assert_eq!(count, expected.len());
+    }
+}
+
+async fn create_owned_resource(
+    catalog: &Catalog,
+    account: &odf::ResourceOwnerHandle,
+    schema: &TypeUri,
+    name: &str,
+    owners: &[&ResourceHandle],
+    deleted: bool,
+) {
+    let mut snapshot = make_test_snapshot(account, schema, name);
+    let headers = &mut snapshot.headers;
+    headers.owner_references =
+        (!owners.is_empty()).then(|| owners.iter().copied().cloned().collect());
+    if deleted {
+        headers.deletion_requested_at = Some(Utc::now());
+        headers.deleted_at = Some(Utc::now());
+    }
+
+    catalog
+        .get_one::<dyn ResourceRepository>()
+        .unwrap()
+        .create_resource(&snapshot)
+        .await
+        .unwrap();
+    catalog
+        .get_one::<dyn ResourceOwnerProjectionRepository>()
+        .unwrap()
+        .replace_owners(
+            &snapshot.id,
+            &owner_ids(snapshot.headers.owner_references.as_ref()),
+        )
+        .await
+        .unwrap();
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

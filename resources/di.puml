@@ -154,6 +154,7 @@ interface "ResourceLoader" <<i>>
 interface "ResourceManifestDiscoveryService" <<i>>
 interface "ResourceManifestExecutionService" <<i>>
 interface "ResourceNameSuffixGenerator" <<i>>
+interface "ResourceOwnerProjectionRepository" <<i>>
 interface "ResourcePersistenceService" <<i>>
 interface "ResourcePresentationDispatcher" <<i>>
 interface "ResourceRawEventStore" <<i>>
@@ -479,6 +480,7 @@ class "SqlitePollingHub" <<singleton>>
 class "SqliteRebacRepository"
 class "SqliteResourceControllerStateRepository"
 class "SqliteResourceLabelProjectionRepository"
+class "SqliteResourceOwnerProjectionRepository"
 class "SqliteResourceRawEventStore"
 class "SqliteResourceRepository"
 class "SqliteSecretSetProjectionRepository"
@@ -996,6 +998,7 @@ class "WsSmartTransferProtocolClient"
 "SecretSetResourcePersistenceServiceImpl"  --> "SecretSetEventStore"
 "SecretSetResourcePersistenceServiceImpl"  --> "ResourceControllerStateRepository"
 "SecretSetResourcePersistenceServiceImpl"  --> "ResourceLabelProjectionRepository"
+"SecretSetResourcePersistenceServiceImpl"  --> "ResourceOwnerProjectionRepository"
 "SecretSetResourcePersistenceServiceImpl"  --> "ResourceRepository"
 "SecretSetResourcePersistenceServiceImpl"  --> "ResourceExtensionSchemaRegistry"
 "ResourceController" <|-- "SecretSetSimpleResourceControllerAdapter"
@@ -1029,6 +1032,7 @@ class "WsSmartTransferProtocolClient"
 "VariableSetResourcePersistenceServiceImpl"  --> "VariableSetEventStore"
 "VariableSetResourcePersistenceServiceImpl"  --> "ResourceControllerStateRepository"
 "VariableSetResourcePersistenceServiceImpl"  --> "ResourceLabelProjectionRepository"
+"VariableSetResourcePersistenceServiceImpl"  --> "ResourceOwnerProjectionRepository"
 "VariableSetResourcePersistenceServiceImpl"  --> "ResourceRepository"
 "VariableSetResourcePersistenceServiceImpl"  --> "ResourceExtensionSchemaRegistry"
 "ResourceController" <|-- "VariableSetSimpleResourceControllerAdapter"
@@ -1285,6 +1289,8 @@ class "WsSmartTransferProtocolClient"
 "SqliteResourceControllerStateRepository"  --> "TransactionRefT"
 "ResourceLabelProjectionRepository" <|-- "SqliteResourceLabelProjectionRepository"
 "SqliteResourceLabelProjectionRepository"  --> "TransactionRefT"
+"ResourceOwnerProjectionRepository" <|-- "SqliteResourceOwnerProjectionRepository"
+"SqliteResourceOwnerProjectionRepository"  --> "TransactionRefT"
 "ResourceRawEventStore" <|-- "SqliteResourceRawEventStore"
 "SqliteResourceRawEventStore"  --> "TransactionRefT"
 "ResourceRepository" <|-- "SqliteResourceRepository"
@@ -1338,6 +1344,7 @@ class "WsSmartTransferProtocolClient"
 "ResourcePersistenceService" <|-- "StorageResourcePersistenceServiceImpl"
 "StorageResourcePersistenceServiceImpl"  --> "ResourceControllerStateRepository"
 "StorageResourcePersistenceServiceImpl"  --> "ResourceLabelProjectionRepository"
+"StorageResourcePersistenceServiceImpl"  --> "ResourceOwnerProjectionRepository"
 "StorageResourcePersistenceServiceImpl"  --> "ResourceRepository"
 "StorageResourcePersistenceServiceImpl"  --> "StorageEventStore"
 "StorageResourcePersistenceServiceImpl"  --> "ResourceExtensionSchemaRegistry"

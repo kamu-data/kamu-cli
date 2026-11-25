@@ -23,7 +23,7 @@ use kamu_datasets::{
     UpsertDatasetEnvVarError,
     UpsertDatasetEnvVarStatus,
 };
-use kamu_resources::ResourceSchemaProvider;
+use kamu_resources::{ResourceHandle, ResourceSchemaProvider};
 use secrecy::SecretString;
 
 use crate::tests::services::dataset_env_var_service_harness::DatasetEnvVarServiceHarness;
@@ -582,6 +582,65 @@ async fn test_target_dataset_label_survives_an_update() {
         1,
         "the label must survive an update"
     );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_owner_references_survive_an_update() {
+    let harness = DatasetEnvVarServiceHarness::new();
+
+    let (_, dataset_id) = odf::DatasetID::new_generated_ed25519();
+    let account_handle = harness.ensure_test_account("test-owner").await;
+    harness
+        .seed_dataset_entry(&dataset_id, &account_handle.did)
+        .await;
+
+    harness
+        .upsert_variable(&dataset_id, "VARIABLE", "first")
+        .await
+        .unwrap();
+    harness
+        .upsert_secret(&dataset_id, "SECRET", "first")
+        .await
+        .unwrap();
+
+    let variable_set_id = harness
+        .variable_sets_targeting(&account_handle, &dataset_id)
+        .await[0];
+    let secret_set_id = harness
+        .secret_sets_targeting(&account_handle, &dataset_id)
+        .await[0];
+    let owners = [
+        (
+            variable_set_id,
+            harness
+                .set_owner::<VariableSetResource>(&variable_set_id)
+                .await,
+        ),
+        (
+            secret_set_id,
+            harness.set_owner::<SecretSetResource>(&secret_set_id).await,
+        ),
+    ];
+
+    harness
+        .upsert_variable(&dataset_id, "VARIABLE", "second")
+        .await
+        .unwrap();
+    harness
+        .upsert_secret(&dataset_id, "SECRET", "second")
+        .await
+        .unwrap();
+
+    for (id, owner) in owners {
+        let snapshot = harness.get_snapshot_by_id(&id).await.unwrap();
+        let expected = ResourceHandle {
+            account: snapshot.headers.account,
+            ..owner
+        };
+        assert_eq!(snapshot.headers.owner_references, Some(vec![expected]));
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -38,7 +38,17 @@ use kamu_datasets::{
     UpsertDatasetEnvVarError,
     UpsertDatasetEnvVarStatus,
 };
-use kamu_resources::{EventSourcedResource, ResourcePersistenceService};
+use kamu_resources::{
+    EventSourcedResource,
+    ManagedResource,
+    ResourceAggregateLoader,
+    ResourceHandle,
+    ResourceHeadersExt,
+    ResourceID,
+    ResourceName,
+    ResourcePersistenceService,
+    ResourceSchemaProvider,
+};
 use secrecy::SecretString;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -216,6 +226,41 @@ impl DatasetEnvVarServiceHarness {
         let persistence_service: Arc<dyn ResourcePersistenceService<R>> =
             self.catalog.get_one().unwrap();
         persistence_service.create(&mut resource).await.unwrap();
+    }
+
+    /// Gives the resource an owner, which need not exist
+    pub async fn set_owner<R>(&self, id: &ResourceID) -> ResourceHandle
+    where
+        R: EventSourcedResource + ManagedResource + 'static,
+        R::ResourceState: std::fmt::Debug,
+        R::LifecycleError: std::fmt::Debug,
+    {
+        let loader: Arc<dyn ResourceAggregateLoader<R>> = self.catalog.get_one().unwrap();
+        let mut resource = loader.load(id).await.unwrap();
+
+        let owner = ResourceHandle {
+            account: resource.headers().account.clone(),
+            r#type: VariableSetResource::type_uri().cheap_clone(),
+            id: self.resource_repo().new_resource_id().await.unwrap(),
+            did: None,
+            name: ResourceName::new_unchecked("owner"),
+        };
+        let mut headers = resource.headers().to_input();
+        headers.owner_references = Some(vec![owner.clone().into()]);
+        let new_generation = resource.headers().generation + 1;
+        <R as ManagedResource>::try_update_headers(
+            &mut resource,
+            Utc::now(),
+            headers,
+            new_generation,
+        )
+        .unwrap();
+
+        let persistence_service: Arc<dyn ResourcePersistenceService<R>> =
+            self.catalog.get_one().unwrap();
+        persistence_service.save(&mut resource).await.unwrap();
+
+        owner
     }
 
     /// Upserts through the mutation adapter, then lets the controller runtime

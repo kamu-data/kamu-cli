@@ -12,7 +12,7 @@ selectors themselves: each `ResourceSelector` carries an optional
 `labels: Option<LabelFilter>` (`ResourceLabelFilterInput` is a `kamu_resources`
 type alias to `odf::metadata::resource::LabelFilter`, raw `String`-keyed
 entries). There is **no** call-level `label_filter` — the search requests carry
-only `selectors`, `account` and `pagination`. The batch ref calls take a bare
+only `selectors`, `owner`, `visibility` and `pagination`. The batch ref calls take a bare
 `Vec<ResourceRef>` and carry no filter at all, since `ResourceRef` has no
 `labels` field.
 

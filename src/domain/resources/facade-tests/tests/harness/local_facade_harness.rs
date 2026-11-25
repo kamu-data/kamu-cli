@@ -15,6 +15,7 @@ use dill::CatalogBuilder;
 use kamu_accounts::{
     AccountConfig,
     AccountPropertyName,
+    AccountRepository,
     CurrentAccountSubject,
     DidSecretEncryptionConfig,
     JOB_KAMU_ACCOUNTS_PREDEFINED_ACCOUNTS_REGISTRATOR,
@@ -305,6 +306,7 @@ impl LocalFacadeHarness {
     ) -> Result<Vec<String>, ListResourcesError> {
         let response = facade
             .search_handles(SearchResourcesRequest {
+                owner: None,
                 visibility: ResourceVisibility::Active,
                 selectors: vec![ResourceSelector {
                     account: account.map(|account| ResourceOwnerRef {
@@ -362,6 +364,17 @@ impl FacadeContractHarness for LocalFacadeHarness {
 
     fn account_name(&self, account: TestAccount) -> odf::AccountName {
         odf::AccountName::new_unchecked(account.name())
+    }
+
+    async fn rename_account(&self, account: TestAccount, new_name: &odf::AccountName) {
+        let account_repo: Arc<dyn AccountRepository> = self.base_catalog.get_one().unwrap();
+
+        let mut account = account_repo
+            .get_account_by_id(&self.account_id(account))
+            .await
+            .unwrap();
+        account.account_name = new_name.clone();
+        account_repo.update_account(&account).await.unwrap();
     }
 
     async fn settle(&self) {

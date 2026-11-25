@@ -198,6 +198,9 @@ CREATE INDEX idx_resource_events_schema_event_id
 CREATE INDEX idx_resource_labels_projection_key_value_resource_id
     ON resource_labels_projection (label_key, label_value, resource_id);
 
+CREATE INDEX idx_resource_owners_projection_owner_id
+    ON resource_owners_projection (owner_id, resource_id);
+
 CREATE UNIQUE INDEX idx_resources_account_schema_name_ci
     ON resources (account_id, resource_schema, resource_name)
     WHERE deletion_requested_at IS NULL;
@@ -601,6 +604,16 @@ CREATE TABLE resource_labels_projection (
         FOREIGN KEY (resource_id) REFERENCES resources(resource_id) ON DELETE CASCADE
 );
 
+CREATE TABLE resource_owners_projection (
+    resource_id             CHAR(36) NOT NULL,
+    owner_id                CHAR(36) NOT NULL,
+
+    PRIMARY KEY (resource_id, owner_id),
+
+    CONSTRAINT fk_resource_owners_projection_resource_id
+        FOREIGN KEY (resource_id) REFERENCES resources(resource_id) ON DELETE CASCADE
+);
+
 CREATE TABLE resources (
     resource_id            CHAR(36) PRIMARY KEY NOT NULL,
     account_id             VARCHAR(100) NOT NULL,
@@ -619,7 +632,7 @@ CREATE TABLE resources (
     deleted_at             TIMESTAMPTZ NULL,
     last_event_id          BIGINT NULL
 , status_generation BIGINT NOT NULL DEFAULT 1, deletion_requested_at TIMESTAMPTZ NULL, reconciled_generation INTEGER
-    GENERATED ALWAYS AS (COALESCE(json_extract(status, '$.reconciledGeneration'), 0)) VIRTUAL);
+    GENERATED ALWAYS AS (COALESCE(json_extract(status, '$.reconciledGeneration'), 0)) VIRTUAL, owner_references JSONB);
 
 CREATE TABLE sqlite_sequence(name,seq);
 

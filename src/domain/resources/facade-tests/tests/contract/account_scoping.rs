@@ -327,6 +327,7 @@ pub async fn test_account_name_id_mismatch_is_rejected(h: &impl FacadeContractHa
     let list = h
         .facade_for(TestAccount::Alice)
         .search(SearchResourcesRequest {
+            owner: None,
             visibility: ResourceVisibility::Active,
             selectors: vec![ResourceSelector::of_type(
                 VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
@@ -352,6 +353,7 @@ pub async fn test_unknown_account_is_rejected(h: &impl FacadeContractHarness) {
 
     let by_name = facade
         .search(SearchResourcesRequest {
+            owner: None,
             visibility: ResourceVisibility::Active,
             selectors: vec![ResourceSelector {
                 account: Some(unknown_account_by_name()),
@@ -364,6 +366,7 @@ pub async fn test_unknown_account_is_rejected(h: &impl FacadeContractHarness) {
     // per-type row.
     let by_id = facade
         .search(SearchResourcesRequest {
+            owner: None,
             visibility: ResourceVisibility::Active,
             pagination: PaginationOpts::from_max_results(1000),
             selectors: vec![ResourceSelector {
@@ -464,6 +467,7 @@ pub async fn test_account_isolation_across_read_apis(h: &impl FacadeContractHarn
 
     let alice_list = alice
         .search_handles(SearchResourcesRequest {
+            owner: None,
             visibility: ResourceVisibility::Active,
             selectors: vec![ResourceSelector::of_type(
                 VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
@@ -475,6 +479,7 @@ pub async fn test_account_isolation_across_read_apis(h: &impl FacadeContractHarn
         .items;
     let bob_list = bob
         .search_handles(SearchResourcesRequest {
+            owner: None,
             visibility: ResourceVisibility::Active,
             selectors: vec![ResourceSelector::of_type(
                 VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
@@ -495,6 +500,7 @@ pub async fn test_account_isolation_across_read_apis(h: &impl FacadeContractHarn
 
     let alice_search = alice
         .search_handles(SearchResourcesRequest {
+            owner: None,
             visibility: ResourceVisibility::Active,
             selectors: vec![ResourceSelector::name_pattern(
                 VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
@@ -507,6 +513,7 @@ pub async fn test_account_isolation_across_read_apis(h: &impl FacadeContractHarn
         .items;
     let bob_search = bob
         .search_handles(SearchResourcesRequest {
+            owner: None,
             visibility: ResourceVisibility::Active,
             selectors: vec![ResourceSelector::name_pattern(
                 VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
@@ -528,6 +535,7 @@ pub async fn test_account_isolation_across_read_apis(h: &impl FacadeContractHarn
 
     let alice_all = alice
         .search_handles(SearchResourcesRequest {
+            owner: None,
             visibility: ResourceVisibility::Active,
             // A default selector narrows by nothing, so it spans every type.
             selectors: vec![ResourceSelector::default()],
@@ -538,6 +546,7 @@ pub async fn test_account_isolation_across_read_apis(h: &impl FacadeContractHarn
         .items;
     let bob_all = bob
         .search(SearchResourcesRequest {
+            owner: None,
             visibility: ResourceVisibility::Active,
             pagination: PaginationOpts::from_max_results(1000),
             selectors: vec![ResourceSelector::default()],

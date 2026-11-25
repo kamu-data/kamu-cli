@@ -138,6 +138,7 @@ where
             &account_id,
             &scope,
             ResourceVisibility::Active,
+            None,
             pagination,
         );
 
