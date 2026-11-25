@@ -287,6 +287,14 @@ database_transactional_test!(
 
 database_transactional_test!(
     storage = postgres,
+    fixture = resource_repo_suite::test_deleted_resources_share_name_with_live_one,
+    harness = PostgresResourceRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = postgres,
     fixture = resource_repo_suite::test_summarize_resources_counts_deleting,
     harness = PostgresResourceRepositoryHarness
 );

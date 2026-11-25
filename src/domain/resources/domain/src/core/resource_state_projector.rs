@@ -115,7 +115,6 @@ where
             headers.deleted_at = Some(e.event_time);
             headers.status_generation += 1;
             headers.updated_at = e.event_time;
-            headers.name = e.tombstone_name;
             align_phase(&mut s);
 
             Ok(s)

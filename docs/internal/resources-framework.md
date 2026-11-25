@@ -324,8 +324,8 @@ pub trait ManagedResource: DeclarativeResource + ResourceStatusRules {
     // A repeated request is a no-op. Headers and spec updates are then rejected with
     // `ResourceDeletionInProgressError`
     fn try_request_deletion(&mut self, now) -> ...;
-    // Renames to the tombstone `deleted-<id>`; a no-op once deleted. An invariant violation
-    // unless deletion was requested, since completing it would skip the cleanup
+    // Keeps the name; a no-op once deleted. An invariant violation unless deletion was
+    // requested, since completing it would skip the cleanup
     fn try_complete_deletion(&mut self, now) -> ...;
     // Compare-and-swap on `statusGeneration`: a stale expected value is a status conflict
     fn try_update_status(&mut self, now, expected_status_generation, new_status) -> ...;
@@ -371,9 +371,9 @@ and an aggregate. This is the bound that all generic use cases require.
   or by a condition patch. It bumps `statusGeneration` and `updatedAt`.
 - `DeletionRequested` sets `deletionRequestedAt` and bumps `statusGeneration`. After it the
   projector accepts only `StatusUpdated` and `Deleted`.
-- `Deleted` sets `deletedAt` and the tombstone name, and bumps `statusGeneration`. Resources
-  deleted before `DeletionRequested` existed have a `Deleted` event alone; replaying it also sets
-  `deletionRequestedAt`.
+- `Deleted` sets `deletedAt` and bumps `statusGeneration`. Resources deleted before
+  `DeletionRequested` existed have a `Deleted` event alone; replaying it also sets
+  `deletionRequestedAt`. The `tombstone_name` of older `Deleted` events is ignored.
 - The projector derives the `Pending`, `Deleting` and `Deleted` phases after each of them
   ([state machine](#lifecycle-state-machine)); that derivation is not a status update.
 
@@ -500,8 +500,8 @@ returns `UpdateResourceError::concurrent_modification()`. A unique-constraint vi
 - Requesting deletion sets `deletion_requested_at`, which takes the row out of the unique name
   index. The name is free for a new resource at once, while the resource being deleted still
   carries it.
-- Completing the deletion sets `deleted_at` and renames the resource to the tombstone
-  `deleted-<id>`.
+- Completing the deletion sets `deleted_at`. The deleted resource keeps its name, so several
+  deleted resources and a live one may carry the same name.
 - Reads hide resources being deleted unless asked; see [Repository](#repository). The summary
   counts resources being deleted as `deleting`.
 
@@ -646,7 +646,7 @@ Concrete conflict cases:
 | Rename target name already taken (same account+schema) | **Reject** — the unique index fails the update, reported as an internal error. |
 | Update by name where another account has the same name | **No conflict** — the account disambiguates; each `(account, schema, name)` is independent. |
 | Apply re-using the name of a resource being deleted | **Create** — the resource being deleted gave up its name. The outcome carries a `replaces_resource_being_deleted` warning naming its id. |
-| Apply re-using the name of a deleted resource | **Create** — the deleted resource was renamed to a tombstone. |
+| Apply re-using the name of a deleted resource | **Create** — the deleted resource gave up its name when its deletion was requested. No warning, unlike one still being deleted. |
 | `id` of a resource being deleted | **Reject** — `ResourceDeletionInProgressError`, a `LifecycleRuleConflict` rejection. |
 | Apply with no real change | **`Untouched`** — no generation bump, no events, no reconcile. |
 
@@ -808,7 +808,7 @@ persists its event and posts the matching lifecycle message:
 | `complete_reconciliation(id, expected)` | `Ready`, reconciled generation recorded | `StatusUpdated` |
 | `fail_reconciliation(id, expected, error)` | `Failed` or `Degraded`, `ReconciliationError` | `StatusUpdated` |
 | `request_deletion(ids)` | `Deleting` | one `DeletionRequested` for the batch |
-| `complete_deletion(completions)` | `Deleted`, tombstone name | one `Deleted` for the completed ones |
+| `complete_deletion(completions)` | `Deleted` | one `Deleted` for the completed ones |
 | `record_cleanup_failure(failures)` | stays `Deleting`, `ReconciliationError{code: cleanup-failed}` | one `StatusUpdated` per resource |
 | `update_conditions(id, expected_status_generation, patch)` | the named conditions set or removed ([below](#condition-patches)) | `StatusUpdated` |
 
@@ -1683,7 +1683,7 @@ sequenceDiagram
     end
     rect rgba(100, 150, 255, 0.15)
         alt cleaned up
-            A->>P: complete_deletion(id) → Deleted (tombstone name)
+            A->>P: complete_deletion(id) → Deleted
             P->>OB: produce ResourceLifecycleMessage::Deleted
         else cleanup failed
             A->>P: record_cleanup_failure(id) → StatusUpdated (cleanup-failed)
@@ -1700,9 +1700,8 @@ Deletion runs in two steps, as the ODF resource framework defines them
   reconciled. Requesting the deletion of a resource already being deleted, by its id, posts the
   message again.
 - **Completing the deletion** is one `process` call per resource: it runs the reconciler's
-  `cleanup`, then appends `Deleted`, which renames the resource to its tombstone and posts a
-  `Deleted` message of its own. A resource that no longer waits for cleanup is skipped, so
-  processing it twice completes its deletion once.
+  `cleanup`, then appends `Deleted` and posts a `Deleted` message of its own. A resource that no
+  longer waits for cleanup is skipped, so processing it twice completes its deletion once.
 - **The cleanup runs in a transaction of its own**, so a failure, a database error included,
   discards whatever the reconciler wrote before failing; the outcome is recorded in the next one.
   A concurrent modification while completing the deletion makes `process` return `RetryAt(now)`:

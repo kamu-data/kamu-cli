@@ -25,7 +25,6 @@ use crate::{
     ResourceEventStatusUpdated,
     ResourceHeadersInput,
     ResourceID,
-    ResourceName,
     ResourceSchemaProvider,
     ResourceSnapshot,
     ResourceStatus,
@@ -109,15 +108,10 @@ pub trait EventSourcedResource:
         })
     }
 
-    fn make_deleted_event(
-        &self,
-        now: DateTime<Utc>,
-        tombstone_name: ResourceName,
-    ) -> ResourceEvent<Self::SpecInput> {
+    fn make_deleted_event(&self, now: DateTime<Utc>) -> ResourceEvent<Self::SpecInput> {
         ResourceEvent::Deleted(ResourceEventDeleted {
             event_time: now,
             id: *self.id(),
-            tombstone_name,
         })
     }
 

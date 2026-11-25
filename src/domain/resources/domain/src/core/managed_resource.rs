@@ -75,14 +75,14 @@ pub trait ManagedResource: DeclarativeResource + ResourceStatusRules {
         new_generation: u64,
     ) -> Result<(), Self::LifecycleError>;
 
-    /// Starts the deletion; the resource keeps its name until it completes.
+    /// Starts the deletion; the resource keeps its name, which a new resource
+    /// may take.
     fn try_request_deletion(&mut self, now: DateTime<Utc>) -> Result<(), Self::LifecycleError>
     where
         Self: Sized;
 
-    /// Completes a requested deletion and renames the resource to
-    /// `deleted-<id>`. Fails with an invariant violation if the deletion was
-    /// not requested.
+    /// Completes a requested deletion; the resource keeps its name. Fails with
+    /// an invariant violation if the deletion was not requested.
     fn try_complete_deletion(&mut self, now: DateTime<Utc>) -> Result<(), Self::LifecycleError>
     where
         Self: Sized;

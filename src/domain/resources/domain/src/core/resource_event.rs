@@ -12,7 +12,7 @@ use enum_variants::*;
 use event_sourcing::ProjectionEvent;
 use serde::{Deserialize, Serialize};
 
-use crate::{ResourceConditions, ResourceHeadersInput, ResourceID, ResourceName, ResourceStatus};
+use crate::{ResourceConditions, ResourceHeadersInput, ResourceID, ResourceStatus};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -82,12 +82,12 @@ pub struct ResourceEventDeletionRequested {
 }
 
 /// Deletion completed. Events stored before deletion had two steps have no
-/// preceding [`ResourceEventDeletionRequested`].
+/// preceding [`ResourceEventDeletionRequested`]. Some stored events also carry
+/// a `tombstone_name`, which is ignored: a deleted resource keeps its name.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ResourceEventDeleted {
     pub event_time: DateTime<Utc>,
     pub id: ResourceID,
-    pub tombstone_name: ResourceName,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

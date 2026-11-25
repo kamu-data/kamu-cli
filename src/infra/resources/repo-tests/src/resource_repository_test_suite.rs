@@ -2923,6 +2923,55 @@ pub async fn test_name_of_resource_being_deleted_can_be_taken(catalog: &Catalog)
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+pub async fn test_deleted_resources_share_name_with_live_one(catalog: &Catalog) {
+    let repo = catalog.get_one::<dyn ResourceRepository>().unwrap();
+    let account_handle = odf::ResourceOwnerHandle::new_test("test-account");
+    let name: ResourceName = "shared".parse().unwrap();
+
+    let first = create_test_resource(repo.as_ref(), &account_handle, "shared").await;
+    let first = delete_test_resource(repo.as_ref(), first).await;
+
+    let second = create_test_resource(repo.as_ref(), &account_handle, "shared").await;
+    delete_test_resource(repo.as_ref(), second).await;
+
+    let live = create_test_resource(repo.as_ref(), &account_handle, "shared").await;
+
+    // A write to a deleted resource does not take the name back
+    let mut first_update = first.clone();
+    first_update.last_event_id = Some(EventID::new(4));
+    repo.update_resource(&first_update, first.last_event_id)
+        .await
+        .unwrap();
+
+    assert_eq!(
+        repo.find_resource_id_by_name(&account_handle.did, &TEST_KIND, &name)
+            .await
+            .unwrap(),
+        Some(live.id)
+    );
+    for visibility in [
+        ResourceVisibility::Active,
+        ResourceVisibility::IncludeDeleting,
+    ] {
+        let resolved = repo
+            .resolve_resource_ids_by_names(
+                &account_handle.did,
+                &TEST_KIND,
+                std::slice::from_ref(&name),
+                visibility,
+            )
+            .await
+            .unwrap();
+        assert_eq!(
+            resolved,
+            vec![(name.clone(), live.id)],
+            "resolve with {visibility:?}"
+        );
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 pub async fn test_summarize_resources_counts_deleting(catalog: &Catalog) {
     let repo = catalog.get_one::<dyn ResourceRepository>().unwrap();
     let account_handle = odf::ResourceOwnerHandle::new_test("test-account");
@@ -3006,6 +3055,26 @@ async fn request_test_resource_deletion(
         .await
         .unwrap();
     deleting
+}
+
+/// Writes `snapshot` as it is once its deletion was requested, then completed.
+async fn delete_test_resource(
+    repo: &dyn ResourceRepository,
+    snapshot: ResourceSnapshot,
+) -> ResourceSnapshot {
+    let deleted_at = Utc::now();
+    let deleting = request_test_resource_deletion(repo, snapshot, deleted_at).await;
+
+    let mut deleted = deleting.clone();
+    deleted.headers.deleted_at = Some(deleted_at);
+    deleted.status = Some(status_with_phase(ResourcePhase::Deleted));
+    deleted.last_event_id = Some(EventID::new(
+        deleting.last_event_id.unwrap().into_inner() + 1,
+    ));
+    repo.update_resource(&deleted, deleting.last_event_id)
+        .await
+        .unwrap();
+    deleted
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

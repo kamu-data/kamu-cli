@@ -17,11 +17,9 @@ use kamu_resources::{
     ResourceCleanupError,
     ResourceEvent,
     ResourceEventCreated,
-    ResourceEventDeleted,
     ResourceEventHeadersUpdated,
     ResourceHeadersInput,
     ResourceID,
-    ResourceName,
     ResourcePhase,
     ResourceStatus,
 };
@@ -288,16 +286,19 @@ impl ResourceLifecycleHarness {
         self.resource.try_complete_deletion(now)
     }
 
-    /// Applies a deletion as stored before it was preceded by a request.
+    /// Applies a deletion as stored before it was preceded by a request, with
+    /// the `tombstone_name` events no longer carry.
     pub fn apply_stored_deletion(&mut self) {
         let id = *self.resource.id();
-        let event = ResourceEventDeleted {
-            event_time: self.tick(),
-            id,
-            tombstone_name: ResourceName::new_unchecked(&format!("deleted-{id}")),
-        };
+        let event = serde_json::json!({
+            "Deleted": {
+                "event_time": self.tick(),
+                "id": id,
+                "tombstone_name": format!("deleted-{id}"),
+            }
+        });
         self.resource
-            .apply_event(ResourceEvent::Deleted(event))
+            .apply_event(serde_json::from_value(event).unwrap())
             .unwrap();
     }
 

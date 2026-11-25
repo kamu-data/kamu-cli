@@ -480,25 +480,11 @@ pub async fn test_name_of_resource_being_deleted_can_be_reused(h: &impl FacadeCo
     let facade = h.facade_for(TestAccount::Alice);
     facade.delete(vec![by_id(&old_id)]).await.unwrap();
 
-    let decision = facade
-        .apply_manifest(ApplyManifestRequest {
-            format: ResourceManifestFormat::Json,
-            manifest: variable_set_manifest_json("reused", None, &[("K", "v2")]),
-        })
-        .await
-        .unwrap();
-    let new_id = assert_applied_outcome(&decision, ApplyResourceOutcome::Created)
-        .headers
-        .id;
+    let (new_id, replacement_warnings) =
+        create_variable_set_with_replacement_warnings(facade.as_ref(), "reused", "v2").await;
     assert_ne!(new_id, old_id);
     assert_eq!(
-        decision
-            .expect_applied()
-            .warnings
-            .into_iter()
-            .filter(|warning| warning.code == WARNING_CODE_REPLACES_RESOURCE_BEING_DELETED)
-            .map(|warning| warning.message)
-            .collect::<Vec<_>>(),
+        replacement_warnings,
         vec![format!(
             "Resource replaces a resource that is still being deleted ({old_id})"
         )]
@@ -527,6 +513,18 @@ pub async fn test_name_of_resource_being_deleted_can_be_reused(h: &impl FacadeCo
     assert_eq!(
         found_by_name(facade.as_ref(), "reused").await,
         vec![(0, new_id)]
+    );
+
+    // Deleted resources keep the name too, but are not replaced
+    facade.delete(vec![by_id(&new_id)]).await.unwrap();
+    h.settle().await;
+
+    let (newest_id, replacement_warnings) =
+        create_variable_set_with_replacement_warnings(facade.as_ref(), "reused", "v3").await;
+    assert_eq!(replacement_warnings, Vec::<String>::new());
+    assert_eq!(
+        found_by_name(facade.as_ref(), "reused").await,
+        vec![(0, newest_id)]
     );
 }
 
@@ -620,6 +618,34 @@ pub async fn test_apply_by_id_of_resource_being_deleted_is_rejected(
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Creates a variable set with `K` set to `value`, returning its id and the
+/// messages of the warnings about resources being deleted it replaces
+async fn create_variable_set_with_replacement_warnings(
+    facade: &dyn ResourceFacade,
+    name: &str,
+    value: &str,
+) -> (ResourceID, Vec<String>) {
+    let decision = facade
+        .apply_manifest(ApplyManifestRequest {
+            format: ResourceManifestFormat::Json,
+            manifest: variable_set_manifest_json(name, None, &[("K", value)]),
+        })
+        .await
+        .unwrap();
+    let id = assert_applied_outcome(&decision, ApplyResourceOutcome::Created)
+        .headers
+        .id;
+    let replacement_warnings = decision
+        .expect_applied()
+        .warnings
+        .into_iter()
+        .filter(|warning| warning.code == WARNING_CODE_REPLACES_RESOURCE_BEING_DELETED)
+        .map(|warning| warning.message)
+        .collect();
+
+    (id, replacement_warnings)
+}
 
 /// `(request_index, id)` of the resources a name resolves to, resources being
 /// deleted included

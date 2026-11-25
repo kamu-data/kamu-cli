@@ -61,8 +61,8 @@ pub trait ResourceRepository: Send + Sync {
         Ok(())
     }
 
-    /// Finds the live resource holding the name; resources being deleted no
-    /// longer hold one.
+    /// Finds the live resource holding the name; a resource gives it up when
+    /// its deletion is requested.
     async fn find_resource_id_by_name(
         &self,
         account_id: &odf::AccountID,
