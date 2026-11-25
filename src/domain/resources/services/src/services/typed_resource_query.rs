@@ -50,7 +50,7 @@ where
         }
     }
 
-    pub async fn load_snapshot_by_id(
+    pub async fn load_undeleted_snapshot_by_id(
         &self,
         id: &ResourceID,
     ) -> Result<ResourceSnapshot, TypedResourceQueryError> {
@@ -58,6 +58,7 @@ where
             .resource_repository
             .find_resource_snapshot_by_id(id)
             .await?
+            .filter(|snapshot| snapshot.headers.deleted_at.is_none())
             .ok_or(ResourceIDNotFoundError(*id))?;
 
         if snapshot.schema != *R::type_uri() {
@@ -188,7 +189,7 @@ macro_rules! declare_typed_resource_query_service {
                     self.resource_repository.as_ref(),
                 );
 
-                helper.load_snapshot_by_id(id).await.map(|_| ())
+                helper.load_undeleted_snapshot_by_id(id).await.map(|_| ())
             }
 
             async fn get_state_by_id(

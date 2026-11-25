@@ -83,8 +83,8 @@ pub(crate) fn group_batch_resource_refs(resource_refs: Vec<ResourceRef>) -> Batc
 
 /// Resolve all `ByName` groups to UIDs using a single batched query per schema.
 /// Returns a combined list of `(request_index, request, id)` entries plus any
-/// name-not-found problems. Under [`ResourceVisibility::IncludeDeleting`] a
-/// name may yield several entries, the live resource first.
+/// name-not-found problems. Unless only live resources are visible, a name may
+/// yield several entries, the live resource first.
 pub(crate) async fn resolve_batch_ids(
     query_service: &dyn GenericResourceQueryService,
     account_id: &odf::AccountID,

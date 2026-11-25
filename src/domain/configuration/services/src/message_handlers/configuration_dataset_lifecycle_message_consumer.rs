@@ -98,11 +98,13 @@ impl ConfigurationDatasetLifecycleMessageConsumer {
             return Ok(());
         }
 
-        // Skips anything concurrently deleted, so this may be shorter than
-        // `ids` -- in which case there is nothing left to clean up.
+        // Anything concurrently deleted has nothing left to clean up
         let snapshots = resource_repo
             .find_resource_snapshots_by_schema_and_ids(schema, &ids)
-            .await?;
+            .await?
+            .into_iter()
+            .filter(|snapshot| snapshot.headers.deleted_at.is_none())
+            .collect::<Vec<_>>();
 
         // Full derived name, never a `legacy-vars-` prefix: a set named after
         // some *other* dataset is not ours to delete.

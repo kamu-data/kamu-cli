@@ -270,6 +270,10 @@ pub enum ResourceLookupProblem {
          across resource types"
     )]
     UntypedName,
+
+    /// The resource was found, but the caller asked to reveal its spec
+    #[error(transparent)]
+    DeletedNotRevealed(#[from] ResourceDeletedNotRevealedError),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -468,6 +472,14 @@ pub struct ResourceNameMismatchError {
     pub id: ResourceID,
     pub expected_name: ResourceName,
     pub actual_name: ResourceName,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Error)]
+#[error("Resource {id} is deleted, its spec cannot be revealed")]
+pub struct ResourceDeletedNotRevealedError {
+    pub id: ResourceID,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

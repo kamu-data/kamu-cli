@@ -287,19 +287,17 @@ impl ServiceLayerTestHarness {
         ids
     }
 
-    pub async fn assert_gone(&self, ids: &[ResourceID]) {
+    pub async fn assert_deleted(&self, ids: &[ResourceID]) {
         for id in ids {
-            assert!(
-                self.get_snapshot_by_id(id).await.is_none(),
-                "expected snapshot for {id} to be gone"
-            );
+            assert!(self.is_deleted(id).await, "expected {id} to be deleted");
         }
     }
 
-    pub async fn assert_exists(&self, id: &ResourceID) {
+    pub async fn assert_live(&self, id: &ResourceID) {
+        let snapshot = self.get_snapshot_by_id(id).await.unwrap();
         assert!(
-            self.get_snapshot_by_id(id).await.is_some(),
-            "expected snapshot for {id} to exist"
+            snapshot.headers.deletion_requested_at.is_none(),
+            "expected {id} to be live"
         );
     }
 

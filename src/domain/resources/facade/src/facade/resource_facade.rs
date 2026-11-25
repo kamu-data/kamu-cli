@@ -52,11 +52,15 @@ use crate::{
 /// boundary belongs to the caller (the CLI's `--continue-on-error` path opens
 /// one transaction per manifest), not to the facade.
 ///
-/// Name lookups and searches see resources being deleted only under
-/// [`ResourceVisibility::IncludeDeleting`]. A name may then resolve to several
-/// resources: the live one first, then those being deleted, each reported as a
-/// success at the same `request_index`. A lookup by id finds a resource being
-/// deleted either way. `delete` resolves names to live resources only.
+/// Name lookups and searches see the resources their [`ResourceVisibility`]
+/// includes. A name may then resolve to several resources: the live one first,
+/// then those being deleted, then the deleted ones, each reported as a success
+/// at the same `request_index`. A lookup by id finds a resource in any state;
+/// only [`ResourceVisibility::DeletedOnly`] hides live ones from it.
+///
+/// `delete` resolves names to live resources only. Deleting or applying by the
+/// id of a deleted resource does not find it. The spec of a deleted resource is
+/// not revealed.
 #[cfg_attr(feature = "testing", mockall::automock)]
 #[async_trait::async_trait]
 pub trait ResourceFacade: Send + Sync {

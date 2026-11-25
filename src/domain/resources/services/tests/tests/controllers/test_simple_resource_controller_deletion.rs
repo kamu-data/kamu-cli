@@ -49,7 +49,7 @@ async fn test_cleanup_completes_requested_deletion() {
     assert!(resource.headers().deleted_at.is_some());
     assert_eq!(resource.headers().name.as_str(), "res-a");
     assert_eq!(resource.status().phase, ResourcePhase::Deleted);
-    assert!(harness.get_snapshot_by_id(&id).await.is_none());
+    harness.assert_deleted(&[id]).await;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

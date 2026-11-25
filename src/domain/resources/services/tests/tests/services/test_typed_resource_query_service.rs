@@ -120,7 +120,7 @@ async fn test_get_state_by_id_type_mismatch() {
     // get_state_by_id uses get_snapshot_by_query which filters by schema, so a
     // snapshot with a different schema is invisible to this query → NotFound, not
     // TypeMismatch. TypeMismatch is covered by ensure_resource_id_matches_type
-    // which uses load_snapshot_by_id (schema-agnostic lookup).
+    // which looks up by id alone.
     assert_matches!(
         result,
         Err(TypedResourceQueryError::NotFound(_)),
@@ -212,6 +212,27 @@ async fn test_ensure_id_matches_type_mismatch() {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_ensure_id_matches_type_does_not_find_deleted_resource() {
+    let harness = TypedResourceQueryServiceHarness::new();
+    let account_handle = odf::ResourceOwnerHandle::new_test("test-owner");
+    let id = harness.apply_and_get_id(&account_handle, "res-a").await;
+    harness.mark_deleted(&id).await;
+
+    let result = harness
+        .typed_query_svc()
+        .ensure_resource_id_matches_type(&id)
+        .await;
+
+    assert_matches!(
+        result,
+        Err(TypedResourceQueryError::NotFound(_)),
+        "expected NotFound, got {result:?}"
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Harness
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -259,6 +280,16 @@ impl TypedResourceQueryServiceHarness {
                 panic!("apply rejected: {:?}", rejection.message)
             }
         }
+    }
+
+    async fn mark_deleted(&self, id: &ResourceID) {
+        let mut snapshot = self.get_snapshot_by_id(id).await.unwrap();
+        snapshot.headers.deletion_requested_at = Some(Utc::now());
+        snapshot.headers.deleted_at = Some(Utc::now());
+        self.resource_repo()
+            .update_resource(&snapshot, snapshot.last_event_id)
+            .await
+            .unwrap();
     }
 
     async fn insert_snapshot_with_schema(

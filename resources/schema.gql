@@ -886,8 +886,8 @@ Resource handles found and references that could not be resolved
 """
 type BatchResourceHandlesResult {
 	"""
-	Handles found, one per resolved reference; with `includeDeleting` a
-	name may match several, which share its `requestIndex`
+	Handles found, one per resolved reference; unless `visibility` is
+	`ACTIVE`, a name may match several, which share its `requestIndex`
 	"""
 	handles: [BatchResourceHandleSuccess!]!
 	"""
@@ -920,8 +920,8 @@ Rendered manifests and references that could not be resolved
 """
 type BatchResourceManifestsResult {
 	"""
-	Manifests rendered, one per resolved reference; with `includeDeleting`
-	a name may match several, which share its `requestIndex`
+	Manifests rendered, one per resolved reference; unless `visibility` is
+	`ACTIVE`, a name may match several, which share its `requestIndex`
 	"""
 	manifests: [BatchResourceManifestSuccess!]!
 	"""
@@ -968,8 +968,8 @@ Resources found and references that could not be resolved
 """
 type BatchResourcesResult {
 	"""
-	Resources found, one per resolved reference; with `includeDeleting` a
-	name may match several, which share its `requestIndex`
+	Resources found, one per resolved reference; unless `visibility` is
+	`ACTIVE`, a name may match several, which share its `requestIndex`
 	"""
 	resources: [BatchResourceSuccess!]!
 	"""
@@ -7053,6 +7053,20 @@ type ResourceDeleteSuccess {
 }
 
 """
+The referenced resource is deleted, so its spec cannot be revealed
+"""
+type ResourceDeletedNotRevealedProblem {
+	"""
+	ID of the deleted resource
+	"""
+	id: ResourceID!
+	"""
+	Human-readable description of the problem
+	"""
+	message: String!
+}
+
+"""
 An edge wrapping a single `ResourceSummary` item
 """
 type ResourceEdge {
@@ -7441,7 +7455,7 @@ union ResourceListOutcome = ResourceConnection | ResourceUnsupportedSelectorProb
 """
 Reason a resource reference could not be resolved
 """
-union ResourceLookupProblem = ResourceIDNotFoundProblem | ResourceNameNotFoundProblem | ResourceSchemaMismatchProblem | ResourceNameMismatchProblem | ResourceEmptyRefProblem | ResourceUntypedNameProblem
+union ResourceLookupProblem = ResourceIDNotFoundProblem | ResourceNameNotFoundProblem | ResourceSchemaMismatchProblem | ResourceNameMismatchProblem | ResourceEmptyRefProblem | ResourceUntypedNameProblem | ResourceDeletedNotRevealedProblem
 
 """
 Text format of a resource manifest
@@ -7596,12 +7610,17 @@ type ResourcePhaseCounts {
 	Resources whose deletion waits for their controllers to clean up
 	"""
 	deleting: Uint64!
+	"""
+	Deleted resources that are still stored
+	"""
+	deleted: Uint64!
 }
 
 """
 Reference to one resource, mirroring the ODF `ResourceRef`. A name matches
-the live resource holding it; with `includeDeleting` it also matches
-resources being deleted, so it may resolve to several.
+the live resource holding it; unless `visibility` is `ACTIVE`, it may also
+match resources that gave it up on their deletion, and so resolve to
+several.
 
 A resource is addressed either by `id`, or by `type` **and** `name` — ODF's
 uniqueness key is `(account, type, name)`, and resources of different types
@@ -7836,7 +7855,8 @@ type ResourceTypeCountSummary {
 	"""
 	typeName: TypeName!
 	"""
-	Number of resources of this type
+	Number of resources of this type, including deleted ones that are still
+	stored
 	"""
 	totalCount: Uint64!
 	"""
@@ -7931,6 +7951,30 @@ type ResourceUntypedNameProblem {
 }
 
 """
+Which resources a query returns, by the state of their deletion
+"""
+enum ResourceVisibility {
+	"""
+	Resources whose deletion was not requested
+	"""
+	ACTIVE
+	"""
+	Also resources whose deletion is in progress
+	"""
+	INCLUDE_DELETING
+	"""
+	Resources in any state. Listings return the live ones first, then the
+	others, newest deletion first
+	"""
+	INCLUDE_DELETED
+	"""
+	Only resources whose deletion is in progress or completed, newest
+	deletion first in listings
+	"""
+	DELETED_ONLY
+}
+
+"""
 Queries over declarative resources and their types
 """
 type Resources {
@@ -7948,18 +7992,18 @@ type Resources {
 	"""
 	byRefs(		resourceRefs: [ResourceRefInput!]!,		opts: SpecViewOptsInput! = {revealed: false},
 		"""
-		Also find resources whose deletion is in progress; a name may then match several resources, the live one first
+		Which resources to find. A name may match several: the live resource comes first, then those being deleted, then the deleted ones. An ID finds a resource in any state; only `DELETED_ONLY` hides live ones from it
 		"""
-		includeDeleting: Boolean! = false
+		visibility: ResourceVisibility! = ACTIVE
 	): BatchResourcesOutcome!
 	"""
 	Returns resource handles by refs
 	"""
 	handlesByRefs(		resourceRefs: [ResourceRefInput!]!,
 		"""
-		Also find resources whose deletion is in progress; a name may then match several resources, the live one first
+		Which resources to find. A name may match several: the live resource comes first, then those being deleted, then the deleted ones. An ID finds a resource in any state; only `DELETED_ONLY` hides live ones from it
 		"""
-		includeDeleting: Boolean! = false
+		visibility: ResourceVisibility! = ACTIVE
 	): BatchResourceHandlesOutcome!
 	"""
 	Returns resources matching the given selectors, which act as a logical
@@ -7975,9 +8019,9 @@ type Resources {
 	"""
 	renderManifests(		resourceRefs: [ResourceRefInput!]!,		format: ResourceManifestFormat!,		opts: SpecViewOptsInput! = {revealed: false},
 		"""
-		Also find resources whose deletion is in progress; a name may then match several resources, the live one first
+		Which resources to find. A name may match several: the live resource comes first, then those being deleted, then the deleted ones. An ID finds a resource in any state; only `DELETED_ONLY` hides live ones from it
 		"""
-		includeDeleting: Boolean! = false
+		visibility: ResourceVisibility! = ACTIVE
 	): BatchResourceManifestsOutcome!
 }
 
@@ -8200,9 +8244,9 @@ input SearchResourcesInput {
 	"""
 	selectors: [ResourceSelectorInput!]
 	"""
-	Also match resources whose deletion is in progress
+	Which resources to match
 	"""
-	includeDeleting: Boolean! = false
+	visibility: ResourceVisibility! = ACTIVE
 }
 
 """

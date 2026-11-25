@@ -288,12 +288,13 @@ impl ResourceRepository for SqliteResourceRepository {
                 r.resource_name as name,
                 r.account_id as account_id,
                 COALESCE(a.resource_id, X'00000000000000000000000000000000') as account_resource_id,
-                COALESCE(a.account_name, $2) as account_name
+                COALESCE(a.account_name, $2) as account_name,
+                r.deletion_requested_at as deletion_requested_at,
+                r.deleted_at as deleted_at
             FROM resources r
             LEFT JOIN accounts a ON a.id = r.account_id
             WHERE r.account_id = $1
               AND r.resource_id IN ({uids_placeholders})
-              AND r.deleted_at IS NULL
             "#,
         );
 
@@ -332,13 +333,11 @@ impl ResourceRepository for SqliteResourceRepository {
 
         // Spelled out rather than bound, so that for live resources the
         // planner can use the partial unique index on names
-        let visibility_predicate = match visibility {
-            ResourceVisibility::Active => "AND r.deletion_requested_at IS NULL",
-            ResourceVisibility::IncludeDeleting => "",
-        };
+        let visibility_predicate = visibility_predicate(visibility);
 
         // Within a name the live resource comes first, then those being
-        // deleted, oldest first; the stable sort below keeps that order.
+        // deleted, oldest first, then the deleted ones, newest first; the
+        // stable sort below keeps that order.
         let query_str = format!(
             r#"
             SELECT
@@ -347,12 +346,11 @@ impl ResourceRepository for SqliteResourceRepository {
             FROM resources r
             WHERE r.account_id = $1
               AND r.resource_schema = $2
-              {visibility_predicate}
+              AND {visibility_predicate}
               AND r.resource_name COLLATE NOCASE IN ({names_placeholders})
-              AND r.deleted_at IS NULL
             ORDER BY
-                r.deletion_requested_at IS NOT NULL,
-                r.deletion_requested_at,
+                r.deleted_at DESC NULLS FIRST,
+                r.deletion_requested_at NULLS FIRST,
                 r.resource_id
             "#,
         );
@@ -409,17 +407,21 @@ impl ResourceRepository for SqliteResourceRepository {
         );
         query_builder.push_bind(kamu_resources::DELETED_ACCOUNT_NAME_SENTINEL);
         query_builder.push(
-            r#") as account_name
+            r#") as account_name,
+                r.deletion_requested_at as deletion_requested_at,
+                r.deleted_at as deleted_at
             FROM resources r
             LEFT JOIN accounts a ON a.id = r.account_id
-            WHERE r.deleted_at IS NULL"#,
+            WHERE "#,
         );
 
-        push_visibility_predicate(&mut query_builder, visibility);
+        query_builder.push(visibility_predicate(visibility));
         push_scope_predicate(&mut query_builder, scope, account_id);
 
         query_builder
-            .push(" ORDER BY r.updated_at DESC, r.resource_id DESC LIMIT ")
+            .push(" ORDER BY ")
+            .push(listing_order(visibility))
+            .push(" LIMIT ")
             .push_bind(limit)
             .push(" OFFSET ")
             .push_bind(offset);
@@ -448,10 +450,10 @@ impl ResourceRepository for SqliteResourceRepository {
             r#"
             SELECT COUNT(*) as count
             FROM resources r
-            WHERE r.deleted_at IS NULL"#,
+            WHERE "#,
         );
 
-        push_visibility_predicate(&mut query_builder, visibility);
+        query_builder.push(visibility_predicate(visibility));
         push_scope_predicate(&mut query_builder, scope, account_id);
 
         let row = query_builder
@@ -496,7 +498,6 @@ impl ResourceRepository for SqliteResourceRepository {
             LEFT JOIN accounts a ON a.id = r.account_id
             WHERE r.resource_id = $1
               AND r.resource_schema = $2
-              AND r.deleted_at IS NULL
             "#,
             query_id,
             query_schema,
@@ -655,7 +656,6 @@ impl ResourceRepository for SqliteResourceRepository {
             LEFT JOIN accounts a ON a.id = r.account_id
             WHERE r.resource_schema = $1
               AND r.resource_id IN ({uids_placeholders})
-              AND r.deleted_at IS NULL
             "#,
         );
 
@@ -710,7 +710,6 @@ impl ResourceRepository for SqliteResourceRepository {
             FROM resources r
             LEFT JOIN accounts a ON a.id = r.account_id
             WHERE r.resource_id = $1
-              AND r.deleted_at IS NULL
             "#,
             resource_id,
             kamu_resources::DELETED_ACCOUNT_NAME_SENTINEL,
@@ -793,7 +792,6 @@ impl ResourceRepository for SqliteResourceRepository {
             LEFT JOIN accounts a ON a.id = r.account_id
             WHERE r.account_id = $1
               AND r.resource_id IN ({uids_placeholders})
-              AND r.deleted_at IS NULL
             "#,
         );
 
@@ -855,14 +853,16 @@ impl ResourceRepository for SqliteResourceRepository {
                     r.last_event_id
                 FROM resources r
                 LEFT JOIN accounts a ON a.id = r.account_id
-                WHERE r.deleted_at IS NULL"#,
+                WHERE "#,
             );
 
-            push_visibility_predicate(&mut query_builder, visibility);
+            query_builder.push(visibility_predicate(visibility));
             push_scope_predicate(&mut query_builder, &scope, &account_id);
 
             query_builder
-                .push(" ORDER BY r.updated_at DESC, r.resource_id DESC LIMIT ")
+                .push(" ORDER BY ")
+                .push(listing_order(visibility))
+                .push(" LIMIT ")
                 .push_bind(limit)
                 .push(" OFFSET ")
                 .push_bind(offset);
@@ -909,6 +909,9 @@ impl ResourceRepository for SqliteResourceRepository {
                     CASE WHEN json_extract(status, '$.phase') = 'Deleting' THEN 1 ELSE 0 END
                 ) as "deleting_count!: i64",
                 SUM(
+                    CASE WHEN json_extract(status, '$.phase') = 'Deleted' THEN 1 ELSE 0 END
+                ) as "deleted_count!: i64",
+                SUM(
                     CASE
                         WHEN COALESCE(json_extract(status, '$.phase'), 'Pending') = 'Pending'
                         THEN 1
@@ -917,7 +920,6 @@ impl ResourceRepository for SqliteResourceRepository {
                 ) as "pending_count!: i64"
             FROM resources
             WHERE account_id = $1
-              AND deleted_at IS NULL
             GROUP BY resource_schema
             ORDER BY resource_schema ASC
             "#,
@@ -939,6 +941,7 @@ impl ResourceRepository for SqliteResourceRepository {
                     degraded: u64::try_from(row.degraded_count).unwrap(),
                     failed: u64::try_from(row.failed_count).unwrap(),
                     deleting: u64::try_from(row.deleting_count).unwrap(),
+                    deleted: u64::try_from(row.deleted_count).unwrap(),
                 },
             })
             .collect())
@@ -974,17 +977,26 @@ fn sort_into_requested_order<Row, Key: std::hash::Hash + Eq>(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Appends the condition excluding resources being deleted, unless
-/// `visibility` includes them.
-fn push_visibility_predicate(
-    query_builder: &mut sqlx::QueryBuilder<sqlx::Sqlite>,
-    visibility: ResourceVisibility,
-) {
+fn visibility_predicate(visibility: ResourceVisibility) -> &'static str {
     match visibility {
-        ResourceVisibility::Active => {
-            query_builder.push(" AND r.deletion_requested_at IS NULL");
-        }
-        ResourceVisibility::IncludeDeleting => {}
+        ResourceVisibility::Active => "r.deletion_requested_at IS NULL",
+        ResourceVisibility::IncludeDeleting => "r.deleted_at IS NULL",
+        ResourceVisibility::IncludeDeleted => "1 = 1",
+        ResourceVisibility::DeletedOnly => "r.deletion_requested_at IS NOT NULL",
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// The order of listings and searches, see
+/// [`ResourceRepository::list_resource_snapshots`]. Repeats the expressions of
+/// the indexes in that order.
+fn listing_order(visibility: ResourceVisibility) -> &'static str {
+    if visibility.includes_deleted() {
+        "COALESCE(r.deleted_at, r.deletion_requested_at) DESC NULLS FIRST, r.updated_at DESC, \
+         r.resource_id DESC"
+    } else {
+        "r.updated_at DESC, r.resource_id DESC"
     }
 }
 

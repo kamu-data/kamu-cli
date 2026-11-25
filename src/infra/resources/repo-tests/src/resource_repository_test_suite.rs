@@ -10,7 +10,7 @@
 use std::assert_matches;
 use std::sync::LazyLock;
 
-use chrono::{DateTime, TimeZone, Utc};
+use chrono::{DateTime, TimeDelta, TimeZone, Utc};
 use database_common::PaginationOpts;
 use database_common::testing::{
     RacingTransactionOutcome,
@@ -347,8 +347,16 @@ pub async fn test_find_resource_handles_by_ids(catalog: &Catalog) {
         .unwrap();
     // Request order is the contract: the survivors keep the relative order they
     // were asked in, with misses simply absent.
+    assert!(found[2].deleted_at.is_some(), "deleted resources are found");
     let found_ids = found.into_iter().map(|row| row.id).collect::<Vec<_>>();
-    assert_eq!(found_ids, vec![*first.id.as_ref(), *second.id.as_ref()]);
+    assert_eq!(
+        found_ids,
+        vec![
+            *first.id.as_ref(),
+            *second.id.as_ref(),
+            *to_delete.id.as_ref()
+        ]
+    );
 
     // Reversing the request must reverse the result, which an arbitrary-but-
     // stable scan order would not do.
@@ -366,7 +374,14 @@ pub async fn test_find_resource_handles_by_ids(catalog: &Catalog) {
         .await
         .unwrap();
     let reversed_ids = reversed.into_iter().map(|row| row.id).collect::<Vec<_>>();
-    assert_eq!(reversed_ids, vec![*second.id.as_ref(), *first.id.as_ref()]);
+    assert_eq!(
+        reversed_ids,
+        vec![
+            *to_delete.id.as_ref(),
+            *second.id.as_ref(),
+            *first.id.as_ref()
+        ]
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -2504,17 +2519,10 @@ pub async fn test_summarize_resources(catalog: &Catalog) {
 
     let mut deleted = make_test_snapshot(&account_handle, &KIND_B, "deleted");
     deleted.id = repo.new_resource_id().await.unwrap();
-    deleted.status = Some(status_with_phase(ResourcePhase::Reconciling));
+    deleted.headers.deletion_requested_at = Some(Utc::now());
+    deleted.headers.deleted_at = Some(Utc::now());
+    deleted.status = Some(status_with_phase(ResourcePhase::Deleted));
     repo.create_resource(&deleted).await.unwrap();
-    let deleted = ResourceSnapshot {
-        headers: ResourceHeaders {
-            deletion_requested_at: Some(Utc::now()),
-            deleted_at: Some(Utc::now()),
-            ..deleted.headers
-        },
-        ..deleted
-    };
-    repo.update_resource(&deleted, None).await.unwrap();
 
     let mut other_account = make_test_snapshot(&other_account_handle, &KIND_A, "other-account");
     other_account.id = repo.new_resource_id().await.unwrap();
@@ -2536,6 +2544,7 @@ pub async fn test_summarize_resources(catalog: &Catalog) {
                     degraded: 0,
                     failed: 0,
                     deleting: 0,
+                    deleted: 0,
                 },
             },
             ResourceSummaryRow {
@@ -2548,11 +2557,12 @@ pub async fn test_summarize_resources(catalog: &Catalog) {
                     degraded: 0,
                     failed: 0,
                     deleting: 0,
+                    deleted: 0,
                 },
             },
             ResourceSummaryRow {
                 schema: "KindB".to_string(),
-                total_count: 2,
+                total_count: 3,
                 phase_counts: ResourcePhaseCounts {
                     pending: 1,
                     reconciling: 0,
@@ -2560,6 +2570,7 @@ pub async fn test_summarize_resources(catalog: &Catalog) {
                     degraded: 0,
                     failed: 1,
                     deleting: 0,
+                    deleted: 1,
                 },
             },
         ]
@@ -2568,100 +2579,84 @@ pub async fn test_summarize_resources(catalog: &Catalog) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn test_find_deleted_resource_not_returned(catalog: &Catalog) {
+pub async fn test_deleted_resource_round_trips(catalog: &Catalog) {
     let repo = catalog.get_one::<dyn ResourceRepository>().unwrap();
-
     let account_handle = odf::ResourceOwnerHandle::new_test("test-account");
 
-    let mut snapshot = make_test_snapshot(&account_handle, &TEST_KIND, "to-delete");
-    snapshot.id = repo.new_resource_id().await.unwrap();
-    let id = snapshot.id;
-    repo.create_resource(&snapshot).await.unwrap();
+    let snapshot = create_test_resource(repo.as_ref(), &account_handle, "to-delete").await;
+    // Whole seconds: storages keep timestamps at different precisions
+    let requested_at = Utc.with_ymd_and_hms(2026, 1, 1, 0, 0, 0).unwrap();
+    let deleted_at = Utc.with_ymd_and_hms(2026, 1, 1, 0, 1, 0).unwrap();
+    let deleted = delete_test_resource(repo.as_ref(), snapshot, requested_at, deleted_at).await;
 
-    // Mark as deleted
-    let deleted = ResourceSnapshot {
-        headers: ResourceHeaders {
-            deletion_requested_at: Some(Utc::now()),
-            deleted_at: Some(Utc::now()),
-            ..snapshot.headers.clone()
-        },
-        ..snapshot
-    };
-    repo.update_resource(&deleted, None).await.unwrap();
-
-    let by_id = repo.find_resource_snapshot_by_id(&id).await.unwrap();
-    assert!(by_id.is_none());
-
+    let by_id = repo
+        .find_resource_snapshot_by_id(&deleted.id)
+        .await
+        .unwrap()
+        .expect("a deleted resource is found by id");
     let by_query = repo
         .find_resource_snapshot(&ResourceRawEventQuery {
             schema: TEST_KIND.clone(),
-            id,
+            id: deleted.id,
         })
         .await
+        .unwrap()
+        .expect("a deleted resource is found by schema and id");
+    let by_ids = repo
+        .find_resource_snapshots_by_ids(&account_handle.did, &[deleted.id])
+        .await
         .unwrap();
-    assert!(by_query.is_none());
-
-    let by_name = repo
-        .find_resource_id_by_name(
+    let by_schema_and_ids = repo
+        .find_resource_snapshots_by_schema_and_ids(&TEST_KIND, &[deleted.id])
+        .await
+        .unwrap();
+    let listed: Vec<_> = repo
+        .list_resource_snapshots(
             &account_handle.did,
-            &TEST_KIND,
-            &"to-delete".parse().unwrap(),
+            &ResourceScope::one_type(TEST_KIND.clone(), None),
+            ResourceVisibility::DeletedOnly,
+            PaginationOpts::from_max_results(10),
+        )
+        .try_collect()
+        .await
+        .unwrap();
+
+    for (read, found) in [
+        ("by id", vec![by_id]),
+        ("by schema and id", vec![by_query]),
+        ("by ids", by_ids),
+        ("by schema and ids", by_schema_and_ids),
+        ("listed", listed),
+    ] {
+        assert_eq!(found.len(), 1, "{read}");
+        let headers = &found[0].headers;
+        assert_eq!(headers.name.as_str(), "to-delete", "{read}");
+        assert_eq!(headers.deletion_requested_at, Some(requested_at), "{read}");
+        assert_eq!(headers.deleted_at, Some(deleted_at), "{read}");
+        assert_eq!(
+            found[0].status.as_ref().unwrap().phase,
+            ResourcePhase::Deleted,
+            "{read}"
+        );
+    }
+
+    let by_ids = repo
+        .find_resource_handles_by_ids(&account_handle.did, &[deleted.id])
+        .await
+        .unwrap();
+    let searched = repo
+        .search_resource_handles(
+            &account_handle.did,
+            &ResourceScope::one_type(TEST_KIND.clone(), None),
+            ResourceVisibility::DeletedOnly,
+            PaginationOpts::from_max_results(10),
         )
         .await
         .unwrap();
-    assert!(by_name.is_none());
-
-    let handles_by_ids = repo
-        .find_resource_handles_by_ids(&account_handle.did, &[id])
-        .await
-        .unwrap();
-    assert_eq!(handles_by_ids.len(), 0);
-
-    let name: ResourceName = "to-delete".parse().unwrap();
-    let scope = ResourceScope::one_type(TEST_KIND.clone(), None);
-    for visibility in [
-        ResourceVisibility::Active,
-        ResourceVisibility::IncludeDeleting,
-    ] {
-        let resolved = repo
-            .resolve_resource_ids_by_names(
-                &account_handle.did,
-                &TEST_KIND,
-                std::slice::from_ref(&name),
-                visibility,
-            )
-            .await
-            .unwrap();
-        assert_eq!(resolved, Vec::new(), "resolve with {visibility:?}");
-
-        let handles = repo
-            .search_resource_handles(
-                &account_handle.did,
-                &scope,
-                visibility,
-                PaginationOpts::from_max_results(10),
-            )
-            .await
-            .unwrap();
-        assert_eq!(handles.len(), 0, "search with {visibility:?}");
-
-        let count = repo
-            .count_search_resource_handles(&account_handle.did, &scope, visibility)
-            .await
-            .unwrap();
-        assert_eq!(count, 0, "count with {visibility:?}");
-
-        let listed: Vec<_> = repo
-            .list_resource_snapshots(
-                &account_handle.did,
-                &scope,
-                visibility,
-                PaginationOpts::from_max_results(10),
-            )
-            .try_collect()
-            .await
-            .unwrap();
-        assert_eq!(listed.len(), 0, "list with {visibility:?}");
+    for (read, found) in [("by ids", by_ids), ("searched", searched)] {
+        assert_eq!(found.len(), 1, "{read}");
+        assert_eq!(found[0].deletion_requested_at, Some(requested_at), "{read}");
+        assert_eq!(found[0].deleted_at, Some(deleted_at), "{read}");
     }
 }
 
@@ -2734,23 +2729,33 @@ pub async fn test_resource_being_deleted_round_trips(catalog: &Catalog) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn test_resource_being_deleted_is_hidden_unless_included(catalog: &Catalog) {
+pub async fn test_visibility_by_deletion_state(catalog: &Catalog) {
     let repo = catalog.get_one::<dyn ResourceRepository>().unwrap();
     let account_handle = odf::ResourceOwnerHandle::new_test("test-account");
 
     let projection_repo = catalog
         .get_one::<dyn ResourceLabelProjectionRepository>()
         .unwrap();
-    let snapshot = create_labelled_test_resource(
-        repo.as_ref(),
-        projection_repo.as_ref(),
-        &account_handle,
-        "doomed",
-        ("env", "prod"),
-    )
-    .await;
-    let deleting = request_test_resource_deletion(repo.as_ref(), snapshot, Utc::now()).await;
-    let name: ResourceName = "doomed".parse().unwrap();
+    let create = |name| {
+        create_labelled_test_resource(
+            repo.as_ref(),
+            projection_repo.as_ref(),
+            &account_handle,
+            name,
+            ("env", "prod"),
+        )
+    };
+    let t0 = Utc.with_ymd_and_hms(2026, 1, 1, 0, 0, 0).unwrap();
+    let live = create("live").await;
+    let deleting = create("deleting").await;
+    let deleting =
+        request_test_resource_deletion(repo.as_ref(), deleting, t0 + TimeDelta::minutes(5)).await;
+    let deleted = create("deleted").await;
+    let deleted = delete_test_resource(repo.as_ref(), deleted, t0, t0).await;
+
+    let names: Vec<ResourceName> = ["live", "deleting", "deleted"]
+        .map(|name| name.parse().unwrap())
+        .to_vec();
     let scopes = [
         (
             "unfiltered",
@@ -2762,37 +2767,45 @@ pub async fn test_resource_being_deleted_is_hidden_unless_included(catalog: &Cat
         ),
     ];
 
-    assert_eq!(
-        repo.find_resource_id_by_name(&account_handle.did, &TEST_KIND, &name)
-            .await
-            .unwrap(),
-        None,
-        "a resource being deleted holds no name"
-    );
+    for (name, expected) in names.iter().zip([Some(live.id), None, None]) {
+        assert_eq!(
+            repo.find_resource_id_by_name(&account_handle.did, &TEST_KIND, name)
+                .await
+                .unwrap(),
+            expected,
+            "only a live resource holds its name"
+        );
+    }
     assert_eq!(
         repo.find_resource_ids_by_schema_and_label(&account_handle.did, &TEST_KIND, "env", "prod")
             .await
             .unwrap(),
-        Vec::<ResourceID>::new()
+        vec![live.id]
     );
     assert_eq!(
         repo.find_resource_ids_by_schema_and_label_any_account(&TEST_KIND, "env", "prod")
             .await
             .unwrap(),
-        Vec::<ResourceID>::new()
+        vec![live.id]
     );
 
     for (visibility, expected) in [
-        (ResourceVisibility::Active, Vec::new()),
-        (ResourceVisibility::IncludeDeleting, vec![deleting.id]),
+        (ResourceVisibility::Active, vec![live.id]),
+        (
+            ResourceVisibility::IncludeDeleting,
+            vec![live.id, deleting.id],
+        ),
+        (
+            ResourceVisibility::IncludeDeleted,
+            vec![live.id, deleting.id, deleted.id],
+        ),
+        (
+            ResourceVisibility::DeletedOnly,
+            vec![deleting.id, deleted.id],
+        ),
     ] {
         let resolved = repo
-            .resolve_resource_ids_by_names(
-                &account_handle.did,
-                &TEST_KIND,
-                std::slice::from_ref(&name),
-                visibility,
-            )
+            .resolve_resource_ids_by_names(&account_handle.did, &TEST_KIND, &names, visibility)
             .await
             .unwrap();
         assert_eq!(
@@ -2928,18 +2941,30 @@ pub async fn test_deleted_resources_share_name_with_live_one(catalog: &Catalog) 
     let account_handle = odf::ResourceOwnerHandle::new_test("test-account");
     let name: ResourceName = "shared".parse().unwrap();
 
-    let first = create_test_resource(repo.as_ref(), &account_handle, "shared").await;
-    let first = delete_test_resource(repo.as_ref(), first).await;
+    // Deletions complete, and are requested, opposite to creation, so the order
+    // below cannot come from creation time or ID
+    let t0 = Utc.with_ymd_and_hms(2026, 1, 1, 0, 0, 0).unwrap();
+    let minutes = |minutes| t0 + TimeDelta::minutes(minutes);
+    let create = || create_test_resource(repo.as_ref(), &account_handle, "shared");
 
-    let second = create_test_resource(repo.as_ref(), &account_handle, "shared").await;
-    delete_test_resource(repo.as_ref(), second).await;
-
-    let live = create_test_resource(repo.as_ref(), &account_handle, "shared").await;
+    let newest_deleted = create().await;
+    let newest_deleted =
+        delete_test_resource(repo.as_ref(), newest_deleted, minutes(1), minutes(4)).await;
+    let oldest_deleted = create().await;
+    let oldest_deleted =
+        delete_test_resource(repo.as_ref(), oldest_deleted, minutes(2), minutes(3)).await;
+    let newest_deleting = create().await;
+    let newest_deleting =
+        request_test_resource_deletion(repo.as_ref(), newest_deleting, minutes(6)).await;
+    let oldest_deleting = create().await;
+    let oldest_deleting =
+        request_test_resource_deletion(repo.as_ref(), oldest_deleting, minutes(5)).await;
+    let live = create().await;
 
     // A write to a deleted resource does not take the name back
-    let mut first_update = first.clone();
-    first_update.last_event_id = Some(EventID::new(4));
-    repo.update_resource(&first_update, first.last_event_id)
+    let mut update = newest_deleted.clone();
+    update.last_event_id = Some(EventID::new(4));
+    repo.update_resource(&update, newest_deleted.last_event_id)
         .await
         .unwrap();
 
@@ -2949,9 +2974,23 @@ pub async fn test_deleted_resources_share_name_with_live_one(catalog: &Catalog) 
             .unwrap(),
         Some(live.id)
     );
-    for visibility in [
-        ResourceVisibility::Active,
-        ResourceVisibility::IncludeDeleting,
+
+    let deleting = vec![oldest_deleting.id, newest_deleting.id];
+    let deleted = vec![newest_deleted.id, oldest_deleted.id];
+    for (visibility, expected) in [
+        (ResourceVisibility::Active, vec![live.id]),
+        (
+            ResourceVisibility::IncludeDeleting,
+            [vec![live.id], deleting.clone()].concat(),
+        ),
+        (
+            ResourceVisibility::IncludeDeleted,
+            [vec![live.id], deleting.clone(), deleted.clone()].concat(),
+        ),
+        (
+            ResourceVisibility::DeletedOnly,
+            [deleting, deleted].concat(),
+        ),
     ] {
         let resolved = repo
             .resolve_resource_ids_by_names(
@@ -2963,8 +3002,8 @@ pub async fn test_deleted_resources_share_name_with_live_one(catalog: &Catalog) 
             .await
             .unwrap();
         assert_eq!(
-            resolved,
-            vec![(name.clone(), live.id)],
+            resolved.into_iter().map(|(_, id)| id).collect::<Vec<_>>(),
+            expected,
             "resolve with {visibility:?}"
         );
     }
@@ -2972,13 +3011,82 @@ pub async fn test_deleted_resources_share_name_with_live_one(catalog: &Catalog) 
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn test_summarize_resources_counts_deleting(catalog: &Catalog) {
+pub async fn test_listings_with_deleted_resources_run_newest_deletion_first(catalog: &Catalog) {
+    let repo = catalog.get_one::<dyn ResourceRepository>().unwrap();
+    let account_handle = odf::ResourceOwnerHandle::new_test("test-account");
+
+    let t0 = Utc.with_ymd_and_hms(2026, 1, 1, 0, 0, 0).unwrap();
+    let minutes = |minutes| t0 + TimeDelta::minutes(minutes);
+    let create = |name| create_test_resource(repo.as_ref(), &account_handle, name);
+
+    // Deletions are requested, and so last updated, in another order than they
+    // complete
+    let completed_last = create("completed-last").await;
+    let completed_last =
+        delete_test_resource(repo.as_ref(), completed_last, minutes(1), minutes(9)).await;
+    let completed_first = create("completed-first").await;
+    let completed_first =
+        delete_test_resource(repo.as_ref(), completed_first, minutes(3), minutes(4)).await;
+    let deleting = create("deleting").await;
+    let deleting = request_test_resource_deletion(repo.as_ref(), deleting, minutes(6)).await;
+
+    // Last updated among the others, yet listed before them
+    let older_live = create("older-live").await;
+    let newer_live = create("newer-live").await;
+    for (live, updated_at) in [(&older_live, minutes(5)), (&newer_live, minutes(7))] {
+        let mut update = live.clone();
+        update.headers.updated_at = updated_at;
+        update.last_event_id = Some(EventID::new(2));
+        repo.update_resource(&update, live.last_event_id)
+            .await
+            .unwrap();
+    }
+
+    let live = vec![newer_live.id, older_live.id];
+    let deleted = vec![completed_last.id, deleting.id, completed_first.id];
+    for (visibility, expected) in [
+        (
+            ResourceVisibility::IncludeDeleted,
+            [live, deleted.clone()].concat(),
+        ),
+        (ResourceVisibility::DeletedOnly, deleted),
+    ] {
+        let scope = ResourceScope::one_type(TEST_KIND.clone(), None);
+        let mut searched = Vec::new();
+        let mut listed = Vec::new();
+        for offset in (0..expected.len()).step_by(2) {
+            let page = PaginationOpts { limit: 2, offset };
+            searched.extend(
+                repo.search_resource_handles(&account_handle.did, &scope, visibility, page)
+                    .await
+                    .unwrap()
+                    .into_iter()
+                    .map(|row| ResourceID::new(row.id)),
+            );
+            let snapshots: Vec<_> = repo
+                .list_resource_snapshots(&account_handle.did, &scope, visibility, page)
+                .try_collect()
+                .await
+                .unwrap();
+            listed.extend(snapshots.into_iter().map(|snapshot| snapshot.id));
+        }
+
+        assert_eq!(searched, expected, "search with {visibility:?}");
+        assert_eq!(listed, expected, "list with {visibility:?}");
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_summarize_resources_counts_deleting_and_deleted(catalog: &Catalog) {
     let repo = catalog.get_one::<dyn ResourceRepository>().unwrap();
     let account_handle = odf::ResourceOwnerHandle::new_test("test-account");
 
     create_test_resource(repo.as_ref(), &account_handle, "live").await;
     let doomed = create_test_resource(repo.as_ref(), &account_handle, "doomed").await;
     request_test_resource_deletion(repo.as_ref(), doomed, Utc::now()).await;
+    let deleted = create_test_resource(repo.as_ref(), &account_handle, "deleted").await;
+    delete_test_resource(repo.as_ref(), deleted, Utc::now(), Utc::now()).await;
 
     let summary = repo.summarize_resources(account_handle.did).await.unwrap();
 
@@ -2986,10 +3094,11 @@ pub async fn test_summarize_resources_counts_deleting(catalog: &Catalog) {
         summary,
         vec![ResourceSummaryRow {
             schema: TEST_KIND.to_string(),
-            total_count: 2,
+            total_count: 3,
             phase_counts: ResourcePhaseCounts {
                 pending: 1,
                 deleting: 1,
+                deleted: 1,
                 ..Default::default()
             },
         }]
@@ -3020,6 +3129,7 @@ async fn create_labelled_test_resource(
 ) -> ResourceSnapshot {
     let mut snapshot = make_test_snapshot(account_handle, &TEST_KIND, name);
     snapshot.id = repo.new_resource_id().await.unwrap();
+    snapshot.headers.id = snapshot.id;
     snapshot.status = Some(new_pending_resource_status());
     snapshot.last_event_id = Some(EventID::new(1));
     snapshot
@@ -3061,9 +3171,10 @@ async fn request_test_resource_deletion(
 async fn delete_test_resource(
     repo: &dyn ResourceRepository,
     snapshot: ResourceSnapshot,
+    requested_at: DateTime<Utc>,
+    deleted_at: DateTime<Utc>,
 ) -> ResourceSnapshot {
-    let deleted_at = Utc::now();
-    let deleting = request_test_resource_deletion(repo, snapshot, deleted_at).await;
+    let deleting = request_test_resource_deletion(repo, snapshot, requested_at).await;
 
     let mut deleted = deleting.clone();
     deleted.headers.deleted_at = Some(deleted_at);

@@ -209,6 +209,16 @@ CREATE INDEX idx_resources_deletion_pending
     ON resources (resource_schema, resource_id)
     WHERE deletion_requested_at IS NOT NULL AND deleted_at IS NULL;
 
+CREATE INDEX idx_resources_deletion_time
+    ON resources (
+        account_id,
+        resource_schema,
+        COALESCE(deleted_at, deletion_requested_at) DESC,
+        updated_at DESC,
+        resource_id DESC
+    )
+    WHERE deletion_requested_at IS NOT NULL;
+
 CREATE INDEX idx_resources_not_reconciled
     ON resources (resource_schema, resource_id)
     WHERE deletion_requested_at IS NULL AND reconciled_generation < generation;
@@ -218,8 +228,7 @@ CREATE INDEX idx_resources_summary_projection
         account_id,
         resource_schema,
         json_extract(status, '$.phase')
-    )
-    WHERE deleted_at IS NULL;
+    );
 
 CREATE INDEX idx_task_events_task_id ON task_events (task_id);
 

@@ -307,6 +307,18 @@ impl ResourceCtx {
         }
         panic!("VariableSet {variable_set_name} did not become ready");
     }
+
+    /// Waits until the resource is `Deleted`: a server cleans up after its
+    /// response to the delete command
+    pub async fn wait_until_deleted(&self, resource_id: &str) {
+        for _ in 0..60 {
+            if self.get_one(["get", resource_id]).await.phase() == "Deleted" {
+                return;
+            }
+            tokio::time::sleep(Duration::from_millis(500)).await;
+        }
+        panic!("Resource {resource_id} was not deleted");
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

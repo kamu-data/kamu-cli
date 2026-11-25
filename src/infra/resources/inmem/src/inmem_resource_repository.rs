@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::cmp::Reverse;
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -354,18 +355,8 @@ impl ResourceRepository for InMemoryResourceRepository {
         Ok(self.state.read(self.transaction_id, |state| {
             ids.iter()
                 .filter_map(|id| state.snapshot(id))
-                .filter(|snapshot| {
-                    snapshot.headers.account.did == *account_id
-                        && snapshot.headers.deleted_at.is_none()
-                })
-                .map(|snapshot| ResourceHandleRow {
-                    id: *snapshot.id.as_ref(),
-                    schema: snapshot.schema.to_string(),
-                    name: snapshot.headers.name.to_string(),
-                    account_id: snapshot.headers.account.did.clone(),
-                    account_resource_id: *snapshot.headers.account.id.as_ref(),
-                    account_name: snapshot.headers.account.name.to_string(),
-                })
+                .filter(|snapshot| snapshot.headers.account.did == *account_id)
+                .map(ResourceHandleRow::from)
                 .collect()
         }))
     }
@@ -380,34 +371,32 @@ impl ResourceRepository for InMemoryResourceRepository {
         Ok(self.state.read(self.transaction_id, |state| {
             let mut resolved = Vec::new();
             for name in names {
-                let live = state.live_snapshot_by_name(&ResourceLookupKey {
-                    account_id: account_id.clone(),
-                    schema: schema.clone(),
-                    name: name.clone(),
+                let mut matching = state
+                    .snapshots()
+                    .filter(|snapshot| {
+                        snapshot.headers.account.did == *account_id
+                            && snapshot.schema == *schema
+                            && snapshot.headers.name == *name
+                            && visibility.includes(
+                                snapshot.headers.deletion_requested_at,
+                                snapshot.headers.deleted_at,
+                            )
+                    })
+                    .collect::<Vec<_>>();
+                matching.sort_by_key(|snapshot| {
+                    let headers = &snapshot.headers;
+                    (
+                        headers.deleted_at.is_some(),
+                        Reverse(headers.deleted_at),
+                        headers.deletion_requested_at,
+                        snapshot.id,
+                    )
                 });
-                resolved.extend(live.map(|snapshot| (snapshot.headers.name.clone(), snapshot.id)));
-
-                if visibility.includes_deleting() {
-                    // Oldest deletion request first, as the SQL backends order them
-                    let mut deleting = state
-                        .snapshots()
-                        .filter(|snapshot| {
-                            snapshot.headers.account.did == *account_id
-                                && snapshot.schema == *schema
-                                && snapshot.headers.name == *name
-                                && snapshot.headers.deletion_requested_at.is_some()
-                                && snapshot.headers.deleted_at.is_none()
-                        })
-                        .collect::<Vec<_>>();
-                    deleting.sort_by_key(|snapshot| {
-                        (snapshot.headers.deletion_requested_at, snapshot.id)
-                    });
-                    resolved.extend(
-                        deleting
-                            .into_iter()
-                            .map(|snapshot| (snapshot.headers.name.clone(), snapshot.id)),
-                    );
-                }
+                resolved.extend(
+                    matching
+                        .into_iter()
+                        .map(|snapshot| (snapshot.headers.name.clone(), snapshot.id)),
+                );
             }
 
             resolved
@@ -431,25 +420,13 @@ impl ResourceRepository for InMemoryResourceRepository {
             })
         };
 
-        snapshots.sort_by(|lhs, rhs| {
-            rhs.headers
-                .updated_at
-                .cmp(&lhs.headers.updated_at)
-                .then_with(|| rhs.id.cmp(&lhs.id))
-        });
+        sort_snapshots(&mut snapshots, visibility);
 
         Ok(snapshots
             .into_iter()
             .skip(pagination.offset)
             .take(pagination.limit)
-            .map(|snapshot| ResourceHandleRow {
-                id: *snapshot.id.as_ref(),
-                schema: snapshot.schema.to_string(),
-                name: snapshot.headers.name.to_string(),
-                account_id: snapshot.headers.account.did.clone(),
-                account_resource_id: *snapshot.headers.account.id.as_ref(),
-                account_name: snapshot.headers.account.name.to_string(),
-            })
+            .map(|snapshot| ResourceHandleRow::from(&snapshot))
             .collect())
     }
 
@@ -477,7 +454,6 @@ impl ResourceRepository for InMemoryResourceRepository {
                 state
                     .snapshot(&query.id)
                     .filter(|snapshot| snapshot.schema == query.schema)
-                    .filter(|snapshot| snapshot.headers.deleted_at.is_none())
                     .cloned()
             })
         };
@@ -517,7 +493,6 @@ impl ResourceRepository for InMemoryResourceRepository {
                 ids.iter()
                     .filter_map(|id| state.snapshot(id))
                     .filter(|snapshot| snapshot.schema == *schema)
-                    .filter(|snapshot| snapshot.headers.deleted_at.is_none())
                     .cloned()
                     .collect::<Vec<_>>()
             })
@@ -531,12 +506,8 @@ impl ResourceRepository for InMemoryResourceRepository {
         id: &ResourceID,
     ) -> Result<Option<ResourceSnapshot>, InternalError> {
         let maybe_snapshot = {
-            self.state.read(self.transaction_id, |state| {
-                state
-                    .snapshot(id)
-                    .filter(|snapshot| snapshot.headers.deleted_at.is_none())
-                    .cloned()
-            })
+            self.state
+                .read(self.transaction_id, |state| state.snapshot(id).cloned())
         };
 
         match maybe_snapshot {
@@ -554,10 +525,7 @@ impl ResourceRepository for InMemoryResourceRepository {
             self.state.read(self.transaction_id, |state| {
                 ids.iter()
                     .filter_map(|id| state.snapshot(id))
-                    .filter(|snapshot| {
-                        snapshot.headers.account.did == *account_id
-                            && snapshot.headers.deleted_at.is_none()
-                    })
+                    .filter(|snapshot| snapshot.headers.account.did == *account_id)
                     .cloned()
                     .collect::<Vec<_>>()
             })
@@ -583,12 +551,7 @@ impl ResourceRepository for InMemoryResourceRepository {
                 })
             };
 
-            snapshots_page.sort_by(|lhs, rhs| {
-                rhs.headers
-                    .updated_at
-                    .cmp(&lhs.headers.updated_at)
-                    .then_with(|| rhs.id.cmp(&lhs.id))
-            });
+            sort_snapshots(&mut snapshots_page, visibility);
 
             let snapshots_page: Vec<_> = snapshots_page
                 .into_iter()
@@ -615,10 +578,7 @@ impl ResourceRepository for InMemoryResourceRepository {
         let snapshots = self.state.read(self.transaction_id, |state| {
             state
                 .snapshots()
-                .filter(|snapshot| {
-                    snapshot.headers.account.did == account_id
-                        && snapshot.headers.deleted_at.is_none()
-                })
+                .filter(|snapshot| snapshot.headers.account.did == account_id)
                 .cloned()
                 .collect::<Vec<_>>()
         });
@@ -643,8 +603,7 @@ impl ResourceRepository for InMemoryResourceRepository {
                 Some(ResourcePhase::Degraded) => row.phase_counts.increment_degraded(),
                 Some(ResourcePhase::Failed) => row.phase_counts.increment_failed(),
                 Some(ResourcePhase::Deleting) => row.phase_counts.increment_deleting(),
-                // Excluded by the `deleted_at` filter
-                Some(ResourcePhase::Deleted) => {}
+                Some(ResourcePhase::Deleted) => row.phase_counts.increment_deleted(),
             }
         }
 
@@ -762,9 +721,11 @@ fn filter_scoped_snapshots(
 ) -> Vec<ResourceSnapshot> {
     state
         .snapshots()
-        .filter(|snapshot| snapshot.headers.deleted_at.is_none())
         .filter(|snapshot| {
-            snapshot.headers.deletion_requested_at.is_none() || visibility.includes_deleting()
+            visibility.includes(
+                snapshot.headers.deletion_requested_at,
+                snapshot.headers.deleted_at,
+            )
         })
         // Account and labels are both matched inside the scope, not here: a row
         // may name its own account and carry its own label pairs, and
@@ -772,6 +733,25 @@ fn filter_scoped_snapshots(
         .filter(|snapshot| snapshot_matches_scope(snapshot, scope, account_id))
         .cloned()
         .collect()
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// The order of listings and searches, see
+/// [`ResourceRepository::list_resource_snapshots`]
+fn sort_snapshots(snapshots: &mut [ResourceSnapshot], visibility: ResourceVisibility) {
+    snapshots.sort_by_key(|snapshot| {
+        let headers = &snapshot.headers;
+        let deletion_time = if visibility.includes_deleted() {
+            headers.deleted_at.or(headers.deletion_requested_at)
+        } else {
+            None
+        };
+        (
+            deletion_time.is_some(),
+            Reverse((deletion_time, headers.updated_at, snapshot.id)),
+        )
+    });
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

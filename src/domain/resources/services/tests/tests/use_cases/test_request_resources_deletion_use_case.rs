@@ -33,7 +33,7 @@ async fn test_request_deletion_of_multiple_resources_in_one_call() {
         .await;
     harness.settle().await;
 
-    harness.assert_gone(&ids).await;
+    harness.assert_deleted(&ids).await;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -57,7 +57,7 @@ async fn test_request_deletion_of_resource_owned_by_other_account_fails() {
         "expected Access error, got: {result:?}"
     );
 
-    harness.assert_exists(&id).await;
+    harness.assert_live(&id).await;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

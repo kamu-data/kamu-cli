@@ -86,7 +86,7 @@ pub struct ResourceHeaders {
     pub created_at: DateTime<Utc>,           // generated
     pub updated_at: DateTime<Utc>,           // generated
     pub deletion_requested_at: Option<DateTime<Utc>>, // generated — deletion requested
-    pub deleted_at: Option<DateTime<Utc>>,   // generated — deletion completed (tombstone)
+    pub deleted_at: Option<DateTime<Utc>>,   // generated — deletion completed
 }
 
 pub struct ResourceStatus {                  // ODF-generated; written only by controllers

@@ -215,12 +215,14 @@ pub async fn test_summary_account_scoping(h: &impl FacadeContractHarness) {
 
 // RF-114
 contract_test!(
-    summary_counts_resources_being_deleted,
-    super::test_summary_counts_resources_being_deleted,
+    summary_counts_resources_being_deleted_and_deleted,
+    super::test_summary_counts_resources_being_deleted_and_deleted,
     messaging_outbox::OutboxProvider::Dispatching
 );
 
-pub async fn test_summary_counts_resources_being_deleted(h: &impl FacadeContractHarness) {
+pub async fn test_summary_counts_resources_being_deleted_and_deleted(
+    h: &impl FacadeContractHarness,
+) {
     let id = create_variable_set(h, TestAccount::Alice, "phase-deleting").await;
     let facade = h.facade_for(TestAccount::Alice);
     facade.delete(vec![by_id(id)]).await.unwrap();
@@ -238,9 +240,10 @@ pub async fn test_summary_counts_resources_being_deleted(h: &impl FacadeContract
         .await
         .unwrap();
     assert_eq!(vs_phase_counts(&summary).deleting, 0);
+    assert_eq!(vs_phase_counts(&summary).deleted, 1);
     assert_eq!(
         total_schema_count(summary, VariableSetResource::type_uri()),
-        0
+        1
     );
 }
 

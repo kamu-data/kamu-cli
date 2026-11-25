@@ -16,9 +16,22 @@
 //! back to the `Literal` plaintext.
 
 use kamu_configuration::SecretSetResource;
-use kamu_resources::{ResourceRef, ResourceSchemaProvider, ResourceVisibility, TypeName};
-use kamu_resources_facade::{ApplyManifestRequest, ResourceManifestFormat, SpecViewOpts};
-use pretty_assertions::assert_eq;
+use kamu_resources::{
+    ResourceID,
+    ResourceRef,
+    ResourceSchemaProvider,
+    ResourceVisibility,
+    TypeName,
+};
+use kamu_resources_facade::{
+    ApplyManifestRequest,
+    BatchResourceProblem,
+    ResourceDeletedNotRevealedError,
+    ResourceLookupProblem,
+    ResourceManifestFormat,
+    SpecViewOpts,
+};
+use pretty_assertions::{assert_eq, assert_matches};
 
 use crate::contract_test;
 use crate::harness::{FacadeContractHarness, TestAccount};
@@ -393,6 +406,91 @@ pub async fn test_spec_view_mode_applies_per_schema_in_a_mixed_batch(
             "{label}: rendering must reveal the secret beside another type; manifests: {manifests}"
         );
     }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// RF-186
+contract_test!(
+    deleted_spec_is_not_revealed,
+    super::test_deleted_spec_is_not_revealed,
+    messaging_outbox::OutboxProvider::Dispatching
+);
+
+pub async fn test_deleted_spec_is_not_revealed(h: &impl FacadeContractHarness) {
+    let facade = h.facade_for(TestAccount::Alice);
+    let create = || {
+        create_secret_set(
+            h,
+            TestAccount::Alice,
+            "sv-deleted",
+            &[("API_TOKEN", "secret-value")],
+        )
+    };
+    let refs = || vec![secret_selector("sv-deleted")];
+    let visibility = ResourceVisibility::IncludeDeleted;
+
+    let deleted_id = create().await;
+    facade.delete(refs()).await.unwrap();
+    h.settle().await;
+    let live_id = create().await;
+
+    // The name finds both: the live one is revealed, the deleted one is not
+    let resources = facade
+        .get(refs(), SpecViewOpts::REVEALED, visibility)
+        .await
+        .unwrap();
+    assert_eq!(resources.successes.len(), 1);
+    let revealed = &resources.successes[0].item;
+    assert_eq!(revealed.headers.id, live_id);
+    assert!(revealed.spec.to_string().contains("secret-value"));
+    assert_deleted_not_revealed(&resources.problems, deleted_id);
+
+    let manifests = facade
+        .render_manifests(
+            refs(),
+            ResourceManifestFormat::Json,
+            SpecViewOpts::REVEALED,
+            visibility,
+        )
+        .await
+        .unwrap();
+    assert_eq!(manifests.successes.len(), 1);
+    assert!(
+        manifests.successes[0]
+            .item
+            .manifest
+            .contains("secret-value")
+    );
+    assert_deleted_not_revealed(&manifests.problems, deleted_id);
+
+    // Its encrypted spec stays readable
+    let resources = facade
+        .get(refs(), SpecViewOpts::ENCRYPTED, visibility)
+        .await
+        .unwrap();
+    assert_eq!(
+        resources
+            .successes
+            .iter()
+            .map(|success| success.item.headers.id)
+            .collect::<Vec<_>>(),
+        vec![live_id, deleted_id]
+    );
+}
+
+#[track_caller]
+fn assert_deleted_not_revealed(
+    problems: &[BatchResourceProblem<ResourceLookupProblem>],
+    expected_id: ResourceID,
+) {
+    assert_matches!(
+        problems,
+        [BatchResourceProblem {
+            request_index: 0,
+            error: ResourceLookupProblem::DeletedNotRevealed(ResourceDeletedNotRevealedError { id }),
+        }] if *id == expected_id
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

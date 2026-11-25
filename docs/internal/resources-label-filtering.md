@@ -187,15 +187,9 @@ It is maintained by a dedicated sibling trait, `ResourceLabelProjectionRepositor
 `create`/`save`/`save_many` — immediately after
 `resource_repository.update_resources(...)` succeeds, with both repositories
 resolved from the same transactional DI scope so the snapshot write and the
-projection write commit or roll back together. A snapshot that arrives already
-tombstoned (`headers.deleted_at.is_some()`) has its entries **cleared** rather than
-rewritten, keyed off the snapshot rather than the call site since `sync_snapshots`
-is shared by every path. Entries of a resource being deleted are kept until
-its deletion completes, so label filters still match it when resources being
-deleted are asked for. Queries join `resources` and skip `deleted_at` rows, so
-stale rows would be invisible rather than wrong — but they would
-cost index space for nothing and would become wrong for any query that read the
-projection without that join. This keeps `ResourceRepository`
+projection write commit or roll back together. A resource keeps its entries when it is
+deleted, so label filters match it when deleted resources are asked for; a query over the projection joins `resources` and applies its
+[visibility](resources-framework.md#repository). This keeps `ResourceRepository`
 scoped to `resources`/`resource_events`. Implemented per backend (`Postgres…`/`Sqlite…`/`InMemoryResourceLabelProjectionRepository`,
 registered alongside `ResourceRepository` at every composition root and test
 harness); Postgres's `replace_entries` insert uses a compile-time checked static

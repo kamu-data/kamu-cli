@@ -104,7 +104,7 @@ Each `RF-*` contract scenario is listed with its status. Test code and comments 
 | RF-111 | summary.rs | Active | Summary counts resources by type |  |
 | RF-112 | summary.rs | Active | Summary phase counts (pending → ready transition) | Reconciling is an internal transient not observable at facade granularity |
 | RF-113 | summary.rs | Active | Summary account scoping |  |
-| RF-114 | summary.rs | Active | Summary counts resources being deleted | `Deleting` until the controllers clean up, then not counted at all |
+| RF-114 | summary.rs | Active | Summary counts resources whose deletion was requested | `Deleting` until the controllers clean up, then `Deleted`; the total includes both |
 | RF-120 | account_scoping.rs | Active | Default account selector resolves to current account |  |
 | RF-121 | account_scoping.rs | Active | Account by name resolves correctly |  |
 | RF-122 | account_scoping.rs | Active | Account by id resolves correctly |  |
@@ -113,15 +113,15 @@ Each `RF-*` contract scenario is listed with its status. Test code and comments 
 | RF-124 | account_scoping.rs | Active | Unknown account name/id is rejected |  |
 | RF-125 | account_scoping.rs | Active | Account isolation across all read APIs |  |
 | RF-126 | account_scoping.rs | Active | Explicit empty account selector `{}` is rejected | Distinct from omitting `account` entirely (RF-120); rejected by account resolution, not parsing |
-| RF-130 | delete.rs | Active | Delete by name removes resource | Reports `Deleting`: the controllers clean up after the request |
+| RF-130 | delete.rs | Active | Delete by name removes resource | Reports `Deleting`: the controllers clean up after the request. Then hidden from names and listings, and found by id as `Deleted` |
 | RF-131 | delete.rs | Active | Delete by UID removes resource |  |
 | RF-132 | delete.rs | Active | Delete missing name returns lookup problem |  |
 | RF-133 | delete.rs | Active | Delete missing UID returns lookup problem |  |
 | RF-134 | delete.rs | Active | Delete wrong schema returns mismatch problem |  |
 | RF-135 | delete.rs | Active | Delete is account-scoped |  |
 | RF-136 | delete.rs | Active | Repeated delete of a deleted resource returns not found |  |
-| RF-137 | delete.rs | Active | Delete reports `Deleting` until controllers clean up | While deleting: found by id, hidden from names and from both `search` and `search_handles` unless `IncludeDeleting` (a `search` summary then reports `Deleting`); once cleaned up: not found even with it |
-| RF-138 | delete.rs | Active | A resource being deleted gives up its name | Re-apply creates a new resource with a `replaces_resource_being_deleted` warning; with `IncludeDeleting`, `get_handles`, `get` and `render_manifests` by name return both under one request index, live first; re-apply over a deleted resource creates one without the warning |
+| RF-137 | delete.rs | Active | Delete reports `Deleting` until controllers clean up | While deleting: found by id, hidden from names and from both `search` and `search_handles` unless `IncludeDeleting` (a `search` summary then reports `Deleting`); once cleaned up: still found by id, hidden from the others unless `IncludeDeleted` or `DeletedOnly` |
+| RF-138 | delete.rs | Active | A resource being deleted gives up its name | Re-apply creates a new resource with a `replaces_resource_being_deleted` warning; with `IncludeDeleting`, `get_handles`, `get` and `render_manifests` by name return both under one request index, live first; re-apply over a deleted resource creates one without the warning; with `IncludeDeleted` the name finds the live resource and then the deleted ones, newest deletion first |
 | RF-139 | delete.rs | Active | Repeated delete of a resource being deleted reports `Deleting` | By id only: `delete` resolves names to live resources; the controller runtime completes the deletion |
 | RF-140 | error_taxonomy.rs | Active | One-element-batch lookup taxonomy is consistent across get/get_handles/render_manifests/delete | Full 3x4 matrix (NameNotFound/IDNotFound/SchemaMismatch x 4 methods); RF-141 covers only a subset, so this was converted to batch form rather than retired |
 | RF-141 | error_taxonomy.rs | Active | Multi-ref batch lookup problem taxonomy mirrors the one-element case |  |
@@ -156,3 +156,7 @@ Each `RF-*` contract scenario is listed with its status. Test code and comments 
 | RF-180 | list_search.rs | Active | A type-less selector may name an account, spanning every type under it | The only spelling for an all-types listing scoped to one account, there being no call-level `account`. RF-105 covers a typed selector's account |
 | RF-181 | generations.rs | Active | `generation` counts header and spec changes, `statusGeneration` counts status updates | Walks apply → reconcile → spec update → labels-only update → unchanged re-apply. Between an update and its reconciliation the phase is derived as `Pending` without a status update |
 | RF-182 | delete.rs | Active | Applying a manifest whose `headers.id` names a resource being deleted is rejected | Plan and apply both reject with `LifecycleRuleConflict`; the resource stays `Deleting` with its spec unchanged |
+| RF-183 | delete.rs | Active | Applying a manifest whose `headers.id` names a deleted resource is not found | Plan and apply alike |
+| RF-184 | delete.rs | Active | `DeletedOnly` hides live resources, even from their ids | Also pins the listing order: newest deletion first, and with `IncludeDeleted` the live ones before it |
+| RF-185 | delete.rs | Active | Label selectors find deleted resources | Deleted resources keep their label projection |
+| RF-186 | spec_view_mode.rs | Active | The spec of a deleted resource is not revealed | A per-item problem from `get` and `render_manifests`; a live resource sharing the name is revealed beside it |

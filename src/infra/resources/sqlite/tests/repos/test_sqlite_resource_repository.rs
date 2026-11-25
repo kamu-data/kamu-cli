@@ -252,7 +252,7 @@ database_transactional_test!(
 
 database_transactional_test!(
     storage = sqlite,
-    fixture = resource_repo_suite::test_find_deleted_resource_not_returned,
+    fixture = resource_repo_suite::test_deleted_resource_round_trips,
     harness = SqliteResourceRepositoryHarness
 );
 
@@ -268,7 +268,7 @@ database_transactional_test!(
 
 database_transactional_test!(
     storage = sqlite,
-    fixture = resource_repo_suite::test_resource_being_deleted_is_hidden_unless_included,
+    fixture = resource_repo_suite::test_visibility_by_deletion_state,
     harness = SqliteResourceRepositoryHarness
 );
 
@@ -292,7 +292,15 @@ database_transactional_test!(
 
 database_transactional_test!(
     storage = sqlite,
-    fixture = resource_repo_suite::test_summarize_resources_counts_deleting,
+    fixture = resource_repo_suite::test_listings_with_deleted_resources_run_newest_deletion_first,
+    harness = SqliteResourceRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = sqlite,
+    fixture = resource_repo_suite::test_summarize_resources_counts_deleting_and_deleted,
     harness = SqliteResourceRepositoryHarness
 );
 

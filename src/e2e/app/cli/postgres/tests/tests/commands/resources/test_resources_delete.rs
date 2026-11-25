@@ -40,12 +40,18 @@ kamu_cli_resource_e2e_test!(
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// `--include-deleting` on `get` and `list` (emits _local + _remote)
+// Visibility of resources whose deletion was requested (emits _local + _remote)
+//
+// Applying SecretSets requires secrets encryption to be enabled, hence the
+// `with_kamu_config`.
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 kamu_cli_resource_e2e_test!(
     storage = postgres,
-    fixture = kamu_cli_e2e_repo_tests::commands::test_resources_include_deleting
+    fixture = kamu_cli_e2e_repo_tests::commands::test_resources_deletion_visibility,
+    options = Options::default().with_kamu_config(
+        kamu_cli_e2e_repo_tests::resources::fixtures::SECRETS_ENCRYPTION_KAMU_CONFIG
+    )
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -74,7 +74,7 @@ pub struct ListCommand {
     label_selectors: Vec<String>,
 
     #[dill::component(explicit)]
-    include_deleting: bool,
+    visibility: ResourceVisibility,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -255,7 +255,7 @@ impl ListCommand {
                 self.max_results
             },
             ResourceLabelSelectorParser::parse(&self.label_selectors)?,
-            ResourceVisibility::with_deleting(self.include_deleting),
+            self.visibility,
         ))
     }
 
@@ -293,9 +293,10 @@ impl Command for ListCommand {
                     ));
                 }
 
-                if self.include_deleting {
+                if self.visibility != ResourceVisibility::Active {
                     return Err(CLIError::usage_error(
-                        "--include-deleting is supported only when listing resources",
+                        "--include-deleting, --include-deleted and --deleted are supported only \
+                         when listing resources",
                     ));
                 }
 
@@ -424,9 +425,9 @@ mod tests {
         ResourceQuery::ExactIds(vec![kamu_resources::ResourceID::new(uuid::Uuid::new_v4())])
     }
 
-    // Ids always find resources being deleted, as `get` and `delete` do
+    // Ids find resources in any state, as `get` does
     #[test]
-    fn test_scope_of_ids_alone_includes_resources_being_deleted() {
+    fn test_scope_of_ids_alone_finds_resources_in_any_state() {
         let by_type = ListResourcesScope::ByType(descriptor("variablesets"), Some(id_query()));
         let types = ListResourcesScope::Types(vec![
             (descriptor("variablesets"), Some(id_query())),
@@ -435,9 +436,19 @@ mod tests {
         let all = ListResourcesScope::All(Some(id_query()));
 
         for scope in [by_type, types, all] {
+            for requested in [
+                ResourceVisibility::Active,
+                ResourceVisibility::IncludeDeleting,
+                ResourceVisibility::IncludeDeleted,
+            ] {
+                assert_eq!(
+                    scope.effective_visibility(requested),
+                    ResourceVisibility::IncludeDeleted
+                );
+            }
             assert_eq!(
-                scope.effective_visibility(ResourceVisibility::Active),
-                ResourceVisibility::IncludeDeleting
+                scope.effective_visibility(ResourceVisibility::DeletedOnly),
+                ResourceVisibility::DeletedOnly
             );
         }
     }
@@ -457,6 +468,8 @@ mod tests {
         for requested in [
             ResourceVisibility::Active,
             ResourceVisibility::IncludeDeleting,
+            ResourceVisibility::IncludeDeleted,
+            ResourceVisibility::DeletedOnly,
         ] {
             assert_eq!(scope.effective_visibility(requested), requested);
         }

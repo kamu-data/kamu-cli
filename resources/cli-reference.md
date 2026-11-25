@@ -842,6 +842,8 @@ Returns manifest representation of a resource
 * `--unbounded` — Disable the limit for expanding selectors
 * `-l`, `--label <LABEL_SELECTOR>` — Narrow the selection to resources carrying all of the given labels, as `key=value` pairs (repeatable, or comma-separated)
 * `--include-deleting` — Also include resources whose deletion is in progress
+* `--include-deleted` — Also include resources whose deletion is in progress or completed
+* `--deleted` — Include only resources whose deletion is in progress or completed
 
 Returns the current state of one or more resources as YAML or JSON.
 
@@ -1109,6 +1111,8 @@ List datasets or resources
 * `--unbounded` — Disable the result limit
 * `-l`, `--label <LABEL_SELECTOR>` — Narrow the listing to resources carrying all of the given labels, as `key=value` pairs (repeatable, or comma-separated)
 * `--include-deleting` — Also include resources whose deletion is in progress
+* `--include-deleted` — Also include resources whose deletion is in progress or completed
+* `--deleted` — Include only resources whose deletion is in progress or completed
 
 **Examples:**
 

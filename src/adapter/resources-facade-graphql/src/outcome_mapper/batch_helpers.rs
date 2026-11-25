@@ -85,9 +85,9 @@ pub(crate) fn collect_batch_problems(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Several successes may share an index only under
-/// [`ResourceVisibility::IncludeDeleting`], where a name may match the live
-/// resource and those being deleted.
+/// Several successes may share an index only when not just live resources are
+/// visible, since a name may then match several. With deleted resources visible
+/// some of them may be problems: their specs are not revealed.
 pub(crate) fn validate_batch_response_indexes<T, E>(
     successes: &[BatchResourceSuccess<T>],
     problems: &[BatchResourceProblem<E>],
@@ -119,7 +119,9 @@ pub(crate) fn validate_batch_response_indexes<T, E>(
                 p.request_index,
             ))));
         }
-        if let Some(previous) = seen.insert(p.request_index, "problem") {
+        if let Some(previous) = seen.insert(p.request_index, "problem")
+            && !visibility.includes_deleted()
+        {
             return Err(BatchResourceError::Internal(InternalError::new(format!(
                 "Remote {context} returned both {previous} and problem for index {}",
                 p.request_index,
@@ -303,6 +305,22 @@ mod tests {
             err,
             BatchResourceError::Internal(_),
             "expected Internal error when success and problem share an index"
+        );
+    }
+
+    #[test]
+    fn validate_batch_response_indexes_allows_overlap_including_deleted() {
+        let successes = vec![make_success(0)];
+        let problems = vec![make_domain_problem(0), make_domain_problem(0)];
+        assert!(
+            validate_batch_response_indexes(
+                &successes,
+                &problems,
+                1,
+                ResourceVisibility::IncludeDeleted,
+                "test",
+            )
+            .is_ok()
         );
     }
 

@@ -26,6 +26,7 @@ use kamu_resources::{
     ResourceListColumnDescriptor,
     ResourceListColumnValue,
     ResourceListColumnVisibility,
+    ResourcePhase,
     ResourceQuery,
     ResourceSummaryView,
     ResourceTypeDescriptor,
@@ -339,16 +340,41 @@ impl ListResourcesCommand {
 
         let mut resources = self.search_resources(&selectors).await?;
 
+        // A listing of deleted resources runs newest deletion first, so only
+        // the live ones, which precede them, are sorted by name.
+        let sorted_count = if self.visibility.includes_deleted() {
+            resources
+                .iter()
+                .take_while(|resource| !Self::is_being_deleted_or_deleted(resource))
+                .count()
+        } else {
+            resources.len()
+        };
+
         // A single-type listing has one schema throughout, so the extra keys are
         // inert there and the ordering matches what `list` produced before the
         // merge.
-        resources.sort_by(|lhs, rhs| {
+        resources[..sorted_count].sort_by(|lhs, rhs| {
             lhs.name
                 .cmp(&rhs.name)
                 .then_with(|| lhs.schema.cmp(&rhs.schema))
                 .then_with(|| lhs.id.to_string().cmp(&rhs.id.to_string()))
         });
         Ok(resources)
+    }
+
+    fn is_being_deleted_or_deleted(resource: &ResourceSummaryView) -> bool {
+        match resource.status.as_ref().and_then(|status| status.phase) {
+            Some(ResourcePhase::Deleting | ResourcePhase::Deleted) => true,
+            Some(
+                ResourcePhase::Pending
+                | ResourcePhase::Reconciling
+                | ResourcePhase::Ready
+                | ResourcePhase::Degraded
+                | ResourcePhase::Failed,
+            )
+            | None => false,
+        }
     }
 
     fn make_writer(
@@ -593,8 +619,8 @@ impl ListResourcesScope {
         !matches!(self, Self::ByType(..))
     }
 
-    /// Ids always find resources being deleted, so a scope of ids alone
-    /// includes them; any other scope follows the requested visibility.
+    /// Ids find resources in any state, so a scope of ids alone includes
+    /// deleted ones; any other scope follows the requested visibility.
     pub(crate) fn effective_visibility(&self, requested: ResourceVisibility) -> ResourceVisibility {
         let only_ids = match self {
             Self::ByType(_, query) | Self::All(query) => Self::is_id_query(query.as_ref()),
@@ -604,7 +630,7 @@ impl ListResourcesScope {
         };
 
         if only_ids {
-            ResourceVisibility::IncludeDeleting
+            requested.of_ids()
         } else {
             requested
         }

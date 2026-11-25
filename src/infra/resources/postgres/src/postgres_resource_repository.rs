@@ -343,12 +343,13 @@ impl ResourceRepository for PostgresResourceRepository {
                 -- row is gone (deletion racing async cleanup), same case the
                 -- account_name sentinel covers. Substitute the nil resource id.
                 COALESCE(a.resource_id, '00000000-0000-0000-0000-000000000000'::uuid) as "account_resource_id!: uuid::Uuid",
-                COALESCE(a.account_name, $3) as "account_name!"
+                COALESCE(a.account_name, $3) as "account_name!",
+                r.deletion_requested_at,
+                r.deleted_at
             FROM resources r
             LEFT JOIN accounts a ON a.id = r.account_id
             WHERE r.account_id = $1
               AND r.resource_id = ANY($2)
-              AND r.deleted_at IS NULL
             -- Request order, matching the in-memory backend: callers pair the
             -- result back to the IDs they asked for. Without this the row order
             -- is whatever the scan happens to produce.
@@ -400,7 +401,6 @@ impl ResourceRepository for PostgresResourceRepository {
                 WHERE r.account_id = $1
                   AND r.resource_schema = $2
                   AND LOWER(r.resource_name) = ANY($3)
-                  AND r.deleted_at IS NULL
                   AND r.deletion_requested_at IS NULL
                 ORDER BY
                     array_position($3, LOWER(r.resource_name)),
@@ -417,8 +417,10 @@ impl ResourceRepository for PostgresResourceRepository {
             .map(|row| (row.name, row.id))
             .collect::<Vec<_>>(),
             // Within a name the live resource comes first, then those being
-            // deleted, oldest first
-            ResourceVisibility::IncludeDeleting => sqlx::query!(
+            // deleted, oldest first, then the deleted ones, newest first
+            ResourceVisibility::IncludeDeleting
+            | ResourceVisibility::IncludeDeleted
+            | ResourceVisibility::DeletedOnly => sqlx::query!(
                 r#"
                 SELECT
                     r.resource_id as "id: uuid::Uuid",
@@ -427,15 +429,19 @@ impl ResourceRepository for PostgresResourceRepository {
                 WHERE r.account_id = $1
                   AND r.resource_schema = $2
                   AND LOWER(r.resource_name) = ANY($3)
-                  AND r.deleted_at IS NULL
+                  AND (r.deletion_requested_at IS NOT NULL OR $4)
+                  AND (r.deleted_at IS NULL OR $5)
                 ORDER BY
                     array_position($3, LOWER(r.resource_name)),
+                    r.deleted_at DESC NULLS FIRST,
                     r.deletion_requested_at NULLS FIRST,
                     r.resource_id
                 "#,
                 account_id_stack.as_str(),
                 schema.as_str(),
                 &lowercase_names,
+                visibility.includes_live(),
+                visibility.includes_deleted(),
             )
             .fetch_all(connection_mut)
             .await
@@ -479,11 +485,18 @@ impl ResourceRepository for PostgresResourceRepository {
                 r.account_id as "account_id: odf::AccountID",
                 -- Account row may be missing during async cleanup.
                 COALESCE(a.resource_id, '00000000-0000-0000-0000-000000000000'::uuid) as "account_resource_id!: uuid::Uuid",
-                COALESCE(a.account_name, $10) as "account_name!"
+                COALESCE(a.account_name, $10) as "account_name!",
+                r.deletion_requested_at,
+                r.deleted_at
             FROM resources r
             LEFT JOIN accounts a ON a.id = r.account_id
-            WHERE r.deleted_at IS NULL
-              AND (r.deletion_requested_at IS NULL OR $12)
+            WHERE (r.deletion_requested_at IS NOT NULL OR $12)
+              AND (r.deletion_requested_at IS NULL OR $13)
+              AND (r.deleted_at IS NULL OR $14)
+              -- Implied by the EXISTS below, but lets the planner read the rows
+              -- of one account and type from an index, in order.
+              AND ($15::text IS NULL OR r.account_id = $15)
+              AND ($16::text IS NULL OR r.resource_schema = $16)
               -- Each type carries its own query, account and label pairs,
               -- re-paired here. A NULL schema array means "every type", in
               -- which case the single row of query columns applies uniformly.
@@ -523,7 +536,13 @@ impl ResourceRepository for PostgresResourceRepository {
                           )
                     )
               )
-            ORDER BY r.updated_at DESC, r.resource_id DESC
+            -- NULL for live resources, which come first, and for every resource
+            -- when deleted ones are hidden
+            ORDER BY
+                CASE WHEN $14 THEN COALESCE(r.deleted_at, r.deletion_requested_at) END
+                    DESC NULLS FIRST,
+                r.updated_at DESC,
+                r.resource_id DESC
             LIMIT $9 OFFSET $11
             "#,
             flat.account_ids(),
@@ -537,7 +556,11 @@ impl ResourceRepository for PostgresResourceRepository {
             limit,
             kamu_resources::DELETED_ACCOUNT_NAME_SENTINEL,
             offset,
+            visibility.includes_live(),
             visibility.includes_deleting(),
+            visibility.includes_deleted(),
+            flat.only_account_id(),
+            flat.only_schema(),
         )
         .fetch_all(connection_mut)
         .await
@@ -562,8 +585,12 @@ impl ResourceRepository for PostgresResourceRepository {
             r#"
             SELECT COUNT(*) AS "count!: i64"
             FROM resources r
-            WHERE r.deleted_at IS NULL
-              AND (r.deletion_requested_at IS NULL OR $9)
+            WHERE (r.deletion_requested_at IS NOT NULL OR $9)
+              AND (r.deletion_requested_at IS NULL OR $10)
+              AND (r.deleted_at IS NULL OR $11)
+              -- Implied by the EXISTS below, see `search_resource_handles`.
+              AND ($12::text IS NULL OR r.account_id = $12)
+              AND ($13::text IS NULL OR r.resource_schema = $13)
               -- Each type carries its own query, account and label pairs,
               -- re-paired here. See `search_resource_handles` for the shape.
               AND EXISTS (
@@ -606,7 +633,11 @@ impl ResourceRepository for PostgresResourceRepository {
             flat.label_row_numbers(),
             flat.label_keys(),
             flat.label_values(),
+            visibility.includes_live(),
             visibility.includes_deleting(),
+            visibility.includes_deleted(),
+            flat.only_account_id(),
+            flat.only_schema(),
         )
         .fetch_one(connection_mut)
         .await
@@ -650,7 +681,6 @@ impl ResourceRepository for PostgresResourceRepository {
             LEFT JOIN accounts a ON a.id = r.account_id
             WHERE r.resource_id = $1
               AND r.resource_schema = $2
-              AND r.deleted_at IS NULL
             "#,
             query_id,
             query_schema,
@@ -805,7 +835,6 @@ impl ResourceRepository for PostgresResourceRepository {
             LEFT JOIN accounts a ON a.id = r.account_id
             WHERE r.resource_schema = $1
               AND r.resource_id = ANY($2)
-              AND r.deleted_at IS NULL
             "#,
         )
         .bind(schema.as_str())
@@ -861,7 +890,6 @@ impl ResourceRepository for PostgresResourceRepository {
             FROM resources r
             LEFT JOIN accounts a ON a.id = r.account_id
             WHERE r.resource_id = $1
-              AND r.deleted_at IS NULL
             "#,
             resource_id,
             kamu_resources::DELETED_ACCOUNT_NAME_SENTINEL,
@@ -943,7 +971,6 @@ impl ResourceRepository for PostgresResourceRepository {
             LEFT JOIN accounts a ON a.id = r.account_id
             WHERE r.account_id = $1
               AND r.resource_id = ANY($2)
-              AND r.deleted_at IS NULL
             -- Request order, matching the in-memory backend: callers pair the
             -- result back to the IDs they asked for. Without this the row order
             -- is whatever the scan happens to produce.
@@ -1000,7 +1027,6 @@ impl ResourceRepository for PostgresResourceRepository {
         pagination: PaginationOpts,
     ) -> ResourceSnapshotStream<'_> {
         let flat = FlatScope::new(scope, account_id);
-        let include_deleting = visibility.includes_deleting();
 
         Box::pin(async_stream::stream! {
             if flat.vacuous {
@@ -1040,8 +1066,12 @@ impl ResourceRepository for PostgresResourceRepository {
                     r.last_event_id
                 FROM resources r
                 LEFT JOIN accounts a ON a.id = r.account_id
-                WHERE r.deleted_at IS NULL
-                  AND (r.deletion_requested_at IS NULL OR $12)
+                WHERE (r.deletion_requested_at IS NOT NULL OR $12)
+                  AND (r.deletion_requested_at IS NULL OR $13)
+                  AND (r.deleted_at IS NULL OR $14)
+                  -- Implied by the EXISTS below, see `search_resource_handles`.
+                  AND ($15::text IS NULL OR r.account_id = $15)
+                  AND ($16::text IS NULL OR r.resource_schema = $16)
                   -- Each type carries its own query, account and label pairs,
                   -- re-paired here. See `search_resource_handles` for the shape.
                   AND EXISTS (
@@ -1075,7 +1105,13 @@ impl ResourceRepository for PostgresResourceRepository {
                               )
                         )
                   )
-                ORDER BY r.updated_at DESC, r.resource_id DESC
+                -- NULL for live resources, which come first, and for every
+                -- resource when deleted ones are hidden
+                ORDER BY
+                    CASE WHEN $14 THEN COALESCE(r.deleted_at, r.deletion_requested_at) END
+                        DESC NULLS FIRST,
+                    r.updated_at DESC,
+                    r.resource_id DESC
                 LIMIT $9 OFFSET $11
                 "#,
                 flat.account_ids(),
@@ -1089,7 +1125,11 @@ impl ResourceRepository for PostgresResourceRepository {
                 limit,
                 kamu_resources::DELETED_ACCOUNT_NAME_SENTINEL,
                 offset,
-                include_deleting,
+                visibility.includes_live(),
+                visibility.includes_deleting(),
+                visibility.includes_deleted(),
+                flat.only_account_id(),
+                flat.only_schema(),
             )
             .fetch(connection_mut)
             .map_err(ErrorIntoInternal::int_err);
@@ -1148,12 +1188,12 @@ impl ResourceRepository for PostgresResourceRepository {
                 COUNT(*) FILTER (WHERE status ->> 'phase' = 'Degraded') as "degraded_count!",
                 COUNT(*) FILTER (WHERE status ->> 'phase' = 'Failed') as "failed_count!",
                 COUNT(*) FILTER (WHERE status ->> 'phase' = 'Deleting') as "deleting_count!",
+                COUNT(*) FILTER (WHERE status ->> 'phase' = 'Deleted') as "deleted_count!",
                 COUNT(*) FILTER (
                     WHERE COALESCE(status ->> 'phase', 'Pending') = 'Pending'
                 ) as "pending_count!"
             FROM resources
             WHERE account_id = $1
-              AND deleted_at IS NULL
             GROUP BY resource_schema
             ORDER BY resource_schema ASC
             "#,
@@ -1175,6 +1215,7 @@ impl ResourceRepository for PostgresResourceRepository {
                     degraded: u64::try_from(row.degraded_count).unwrap(),
                     failed: u64::try_from(row.failed_count).unwrap(),
                     deleting: u64::try_from(row.deleting_count).unwrap(),
+                    deleted: u64::try_from(row.deleted_count).unwrap(),
                 },
             })
             .collect())
@@ -1336,6 +1377,21 @@ impl FlatScope {
 
     fn account_ids(&self) -> &[String] {
         &self.account_ids
+    }
+
+    /// The account every row spans, if they all span one.
+    fn only_account_id(&self) -> Option<&str> {
+        Self::only_value(&self.account_ids)
+    }
+
+    /// The type every row names, if they all name one.
+    fn only_schema(&self) -> Option<&str> {
+        self.schemas().and_then(Self::only_value)
+    }
+
+    fn only_value(values: &[String]) -> Option<&str> {
+        let first = values.first()?;
+        values.iter().all(|value| value == first).then_some(first)
     }
 
     fn name_patterns(&self) -> &[Option<String>] {

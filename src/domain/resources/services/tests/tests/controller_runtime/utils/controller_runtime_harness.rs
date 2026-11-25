@@ -400,10 +400,6 @@ impl ControllerRuntimeHarness {
         ResourceVersion::from(&self.get_snapshot_by_id(&id).await.unwrap().headers)
     }
 
-    pub async fn exists(&self, id: ResourceID) -> bool {
-        self.get_snapshot_by_id(&id).await.is_some()
-    }
-
     pub async fn phase(&self, id: ResourceID) -> ResourcePhase {
         self.get_snapshot_by_id(&id)
             .await

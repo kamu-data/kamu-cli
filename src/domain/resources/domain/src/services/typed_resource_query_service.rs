@@ -23,11 +23,13 @@ use crate::{
 
 #[async_trait::async_trait]
 pub trait TypedResourceQueryService<R: DeclarativeResource>: Send + Sync {
+    /// A deleted resource is not found.
     async fn ensure_resource_id_matches_type(
         &self,
         id: &ResourceID,
     ) -> Result<(), TypedResourceQueryError>;
 
+    /// Returns the resource in any state.
     async fn get_state_by_id(
         &self,
         account_id: odf::AccountID,

@@ -41,6 +41,7 @@ pub trait GenericResourceQueryService: Send + Sync {
         name: &ResourceName,
     ) -> Result<Option<ResourceID>, InternalError>;
 
+    /// Returns resources in any state.
     async fn find_resource_handles_by_ids(
         &self,
         account_id: &odf::AccountID,
@@ -72,6 +73,7 @@ pub trait GenericResourceQueryService: Send + Sync {
         visibility: ResourceVisibility,
     ) -> Result<usize, InternalError>;
 
+    /// A deleted resource is not found.
     async fn find_owned_snapshot(
         &self,
         account_id: &odf::AccountID,
@@ -79,6 +81,7 @@ pub trait GenericResourceQueryService: Send + Sync {
         id: ResourceID,
     ) -> Result<Option<ResourceSnapshot>, FindOwnedResourceError>;
 
+    /// Deleted resources are not found.
     async fn find_owned_snapshots(
         &self,
         account_id: &odf::AccountID,
@@ -86,11 +89,13 @@ pub trait GenericResourceQueryService: Send + Sync {
         ids: &[ResourceID],
     ) -> Result<FindOwnedSnapshotsOutcome, InternalError>;
 
+    /// Returns the resource in any state.
     async fn get_snapshot_by_id(
         &self,
         id: &crate::ResourceID,
     ) -> Result<Option<ResourceSnapshot>, InternalError>;
 
+    /// Returns resources in any state.
     async fn find_snapshots_by_ids(
         &self,
         account_id: &odf::AccountID,

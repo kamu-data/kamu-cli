@@ -77,11 +77,9 @@ impl ResourceFacade for LocalResourceFacadeImpl {
         spec_view: SpecViewOpts,
         visibility: ResourceVisibility,
     ) -> Result<BatchResourceResponse<Resource, ResourceLookupProblem>, BatchResourceError> {
-        let (mut indexed_resources, problems) = self
-            .resolve_multiple_resource_views(resource_refs, visibility)
+        let (indexed_resources, problems) = self
+            .resolve_multiple_resource_views(resource_refs, spec_view, visibility)
             .await?;
-
-        self.apply_spec_view_mode_batch::<BatchResourceError>(&mut indexed_resources, spec_view)?;
 
         let successes = indexed_resources
             .into_iter()
@@ -126,6 +124,7 @@ impl ResourceFacade for LocalResourceFacadeImpl {
                     &group.schema,
                     resolution_response.id_entries,
                     resolution_response.problems,
+                    visibility,
                 )
                 .await?;
 
@@ -164,11 +163,9 @@ impl ResourceFacade for LocalResourceFacadeImpl {
         BatchResourceResponse<RenderResourceManifestResult, ResourceLookupProblem>,
         BatchResourceError,
     > {
-        let (mut indexed_resources, problems) = self
-            .resolve_multiple_resource_views(resource_refs, visibility)
+        let (indexed_resources, problems) = self
+            .resolve_multiple_resource_views(resource_refs, spec_view, visibility)
             .await?;
-
-        self.apply_spec_view_mode_batch::<BatchResourceError>(&mut indexed_resources, spec_view)?;
 
         let successes = indexed_resources
             .into_iter()
@@ -439,6 +436,7 @@ impl ResourceFacade for LocalResourceFacadeImpl {
             for (request_index, resource_ref, id) in resolution_response.id_entries {
                 let row_result = rows_by_id
                     .get(id.as_ref())
+                    .filter(|row| row.deleted_at.is_none())
                     .cloned()
                     .ok_or_else(|| id_not_found(id));
 
@@ -488,12 +486,13 @@ impl ResourceFacade for LocalResourceFacadeImpl {
                 .await?;
 
             // The controller runtime may complete a deletion before the
-            // response, which removes the resource from the lookup by id
+            // response
             let being_deleted = self
                 .generic_resource_query_service
                 .find_resource_handles_by_ids(&group.account.did, &ids_to_delete)
                 .await?
                 .into_iter()
+                .filter(|row| row.deleted_at.is_none())
                 .map(|row| ResourceID::new(row.id))
                 .collect::<HashSet<_>>();
 
@@ -869,6 +868,7 @@ impl LocalResourceFacadeImpl {
     async fn resolve_multiple_resource_views(
         &self,
         resource_refs: Vec<ResourceRef>,
+        spec_view: SpecViewOpts,
         visibility: ResourceVisibility,
     ) -> Result<
         (
@@ -928,6 +928,12 @@ impl LocalResourceFacadeImpl {
 
                 match snapshots_by_id
                     .get(&id)
+                    .filter(|snapshot| {
+                        ref_visibility(&resource_ref, visibility).includes(
+                            snapshot.headers.deletion_requested_at,
+                            snapshot.headers.deleted_at,
+                        )
+                    })
                     .cloned()
                     .ok_or(ResourceLookupProblem::IDNotFound(ResourceIDNotFoundError(
                         id,
@@ -980,6 +986,9 @@ impl LocalResourceFacadeImpl {
             }
         }
 
+        let mut indexed_resources =
+            self.apply_spec_view_mode_batch(indexed_resources, spec_view, &mut problems)?;
+
         indexed_resources.sort_by_key(|resource| resource.request_index);
         problems.sort_by_key(|problem| problem.request_index);
 
@@ -992,6 +1001,7 @@ impl LocalResourceFacadeImpl {
         schema: &TypeUri,
         id_entries: BatchIdEntries,
         mut problems: Vec<BatchResourceProblem<ResourceLookupProblem>>,
+        visibility: ResourceVisibility,
     ) -> Result<
         (
             Vec<IndexedResource<ResourceHandle>>,
@@ -1033,7 +1043,14 @@ impl LocalResourceFacadeImpl {
                 None
             };
 
-            let row_result = rows_by_id.get(id.as_ref()).cloned().ok_or_else(not_found);
+            let row_result = rows_by_id
+                .get(id.as_ref())
+                .filter(|row| {
+                    ref_visibility(&resource_ref, visibility)
+                        .includes(row.deletion_requested_at, row.deleted_at)
+                })
+                .cloned()
+                .ok_or_else(not_found);
             match row_result.and_then(|row| {
                 validate_handle_row(
                     row,
@@ -1062,7 +1079,7 @@ impl LocalResourceFacadeImpl {
         Ok((handles, problems))
     }
 
-    async fn find_account_snapshot(
+    async fn find_undeleted_account_snapshot(
         &self,
         account_id: &odf::AccountID,
         id: ResourceID,
@@ -1071,6 +1088,7 @@ impl LocalResourceFacadeImpl {
             .generic_resource_query_service
             .get_snapshot_by_id(&id)
             .await?
+            .filter(|snapshot| snapshot.headers.deleted_at.is_none())
         else {
             return Ok(None);
         };
@@ -1092,7 +1110,7 @@ impl LocalResourceFacadeImpl {
             return Ok(());
         };
 
-        let Some(snapshot) = self.find_account_snapshot(account_id, id).await? else {
+        let Some(snapshot) = self.find_undeleted_account_snapshot(account_id, id).await? else {
             return Err(ResourceIDNotFoundError(id).into());
         };
 
@@ -1103,14 +1121,14 @@ impl LocalResourceFacadeImpl {
         Ok(())
     }
 
-    fn apply_spec_view_mode_batch<E>(
+    /// Reveals the specs when `spec_view` asks for it; a deleted resource with
+    /// something to reveal becomes a problem instead.
+    fn apply_spec_view_mode_batch(
         &self,
-        resources: &mut [IndexedResource<Resource>],
+        resources: Vec<IndexedResource<Resource>>,
         spec_view: SpecViewOpts,
-    ) -> Result<(), E>
-    where
-        E: From<InternalError>,
-    {
+        problems: &mut Vec<BatchResourceProblem<ResourceLookupProblem>>,
+    ) -> Result<Vec<IndexedResource<Resource>>, InternalError> {
         // A batch can span several schemas, and the dispatcher is schema-specific
         // — a schema may register one or none. Resolving from the first item
         // alone would apply its answer to every other schema, either skipping a
@@ -1121,7 +1139,9 @@ impl LocalResourceFacadeImpl {
         let mut dispatchers: HashMap<TypeUri, Option<Arc<dyn ResourceSpecViewDispatcher>>> =
             HashMap::new();
 
-        for resource in resources.iter_mut() {
+        let mut viewed = Vec::with_capacity(resources.len());
+
+        for mut resource in resources {
             let maybe_dispatcher = dispatchers
                 .entry(resource.item.schema.clone())
                 .or_insert_with(|| {
@@ -1129,12 +1149,25 @@ impl LocalResourceFacadeImpl {
                 });
 
             if let Some(d) = maybe_dispatcher {
+                if resource.item.headers.deleted_at.is_some() {
+                    problems.push(BatchResourceProblem {
+                        request_index: resource.request_index,
+                        error: ResourceDeletedNotRevealedError {
+                            id: resource.item.headers.id,
+                        }
+                        .into(),
+                    });
+                    continue;
+                }
+
                 let spec = std::mem::replace(&mut resource.item.spec, serde_json::Value::Null);
-                resource.item.spec = d.reveal_spec(spec).map_err(E::from)?;
+                resource.item.spec = d.reveal_spec(spec)?;
             }
+
+            viewed.push(resource);
         }
 
-        Ok(())
+        Ok(viewed)
     }
 
     async fn prepare_apply_manifest(

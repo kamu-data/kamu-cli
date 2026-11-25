@@ -286,6 +286,11 @@ impl BaseResourceServiceHarness {
         self.generic_query_svc.get_snapshot_by_id(id).await.unwrap()
     }
 
+    pub async fn is_deleted(&self, id: &ResourceID) -> bool {
+        let snapshot = self.get_snapshot_by_id(id).await.unwrap();
+        snapshot.headers.deleted_at.is_some()
+    }
+
     pub async fn resource_id_by_name(
         &self,
         account_id: &odf::AccountID,

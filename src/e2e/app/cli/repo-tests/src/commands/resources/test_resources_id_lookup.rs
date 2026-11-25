@@ -12,9 +12,9 @@ use crate::resources::{ResourceCtx, fixtures};
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Scenario: ID lookup for resources (QA scenario 8)
 //
-// A resource ID is a stable selector for the same resource across updates, and
-// stops resolving after the resource is deleted. Wired with
-// `kamu_cli_resource_e2e_test!` to run against both local and remote contexts.
+// A resource ID is a stable selector for the same resource across updates and
+// its deletion. Wired with `kamu_cli_resource_e2e_test!` to run against both
+// local and remote contexts.
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_resources_id_lookup(ctx: ResourceCtx) {
@@ -47,18 +47,28 @@ pub async fn test_resources_id_lookup(ctx: ResourceCtx) {
     ctx.assert_success(["delete", "vs", resource_name, "--force"], None)
         .await;
 
+    ctx.wait_until_deleted(&resource_id).await;
+
+    let deleted_view_by_id = ctx.get_one(["get", "variablesets", &resource_id]).await;
+    assert_eq!(
+        deleted_view_by_id.ident(),
+        (fixtures::VARIABLE_SET_SCHEMA, resource_name)
+    );
+    assert_eq!(deleted_view_by_id.phase(), "Deleted");
+
+    let missing_id = "51a420dc-f0a0-4842-a148-4481195a4b34";
     ctx.assert_failure(
-        ["get", "variablesets", &resource_id],
+        ["get", "variablesets", missing_id],
         Some(&[r"Resource with id .+ was not found"]),
     )
     .await;
 
     let ignored_missing = ctx
-        .stdout(["get", "variablesets", &resource_id, "--ignore-not-found"])
+        .stdout(["get", "variablesets", missing_id, "--ignore-not-found"])
         .await;
     assert!(
         ignored_missing.trim().is_empty(),
-        "`get variablesets <id> --ignore-not-found` should emit no resources after delete, \
+        "`get variablesets <id> --ignore-not-found` should emit no resources, \
          got:\n{ignored_missing}"
     );
 }

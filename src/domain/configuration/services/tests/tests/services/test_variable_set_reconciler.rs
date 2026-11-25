@@ -219,7 +219,7 @@ async fn test_requested_deletion_of_variable_set_removes_its_projection_entries(
         harness.variable_set_phase(&id_deleted).await,
         ResourcePhase::Deleted
     );
-    assert!(harness.get_snapshot_by_id(&id_deleted).await.is_none());
+    assert!(harness.is_deleted(&id_deleted).await);
     assert_eq!(
         harness
             .variable_set_projection_entry_count(&id_deleted)

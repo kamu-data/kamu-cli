@@ -242,52 +242,170 @@ pub async fn test_resources_bare_id_selector(ctx: ResourceCtx) {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Scenario: `--include-deleting` on `get` and `list`
+// Scenario: `--include-deleting`, `--include-deleted` and `--deleted`
 //
-// The flag also shows resources whose deletion waits for their controllers.
-// The controllers clean up once the delete command has finished, so a deleted
-// resource is gone with or without the flag.
+// Deletions are completed before the checks, so `--include-deleting` alone shows
+// no deleted resource.
+//
+// IMPORTANT: this scenario applies a `SecretSet` resource, so it must be wired
+// with `Options::with_kamu_config(fixtures::SECRETS_ENCRYPTION_KAMU_CONFIG)`.
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn test_resources_include_deleting(ctx: ResourceCtx) {
-    let kept = "kept-vars";
+pub async fn test_resources_deletion_visibility(ctx: ResourceCtx) {
+    let live = "live-vars";
+    let reused = "reused-vars";
     let gone = "gone-vars";
-    let vs_schema = fixtures::VARIABLE_SET_SCHEMA.to_string();
 
-    ctx.apply_variable_set(kept, "one").await;
-    ctx.apply_variable_set(gone, "two").await;
-
-    assert_eq!(
-        ctx.get_idents(["get", "vs/%", "--include-deleting"]).await,
-        vec![
-            (vs_schema.clone(), gone.to_string()),
-            (vs_schema.clone(), kept.to_string()),
-        ]
-    );
+    ctx.apply_variable_set(live, "one").await;
+    ctx.apply_variable_set(reused, "two").await;
+    ctx.apply_variable_set(gone, "three").await;
+    let live_id = ctx.resource_id("vs", live).await;
+    let reused_id = ctx.resource_id("vs", reused).await;
+    let gone_id = ctx.resource_id("vs", gone).await;
 
     ctx.assert_deleted(
         ["delete", "vs", gone, "--force"],
         &["VariableSet/gone-vars"],
     )
     .await;
-
-    ctx.assert_failure(
-        ["get", "vs", gone, "--include-deleting"],
-        Some(&[&format!(
-            "Resource '{gone}' of type 'VariableSet' was not found"
-        )]),
+    ctx.wait_until_deleted(&gone_id).await;
+    ctx.assert_deleted(
+        ["delete", "vs", reused, "--force"],
+        &["VariableSet/reused-vars"],
     )
     .await;
+    ctx.wait_until_deleted(&reused_id).await;
+    ctx.apply_variable_set(reused, "four").await;
+    let new_id = ctx.resource_id("vs", reused).await;
+
+    // -- 1. A name finds deleted resources only when asked for ----------------
+    for args in [
+        ["get", "vs", gone].as_slice(),
+        &["get", "vs", gone, "--include-deleting"],
+    ] {
+        ctx.assert_failure(
+            args.iter().copied(),
+            Some(&[&format!(
+                "Resource '{gone}' of type 'VariableSet' was not found"
+            )]),
+        )
+        .await;
+    }
     assert_eq!(
-        ctx.get_idents(["get", "vs/%", "--include-deleting"]).await,
-        vec![(vs_schema, kept.to_string())]
+        got_ids_and_phases(&ctx, &["vs", gone, "--include-deleted"]).await,
+        [(gone_id.clone(), "Deleted".to_string())]
+    );
+    let reused_phases = got_ids_and_phases(&ctx, &["vs", reused, "--include-deleted"]).await;
+    assert_eq!(
+        reused_phases.iter().map(|(id, _)| id).collect::<Vec<_>>(),
+        [&new_id, &reused_id],
+        "the live resource comes first"
+    );
+    assert_eq!(
+        got_ids_and_phases(&ctx, &["vs", reused, "--deleted"]).await,
+        [(reused_id.clone(), "Deleted".to_string())]
     );
 
-    let listed = ctx.stdout(["list", "vs", "--include-deleting"]).await;
-    assert!(
-        listed.contains(kept) && !listed.contains(gone),
-        "`list vs --include-deleting` should show only {kept}, got:\n{listed}"
+    // -- 2. An id finds a resource in any state -------------------------------
+    for args in [vec![gone_id.as_str()], vec!["vs", gone_id.as_str()]] {
+        assert_eq!(
+            got_ids_and_phases(&ctx, &args).await,
+            [(gone_id.clone(), "Deleted".to_string())]
+        );
+    }
+    ctx.assert_failure(
+        ["get", &live_id, "--deleted"],
+        Some(&[r"Resource with id .+ was not found"]),
+    )
+    .await;
+    ctx.assert_failure(
+        ["delete", &gone_id, "--force"],
+        Some(&[r"Resource with id .+ was not found"]),
+    )
+    .await;
+
+    // -- 3. Listings of deleted resources run newest deletion first -----------
+    assert_eq!(
+        listed_names_and_phases(&ctx, &["vs", "--deleted"]).await,
+        [(reused, "Deleted"), (gone, "Deleted")].map(to_owned_pair)
     );
+    assert_eq!(
+        listed_names_and_phases(&ctx, &["vs", "--deleted", "--max-results", "1"]).await,
+        [(reused, "Deleted")].map(to_owned_pair)
+    );
+    assert_eq!(
+        listed_names_and_phases(&ctx, &["%", "--include-deleted"])
+            .await
+            .into_iter()
+            .map(|(name, _)| name)
+            .collect::<Vec<_>>(),
+        [live, reused, reused, gone]
+    );
+    assert_eq!(
+        listed_names_and_phases(&ctx, &["vs", "--include-deleting"])
+            .await
+            .into_iter()
+            .map(|(name, _)| name)
+            .collect::<Vec<_>>(),
+        [live, reused]
+    );
+    assert_eq!(
+        listed_names_and_phases(&ctx, &[&gone_id]).await,
+        [(gone, "Deleted")].map(to_owned_pair)
+    );
+
+    // -- 4. The summary counts deleted resources ------------------------------
+    assert_eq!(ctx.summary_count(fixtures::VARIABLE_SET_SCHEMA).await, 4);
+    let summary = ctx.stdout(["summary", "-o", "table"]).await;
+    assert_output_contains_all(&summary, &["Deleting", "Deleted"], "summary -o table");
+
+    // -- 5. The options exclude each other ------------------------------------
+    for command in ["get", "list"] {
+        ctx.assert_failure(
+            [command, "vs", "--include-deleted", "--deleted"],
+            Some(&["cannot be used with"]),
+        )
+        .await;
+    }
+
+    // -- 6. Datasets do not take them -----------------------------------------
+    for option in ["--include-deleting", "--include-deleted", "--deleted"] {
+        ctx.assert_failure(
+            ["list", "datasets", option],
+            Some(&["supported only when listing resources"]),
+        )
+        .await;
+    }
+
+    // -- 7. Deleted secrets are not revealed ----------------------------------
+    let secrets = "gone-secrets";
+    ctx.apply_secret_set(secrets, "some-token", "some-password")
+        .await;
+    let secrets_id = ctx.resource_id("ss", secrets).await;
+    ctx.assert_deleted(
+        ["delete", "ss", secrets, "--force"],
+        &["SecretSet/gone-secrets"],
+    )
+    .await;
+    ctx.wait_until_deleted(&secrets_id).await;
+
+    for format in [["-o", "yaml"].as_slice(), &["-o", "yaml", "--spec"]] {
+        let encrypted = ctx
+            .stdout(["get", &secrets_id].iter().chain(format).copied())
+            .await;
+        assert!(
+            encrypted.contains("jwe") && !encrypted.contains("some-password"),
+            "the spec of a deleted secret set stays readable encrypted, got:\n{encrypted}"
+        );
+        ctx.assert_failure(
+            ["get", &secrets_id, "--revealed"]
+                .iter()
+                .chain(format)
+                .copied(),
+            Some(&[r"Resource .+ is deleted, its spec cannot be revealed"]),
+        )
+        .await;
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -307,6 +425,39 @@ async fn seed_delete_fixtures(
         .await;
     ctx.apply_secret_set(temp_secrets, "temp-token", "temp-password")
         .await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Runs `get <args>` and returns the id and phase of each resource, in order.
+async fn got_ids_and_phases(ctx: &ResourceCtx, args: &[&str]) -> Vec<(String, String)> {
+    ctx.get_views(["get"].iter().chain(args).copied())
+        .await
+        .iter()
+        .map(|view| (view.id(), view.phase().to_string()))
+        .collect()
+}
+
+/// Runs `list <args>` and returns the name and phase of each resource, in
+/// order.
+async fn listed_names_and_phases(ctx: &ResourceCtx, args: &[&str]) -> Vec<(String, String)> {
+    let doc = ctx
+        .stdout_json(["list"].iter().chain(args).chain(&["-o", "json"]).copied())
+        .await;
+    doc.as_array()
+        .unwrap()
+        .iter()
+        .map(|row| {
+            to_owned_pair((
+                row["Name"].as_str().unwrap(),
+                row["Phase"].as_str().unwrap(),
+            ))
+        })
+        .collect()
+}
+
+fn to_owned_pair((name, phase): (&str, &str)) -> (String, String) {
+    (name.to_string(), phase.to_string())
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

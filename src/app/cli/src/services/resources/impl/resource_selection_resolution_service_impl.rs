@@ -71,18 +71,14 @@ impl ResourceSelectionResolutionService for ResourceSelectionResolutionServiceIm
             &selection,
             resource_facade,
             options.label_filter.as_ref(),
+            options.id_visibility,
         )
         .await?;
         let mut exact_any_type_results = exact_any_type_results.into_iter();
 
         // Prefetch exact selectors in batches, then replay them in input order.
-        let exact_results = Self::fetch_exact_identities(
-            &selection,
-            resource_facade,
-            options.label_filter.as_ref(),
-            options.visibility,
-        )
-        .await?;
+        let exact_results =
+            Self::fetch_exact_identities(&selection, resource_facade, options).await?;
         let mut exact_results = exact_results.into_iter();
 
         for item in selection.items {
@@ -221,12 +217,6 @@ impl ResourceSelectionResolutionService for ResourceSelectionResolutionServiceIm
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// An id finds a resource being deleted, as the facade's lookups by id do, so
-/// that deleting it again reports where its deletion stands
-const ID_LOOKUP_VISIBILITY: ResourceVisibility = ResourceVisibility::IncludeDeleting;
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 impl ResourceSelectionResolutionServiceImpl {
     fn target_key_from_handle(handle: &ResourceHandle) -> ResourceTargetKey {
         (handle.r#type.clone(), handle.id)
@@ -277,13 +267,13 @@ impl ResourceSelectionResolutionServiceImpl {
     }
 
     /// An exact name resolves to several resources only when resources being
-    /// deleted are visible.
+    /// deleted or deleted are visible.
     async fn fetch_exact_identities(
         selection: &ResourceSelectionSyntax,
         resource_facade: &dyn ResourceFacade,
-        label_filter: Option<&kamu_resources::ResourceLabelFilterInput>,
-        visibility: ResourceVisibility,
+        options: &ResourceSelectionResolutionOptions,
     ) -> Result<Vec<Result<Vec<ResourceHandle>, GetResourceError>>, CLIError> {
+        let label_filter = options.label_filter.as_ref();
         let exact_selectors = selection
             .items
             .iter()
@@ -346,7 +336,7 @@ impl ResourceSelectionResolutionServiceImpl {
                             ResourceSelector::ids_of_type(&schema.clone().into(), ids),
                             label_filter,
                         ),
-                        visibility: ID_LOOKUP_VISIBILITY,
+                        visibility: options.id_visibility,
                         pagination: PaginationOpts {
                             limit: by_id.len(),
                             offset: 0,
@@ -397,7 +387,7 @@ impl ResourceSelectionResolutionServiceImpl {
                                 .collect(),
                             Some(label_filter),
                         ),
-                        visibility,
+                        options.visibility,
                         by_name.len(),
                     )
                     .await?
@@ -414,7 +404,7 @@ impl ResourceSelectionResolutionServiceImpl {
                         .collect::<Vec<_>>();
 
                     resource_facade
-                        .get_handles(refs, visibility)
+                        .get_handles(refs, options.visibility)
                         .await
                         .map_err(CLIError::critical)?
                         .successes
@@ -454,6 +444,7 @@ impl ResourceSelectionResolutionServiceImpl {
         selection: &ResourceSelectionSyntax,
         resource_facade: &dyn ResourceFacade,
         label_filter: Option<&kamu_resources::ResourceLabelFilterInput>,
+        visibility: ResourceVisibility,
     ) -> Result<Vec<Result<ResourceHandle, GetResourceError>>, CLIError> {
         let ids = selection
             .items
@@ -479,7 +470,7 @@ impl ResourceSelectionResolutionServiceImpl {
         let found = resource_facade
             .search_handles(SearchResourcesRequest {
                 selectors: with_labels(ResourceSelector::any_type_ids(ids.clone()), label_filter),
-                visibility: ID_LOOKUP_VISIBILITY,
+                visibility,
                 pagination: PaginationOpts {
                     limit: ids.len(),
                     offset: 0,
@@ -749,7 +740,7 @@ impl ResourceSelectionResolutionServiceImpl {
         // does not apply here.
         let (selector, visibility) = match &resource_ref {
             ExactResourceRef::ById(id) => {
-                (ResourceSelector::any_type_id(*id), ID_LOOKUP_VISIBILITY)
+                (ResourceSelector::any_type_id(*id), options.id_visibility)
             }
             ExactResourceRef::ByName(name) => (
                 ResourceSelector::any_type_name_pattern(sql_like_escape_literal(name.as_str())),
@@ -782,13 +773,7 @@ impl ResourceSelectionResolutionServiceImpl {
         )
         .await?;
 
-        Self::put_live_resources_first(
-            resource_facade,
-            with_labels(vec![selector], options.label_filter.as_ref()),
-            visibility,
-            &mut collected.identities,
-        )
-        .await?;
+        Self::order_as_name_lookup(resource_facade, visibility, &mut collected.identities).await?;
 
         if collected.identities.is_empty() && !collected.had_any_match {
             if options.ignore_not_found {
@@ -950,14 +935,14 @@ impl ResourceSelectionResolutionServiceImpl {
     }
 
     /// Searches past `expected_count` when the name patterns match more
-    /// resources, as a name does with resources being deleted visible.
+    /// resources, as a name does when not only live resources are visible.
     async fn search_all_handles(
         resource_facade: &dyn ResourceFacade,
         selectors: Vec<ResourceSelector>,
         visibility: ResourceVisibility,
         expected_count: usize,
     ) -> Result<Vec<ResourceHandle>, CLIError> {
-        let search = |visibility, limit| {
+        let search = |limit| {
             resource_facade.search_handles(SearchResourcesRequest {
                 selectors: selectors.clone(),
                 visibility,
@@ -965,37 +950,44 @@ impl ResourceSelectionResolutionServiceImpl {
             })
         };
 
-        let mut response = search(visibility, expected_count).await?;
+        let mut response = search(expected_count).await?;
         if response.total_count > response.items.len() {
-            response = search(visibility, response.total_count).await?;
+            response = search(response.total_count).await?;
         }
         let mut handles = response.items;
 
-        Self::put_live_resources_first(resource_facade, selectors, visibility, &mut handles)
-            .await?;
+        Self::order_as_name_lookup(resource_facade, visibility, &mut handles).await?;
 
         Ok(handles)
     }
 
-    /// A search orders by last update, not by phase. With resources being
-    /// deleted visible, this puts the live ones first, as a lookup by name
-    /// does; the others keep the search order.
-    async fn put_live_resources_first(
+    /// A search orders by time, a lookup by name by the state of the deletion:
+    /// live resources, those being deleted, the deleted ones. This brings the
+    /// handles into the order of the states; within one they keep the search
+    /// order.
+    async fn order_as_name_lookup(
         resource_facade: &dyn ResourceFacade,
-        selectors: Vec<ResourceSelector>,
         visibility: ResourceVisibility,
         handles: &mut [ResourceHandle],
     ) -> Result<(), CLIError> {
-        if !visibility.includes_deleting() || handles.len() < 2 {
+        // A search that sees deleted resources puts the live ones first itself
+        let leading_visibility = match visibility {
+            ResourceVisibility::Active => return Ok(()),
+            ResourceVisibility::IncludeDeleting => ResourceVisibility::Active,
+            ResourceVisibility::IncludeDeleted | ResourceVisibility::DeletedOnly => {
+                ResourceVisibility::IncludeDeleting
+            }
+        };
+
+        if handles.len() < 2 {
             return Ok(());
         }
 
-        // Live resources are a subsequence of the search order, so those among
-        // `handles` come within its first `handles.len()`
-        let live_ids = resource_facade
+        let ids = handles.iter().map(|handle| handle.id).collect::<Vec<_>>();
+        let leading_ids = resource_facade
             .search_handles(SearchResourcesRequest {
-                selectors,
-                visibility: ResourceVisibility::Active,
+                selectors: ResourceSelector::any_type_ids(ids),
+                visibility: leading_visibility,
                 pagination: PaginationOpts {
                     limit: handles.len(),
                     offset: 0,
@@ -1006,7 +998,7 @@ impl ResourceSelectionResolutionServiceImpl {
             .into_iter()
             .map(|handle| handle.id)
             .collect::<HashSet<_>>();
-        handles.sort_by_key(|handle| !live_ids.contains(&handle.id));
+        handles.sort_by_key(|handle| !leading_ids.contains(&handle.id));
 
         Ok(())
     }

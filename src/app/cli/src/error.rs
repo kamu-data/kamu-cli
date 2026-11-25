@@ -28,6 +28,7 @@ use kamu_resources_facade::{
     GetResourceError,
     ListResourcesError,
     ListSupportedResourceTypesError,
+    ResourceDeletedNotRevealedError,
     ResourceLookupProblem,
     ResourcesSummaryError,
 };
@@ -471,6 +472,9 @@ pub enum ResourceLookupCliError {
         expected_name: String,
         actual_name: String,
     },
+
+    #[error(transparent)]
+    DeletedNotRevealed(ResourceDeletedNotRevealedError),
 }
 
 impl From<ResourceLookupProblem> for ResourceLookupCliError {
@@ -493,6 +497,7 @@ impl From<ResourceLookupProblem> for ResourceLookupCliError {
             },
             ResourceLookupProblem::EmptyRef => Self::EmptyRef,
             ResourceLookupProblem::UntypedName => Self::UntypedName,
+            ResourceLookupProblem::DeletedNotRevealed(err) => Self::DeletedNotRevealed(err),
         }
     }
 }

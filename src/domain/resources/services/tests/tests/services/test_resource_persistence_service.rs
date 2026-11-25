@@ -135,9 +135,7 @@ async fn test_save_resource_resyncs_label_projection() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_completed_deletion_clears_label_projection() {
-    // Stale rows are only invisible today because every query filters
-    // `deleted_at IS NULL`; they would become wrong without that join.
+async fn test_deletion_keeps_label_projection() {
     let harness = ResourcePersistenceServiceHarness::new();
     let (id, mut agg) = make_fresh_aggregate(harness.account_handle.clone(), "res-a");
     harness.persistence_svc().create(&mut agg).await.unwrap();
@@ -179,8 +177,8 @@ async fn test_completed_deletion_clears_label_projection() {
 
     assert_eq!(
         harness.label_projection_entries(&id).await,
-        Vec::<(String, String)>::new(),
-        "completing the deletion must clear the projection rows"
+        vec![("env".to_string(), "staging".to_string())],
+        "a deleted resource keeps its projection rows"
     );
 }
 
@@ -255,7 +253,7 @@ async fn test_requested_deletion_keeps_resource_live() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_completed_deletion_hides_resource() {
+async fn test_completed_deletion_is_stored_in_snapshot() {
     let harness = ResourcePersistenceServiceHarness::new();
     let (id, mut agg) = make_fresh_aggregate(harness.account_handle.clone(), "res-a");
     harness.persistence_svc().create(&mut agg).await.unwrap();
@@ -269,11 +267,9 @@ async fn test_completed_deletion_hides_resource() {
     assert_eq!(reloaded.headers().deleted_at, Some(now));
     assert_eq!(reloaded.status().phase, ResourcePhase::Deleted);
 
-    // Deleted snapshots are hidden from live lookups — finding None is correct
-    assert!(
-        harness.snapshot_not_found(&id).await,
-        "deleted resource must not appear in live snapshot lookup"
-    );
+    let snapshot = harness.find_snapshot(&id).await;
+    assert_eq!(snapshot.headers.deleted_at, Some(now));
+    assert_eq!(snapshot.status.unwrap().phase, ResourcePhase::Deleted);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -421,17 +417,6 @@ impl ResourcePersistenceServiceHarness {
             .await
             .unwrap()
             .expect("snapshot must exist")
-    }
-
-    async fn snapshot_not_found(&self, id: &ResourceID) -> bool {
-        self.resource_repo()
-            .find_resource_snapshot(&ResourceRawEventQuery {
-                schema: TestResource::type_uri().cheap_clone(),
-                id: *id,
-            })
-            .await
-            .unwrap()
-            .is_none()
     }
 
     async fn label_projection_entries(&self, id: &ResourceID) -> Vec<(String, String)> {

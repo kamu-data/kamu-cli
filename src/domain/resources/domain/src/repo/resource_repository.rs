@@ -14,6 +14,7 @@ use internal_error::InternalError;
 use thiserror::Error;
 
 use crate::{
+    ResourceHeaders,
     ResourceID,
     ResourceName,
     ResourcePhaseCounts,
@@ -70,10 +71,9 @@ pub trait ResourceRepository: Send + Sync {
         name: &ResourceName,
     ) -> Result<Option<ResourceID>, InternalError>;
 
-    /// Returns rows in the order their IDs appear in `ids`, including resources
-    /// being deleted. IDs that do not exist, are deleted, or belong to another
-    /// account are absent, so the result may be shorter than the request but
-    /// never reordered.
+    /// Returns rows in the order their IDs appear in `ids`, in any state. IDs
+    /// that do not exist or belong to another account are absent, so the result
+    /// may be shorter than the request but never reordered.
     async fn find_resource_handles_by_ids(
         &self,
         account_id: &odf::AccountID,
@@ -81,12 +81,12 @@ pub trait ResourceRepository: Send + Sync {
     ) -> Result<Vec<ResourceHandleRow>, InternalError>;
 
     /// Matches names case-insensitively. Names that do not exist are absent
-    /// from the result. With [`ResourceVisibility::IncludeDeleting`] a name may
-    /// resolve to several IDs: one live resource and those being deleted.
+    /// from the result. Unless only live resources are visible, a name may
+    /// resolve to several IDs.
     ///
     /// Returns pairs in the order their names appear in `names`. Within a name
     /// the live resource comes first, then those being deleted, oldest request
-    /// first.
+    /// first, then the deleted ones, newest deletion first.
     async fn resolve_resource_ids_by_names(
         &self,
         account_id: &odf::AccountID,
@@ -129,6 +129,8 @@ pub trait ResourceRepository: Send + Sync {
 
     /// Label filtering rides on `scope`: each row carries the pairs it must
     /// satisfy, so one call may filter differently per type.
+    ///
+    /// Orders as [`Self::list_resource_snapshots`] does.
     async fn search_resource_handles(
         &self,
         account_id: &odf::AccountID,
@@ -144,28 +146,29 @@ pub trait ResourceRepository: Send + Sync {
         visibility: ResourceVisibility,
     ) -> Result<usize, InternalError>;
 
+    /// Returns the resource in any state.
     async fn find_resource_snapshot(
         &self,
         query: &ResourceRawEventQuery,
     ) -> Result<Option<ResourceSnapshot>, InternalError>;
 
-    /// Returns snapshots in the order their IDs appear in `ids`. This lookup is
-    /// by schema, not by account, so it spans accounts.
+    /// Returns snapshots in the order their IDs appear in `ids`, in any state.
+    /// This lookup is by schema, not by account, so it spans accounts.
     async fn find_resource_snapshots_by_schema_and_ids(
         &self,
         schema: &TypeUri,
         ids: &[ResourceID],
     ) -> Result<Vec<ResourceSnapshot>, InternalError>;
 
+    /// Returns the resource in any state.
     async fn find_resource_snapshot_by_id(
         &self,
         id: &ResourceID,
     ) -> Result<Option<ResourceSnapshot>, InternalError>;
 
-    /// Returns snapshots in the order their IDs appear in `ids`, including
-    /// resources being deleted. IDs that do not exist, are deleted, or belong
-    /// to another account are absent, so the result may be shorter than the
-    /// request but never reordered.
+    /// Returns snapshots in the order their IDs appear in `ids`, in any state.
+    /// IDs that do not exist or belong to another account are absent, so the
+    /// result may be shorter than the request but never reordered.
     async fn find_resource_snapshots_by_ids(
         &self,
         account_id: &odf::AccountID,
@@ -174,6 +177,11 @@ pub trait ResourceRepository: Send + Sync {
 
     /// Spans the schemas named by `scope`, each with its own query and label
     /// pairs.
+    ///
+    /// Orders by last update, newest first. When deleted resources are visible,
+    /// the live ones keep that order and come first; the others follow, newest
+    /// first by the time their deletion completed, or was requested while it
+    /// has not.
     fn list_resource_snapshots(
         &self,
         account_id: &odf::AccountID,
@@ -182,6 +190,7 @@ pub trait ResourceRepository: Send + Sync {
         pagination: PaginationOpts,
     ) -> ResourceSnapshotStream<'_>;
 
+    /// Counts resources in any state.
     async fn summarize_resources(
         &self,
         account_id: odf::AccountID,
@@ -190,10 +199,10 @@ pub trait ResourceRepository: Send + Sync {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Which resources a lookup by name, search or listing returns. Deleted
-/// resources are never returned. The reads by ID (`find_resource_snapshot*`,
-/// `find_resource_handles_by_ids`) always return resources being deleted; an
-/// ID query in a search scope follows the visibility like any other.
+/// Which resources a lookup by name, search or listing returns. The reads by ID
+/// (`find_resource_snapshot*`, `find_resource_handles_by_ids`) return resources
+/// in any state; an ID query in a search scope follows the visibility like any
+/// other.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub enum ResourceVisibility {
     /// Resources whose deletion was not requested
@@ -201,21 +210,58 @@ pub enum ResourceVisibility {
     Active,
     /// Also resources whose deletion is in progress
     IncludeDeleting,
+    /// Resources in any state
+    IncludeDeleted,
+    /// Only resources whose deletion is in progress or completed
+    DeletedOnly,
 }
 
 impl ResourceVisibility {
-    pub fn with_deleting(include_deleting: bool) -> Self {
-        if include_deleting {
-            Self::IncludeDeleting
-        } else {
-            Self::Active
+    /// The visibility of resources addressed by ID: an ID finds a resource in
+    /// any state, and only [`Self::DeletedOnly`] hides live ones from it
+    pub fn of_ids(self) -> Self {
+        match self {
+            Self::Active | Self::IncludeDeleting | Self::IncludeDeleted => Self::IncludeDeleted,
+            Self::DeletedOnly => Self::DeletedOnly,
         }
     }
 
+    /// Whether resources whose deletion was not requested are visible
+    pub fn includes_live(self) -> bool {
+        match self {
+            Self::Active | Self::IncludeDeleting | Self::IncludeDeleted => true,
+            Self::DeletedOnly => false,
+        }
+    }
+
+    /// Whether resources whose deletion is in progress are visible
     pub fn includes_deleting(self) -> bool {
         match self {
             Self::Active => false,
-            Self::IncludeDeleting => true,
+            Self::IncludeDeleting | Self::IncludeDeleted | Self::DeletedOnly => true,
+        }
+    }
+
+    /// Whether resources whose deletion completed are visible
+    pub fn includes_deleted(self) -> bool {
+        match self {
+            Self::Active | Self::IncludeDeleting => false,
+            Self::IncludeDeleted | Self::DeletedOnly => true,
+        }
+    }
+
+    /// Whether a resource in this state of deletion is visible
+    pub fn includes(
+        self,
+        deletion_requested_at: Option<DateTime<Utc>>,
+        deleted_at: Option<DateTime<Utc>>,
+    ) -> bool {
+        if deleted_at.is_some() {
+            self.includes_deleted()
+        } else if deletion_requested_at.is_some() {
+            self.includes_deleting()
+        } else {
+            self.includes_live()
         }
     }
 }
@@ -440,6 +486,8 @@ pub struct ResourceHandleRow {
     pub account_id: odf::AccountID,
     pub account_resource_id: uuid::Uuid,
     pub account_name: String,
+    pub deletion_requested_at: Option<DateTime<Utc>>,
+    pub deleted_at: Option<DateTime<Utc>>,
 }
 
 impl ResourceHandleRow {
@@ -450,6 +498,22 @@ impl ResourceHandleRow {
             id: ResourceID::new(self.account_resource_id),
             did: self.account_id.clone(),
             name: odf::AccountName::new_unchecked(&self.account_name),
+        }
+    }
+}
+
+impl From<&ResourceSnapshot> for ResourceHandleRow {
+    fn from(snapshot: &ResourceSnapshot) -> Self {
+        let headers = &snapshot.headers;
+        Self {
+            id: *snapshot.id.as_ref(),
+            schema: snapshot.schema.to_string(),
+            name: headers.name.to_string(),
+            account_id: headers.account.did.clone(),
+            account_resource_id: *headers.account.id.as_ref(),
+            account_name: headers.account.name.to_string(),
+            deletion_requested_at: headers.deletion_requested_at,
+            deleted_at: headers.deleted_at,
         }
     }
 }
@@ -485,7 +549,7 @@ impl ResourceSnapshotRow {
         ResourceSnapshot {
             id,
             schema: TypeUri::new_unchecked(&self.resource_schema),
-            headers: crate::ResourceHeaders {
+            headers: ResourceHeaders {
                 id,
                 account: odf::ResourceOwnerHandle {
                     // TODO: Support Org accounts

@@ -180,11 +180,33 @@ pub(crate) fn resource_selector_inputs(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[derive(cynic::Enum, Debug, Clone, Copy)]
+#[cynic(graphql_type = "ResourceVisibility")]
+pub(crate) enum ResourceVisibilityInput {
+    Active,
+    IncludeDeleting,
+    IncludeDeleted,
+    DeletedOnly,
+}
+
+impl From<domain::ResourceVisibility> for ResourceVisibilityInput {
+    fn from(value: domain::ResourceVisibility) -> Self {
+        match value {
+            domain::ResourceVisibility::Active => Self::Active,
+            domain::ResourceVisibility::IncludeDeleting => Self::IncludeDeleting,
+            domain::ResourceVisibility::IncludeDeleted => Self::IncludeDeleted,
+            domain::ResourceVisibility::DeletedOnly => Self::DeletedOnly,
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[derive(cynic::InputObject, Debug, Clone)]
 #[cynic(graphql_type = "SearchResourcesInput")]
 pub(crate) struct SearchResourcesInput {
     pub selectors: Option<Vec<ResourceSelectorInput>>,
-    pub include_deleting: bool,
+    pub visibility: ResourceVisibilityInput,
 }
 
 impl TryFrom<&SearchResourcesRequest> for SearchResourcesInput {
@@ -196,7 +218,7 @@ impl TryFrom<&SearchResourcesRequest> for SearchResourcesInput {
             // spans every type, but the facade has already resolved that to a
             // concrete selector list by this point.
             selectors: Some(resource_selector_inputs(&value.selectors)),
-            include_deleting: value.visibility.includes_deleting(),
+            visibility: value.visibility.into(),
         })
     }
 }

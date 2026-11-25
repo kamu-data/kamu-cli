@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
 use database_common::PaginationOpts;
@@ -118,6 +118,7 @@ impl GenericResourceQueryService for GenericResourceQueryServiceImpl {
             .resource_repository
             .find_resource_snapshot(&query)
             .await?
+            .filter(|snapshot| snapshot.headers.deleted_at.is_none())
         else {
             return Ok(None);
         };
@@ -156,6 +157,7 @@ impl GenericResourceQueryService for GenericResourceQueryServiceImpl {
             .find_resource_snapshots_by_ids(account_id, ids)
             .await?
             .into_iter()
+            .filter(|snapshot| snapshot.headers.deleted_at.is_none())
             .map(|snapshot| (snapshot.id, snapshot))
             .collect();
 
@@ -171,12 +173,14 @@ impl GenericResourceQueryService for GenericResourceQueryServiceImpl {
             .filter(|id| !owned_any_kind.contains_key(id))
             .collect();
 
-        let access_denied_snapshots = self
+        let access_denied_ids: HashSet<ResourceID> = self
             .resource_repository
             .find_resource_snapshots_by_schema_and_ids(schema, &missing_ids)
-            .await?;
-        let access_denied_ids: std::collections::HashSet<ResourceID> =
-            access_denied_snapshots.iter().map(|s| s.id).collect();
+            .await?
+            .into_iter()
+            .filter(|snapshot| snapshot.headers.deleted_at.is_none())
+            .map(|snapshot| snapshot.id)
+            .collect();
 
         let access_denied: Vec<ResourceID> = access_denied_ids.iter().copied().collect();
 

@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "\n            SELECT\n                r.resource_id as \"id: uuid::Uuid\",\n                r.account_id as \"account_id: odf::AccountID\",\n                COALESCE(a.resource_id, X'00000000000000000000000000000000') as \"account_resource_id!: uuid::Uuid\",\n                COALESCE(a.account_name, $3) as \"account_name!: String\",\n                r.resource_schema,\n                r.resource_name,\n                r.labels as \"labels: serde_json::Value\",\n                r.annotations as \"annotations: serde_json::Value\",\n                r.spec as \"spec: serde_json::Value\",\n                r.status as \"status: serde_json::Value\",\n                r.generation,\n                r.status_generation,\n                r.created_at as \"created_at: DateTime<Utc>\",\n                r.updated_at as \"updated_at: DateTime<Utc>\",\n                r.deletion_requested_at as \"deletion_requested_at: DateTime<Utc>\",\n                r.deleted_at as \"deleted_at: DateTime<Utc>\",\n                r.last_event_id\n            FROM resources r\n            LEFT JOIN accounts a ON a.id = r.account_id\n            WHERE r.resource_id = $1\n              AND r.resource_schema = $2\n              AND r.deleted_at IS NULL\n            ",
+  "query": "\n            SELECT\n                r.resource_id as \"id: uuid::Uuid\",\n                r.account_id as \"account_id: odf::AccountID\",\n                COALESCE(a.resource_id, X'00000000000000000000000000000000') as \"account_resource_id!: uuid::Uuid\",\n                COALESCE(a.account_name, $3) as \"account_name!: String\",\n                r.resource_schema,\n                r.resource_name,\n                r.labels as \"labels: serde_json::Value\",\n                r.annotations as \"annotations: serde_json::Value\",\n                r.spec as \"spec: serde_json::Value\",\n                r.status as \"status: serde_json::Value\",\n                r.generation,\n                r.status_generation,\n                r.created_at as \"created_at: DateTime<Utc>\",\n                r.updated_at as \"updated_at: DateTime<Utc>\",\n                r.deletion_requested_at as \"deletion_requested_at: DateTime<Utc>\",\n                r.deleted_at as \"deleted_at: DateTime<Utc>\",\n                r.last_event_id\n            FROM resources r\n            LEFT JOIN accounts a ON a.id = r.account_id\n            WHERE r.resource_id = $1\n              AND r.resource_schema = $2\n            ",
   "describe": {
     "columns": [
       {
@@ -204,5 +204,5 @@
       true
     ]
   },
-  "hash": "e1b024d96ed5e908a293741c3b5d258392c6f1735527bb36c4fed607a87f4686"
+  "hash": "59fbee1dd71da67fee9d60b232f568df491e59a1e22e06d65474aa334f62575b"
 }

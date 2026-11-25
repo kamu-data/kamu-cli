@@ -12,6 +12,7 @@ use std::path::PathBuf;
 
 use clap::{ArgAction, Parser};
 use kamu::domain::ExportFormat;
+use kamu_resources::ResourceVisibility;
 
 use crate::cli_value_parser::{self as parsers};
 use crate::config::{ConfigObjectFormat, ConfigScope};
@@ -274,6 +275,40 @@ pub struct ResourceContextArgs {
     /// Override the current resource context for this invocation
     #[arg(long, short = 'c', value_name = "CONTEXT_NAME")]
     pub context: Option<String>,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Which resources to select by the state of their deletion; only live ones
+/// when none is given
+#[derive(Debug, clap::Args)]
+#[group(multiple = false)]
+pub struct ResourceVisibilityArgs {
+    /// Also include resources whose deletion is in progress
+    #[arg(long)]
+    pub include_deleting: bool,
+
+    /// Also include resources whose deletion is in progress or completed
+    #[arg(long)]
+    pub include_deleted: bool,
+
+    /// Include only resources whose deletion is in progress or completed
+    #[arg(long)]
+    pub deleted: bool,
+}
+
+impl ResourceVisibilityArgs {
+    pub fn visibility(&self) -> ResourceVisibility {
+        if self.deleted {
+            ResourceVisibility::DeletedOnly
+        } else if self.include_deleted {
+            ResourceVisibility::IncludeDeleted
+        } else if self.include_deleting {
+            ResourceVisibility::IncludeDeleting
+        } else {
+            ResourceVisibility::Active
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1152,9 +1187,8 @@ pub struct Get {
     #[arg(long = "label", short = 'l', value_name = "LABEL_SELECTOR")]
     pub label_selectors: Vec<String>,
 
-    /// Also include resources whose deletion is in progress
-    #[arg(long)]
-    pub include_deleting: bool,
+    #[command(flatten)]
+    pub visibility: ResourceVisibilityArgs,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1443,9 +1477,8 @@ pub struct List {
     #[arg(long = "label", short = 'l', value_name = "LABEL_SELECTOR")]
     pub label_selectors: Vec<String>,
 
-    /// Also include resources whose deletion is in progress
-    #[arg(long)]
-    pub include_deleting: bool,
+    #[command(flatten)]
+    pub visibility: ResourceVisibilityArgs,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -392,19 +392,33 @@ siblings, which share the scope predicate and must agree with it.
 **Batch reads return rows in request order.** `resolve_resource_ids_by_names`,
 `find_resource_handles_by_ids`, `find_resource_snapshots_by_ids` and
 `find_resource_snapshots_by_schema_and_ids` return rows ordered to match the input slice; rows that
-do not exist, are deleted, or belong to another account are simply absent, so a result may be
-*shorter* than the request but never reordered. Callers rely on this to zip results back onto
+do not exist or belong to another account are simply absent, so a result may be *shorter* than the
+request but never reordered. Callers rely on this to zip results back onto
 positional `request_index` values. Postgres pins the order in SQL with `array_position`; SQLite has
 no equivalent, so its repository re-sorts in Rust after the query (`IN (...)` makes no ordering
 promise); the in-memory backend iterates the request slice directly. Pinned by the shared repository
 suite, which asserts the *reversed* request too — an arbitrary-but-stable scan order would pass a
 forward-only assertion.
 
-**Resources being deleted** are found by id. Name resolution, searches, listings and their counts
-take a `ResourceVisibility`: `Active` hides resources being deleted, `IncludeDeleting` returns them
-too, and a name may then resolve to several IDs, the live resource first. `find_resource_id_by_name`
-and `find_resource_ids_by_schema_and_label(_any_account)` see live resources only; label filters in
-a search follow its visibility. Deleted resources are never returned.
+**Visibility.** Reads by id return a resource in any state. Name resolution, searches, listings and
+their counts take a `ResourceVisibility`:
+
+| `ResourceVisibility` | Live | Being deleted | Deleted | Order of listings and searches |
+| --- | --- | --- | --- | --- |
+| `Active` | yes | — | — | last update, newest first |
+| `IncludeDeleting` | yes | yes | — | last update, newest first |
+| `IncludeDeleted` | yes | yes | yes | live ones as above, then the others by deletion time, newest first |
+| `DeletedOnly` | — | yes | yes | deletion time, newest first |
+
+- The deletion time is `deletedAt`, or `deletionRequestedAt` while the deletion is not completed. A
+  partial index, `idx_resources_deletion_time`, serves the `DeletedOnly` listing of one account and
+  type in order; wider listings are sorted.
+- A name may resolve to several IDs unless only live resources are visible: the live one first, then
+  those being deleted, oldest request first, then the deleted ones, newest deletion first.
+- `find_resource_id_by_name` and `find_resource_ids_by_schema_and_label(_any_account)` see live
+  resources only; label filters in a search follow its visibility.
+- **A read by id does not tell that a resource still exists.** Code that acts on the resource checks
+  `deleted_at`, as `find_owned_snapshots` and `ensure_resource_id_matches_type` do.
 
 **Label filters apply only to scoped searches**, never to direct identity reads: the scoped calls
 carry their pairs per row inside `ResourceScope`, while the by-id/by-name reads take none at all.
@@ -471,9 +485,8 @@ and the later `*_resource_*` migrations (SQLite mirrors alongside).
   `deletion_requested_at`/`deleted_at` (nullable), `last_event_id`. **Uniqueness:** a unique index
   on `(account_id, resource_schema, resource_name)`, case-insensitive, partial
   `WHERE deletion_requested_at IS NULL`.
-  A partial index on `(account_id, resource_schema, status->>'phase') WHERE deleted_at IS NULL`
-  backs the summary projection. `labels`/`annotations` are untyped JSONB with **no index of their
-  own**; label selector queries are served by the separate `resource_labels_projection` table
+  An index on `(account_id, resource_schema, status->>'phase')` backs the summary projection.
+  `labels`/`annotations` are untyped JSONB with **no index of their own**; label selector queries are served by the separate `resource_labels_projection` table
   (below), never by scanning this JSONB. There is no dedicated
   `description` column: `description` lives inside `annotations` as the first well-known
   annotation entry, so adding future well-known annotations needs no schema change.
@@ -502,8 +515,10 @@ returns `UpdateResourceError::concurrent_modification()`. A unique-constraint vi
   carries it.
 - Completing the deletion sets `deleted_at`. The deleted resource keeps its name, so several
   deleted resources and a live one may carry the same name.
-- Reads hide resources being deleted unless asked; see [Repository](#repository). The summary
-  counts resources being deleted as `deleting`.
+- A deleted resource keeps its rows in `resource_labels_projection`, so label selectors find it.
+- Names, searches and listings hide resources whose deletion was requested unless asked; see
+  [Repository](#repository). The summary counts them as `deleting` and `deleted`, and the total
+  includes both.
 
 **Migration / backfill.** Schema changes are ordinary SQLx migrations under `migrations/{postgres,sqlite}`.
 There is a precedent for data backfill into resources —
@@ -554,7 +569,7 @@ existing rows/events that should move to the new schema.
   or, with `not_before` set, a retry or a failure, with `attempts` and `last_error`.
 - Rows are not event-sourced: an upsert replaces the row. The FK means a resource's rows must be
   removed (`delete_states_for_resource`) before the resource itself. Nothing removes a deleted
-  resource, which stays as its tombstone, so its rows stay too; every query leaves them out.
+  resource, so its rows stay too; every query leaves them out.
 - Postgres stores `last_error` with NUL characters replaced by U+FFFD, since a TEXT column
   rejects them and the failed write would fail every later drain.
 - **A change clears the rows.** Saving a new generation or a deletion request removes the
@@ -648,6 +663,7 @@ Concrete conflict cases:
 | Apply re-using the name of a resource being deleted | **Create** — the resource being deleted gave up its name. The outcome carries a `replaces_resource_being_deleted` warning naming its id. |
 | Apply re-using the name of a deleted resource | **Create** — the deleted resource gave up its name when its deletion was requested. No warning, unlike one still being deleted. |
 | `id` of a resource being deleted | **Reject** — `ResourceDeletionInProgressError`, a `LifecycleRuleConflict` rejection. |
+| `id` of a deleted resource | **Not found** — `ResourceIDNotFoundError`, although reads by id find it. |
 | Apply with no real change | **`Untouched`** — no generation bump, no events, no reconcile. |
 
 Note names are normalized to lowercase on write, so case-only differences are not distinct names.
@@ -1054,12 +1070,20 @@ pub trait ResourceFacade: Send + Sync {
 }
 ```
 
-**Resources being deleted are hidden unless asked for.** With `ResourceVisibility::IncludeDeleting`
-a ref by name may match several resources: each is a success at the same `request_index`, the live
-resource first. A ref by id finds a resource being deleted either way. `delete` takes no visibility:
-a name finds the live resource only, and a resource being deleted is deleted again by its id. That
-posts its message again; a failed cleanup is retried by the controller runtime either way, once its
-backoff ends ([(c) Deletion](#c-deletion)).
+**Resources whose deletion was requested are hidden unless asked for** ([visibility](#repository)).
+Unless only live resources are visible, a ref by name may match several: each is a success at the
+same `request_index`, the live resource first. A ref by id finds a resource in any state; only
+`DeletedOnly` hides live ones from it.
+
+`delete` takes no visibility: a name finds the live resource only, a resource being deleted is
+deleted again by its id, and a deleted one is not found. Deleting again posts the message again; a
+failed cleanup is retried by the controller runtime either way, once its backoff ends
+([(c) Deletion](#c-deletion)).
+
+**The spec of a deleted resource is not revealed.** With `SpecViewOpts::REVEALED` a deleted resource
+whose type has a spec-view dispatcher is a `ResourceLookupProblem::DeletedNotRevealed`; a live
+resource sharing its name is revealed beside it, so one `request_index` may have both a success and
+a problem. The encrypted spec stays readable.
 
 **The two families are deliberately asymmetric about which form is the
 primitive.** Ref-keyed reads and deletes (`get`, `get_handles`,
@@ -1220,8 +1244,8 @@ Every resolver delegates to `ResourceFacade`.
 `handlesByRefs`, `bySelectors` / `handlesBySelectors`, `renderManifests`. Each ref-keyed
 query takes `[ResourceRefInput!]!` — there are no single-ref variants, matching the facade. The
 `opts: SpecViewOptsInput` argument (`{ revealed: bool }`) maps to the facade's `SpecViewOpts`.
-`includeDeleting: Boolean! = false` on the ref-keyed queries and on
-`SearchResourcesInput`, maps to `ResourceVisibility::IncludeDeleting`.
+`visibility: ResourceVisibility! = ACTIVE`, on the ref-keyed queries and on
+`SearchResourcesInput`, maps to the domain enum.
 
 **Mutations (`ResourcesMut`):** `apply_manifest(manifest, format, dry_run?)`,
 `apply_manifests(manifests, dry_run?)`, `delete(resourceRefs)`. `dry_run` routes to
@@ -1231,8 +1255,9 @@ query takes `[ResourceRefInput!]!` — there are no single-ref variants, matchin
 
 **Per-item lookup problems.** The ref-keyed queries and `delete` report per-entry failures through
 the `ResourceLookupProblem` union: `ResourceIDNotFoundProblem`, `ResourceNameNotFoundProblem`,
-`ResourceSchemaMismatchProblem`, `ResourceNameMismatchProblem`, `ResourceEmptyRefProblem` and
-`ResourceUntypedNameProblem`. The last marks a ref that addressed by `name` without a `type`
+`ResourceSchemaMismatchProblem`, `ResourceNameMismatchProblem`, `ResourceEmptyRefProblem`,
+`ResourceUntypedNameProblem` and `ResourceDeletedNotRevealedProblem`. `ResourceUntypedNameProblem`
+marks a ref that addressed by `name` without a `type`
 ([§10](#10-facade-kamu-resources-facade)); it is kept distinct from `EmptyRef` so a caller who did
 supply a name is not told they supplied none. Over GraphQL such a ref is normally rejected earlier,
 by the adapter's `validate_ref`, so the variant is what an *in-process* caller sees — the local
@@ -1337,8 +1362,8 @@ implementation files carry `_resource(s)_` names:
 | Subcommand | Implementation file | Purpose |
 | --- | --- | --- |
 | `kamu apply` | `apply_command.rs` | Discover manifests (files/dir/stdin) and apply/plan them as a single all-or-nothing batch by default; `--dry-run`, `--recursive`, `--stdin`, `--continue-on-error`. |
-| `kamu list` | `list_resources_command.rs` | List resources by type or `%` for all; renders Table/CSV/JSON/Parquet. `--include-deleting` lists resources being deleted too; a list of ids alone always does. |
-| `kamu get` | `get_resource_command.rs` | Get resource(s) by selector(s); names or full manifest; `--spec`, `--revealed`, `--include-deleting`. |
+| `kamu list` | `list_resources_command.rs` | List resources by type or `%` for all; renders Table/CSV/JSON/Parquet. `--include-deleting`, `--include-deleted` and `--deleted` choose the visibility; a list of ids alone finds resources in any state, unless `--deleted` is given. |
+| `kamu get` | `get_resource_command.rs` | Get resource(s) by selector(s); names or full manifest; `--spec`, `--revealed`, `--include-deleting`, `--include-deleted`, `--deleted`. |
 | `kamu delete` | `delete_resources_command.rs` | Request deletion by selector(s), printing `Deleting` or `Deleted` per resource; `--force`, `--ignore-not-found`, `--dry-run`. |
 
 **Context commands** (manage which server/workspace resources target): `kamu context add` / `list` /
@@ -1388,7 +1413,8 @@ themselves are agnostic. Selector grammar is specified below, after the semantic
 | Default secret visibility | n/a | **`Encrypted`** (ciphertext); `--revealed` to decrypt | secrets not expanded in list columns | n/a |
 | Relevant flags | `--dry-run`, `--recursive`, `--stdin`, `--continue-on-error` | `--ignore-not-found`, `--spec`, `--revealed`, `--max-results`/`--unbounded`, `--label`/`-l` | `--max-results`/`--unbounded`, `-w`, `-o`, `--label`/`-l` | `--force`, `--ignore-not-found`, `--dry-run`, `--label`/`-l` |
 | Label filtering | n/a | `-l` narrows the selector expansion | `-l` narrows the listing (incl. `list %`) | `-l` narrows what `--all`/patterns resolve to |
-| Resources being deleted | a manifest taking the name of one creates a new resource and warns | hidden; `--include-deleting` shows them, and a name may then match several | hidden; `--include-deleting` lists them, as does a list of ids alone | names select live resources only; an id selects a resource being deleted again |
+| Resources being deleted | a manifest taking the name of one creates a new resource and warns | hidden; `--include-deleting` shows them, and a name may then match several; an id finds them | hidden; `--include-deleting` lists them, as does a list of ids alone | names select live resources only; an id selects a resource being deleted again |
+| Deleted resources | a manifest taking the name of one creates a new resource | hidden; `--include-deleted` shows them, `--deleted` only them and those being deleted; an id finds them; `--revealed` is refused | as `get`; `--include-deleted` lists the live ones by name, then the others newest deletion first | never selected |
 | Flag semantics | default: whole batch is one transaction, a rejection/failure rolls back every manifest including earlier successes; `--continue-on-error`: apply each manifest independently so earlier successes survive a later failure; `--dry-run`: plan only, no writes | `--ignore-not-found`: skip missing selectors instead of erroring | — | `--force`: skip confirmation prompt; `--ignore-not-found`: exit OK if absent; `--dry-run`: preview resolved deletions |
 | Local vs remote | identical behavior; chosen by context (`--context` to override) | identical | identical | identical |
 
@@ -1716,7 +1742,7 @@ Deletion runs in two steps, as the ODF resource framework defines them
 - **The phase a delete reports** is the one at the time of the response: `Deleting` unless the
   controller runtime completed the deletion before it. A local workspace processes a command's messages once
   its transaction has committed, so `kamu delete` there reports afterwards, through a
-  `PostCommandActions` step: a resource still found by its id is `Deleting`, one gone is `Deleted`.
+  `PostCommandActions` step, which reads the phase again.
   A resource still `Deleting` there gets a hint to retry by id. The command runs in one
   transaction, so when any deletion fails the others are reported as rolled back.
 
@@ -2215,7 +2241,7 @@ Each tier has a distinct job; put a test at the lowest tier that can express it:
 
 - **Service tests** validate internal state transitions and persistence edge cases — reconcile
   transitions, generation/observed-generation bookkeeping, optimistic-concurrency conflicts,
-  tombstone/uniqueness behavior, event-store projection. Fast, no transport.
+  deletion/uniqueness behavior, event-store projection. Fast, no transport.
 - **Facade contract tests** validate **semantic API parity** between the local and remote facade:
   one `contract_test!` body runs against both, so behavior (including error taxonomy and batch
   positional results) stays identical. This is the canonical place to lock in facade behavior.

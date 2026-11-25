@@ -777,6 +777,7 @@ impl DatasetEnvVarMutationAdapterImpl {
         self.generic_resource_query_service
             .get_snapshot_by_id(resource_id)
             .await?
+            .filter(|snapshot| snapshot.headers.deleted_at.is_none())
             .ok_or_else(|| format!("Resource {resource_id} missing snapshot").int_err())
     }
 

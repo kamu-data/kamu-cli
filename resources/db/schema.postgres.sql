@@ -1785,6 +1785,13 @@ CREATE INDEX idx_resources_deletion_pending ON public.resources USING btree (res
 
 
 --
+-- Name: idx_resources_deletion_time; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_resources_deletion_time ON public.resources USING btree (account_id, resource_schema, COALESCE(deleted_at, deletion_requested_at) DESC, updated_at DESC, resource_id DESC) WHERE (deletion_requested_at IS NOT NULL);
+
+
+--
 -- Name: idx_resources_not_reconciled; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -1795,7 +1802,7 @@ CREATE INDEX idx_resources_not_reconciled ON public.resources USING btree (resou
 -- Name: idx_resources_summary_projection; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_resources_summary_projection ON public.resources USING btree (account_id, resource_schema, ((status ->> 'phase'::text))) WHERE (deleted_at IS NULL);
+CREATE INDEX idx_resources_summary_projection ON public.resources USING btree (account_id, resource_schema, ((status ->> 'phase'::text)));
 
 
 --
