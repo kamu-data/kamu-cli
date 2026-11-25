@@ -17,49 +17,49 @@
       {
         "name": "total_count!: i64",
         "ordinal": 1,
-        "type_info": "Null",
+        "type_info": "Integer",
         "origin": "Expression"
       },
       {
         "name": "reconciling_count!: i64",
         "ordinal": 2,
-        "type_info": "Null",
+        "type_info": "Integer",
         "origin": "Expression"
       },
       {
         "name": "ready_count!: i64",
         "ordinal": 3,
-        "type_info": "Null",
+        "type_info": "Integer",
         "origin": "Expression"
       },
       {
         "name": "degraded_count!: i64",
         "ordinal": 4,
-        "type_info": "Null",
+        "type_info": "Integer",
         "origin": "Expression"
       },
       {
         "name": "failed_count!: i64",
         "ordinal": 5,
-        "type_info": "Null",
+        "type_info": "Integer",
         "origin": "Expression"
       },
       {
         "name": "deleting_count!: i64",
         "ordinal": 6,
-        "type_info": "Null",
+        "type_info": "Integer",
         "origin": "Expression"
       },
       {
         "name": "deleted_count!: i64",
         "ordinal": 7,
-        "type_info": "Null",
+        "type_info": "Integer",
         "origin": "Expression"
       },
       {
         "name": "pending_count!: i64",
         "ordinal": 8,
-        "type_info": "Null",
+        "type_info": "Integer",
         "origin": "Expression"
       }
     ],
@@ -68,14 +68,14 @@
     },
     "nullable": [
       false,
-      null,
-      null,
-      null,
-      null,
-      null,
-      null,
-      null,
-      null
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
     ]
   },
   "hash": "568490148b5d5517f8e47de94dde48e3bcc681f37cdee639b52ff093e5f72337"

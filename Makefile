@@ -40,6 +40,21 @@ MIGRATION_DIRS := ./migrations/postgres ./migrations/sqlite
 
 KAMU_CONTAINER_RUNTIME_TYPE ?= podman
 
+# $(call Run_In_Crates,crates,command): runs the command in every crate, even after a failure,
+# then lists the crates where it failed and fails
+define Run_In_Crates
+@failed=; \
+for crate in $(1); do \
+	echo "[$$crate] $(2)"; \
+	(cd "$$crate" && $(2)) || failed="$$failed $$crate"; \
+done; \
+if [ -n "$$failed" ]; then \
+	echo "error: '$(2)' failed in:"; \
+	printf '  %s\n' $$failed; \
+	exit 1; \
+fi
+endef
+
 # Keep in sync with `services.postgres.image` in `.github/workflows/build.yaml`
 POSTGRES_IMAGE ?= postgres:18
 
@@ -84,7 +99,7 @@ lint-deps:
 
 .PHONY: lint-sqlx
 lint-sqlx:
-	$(foreach crate,$(ALL_DATABASE_CRATES),(cd $(crate) && cargo sqlx prepare --check);)
+	$(call Run_In_Crates,$(ALL_DATABASE_CRATES),cargo sqlx prepare --check)
 
 
 .PHONY: check
@@ -184,15 +199,15 @@ sqlx-local-clean-sqlite:
 
 .PHONY: sqlx-prepare
 sqlx-prepare:
-	$(foreach crate,$(ALL_DATABASE_CRATES),(cd $(crate) && cargo sqlx prepare);)
+	$(call Run_In_Crates,$(ALL_DATABASE_CRATES),cargo sqlx prepare)
 
 .PHONY: sqlx-prepare-postgres
 sqlx-prepare-postgres:
-	$(foreach crate,$(POSTGRES_CRATES),(cd $(crate) && cargo sqlx prepare);)
+	$(call Run_In_Crates,$(POSTGRES_CRATES),cargo sqlx prepare)
 
 .PHONY: sqlx-prepare-sqlite
 sqlx-prepare-sqlite:
-	$(foreach crate,$(SQLITE_CRATES),(cd $(crate) && cargo sqlx prepare);)
+	$(call Run_In_Crates,$(SQLITE_CRATES),cargo sqlx prepare)
 
 ###############################################################################
 # Sqlx: add migration
