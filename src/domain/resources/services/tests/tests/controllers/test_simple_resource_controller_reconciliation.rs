@@ -26,6 +26,9 @@ use kamu_resources::{
 use kamu_resources_services::testing::{
     BaseResourceServiceHarness,
     BaseResourceServiceHarnessOpts,
+    TEST_RECONCILIATION_ERROR_CODE_REJECTED,
+    TestResource,
+    TestResourceReconcilerProvider,
 };
 use kamu_resources_services::{
     SimpleResourceReconciliationOutcome,
@@ -33,13 +36,7 @@ use kamu_resources_services::{
 };
 use messaging_outbox::{MockOutbox, OutboxProvider};
 
-use crate::tests::utils::{
-    ServiceLayerTestHarness,
-    ServiceLayerTestHarnessOpts,
-    TEST_RECONCILIATION_ERROR_CODE_REJECTED,
-    TestResource,
-    TestResourceReconcilerProvider,
-};
+use crate::tests::utils::{ServiceLayerTestHarness, ServiceLayerTestHarnessOpts};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Tests: error cases

@@ -18,7 +18,7 @@ use kamu_resources::{
     TypeUri,
 };
 
-use crate::tests::utils::TestResource;
+use crate::testing::TestResource;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -70,7 +70,7 @@ impl ResourceValidateSchemaValue for TestStageCondition {
     }
 }
 
-kamu_resources_services::declare_resource_extension_schema_dispatcher!(
+declare_resource_extension_schema_dispatcher!(
     dispatcher = TestStageConditionDispatcher,
     value = TestStageCondition,
     schema_id = TEST_STAGE_CONDITION_URI,
@@ -101,7 +101,7 @@ impl ResourceValidateSchemaValue for TestPayloadCondition {
     }
 }
 
-kamu_resources_services::declare_resource_extension_schema_dispatcher!(
+declare_resource_extension_schema_dispatcher!(
     dispatcher = TestPayloadConditionDispatcher,
     value = TestPayloadCondition,
     schema_id = TEST_PAYLOAD_CONDITION_URI,
@@ -125,7 +125,7 @@ const OTHER_TYPE_APPLICATIONS: &[ResourceExtensionApplicationMeta] =
         aliases: &[],
     }];
 
-kamu_resources_services::declare_resource_extension_schema_dispatcher!(
+declare_resource_extension_schema_dispatcher!(
     dispatcher = TestOtherTypeConditionDispatcher,
     value = TestStageCondition,
     schema_id = TEST_OTHER_TYPE_CONDITION_URI,

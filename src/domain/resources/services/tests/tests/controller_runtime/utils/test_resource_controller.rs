@@ -25,10 +25,13 @@ use kamu_resources::{
     ResourceVersion,
     TypeUri,
 };
+use kamu_resources_services::testing::{
+    TEST_STAGE_CONDITION_URI,
+    TestResource,
+    test_stage_condition_key,
+};
 use time_source::{FakeSystemTimeSource, SystemTimeSource};
 use tokio::sync::Notify;
-
-use crate::tests::utils::{TEST_STAGE_CONDITION_URI, TestResource, test_stage_condition_key};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

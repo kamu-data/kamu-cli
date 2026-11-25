@@ -16,6 +16,7 @@ use dill::CatalogBuilder;
 use kamu_accounts::{Account, AccountRepository, AccountType};
 use kamu_accounts_inmem::InMemoryAccountRepository;
 use kamu_resources::{
+    ApplyResourceHeaders,
     GenericResourceQueryService,
     MESSAGE_PRODUCER_KAMU_RESOURCE_SERVICE,
     ReconciliationError,
@@ -280,6 +281,12 @@ impl BaseResourceServiceHarness {
             }),
             owner_references: None,
         }
+    }
+
+    /// Like [`Self::make_headers_input`], with the name left to the resource
+    /// type
+    pub fn make_nameless_headers(account: odf::ResourceOwnerHandle) -> ApplyResourceHeaders {
+        ApplyResourceHeaders::try_new(Some(account.into()), None, vec![], vec![]).unwrap()
     }
 
     pub async fn get_snapshot_by_id(&self, id: &ResourceID) -> Option<ResourceSnapshot> {

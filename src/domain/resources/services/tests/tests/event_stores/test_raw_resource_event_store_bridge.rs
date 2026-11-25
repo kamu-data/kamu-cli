@@ -21,16 +21,13 @@ use kamu_resources::{
     TypeUri,
 };
 use kamu_resources_inmem::{InMemoryRawResourceEventState, InMemoryRawResourceEventStore};
-use tokio_stream::StreamExt;
-
-use crate::tests::utils::{
-    TestEvent,
+use kamu_resources_services::testing::{
     TestResourceEventStore,
-    make_created_event,
-    make_id,
-    make_spec_updated_event,
     register_test_resource_resource_service_layer,
 };
+use tokio_stream::StreamExt;
+
+use crate::tests::utils::{TestEvent, make_created_event, make_id, make_spec_updated_event};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Tests

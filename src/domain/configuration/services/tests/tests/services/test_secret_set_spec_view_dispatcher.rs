@@ -51,7 +51,8 @@ async fn test_spec_view_dispatcher_reveals_encrypted_secrets_as_plaintext() {
         .apply_secret_use_case()
         .apply(ApplyResourceParams {
             id: None,
-            headers: BaseResourceServiceHarness::make_headers_input(account_handle, "test-secrets"),
+            headers: BaseResourceServiceHarness::make_headers_input(account_handle, "test-secrets")
+                .into(),
             spec,
         })
         .await

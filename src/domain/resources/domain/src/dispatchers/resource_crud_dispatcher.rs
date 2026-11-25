@@ -15,10 +15,11 @@ use crate::{
     ApplyManifestApplicationDecision,
     ApplyManifestPlanningDecision,
     ApplyManifestRejection,
+    ApplyResourceHeaders,
     ApplyResourcePrecondition,
     ApplyResourceUseCaseError,
     RequestResourcesDeletionError,
-    ResourceHeadersInput,
+    ResourceHeadersValidationError,
     ResourceID,
     ResourceIDNotFoundError,
     ResourceTypeMismatchError,
@@ -63,7 +64,7 @@ pub trait ResourceCrudDispatcher: Send + Sync {
 #[derive(Debug, Clone)]
 pub struct ResourceCrudDispatcherApplyRequest {
     pub id: Option<ResourceID>,
-    pub headers: ResourceHeadersInput,
+    pub headers: ApplyResourceHeaders,
     pub spec: serde_json::Value,
 }
 
@@ -79,6 +80,9 @@ pub struct ResourceCrudDispatcherDeletionRequest {
 
 #[derive(Debug, Error)]
 pub enum ApplyResourceCrudDispatcherError {
+    #[error(transparent)]
+    InvalidHeaders(#[from] ResourceHeadersValidationError),
+
     #[error("Invalid spec for resource {schema}: {message}")]
     InvalidSpec { schema: TypeUri, message: String },
 
@@ -143,6 +147,7 @@ where
 {
     fn from(err: ApplyResourceUseCaseError<R>) -> Self {
         match err {
+            ApplyResourceUseCaseError::InvalidHeaders(err) => Self::InvalidHeaders(err),
             ApplyResourceUseCaseError::LoadFailed(err) => {
                 Self::Internal(format!("{err}").int_err())
             }

@@ -25,14 +25,14 @@ use kamu_resources::{
     TypedResourceQueryError,
     TypedResourceQueryService,
 };
-use kamu_resources_services::testing::BaseResourceServiceHarness;
-
-use crate::tests::utils::{
+use kamu_resources_services::testing::{
+    BaseResourceServiceHarness,
     TestResource,
     TestResourceReconciler,
-    make_resource_params,
     register_test_resource_resource_service_layer,
 };
+
+use crate::tests::utils::make_resource_params;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

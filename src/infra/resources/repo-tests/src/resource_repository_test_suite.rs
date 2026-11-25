@@ -1766,6 +1766,35 @@ pub async fn test_create_resource_duplicate_fails(catalog: &Catalog) {
 
     let result = repo.create_resource(&second).await;
     assert_matches!(result, Err(CreateResourceError::Duplicate(_)));
+
+    // The transaction stays usable: the caller may look the first one up, or
+    // create the second under another name
+    let found_id = repo
+        .find_resource_id_by_name(&account_handle.did, &TEST_KIND, &first.headers.name)
+        .await
+        .unwrap();
+    assert_eq!(found_id, Some(first.id));
+
+    second.headers.name = "other-resource".parse().unwrap();
+    repo.create_resource(&second).await.unwrap();
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_create_resource_with_taken_id_fails(catalog: &Catalog) {
+    let repo = catalog.get_one::<dyn ResourceRepository>().unwrap();
+
+    let account_handle = odf::ResourceOwnerHandle::new_test("test-account");
+
+    let first = make_test_snapshot(&account_handle, &TEST_KIND, "first-resource");
+    repo.create_resource(&first).await.unwrap();
+
+    // Not a duplicate, which means a taken name
+    let mut second = make_test_snapshot(&account_handle, &TEST_KIND, "second-resource");
+    second.id = first.id;
+
+    let result = repo.create_resource(&second).await;
+    assert_matches!(result, Err(CreateResourceError::Internal(_)));
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -3791,9 +3820,25 @@ pub async fn test_create_same_name_in_concurrent_transactions(catalog: &Catalog)
             let repo = catalog.get_one::<dyn ResourceRepository>().unwrap();
             repo.create_resource(&first).await.unwrap();
         },
-        move |catalog| async move {
-            let repo = catalog.get_one::<dyn ResourceRepository>().unwrap();
-            repo.create_resource(&second).await
+        {
+            let account_handle = account_handle.clone();
+            move |catalog| async move {
+                let repo = catalog.get_one::<dyn ResourceRepository>().unwrap();
+                let result = repo.create_resource(&second).await;
+                if result.is_err() {
+                    // Where the write fails, the transaction sees the winner
+                    let found_id = repo
+                        .find_resource_id_by_name(
+                            &account_handle.did,
+                            &TEST_KIND,
+                            &second.headers.name,
+                        )
+                        .await
+                        .unwrap();
+                    assert_eq!(found_id, Some(first_id));
+                }
+                result
+            }
         },
     )
     .await;

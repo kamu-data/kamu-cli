@@ -56,6 +56,7 @@ use kamu_resources::{
     ResourceVisibility,
 };
 use kamu_resources_facade::{ListResourcesError, ResourceFacade, SearchResourcesRequest};
+use kamu_resources_services::testing::register_test_resource;
 use kamu_resources_services::{BackgroundWorkFinalizer, ResourceControllerRuntimeImpl};
 use messaging_outbox::{OutboxAgent, OutboxProvider, register_message_dispatcher};
 use strum::IntoEnumIterator;
@@ -75,6 +76,9 @@ const ADMIN_ACCOUNT_NAME: &str = "admin";
 
 pub struct LocalFacadeHarnessOpts {
     pub outbox_provider: OutboxProvider,
+    /// Serves [`TestResource`](kamu_resources_services::testing::TestResource)
+    /// beside the real types
+    pub test_resource: bool,
 }
 
 impl Default for LocalFacadeHarnessOpts {
@@ -83,6 +87,7 @@ impl Default for LocalFacadeHarnessOpts {
             outbox_provider: OutboxProvider::Immediate {
                 force_immediate: true,
             },
+            test_resource: false,
         }
     }
 }
@@ -125,7 +130,7 @@ impl LocalFacadeHarness {
             .clone();
 
         let is_dispatching = matches!(opts.outbox_provider, OutboxProvider::Dispatching);
-        let base_catalog = Self::build_base_catalog(&subjects, opts.outbox_provider).await;
+        let base_catalog = Self::build_base_catalog(&subjects, opts).await;
 
         if is_dispatching {
             base_catalog
@@ -146,7 +151,7 @@ impl LocalFacadeHarness {
 
     async fn build_base_catalog(
         subjects: &[(TestAccount, CurrentAccountSubject)],
-        outbox_provider: OutboxProvider,
+        opts: LocalFacadeHarnessOpts,
     ) -> dill::Catalog {
         let mut predefined_accounts_config = PredefinedAccountsConfig::new();
         for (_, subject) in subjects {
@@ -174,8 +179,8 @@ impl LocalFacadeHarness {
         NoOpDatabasePlugin::init_database_components(&mut b);
 
         // Outbox
-        let needs_bridge = matches!(outbox_provider, OutboxProvider::Dispatching);
-        outbox_provider.embed_into_catalog(&mut b);
+        let needs_bridge = matches!(opts.outbox_provider, OutboxProvider::Dispatching);
+        opts.outbox_provider.embed_into_catalog(&mut b);
         // The controller hint hub needs it with any outbox
         b.add::<WakeupListenerMetrics>();
         if needs_bridge {
@@ -222,6 +227,9 @@ impl LocalFacadeHarness {
 
         kamu_resources_services::register_dependencies(&mut b);
         kamu_configuration_services::register_dependencies(&mut b);
+        if opts.test_resource {
+            register_test_resource(&mut b);
+        }
 
         register_message_dispatcher::<ResourceLifecycleMessage>(
             &mut b,

@@ -160,3 +160,7 @@ Each `RF-*` contract scenario is listed with its status. Test code and comments 
 | RF-184 | delete.rs | Active | `DeletedOnly` hides live resources, even from their ids | Also pins the listing order: newest deletion first, and with `IncludeDeleted` the live ones before it |
 | RF-185 | delete.rs | Active | Label selectors find deleted resources | Deleted resources keep their label projection |
 | RF-186 | spec_view_mode.rs | Active | The spec of a deleted resource is not revealed | A per-item problem from `get` and `render_manifests`; a live resource sharing the name is revealed beside it |
+| RF-187 | generated_names.rs | Active | Applying a manifest without a name creates a resource each time and returns its generated name | On `TestResource`, the type that generates names |
+| RF-188 | generated_names.rs | Active | Planning a manifest without a name reports the name as pending | A placeholder in `resource`, no name in the `after` document |
+| RF-189 | generated_names.rs | Active | A manifest with an `id` and without a name keeps the name of the resource | Plan and apply alike |
+| RF-190 | generated_names.rs | Active | A manifest without a name is refused for a type that does not generate names | Omitted, `null`, and with an `id`; `InvalidHeaders` from plan, apply and batch apply |

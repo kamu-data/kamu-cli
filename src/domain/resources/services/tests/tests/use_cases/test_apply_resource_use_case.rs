@@ -17,20 +17,18 @@ use kamu_resources::{
     ApplyResourcePlanningDecision,
     ApplyResourcePrecondition,
     ApplyResourceUseCaseError,
+    ResourceName,
     ResourcePhase,
 };
 use kamu_resources_services::testing::{
     BaseResourceServiceHarness,
     BaseResourceServiceHarnessOpts,
+    TestResource,
+    TestResourceSpec,
 };
 use messaging_outbox::OutboxProvider;
 
-use crate::tests::utils::{
-    SanitizerKind,
-    ServiceLayerTestHarness,
-    ServiceLayerTestHarnessOpts,
-    TestResourceSpec,
-};
+use crate::tests::utils::{SanitizerKind, ServiceLayerTestHarness, ServiceLayerTestHarnessOpts};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Tests
@@ -351,6 +349,37 @@ async fn test_apply_with_precondition() {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_apply_without_name_creates_a_resource_each_time() {
+    // With a sanitizer, which looks for the resource to update as well
+    let harness = ServiceLayerTestHarness::new_with_opts(ServiceLayerTestHarnessOpts {
+        sanitizer: SanitizerKind::Appending,
+        ..Default::default()
+    });
+    let account_handle = odf::ResourceOwnerHandle::new_test("test-owner");
+
+    let mut applied = Vec::new();
+    for _ in 0..2 {
+        let result = harness
+            .apply_test_uc()
+            .apply(make_nameless_params(&account_handle, "same"))
+            .await
+            .unwrap()
+            .expect_applied();
+        assert_eq!(result.outcome, ApplyResourceOutcome::Created);
+        assert_generated_name(&result.state.headers.name, "plain-");
+
+        let snapshot = harness.get_snapshot_by_id(&result.id).await.unwrap();
+        assert_eq!(snapshot.headers.name, result.state.headers.name);
+        applied.push(result);
+    }
+
+    assert_ne!(applied[0].id, applied[1].id);
+    assert_ne!(applied[0].state.headers.name, applied[1].state.headers.name);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Helpers
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -358,14 +387,46 @@ fn make_params(
     account_handle: &odf::ResourceOwnerHandle,
     name: &str,
     value: &str,
-) -> ApplyResourceParams<crate::tests::utils::TestResource> {
+) -> ApplyResourceParams<TestResource> {
     ApplyResourceParams {
         id: None,
-        headers: BaseResourceServiceHarness::make_headers_input(account_handle.clone(), name),
+        headers: BaseResourceServiceHarness::make_headers_input(account_handle.clone(), name)
+            .into(),
         spec: TestResourceSpec {
             value: value.to_string(),
         },
     }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+fn make_nameless_params(
+    account_handle: &odf::ResourceOwnerHandle,
+    value: &str,
+) -> ApplyResourceParams<TestResource> {
+    ApplyResourceParams {
+        id: None,
+        headers: BaseResourceServiceHarness::make_nameless_headers(account_handle.clone()),
+        spec: TestResourceSpec {
+            value: value.to_string(),
+        },
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+fn assert_generated_name(name: &ResourceName, prefix: &str) {
+    let suffix = name
+        .as_str()
+        .strip_prefix(prefix)
+        .unwrap_or_else(|| panic!("'{name}' must start with '{prefix}'"));
+    assert_eq!(suffix.len(), 6, "{name}");
+    assert!(
+        suffix
+            .chars()
+            .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit()),
+        "{name}"
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

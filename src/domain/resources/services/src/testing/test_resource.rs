@@ -11,7 +11,11 @@ use event_sourcing::*;
 use kamu_resources::*;
 use serde::{Deserialize, Serialize};
 
-use crate::tests::utils::test_stage_condition_key;
+use crate::testing::{
+    TestResourceReconciler,
+    register_test_condition_schema_dispatchers,
+    test_stage_condition_key,
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // TestResourceSpec
@@ -158,7 +162,7 @@ impl ResourceReconcileError for TestResourceReconcileError {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Aggregate, Debug)]
-pub struct TestResource(pub(crate) Aggregate<TestResourceState, dyn TestResourceEventStore>);
+pub struct TestResource(pub Aggregate<TestResourceState, dyn TestResourceEventStore>);
 
 impl TestResource {
     pub const SCHEMA_STR: &'static str = "https://test.kamu.dev/schemas/test/v1/TestResource";
@@ -195,6 +199,15 @@ impl DeclarativeResource for TestResource {
     type Spec = TestResourceSpec;
     type SpecInput = TestResourceSpec;
     type ResourceState = TestResourceState;
+
+    const GENERATED_NAME_PREFIX: Option<fn(&TestResourceSpec) -> String> = Some(|spec| {
+        if spec.value.starts_with(Self::STAGED_VALUE_PREFIX) {
+            "staged"
+        } else {
+            "plain"
+        }
+        .to_string()
+    });
 }
 
 impl ResourceStatusRules for TestResource {
@@ -294,22 +307,37 @@ impl ResourceSpecSanitizer<TestResource> for TestResourceSpecClearingSanitizer {
 
 pub const TEST_RESOURCE_SIMPLE_CONTROLLER_NAME: &str = "test-resource-simple-controller";
 
-kamu_resources_services::declare_resource_service_layer!(
-    domain = crate::tests::utils,
+crate::declare_resource_service_layer!(
+    domain = crate::testing,
     name = TestResource,
-    resource = crate::tests::utils::TestResource,
-    state_model = crate::tests::utils::TestResourceStateModel,
+    resource = TestResource,
+    state_model = TestResourceStateModel,
     controller_name = TEST_RESOURCE_SIMPLE_CONTROLLER_NAME,
     controller_revision = 1
 );
 
-kamu_resources_services::declare_resource_crud_dispatcher!(
+declare_resource_crud_dispatcher!(
     dispatcher = TestResourceCrudDispatcher,
-    resource = crate::tests::utils::TestResource
+    resource = TestResource
+);
+
+declare_resource_presentation_dispatcher!(
+    dispatcher = TestResourcePresentationDispatcher,
+    resource = TestResource
 );
 
 pub fn register_test_resource_crud_dispatcher(catalog_builder: &mut dill::CatalogBuilder) {
     catalog_builder.add::<TestResourceCrudDispatcher>();
+}
+
+/// Everything the type needs to be served beside the real ones, reconciled by
+/// a stub
+pub fn register_test_resource(catalog_builder: &mut dill::CatalogBuilder) {
+    register_test_resource_resource_service_layer(catalog_builder);
+    register_test_resource_crud_dispatcher(catalog_builder);
+    catalog_builder.add::<TestResourcePresentationDispatcher>();
+    register_test_condition_schema_dispatchers(catalog_builder);
+    catalog_builder.add::<TestResourceReconciler>();
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

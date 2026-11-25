@@ -8,5 +8,11 @@
 // by the Apache License, Version 2.0.
 
 mod base_resource_service_harness;
+mod test_conditions;
+mod test_resource;
+mod test_resource_reconciler;
 
 pub use base_resource_service_harness::*;
+pub use test_conditions::*;
+pub use test_resource::*;
+pub use test_resource_reconciler::*;

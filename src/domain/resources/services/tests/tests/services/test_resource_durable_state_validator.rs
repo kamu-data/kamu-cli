@@ -28,18 +28,17 @@ use kamu_resources::{
     ResourcePersistenceService,
     TypeRef,
 };
-use kamu_resources_services::testing::BaseResourceServiceHarness;
-
-use crate::tests::utils::{
+use kamu_resources_services::testing::{
+    BaseResourceServiceHarness,
     TestResource,
     TestResourceReconcileError,
     TestResourceReconciler,
     TestResourceSpec,
     TestResourceState,
-    make_fresh_aggregate,
-    make_id,
     register_test_resource_resource_service_layer,
 };
+
+use crate::tests::utils::{make_fresh_aggregate, make_id};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Tests

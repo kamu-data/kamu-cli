@@ -23,15 +23,15 @@ use kamu_resources::{
     ResourcePhase,
     ResourceStatus,
 };
-use kamu_resources_services::testing::BaseResourceServiceHarness;
-
-use crate::tests::utils::{
+use kamu_resources_services::testing::{
+    BaseResourceServiceHarness,
     TestResource,
     TestResourceLifecycleError,
     TestResourceReconcileError,
     TestResourceSpec,
-    make_id,
 };
+
+use crate::tests::utils::make_id;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

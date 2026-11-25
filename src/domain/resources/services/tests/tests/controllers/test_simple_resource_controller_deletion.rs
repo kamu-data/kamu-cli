@@ -22,15 +22,12 @@ use kamu_resources::{
 use kamu_resources_services::testing::{
     BaseResourceServiceHarness,
     BaseResourceServiceHarnessOpts,
-};
-use messaging_outbox::{MockOutbox, OutboxProvider};
-
-use crate::tests::utils::{
-    ServiceLayerTestHarness,
-    ServiceLayerTestHarnessOpts,
     TestResource,
     TestResourceReconcilerProvider,
 };
+use messaging_outbox::{MockOutbox, OutboxProvider};
+
+use crate::tests::utils::{ServiceLayerTestHarness, ServiceLayerTestHarnessOpts};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

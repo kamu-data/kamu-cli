@@ -6957,13 +6957,18 @@ type ResourceApplySuccess {
 	"""
 	resource: Resource!
 	"""
+	Whether the name in `resource` is a placeholder, as on a dry run of a
+	manifest without a name: the apply generates it
+	"""
+	namePending: Boolean!
+	"""
 	Canonical manifest before the apply. Null **iff** the resource is being
 	created.
 	"""
 	before: JSON
 	"""
 	Canonical manifest the apply produced (or would produce). Always present
-	on an accepted apply.
+	on an accepted apply, without the name while `namePending`.
 	"""
 	after: JSON!
 	"""
@@ -7155,6 +7160,10 @@ union ResourceHandleListOutcome = ResourceHandleConnection | ResourceUnsupported
 Kind of resource header validation failure
 """
 enum ResourceHeaderValidationProblemCode {
+	"""
+	Resource name is omitted, and the resource type does not generate names
+	"""
+	MISSING_NAME
 	"""
 	Resource name is empty
 	"""

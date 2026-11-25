@@ -18,9 +18,9 @@ use kamu_resources::{
     ResourceCrudDispatcherApplyRequest,
     ResourceSchemaProvider,
 };
-use kamu_resources_services::testing::BaseResourceServiceHarness;
+use kamu_resources_services::testing::{BaseResourceServiceHarness, TestResource};
 
-use crate::tests::utils::{ServiceLayerTestHarness, TestResource};
+use crate::tests::utils::ServiceLayerTestHarness;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Tests — spec decoding / validation
@@ -202,7 +202,7 @@ async fn test_apply_update_returns_applied_updated() {
     let account = applied1.resource.headers.account.clone();
     let req2 = ResourceCrudDispatcherApplyRequest {
         id: Some(id),
-        headers: BaseResourceServiceHarness::make_headers_input(account, "res-a"),
+        headers: BaseResourceServiceHarness::make_headers_input(account, "res-a").into(),
         spec: serde_json::json!({ "value": "value-v2" }),
     };
     let decision2 = harness.dispatcher().apply(req2).await.unwrap();
@@ -230,7 +230,7 @@ async fn test_apply_untouched_returns_applied_untouched() {
     // Second apply — identical spec and headers
     let req2 = ResourceCrudDispatcherApplyRequest {
         id: Some(id),
-        headers: BaseResourceServiceHarness::make_headers_input(account, "res-a"),
+        headers: BaseResourceServiceHarness::make_headers_input(account, "res-a").into(),
         spec: serde_json::json!({ "value": "same-value" }),
     };
     let decision2 = harness.dispatcher().apply(req2).await.unwrap();
@@ -264,7 +264,8 @@ impl ResourceCrudDispatcherHarness {
             headers: BaseResourceServiceHarness::make_headers_input(
                 odf::ResourceOwnerHandle::new_test("test"),
                 name,
-            ),
+            )
+            .into(),
             spec: serde_json::json!({ "value": value }),
         }
     }
@@ -278,7 +279,8 @@ impl ResourceCrudDispatcherHarness {
             headers: BaseResourceServiceHarness::make_headers_input(
                 odf::ResourceOwnerHandle::new_test("test"),
                 name,
-            ),
+            )
+            .into(),
             spec,
         }
     }

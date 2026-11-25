@@ -27,12 +27,13 @@ use kamu_resources::{
     ResourceSnapshot,
     new_pending_resource_status,
 };
+use kamu_resources_services::testing::TestResource;
 use messaging_outbox::{MessageConsumerT, OutboxProvider, register_message_dispatcher};
 use odf::metadata::resources::TypeUri;
 use pretty_assertions::assert_eq;
 use wakeup_listener::WakeupListener;
 
-use crate::tests::utils::{TestResource, make_id};
+use crate::tests::utils::make_id;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Tests

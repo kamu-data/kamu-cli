@@ -134,7 +134,8 @@ impl ControllersHarness {
         self.apply_variable_use_case()
             .apply(ApplyResourceParams {
                 id: None,
-                headers: BaseResourceServiceHarness::make_headers_input(self.owner.clone(), name),
+                headers: BaseResourceServiceHarness::make_headers_input(self.owner.clone(), name)
+                    .into(),
                 spec,
             })
             .await

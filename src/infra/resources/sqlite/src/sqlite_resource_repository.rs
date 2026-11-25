@@ -85,7 +85,7 @@ impl ResourceRepository for SqliteResourceRepository {
             .as_ref()
             .map(kamu_resources::resource_status_to_json);
 
-        sqlx::query!(
+        let insert_result = sqlx::query!(
             r#"
             INSERT INTO resources (
                 resource_id,
@@ -105,6 +105,9 @@ impl ResourceRepository for SqliteResourceRepository {
                 deletion_requested_at
             )
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+            ON CONFLICT (account_id, resource_schema, resource_name)
+                WHERE deletion_requested_at IS NULL
+                DO NOTHING
             "#,
             resource_id,
             account_id_str,
@@ -124,19 +127,15 @@ impl ResourceRepository for SqliteResourceRepository {
         )
         .execute(connection_mut)
         .await
-        .map_err(|e: sqlx::Error| {
-            if let Some(db_err) = e.as_database_error()
-                && db_err.is_unique_violation()
-            {
-                CreateResourceError::Duplicate(ResourceDuplicateError {
-                    account_id: resource_snapshot.headers.account.did.clone(),
-                    schema: resource_snapshot.schema.clone(),
-                    name: resource_snapshot.headers.name.clone(),
-                })
-            } else {
-                CreateResourceError::Internal(e.int_err())
-            }
-        })?;
+        .int_err()?;
+
+        if insert_result.rows_affected() == 0 {
+            return Err(CreateResourceError::Duplicate(ResourceDuplicateError {
+                account_id: resource_snapshot.headers.account.did.clone(),
+                schema: resource_snapshot.schema.clone(),
+                name: resource_snapshot.headers.name.clone(),
+            }));
+        }
 
         Ok(())
     }

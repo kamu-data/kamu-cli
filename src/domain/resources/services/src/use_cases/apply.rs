@@ -28,6 +28,8 @@ macro_rules! declare_apply_resource_use_case {
                 std::sync::Arc<dyn kamu_resources::ResourcePersistenceService<$resource>>,
             resource_spec_sanitizer:
                 Option<std::sync::Arc<dyn kamu_resources::ResourceSpecSanitizer<$resource>>>,
+            name_suffix_generator:
+                std::sync::Arc<dyn kamu_resources::ResourceNameSuffixGenerator>,
             outbox: std::sync::Arc<dyn $crate::messaging_outbox::Outbox>,
             time_source: std::sync::Arc<dyn time_source::SystemTimeSource>,
         }
@@ -59,6 +61,16 @@ macro_rules! declare_apply_resource_use_case {
                 }
             }
 
+            fn planner(&self) -> $crate::ApplyResourcePlanner<'_, $resource> {
+                $crate::ApplyResourcePlanner::new(
+                    self.generic_resource_query_service.as_ref(),
+                    self.typed_resource_query_service.as_ref(),
+                    self.resource_aggregate_loader.as_ref(),
+                    self.name_suffix_generator.as_ref(),
+                    self.time_source.as_ref(),
+                )
+            }
+
             /// Runs the optional sanitizer and surfaces sanitizer-level
             /// business rejections before planning.
             async fn sanitize_params(
@@ -74,26 +86,10 @@ macro_rules! declare_apply_resource_use_case {
                 };
 
                 // Find the resource UID if not provided
-                let maybe_resource_id = match params.id {
-                    Some(id) => Some(id),
-                    None => {
-                        let account_id = params
-                            .headers
-                            .account
-                            .as_ref()
-                            .and_then(|a| a.did.as_ref())
-                            .expect("resource headers account must be resolved by this point");
-
-                        self.generic_resource_query_service
-                            .find_resource_id_by_name(
-                                account_id,
-                                <$resource as kamu_resources::ResourceSchemaProvider>::type_uri(),
-                                &params.headers.name,
-                            )
-                            .await
-                            .map_err(kamu_resources::ApplyResourceUseCaseError::Internal)?
-                    }
-                };
+                let maybe_resource_id = self
+                    .planner()
+                    .resolve_existing_resource_id(params.id, &params.headers)
+                    .await?;
 
                 // Load the current spec if the resource exists to provide it to the sanitizer for comparison
                 let current_spec = if let Some(id) = maybe_resource_id {
@@ -174,14 +170,7 @@ macro_rules! declare_apply_resource_use_case {
                     }
                 };
 
-                let planner = $crate::ApplyResourcePlanner::<$resource>::new(
-                    self.generic_resource_query_service.as_ref(),
-                    self.typed_resource_query_service.as_ref(),
-                    self.resource_aggregate_loader.as_ref(),
-                    self.time_source.as_ref(),
-                );
-
-                planner.plan(params).await
+                self.planner().plan(params).await
             }
 
             async fn apply(
@@ -216,13 +205,7 @@ macro_rules! declare_apply_resource_use_case {
                     }
                 };
 
-                let planner = $crate::ApplyResourcePlanner::<$resource>::new(
-                    self.generic_resource_query_service.as_ref(),
-                    self.typed_resource_query_service.as_ref(),
-                    self.resource_aggregate_loader.as_ref(),
-                    self.time_source.as_ref(),
-                );
-                let plan = planner.plan_internal(params, precondition).await?;
+                let plan = self.planner().plan_internal(params, precondition).await?;
 
                 let plan = match plan {
                     $crate::PlannedApplyResourceDecision::Planned(plan) => plan,
@@ -238,6 +221,7 @@ macro_rules! declare_apply_resource_use_case {
                     self.typed_resource_query_service.as_ref(),
                     self.resource_aggregate_loader.as_ref(),
                     self.resource_persistence_service.as_ref(),
+                    self.name_suffix_generator.as_ref(),
                     self.outbox.as_ref(),
                     self.time_source.as_ref(),
                 );

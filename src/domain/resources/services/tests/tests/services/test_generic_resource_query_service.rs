@@ -20,9 +20,7 @@ use kamu_resources::{
     ResourceSnapshot,
     TypeUri,
 };
-use kamu_resources_services::testing::BaseResourceServiceHarness;
-
-use crate::tests::utils::TestResource;
+use kamu_resources_services::testing::{BaseResourceServiceHarness, TestResource};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

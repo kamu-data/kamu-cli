@@ -164,6 +164,14 @@ database_transactional_test!(
 
 database_transactional_test!(
     storage = sqlite,
+    fixture = resource_repo_suite::test_create_resource_with_taken_id_fails,
+    harness = SqliteResourceRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = sqlite,
     fixture = resource_repo_suite::test_create_resource_duplicate_ignore_case_fails,
     harness = SqliteResourceRepositoryHarness
 );

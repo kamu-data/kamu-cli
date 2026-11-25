@@ -9,8 +9,7 @@
 
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu_resources::{
-    ResourceHeadersInput,
-    ResourceHeadersInputExt,
+    ApplyResourceHeaders,
     ResourceManifest,
     ResourceWarning,
     description_annotation_type_ref,
@@ -42,13 +41,13 @@ pub(crate) fn parse_manifest(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub(crate) fn make_headers_input(
-    name: &str,
+pub(crate) fn make_apply_headers(
+    name: Option<&str>,
     target_account: &odf::ResourceOwnerHandle,
     labels: Vec<(kamu_resources::TypeRef, serde_json::Value)>,
     annotations: Vec<(kamu_resources::TypeRef, serde_json::Value)>,
-) -> Result<ResourceHeadersInput, ApplyManifestError> {
-    ResourceHeadersInputExt::try_new(
+) -> Result<ApplyResourceHeaders, ApplyManifestError> {
+    ApplyResourceHeaders::try_new(
         Some(target_account.clone().into()),
         name,
         labels,

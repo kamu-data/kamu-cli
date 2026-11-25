@@ -34,6 +34,7 @@ use crate::UnsupportedSelectorFieldError;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum ResourceHeadersValidationProblemCode {
+    MissingName,
     EmptyName,
     NameTooLong,
     InvalidName,
@@ -56,6 +57,7 @@ impl From<ResourceHeadersValidationError> for ResourceInvalidHeadersError {
         use ResourceHeadersValidationError as E;
         use ResourceHeadersValidationProblemCode as C;
         let code = match &err {
+            E::MissingName { .. } => C::MissingName,
             E::EmptyName => C::EmptyName,
             E::NameTooLong { .. } => C::NameTooLong,
             E::InvalidName { .. } => C::InvalidName,
@@ -437,6 +439,7 @@ impl From<ApplyResourceCrudDispatcherError> for ApplyManifestError {
     fn from(err: ApplyResourceCrudDispatcherError) -> Self {
         use ApplyResourceCrudDispatcherError as E;
         match err {
+            E::InvalidHeaders(err) => Self::InvalidHeaders(err.into()),
             E::Internal(err) => Self::Internal(err),
             E::NotFound(err) => Self::IDNotFound(err),
             E::TypeMismatch(err) => Self::TypeMismatch(err),

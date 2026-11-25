@@ -47,7 +47,8 @@ async fn test_reconcile_secret_set_decrypts_and_reprojects_values() {
         .apply_secret_use_case()
         .apply(ApplyResourceParams {
             id: None,
-            headers: BaseResourceServiceHarness::make_headers_input(account_handle, "test-secrets"),
+            headers: BaseResourceServiceHarness::make_headers_input(account_handle, "test-secrets")
+                .into(),
             spec,
         })
         .await

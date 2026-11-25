@@ -14,6 +14,7 @@ mod resource_aggregate_loader;
 mod resource_condition_patch_checker;
 mod resource_durable_state_validator;
 mod resource_lifecycle_primitives;
+mod resource_name_suffix_generator_impl;
 mod resource_persistence;
 mod typed_resource_query;
 
@@ -23,5 +24,6 @@ pub use generic_resource_query::*;
 pub(crate) use resource_condition_patch_checker::*;
 pub use resource_durable_state_validator::*;
 pub use resource_lifecycle_primitives::*;
+pub use resource_name_suffix_generator_impl::*;
 pub use resource_persistence::*;
 pub use typed_resource_query::*;

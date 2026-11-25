@@ -286,7 +286,7 @@ impl BaseConfigurationServiceHarness {
             .apply_variable_use_case()
             .apply(ApplyResourceParams {
                 id: None,
-                headers,
+                headers: headers.into(),
                 spec,
             })
             .await
@@ -322,7 +322,7 @@ impl BaseConfigurationServiceHarness {
             .apply_secret_use_case()
             .apply(ApplyResourceParams {
                 id: None,
-                headers,
+                headers: headers.into(),
                 spec,
             })
             .await

@@ -70,6 +70,7 @@ make clippy
   - [6. Persistence model](#6-persistence-model)
   - [7. Account resolution \& authorization](#7-account-resolution--authorization)
   - [8. Rename \& conflict rules](#8-rename--conflict-rules)
+    - [Generated names](#generated-names)
   - [9. Services (`kamu-resources-services`)](#9-services-kamu-resources-services)
   - [10. Facade (`kamu-resources-facade`)](#10-facade-kamu-resources-facade)
   - [11. GraphQL API](#11-graphql-api)
@@ -451,7 +452,7 @@ which takes a `ResourceScope` and answers a multi-type request in one query.
 ### 5a. Resource anatomy — input vs auto-generated
 
 Only a subset of a resource is user-authored: a manifest carries `$schema`,
-`headers.{id?, account?, name, labels, annotations}` and `spec`, and nothing else —
+`headers.{id?, account?, name?, labels, annotations}` and `spec`, and nothing else —
 `deny_unknown_fields` rejects `status`, timestamps and `generation`, which are server-owned. The
 framework generates the remaining headers (`id`, resolved `account`, `generation`,
 `status_generation`, `created_at`/`updated_at`/`deletion_requested_at`/`deleted_at`) and the whole
@@ -507,6 +508,11 @@ columns are derived from the current spec/read model instead: `VariableSet.varia
 only applies if the stored `last_event_id` equals the caller's `expected_last_event_id`; otherwise it
 returns `UpdateResourceError::concurrent_modification()`. A unique-constraint violation surfaces as
 `UpdateResourceError::Duplicate`, which the apply use case reports as an internal error.
+
+**Taken names.** `create_resource` inserts with `ON CONFLICT … DO NOTHING` on the unique name index
+and reports a row that was not inserted as `CreateResourceError::Duplicate`. The statement does not
+fail, so the transaction stays usable: Postgres would otherwise abort it, and the apply retries in
+it ([§8](#8-rename--conflict-rules)).
 
 **Soft delete in two steps.** Rows are never removed ([(c) Deletion](#c-deletion)):
 
@@ -646,6 +652,7 @@ decides create vs update by resolving the target resource first:
 
 - **No `id` in manifest** → resolve by `(account, schema, name)`. Found → update; not found → create
   (new UID allocated).
+- **Neither `id` nor `name`** → always create, under a [generated name](#generated-names).
 - **`id` in manifest** → load that exact resource (the "exact pointer"). This is what enables a
   **rename**: supply the `id` and a new `headers.name`; identity stays stable while the name
   changes.
@@ -659,6 +666,7 @@ Concrete conflict cases:
 | `id` resolving to a resource in a different account | **Not found** — `ResourceIDNotFoundError` (account-scoped lookup; existence not leaked). |
 | `headers.account` targeting another account without admin | **Reject** — `AccessError::Unauthorized` ([§7](#7-account-resolution--authorization)). |
 | Rename target name already taken (same account+schema) | **Reject** — the unique index fails the update, reported as an internal error. |
+| Create whose name another writer takes first | **Update** of the resource that writer created — the create is replanned in the same transaction. With a generated name: **Create** under another name, never an update. |
 | Update by name where another account has the same name | **No conflict** — the account disambiguates; each `(account, schema, name)` is independent. |
 | Apply re-using the name of a resource being deleted | **Create** — the resource being deleted gave up its name. The outcome carries a `replaces_resource_being_deleted` warning naming its id. |
 | Apply re-using the name of a deleted resource | **Create** — the deleted resource gave up its name when its deletion was requested. No warning, unlike one still being deleted. |
@@ -667,6 +675,33 @@ Concrete conflict cases:
 | Apply with no real change | **`Untouched`** — no generation bump, no events, no reconcile. |
 
 Note names are normalized to lowercase on write, so case-only differences are not distinct names.
+
+### Generated names
+
+A type whose resources may be applied without a name gives a
+`DeclarativeResource::GENERATED_NAME_PREFIX`, which derives a prefix from the spec. Every other type
+requires `headers.name`: a manifest without it is refused as `InvalidHeaders`
+(`ResourceHeadersValidationProblemCode::MissingName`). `name: null` counts as omitted; an empty name
+is invalid for every type. `ApplyResourceHeaders` carries the optional name up to the planner, and
+events and stored headers always have one.
+
+| Manifest of a type that generates names | Outcome |
+| --- | --- |
+| Neither `id` nor `name`, applied | **Create** as `<prefix>-<6 random lowercase letters and digits>`. |
+| Neither `id` nor `name`, planned | **Create** with the placeholder `<prefix>-xxxxxx`, `name_pending` set, and no name in the `after` document. |
+| `id`, no `name` | The resource keeps its name. |
+
+- A name that a resource of the same type and account carries is not used, deleted resources
+  included, so that a generated name normally finds one resource in the history too. Only names of
+  live resources are unique by index.
+- A taken name is replaced by another, up to 5 names in one apply, whether it was taken before the
+  insert or by it. Then the apply fails with an internal error.
+- **Applying without a name is not idempotent.** A repeated apply, such as after a lost response,
+  creates another resource.
+- **Omitting the name deviates from ODF,** whose `ResourceHeadersInput` schema requires it; such a
+  manifest does not validate against the published schema. The canonical form always has a name and
+  conforms. Whether input may omit it is asked in
+  [open-data-fabric#140](https://github.com/open-data-fabric/open-data-fabric/issues/140).
 
 ---
 
@@ -686,6 +721,8 @@ This crate turns the domain traits into running code. Module layout: `services/`
 - **`GenericResourceQueryService`** (impl `GenericResourceQueryServiceImpl`) — descriptor-agnostic
   queries (allocate UID, find by name, search identities) delegating to `ResourceRepository`.
 - **`TypedResourceQueryService<R>`** — type-safe queries for a single type.
+- **`ResourceNameSuffixGenerator`** — the random part of a [generated name](#generated-names); tests
+  script it to force collisions.
 - **`SimpleResourceReconciler<R>`** — the per-type callbacks of a type whose reconciliation and
   cleanup each fit in one step (implemented in the type's crate): `reconcile` drives the resource
   toward its spec, and `cleanup` removes what it built before the deletion completes
@@ -719,7 +756,7 @@ The `--dry-run` path uses `plan`; a live apply uses `apply`. A read-modify-write
 `apply_with_precondition`, passing the state it read (`ApplyResourcePrecondition::Absent` or
 `Generation(n)`). If the stored resource no longer matches, the apply fails with
 `ConcurrentModification`. That includes a create that hits an existing name, which is otherwise
-retried as an update. The planner checks the generation of the aggregate it loads, and saving
+retried as an update, or under another name if it was [generated](#generated-names). The planner checks the generation of the aggregate it loads, and saving
 checks that no event was appended since, so the check and the write are atomic.
 
 Use-case implementations are generated by **`declare_*_use_case!`** macros so each type gets a
@@ -1210,7 +1247,7 @@ the normal per-item `data` is unavailable (see `GqlError::gql_extended` /
   `ResourceExtensionSchemaResolver`. For `plan_apply_manifest` / `apply_manifest`, the shared
   preparation step parses the manifest, resolves the account, resolves the CRUD dispatcher,
   canonicalizes and validates labels/annotations, collects header warnings, then builds
-  `ResourceHeadersInput`; this is why plan/apply accept, reject, and warn identically.
+  `ApplyResourceHeaders`; this is why plan/apply accept, reject, and warn identically.
 - **`RemoteGraphqlResourceFacadeImpl`** — a `cynic`-based GraphQL client that issues the queries /
   mutations of a remote server (whose resolvers use a *local* facade there). It lives in the
   `kamu-adapter-resources-facade-graphql` crate: operations under
@@ -1272,7 +1309,8 @@ typed `Problem` variants *and* transport-level GraphQL errors. The apply outcome
 (`resource_apply_outcome_model.rs`) is the richest example of the union:
 
 - `Success` → operation (`Created`/`Updated`/`Untouched`) + `before`/`after` (canonical manifest
-  documents as JSON; `after` is non-null, `before` is null **iff** creating) + `warnings`. Sent for a live apply as well as a
+  documents as JSON; `after` is non-null, `before` is null **iff** creating) + `warnings` +
+  `namePending` ([Generated names](#generated-names)). Sent for a live apply as well as a
   dry run — see [Canonical manifest documents](#canonical-manifest-documents).
 - `Rejection` → category (`ImmutableFieldChanged`, `BusinessValidationFailed`,
   `ReferencedObjectMissing`, `LifecycleRuleConflict`) + message.
@@ -2190,9 +2228,10 @@ work: the harnesses' `settle` runs the `BackgroundWorkFinalizer`, as the CLI doe
 apply planner/executor, the simple controller adapter's reconciliation, deletion and retries, CRUD
 dispatch, persistence, the event-store bridge, and the message consumers. Configuration tests also
 leave real resources `Reconciling` or `Deleting` without the runtime, as a crash would, and check
-that the first drain completes them, and that a failing `SecretSet` holds back no `VariableSet`. A `TestResource` mock
-(`services/tests/tests/utils/`) and `BaseResourceServiceHarness` (`services/src/testing/`) provide
-a type-agnostic harness;
+that the first drain completes them, and that a failing `SecretSet` holds back no `VariableSet`. A
+`TestResource` mock and `BaseResourceServiceHarness` (both in `services/src/testing/`) provide a
+type-agnostic harness; the facade contract tests serve `TestResource` beside the real types where
+they need a feature no real type has (`LocalFacadeHarnessOpts::test_resource`);
 configuration tests cover the real reconcilers (incl. the `SecretSet` spec sanitizer, encrypted projection, and `reveal_spec`).
 
 **Controller runtime** —

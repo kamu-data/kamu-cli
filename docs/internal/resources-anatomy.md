@@ -22,13 +22,13 @@ pub struct ResourceManifestHeaders {
     pub id: Option<ResourceID>,              // optional — NOT assignable; an exact pointer to an
                                              // existing resource for updates (e.g. when renaming)
     pub account: Option<ResourceOwnerRef>, // optional — id/did/name selector; defaults to caller
-    pub name: ResourceName,                  // required
+    pub name: Option<String>,                // required, unless the type generates names
     pub labels: Vec<(TypeRef, serde_json::Value)>,
     pub annotations: Vec<(TypeRef, serde_json::Value)>,
 }
 ```
 
-A user may write **only**: `$schema`, `headers.{id?, account?, name, labels, annotations}`, and
+A user may write **only**: `$schema`, `headers.{id?, account?, name?, labels, annotations}`, and
 `spec`. `deny_unknown_fields` means a manifest **cannot** carry `status`, timestamps, or
 `generation` — those are server-owned.
 
@@ -68,7 +68,8 @@ A user may write **only**: `$schema`, `headers.{id?, account?, name, labels, ann
 The `id` is **not** something the user assigns — a new resource's UID is always allocated by the
 server. It may only be *supplied* on a manifest to point at an already-existing resource for an
 update; this is what lets a resource be renamed (the `id` keeps the identity stable while `name`
-changes). Omit it for normal create/update-by-name.
+changes). Omit it for normal create/update-by-name. When the `name` may be omitted is in
+[Generated names](resources-framework.md#generated-names).
 
 **(2) Framework-generated — the rest of headers + all of status.**
 `ResourceHeaders` ([`values/resource_headers.rs`](/src/domain/resources/domain/src/values/resource_headers.rs))
@@ -195,7 +196,7 @@ The behaviorally-significant consequences of adopting these shapes:
   unreachable; only entry *counts* (`MAX_LABELS`/`MAX_ANNOTATIONS`) are enforced.
 - **Registered label/annotation keys are canonicalized before diffing.** Facade apply preparation
   resolves `headers.labels` and `headers.annotations` with `ResourceExtensionSchemaResolver` before
-  constructing `ResourceHeadersInput`. Short names and aliases that resolve to a registered extension
+  constructing `ApplyResourceHeaders`. Short names and aliases that resolve to a registered extension
   are rewritten to the canonical schema URI, so re-applying `description` after a stored URI form (or
   vice versa) is `Untouched` rather than a headers update. Duplicate keys that only become duplicates
   after canonicalization are rejected as `InvalidHeaders`. Unknown short names remain free-form and
@@ -243,7 +244,7 @@ pub struct ResourceSnapshot {
 
 ```mermaid
 flowchart LR
-    M["Manifest (authored)<br/>$schema<br/>headers: name, account?, id?,<br/>labels, annotations<br/>spec"]
+    M["Manifest (authored)<br/>$schema<br/>headers: name?, account?, id?,<br/>labels, annotations<br/>spec"]
     A["apply use case<br/>(resolve account, allocate id,<br/>bump generation, set timestamps)"]
     S["Snapshot / State<br/>= authored fields<br/>+ <b>generated</b>: account(ID), id,<br/>generation, statusGeneration, created/updated/<br/>deletionRequested/deleted_at,<br/>status{phase, observed/reconciled generation and time, conditions}"]
     M --> A --> S

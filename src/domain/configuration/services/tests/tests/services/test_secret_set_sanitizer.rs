@@ -76,7 +76,8 @@ async fn test_apply_secret_set_encrypts_literal_values() {
         .apply_secret_use_case()
         .apply(ApplyResourceParams {
             id: None,
-            headers: BaseResourceServiceHarness::make_headers_input(account_handle, "test-secrets"),
+            headers: BaseResourceServiceHarness::make_headers_input(account_handle, "test-secrets")
+                .into(),
             spec,
         })
         .await
@@ -137,7 +138,8 @@ async fn test_apply_secret_set_already_encrypted_passes_through_idempotently() {
             headers: BaseResourceServiceHarness::make_headers_input(
                 account_handle.clone(),
                 "test-secrets",
-            ),
+            )
+            .into(),
             spec,
         })
         .await
@@ -173,7 +175,8 @@ async fn test_apply_secret_set_already_encrypted_passes_through_idempotently() {
         .apply_secret_use_case()
         .apply(ApplyResourceParams {
             id: Some(id),
-            headers: BaseResourceServiceHarness::make_headers_input(account_handle, "test-secrets"),
+            headers: BaseResourceServiceHarness::make_headers_input(account_handle, "test-secrets")
+                .into(),
             spec: encrypted_spec.clone().into_input(),
         })
         .await
@@ -229,7 +232,8 @@ async fn test_apply_secret_set_same_plaintext_is_untouched() {
             headers: BaseResourceServiceHarness::make_headers_input(
                 account_handle.clone(),
                 "test-secrets",
-            ),
+            )
+            .into(),
             spec: spec.clone(),
         })
         .await
@@ -256,7 +260,8 @@ async fn test_apply_secret_set_same_plaintext_is_untouched() {
         .apply_secret_use_case()
         .apply(ApplyResourceParams {
             id: Some(id),
-            headers: BaseResourceServiceHarness::make_headers_input(account_handle, "test-secrets"),
+            headers: BaseResourceServiceHarness::make_headers_input(account_handle, "test-secrets")
+                .into(),
             spec,
         })
         .await
@@ -314,7 +319,8 @@ async fn test_apply_secret_set_rejects_jwe_that_does_not_decrypt_under_current_k
         .apply_secret_use_case()
         .apply(ApplyResourceParams {
             id: None,
-            headers: BaseResourceServiceHarness::make_headers_input(account_handle, "test-secrets"),
+            headers: BaseResourceServiceHarness::make_headers_input(account_handle, "test-secrets")
+                .into(),
             spec,
         })
         .await
@@ -352,7 +358,8 @@ async fn test_apply_secret_set_upgrades_legacy_aes256gcm_to_jwe() {
         .apply_secret_use_case()
         .apply(ApplyResourceParams {
             id: None,
-            headers: BaseResourceServiceHarness::make_headers_input(account_handle, "test-secrets"),
+            headers: BaseResourceServiceHarness::make_headers_input(account_handle, "test-secrets")
+                .into(),
             spec: legacy_spec,
         })
         .await

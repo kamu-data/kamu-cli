@@ -15,9 +15,10 @@ use kamu_resources::{
     ResourceDeletionInProgressError,
     ResourcePhase,
 };
+use kamu_resources_services::testing::TestResourceLifecycleError;
 use pretty_assertions::assert_eq;
 
-use crate::tests::utils::{ResourceLifecycleHarness, TestResourceLifecycleError};
+use crate::tests::utils::ResourceLifecycleHarness;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

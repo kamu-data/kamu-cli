@@ -47,7 +47,8 @@ async fn test_reconcile_variable_set_populates_projection_entries() {
         .apply_variable_use_case()
         .apply(ApplyResourceParams {
             id: None,
-            headers: BaseResourceServiceHarness::make_headers_input(account_handle, "test-vars"),
+            headers: BaseResourceServiceHarness::make_headers_input(account_handle, "test-vars")
+                .into(),
             spec,
         })
         .await
@@ -94,7 +95,8 @@ async fn test_reconcile_variable_set_preserves_entry_id_across_reconciliations()
             headers: BaseResourceServiceHarness::make_headers_input(
                 account_handle.clone(),
                 "test-vars",
-            ),
+            )
+            .into(),
             spec,
         })
         .await
@@ -125,7 +127,8 @@ async fn test_reconcile_variable_set_preserves_entry_id_across_reconciliations()
             headers: BaseResourceServiceHarness::make_headers_input(
                 account_handle.clone(),
                 "test-vars",
-            ),
+            )
+            .into(),
             spec: spec2,
         })
         .await

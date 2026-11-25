@@ -62,7 +62,7 @@ impl ResourceManifest {
             headers: ResourceManifestHeaders {
                 id: None,
                 account: Some(ResourceOwnerRef::from(headers.account.clone())),
-                name: headers.name.to_string(),
+                name: Some(headers.name.to_string()),
                 labels: headers
                     .labels
                     .entries
@@ -107,7 +107,9 @@ pub struct ResourceManifestHeaders {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[serde_as(as = "Option<odf::metadata::serde::yaml::auth::ResourceOwnerRef>")]
     pub account: Option<ResourceOwnerRef>,
-    pub name: String,
+    /// May be omitted where the resource type generates names
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
     #[serde(
         default,
         serialize_with = "serialize_entries",

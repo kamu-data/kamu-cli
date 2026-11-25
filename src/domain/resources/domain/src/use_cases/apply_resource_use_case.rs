@@ -11,8 +11,10 @@ use event_sourcing::ConcurrentModificationError;
 use internal_error::{ErrorIntoInternal, InternalError};
 
 use crate::{
+    ApplyResourceHeaders,
     DeclarativeResource,
     EventSourcedResource,
+    ResourceHeadersValidationError,
     ResourceID,
     ResourceIDNotFoundError,
     ResourceLoadError,
@@ -70,8 +72,9 @@ pub enum ApplyResourcePrecondition {
 pub struct ApplyResourceParams<R: DeclarativeResource> {
     pub id: Option<ResourceID>,
     /// `headers.account` must be a fully resolved `ResourceOwnerRef` — see
-    /// [`ApplyResourceUseCase`].
-    pub headers: crate::ResourceHeadersInput,
+    /// [`ApplyResourceUseCase`]. `headers.name` may be omitted if the type has
+    /// a [`DeclarativeResource::GENERATED_NAME_PREFIX`].
+    pub headers: ApplyResourceHeaders,
     pub spec: R::SpecInput,
 }
 
@@ -127,6 +130,9 @@ pub struct ApplyResourcePlan<R: DeclarativeResource> {
     /// documents. `None` for a create. Captured from the aggregate the planner
     /// already loaded, so it costs no additional read.
     pub previous_state: Option<R::ResourceState>,
+
+    /// The name in `state` is a placeholder: the apply generates the real one
+    pub name_pending: bool,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -244,6 +250,9 @@ pub trait IntoApplyResourceRejection {
 
 #[derive(thiserror::Error, Debug)]
 pub enum ApplyResourceUseCaseError<R: EventSourcedResource> {
+    #[error(transparent)]
+    InvalidHeaders(#[from] ResourceHeadersValidationError),
+
     #[error(transparent)]
     LoadFailed(#[from] ResourceLoadError<R::ResourceState>),
 

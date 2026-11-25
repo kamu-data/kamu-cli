@@ -61,6 +61,7 @@ where
                 executable,
                 warnings,
                 previous_state,
+                name_pending,
                 ..
             } = plan;
 
@@ -76,6 +77,7 @@ where
                 reconciliation_required,
                 executable,
                 warnings,
+                name_pending,
                 // Deliberately not canonicalized here: the facade corrects
                 // `headers.account` after this dispatcher returns, and the
                 // account is part of the canonical manifest.

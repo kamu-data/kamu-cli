@@ -29,11 +29,6 @@ use kamu_resources::{
 use kamu_resources_services::testing::{
     BaseResourceServiceHarness,
     BaseResourceServiceHarnessOpts,
-};
-use messaging_outbox::{MockOutbox, OutboxAgent, OutboxProvider};
-use time_source::FakeSystemTimeSource;
-
-use crate::tests::utils::{
     TEST_RESOURCE_SIMPLE_CONTROLLER_NAME,
     TestResource,
     TestResourceReconcilerProvider,
@@ -45,6 +40,8 @@ use crate::tests::utils::{
     register_test_resource_resource_service_layer,
     register_test_resource_resource_service_layer_without_controller,
 };
+use messaging_outbox::{MockOutbox, OutboxAgent, OutboxProvider};
+use time_source::FakeSystemTimeSource;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -261,7 +258,8 @@ impl ServiceLayerTestHarness {
     ) {
         let params = ApplyResourceParams {
             id: Some(id),
-            headers: BaseResourceServiceHarness::make_headers_input(account_handle.clone(), name),
+            headers: BaseResourceServiceHarness::make_headers_input(account_handle.clone(), name)
+                .into(),
             spec: TestResourceSpec {
                 value: value.to_string(),
             },
@@ -308,7 +306,8 @@ impl ServiceLayerTestHarness {
     ) -> ResourceID {
         let params = ApplyResourceParams {
             id: None,
-            headers: BaseResourceServiceHarness::make_headers_input(account_handle.clone(), name),
+            headers: BaseResourceServiceHarness::make_headers_input(account_handle.clone(), name)
+                .into(),
             spec: TestResourceSpec {
                 value: name.to_string(),
             },

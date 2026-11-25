@@ -52,12 +52,6 @@ use kamu_resources::{
 use kamu_resources_services::testing::{
     BaseResourceServiceHarness,
     BaseResourceServiceHarnessOpts,
-};
-use messaging_outbox::{OutboxMessageBoundary, OutboxMessageBridge, OutboxProvider};
-
-use crate::tests::utils::{
-    ServiceLayerTestHarness,
-    ServiceLayerTestHarnessOpts,
     TEST_OTHER_TYPE_CONDITION_URI,
     TEST_PAYLOAD_CONDITION_URI,
     TEST_STAGE_CONDITION_URI,
@@ -65,6 +59,9 @@ use crate::tests::utils::{
     TestResourceReconcileError,
     TestResourceSpec,
 };
+use messaging_outbox::{OutboxMessageBoundary, OutboxMessageBridge, OutboxProvider};
+
+use crate::tests::utils::{ServiceLayerTestHarness, ServiceLayerTestHarnessOpts};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -941,7 +938,8 @@ impl LifecyclePrimitivesHarness {
                         headers: BaseResourceServiceHarness::make_headers_input(
                             self.account.clone(),
                             snapshot.headers.name.as_str(),
-                        ),
+                        )
+                        .into(),
                         spec: TestResourceSpec {
                             value: "updated".to_string(),
                         },

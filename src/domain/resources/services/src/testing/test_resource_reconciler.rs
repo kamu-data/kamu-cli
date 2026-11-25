@@ -22,7 +22,7 @@ use kamu_resources::{
     SimpleResourceReconciler,
 };
 
-use crate::tests::utils::{TestResource, TestResourceReconcileError};
+use crate::testing::{TestResource, TestResourceReconcileError};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // TestResourceReconciler

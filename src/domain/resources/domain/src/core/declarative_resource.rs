@@ -33,6 +33,12 @@ pub trait DeclarativeResource:
         + TryFrom<ResourceSnapshot, Error = InternalError>
         + From<Self>;
 
+    /// Given by a type whose resources may be applied without a name: the
+    /// prefix of the generated name `<prefix>-<random suffix>`
+    ///
+    /// Deviates from ODF, whose `ResourceHeadersInput` requires a name.
+    const GENERATED_NAME_PREFIX: Option<fn(&Self::SpecInput) -> String> = None;
+
     fn id(&self) -> &ResourceID {
         self.as_ref().id()
     }

@@ -10,14 +10,10 @@
 use std::assert_matches;
 
 use kamu_resources::{ResourceEvent, ResourcePhase, ResourceStatusConflictError};
+use kamu_resources_services::testing::{TestResourceLifecycleError, test_stage_condition_key};
 use pretty_assertions::assert_eq;
 
-use crate::tests::utils::{
-    ResourceLifecycleHarness,
-    TestResourceLifecycleError,
-    make_id,
-    test_stage_condition_key,
-};
+use crate::tests::utils::{ResourceLifecycleHarness, make_id};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

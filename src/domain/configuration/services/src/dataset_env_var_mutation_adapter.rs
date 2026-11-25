@@ -228,7 +228,8 @@ impl DatasetEnvVarMutationAdapterImpl {
                 return Err(EnvVarSetWriteError::ConcurrentModification);
             }
             Err(
-                err @ (ApplyResourceCrudDispatcherError::InvalidSpec { .. }
+                err @ (ApplyResourceCrudDispatcherError::InvalidHeaders(_)
+                | ApplyResourceCrudDispatcherError::InvalidSpec { .. }
                 | ApplyResourceCrudDispatcherError::NotFound(_)
                 | ApplyResourceCrudDispatcherError::TypeMismatch(_)
                 | ApplyResourceCrudDispatcherError::Internal(_)),
@@ -353,7 +354,7 @@ impl DatasetEnvVarMutationAdapterImpl {
             &dispatcher,
             ResourceCrudDispatcherApplyRequest {
                 id: existing_id,
-                headers,
+                headers: headers.into(),
                 spec: new_spec,
             },
             precondition,
@@ -455,7 +456,7 @@ impl DatasetEnvVarMutationAdapterImpl {
             &dispatcher,
             ResourceCrudDispatcherApplyRequest {
                 id: existing_id,
-                headers,
+                headers: headers.into(),
                 spec: new_spec,
             },
             precondition,
@@ -522,7 +523,7 @@ impl DatasetEnvVarMutationAdapterImpl {
                 &dispatcher,
                 ResourceCrudDispatcherApplyRequest {
                     id: Some(resource_id),
-                    headers,
+                    headers: headers.into(),
                     spec: serde_json::to_value(spec.into_input()).int_err()?,
                 },
                 precondition,
@@ -578,7 +579,7 @@ impl DatasetEnvVarMutationAdapterImpl {
                 &dispatcher,
                 ResourceCrudDispatcherApplyRequest {
                     id: Some(resource_id),
-                    headers,
+                    headers: headers.into(),
                     spec: serde_json::to_value(new_spec).int_err()?,
                 },
                 precondition,

@@ -161,6 +161,14 @@ database_transactional_test!(
 
 database_transactional_test!(
     storage = inmem_with_transaction,
+    fixture = resource_repo_suite::test_create_resource_with_taken_id_fails,
+    harness = InMemoryResourceRepositoriesHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = inmem_with_transaction,
     fixture = resource_repo_suite::test_create_resource_duplicate_ignore_case_fails,
     harness = InMemoryResourceRepositoriesHarness
 );

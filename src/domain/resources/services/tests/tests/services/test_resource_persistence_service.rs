@@ -16,24 +16,27 @@ use kamu_resources::{
     DeclarativeResource,
     ManagedResource,
     ResourceAggregateLoader,
+    ResourceHeadersInput,
     ResourceID,
     ResourceLabelProjectionRepository,
+    ResourceLabels,
     ResourcePersistenceError,
     ResourcePersistenceService,
     ResourcePhase,
     ResourceRawEventQuery,
     ResourceSchemaProvider,
     ResourceSnapshot,
+    TypeRef,
 };
-use kamu_resources_services::testing::BaseResourceServiceHarness;
-
-use crate::tests::utils::{
+use kamu_resources_services::testing::{
+    BaseResourceServiceHarness,
     TestResource,
     TestResourceReconciler,
     TestResourceSpec,
-    make_fresh_aggregate,
     register_test_resource_resource_service_layer,
 };
+
+use crate::tests::utils::make_fresh_aggregate;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Tests
@@ -68,8 +71,7 @@ async fn test_create_resource_persists_snapshot_and_events() {
 async fn test_create_resource_populates_label_projection() {
     let harness = ResourcePersistenceServiceHarness::new();
 
-    let headers = kamu_resources::ResourceHeadersInputExt::try_new(
-        Some(harness.account_handle.clone().into()),
+    let headers = harness.make_labeled_headers(
         "res-a",
         vec![
             ("env".parse().unwrap(), serde_json::json!("prod")),
@@ -79,12 +81,10 @@ async fn test_create_resource_populates_label_projection() {
                 serde_json::json!({"lat": 1}),
             ),
         ],
-        vec![],
-    )
-    .unwrap();
+    );
 
     let id = kamu_resources::ResourceID::new(uuid::Uuid::new_v4());
-    let mut agg = crate::tests::utils::TestResource::try_create(
+    let mut agg = TestResource::try_create(
         Utc::now(),
         id,
         headers,
@@ -113,13 +113,10 @@ async fn test_save_resource_resyncs_label_projection() {
     assert_eq!(harness.label_projection_entries(&id).await, vec![]);
 
     let mut loaded = harness.aggregate_loader().load(&id).await.unwrap();
-    let new_headers = kamu_resources::ResourceHeadersInputExt::try_new(
-        Some(harness.account_handle.clone().into()),
+    let new_headers = harness.make_labeled_headers(
         "res-a",
         vec![("env".parse().unwrap(), serde_json::json!("staging"))],
-        vec![],
-    )
-    .unwrap();
+    );
     let new_generation = loaded.headers().generation + 1;
     loaded
         .try_update_headers(Utc::now(), new_headers, new_generation)
@@ -141,13 +138,10 @@ async fn test_deletion_keeps_label_projection() {
     harness.persistence_svc().create(&mut agg).await.unwrap();
 
     let mut loaded = harness.aggregate_loader().load(&id).await.unwrap();
-    let new_headers = kamu_resources::ResourceHeadersInputExt::try_new(
-        Some(harness.account_handle.clone().into()),
+    let new_headers = harness.make_labeled_headers(
         "res-a",
         vec![("env".parse().unwrap(), serde_json::json!("staging"))],
-        vec![],
-    )
-    .unwrap();
+    );
     let new_generation = loaded.headers().generation + 1;
     loaded
         .try_update_headers(Utc::now(), new_headers, new_generation)
@@ -388,6 +382,19 @@ impl ResourcePersistenceServiceHarness {
             catalog: b.build(),
             account_handle: odf::ResourceOwnerHandle::new_test("test"),
         }
+    }
+
+    fn make_labeled_headers(
+        &self,
+        name: &str,
+        labels: Vec<(TypeRef, serde_json::Value)>,
+    ) -> ResourceHeadersInput {
+        let mut headers =
+            BaseResourceServiceHarness::make_headers_input(self.account_handle.clone(), name);
+        headers.labels = Some(ResourceLabels {
+            entries: labels.into_iter().collect(),
+        });
+        headers
     }
 
     fn persistence_svc(&self) -> Arc<dyn ResourcePersistenceService<TestResource>> {

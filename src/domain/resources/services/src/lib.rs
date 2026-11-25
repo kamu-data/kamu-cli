@@ -11,19 +11,22 @@ use kamu_resources as domain;
 pub use messaging_outbox;
 pub use paste;
 
-#[cfg(feature = "testing")]
-pub mod testing;
-
 mod controller_runtime;
 mod controllers;
+#[macro_use]
 mod crud_dispatchers;
 mod dependencies;
 mod event_stores;
 mod message_handlers;
+#[macro_use]
 mod resource_extension_schemas;
 mod resources;
 mod services;
 mod use_cases;
+
+// After the modules whose macros it uses
+#[cfg(feature = "testing")]
+pub mod testing;
 
 pub use controller_runtime::*;
 pub use controllers::*;

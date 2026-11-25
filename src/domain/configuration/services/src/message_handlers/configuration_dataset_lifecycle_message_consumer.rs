@@ -201,7 +201,7 @@ impl ConfigurationDatasetLifecycleMessageConsumer {
             let decision = dispatcher
                 .apply(ResourceCrudDispatcherApplyRequest {
                     id: Some(snapshot.id),
-                    headers,
+                    headers: headers.into(),
                     // Verbatim: the dispatcher decodes it back per type, so
                     // both kinds share this path without naming a spec type.
                     spec: snapshot.spec,

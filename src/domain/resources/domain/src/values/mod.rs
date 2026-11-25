@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+mod apply_resource_headers;
 mod reconciliation_error;
 mod resource;
 mod resource_annotation;
@@ -32,6 +33,7 @@ mod resource_version;
 mod resource_warning;
 mod rfc_spec_newtype;
 
+pub use apply_resource_headers::*;
 pub use reconciliation_error::*;
 pub use resource::*;
 pub use resource_annotation::*;

@@ -985,9 +985,15 @@ impl ApplyPrinter<'_> {
             .map(|type_name| type_name.to_string())
             .map_err(CLIError::critical)?;
 
+        let name_note = if result.name_pending {
+            " (name is generated on apply)"
+        } else {
+            ""
+        };
+
         Ok(format!(
-            "{}: {} -> {}/{}",
-            style, source, kind_name, result.resource.headers.name
+            "{style}: {source} -> {kind_name}/{}{name_note}",
+            result.resource.headers.name
         ))
     }
 

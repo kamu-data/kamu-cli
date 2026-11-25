@@ -54,6 +54,17 @@ impl ApplyManifestDocuments {
         })
     }
 
+    /// Removes the name from the `after` side, where it is not decided yet
+    fn omit_name_after(&mut self) {
+        if let Some(headers) = self
+            .after
+            .get_mut("headers")
+            .and_then(serde_json::Value::as_object_mut)
+        {
+            headers.remove("name");
+        }
+    }
+
     /// Whether the two sides differ. An apply that changed nothing, and a
     /// create, are both answered correctly here without inspecting the outcome.
     pub fn has_changes(&self) -> bool {
@@ -71,6 +82,10 @@ pub struct ApplyManifestPlan {
     pub executable: bool,
     pub warnings: Vec<ResourceWarning>,
 
+    /// The name in `resource` is a placeholder: the apply generates the real
+    /// one. The `after` document has no name then.
+    pub name_pending: bool,
+
     /// How to obtain the canonical [`ApplyManifestDocuments`] for this apply.
     pub documents: ApplyManifestDocumentSource,
 }
@@ -79,7 +94,11 @@ impl ApplyManifestPlan {
     /// Canonical documents describing this apply. See
     /// [`ApplyManifestDocumentSource::resolve`] for the ordering requirement.
     pub fn documents(&self) -> Result<ApplyManifestDocuments, InternalError> {
-        self.documents.resolve(&self.resource)
+        let mut documents = self.documents.resolve(&self.resource)?;
+        if self.name_pending {
+            documents.omit_name_after();
+        }
+        Ok(documents)
     }
 }
 

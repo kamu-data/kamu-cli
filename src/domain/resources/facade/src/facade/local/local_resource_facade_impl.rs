@@ -1207,8 +1207,8 @@ impl LocalResourceFacadeImpl {
         header_warnings.extend(canonical_labels.warnings);
         header_warnings.extend(canonical_annotations.warnings);
 
-        let headers = make_headers_input(
-            manifest.headers.name.as_str(),
+        let headers = make_apply_headers(
+            manifest.headers.name.as_deref(),
             &target_account,
             canonical_labels.entries,
             canonical_annotations.entries,
@@ -1249,7 +1249,7 @@ impl LocalResourceFacadeImpl {
 struct PreparedApplyManifest {
     dispatcher: Arc<dyn ResourceCrudDispatcher>,
     id: Option<ResourceID>,
-    header: ResourceHeadersInput,
+    header: ApplyResourceHeaders,
     header_warnings: Vec<ResourceWarning>,
     target_account: odf::ResourceOwnerHandle,
     spec: serde_json::Value,

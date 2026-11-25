@@ -227,14 +227,19 @@ impl ResourceRepository for InMemoryResourceRepository {
 
         self.state
             .write(self.transaction_id, |snapshots_by_id, ids_by_lookup_key| {
-                if snapshots_by_id.view().contains_key(&resource_snapshot.id)
-                    || holds_name && name_is_taken(ids_by_lookup_key, &lookup_key, None)
-                {
+                if holds_name && name_is_taken(ids_by_lookup_key, &lookup_key, None) {
                     return Err(CreateResourceError::Duplicate(ResourceDuplicateError {
                         account_id: resource_snapshot.headers.account.did.clone(),
                         schema: resource_snapshot.schema.clone(),
                         name: resource_snapshot.headers.name.clone(),
                     }));
+                }
+
+                if snapshots_by_id.view().contains_key(&resource_snapshot.id) {
+                    return Err(CreateResourceError::Internal(InternalError::new(format!(
+                        "Resource {} already exists",
+                        resource_snapshot.id
+                    ))));
                 }
 
                 if holds_name {

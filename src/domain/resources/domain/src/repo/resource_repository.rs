@@ -36,6 +36,8 @@ use crate::{
 pub trait ResourceRepository: Send + Sync {
     async fn new_resource_id(&self) -> Result<ResourceID, InternalError>;
 
+    /// A taken name is reported without failing the transaction, so the caller
+    /// may read and write on in it.
     async fn create_resource(
         &self,
         resource_snapshot: &ResourceSnapshot,

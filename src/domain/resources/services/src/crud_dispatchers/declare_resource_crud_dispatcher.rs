@@ -26,8 +26,6 @@ macro_rules! declare_resource_crud_dispatcher {
         pub struct $dispatcher {
             apply_resource_use_case:
                 std::sync::Arc<dyn kamu_resources::ApplyResourceUseCase<$resource>>,
-            generic_resource_query_service:
-                std::sync::Arc<dyn kamu_resources::GenericResourceQueryService>,
             request_resources_deletion_use_case:
                 std::sync::Arc<dyn kamu_resources::RequestResourcesDeletionUseCase<$resource>>,
         }

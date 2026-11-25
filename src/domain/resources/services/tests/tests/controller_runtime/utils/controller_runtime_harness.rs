@@ -37,6 +37,9 @@ use kamu_resources::{
 use kamu_resources_services::testing::{
     BaseResourceServiceHarness,
     BaseResourceServiceHarnessOpts,
+    TestResource,
+    TestResourceSpec,
+    test_stage_condition_key,
 };
 use kamu_resources_services::{
     BackgroundWorkFinalizer,
@@ -60,13 +63,7 @@ use crate::tests::controller_runtime::utils::{
     TestResourceSecondController,
     TestResourceStatusReactingController,
 };
-use crate::tests::utils::{
-    ServiceLayerTestHarness,
-    ServiceLayerTestHarnessOpts,
-    TestResource,
-    TestResourceSpec,
-    test_stage_condition_key,
-};
+use crate::tests::utils::{ServiceLayerTestHarness, ServiceLayerTestHarnessOpts};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -364,7 +361,8 @@ impl ControllerRuntimeHarness {
                 headers: BaseResourceServiceHarness::make_headers_input(
                     self.account.clone(),
                     snapshot.headers.name.as_str(),
-                ),
+                )
+                .into(),
                 spec: TestResourceSpec {
                     value: value.to_string(),
                 },
