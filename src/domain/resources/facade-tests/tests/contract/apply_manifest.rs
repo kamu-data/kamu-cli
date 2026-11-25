@@ -626,14 +626,6 @@ pub async fn test_apply_idempotent(h: &impl FacadeContractHarness) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// RF-024 (deferred): apply rejects immutable field change.
-// Requires a resource type with at least one immutable spec or headers field
-// that the facade contract forbids changing after creation. No current resource
-// type (VariableSet, SecretSet) has such a field. Add once a suitable type
-// exists.
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 // RF-026
 contract_test!(
     apply_rejects_duplicate_header_key,
@@ -1185,12 +1177,6 @@ pub async fn test_apply_invalid_spec_carries_schema(h: &impl FacadeContractHarne
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// RF-143: ImmutableFieldChanged and ReferencedObjectMissing are not triggerable
-// by VariableSet/SecretSet, so they stay deferred until a resource type can
-// trigger them. LifecycleRuleConflict is covered by RF-182 in delete.rs.
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 // RF-027
 contract_test!(
     apply_documents_never_expose_secret_plaintext,
@@ -1201,7 +1187,7 @@ contract_test!(
 /// must never appear. The canonical documents are the diff's raw material and
 /// travel over the wire, so they are exactly such a place.
 ///
-/// The spec sanitizer encrypts before the planner runs, so this holds by
+/// The pre-apply hook encrypts before the planner runs, so this holds by
 /// construction today — the test exists because that ordering is easy to break
 /// from a distance, and nothing else would catch it.
 pub async fn test_apply_documents_never_expose_secret_plaintext(h: &impl FacadeContractHarness) {

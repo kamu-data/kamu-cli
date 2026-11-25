@@ -107,6 +107,9 @@ pub enum TestResourceLifecycleError {
 
     #[error(transparent)]
     DeletionInProgress(#[from] ResourceDeletionInProgressError),
+
+    #[error(transparent)]
+    SpecImmutable(#[from] ResourceSpecImmutableError),
 }
 
 kamu_resources::impl_resource_lifecycle_error!(TestResourceLifecycleError, TestResourceState);
@@ -266,38 +269,42 @@ kamu_resources::impl_event_sourced_resource!(
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// TestResourceSpecSanitizer
+// TestResourceAppendingPreApply
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct TestResourceSpecSanitizer {
+pub struct TestResourceAppendingPreApply {
     pub suffix: String,
 }
 
 #[async_trait::async_trait]
-impl ResourceSpecSanitizer<TestResource> for TestResourceSpecSanitizer {
-    async fn sanitize_new_spec(
+impl ResourceSpecPreApply<TestResource> for TestResourceAppendingPreApply {
+    async fn pre_apply(
         &self,
         mut new_spec: TestResourceSpec,
-        _maybe_current_spec: Option<&TestResourceSpec>,
-    ) -> Result<SanitizeSpecOutcome<TestResource>, internal_error::InternalError> {
-        new_spec.value.push_str(&self.suffix);
-        Ok(SanitizeSpecOutcome::Sanitized(new_spec))
+        _context: ResourceSpecPreApplyContext<'_, TestResource>,
+    ) -> Result<ResourceSpecPreApplyOutcome<TestResource>, internal_error::InternalError> {
+        if !new_spec.value.ends_with(&self.suffix) {
+            new_spec.value.push_str(&self.suffix);
+        }
+        Ok(ResourceSpecPreApplyOutcome::Prepared(new_spec))
     }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// TestResourceClearingPreApply
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct TestResourceSpecClearingSanitizer;
+pub struct TestResourceClearingPreApply;
 
 #[async_trait::async_trait]
-impl ResourceSpecSanitizer<TestResource> for TestResourceSpecClearingSanitizer {
-    async fn sanitize_new_spec(
+impl ResourceSpecPreApply<TestResource> for TestResourceClearingPreApply {
+    async fn pre_apply(
         &self,
         mut new_spec: TestResourceSpec,
-        _maybe_current_spec: Option<&TestResourceSpec>,
-    ) -> Result<SanitizeSpecOutcome<TestResource>, internal_error::InternalError> {
+        _context: ResourceSpecPreApplyContext<'_, TestResource>,
+    ) -> Result<ResourceSpecPreApplyOutcome<TestResource>, internal_error::InternalError> {
         new_spec.value.clear();
-        Ok(SanitizeSpecOutcome::Sanitized(new_spec))
+        Ok(ResourceSpecPreApplyOutcome::Prepared(new_spec))
     }
 }
 

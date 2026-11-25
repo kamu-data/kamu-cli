@@ -15,6 +15,7 @@ use crate::{
     ResourceSnapshot,
     ResourceStatus,
     ResourceStatusConflictError,
+    SpecMutability,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -26,8 +27,8 @@ pub trait DeclarativeResource:
     /// snapshot persists.
     type Spec: std::fmt::Debug + Send + Sync;
     /// Write-path shape decoded from a manifest/apply request, converted to
-    /// `Spec` once at projection time. Identical to `Spec` unless the
-    /// resource has server-side defaulting.
+    /// `Spec` at projection time. Identical to `Spec` unless the resource has
+    /// server-owned spec fields.
     type SpecInput: std::fmt::Debug + Send + Sync;
     type ResourceState: DeclarativeResourceState<Spec = Self::Spec>
         + TryFrom<ResourceSnapshot, Error = InternalError>
@@ -74,6 +75,10 @@ pub trait DeclarativeResource:
 pub trait DeclarativeResourceState: Send + Sync + std::fmt::Debug {
     type Spec: std::fmt::Debug + Send + Sync;
 
+    /// Declared by the type's
+    /// [`ResourceStateModel`](crate::ResourceStateModel::SPEC_MUTABILITY)
+    const SPEC_MUTABILITY: SpecMutability;
+
     fn id(&self) -> &ResourceID;
 
     fn headers(&self) -> &ResourceHeaders;
@@ -93,16 +98,16 @@ pub trait DeclarativeResourceState: Send + Sync + std::fmt::Debug {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// Converts a resource's write-path `SpecInput` into its resolved, stored
-/// `Spec`, filling any server-owned/defaulted fields. Mirrors
+/// `Spec`, filling any server-owned fields, but no defaults: those belong in
+/// [`ResourceSpecPreApply`](crate::ResourceSpecPreApply). Mirrors
 /// `ResourceHeadersExt::from_input`. For resource types where `Spec` and
 /// `SpecInput` are the same type, this is the identity conversion.
 pub trait ResourceSpecFromInput<TInput> {
     fn from_input(input: TInput) -> Self;
 
-    /// Inverse of `from_input`, used only to re-derive a `SpecInput` from
-    /// already-resolved server state (duplicate-create retry path). Not
-    /// guaranteed lossless for types where `Spec` carries server-owned
-    /// fields with no `SpecInput` counterpart.
+    /// Inverse of `from_input`, used to re-derive a `SpecInput` from
+    /// already-resolved server state. Not guaranteed lossless for types where
+    /// `Spec` carries server-owned fields with no `SpecInput` counterpart.
     fn into_input(self) -> TInput;
 }
 

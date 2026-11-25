@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+mod test_apply_immutable_resource_use_case;
 mod test_apply_resource_use_case;
 mod test_request_account_resources_deletion_use_case;
 mod test_request_resources_deletion_use_case;

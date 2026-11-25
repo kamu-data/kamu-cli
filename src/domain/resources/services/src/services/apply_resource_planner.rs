@@ -96,13 +96,16 @@ where
         }
     }
 
+    /// `maybe_existing` is the result of [`Self::find_existing_resource`]
     pub async fn plan(
         &self,
         params: ApplyResourceParams<R>,
+        maybe_existing: Option<R>,
     ) -> Result<ApplyResourcePlanningDecision<R>, ApplyResourceUseCaseError<R>> {
         let plan = self
             .plan_with_naming(
                 params,
+                maybe_existing,
                 ApplyResourcePrecondition::None,
                 OmittedNameHandling::LeavePending,
             )
@@ -117,13 +120,16 @@ where
         })
     }
 
+    /// `maybe_existing` is the result of [`Self::find_existing_resource`]
     pub async fn plan_internal(
         &self,
         params: ApplyResourceParams<R>,
+        maybe_existing: Option<R>,
         precondition: ApplyResourcePrecondition,
     ) -> Result<PlannedApplyResourceDecision<R>, ApplyResourceUseCaseError<R>> {
         self.plan_with_naming(
             params,
+            maybe_existing,
             precondition,
             OmittedNameHandling::Generate {
                 max_attempts: MAX_GENERATED_NAME_ATTEMPTS,
@@ -135,6 +141,7 @@ where
     async fn plan_with_naming(
         &self,
         params: ApplyResourceParams<R>,
+        maybe_existing: Option<R>,
         precondition: ApplyResourcePrecondition,
         omitted_name_handling: OmittedNameHandling,
     ) -> Result<PlannedApplyResourceDecision<R>, ApplyResourceUseCaseError<R>> {
@@ -142,11 +149,7 @@ where
 
         let now = self.time_source.now();
 
-        let maybe_existing_id = self
-            .resolve_existing_resource_id(params.id, &params.headers)
-            .await?;
-
-        let Some(id) = maybe_existing_id else {
+        let Some(resource) = maybe_existing else {
             return match precondition {
                 ApplyResourcePrecondition::None | ApplyResourcePrecondition::Absent => {
                     self.plan_create_resource(params, now, omitted_name_handling)
@@ -159,15 +162,6 @@ where
                 }
             };
         };
-
-        self.ensure_resource_id_matches_type(&id).await?;
-
-        let resource = self
-            .resource_aggregate_loader
-            .load(&id)
-            .await
-            .map_err(ResourceLoadError)
-            .map_err(ApplyResourceUseCaseError::LoadFailed)?;
 
         let precondition_holds = match precondition {
             ApplyResourcePrecondition::None => true,
@@ -201,9 +195,37 @@ where
         }
     }
 
+    /// The resource to update, `None` for one to create.
+    ///
+    /// An apply calls it once: whatever depends on the current state, the
+    /// prepared spec included, is based on the returned resource, so that
+    /// saving detects any change made since.
+    pub async fn find_existing_resource(
+        &self,
+        params: &ApplyResourceParams<R>,
+    ) -> Result<Option<R>, ApplyResourceUseCaseError<R>> {
+        let Some(id) = self
+            .resolve_existing_resource_id(params.id, &params.headers)
+            .await?
+        else {
+            return Ok(None);
+        };
+
+        self.ensure_resource_id_matches_type(&id).await?;
+
+        let resource = self
+            .resource_aggregate_loader
+            .load(&id)
+            .await
+            .map_err(ResourceLoadError)
+            .map_err(ApplyResourceUseCaseError::LoadFailed)?;
+
+        Ok(Some(resource))
+    }
+
     /// `None` for a resource to create, which one without an ID and a name
     /// always is
-    pub async fn resolve_existing_resource_id(
+    async fn resolve_existing_resource_id(
         &self,
         id: Option<ResourceID>,
         headers: &ApplyResourceHeaders,
@@ -217,23 +239,12 @@ where
         };
 
         self.generic_resource_query_service
-            .find_resource_id_by_name(Self::resolved_account_id(headers), R::type_uri(), name)
+            .find_resource_id_by_name(headers.resolved_account_id(), R::type_uri(), name)
             .await
             .map_err(ApplyResourceUseCaseError::Internal)
     }
 
-    /// Account resolution (id + did + name lookup) already happened upstream,
-    /// as part of the apply process (see `ResourceAccountResolver`), so
-    /// `headers.account` is always fully resolved by this point.
-    fn resolved_account_id(headers: &ApplyResourceHeaders) -> &odf::AccountID {
-        headers
-            .account
-            .as_ref()
-            .and_then(|a| a.did.as_ref())
-            .expect("resource headers must carry a resolved account by apply time")
-    }
-
-    pub(crate) async fn ensure_resource_id_matches_type(
+    async fn ensure_resource_id_matches_type(
         &self,
         id: &ResourceID,
     ) -> Result<(), ApplyResourceUseCaseError<R>> {
@@ -352,7 +363,7 @@ where
         let holders = self
             .generic_resource_query_service
             .resolve_resource_ids_by_names(
-                Self::resolved_account_id(headers),
+                headers.resolved_account_id(),
                 R::type_uri(),
                 std::slice::from_ref(name),
                 ResourceVisibility::IncludeDeleted,
@@ -373,7 +384,7 @@ where
         let replaced = self
             .generic_resource_query_service
             .resolve_resource_ids_by_names(
-                Self::resolved_account_id(headers),
+                headers.resolved_account_id(),
                 R::type_uri(),
                 std::slice::from_ref(name),
                 ResourceVisibility::IncludeDeleting,
@@ -387,7 +398,7 @@ where
             .collect())
     }
 
-    pub(crate) fn plan_update_resource(
+    fn plan_update_resource(
         &self,
         mut resource: R,
         params: ApplyResourceParams<R>,

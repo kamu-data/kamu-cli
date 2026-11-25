@@ -18,6 +18,7 @@ use crate::{
     ResourceState,
     ResourceStateModel,
     ResourceStatus,
+    SpecMutability,
     project_resource_state,
 };
 
@@ -103,6 +104,8 @@ where
     TModel: ResourceStateModel,
 {
     type Spec = TModel::Spec;
+
+    const SPEC_MUTABILITY: SpecMutability = TModel::SPEC_MUTABILITY;
 
     fn id(&self) -> &ResourceID {
         &self.inner.id

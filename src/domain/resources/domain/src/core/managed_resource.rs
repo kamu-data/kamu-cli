@@ -14,6 +14,7 @@ use crate::{
     ResourceCleanupError,
     ResourceDeletionInProgressError,
     ResourceReconcileError,
+    ResourceSpecImmutableError,
     ResourceStatus,
     ResourceStatusRules,
     StatusConflictOf,
@@ -29,7 +30,9 @@ use crate::{
 /// stale.
 pub trait ManagedResource: DeclarativeResource + ResourceStatusRules {
     type ReconcileError: ResourceReconcileError;
-    type LifecycleError: StatusConflictOf + From<ResourceDeletionInProgressError>;
+    type LifecycleError: StatusConflictOf
+        + From<ResourceDeletionInProgressError>
+        + From<ResourceSpecImmutableError>;
 
     /// A resource being deleted never needs reconciliation.
     fn needs_reconciliation(&self) -> bool {

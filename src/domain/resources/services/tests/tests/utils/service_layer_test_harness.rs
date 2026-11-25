@@ -24,17 +24,17 @@ use kamu_resources::{
     ResourceControllerStateRepository,
     ResourceID,
     ResourceProcessOutcome,
-    ResourceSpecSanitizer,
+    ResourceSpecPreApply,
 };
 use kamu_resources_services::testing::{
     BaseResourceServiceHarness,
     BaseResourceServiceHarnessOpts,
     TEST_RESOURCE_SIMPLE_CONTROLLER_NAME,
     TestResource,
+    TestResourceAppendingPreApply,
+    TestResourceClearingPreApply,
     TestResourceReconcilerProvider,
     TestResourceSpec,
-    TestResourceSpecClearingSanitizer,
-    TestResourceSpecSanitizer,
     register_test_condition_schema_dispatchers,
     register_test_resource_crud_dispatcher,
     register_test_resource_resource_service_layer,
@@ -46,7 +46,7 @@ use time_source::FakeSystemTimeSource;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Default)]
-pub enum SanitizerKind {
+pub enum SpecPreApplyKind {
     #[default]
     None,
     Appending,
@@ -58,7 +58,7 @@ pub enum SanitizerKind {
 pub struct ServiceLayerTestHarnessOpts {
     pub base_opts: BaseResourceServiceHarnessOpts,
     pub reconciler_provider: TestResourceReconcilerProvider,
-    pub sanitizer: SanitizerKind,
+    pub spec_pre_apply: SpecPreApplyKind,
     /// Whether the controller runtime drives the test type through its simple
     /// controller adapter, which `settle` drains. Without it, the test brings
     /// its own controller and runtime.
@@ -75,7 +75,7 @@ impl Default for ServiceLayerTestHarnessOpts {
                 ..Default::default()
             },
             reconciler_provider: TestResourceReconcilerProvider::default(),
-            sanitizer: SanitizerKind::None,
+            spec_pre_apply: SpecPreApplyKind::None,
             simple_controller: true,
         }
     }
@@ -137,17 +137,17 @@ impl ServiceLayerTestHarness {
         register_test_condition_schema_dispatchers(&mut b);
         opts.reconciler_provider.embed_into_catalog(&mut b);
 
-        match opts.sanitizer {
-            SanitizerKind::None => {}
-            SanitizerKind::Appending => {
-                b.add_value(TestResourceSpecSanitizer {
-                    suffix: "-sanitized".to_string(),
+        match opts.spec_pre_apply {
+            SpecPreApplyKind::None => {}
+            SpecPreApplyKind::Appending => {
+                b.add_value(TestResourceAppendingPreApply {
+                    suffix: "-prepared".to_string(),
                 })
-                .bind::<dyn ResourceSpecSanitizer<TestResource>, TestResourceSpecSanitizer>();
+                .bind::<dyn ResourceSpecPreApply<TestResource>, TestResourceAppendingPreApply>();
             }
-            SanitizerKind::Clearing => {
-                b.add_value(TestResourceSpecClearingSanitizer)
-                    .bind::<dyn ResourceSpecSanitizer<TestResource>, TestResourceSpecClearingSanitizer>();
+            SpecPreApplyKind::Clearing => {
+                b.add_value(TestResourceClearingPreApply)
+                    .bind::<dyn ResourceSpecPreApply<TestResource>, TestResourceClearingPreApply>();
             }
         }
 

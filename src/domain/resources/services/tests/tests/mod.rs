@@ -19,4 +19,5 @@ mod test_resource_deletion;
 mod test_resource_extension_schema_registry;
 mod test_resource_extension_schema_resolver;
 mod test_resource_generations;
+mod test_resource_spec_mutability;
 mod use_cases;

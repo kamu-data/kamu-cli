@@ -169,7 +169,7 @@ impl ConfigurationDatasetLifecycleMessageConsumer {
     /// once and so reconciles the resource again.
     ///
     /// The exception is a `SecretSet` still in the migration's `aes256gcm`
-    /// form, which the sanitizer upgrades to `jwe` -- a real spec change in the
+    /// form, which the pre-apply hook upgrades to `jwe` -- a real spec change in the
     /// same apply. Only reachable here, since auto-managed sets are deleted
     /// rather than stripped.
     async fn strip_dangling_label(

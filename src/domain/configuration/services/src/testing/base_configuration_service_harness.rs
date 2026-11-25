@@ -213,7 +213,7 @@ impl BaseConfigurationServiceHarness {
     }
 
     /// [`Self::apply_variable_set`] for secrets, which arrive as plaintext
-    /// and are sanitized to `jwe` like any normally-authored set.
+    /// and are upgraded to `jwe` like any normally-authored set.
     pub async fn apply_secret_set(
         &self,
         account: &odf::ResourceOwnerHandle,

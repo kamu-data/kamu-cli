@@ -9,7 +9,7 @@
 
 use event_sourcing::Projection;
 
-use crate::{DeclarativeResourceState, ResourceEvent, ResourceState};
+use crate::{DeclarativeResourceState, ResourceEvent, ResourceState, SpecMutability};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -20,6 +20,10 @@ pub trait ResourceStateModel {
     type State: DeclarativeResourceState<Spec = Self::Spec>
         + From<ResourceState<Self::Spec>>
         + Projection<Event = ResourceEvent<Self::SpecInput>>;
+
+    /// Must not become `Immutable` once specs of the type have been updated:
+    /// such resources would no longer load.
+    const SPEC_MUTABILITY: SpecMutability = SpecMutability::Mutable;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

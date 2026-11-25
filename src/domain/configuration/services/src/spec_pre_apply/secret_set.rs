@@ -16,7 +16,6 @@ use kamu_configuration::{
     Secret,
     SecretExt,
     SecretSetResource,
-    SecretSetSpec,
     SecretSetSpecInput,
     SecretSetSpecValidationError,
 };
@@ -24,27 +23,28 @@ use kamu_datasets::SecretsEncryptionConfig;
 use kamu_resources::{
     ApplyResourceRejection,
     ApplyResourceRejectionCategory,
-    ResourceSpecSanitizer,
-    SanitizeSpecOutcome,
+    ResourceSpecPreApply,
+    ResourceSpecPreApplyContext,
+    ResourceSpecPreApplyOutcome,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[dill::component]
-#[dill::interface(dyn ResourceSpecSanitizer<SecretSetResource>)]
-pub struct SecretSetSpecSanitizer {
+#[dill::interface(dyn ResourceSpecPreApply<SecretSetResource>)]
+pub struct SecretSetSpecPreApply {
     secrets_encryption_config: Arc<SecretsEncryptionConfig>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-impl ResourceSpecSanitizer<SecretSetResource> for SecretSetSpecSanitizer {
-    async fn sanitize_new_spec(
+impl ResourceSpecPreApply<SecretSetResource> for SecretSetSpecPreApply {
+    async fn pre_apply(
         &self,
         mut new_spec: SecretSetSpecInput,
-        maybe_current_spec: Option<&SecretSetSpec>,
-    ) -> Result<SanitizeSpecOutcome<SecretSetResource>, InternalError> {
+        context: ResourceSpecPreApplyContext<'_, SecretSetResource>,
+    ) -> Result<ResourceSpecPreApplyOutcome<SecretSetResource>, InternalError> {
         let cryptor = self.secrets_encryption_config.new_secret_cryptor()?;
 
         for (name, new_secret) in &mut new_spec.secrets.entries {
@@ -58,10 +58,9 @@ impl ResourceSpecSanitizer<SecretSetResource> for SecretSetSpecSanitizer {
             // migrations) is decrypted and re-encrypted to `jwe`.
             if new_secret.content_encoding() == Some(ContentEncoding::Jwe) {
                 if let Err(reason) = new_secret.decrypt_plaintext_bytes(&cryptor) {
-                    return Ok(SanitizeSpecOutcome::Rejected(rejection_for_invalid_secret(
-                        name,
-                        &reason.to_string(),
-                    )));
+                    return Ok(ResourceSpecPreApplyOutcome::Rejected(
+                        rejection_for_invalid_secret(name, &reason.to_string()),
+                    ));
                 }
                 continue;
             }
@@ -69,8 +68,9 @@ impl ResourceSpecSanitizer<SecretSetResource> for SecretSetSpecSanitizer {
 
             // Reuse the current ciphertext if the plaintext is unchanged, to avoid
             // unnecessary rewrites.
-            if let Some(current_secret) =
-                maybe_current_spec.and_then(|s| s.secrets.entries.get(name))
+            if let Some(current_secret) = context
+                .maybe_current_spec
+                .and_then(|s| s.secrets.entries.get(name))
                 && current_secret.content_encoding() == Some(ContentEncoding::Jwe)
                 && Self::matches_current_plaintext(current_secret, &new_plaintext, &cryptor)?
             {
@@ -87,13 +87,13 @@ impl ResourceSpecSanitizer<SecretSetResource> for SecretSetSpecSanitizer {
             };
         }
 
-        Ok(SanitizeSpecOutcome::Sanitized(new_spec))
+        Ok(ResourceSpecPreApplyOutcome::Prepared(new_spec))
     }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl SecretSetSpecSanitizer {
+impl SecretSetSpecPreApply {
     /// Decrypts the *current* (already-persisted) secret to compare against
     /// `new_plaintext`. Unlike the new-value verify-before-trust check above,
     /// a failure here means a previously-accepted secret no longer decrypts

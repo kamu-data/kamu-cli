@@ -34,6 +34,7 @@ use kamu_resources_services::testing::{
     register_test_resource_resource_service_layer,
 };
 use kamu_resources_services::{
+    ApplyResourceExecution,
     ApplyResourcePlanExecutor,
     ApplyResourcePlanner,
     PlannedApplyResource,
@@ -69,14 +70,9 @@ async fn test_execute_create_returns_applied_created() {
         )
         .await;
 
-    let result = harness
-        .make_executor()
-        .execute(plan, ApplyResourcePrecondition::None)
-        .await
-        .unwrap();
+    let result = harness.execute(plan).await;
 
-    let applied = result.expect_applied();
-    assert_eq!(applied.outcome, ApplyResourceOutcome::Created);
+    assert_eq!(result.outcome, ApplyResourceOutcome::Created);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -109,11 +105,7 @@ async fn test_execute_update_returns_applied_updated() {
             },
         )
         .await;
-    harness
-        .make_executor()
-        .execute(create_plan, ApplyResourcePrecondition::None)
-        .await
-        .unwrap();
+    harness.execute(create_plan).await;
 
     // Then update
     let update_plan = harness
@@ -126,14 +118,9 @@ async fn test_execute_update_returns_applied_updated() {
         )
         .await;
 
-    let result = harness
-        .make_executor()
-        .execute(update_plan, ApplyResourcePrecondition::None)
-        .await
-        .unwrap();
+    let result = harness.execute(update_plan).await;
 
-    let applied = result.expect_applied();
-    assert_eq!(applied.outcome, ApplyResourceOutcome::Updated);
+    assert_eq!(result.outcome, ApplyResourceOutcome::Updated);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -162,11 +149,7 @@ async fn test_execute_untouched_returns_applied_no_outbox_call() {
             },
         )
         .await;
-    harness
-        .make_executor()
-        .execute(create_plan, ApplyResourcePrecondition::None)
-        .await
-        .unwrap();
+    harness.execute(create_plan).await;
 
     // Re-plan with identical spec — action = Untouched, no outbox call
     let untouched_plan = harness
@@ -179,14 +162,9 @@ async fn test_execute_untouched_returns_applied_no_outbox_call() {
         )
         .await;
 
-    let result = harness
-        .make_executor()
-        .execute(untouched_plan, ApplyResourcePrecondition::None)
-        .await
-        .unwrap();
+    let result = harness.execute(untouched_plan).await;
 
-    let applied = result.expect_applied();
-    assert_eq!(applied.outcome, ApplyResourceOutcome::Untouched);
+    assert_eq!(result.outcome, ApplyResourceOutcome::Untouched);
 
     // MockOutbox verifies at drop that post_message_as_json was called exactly
     // once (from create)
@@ -195,18 +173,12 @@ async fn test_execute_untouched_returns_applied_no_outbox_call() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_execute_create_duplicate_retries_as_update() {
-    // The other writer's create is stored without a message
-    let mut mock_outbox = MockOutbox::new();
-    BaseResourceServiceHarness::expect_applied_messages(
-        &mut mock_outbox,
-        1,
-        Some(ResourceLifecycleMessageOutcome::Updated),
-    );
-    let harness = ApplyResourcePlanExecutorHarness::new(mock_outbox);
+async fn test_execute_create_reports_a_taken_name() {
+    // No message expected: nothing is written
+    let harness = ApplyResourcePlanExecutorHarness::new(MockOutbox::new());
 
     // Another writer creates the resource after the plan was made
-    let create_plan = harness
+    let plan = harness
         .make_plan(
             ApplyResourcePlanExecutorHarness::account_handle(),
             "res-a",
@@ -217,49 +189,11 @@ async fn test_execute_create_duplicate_retries_as_update() {
         .await;
     let winner = harness.store("res-a").await;
 
-    let result = harness
-        .execute(create_plan, ApplyResourcePrecondition::None)
-        .await;
-
-    assert_eq!(result.outcome, ApplyResourceOutcome::Updated);
-    assert_eq!(result.id, *winner.id());
-    assert_eq!(result.state.spec.value, "new-value");
-    assert_eq!(result.state.headers.generation, 2);
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[test_log::test(tokio::test)]
-async fn test_execute_create_duplicate_fails_when_absence_required() {
-    // No message expected: nothing is written
-    let harness = ApplyResourcePlanExecutorHarness::new(MockOutbox::new());
-    let account_handle = odf::ResourceOwnerHandle::new_test("test");
-
-    // Another writer creates the resource after the plan was made
-    let create_plan = harness
-        .make_plan(
-            account_handle.clone(),
-            "res-a",
-            TestResourceSpec {
-                value: "new-value".to_string(),
-            },
-        )
-        .await;
-    let (_, mut existing_agg) = make_fresh_aggregate(account_handle, "res-a");
-    harness
-        .persistence_svc
-        .create(&mut existing_agg)
-        .await
-        .unwrap();
-
-    // Retrying as an update would overwrite what that writer created
     assert_matches!(
-        harness
-            .make_executor()
-            .execute(create_plan, ApplyResourcePrecondition::Absent)
-            .await,
-        Err(ApplyResourceUseCaseError::ConcurrentModification(_))
+        harness.make_executor().execute(plan).await,
+        Ok(ApplyResourceExecution::NameTaken)
     );
+    harness.assert_untouched(&winner).await;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -275,7 +209,7 @@ async fn test_generated_name_avoids_names_of_resources_in_any_state() {
     harness.store_deleted("plain-dead00").await;
 
     let plan = harness.make_nameless_plan().await;
-    let result = harness.execute(plan, ApplyResourcePrecondition::None).await;
+    let result = harness.execute(plan).await;
 
     assert_eq!(result.outcome, ApplyResourceOutcome::Created);
     assert_eq!(result.state.headers.name.as_str(), "plain-free00");
@@ -286,26 +220,19 @@ async fn test_generated_name_avoids_names_of_resources_in_any_state() {
 
 #[test_log::test(tokio::test)]
 async fn test_generated_name_taken_after_planning_is_replaced() {
-    for precondition in [
-        ApplyResourcePrecondition::None,
-        ApplyResourcePrecondition::Absent,
-    ] {
-        let harness = ApplyResourcePlanExecutorHarness::with_name_suffixes(
-            ApplyResourcePlanExecutorHarness::mock_outbox_for_create(),
-            ["first0", "second"],
-        );
-        let plan = harness.make_nameless_plan().await;
-        let winner = harness.store("plain-first0").await;
+    let harness = ApplyResourcePlanExecutorHarness::with_name_suffixes(
+        ApplyResourcePlanExecutorHarness::mock_outbox_for_create(),
+        ["first0", "second"],
+    );
+    let plan = harness.make_nameless_plan().await;
+    let winner = harness.store("plain-first0").await;
 
-        let result = harness.execute(plan, precondition).await;
+    let result = harness.execute(plan).await;
 
-        // A resource of its own, rather than an update of the winner
-        assert_eq!(result.outcome, ApplyResourceOutcome::Created);
-        assert_eq!(result.state.headers.name.as_str(), "plain-second");
-        let stored_winner = harness.aggregate_loader.load(winner.id()).await.unwrap();
-        assert_eq!(stored_winner.spec(), winner.spec());
-        assert_eq!(stored_winner.headers().generation, 1);
-    }
+    // A resource of its own, rather than an update of the winner
+    assert_eq!(result.outcome, ApplyResourceOutcome::Created);
+    assert_eq!(result.state.headers.name.as_str(), "plain-second");
+    harness.assert_untouched(&winner).await;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -331,10 +258,7 @@ async fn test_generating_a_name_gives_up_after_five_attempts() {
     let plan = harness.make_nameless_plan().await;
     harness.store("plain-lost00").await;
     assert_matches!(
-        harness
-            .make_executor()
-            .execute(plan, ApplyResourcePrecondition::None)
-            .await,
+        harness.make_executor().execute(plan).await,
         Err(ApplyResourceUseCaseError::Internal(_))
     );
     harness.name_suffix_generator.assert_all_used();
@@ -430,19 +354,25 @@ impl ApplyResourcePlanExecutorHarness {
         &self,
     ) -> Result<PlannedApplyResourceDecision<TestResource>, ApplyResourceUseCaseError<TestResource>>
     {
-        self.make_planner()
-            .plan_internal(
-                ApplyResourceParams {
-                    id: None,
-                    headers: BaseResourceServiceHarness::make_nameless_headers(
-                        Self::account_handle(),
-                    ),
-                    spec: TestResourceSpec {
-                        value: "nameless".to_string(),
-                    },
-                },
-                ApplyResourcePrecondition::None,
-            )
+        self.plan(ApplyResourceParams {
+            id: None,
+            headers: BaseResourceServiceHarness::make_nameless_headers(Self::account_handle()),
+            spec: TestResourceSpec {
+                value: "nameless".to_string(),
+            },
+        })
+        .await
+    }
+
+    async fn plan(
+        &self,
+        params: ApplyResourceParams<TestResource>,
+    ) -> Result<PlannedApplyResourceDecision<TestResource>, ApplyResourceUseCaseError<TestResource>>
+    {
+        let planner = self.make_planner();
+        let maybe_existing = planner.find_existing_resource(&params).await?;
+        planner
+            .plan_internal(params, maybe_existing, ApplyResourcePrecondition::None)
             .await
     }
 
@@ -456,13 +386,17 @@ impl ApplyResourcePlanExecutorHarness {
     async fn execute(
         &self,
         plan: PlannedApplyResource<TestResource>,
-        precondition: ApplyResourcePrecondition,
     ) -> ApplyResourceResult<TestResource> {
-        self.make_executor()
-            .execute(plan, precondition)
-            .await
-            .unwrap()
-            .expect_applied()
+        match self.make_executor().execute(plan).await.unwrap() {
+            ApplyResourceExecution::Decided(decision) => decision.expect_applied(),
+            ApplyResourceExecution::NameTaken => panic!("name taken"),
+        }
+    }
+
+    async fn assert_untouched(&self, resource: &TestResource) {
+        let stored = self.aggregate_loader.load(resource.id()).await.unwrap();
+        assert_eq!(stored.spec(), resource.spec());
+        assert_eq!(stored.headers().generation, 1);
     }
 
     fn make_planner(&self) -> ApplyResourcePlanner<'_, TestResource> {
@@ -499,12 +433,7 @@ impl ApplyResourcePlanExecutorHarness {
             spec,
         };
 
-        match self
-            .make_planner()
-            .plan_internal(params, ApplyResourcePrecondition::None)
-            .await
-            .unwrap()
-        {
+        match self.plan(params).await.unwrap() {
             PlannedApplyResourceDecision::Planned(plan) => plan,
             PlannedApplyResourceDecision::Rejected(r) => {
                 panic!("plan rejected: {:?}", r.message)

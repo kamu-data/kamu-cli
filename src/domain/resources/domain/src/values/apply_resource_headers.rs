@@ -79,6 +79,16 @@ impl ApplyResourceHeaders {
         Ok(name)
     }
 
+    /// For headers given to an
+    /// [`ApplyResourceUseCase`](crate::ApplyResourceUseCase), which takes them
+    /// with the account resolved
+    pub fn resolved_account_id(&self) -> &odf::AccountID {
+        self.account
+            .as_ref()
+            .and_then(|account| account.did.as_ref())
+            .expect("resource headers must carry a resolved account by apply time")
+    }
+
     /// Headers of a resource that has the name `name`, whatever `self.name` is
     pub fn into_named(self, name: ResourceName) -> ResourceHeadersInput {
         ResourceHeadersInput {

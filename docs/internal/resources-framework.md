@@ -200,9 +200,10 @@ not break; most are enforced in code and exercised by tests — pointers given w
   or one left in `Reconciling` still needs it.
 - **`status` is never accepted from manifests.** It is server-owned end to end; manifests use
   `deny_unknown_fields`, so a `status` key is rejected ([§5a](#5a-resource-anatomy--input-vs-auto-generated)).
-- **`SecretSet` plaintext never crosses a durable boundary.** It is encrypted by the spec sanitizer
-  *before the first event/snapshot write*; plaintext must not appear in events, snapshots, the
-  read-side projection, logs, GraphQL responses, CLI output, diffs, or outbox payloads
+- **`SecretSet` plaintext never crosses a durable boundary.** It is encrypted by its
+  [pre-apply hook](#preparing-a-spec) *before the first event/snapshot write*; plaintext must not
+  appear in events, snapshots, the read-side projection, logs, GraphQL responses, CLI output, diffs,
+  or outbox payloads
   ([Secret handling](#secret-handling-invariant)).
 - **Local and remote facade behavior must match for all contract-tested cases.** The `contract_test!`
   suite runs each case against both implementations; new facade behavior must be added there
@@ -297,8 +298,8 @@ step (see below). `VariableSet` and `SecretSet` declare `SpecInput` as a separat
 field-identical to `Spec`, so validation and linting attach to the write-path type. `Storage` uses
 one type for both, with the identity conversion from `declare_identity_resource_spec_from_input!`.
 
-**Validating an update.** A create runs `ResourceValidateSpec::validate`; a spec update runs
-`validate_update(current)`, where `current` is the stored spec in input form. Its default is
+**Validating an update.** A create runs `ResourceValidateSpec::validate`; an update of a mutable spec
+runs `validate_update(current)`, where `current` is the stored spec in input form. Its default is
 `validate`. A type whose rules can get stricter than data already stored overrides it, so that an
 old entry does not block every later write to its resource: `VariableSetSpecInput` and
 `SecretSetSpecInput` skip the name rule for names `current` already has, skip the value rules for
@@ -357,6 +358,40 @@ and an aggregate. This is the bound that all generic use cases require.
   > dispatchers on `dill` metadata (`ResourceDispatcherMeta`) and compares it against the target
   > `TypeUri`/selector — see [§9](#9-services-kamu-resources-services) for the const-string details.
 
+### Preparing a spec
+
+A type may have one `ResourceSpecPreApply`
+([`use_cases/resource_spec_pre_apply.rs`](/src/domain/resources/domain/src/use_cases/resource_spec_pre_apply.rs)),
+a DI component that runs first in both plan and apply, before validation and the planner. It may use
+other services, so it fills defaults, resolves references to identities, and encrypts secrets. It
+gets the account and the current spec, and it may reject.
+
+- **What is equivalent comes back in its stored form.** Otherwise applying the same manifest again
+  would change the resource, or, for an immutable spec, be rejected. A reference by ID or DID that
+  matches the stored one is kept without being resolved, so it is a no-op even after its object was
+  renamed or deleted. A reference by name is resolved, since another object may have taken the name.
+  The type decides what is equivalent: `SecretSet` keeps the stored ciphertext of an equal
+  plaintext, but takes a given JWE token as a new value.
+- **Preparing a prepared spec again changes nothing.**
+- **It has no side effects.** It runs for plans too, and twice in an apply that loses a race for its
+  name.
+- **Defaults are filled here, never in `ResourceSpecFromInput::from_input`.** That runs on every
+  replay, so changing a default there would change specs already stored.
+- **A default of a type with an [immutable spec](#immutable-specs) never changes.** Applying again a
+  manifest that omits the field would be rejected as a change.
+
+### Immutable specs
+
+`ResourceStateModel::SPEC_MUTABILITY` says what applying a different spec to an existing resource
+does. `Mutable`, the default, updates the spec. `Immutable` rejects the apply as a whole, headers
+included, with the category `ImmutableFieldChanged`, in plan and apply alike.
+
+- The prepared spec is compared with the stored one, and an equal one is a no-op. It is not
+  validated again: rules added after the resource was created do not concern it.
+- Headers stay mutable, and changing them bumps the generation as for any other type.
+- The projector refuses a `SpecUpdated` event of an immutable type, so such a stream does not load.
+  A type whose specs were ever updated therefore cannot become immutable.
+
 ### Events
 
 `ResourceEvent<TSpec>` is the event-sourcing alphabet:
@@ -378,7 +413,8 @@ and an aggregate. This is the bound that all generic use cases require.
 - The projector derives the `Pending`, `Deleting` and `Deleted` phases after each of them
   ([state machine](#lifecycle-state-machine)); that derivation is not a status update.
 
-`Created.spec` and `SpecUpdated.new_spec` are instantiated with `R::SpecInput`, not `R::Spec` — the event log stores what was submitted, same as
+`Created.spec` and `SpecUpdated.new_spec` are instantiated with `R::SpecInput`, not `R::Spec` — the
+event log stores what was submitted, as [prepared](#preparing-a-spec), same as
 `Created.headers`/`HeadersUpdated.new_headers` store `ResourceHeadersInput`. The `ResourceState`
 projection folds these into current state, converting `SpecInput` -> `Spec` (and `HeadersInput` ->
 `Headers`) at fold time — see `Spec` vs `SpecInput` above.
@@ -666,10 +702,11 @@ Concrete conflict cases:
 | `id` resolving to a resource in a different account | **Not found** — `ResourceIDNotFoundError` (account-scoped lookup; existence not leaked). |
 | `headers.account` targeting another account without admin | **Reject** — `AccessError::Unauthorized` ([§7](#7-account-resolution--authorization)). |
 | Rename target name already taken (same account+schema) | **Reject** — the unique index fails the update, reported as an internal error. |
-| Create whose name another writer takes first | **Update** of the resource that writer created — the create is replanned in the same transaction. With a generated name: **Create** under another name, never an update. |
+| Create whose name another writer takes first | The whole apply runs once more in the same transaction, [spec preparation](#preparing-a-spec) included, as if it had come second: normally an **Update** of the resource that writer created. With a generated name: **Create** under another name, never an update. |
 | Update by name where another account has the same name | **No conflict** — the account disambiguates; each `(account, schema, name)` is independent. |
 | Apply re-using the name of a resource being deleted | **Create** — the resource being deleted gave up its name. The outcome carries a `replaces_resource_being_deleted` warning naming its id. |
 | Apply re-using the name of a deleted resource | **Create** — the deleted resource gave up its name when its deletion was requested. No warning, unlike one still being deleted. |
+| Different spec for a type with an [immutable spec](#immutable-specs) | **Reject** — `ResourceSpecImmutableError`, an `ImmutableFieldChanged` rejection. |
 | `id` of a resource being deleted | **Reject** — `ResourceDeletionInProgressError`, a `LifecycleRuleConflict` rejection. |
 | `id` of a deleted resource | **Not found** — `ResourceIDNotFoundError`, although reads by id find it. |
 | Apply with no real change | **`Untouched`** — no generation bump, no events, no reconcile. |
@@ -755,9 +792,17 @@ pub enum ApplyResourceOutcome { Created, Updated, Untouched }
 The `--dry-run` path uses `plan`; a live apply uses `apply`. A read-modify-write caller uses
 `apply_with_precondition`, passing the state it read (`ApplyResourcePrecondition::Absent` or
 `Generation(n)`). If the stored resource no longer matches, the apply fails with
-`ConcurrentModification`. That includes a create that hits an existing name, which is otherwise
-retried as an update, or under another name if it was [generated](#generated-names). The planner checks the generation of the aggregate it loads, and saving
+`ConcurrentModification`. The planner checks the generation of the loaded aggregate, and saving
 checks that no event was appended since, so the check and the write are atomic.
+
+`ApplyResourceRunner`
+([`services/apply_resource_runner.rs`](/src/domain/resources/services/src/services/apply_resource_runner.rs))
+strings the steps together: find the existing resource, [prepare the spec](#preparing-a-spec), plan,
+execute. The resource is loaded once for all of them: a resource updated or deleted by another writer
+since then fails the save with `ConcurrentModification`, so a spec is never saved over one it was not
+prepared against. A create that loses its given name to another writer runs all of them once more, as
+the spec was prepared without the one that writer stored; losing again is an internal error. A
+[generated name](#generated-names) is replaced within the execution instead.
 
 Use-case implementations are generated by **`declare_*_use_case!`** macros so each type gets a
 fully-wired instance without boilerplate.
@@ -2018,7 +2063,7 @@ legitimately match several user-authored sets that this path must not touch.
 *It reads the stored spec, never the projection.* Upsert and delete both rebuild the whole set and
 apply it back, so here a pre-reconcile read is not merely stale but **destructive**: it would
 silently retract every entry added since the last reconcile — adding a second secret moments after
-the first would drop the first. Secrets are recoverable from the spec (the sanitizer encrypts before
+the first would drop the first. Secrets are recoverable from the spec (the pre-apply hook encrypts before
 the first durable write), so that path decrypts via `SecretExt::decrypt_plaintext_bytes` rather than
 reading the projection's raw-AES columns.
 
@@ -2063,7 +2108,7 @@ belongs to another account. Nothing in `ResourceEventDeleted` or
 resource contract working as intended. Behaviourally it is a headers-only change: `try_update_spec`
 short-circuits on an unchanged spec. Like any header change it bumps `generation` once, so the
 resource is reconciled again. A `SecretSet` whose stored spec is still the backfill migration's
-read-only `aes256gcm` form also changes its spec, as `SecretSetSpecSanitizer` upgrades it to `jwe`
+read-only `aes256gcm` form also changes its spec, as `SecretSetSpecPreApply` upgrades it to `jwe`
 on the way through; that still bumps the generation only once. The `aes256gcm` form cannot reach
 the auto-managed sets (those are deleted, not stripped), and a normally-authored set is always
 already `jwe`.
@@ -2084,31 +2129,32 @@ orphaned binding rows.
 Encryption happens in **two places — not (primarily) in the reconciler**, which is the easy wrong
 assumption:
 
-1. **Spec sanitizer — the pre-persistence boundary** ([`sanitizers/secret_set.rs`](/src/domain/configuration/services/src/sanitizers/secret_set.rs)).
-   `SecretSetSpecSanitizer` runs as the **very first step** of both `plan` and `apply`, before the
-   planner and before any event/snapshot write. It encrypts each non-encrypted secret into a compact
-   **JWE** token (`dir` + `A256GCM`, via `crypto_utils::SecretCryptor` / `crypto_utils::jwe`) and
+1. **Pre-apply hook — the pre-persistence boundary** ([`spec_pre_apply/secret_set.rs`](/src/domain/configuration/services/src/spec_pre_apply/secret_set.rs)).
+   `SecretSetSpecPreApply`, the type's [`ResourceSpecPreApply`](#preparing-a-spec), runs as the
+   **very first step** of both `plan` and `apply`, before the planner and before any event/snapshot
+   write. It encrypts each non-encrypted secret into a compact **JWE** token (`dir` + `A256GCM`, via
+   `crypto_utils::SecretCryptor` / `crypto_utils::jwe`) and
    stores it as `Secret { value: <jwe>, contentEncoding: Some("jwe") }`, so the persisted `spec`
    **already holds ciphertext.**
 
    > This ordering is what makes the apply `before`/`after` documents safe: they are built from the
-   > sanitized state, carry the **stored (unrevealed)** spec, and never invoke
+   > prepared state, carry the **stored (unrevealed)** spec, and never invoke
    > `ResourceSpecViewDispatcher::reveal_spec`. Pinned by the contract test
    > `apply_documents_never_expose_secret_plaintext`, which runs against both facades. "diffs" in
    > the invariant above means exactly these documents.
 
-   The sanitizer also handles three edge cases:
+   The hook also handles three edge cases:
    - If new plaintext decrypts-equal to the stored JWE token, it reuses that token to avoid a
      spurious change.
-   - If input is already tagged as `contentEncoding: "jwe"`, the sanitizer decrypts it under the
+   - If input is already tagged as `contentEncoding: "jwe"`, the hook decrypts it under the
      current key before trusting it. A wrong-key or tampered token becomes
      `ApplyResourceRejectionCategory::BusinessValidationFailed` (`ApplyResource*Decision::Rejected`),
      not a later reconciliation/reveal failure.
    - The read-only `contentEncoding: "aes256gcm"` form (`hex(nonce ‖ ciphertext)`) exists only for
-     env-var backfill migrations, which cannot compute JWE in SQL. On the next apply, the sanitizer
+     env-var backfill migrations, which cannot compute JWE in SQL. On the next apply, the hook
      re-materializes it as JWE even when the plaintext has not changed.
 
-   `ResourceSpecSanitizer::sanitize_new_spec` returns `SanitizeSpecOutcome<R>` so sanitizers can
+   `ResourceSpecPreApply::pre_apply` returns `ResourceSpecPreApplyOutcome<R>` so hooks can
    report key-dependent business rejections without adding resource-specific `LifecycleError`
    variants; technical failures still return `InternalError`.
 2. **Reconciler — encrypted read-side projection** ([`reconcilers/secret_set.rs`](/src/domain/configuration/services/src/reconcilers/secret_set.rs)).
@@ -2173,7 +2219,9 @@ pub fn register_variable_set_resource_crud_dispatcher(catalog_builder: &mut dill
    canonical should be the schema `TypeName`; include at least the singular and plural lowercase
    forms and a short code as aliases). No `status.rs` is needed — status is inherited automatically
    via the shared `ResourceStatus`/`ResourceStatusExt`, written through the generic
-   `StatusUpdated` event by the type's controller.
+   `StatusUpdated` event by the type's controller. Declare in `state.rs` whether the spec is
+   [immutable](#immutable-specs), and add a [`ResourceSpecPreApply`](#preparing-a-spec) to the
+   services crate if the spec has defaults or references.
 2. **Implement a `SimpleResourceReconciler<R>`** in `configuration/services/src/reconcilers/`
    (no-op projection is fine if there's nothing to do; transform the spec here if needed — see
    `SecretSet`).
@@ -2195,7 +2243,7 @@ pub fn register_variable_set_resource_crud_dispatcher(catalog_builder: &mut dill
 operations work without touching CLI or GraphQL code. **But "no changes" holds only for the generic
 path** — a complete type still needs its DI registration, presentation metadata (aliases + list
 columns), facade contract coverage, CLI golden-output test, `cynic`/schema updates if the remote
-client depends on type-specific shapes, and any type-specific spec-view/sanitizer logic (+ tests).
+client depends on type-specific shapes, and any type-specific spec-view/pre-apply logic (+ tests).
 
 ### Recipe: driving a type with a resource controller
 
@@ -2230,9 +2278,10 @@ dispatch, persistence, the event-store bridge, and the message consumers. Config
 leave real resources `Reconciling` or `Deleting` without the runtime, as a crash would, and check
 that the first drain completes them, and that a failing `SecretSet` holds back no `VariableSet`. A
 `TestResource` mock and `BaseResourceServiceHarness` (both in `services/src/testing/`) provide a
-type-agnostic harness; the facade contract tests serve `TestResource` beside the real types where
-they need a feature no real type has (`LocalFacadeHarnessOpts::test_resource`);
-configuration tests cover the real reconcilers (incl. the `SecretSet` spec sanitizer, encrypted projection, and `reveal_spec`).
+type-agnostic harness, and `ImmutableTestResource` has an immutable spec with a reference to
+resolve; the facade contract tests serve both beside the real types where they need a feature no
+real type has (`LocalFacadeHarnessOpts::test_resources`);
+configuration tests cover the real reconcilers (incl. the `SecretSet` pre-apply hook, encrypted projection, and `reveal_spec`).
 
 **Controller runtime** —
 [`services/tests/tests/controller_runtime`](/src/domain/resources/services/tests/tests/controller_runtime/).
@@ -2357,7 +2406,7 @@ Otherwise the behavior is already guaranteed for both implementations by the con
   URLs, whitespace, query strings, fragments, trailing slashes, and too-few path segments, but it
   preserves the accepted string (stored as the inner `TypeUri`) and allows non-`opendatafabric.org`
   hosts for future custom schema namespaces.
-- **Secrets are encrypted before the first durable write** (by the spec sanitizer, not the
+- **Secrets are encrypted before the first durable write** (by the pre-apply hook, not the
   controller) and only decrypted on read with `SpecViewOpts::REVEALED` (CLI `--revealed`,
   GraphQL `revealed: true`); the default `SpecViewOpts::ENCRYPTED` returns the stored ciphertext
   envelope. See [Secret handling](#secret-handling-invariant) — never assume plaintext is safe to

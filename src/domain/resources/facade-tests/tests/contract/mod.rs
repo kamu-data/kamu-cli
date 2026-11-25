@@ -17,6 +17,7 @@ pub mod error_taxonomy;
 pub mod generated_names;
 pub mod generations;
 pub mod get_handle;
+pub mod immutable_specs;
 pub mod list_search;
 pub mod render_manifest;
 pub mod search_any_type;

@@ -11,6 +11,7 @@ use event_sourcing::ProjectionError;
 use kamu_resources::{
     ResourceDeletionInProgressError,
     ResourceHeadersValidationError,
+    ResourceSpecImmutableError,
     ResourceStatusConflictError,
 };
 
@@ -34,6 +35,9 @@ pub enum StorageLifecycleError {
 
     #[error(transparent)]
     DeletionInProgress(#[from] ResourceDeletionInProgressError),
+
+    #[error(transparent)]
+    SpecImmutable(#[from] ResourceSpecImmutableError),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

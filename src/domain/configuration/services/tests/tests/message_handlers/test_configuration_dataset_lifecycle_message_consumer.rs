@@ -166,7 +166,7 @@ async fn test_deleted_dataset_strips_label_from_user_authored_secret_set() {
     assert_eq!(
         after.headers.generation,
         before.headers.generation + 1,
-        "only the label changes for an already-sanitized secret set, bumping the generation once"
+        "only the label changes for an already-encrypted secret set, bumping the generation once"
     );
 }
 

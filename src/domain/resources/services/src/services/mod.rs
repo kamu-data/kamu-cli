@@ -9,6 +9,7 @@
 
 mod apply_resource_plan_executor;
 mod apply_resource_planner;
+mod apply_resource_runner;
 mod generic_resource_query;
 mod resource_aggregate_loader;
 mod resource_condition_patch_checker;
@@ -20,6 +21,7 @@ mod typed_resource_query;
 
 pub use apply_resource_plan_executor::*;
 pub use apply_resource_planner::*;
+pub use apply_resource_runner::*;
 pub use generic_resource_query::*;
 pub(crate) use resource_condition_patch_checker::*;
 pub use resource_durable_state_validator::*;

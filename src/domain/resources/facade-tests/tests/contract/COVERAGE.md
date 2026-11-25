@@ -18,7 +18,7 @@ Each `RF-*` contract scenario is listed with its status. Test code and comments 
 | RF-021 | apply_manifest.rs | Active | Apply create from YAML manifest |  |
 | RF-022 | apply_manifest.rs | Active | Apply update changes headers/spec |  |
 | RF-023 | apply_manifest.rs | Active | Apply unchanged manifest is idempotent |  |
-| RF-024 | apply_manifest.rs | Deferred | Apply rejects immutable field change | Requires a resource type with an immutable field |
+| RF-024 | immutable_specs.rs | Active | Plan and apply reject a changed immutable spec | On `ImmutableTestResource`; an unchanged manifest stays a no-op |
 | RF-025 | apply_manifest.rs | Active | Apply rejects invalid spec | Combined with RF-016 in one test |
 | RF-026 | apply_manifest.rs | Active | Apply preserves duplicate header-key validation |  |
 | RF-026A | apply_manifest.rs | Active | Apply rejects invalid label/annotation header keys at parse time | Extension beyond original plan |
@@ -27,7 +27,7 @@ Each `RF-*` contract scenario is listed with its status. Test code and comments 
 | RF-026D | apply_manifest.rs | Active | Extension header canonicalization precedes diffing | Short-name after URI reapply reports `Untouched` |
 | RF-026E | apply_manifest.rs | Active | Plan/apply reject invalid registered extension values as headers | Surfaces as `InvalidHeaders` locally and remotely |
 | RF-026F | apply_manifest.rs | Active | Plan/apply reject over-long description via annotation schema | Uses `ResourceExtensionSchema`, not legacy `DescriptionTooLong` |
-| RF-027 | apply_manifest.rs | Active | Apply documents never expose SecretSet plaintext | Sanitizer runs before planning, so `before`/`after` carry ciphertext |
+| RF-027 | apply_manifest.rs | Active | Apply documents never expose SecretSet plaintext | The pre-apply hook runs before planning, so `before`/`after` carry ciphertext |
 | RF-028 | apply_manifest.rs | Active | Apply documents match the rendered manifest | Shared canonicalization with `render_manifests` |
 | RF-029 | apply_manifest.rs | Active | Apply document `before` is absent only for creates | Unchanged apply still carries `before`; guards placeholder regressions |
 | RF-030 | get_handle.rs | Active | Get by name returns full resource view |  |
@@ -126,7 +126,7 @@ Each `RF-*` contract scenario is listed with its status. Test code and comments 
 | RF-140 | error_taxonomy.rs | Active | One-element-batch lookup taxonomy is consistent across get/get_handles/render_manifests/delete | Full 3x4 matrix (NameNotFound/IDNotFound/SchemaMismatch x 4 methods); RF-141 covers only a subset, so this was converted to batch form rather than retired |
 | RF-141 | error_taxonomy.rs | Active | Multi-ref batch lookup problem taxonomy mirrors the one-element case |  |
 | RF-142 | error_taxonomy.rs | Active | Batch-level error taxonomy (unsupported type, bad account) |  |
-| RF-143 | error_taxonomy.rs | Active | Apply rejection taxonomy (InvalidHeaders, InvalidSpec, Rejected) | Also split into apply_manifest.rs for apply-specific rejection cases |
+| RF-143 | error_taxonomy.rs | Active | Apply rejection taxonomy (InvalidHeaders, InvalidSpec, Rejected) | Also split into apply_manifest.rs for apply-specific rejection cases, and immutable_specs.rs for `ImmutableFieldChanged` and `ReferencedObjectMissing` |
 | RF-150 | cross_impl.rs | Active | Local and remote expose same supported type descriptors | Verified via `contract_test!` macro, not side-by-side comparison |
 | RF-151 | cross_impl.rs | Active | Local-created resource is readable remotely | True cross-facade test |
 | RF-152 | cross_impl.rs | Active | Remote-created resource is readable locally | True cross-facade test |

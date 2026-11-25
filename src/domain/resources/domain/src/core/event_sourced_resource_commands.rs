@@ -11,6 +11,7 @@ use chrono::{DateTime, Utc};
 use event_sourcing::{Projection, ProjectionError};
 
 use crate::{
+    DeclarativeResourceState,
     EventSourcedResource,
     IllegalStatusTransitionError,
     ResourceCleanupError,
@@ -22,11 +23,13 @@ use crate::{
     ResourcePhase,
     ResourceReconcileError,
     ResourceSpecFromInput,
+    ResourceSpecImmutableError,
     ResourceStatus,
     ResourceStatusConflictError,
     ResourceStatusExt,
     ResourceValidateHeaders,
     ResourceValidateSpec,
+    SpecMutability,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -48,8 +51,8 @@ pub trait StatusConflictOf: From<ResourceStatusConflictError> {
 /// Implements [`InvariantViolationOf`], [`StatusConflictOf`] and
 /// [`IntoApplyResourceRejection`](crate::IntoApplyResourceRejection) for a
 /// lifecycle error enum with the variants `HeadersValidation`,
-/// `SpecValidation`, `InvariantViolation`, `StatusConflict` and
-/// `DeletionInProgress`.
+/// `SpecValidation`, `InvariantViolation`, `StatusConflict`,
+/// `DeletionInProgress` and `SpecImmutable`.
 #[macro_export]
 macro_rules! impl_resource_lifecycle_error {
     ($lifecycle_error:ty, $state:ty) => {
@@ -71,6 +74,9 @@ macro_rules! impl_resource_lifecycle_error {
                     Self::StatusConflict(err) => Handling::internal(err),
                     Self::DeletionInProgress(err) => {
                         Handling::rejected(Category::LifecycleRuleConflict, err)
+                    }
+                    Self::SpecImmutable(err) => {
+                        Handling::rejected(Category::ImmutableFieldChanged, err)
                     }
                 }
             }
@@ -162,16 +168,38 @@ where
         + InvariantViolationOf<R::ResourceState>,
 {
     ensure_not_being_deleted(resource)?;
-    new_spec.validate_update(&resource.spec().clone().into_input())?;
 
-    // Compare after normalizing (not the raw input) so a resubmitted-but-equivalent
-    // input is correctly detected as unchanged, even if its written form differs.
-    if resource.spec() == &R::Spec::from_input(new_spec.clone()) {
-        return Ok(());
+    match R::ResourceState::SPEC_MUTABILITY {
+        // Not validated: the spec is either the one accepted at creation, which
+        // newer rules do not concern, or refused whatever it holds
+        SpecMutability::Immutable => {
+            return if is_same_spec(resource, &new_spec) {
+                Ok(())
+            } else {
+                Err(ResourceSpecImmutableError { id: *resource.id() }.into())
+            };
+        }
+        SpecMutability::Mutable => {
+            new_spec.validate_update(&resource.spec().clone().into_input())?;
+            if is_same_spec(resource, &new_spec) {
+                return Ok(());
+            }
+        }
     }
 
     let event = resource.make_spec_updated_event(now, new_spec, new_generation);
     resource.apply_event(event)
+}
+
+/// Compares what would be stored, so an equivalent input counts as the same
+/// even if its written form differs
+fn is_same_spec<R>(resource: &R, new_spec: &R::SpecInput) -> bool
+where
+    R: EventSourcedResource,
+    R::SpecInput: Clone,
+    R::Spec: ResourceSpecFromInput<R::SpecInput> + PartialEq,
+{
+    resource.spec() == &R::Spec::from_input(new_spec.clone())
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -283,7 +283,9 @@ impl ApplyResourcePlannerHarness {
         params: ApplyResourceParams<TestResource>,
     ) -> Result<ApplyResourcePlanningDecision<TestResource>, ApplyResourceUseCaseError<TestResource>>
     {
-        self.make_planner().plan(params).await
+        let planner = self.make_planner();
+        let maybe_existing = planner.find_existing_resource(&params).await?;
+        planner.plan(params, maybe_existing).await
     }
 
     fn make_apply_params(

@@ -141,7 +141,7 @@ pub async fn test_resources_secretset_lifecycle(ctx: ResourceCtx) {
     //
     // Exercises the already-encrypted apply path — the GitOps case where a
     // committed manifest carries `{ value: <jwe>, contentEncoding: jwe }`
-    // instead of a plaintext value. The sanitizer must accept the encrypted
+    // instead of a plaintext value. The pre-apply hook must accept the encrypted
     // value as-is (not re-encrypt it), and `--revealed` must decrypt it back
     // to the original plaintext. Shares this fixture's `with_kamu_config`
     // wiring rather than needing its own. The JWE token is tied to the
@@ -169,7 +169,7 @@ async fn test_resources_secretset_apply_pre_encrypted(ctx: &ResourceCtx) {
     )
     .await;
 
-    // Re-applying the same encrypted manifest is idempotent: the sanitizer
+    // Re-applying the same encrypted manifest is idempotent: the hook
     // passes encrypted secrets through untouched, so nothing changes.
     ctx.assert_success_with_stdin(
         ["apply", "--stdin"],

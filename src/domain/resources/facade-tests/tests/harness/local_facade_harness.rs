@@ -56,7 +56,7 @@ use kamu_resources::{
     ResourceVisibility,
 };
 use kamu_resources_facade::{ListResourcesError, ResourceFacade, SearchResourcesRequest};
-use kamu_resources_services::testing::register_test_resource;
+use kamu_resources_services::testing::{register_immutable_test_resource, register_test_resource};
 use kamu_resources_services::{BackgroundWorkFinalizer, ResourceControllerRuntimeImpl};
 use messaging_outbox::{OutboxAgent, OutboxProvider, register_message_dispatcher};
 use strum::IntoEnumIterator;
@@ -77,8 +77,19 @@ const ADMIN_ACCOUNT_NAME: &str = "admin";
 pub struct LocalFacadeHarnessOpts {
     pub outbox_provider: OutboxProvider,
     /// Serves [`TestResource`](kamu_resources_services::testing::TestResource)
+    /// and
+    /// [`ImmutableTestResource`](kamu_resources_services::testing::ImmutableTestResource)
     /// beside the real types
-    pub test_resource: bool,
+    pub test_resources: bool,
+}
+
+impl LocalFacadeHarnessOpts {
+    pub fn with_test_resources() -> Self {
+        Self {
+            test_resources: true,
+            ..Default::default()
+        }
+    }
 }
 
 impl Default for LocalFacadeHarnessOpts {
@@ -87,7 +98,7 @@ impl Default for LocalFacadeHarnessOpts {
             outbox_provider: OutboxProvider::Immediate {
                 force_immediate: true,
             },
-            test_resource: false,
+            test_resources: false,
         }
     }
 }
@@ -227,8 +238,9 @@ impl LocalFacadeHarness {
 
         kamu_resources_services::register_dependencies(&mut b);
         kamu_configuration_services::register_dependencies(&mut b);
-        if opts.test_resource {
+        if opts.test_resources {
             register_test_resource(&mut b);
+            register_immutable_test_resource(&mut b);
         }
 
         register_message_dispatcher::<ResourceLifecycleMessage>(

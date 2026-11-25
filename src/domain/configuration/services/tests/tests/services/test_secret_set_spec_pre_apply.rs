@@ -169,7 +169,7 @@ async fn test_apply_secret_set_already_encrypted_passes_through_idempotently() {
         "first apply must produce an encrypted secret"
     );
 
-    // Re-apply the already-encrypted spec — the sanitizer must pass it through
+    // Re-apply the already-encrypted spec — the hook must pass it through
     // unchanged
     let decision2 = harness
         .apply_secret_use_case()
@@ -207,7 +207,7 @@ async fn test_apply_secret_set_already_encrypted_passes_through_idempotently() {
         "secret must remain encrypted after idempotent re-apply"
     );
 
-    // The ciphertext must equal the original — sanitizer is a no-op on
+    // The ciphertext must equal the original — the hook is a no-op on
     // already-encrypted specs
     assert_eq!(
         stored_spec2.secrets.entries["API_TOKEN"].as_encrypted(),

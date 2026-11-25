@@ -39,7 +39,7 @@ use crate::helpers::{VARIABLE_SET_SCHEMA_STR, assert_single_batch_success, creat
 contract_test!(
     apply_without_name_creates_each_time,
     super::test_apply_without_name_creates_each_time,
-    opts = super::with_test_resource()
+    opts = super::LocalFacadeHarnessOpts::with_test_resources()
 );
 
 pub async fn test_apply_without_name_creates_each_time(h: &impl FacadeContractHarness) {
@@ -71,7 +71,7 @@ pub async fn test_apply_without_name_creates_each_time(h: &impl FacadeContractHa
 contract_test!(
     plan_without_name_leaves_it_pending,
     super::test_plan_without_name_leaves_it_pending,
-    opts = super::with_test_resource()
+    opts = super::LocalFacadeHarnessOpts::with_test_resources()
 );
 
 pub async fn test_plan_without_name_leaves_it_pending(h: &impl FacadeContractHarness) {
@@ -99,7 +99,7 @@ pub async fn test_plan_without_name_leaves_it_pending(h: &impl FacadeContractHar
 contract_test!(
     id_without_name_keeps_the_name,
     super::test_id_without_name_keeps_the_name,
-    opts = super::with_test_resource()
+    opts = super::LocalFacadeHarnessOpts::with_test_resources()
 );
 
 pub async fn test_id_without_name_keeps_the_name(h: &impl FacadeContractHarness) {
@@ -161,13 +161,6 @@ pub async fn test_name_is_required_where_the_type_does_not_generate_it(
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Helpers
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-fn with_test_resource() -> LocalFacadeHarnessOpts {
-    LocalFacadeHarnessOpts {
-        test_resource: true,
-        ..Default::default()
-    }
-}
 
 fn request(manifest: &serde_json::Value) -> ApplyManifestRequest {
     ApplyManifestRequest {

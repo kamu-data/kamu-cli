@@ -157,7 +157,7 @@ impl ControllersHarness {
     }
 
     /// A `SecretSet` whose secret claims an encoding it does not have, written
-    /// past the sanitizer, so that every reconciliation of it fails
+    /// past the pre-apply hook, so that every reconciliation of it fails
     async fn create_secret_set_with_undecryptable_secret(&self) -> ResourceID {
         let spec = SecretSetSpecInput::new(odf::meta::config::SecretSetSpecInput {
             secrets: odf::meta::config::Secrets {

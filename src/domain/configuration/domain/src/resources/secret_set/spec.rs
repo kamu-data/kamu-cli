@@ -120,7 +120,7 @@ pub trait SecretExt {
     fn content_encoding(&self) -> Option<ContentEncoding>;
 
     /// The encrypted token, if this is an encrypted secret — used by the
-    /// sanitizer idempotency check to compare/reuse an existing ciphertext.
+    /// pre-apply idempotency check to compare/reuse an existing ciphertext.
     fn as_encrypted(&self) -> Option<&str>;
 
     /// Decrypt to plaintext bytes, dispatching on `contentEncoding`:
@@ -254,7 +254,7 @@ impl ResourceValidateSpec for SecretSetSpecInput {
 impl SecretSetSpecInput {
     /// Entries of `current` written before a rule existed stay valid: a kept
     /// name skips the name rule, an unchanged entry skips the value rules, and
-    /// a set already over the limit may shrink but not grow. The sanitizer
+    /// a set already over the limit may shrink but not grow. The pre-apply hook
     /// reuses the stored ciphertext of a secret whose plaintext is unchanged,
     /// so such a secret compares equal here.
     fn validate_against(

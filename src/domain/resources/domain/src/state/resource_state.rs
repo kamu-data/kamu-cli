@@ -11,7 +11,6 @@ use internal_error::InternalError;
 use serde::de::DeserializeOwned;
 
 use crate::{
-    DeclarativeResourceState,
     ResourceHeaders,
     ResourceID,
     ResourceSnapshot,
@@ -48,45 +47,8 @@ where
             status,
         }
     }
-}
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-impl<TSpec> DeclarativeResourceState for ResourceState<TSpec>
-where
-    TSpec: std::fmt::Debug + Clone + Send + Sync,
-{
-    type Spec = TSpec;
-
-    fn id(&self) -> &ResourceID {
-        &self.id
-    }
-
-    fn headers(&self) -> &ResourceHeaders {
-        &self.headers
-    }
-
-    fn headers_mut(&mut self) -> &mut ResourceHeaders {
-        &mut self.headers
-    }
-
-    fn spec(&self) -> &Self::Spec {
-        &self.spec
-    }
-
-    fn spec_mut(&mut self) -> &mut Self::Spec {
-        &mut self.spec
-    }
-
-    fn status(&self) -> &ResourceStatus {
-        &self.status
-    }
-
-    fn status_mut(&mut self) -> &mut ResourceStatus {
-        &mut self.status
-    }
-
-    fn into_parts(self) -> (ResourceID, ResourceHeaders, Self::Spec, ResourceStatus) {
+    pub fn into_parts(self) -> (ResourceID, ResourceHeaders, TSpec, ResourceStatus) {
         (self.id, self.headers, self.spec, self.status)
     }
 }

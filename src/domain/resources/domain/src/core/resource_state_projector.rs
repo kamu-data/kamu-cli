@@ -18,6 +18,7 @@ use crate::{
     ResourceState,
     ResourceStateModel,
     ResourceStatusExt,
+    SpecMutability,
     empty_resource_conditions,
     new_pending_resource_status_with,
 };
@@ -58,6 +59,12 @@ where
             | E::SpecUpdated(_)
             | E::DeletionRequested(_)),
         ) if s.headers().deletion_requested_at.is_some() => {
+            Err(ProjectionError::new(Some(s), event))
+        }
+
+        (Some(s), event @ E::SpecUpdated(_))
+            if TModel::SPEC_MUTABILITY == SpecMutability::Immutable =>
+        {
             Err(ProjectionError::new(Some(s), event))
         }
 
