@@ -615,6 +615,7 @@ impl FlowControllerWebhookDeliverHarness {
     fn register_dataset(&self, dataset_id: &odf::DatasetID) {
         self.fake_dataset_entry_service.add_entry(DatasetEntry {
             id: dataset_id.clone(),
+            resource_id: DatasetEntry::generate_resource_id(),
             owner_id: TEST_ACCOUNT_ID.clone(),
             owner_name: DEFAULT_ACCOUNT_NAME.clone(),
             name: odf::DatasetName::new_unchecked("foo"),

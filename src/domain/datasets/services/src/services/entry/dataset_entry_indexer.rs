@@ -150,6 +150,7 @@ impl DatasetEntryIndexer {
 
             let dataset_entry = DatasetEntry::new(
                 dataset_handle.id,
+                DatasetEntry::generate_resource_id(),
                 owner_account_id,
                 dataset_handle
                     .alias

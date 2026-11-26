@@ -47,6 +47,23 @@ pub trait DatasetEntryService: Sync + Send {
         BatchLookup<DatasetEntry, (odf::AccountID, odf::DatasetName), GetDatasetEntryByNameError>,
         InternalError,
     >;
+
+    /// Resolves an ODF dataset reference to the handle task specs store.
+    ///
+    /// The dataset is looked up by the strongest field the reference gives:
+    /// the resource ID, then the DID, then the account and name. A reference
+    /// whose other fields disagree with that dataset names no dataset. A name
+    /// without an account is looked up in `bare_name_account`; no caller
+    /// identity is consulted. Access is not checked: callers check the
+    /// permission they need.
+    ///
+    /// Returns `None` when no dataset matches, and for a dataset whose owner
+    /// account is already deleted.
+    async fn resolve_dataset_handle(
+        &self,
+        dataset_ref: &odf::metadata::datasets::DatasetRef,
+        bare_name_account: Option<&odf::AccountName>,
+    ) -> Result<Option<odf::metadata::datasets::DatasetHandle>, ResolveDatasetHandleError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -125,6 +142,22 @@ pub enum GetOwnedDatasetIdsError {
 pub enum IsDatasetOwnedByError {
     #[error(transparent)]
     Internal(#[from] InternalError),
+}
+
+#[derive(Error, Debug)]
+pub enum ResolveDatasetHandleError {
+    #[error(transparent)]
+    InvalidRef(#[from] InvalidDatasetRefError),
+
+    #[error(transparent)]
+    Internal(#[from] InternalError),
+}
+
+/// The reference cannot name a dataset whatever datasets exist
+#[derive(Error, Debug)]
+#[error("Invalid dataset reference: {reason}")]
+pub struct InvalidDatasetRefError {
+    pub reason: &'static str,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

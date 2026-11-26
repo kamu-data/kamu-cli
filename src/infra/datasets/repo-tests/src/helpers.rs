@@ -69,6 +69,7 @@ pub(crate) fn new_dataset_entry_with(
 
     DatasetEntry::new(
         dataset_id,
+        DatasetEntry::generate_resource_id(),
         owner_id,
         owner_name,
         dataset_alias,
@@ -110,6 +111,7 @@ pub(crate) async fn init_dataset_entry(
     dataset_entry_repo
         .save_dataset_entry(&DatasetEntry {
             id: dataset_id.clone(),
+            resource_id: DatasetEntry::generate_resource_id(),
             owner_id: account_id.clone(),
             owner_name: account_name.clone(),
             name: dataset_name.clone(),

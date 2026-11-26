@@ -254,6 +254,7 @@ impl FlowHarness {
         self.fake_dataset_entry_service.add_entry(DatasetEntry {
             created_at: self.now(),
             id: dataset_id.clone(),
+            resource_id: DatasetEntry::generate_resource_id(),
             owner_id: owner_id.clone(),
             owner_name,
             name: dataset_alias.dataset_name.clone(),
@@ -295,6 +296,7 @@ impl FlowHarness {
         self.fake_dataset_entry_service.add_entry(DatasetEntry {
             created_at: self.now(),
             id: dataset_id.clone(),
+            resource_id: DatasetEntry::generate_resource_id(),
             owner_id: owner_id.clone(),
             owner_name,
             name: dataset_alias.dataset_name.clone(),

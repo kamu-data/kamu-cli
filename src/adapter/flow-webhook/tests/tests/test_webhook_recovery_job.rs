@@ -145,6 +145,7 @@ impl WebhookRecoveryJobHarness {
     fn register_dataset_entry(&self, dataset_id: &odf::DatasetID, dataset_name: &str) {
         self.fake_dataset_entry_service.add_entry(DatasetEntry::new(
             dataset_id.clone(),
+            DatasetEntry::generate_resource_id(),
             TEST_ACCOUNT_ID.clone(),
             DEFAULT_ACCOUNT_NAME.clone(),
             odf::DatasetName::new_unchecked(dataset_name),

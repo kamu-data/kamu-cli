@@ -44,6 +44,11 @@ pub trait DatasetEntryRepository: Send + Sync {
         dataset_id: &odf::DatasetID,
     ) -> Result<DatasetEntry, GetDatasetEntryError>;
 
+    async fn find_dataset_entry_by_resource_id(
+        &self,
+        resource_id: &odf::ResourceID,
+    ) -> Result<Option<DatasetEntry>, InternalError>;
+
     async fn get_multiple_dataset_entries<'a>(
         &'a self,
         dataset_ids: &[Cow<'a, odf::DatasetID>],

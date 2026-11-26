@@ -178,6 +178,7 @@ impl<'a> ScenarioWriter<'a> {
             .unwrap()
             .save_dataset_entry(&DatasetEntry::new(
                 dataset_id.clone(),
+                DatasetEntry::generate_resource_id(),
                 odf::AccountID::new_seeded_ed25519(b"owner"),
                 odf::AccountName::new_unchecked("owner"),
                 odf::DatasetName::new_unchecked(name),

@@ -14,6 +14,7 @@ use std::sync::{Arc, Mutex};
 use database_common::{BatchLookup, BatchLookupCreateOptions};
 use dill::{Singleton, component, interface, scope};
 use internal_error::InternalError;
+use kamu_accounts::{Account, AccountHandle};
 use kamu_datasets::{
     DatasetEntriesResolution,
     DatasetEntry,
@@ -23,6 +24,8 @@ use kamu_datasets::{
     GetDatasetEntryByNameError,
     GetDatasetEntryError,
     GetMultipleDatasetEntriesError,
+    InvalidDatasetRefError,
+    ResolveDatasetHandleError,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -57,6 +60,20 @@ impl FakeDatasetEntryService {
             .entry(entry.owner_id.clone())
             .and_modify(|entries| entries.push(entry.clone()))
             .or_insert_with(|| vec![entry]);
+    }
+
+    fn dataset_handle(entry: &DatasetEntry) -> odf::metadata::datasets::DatasetHandle {
+        odf::metadata::datasets::DatasetHandle {
+            account: AccountHandle {
+                id: Account::seed_resource_id_from_name(entry.owner_name.as_str()),
+                did: entry.owner_id.clone(),
+                name: entry.owner_name.clone(),
+            }
+            .into(),
+            id: entry.resource_id,
+            did: entry.id.clone(),
+            name: odf::metadata::resources::ResourceName::new_unchecked(entry.name.as_str()),
+        }
     }
 }
 
@@ -174,6 +191,40 @@ impl DatasetEntryService for FakeDatasetEntryService {
                 _phantom: Default::default(),
             },
         ))
+    }
+
+    /// Owners are built from the entries, with the resource ID that
+    /// `Account::test` accounts get. An account given by resource ID alone is
+    /// accepted here, unlike in the real service.
+    async fn resolve_dataset_handle(
+        &self,
+        dataset_ref: &odf::metadata::datasets::DatasetRef,
+        bare_name_account: Option<&odf::AccountName>,
+    ) -> Result<Option<odf::metadata::datasets::DatasetHandle>, ResolveDatasetHandleError> {
+        if dataset_ref.id.is_none() && dataset_ref.did.is_none() && dataset_ref.name.is_none() {
+            return Err(InvalidDatasetRefError {
+                reason: "it has no ID, DID or name",
+            }
+            .into());
+        }
+        let bare_name_owner = if dataset_ref.id.is_none()
+            && dataset_ref.did.is_none()
+            && dataset_ref.account.is_none()
+        {
+            Some(bare_name_account.ok_or(InvalidDatasetRefError {
+                reason: "it names a dataset without an account",
+            })?)
+        } else {
+            None
+        };
+
+        let guard = self.state.lock().unwrap();
+        Ok(guard
+            .all_entries_by_id
+            .values()
+            .filter(|entry| bare_name_owner.is_none_or(|owner| *owner == entry.owner_name))
+            .map(Self::dataset_handle)
+            .find(|handle| dataset_ref.matches(handle)))
     }
 }
 

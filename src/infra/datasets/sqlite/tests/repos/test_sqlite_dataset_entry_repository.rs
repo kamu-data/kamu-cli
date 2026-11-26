@@ -27,6 +27,22 @@ database_transactional_test!(
 
 database_transactional_test!(
     storage = sqlite,
+    fixture = dataset_entry_repo::test_find_dataset_entry_by_resource_id,
+    harness = SqliteDatasetEntryRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = sqlite,
+    fixture = dataset_entry_repo::test_try_save_dataset_entry_with_taken_resource_id,
+    harness = SqliteDatasetEntryRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = sqlite,
     fixture = dataset_entry_repo::test_stream_many_entries,
     harness = SqliteDatasetEntryRepositoryHarness
 );

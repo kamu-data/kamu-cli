@@ -90,6 +90,8 @@ CREATE INDEX idx_dataset_entries_owner_id
 CREATE UNIQUE INDEX idx_dataset_entries_owner_id_dataset_name
     ON dataset_entries (owner_id, LOWER(dataset_name));
 
+CREATE UNIQUE INDEX idx_dataset_entries_resource_id ON dataset_entries (resource_id);
+
 CREATE UNIQUE INDEX idx_dataset_key_blocks_by_hash
     ON dataset_key_blocks (dataset_id, block_hash_bin);
 
@@ -386,7 +388,7 @@ CREATE TABLE "dataset_entries"
     created_at   timestamptz  NOT NULL,
     kind         VARCHAR(15)  NOT NULL CHECK (kind IN ('root', 'derivative')),
     owner_name   VARCHAR(100) NOT NULL
-);
+, resource_id CHAR(36));
 
 CREATE TABLE dataset_key_blocks (
     dataset_id VARCHAR(100) NOT NULL REFERENCES dataset_entries(dataset_id) ON DELETE CASCADE,

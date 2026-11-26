@@ -172,6 +172,16 @@ the old set, do a clean build.
 
 Before committing the migration run `make resources-db-schema` to update the final schema snapshots in `/resources/db` directory.
 
+### UUIDs in SQLite are 16-byte blobs
+
+`sqlx` binds and decodes `uuid::Uuid` in SQLite as a 16-byte blob, whatever the column is declared
+as: resource id columns are declared `CHAR(36)`, and text affinity never converts a blob. A SQLite
+migration that writes UUIDs therefore writes blobs: `randomblob(16)` for new ids, `unhex(id, '-')`
+for text ones. A text UUID compiles and passes every test on a fresh database, then fails to decode
+or match on existing workspaces: v0.267.0 broke CLI startup this way, repaired by
+`migrations/sqlite/20261008120000_resource_ids_text_to_blob.sql`. Check a backfill on a scratch
+database that has rows (`typeof(column) = 'blob'`, `length(column) = 16`).
+
 ## Validation
 
 - `make lint` includes SQLx cache validation through `make lint-sqlx`.
@@ -186,6 +196,7 @@ Do not re-propose these without new evidence.
 |---|---|
 | Dynamic `OR` chains via `QueryBuilder` in Postgres | Not checked at compile time by `query!`; the static `UNNEST` form is. |
 | `json_each()` over UUID columns in SQLite | `sqlx` binds `uuid::Uuid` as a blob, `json_each` yields text; comparisons silently mismatch. |
+| Text UUIDs in a SQLite backfill (`hex(randomblob(4)) \|\| '-' \|\| ...`) | Existing rows stop decoding; v0.267.0 broke CLI startup ([UUIDs in SQLite](#uuids-in-sqlite-are-16-byte-blobs)). |
 | Per-row `query!` in a loop for SQLite bulk writes | Measured 4–5× slower than one multi-row statement: each `execute` is a round-trip to the SQLite worker thread. |
 | Down (reversible) migrations | Migrations are forward-only (AGENTS.md). |
 | Forcing `SQLX_OFFLINE` from the shell | Checks queries against a stale cache and hides schema drift (AGENTS.md, "Hard rules"). |

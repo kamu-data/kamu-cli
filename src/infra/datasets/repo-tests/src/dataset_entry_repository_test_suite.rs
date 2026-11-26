@@ -84,6 +84,89 @@ pub async fn test_get_dataset_entry(catalog: &dill::Catalog) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// The resource ID is found once saved and stays with the entry when it or its
+/// owner is renamed
+pub async fn test_find_dataset_entry_by_resource_id(catalog: &dill::Catalog) {
+    let account_repo = catalog.get_one::<dyn AccountRepository>().unwrap();
+    let dataset_entry_repo = catalog.get_one::<dyn DatasetEntryRepository>().unwrap();
+
+    let account = new_account(&account_repo).await;
+    let dataset_entry = new_dataset_entry(&account, odf::DatasetKind::Root);
+    let other_entry = new_dataset_entry_with(&account, "other", odf::DatasetKind::Root);
+
+    assert_matches!(
+        dataset_entry_repo
+            .find_dataset_entry_by_resource_id(&dataset_entry.resource_id)
+            .await,
+        Ok(None)
+    );
+
+    for entry in [&dataset_entry, &other_entry] {
+        dataset_entry_repo.save_dataset_entry(entry).await.unwrap();
+    }
+    assert_eq!(
+        dataset_entry_repo
+            .find_dataset_entry_by_resource_id(&dataset_entry.resource_id)
+            .await
+            .unwrap(),
+        Some(dataset_entry.clone())
+    );
+
+    dataset_entry_repo
+        .update_dataset_entry_name(
+            &dataset_entry.id,
+            &odf::DatasetName::new_unchecked("renamed"),
+        )
+        .await
+        .unwrap();
+    dataset_entry_repo
+        .update_owner_entries_after_rename(
+            &account.id,
+            &odf::AccountName::new_unchecked("renamed-owner"),
+        )
+        .await
+        .unwrap();
+
+    let found = dataset_entry_repo
+        .find_dataset_entry_by_resource_id(&dataset_entry.resource_id)
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(
+        (found.id, found.resource_id, found.name.as_str()),
+        (dataset_entry.id, dataset_entry.resource_id, "renamed")
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Each entry has its own resource ID: a second entry with a taken one is
+/// refused
+pub async fn test_try_save_dataset_entry_with_taken_resource_id(catalog: &dill::Catalog) {
+    let account_repo = catalog.get_one::<dyn AccountRepository>().unwrap();
+    let dataset_entry_repo = catalog.get_one::<dyn DatasetEntryRepository>().unwrap();
+
+    let account = new_account(&account_repo).await;
+    let dataset_entry = new_dataset_entry(&account, odf::DatasetKind::Root);
+    dataset_entry_repo
+        .save_dataset_entry(&dataset_entry)
+        .await
+        .unwrap();
+
+    let other_entry = DatasetEntry {
+        resource_id: dataset_entry.resource_id,
+        ..new_dataset_entry_with(&account, "other", odf::DatasetKind::Root)
+    };
+
+    // A reused ID is a bug, so how it is reported is left to the storage
+    assert_matches!(
+        dataset_entry_repo.save_dataset_entry(&other_entry).await,
+        Err(_)
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 pub async fn test_stream_many_entries(catalog: &dill::Catalog) {
     let account_repo = catalog.get_one::<dyn AccountRepository>().unwrap();
     let dataset_entry_repo = catalog.get_one::<dyn DatasetEntryRepository>().unwrap();

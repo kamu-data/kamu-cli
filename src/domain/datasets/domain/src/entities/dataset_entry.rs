@@ -15,6 +15,8 @@ use chrono::{DateTime, Utc};
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DatasetEntry {
     pub id: odf::DatasetID,
+    /// ID of the dataset resource, permanent once assigned
+    pub resource_id: odf::ResourceID,
     pub owner_id: odf::AccountID,
     pub owner_name: odf::AccountName,
     pub name: odf::DatasetName,
@@ -25,6 +27,7 @@ pub struct DatasetEntry {
 impl DatasetEntry {
     pub fn new(
         id: odf::DatasetID,
+        resource_id: odf::ResourceID,
         owner_id: odf::AccountID,
         owner_name: odf::AccountName,
         name: odf::DatasetName,
@@ -33,12 +36,18 @@ impl DatasetEntry {
     ) -> Self {
         Self {
             id,
+            resource_id,
             owner_id,
             owner_name,
             name,
             created_at,
             kind,
         }
+    }
+
+    /// A fresh resource ID for a new entry; an existing entry keeps its own
+    pub fn generate_resource_id() -> odf::ResourceID {
+        odf::ResourceID::new(uuid::Uuid::new_v4())
     }
 
     pub fn alias(&self) -> odf::DatasetAlias {
@@ -60,6 +69,7 @@ impl DatasetEntry {
 #[derive(Debug, Clone, sqlx::FromRow)]
 pub struct DatasetEntryRowModel {
     pub id: odf::DatasetID,
+    pub resource_id: odf::ResourceID,
     pub owner_id: odf::AccountID,
     pub owner_name: String,
     pub name: String,
@@ -104,6 +114,7 @@ impl From<DatasetEntryRowModel> for DatasetEntry {
     fn from(
         DatasetEntryRowModel {
             id,
+            resource_id,
             owner_id,
             owner_name,
             name,
@@ -113,6 +124,7 @@ impl From<DatasetEntryRowModel> for DatasetEntry {
     ) -> Self {
         Self {
             id,
+            resource_id,
             owner_id,
             owner_name: odf::AccountName::new_unchecked(&owner_name),
             name: odf::DatasetName::new_unchecked(&name),

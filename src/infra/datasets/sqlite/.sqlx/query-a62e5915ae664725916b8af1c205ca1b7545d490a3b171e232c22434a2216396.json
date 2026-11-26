@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            INSERT INTO dataset_entries(dataset_id, resource_id, owner_id, owner_name, dataset_name, created_at, kind)\n                VALUES ($1, $2, $3, $4, $5, $6, $7)\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 7
+    },
+    "nullable": []
+  },
+  "hash": "a62e5915ae664725916b8af1c205ca1b7545d490a3b171e232c22434a2216396"
+}

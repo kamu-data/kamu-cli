@@ -93,6 +93,7 @@ impl DatasetEntryRepository for SqliteDatasetEntryRepository {
                 r#"
                 SELECT
                     dataset_id   as "id: _",
+                    resource_id  as "resource_id!: _",
                     owner_id     as "owner_id: _",
                     owner_name,
                     dataset_name as name,
@@ -130,6 +131,7 @@ impl DatasetEntryRepository for SqliteDatasetEntryRepository {
             DatasetEntryRowModel,
             r#"
             SELECT dataset_id   as "id: _",
+                   resource_id  as "resource_id!: _",
                    owner_id     as "owner_id: _",
                    owner_name,
                    dataset_name as name,
@@ -151,6 +153,38 @@ impl DatasetEntryRepository for SqliteDatasetEntryRepository {
         }
     }
 
+    async fn find_dataset_entry_by_resource_id(
+        &self,
+        resource_id: &odf::ResourceID,
+    ) -> Result<Option<DatasetEntry>, InternalError> {
+        let mut tr = self.transaction.lock().await;
+
+        let connection_mut = tr.connection_mut().await?;
+
+        let resource_id = resource_id.as_ref();
+
+        let maybe_dataset_entry_row = sqlx::query_as!(
+            DatasetEntryRowModel,
+            r#"
+            SELECT dataset_id   as "id: _",
+                   resource_id  as "resource_id!: _",
+                   owner_id     as "owner_id: _",
+                   owner_name,
+                   dataset_name as name,
+                   created_at   as "created_at: _",
+                   kind         as "kind: _"
+            FROM dataset_entries
+            WHERE resource_id = $1
+            "#,
+            resource_id,
+        )
+        .fetch_optional(connection_mut)
+        .await
+        .int_err()?;
+
+        Ok(maybe_dataset_entry_row.map(Into::into))
+    }
+
     async fn get_multiple_dataset_entries<'a>(
         &'a self,
         dataset_ids: &[Cow<'a, odf::DatasetID>],
@@ -162,6 +196,7 @@ impl DatasetEntryRepository for SqliteDatasetEntryRepository {
         let query_str = format!(
             r#"
             SELECT dataset_id as id,
+                   resource_id,
                    owner_id,
                    owner_name,
                    dataset_name as name,
@@ -222,6 +257,7 @@ impl DatasetEntryRepository for SqliteDatasetEntryRepository {
             DatasetEntryRowModel,
             r#"
             SELECT dataset_id   as "id: _",
+                   resource_id  as "resource_id!: _",
                    owner_id     as "owner_id: _",
                    owner_name,
                    dataset_name as name,
@@ -273,6 +309,7 @@ impl DatasetEntryRepository for SqliteDatasetEntryRepository {
             r#"
             )
             SELECT dataset_id   as id,
+                   resource_id,
                    owner_id,
                    owner_name,
                    dataset_name as name,
@@ -320,6 +357,7 @@ impl DatasetEntryRepository for SqliteDatasetEntryRepository {
                 r#"
                 SELECT
                     dataset_id   as "id: _",
+                    resource_id  as "resource_id!: _",
                     owner_id     as "owner_id: _",
                     owner_name,
                     dataset_name as name,
@@ -359,16 +397,18 @@ impl DatasetEntryRepository for SqliteDatasetEntryRepository {
         let owner_id_as_str = stack_owner_id.as_str();
         let owner_name_as_str = dataset_entry.owner_name.as_str();
         let dataset_name_as_str = dataset_entry.name.as_str();
+        let resource_id = dataset_entry.resource_id.as_ref();
 
         let dataset_entry_kind: DatasetEntryKindRowModel = dataset_entry.kind.into();
         let dataset_entry_kind_str = dataset_entry_kind.to_string();
 
         sqlx::query!(
             r#"
-            INSERT INTO dataset_entries(dataset_id, owner_id, owner_name, dataset_name, created_at, kind)
-                VALUES ($1, $2, $3, $4, $5, $6)
+            INSERT INTO dataset_entries(dataset_id, resource_id, owner_id, owner_name, dataset_name, created_at, kind)
+                VALUES ($1, $2, $3, $4, $5, $6, $7)
             "#,
             dataset_id_as_str,
+            resource_id,
             owner_id_as_str,
             owner_name_as_str,
             dataset_name_as_str,

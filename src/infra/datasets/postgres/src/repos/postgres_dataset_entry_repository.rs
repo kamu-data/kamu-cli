@@ -90,6 +90,7 @@ impl DatasetEntryRepository for PostgresDatasetEntryRepository {
                 r#"
                 SELECT
                     dataset_id   as "id: _",
+                    resource_id  as "resource_id: _",
                     owner_id     as "owner_id: _",
                     owner_name   as owner_name,
                     dataset_name as name,
@@ -126,6 +127,7 @@ impl DatasetEntryRepository for PostgresDatasetEntryRepository {
             DatasetEntryRowModel,
             r#"
             SELECT dataset_id   as "id: _",
+                   resource_id  as "resource_id: _",
                    owner_id     as "owner_id: _",
                    owner_name,
                    dataset_name as name,
@@ -147,6 +149,36 @@ impl DatasetEntryRepository for PostgresDatasetEntryRepository {
         }
     }
 
+    async fn find_dataset_entry_by_resource_id(
+        &self,
+        resource_id: &odf::ResourceID,
+    ) -> Result<Option<DatasetEntry>, InternalError> {
+        let mut tr = self.transaction.lock().await;
+
+        let connection_mut = tr.connection_mut().await?;
+
+        let maybe_dataset_entry_row = sqlx::query_as!(
+            DatasetEntryRowModel,
+            r#"
+            SELECT dataset_id   as "id: _",
+                   resource_id  as "resource_id: _",
+                   owner_id     as "owner_id: _",
+                   owner_name,
+                   dataset_name as name,
+                   created_at   as "created_at: _",
+                   kind         as "kind: _"
+            FROM dataset_entries
+            WHERE resource_id = $1
+            "#,
+            *resource_id.as_ref(),
+        )
+        .fetch_optional(connection_mut)
+        .await
+        .int_err()?;
+
+        Ok(maybe_dataset_entry_row.map(Into::into))
+    }
+
     async fn get_multiple_dataset_entries<'a>(
         &'a self,
         dataset_ids: &[Cow<'a, odf::DatasetID>],
@@ -164,6 +196,7 @@ impl DatasetEntryRepository for PostgresDatasetEntryRepository {
             DatasetEntryRowModel,
             r#"
             SELECT dataset_id   as "id: _",
+                   resource_id  as "resource_id: _",
                    owner_id     as "owner_id: _",
                    owner_name,
                    dataset_name as name,
@@ -215,6 +248,7 @@ impl DatasetEntryRepository for PostgresDatasetEntryRepository {
             DatasetEntryRowModel,
             r#"
             SELECT dataset_id   as "id: _",
+                   resource_id  as "resource_id: _",
                    owner_id     as "owner_id: _",
                    owner_name,
                    dataset_name as name,
@@ -262,6 +296,7 @@ impl DatasetEntryRepository for PostgresDatasetEntryRepository {
             DatasetEntryRowModel,
             r#"
             SELECT dataset_id   AS "id: _",
+                   resource_id  as "resource_id: _",
                    owner_id     AS "owner_id: _",
                    owner_name,
                    dataset_name AS name,
@@ -304,6 +339,7 @@ impl DatasetEntryRepository for PostgresDatasetEntryRepository {
                 DatasetEntryRowModel,
                 r#"
                 SELECT dataset_id   as "id: _",
+                       resource_id  as "resource_id: _",
                     owner_id     as "owner_id: _",
                     owner_name,
                     dataset_name as name,
@@ -370,10 +406,11 @@ impl DatasetEntryRepository for PostgresDatasetEntryRepository {
 
         sqlx::query!(
             r#"
-            INSERT INTO dataset_entries(dataset_id, owner_id, owner_name, dataset_name, created_at, kind)
-                VALUES ($1, $2, $3, $4, $5, ($6::text)::dataset_kind)
+            INSERT INTO dataset_entries(dataset_id, resource_id, owner_id, owner_name, dataset_name, created_at, kind)
+                VALUES ($1, $2, $3, $4, $5, $6, ($7::text)::dataset_kind)
             "#,
             stack_dataset_id.as_str(),
+            *dataset_entry.resource_id.as_ref(),
             stack_owner_id.as_str(),
             dataset_entry.owner_name.as_str(),
             dataset_entry.name.as_str(),

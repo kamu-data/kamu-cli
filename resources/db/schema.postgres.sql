@@ -517,7 +517,8 @@ CREATE TABLE public.dataset_entries (
     dataset_name character varying(100) NOT NULL,
     created_at timestamp with time zone NOT NULL,
     kind public.dataset_kind NOT NULL,
-    owner_name character varying(100) NOT NULL
+    owner_name character varying(100) NOT NULL,
+    resource_id uuid NOT NULL
 );
 
 
@@ -1521,6 +1522,13 @@ CREATE INDEX idx_dataset_entries_owner_id ON public.dataset_entries USING btree 
 --
 
 CREATE UNIQUE INDEX idx_dataset_entries_owner_id_dataset_name ON public.dataset_entries USING btree (owner_id, lower((dataset_name)::text));
+
+
+--
+-- Name: idx_dataset_entries_resource_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_dataset_entries_resource_id ON public.dataset_entries USING btree (resource_id);
 
 
 --

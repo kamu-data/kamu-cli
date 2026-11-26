@@ -170,6 +170,13 @@ The behaviorally-significant consequences of adopting these shapes:
   a resource yet; `resource_id` is an artificial, stable id assigned per account
   (`kamu_accounts::Account::resource_id`) in preparation for `Account` eventually becoming a
   projection of an account resource — no account-resource events/history exist today.
+- **Datasets have resource ids too, without being resources.** `DatasetEntry::resource_id` is a
+  random UUID created with the entry (`DatasetEntry::generate_resource_id`) and stored on
+  `dataset_entries.resource_id` (unique). Renames and owner renames keep it; it is the id datasets
+  keep when they become resources, because immutable specs refer to it.
+  `DatasetEntryService::resolve_dataset_handle` turns an ODF `datasets::DatasetRef` into the
+  `datasets::DatasetHandle` such specs store. It reads no caller identity (a bare name is looked up
+  in an account the caller passes), checks no access, and returns `None` when no dataset matches.
 - **Account is a precondition, not resolved, at the use-case boundary.**
   `ResourceHeadersInput.account` is an `Option<auth::ResourceOwnerRef>` selector — `{id, did, name}`, all
   optional — but by the time headers reach `ApplyResourceUseCase::plan`/`apply` it must already be a

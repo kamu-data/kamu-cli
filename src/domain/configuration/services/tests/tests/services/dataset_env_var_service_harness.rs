@@ -126,6 +126,7 @@ impl DatasetEnvVarServiceHarness {
 
         repo.save_dataset_entry(&DatasetEntry::new(
             dataset_id.clone(),
+            DatasetEntry::generate_resource_id(),
             account_id.clone(),
             odf::AccountName::new_unchecked("test-account"),
             odf::DatasetName::new_unchecked("test-dataset"),

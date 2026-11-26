@@ -128,6 +128,18 @@ impl DatasetEntryRepository for InMemoryDatasetEntryRepository {
             .ok_or_else(|| DatasetEntryNotFoundError::new(dataset_id.clone()).into())
     }
 
+    async fn find_dataset_entry_by_resource_id(
+        &self,
+        resource_id: &odf::ResourceID,
+    ) -> Result<Option<DatasetEntry>, InternalError> {
+        Ok(self.state.rows.read(self.transaction_id, |rows| {
+            rows.iter()
+                .map(|(_, entry)| entry)
+                .find(|entry| &entry.resource_id == resource_id)
+                .cloned()
+        }))
+    }
+
     async fn get_multiple_dataset_entries<'a>(
         &'a self,
         dataset_ids: &[Cow<'a, odf::DatasetID>],
@@ -220,6 +232,18 @@ impl DatasetEntryRepository for InMemoryDatasetEntryRepository {
                     return Err(
                         DatasetEntryNameCollisionError::new(dataset_entry.name.clone()).into(),
                     );
+                }
+                if rows
+                    .view()
+                    .iter()
+                    .any(|(_, entry)| entry.resource_id == dataset_entry.resource_id)
+                {
+                    // A resource ID is generated per new entry; a reused one is a bug
+                    return InternalError::bail(format!(
+                        "Dataset resource ID {} is already taken",
+                        dataset_entry.resource_id
+                    ))
+                    .map_err(SaveDatasetEntryError::Internal);
                 }
 
                 names.put(name_key.clone(), dataset_entry.id.clone());
