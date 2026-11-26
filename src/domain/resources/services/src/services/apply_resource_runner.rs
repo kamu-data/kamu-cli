@@ -13,11 +13,14 @@ use serde::Serialize;
 use time_source::SystemTimeSource;
 
 use crate::domain::{
+    ApplyResourceAccessCheck,
+    ApplyResourceAccountSource,
     ApplyResourceApplicationDecision,
     ApplyResourceParams,
     ApplyResourcePlanningDecision,
     ApplyResourcePrecondition,
     ApplyResourceRejection,
+    ApplyResourceRejectionCategory,
     ApplyResourceUseCaseError,
     DeclarativeResource,
     EventSourcedResource,
@@ -26,9 +29,16 @@ use crate::domain::{
     InvariantViolationOf,
     ResourceAggregateLoader,
     ResourceHeadersValidationError,
+    ResourceIDNotFoundError,
     ResourceLinterSpec,
     ResourceNameSuffixGenerator,
+    ResourceOperation,
+    ResourceOperationError,
+    ResourceOperationGuard,
+    ResourceOperationRequest,
     ResourcePersistenceService,
+    ResourcePlacement,
+    ResourcePlacementOutcome,
     ResourceSchemaProvider,
     ResourceSpecFromInput,
     ResourceSpecPreApply,
@@ -41,6 +51,7 @@ use crate::{
     ApplyResourceExecution,
     ApplyResourcePlanExecutor,
     ApplyResourcePlanner,
+    DefaultResourceOperationGuard,
     PlannedApplyResourceDecision,
 };
 
@@ -61,6 +72,9 @@ where
     pub resource_aggregate_loader: &'a dyn ResourceAggregateLoader<R>,
     pub resource_persistence_service: &'a dyn ResourcePersistenceService<R>,
     pub maybe_resource_spec_pre_apply: Option<&'a dyn ResourceSpecPreApply<R>>,
+    pub maybe_resource_placement: Option<&'a dyn ResourcePlacement<R>>,
+    pub maybe_resource_operation_guard: Option<&'a dyn ResourceOperationGuard<R>>,
+    pub default_resource_operation_guard: &'a DefaultResourceOperationGuard,
     pub name_suffix_generator: &'a dyn ResourceNameSuffixGenerator,
     pub outbox: &'a dyn Outbox,
     pub time_source: &'a dyn SystemTimeSource,
@@ -82,11 +96,11 @@ where
     ) -> Result<ApplyResourcePlanningDecision<R>, ApplyResourceUseCaseError<R>> {
         Self::ensure_account_resolved(&params)?;
 
-        let maybe_existing = self.planner().find_existing_resource(&params).await?;
-
-        match self.prepare(&params, maybe_existing.as_ref()).await? {
-            PreparedApplyResource::Prepared(params) => {
-                self.planner().plan(params, maybe_existing).await
+        match self.prepare_with_access(params).await? {
+            PreparedApplyResource::Prepared(prepared) => {
+                self.planner()
+                    .plan(prepared.params, prepared.maybe_existing)
+                    .await
             }
             PreparedApplyResource::Rejected(rejection) => {
                 Ok(ApplyResourcePlanningDecision::Rejected(rejection))
@@ -127,12 +141,8 @@ where
         params: &ApplyResourceParams<R>,
         precondition: ApplyResourcePrecondition,
     ) -> Result<ApplyResourceExecution<R>, ApplyResourceUseCaseError<R>> {
-        // Preparation and planning must see the same resource, so it is looked
-        // for once
-        let maybe_existing = self.planner().find_existing_resource(params).await?;
-
-        let params = match self.prepare(params, maybe_existing.as_ref()).await? {
-            PreparedApplyResource::Prepared(params) => params,
+        let prepared = match self.prepare_with_access(params.clone()).await? {
+            PreparedApplyResource::Prepared(prepared) => prepared,
             PreparedApplyResource::Rejected(rejection) => {
                 return Ok(ApplyResourceExecution::rejected(rejection));
             }
@@ -140,7 +150,7 @@ where
 
         let plan = match self
             .planner()
-            .plan_internal(params, maybe_existing, precondition)
+            .plan_internal(prepared.params, prepared.maybe_existing, precondition)
             .await?
         {
             PlannedApplyResourceDecision::Planned(plan) => plan,
@@ -152,40 +162,233 @@ where
         self.executor().execute(plan).await
     }
 
-    /// Runs the type's [`ResourceSpecPreApply`], if it has one
+    /// Places and prepares the resource, then checks that the principal may
+    /// apply it there. Preparation and planning must see the same resource,
+    /// so the one found here is planned against
+    async fn prepare_with_access(
+        &self,
+        params: ApplyResourceParams<R>,
+    ) -> Result<PreparedApplyResource<R>, ApplyResourceUseCaseError<R>> {
+        let (prepared, existing) = match self.place_and_prepare(params).await? {
+            PlacedApplyResource::Prepared(prepared, existing) => (prepared, existing),
+            PlacedApplyResource::Rejected(rejection) => {
+                return Ok(PreparedApplyResource::Rejected(rejection));
+            }
+        };
+
+        match prepared.access_check {
+            ApplyResourceAccessCheck::ByGuard => {
+                let account = prepared.headers.resolved_account_handle();
+                let operation = match &existing {
+                    ExistingResource::Found(current) => ResourceOperation::Update {
+                        current,
+                        new_spec: &prepared.spec,
+                    },
+                    ExistingResource::Absent | ExistingResource::Unavailable(_) => {
+                        ResourceOperation::Create {
+                            spec: &prepared.spec,
+                        }
+                    }
+                };
+                self.check_operation(
+                    &prepared.provenance.principal,
+                    &ResourceOperationRequest {
+                        account: &account,
+                        operation,
+                    },
+                )
+                .await?;
+            }
+            ApplyResourceAccessCheck::CheckedByCaller => {}
+        }
+
+        let maybe_existing = match existing {
+            ExistingResource::Absent => None,
+            ExistingResource::Found(resource) => Some(resource),
+            // Reported only to a principal who may apply in the account, so a
+            // denial does not reveal what the ID names there
+            ExistingResource::Unavailable(err) => return Err(err),
+        };
+
+        Ok(PreparedApplyResource::Prepared(PreparedApply {
+            params: prepared,
+            maybe_existing,
+        }))
+    }
+
+    async fn check_operation(
+        &self,
+        principal: &odf::metadata::auth::PrincipalHandle,
+        request: &ResourceOperationRequest<'_, R>,
+    ) -> Result<(), ApplyResourceUseCaseError<R>> {
+        let guard: &dyn ResourceOperationGuard<R> = match self.maybe_resource_operation_guard {
+            Some(guard) => guard,
+            None => self.default_resource_operation_guard,
+        };
+
+        match guard.check_operation(principal, request).await {
+            Ok(()) => Ok(()),
+            Err(ResourceOperationError::Access(err)) => Err(err.into()),
+            // Applying a resource the principal may not read is applying in an
+            // account they may not use
+            Err(ResourceOperationError::NotFound(_)) => Err(odf::AccessError::Unauthorized(
+                format!(
+                    "Current subject is not allowed to apply resources of account '{}'",
+                    request.account.name
+                )
+                .into(),
+            )
+            .into()),
+            Err(ResourceOperationError::Internal(err)) => Err(err.into()),
+        }
+    }
+
+    /// Prepares the spec in the account of the apply, then places it. A
+    /// manifest naming no account moves to the placed one, where the current
+    /// spec is looked up and the spec is prepared again
+    async fn place_and_prepare(
+        &self,
+        params: ApplyResourceParams<R>,
+    ) -> Result<PlacedApplyResource<R>, ApplyResourceUseCaseError<R>> {
+        let existing = self.find_existing(&params).await?;
+        let prepared = match self.prepare(&params, existing.resource()).await? {
+            Some(Ok(prepared)) => prepared,
+            Some(Err(rejection)) => return Ok(PlacedApplyResource::Rejected(rejection)),
+            None => params.clone(),
+        };
+
+        let placed_account = match self.place(&prepared).await? {
+            Ok(None) => return Ok(PlacedApplyResource::Prepared(prepared, existing)),
+            Ok(Some(account)) if account.did == *prepared.headers.resolved_account_id() => {
+                return Ok(PlacedApplyResource::Prepared(prepared, existing));
+            }
+            Ok(Some(account)) => account,
+            Err(rejection) => return Ok(PlacedApplyResource::Rejected(rejection)),
+        };
+
+        match params.account_source {
+            ApplyResourceAccountSource::Manifest => {
+                return Ok(PlacedApplyResource::Rejected(ApplyResourceRejection {
+                    category: ApplyResourceRejectionCategory::BusinessValidationFailed,
+                    message: format!(
+                        "A {} resource with this spec belongs to account '{}', not to account \
+                         '{}' that the manifest names",
+                        R::type_uri(),
+                        placed_account.name,
+                        prepared.headers.resolved_account_handle().name,
+                    ),
+                }));
+            }
+            ApplyResourceAccountSource::PrincipalDefault => {}
+        }
+
+        let mut params = params;
+        params.headers.account = Some(placed_account.clone().into());
+
+        let existing = self.find_existing(&params).await?;
+        let prepared = match self.prepare(&params, existing.resource()).await? {
+            Some(Ok(prepared)) => prepared,
+            Some(Err(rejection)) => return Ok(PlacedApplyResource::Rejected(rejection)),
+            None => params,
+        };
+
+        match self.place(&prepared).await? {
+            Ok(Some(account)) if account.did == placed_account.did => {
+                Ok(PlacedApplyResource::Prepared(prepared, existing))
+            }
+            Ok(other) => Err(InternalError::new(format!(
+                "Placing a prepared {} spec again gave another account: first '{}', then {:?}",
+                R::type_uri(),
+                placed_account.name,
+                other.map(|account| account.name),
+            ))
+            .into()),
+            Err(rejection) => Ok(PlacedApplyResource::Rejected(rejection)),
+        }
+    }
+
+    /// `Ok(None)` for the default placement
+    async fn place(
+        &self,
+        prepared: &ApplyResourceParams<R>,
+    ) -> Result<Result<Option<odf::ResourceOwnerHandle>, ApplyResourceRejection>, InternalError>
+    {
+        let Some(placement) = self.maybe_resource_placement else {
+            return Ok(Ok(None));
+        };
+
+        Ok(
+            match placement
+                .place(&prepared.provenance.principal, &prepared.spec)
+                .await?
+            {
+                ResourcePlacementOutcome::Default => Ok(None),
+                ResourcePlacementOutcome::Account(account) => Ok(Some(account)),
+                ResourcePlacementOutcome::Rejected(rejection) => Err(rejection),
+            },
+        )
+    }
+
+    /// The resource the apply addresses in its account. One addressed by an ID
+    /// is looked for there only
+    async fn find_existing(
+        &self,
+        params: &ApplyResourceParams<R>,
+    ) -> Result<ExistingResource<R>, ApplyResourceUseCaseError<R>> {
+        if let Some(id) = params.id {
+            let in_account = self
+                .generic_resource_query_service
+                .find_resource_handles_by_ids(params.headers.resolved_account_id(), &[id])
+                .await?
+                .into_iter()
+                .any(|row| row.deleted_at.is_none());
+            if !in_account {
+                return Ok(ExistingResource::Unavailable(
+                    ResourceIDNotFoundError(id).into(),
+                ));
+            }
+        }
+
+        match self.planner().find_existing_resource(params).await {
+            Ok(Some(resource)) => Ok(ExistingResource::Found(resource)),
+            Ok(None) => Ok(ExistingResource::Absent),
+            Err(err @ ApplyResourceUseCaseError::ResourceTypeMismatch(_)) => {
+                Ok(ExistingResource::Unavailable(err))
+            }
+            Err(err) => Err(err),
+        }
+    }
+
+    /// Runs the type's [`ResourceSpecPreApply`]; `None` without one
     async fn prepare(
         &self,
         params: &ApplyResourceParams<R>,
         maybe_existing: Option<&R>,
-    ) -> Result<PreparedApplyResource<R>, ApplyResourceUseCaseError<R>> {
-        let spec = match self.maybe_resource_spec_pre_apply {
-            None => params.spec.clone(),
-            Some(pre_apply) => {
-                let outcome = pre_apply
-                    .pre_apply(
-                        params.spec.clone(),
-                        ResourceSpecPreApplyContext {
-                            account_id: params.headers.resolved_account_id(),
-                            maybe_current_spec: maybe_existing.map(R::spec),
-                        },
-                    )
-                    .await
-                    .map_err(ApplyResourceUseCaseError::Internal)?;
-
-                match outcome {
-                    ResourceSpecPreApplyOutcome::Prepared(spec) => spec,
-                    ResourceSpecPreApplyOutcome::Rejected(rejection) => {
-                        return Ok(PreparedApplyResource::Rejected(rejection));
-                    }
-                }
-            }
+    ) -> Result<
+        Option<Result<ApplyResourceParams<R>, ApplyResourceRejection>>,
+        ApplyResourceUseCaseError<R>,
+    > {
+        let Some(pre_apply) = self.maybe_resource_spec_pre_apply else {
+            return Ok(None);
         };
 
-        Ok(PreparedApplyResource::Prepared(ApplyResourceParams {
-            id: params.id,
-            headers: params.headers.clone(),
-            spec,
-            provenance: params.provenance.clone(),
+        let outcome = pre_apply
+            .pre_apply(
+                params.spec.clone(),
+                ResourceSpecPreApplyContext {
+                    account_id: params.headers.resolved_account_id(),
+                    maybe_current_spec: maybe_existing.map(R::spec),
+                },
+            )
+            .await
+            .map_err(ApplyResourceUseCaseError::Internal)?;
+
+        Ok(Some(match outcome {
+            ResourceSpecPreApplyOutcome::Prepared(spec) => Ok(ApplyResourceParams {
+                spec,
+                ..params.clone()
+            }),
+            ResourceSpecPreApplyOutcome::Rejected(rejection) => Err(rejection),
         }))
     }
 
@@ -236,8 +439,39 @@ where
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 enum PreparedApplyResource<R: DeclarativeResource> {
-    Prepared(ApplyResourceParams<R>),
+    Prepared(PreparedApply<R>),
     Rejected(ApplyResourceRejection),
+}
+
+struct PreparedApply<R: DeclarativeResource> {
+    params: ApplyResourceParams<R>,
+    maybe_existing: Option<R>,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+enum PlacedApplyResource<R: EventSourcedResource> {
+    Prepared(ApplyResourceParams<R>, ExistingResource<R>),
+    Rejected(ApplyResourceRejection),
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+enum ExistingResource<R: EventSourcedResource> {
+    Absent,
+    Found(R),
+    /// The ID names no resource of the type in the account; reported once
+    /// the principal may apply there
+    Unavailable(ApplyResourceUseCaseError<R>),
+}
+
+impl<R: EventSourcedResource> ExistingResource<R> {
+    fn resource(&self) -> Option<&R> {
+        match self {
+            Self::Found(resource) => Some(resource),
+            Self::Absent | Self::Unavailable(_) => None,
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

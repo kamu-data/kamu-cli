@@ -172,3 +172,9 @@ Each `RF-*` contract scenario is listed with its status. Test code and comments 
 | RF-196 | owner_references.rs | Active | The owner to search by is found by id even when gone, by name only when live | Lookup problems and unresolvable forms are typed errors |
 | RF-197 | owner_references.rs | Active | Owners carry the current name of a renamed account | In plan, apply and get |
 | RF-198 | creation_provenance.rs | Active | A created resource records its creator's principal and origin in a `CreationProvenance` condition | Local records `Cli`, remote `Api` (`GraphQl`); an update keeps it |
+| RF-199 | operation_guard.rs | Active | A type's placement puts a resource applied by a non-owner in the placed account | On `TestResource` with its access rules; without an account and naming the placed one |
+| RF-200 | operation_guard.rs | Active | A manifest naming another account than the placement is rejected | `BusinessValidationFailed` |
+| RF-201 | operation_guard.rs | Active | A type's guard decides a create in another account | Without a grant it is `AccountAccess`, as under the default rule |
+| RF-202 | operation_guard.rs | Active | Get in another account is decided per resource | A resource the caller may not read is a not-found problem beside the one it may; one resource named twice is checked once and answered for both refs |
+| RF-203 | operation_guard.rs | Active | Delete in another account is decided per resource | A readable resource the caller may not delete is an `Access` problem, an unreadable one not found; the permitted one is deleted. A resource named twice gets the same problem for both refs |
+| RF-204 | operation_guard.rs | Active | Listing another account needs the filter the type's guard asks for | A selector without a type keeps the default rule |

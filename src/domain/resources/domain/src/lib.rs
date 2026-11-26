@@ -9,6 +9,7 @@
 
 #![feature(error_generic_member_access)]
 
+mod access;
 mod core;
 mod dispatchers;
 mod errors;
@@ -24,6 +25,7 @@ mod views;
 
 pub use core::*;
 
+pub use access::*;
 pub use dispatchers::*;
 pub use errors::*;
 pub use manifests::*;

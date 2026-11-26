@@ -6809,6 +6809,16 @@ type Resource {
 }
 
 """
+The caller may see the resource, but not run the operation on it
+"""
+type ResourceAccessDeniedProblem {
+	"""
+	Human-readable description of the problem
+	"""
+	message: String!
+}
+
+"""
 The account selector supplied for this operation could not be resolved to a
 concrete account (empty selector, unknown id/name, or a selector whose
 fields disagree with each other). This is an input-validation problem, not
@@ -7472,7 +7482,7 @@ union ResourceListOutcome = ResourceConnection | ResourceUnsupportedSelectorProb
 """
 Reason a resource reference could not be resolved
 """
-union ResourceLookupProblem = ResourceIDNotFoundProblem | ResourceNameNotFoundProblem | ResourceSchemaMismatchProblem | ResourceNameMismatchProblem | ResourceEmptyRefProblem | ResourceUntypedNameProblem | ResourceDeletedNotRevealedProblem
+union ResourceLookupProblem = ResourceIDNotFoundProblem | ResourceNameNotFoundProblem | ResourceSchemaMismatchProblem | ResourceNameMismatchProblem | ResourceEmptyRefProblem | ResourceUntypedNameProblem | ResourceDeletedNotRevealedProblem | ResourceAccessDeniedProblem
 
 """
 Text format of a resource manifest

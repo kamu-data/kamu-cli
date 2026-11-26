@@ -13,6 +13,8 @@ use std::sync::Arc;
 use chrono::Utc;
 use dill::CatalogBuilder;
 use kamu_resources::{
+    ApplyResourceAccessCheck,
+    ApplyResourceAccountSource,
     ApplyResourceOutcome,
     ApplyResourceParams,
     ApplyResourcePrecondition,
@@ -360,6 +362,8 @@ impl ApplyResourcePlanExecutorHarness {
 
     fn make_nameless_params() -> ApplyResourceParams<TestResource> {
         ApplyResourceParams {
+            account_source: ApplyResourceAccountSource::Manifest,
+            access_check: ApplyResourceAccessCheck::ByGuard,
             id: None,
             headers: BaseResourceServiceHarness::make_nameless_headers(Self::account_handle()),
             spec: TestResourceSpec {
@@ -459,6 +463,8 @@ impl ApplyResourcePlanExecutorHarness {
         spec: TestResourceSpec,
     ) -> PlannedApplyResource<TestResource> {
         let params = ApplyResourceParams {
+            account_source: ApplyResourceAccountSource::Manifest,
+            access_check: ApplyResourceAccessCheck::ByGuard,
             id: None,
             headers: BaseResourceServiceHarness::make_headers_input(account, name).into(),
             spec,

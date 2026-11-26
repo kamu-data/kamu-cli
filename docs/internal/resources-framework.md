@@ -377,8 +377,8 @@ gets the account and the current spec, and it may reject.
   The type decides what is equivalent: `SecretSet` keeps the stored ciphertext of an equal
   plaintext, but takes a given JWE token as a new value.
 - **Preparing a prepared spec again changes nothing.**
-- **It has no side effects.** It runs for plans too, and twice in an apply that loses a race for its
-  name.
+- **It has no side effects.** It runs for plans too, again when [placement](#per-type-guard-and-placement)
+  moves the resource to another account, and again in an apply that loses a race for its name.
 - **Defaults are filled here, never in `ResourceSpecFromInput::from_input`.** That runs on every
   replay, so changing a default there would change specs already stored.
 - **A default of a type with an [immutable spec](#immutable-specs) never changes.** Applying again a
@@ -715,13 +715,19 @@ existing rows/events that should move to the new schema.
 ## 7. Account resolution & authorization
 
 Every resource belongs to exactly one account, and that scoping is also the authorization boundary.
-Resolution + permission checks live in `ResourceAccountResolverImpl`
-([`facade/local/resource_account_resolver_impl.rs`](/src/domain/resources/facade/src/facade/local/resource_account_resolver_impl.rs)).
+`ResourceAccountResolverImpl`
+([`facade/local/resource_account_resolver_impl.rs`](/src/domain/resources/facade/src/facade/local/resource_account_resolver_impl.rs))
+resolves account selectors; who may act on a resolved account is decided per type, below.
 
-- **Who may specify `headers.account`.** The manifest `account` field is optional and **defaults to
-  the calling subject's own account**. To target *another* account, the resolver requires the caller
-  to be an **admin** (`rebac_service.is_account_admin`); otherwise it returns
-  `AccessError::Unauthorized`. An **anonymous** subject cannot resolve any account (rejected).
+- **The default rule** decides for types without a guard of their own: the node, the account
+  itself, or a platform administrator may use every resource of an account, for every operation.
+  The framework does not know what makes an account usable. It asks `ResourceAccountAccessPort`
+  ([`access/resource_account_access_port.rs`](/src/domain/resources/domain/src/access/resource_account_access_port.rs)),
+  which the accounts context implements (`ResourceAccountAccessAdapter` in `kamu-accounts-services`,
+  through `RebacService::is_account_admin`). A denial is `AccessError::Unauthorized`. An
+  **anonymous** subject cannot resolve any account.
+- **`headers.account` is optional** and defaults to the caller's own account, unless the type's
+  placement puts the resource elsewhere ([below](#per-type-guard-and-placement)).
 - **Account selector forms.** `account` (`ResourceOwnerRef`) carries `id`/`did`/`name`, all
   optional. The account is looked up by `did` if given, else by `name`; any other selector field(s)
   present are then checked for agreement against the resolved account (a mismatch on `id`, `did`, or
@@ -734,8 +740,8 @@ Resolution + permission checks live in `ResourceAccountResolverImpl`
   exactly as above — the client never asserts its own account id.
 - **Local workspace context.** The resolver defaults `headers.account` to the workspace's caller
   (`CurrentAccountSubject`) and checks access for the `Principal` the CLI catalog registers beside
-  it ([identity](identity.md#who-registers-it)); the same admin rule applies for cross-account
-  targeting. Background work runs as `Principal::Node`, which may target any account.
+  it ([identity](identity.md#who-registers-it)); the same rules apply for cross-account targeting.
+  Background work runs as `Principal::Node`, which the default rule lets target any account.
 - **UID belonging to a different account.** Lookups are account-scoped: `find_account_snapshot`
   treats a snapshot owned by another account as absent. A UID that exists but belongs to another account is reported as
   **not-found** (`ResourceIDNotFoundError`), not "forbidden" — so existence is not leaked across
@@ -745,6 +751,43 @@ Resolution + permission checks live in `ResourceAccountResolverImpl`
   requests deletion of that account's resources (see [§13](#13-data-flow-walkthroughs)). Resources
   already being deleted are included again, which posts their message again; deleted ones are skipped,
   so the cascade is idempotent with respect to prior deletions.
+
+
+### Per-type guard and placement
+
+A type may register two optional hooks
+([`access/`](/src/domain/resources/domain/src/access/)), as it registers `ResourceSpecPreApply`.
+Both take the principal as an ODF `PrincipalHandle`.
+
+- **`ResourceOperationGuard<R>`** replaces the default rule for the type, and may delegate to it
+  (`DefaultResourceOperationGuard`). `check_operation` and `check_operations` decide one
+  `ResourceOperation`: `Create`, `Update`, `Read`, `Delete` or `List`. Its doc comment holds the
+  type's rule table.
+- **`ResourcePlacement<R>`** names the account that owns a resource with a given prepared spec,
+  such as the owner of a dataset the spec targets.
+
+Where each operation is decided:
+
+| Operation | Decided | A denial |
+| --- | --- | --- |
+| Apply (plan alike) | In the apply runner, after placement: `Create`, or `Update` with the current resource | `AccountAccess`, the whole call |
+| Get, render, handles, delete | First `check_account` before the query: allowed, denied, or per resource. Per resource, each loaded resource after | On the account, the whole call. Per resource, an unreadable one is not found and a readable one is an `Access` problem of its item |
+| Search | One `List` per selector naming an account, on what it filters by (`ResourceListScope`) | The whole call |
+
+- **Placement runs after preparation.** The runner prepares the spec in the account the manifest
+  names, or the caller's own, then places it. A manifest naming another account than the placement
+  is rejected. One naming none moves there, so the current spec is looked up in the placed account
+  and the spec is prepared again. Placing it again must give the same account.
+- **The default rule decides what has no type to ask:** a type-less ref or selector in another
+  account, the search's own-account default, and the summary.
+- **A guard never widens a query across accounts.** It decides which account may be used and
+  whether the caller may see a resource there; repository queries stay scoped to one account.
+- **The principal of an apply** is the one in its `CreationProvenance`, so internal producers are
+  checked as the node.
+- **An apply its caller has authorized** skips the check (`ApplyResourceAccessCheck::CheckedByCaller`).
+  The dataset environment variable API is one: it checks `Maintain` on the dataset, then writes the
+  dataset's sets in the owner's account for a maintainer who does not own it. The facade always
+  checks.
 
 ---
 

@@ -267,7 +267,8 @@ impl GetResourceCommand {
                 | ResourceLookupProblem::NameMismatch(_)
                 | ResourceLookupProblem::EmptyRef
                 | ResourceLookupProblem::UntypedName
-                | ResourceLookupProblem::DeletedNotRevealed(_)) => {
+                | ResourceLookupProblem::DeletedNotRevealed(_)
+                | ResourceLookupProblem::Access(_)) => {
                     return Err(GetResourceError::LookupProblem(error).into());
                 }
             }

@@ -109,13 +109,15 @@ impl ResourceFacade for LocalResourceFacadeImpl {
     {
         // An empty batch names nothing, so it yields an empty response.
         let mut successes = Vec::new();
-        let (groups, mut problems) = self.group_refs_by_target(resource_refs).await?;
+        let (groups, mut problems) = self
+            .group_refs_by_target(resource_refs, ResourceAccountOperation::Read)
+            .await?;
 
-        for group in groups {
+        for (group, access) in groups {
             let (indexes, refs): (Vec<_>, Vec<_>) = group.entries.into_iter().unzip();
 
             let grouped = group_batch_resource_refs(refs);
-            let resolution_response = resolve_batch_ids(
+            let mut resolution_response = resolve_batch_ids(
                 self.generic_resource_query_service.as_ref(),
                 &group.account.did,
                 &group.schema,
@@ -123,6 +125,16 @@ impl ResourceFacade for LocalResourceFacadeImpl {
                 visibility,
             )
             .await?;
+            resolution_response.id_entries = self
+                .retain_permitted_entries(
+                    &group.account,
+                    &group.schema,
+                    access,
+                    ResourceAccountOperation::Read,
+                    resolution_response.id_entries,
+                    &mut resolution_response.problems,
+                )
+                .await?;
 
             let (handles, group_problems) = self
                 .resolve_id_handle_groups(
@@ -205,7 +217,7 @@ impl ResourceFacade for LocalResourceFacadeImpl {
             .await?;
 
         let owner_id = self.resolve_owner(request.owner).await?;
-        let scope = self.resolve_scope(request.selectors).await?;
+        let scope = self.resolve_scope(request.selectors, owner_id).await?;
 
         if scope.is_vacuous() {
             return Ok(SearchResourcesResponse {
@@ -254,7 +266,7 @@ impl ResourceFacade for LocalResourceFacadeImpl {
             .await?;
 
         let owner_id = self.resolve_owner(request.owner).await?;
-        let scope = self.resolve_scope(request.selectors).await?;
+        let scope = self.resolve_scope(request.selectors, owner_id).await?;
 
         // Empty exact-name/id queries are vacuous.
         if scope.is_vacuous() {
@@ -303,6 +315,8 @@ impl ResourceFacade for LocalResourceFacadeImpl {
             .plan_apply(ResourceCrudDispatcherApplyRequest {
                 id: prepared.id,
                 headers: prepared.header,
+                account_source: prepared.account_source,
+                access_check: ApplyResourceAccessCheck::ByGuard,
                 spec: prepared.spec,
                 provenance: prepared.provenance,
             })
@@ -311,7 +325,11 @@ impl ResourceFacade for LocalResourceFacadeImpl {
         Ok(match plan {
             ApplyManifestPlanningDecision::Planned(mut plan) => {
                 plan.warnings.splice(0..0, prepared.header_warnings);
-                plan.resource.headers.set_account(prepared.target_account);
+                // The resolved handle names the account as it is now; a
+                // resource placed elsewhere keeps the handle placement gave
+                if plan.resource.headers.account.did == prepared.target_account.did {
+                    plan.resource.headers.set_account(prepared.target_account);
+                }
 
                 ApplyManifestPlanningDecision::Planned(plan)
             }
@@ -332,6 +350,8 @@ impl ResourceFacade for LocalResourceFacadeImpl {
             .apply(ResourceCrudDispatcherApplyRequest {
                 id: prepared.id,
                 headers: prepared.header,
+                account_source: prepared.account_source,
+                access_check: ApplyResourceAccessCheck::ByGuard,
                 spec: prepared.spec,
                 provenance: prepared.provenance,
             })
@@ -340,7 +360,11 @@ impl ResourceFacade for LocalResourceFacadeImpl {
         Ok(match result {
             ApplyManifestApplicationDecision::Applied(mut result) => {
                 result.warnings.splice(0..0, prepared.header_warnings);
-                result.resource.headers.set_account(prepared.target_account);
+                // The resolved handle names the account as it is now; a
+                // resource placed elsewhere keeps the handle placement gave
+                if result.resource.headers.account.did == prepared.target_account.did {
+                    result.resource.headers.set_account(prepared.target_account);
+                }
 
                 ApplyManifestApplicationDecision::Applied(result)
             }
@@ -412,16 +436,18 @@ impl ResourceFacade for LocalResourceFacadeImpl {
     {
         // An empty batch names nothing, so it yields an empty response.
         let mut successes = Vec::new();
-        let (groups, mut problems) = self.group_refs_by_target(resource_refs).await?;
+        let (groups, mut problems) = self
+            .group_refs_by_target(resource_refs, ResourceAccountOperation::Delete)
+            .await?;
 
         // One dispatcher call per `(account, schema)` group. The request runs in one
         // transaction (the `#[transactional_handler]` GraphQL handler, or the CLI command's
         // `transaction!` block), so a failure in a later group rolls back earlier deletions.
-        for group in groups {
+        for (group, access) in groups {
             let (indexes, refs): (Vec<_>, Vec<_>) = group.entries.into_iter().unzip();
 
             let grouped = group_batch_resource_refs(refs);
-            let resolution_response = resolve_batch_ids(
+            let mut resolution_response = resolve_batch_ids(
                 self.generic_resource_query_service.as_ref(),
                 &group.account.did,
                 &group.schema,
@@ -429,6 +455,16 @@ impl ResourceFacade for LocalResourceFacadeImpl {
                 ResourceVisibility::Active,
             )
             .await?;
+            resolution_response.id_entries = self
+                .retain_permitted_entries(
+                    &group.account,
+                    &group.schema,
+                    access,
+                    ResourceAccountOperation::Delete,
+                    resolution_response.id_entries,
+                    &mut resolution_response.problems,
+                )
+                .await?;
 
             problems.extend(resolution_response.problems.into_iter().map(|problem| {
                 BatchResourceProblem {
@@ -677,9 +713,10 @@ impl LocalResourceFacadeImpl {
     async fn group_refs_by_target(
         &self,
         resource_refs: Vec<ResourceRef>,
+        operation: ResourceAccountOperation,
     ) -> Result<
         (
-            Vec<BatchTargetGroup>,
+            Vec<(BatchTargetGroup, ResourceAccountAccess)>,
             Vec<BatchResourceProblem<ResourceLookupProblem>>,
         ),
         BatchResourceError,
@@ -687,13 +724,16 @@ impl LocalResourceFacadeImpl {
         let account_refs = distinct_account_refs(&resource_refs);
         let resolved_accounts = self
             .resource_account_resolver
-            .resolve_target_accounts(&self.principal, &account_refs)
+            .resolve_accounts(&self.principal, &account_refs)
             .await?;
 
         let descriptors = self.list_resource_type_descriptors();
 
         let mut entries = Vec::new();
         let mut problems = Vec::new();
+        // Resolving a type-less ref looks at stored data, so it needs the
+        // default rule on its account first
+        let mut default_rule_checked = HashSet::new();
 
         for (request_index, resource_ref) in resource_refs.into_iter().enumerate() {
             let account_position = account_refs
@@ -701,6 +741,12 @@ impl LocalResourceFacadeImpl {
                 .position(|account| account == &resource_ref.account)
                 .expect("every ref's account is in the deduplicated list");
             let account = resolved_accounts[account_position].clone();
+
+            if resource_ref.r#type.is_none() && default_rule_checked.insert(account.did.clone()) {
+                self.resource_account_resolver
+                    .ensure_can_use_account(&self.principal, &account)
+                    .await?;
+            }
 
             match self
                 .resolve_ref_schema(&descriptors, &account.did, &resource_ref)
@@ -714,7 +760,127 @@ impl LocalResourceFacadeImpl {
             }
         }
 
-        Ok((group_by_account_and_schema(entries), problems))
+        let mut groups = Vec::new();
+        for group in group_by_account_and_schema(entries) {
+            // Registered selector schemas must have a dispatcher.
+            let access = self
+                .dispatcher_factory
+                .crud_dispatcher_for_trusted_schema(group.schema.as_str())?
+                .check_account_access(&self.principal_handle()?, &group.account, operation)
+                .await
+                .map_err(ResolveManifestAccountError::from_operation_error)?;
+            groups.push((group, access));
+        }
+
+        Ok((groups, problems))
+    }
+
+    /// Keeps the entries whose resources the principal may run `operation`
+    /// on, and reports each other one as a problem of its ref: one the
+    /// principal may not read as not found, so a denial does not reveal it
+    async fn retain_permitted_entries(
+        &self,
+        account: &odf::ResourceOwnerHandle,
+        schema: &TypeUri,
+        access: ResourceAccountAccess,
+        operation: ResourceAccountOperation,
+        id_entries: BatchIdEntries,
+        problems: &mut Vec<BatchResourceProblem<ResourceLookupProblem>>,
+    ) -> Result<BatchIdEntries, BatchResourceError> {
+        match access {
+            ResourceAccountAccess::Allowed => return Ok(id_entries),
+            ResourceAccountAccess::PerResource => {}
+        }
+
+        let ids = id_entries.iter().map(|(_, _, id)| *id).collect::<Vec<_>>();
+        // Only resources of the type in the account are checked; any other
+        // ID names nothing the principal may see
+        let of_type = self
+            .generic_resource_query_service
+            .find_resource_handles_by_ids(&account.did, &ids)
+            .await?
+            .into_iter()
+            .filter(|row| row.schema == schema.as_str())
+            .map(|row| ResourceID::new(row.id))
+            .collect::<HashSet<_>>();
+        let mut checked_ids = Vec::with_capacity(ids.len());
+        for id in ids {
+            if of_type.contains(&id) && !checked_ids.contains(&id) {
+                checked_ids.push(id);
+            }
+        }
+
+        let checked = self
+            .dispatcher_factory
+            .crud_dispatcher_for_trusted_schema(schema.as_str())?
+            .check_resource_operations(&self.principal_handle()?, account, operation, &checked_ids)
+            .await?;
+        let mut results = HashMap::with_capacity(checked_ids.len());
+        for (id, result) in checked_ids.into_iter().zip(checked) {
+            match result {
+                Err(ResourceOperationError::Internal(err)) => {
+                    return Err(BatchResourceError::Internal(err));
+                }
+                result => {
+                    results.insert(id, result);
+                }
+            }
+        }
+
+        // A resource named by several refs gets the same answer for each
+        let mut permitted = Vec::with_capacity(id_entries.len());
+        for (request_index, resource_ref, id) in id_entries {
+            let error = match results.get(&id) {
+                Some(Ok(())) => {
+                    permitted.push((request_index, resource_ref, id));
+                    continue;
+                }
+                Some(Err(ResourceOperationError::Access(err))) => {
+                    ResourceLookupProblem::Access(repeat_access_error(err))
+                }
+                Some(Err(
+                    ResourceOperationError::NotFound(_) | ResourceOperationError::Internal(_),
+                ))
+                | None => ref_not_found(schema, &resource_ref, id),
+            };
+            problems.push(BatchResourceProblem {
+                request_index,
+                error,
+            });
+        }
+
+        Ok(permitted)
+    }
+
+    fn principal_handle(
+        &self,
+    ) -> Result<odf::metadata::auth::PrincipalHandle, ResolveManifestAccountError> {
+        self.principal
+            .handle()
+            .ok_or_else(|| ResourceAccountAccessError::AnonymousSubject.into())
+    }
+
+    /// A selector of a type is checked by the type's guard; one without a
+    /// type by the default rule
+    async fn ensure_can_list(
+        &self,
+        account: &odf::ResourceOwnerHandle,
+        schema: Option<&TypeUri>,
+        scope: &ResourceListScope,
+    ) -> Result<(), ResolveManifestAccountError> {
+        let Some(schema) = schema else {
+            return self
+                .resource_account_resolver
+                .ensure_can_use_account(&self.principal, account)
+                .await;
+        };
+
+        self.dispatcher_factory
+            .crud_dispatcher_for_trusted_schema(schema.as_str())
+            .int_err()?
+            .check_list(&self.principal_handle()?, account, scope)
+            .await
+            .map_err(ResolveManifestAccountError::from_operation_error)
     }
 
     /// Converts snapshots into summary views, rendering each one's typed list
@@ -799,6 +965,7 @@ impl LocalResourceFacadeImpl {
     async fn resolve_scope(
         &self,
         selectors: Vec<ResourceSelector>,
+        owner_id: Option<ResourceID>,
     ) -> Result<ResourceScope, ListResourcesError> {
         // Before the fast path below: a selector narrowed *only* by a field the
         // facade cannot resolve reads as unnarrowed there and would widen into
@@ -821,8 +988,9 @@ impl LocalResourceFacadeImpl {
             return Ok(ResourceScope::any_type());
         }
 
-        // Resolved in one batch, deduplicated by spelling, with the permission
-        // check applied per distinct account. Any denial fails the whole call.
+        // Resolved in one batch, deduplicated by spelling. Access is checked
+        // per selector below, by the type's guard; any denial fails the whole
+        // call.
         //
         // `None` stays `None` rather than resolving to the principal's own
         // account: the repository takes that account as the
@@ -832,15 +1000,15 @@ impl LocalResourceFacadeImpl {
             .iter()
             .map(|selector| selector.account.clone())
             .collect::<Vec<_>>();
-        let account_ids = if account_refs.iter().all(Option::is_none) {
+        let accounts = if account_refs.iter().all(Option::is_none) {
             vec![None; account_refs.len()]
         } else {
             self.resource_account_resolver
-                .resolve_target_accounts(&self.principal, &account_refs)
+                .resolve_accounts(&self.principal, &account_refs)
                 .await?
                 .into_iter()
                 .zip(account_refs.iter())
-                .map(|(handle, requested)| requested.as_ref().map(|_| handle.did))
+                .map(|(handle, requested)| requested.as_ref().map(|_| handle))
                 .collect()
         };
 
@@ -857,7 +1025,7 @@ impl LocalResourceFacadeImpl {
 
         let mut applicable = Vec::with_capacity(selectors.len());
 
-        for (selector, account_id) in selectors.into_iter().zip(account_ids) {
+        for (selector, account) in selectors.into_iter().zip(accounts) {
             let schema = selector
                 .r#type
                 .as_ref()
@@ -883,9 +1051,22 @@ impl LocalResourceFacadeImpl {
                 &candidate_schema_ids,
             )?;
 
+            // What a type's guard sees of the selector
+            let list_scope = |label_pairs| ResourceListScope {
+                id: selector.id,
+                name_pattern: selector.name.clone(),
+                label_pairs,
+                owner_id,
+            };
+
             // This selector's schema cannot carry its labels, so it can never
-            // match. Drop it rather than widening the scope.
+            // match. Drop it rather than widening the scope, once the caller
+            // may list the account at all, judged without the labels.
             if applicable_schema_ids.is_empty() {
+                if let Some(account) = &account {
+                    self.ensure_can_list(account, schema.as_ref(), &list_scope(Vec::new()))
+                        .await?;
+                }
                 continue;
             }
 
@@ -902,6 +1083,11 @@ impl LocalResourceFacadeImpl {
                     .map(|(key, value)| (key.clone(), value.to_owned()))
                     .collect::<Vec<_>>();
 
+            if let Some(account) = &account {
+                self.ensure_can_list(account, schema.as_ref(), &list_scope(label_pairs.clone()))
+                    .await?;
+            }
+
             applicable.push(ResolvedSelector {
                 schema,
                 id: selector.id,
@@ -909,7 +1095,7 @@ impl LocalResourceFacadeImpl {
                 // an exact name arrives as a `ResourceRef`, not here.
                 name: None,
                 name_pattern: selector.name,
-                account_id,
+                account_id: account.map(|account| account.did),
                 label_pairs,
             });
         }
@@ -935,15 +1121,17 @@ impl LocalResourceFacadeImpl {
     > {
         // An empty batch names nothing, so it yields an empty result.
         let mut indexed_resources = Vec::new();
-        let (groups, mut problems) = self.group_refs_by_target(resource_refs).await?;
+        let (groups, mut problems) = self
+            .group_refs_by_target(resource_refs, ResourceAccountOperation::Read)
+            .await?;
 
-        for group in groups {
+        for (group, access) in groups {
             let (indexes, refs): (Vec<_>, Vec<_>) = group.entries.into_iter().unzip();
 
             // Batch refs name their targets explicitly.
             let grouped = group_batch_resource_refs(refs);
 
-            let resolution_response = resolve_batch_ids(
+            let mut resolution_response = resolve_batch_ids(
                 self.generic_resource_query_service.as_ref(),
                 &group.account.did,
                 &group.schema,
@@ -951,6 +1139,16 @@ impl LocalResourceFacadeImpl {
                 visibility,
             )
             .await?;
+            resolution_response.id_entries = self
+                .retain_permitted_entries(
+                    &group.account,
+                    &group.schema,
+                    access,
+                    ResourceAccountOperation::Read,
+                    resolution_response.id_entries,
+                    &mut resolution_response.problems,
+                )
+                .await?;
 
             problems.extend(resolution_response.problems.into_iter().map(|problem| {
                 BatchResourceProblem {
@@ -1076,19 +1274,7 @@ impl LocalResourceFacadeImpl {
 
         let mut handles = Vec::new();
         for (request_index, resource_ref, id) in id_entries {
-            // Report misses in the terms the caller selected by. A ref carrying
-            // both is resolved by its id, so it reports as an id miss.
-            let not_found = || match (&resource_ref.id, &resource_ref.name) {
-                (None, Some(name)) => resource_type_name(schema)
-                    .map(|type_name| {
-                        ResourceLookupProblem::NameNotFound(ResourceNameNotFoundError {
-                            type_name,
-                            name: name.clone(),
-                        })
-                    })
-                    .unwrap_or_else(|_| id_not_found(id)),
-                _ => id_not_found(id),
-            };
+            let not_found = || ref_not_found(schema, &resource_ref, id);
 
             // Only a ref that supplied its own id asserts a name to verify: for
             // a name-keyed ref the name *is* how the id was found.
@@ -1132,48 +1318,6 @@ impl LocalResourceFacadeImpl {
         problems.sort_by_key(|problem| problem.request_index);
 
         Ok((handles, problems))
-    }
-
-    async fn find_undeleted_account_snapshot(
-        &self,
-        account_id: &odf::AccountID,
-        id: ResourceID,
-    ) -> Result<Option<ResourceSnapshot>, InternalError> {
-        let Some(snapshot) = self
-            .generic_resource_query_service
-            .get_snapshot_by_id(&id)
-            .await?
-            .filter(|snapshot| snapshot.headers.deleted_at.is_none())
-        else {
-            return Ok(None);
-        };
-
-        if snapshot.headers.account.did != *account_id {
-            return Ok(None);
-        }
-
-        Ok(Some(snapshot))
-    }
-
-    async fn ensure_manifest_id_is_accessible(
-        &self,
-        schema: &TypeUri,
-        account_id: &odf::AccountID,
-        maybe_id: Option<ResourceID>,
-    ) -> Result<(), ApplyManifestError> {
-        let Some(id) = maybe_id else {
-            return Ok(());
-        };
-
-        let Some(snapshot) = self.find_undeleted_account_snapshot(account_id, id).await? else {
-            return Err(ResourceIDNotFoundError(id).into());
-        };
-
-        if snapshot.schema != *schema {
-            return Err(ResourceTypeMismatchError::new(id, schema.clone(), snapshot.schema).into());
-        }
-
-        Ok(())
     }
 
     /// Reveals the specs when `spec_view` asks for it; a deleted resource with
@@ -1231,10 +1375,16 @@ impl LocalResourceFacadeImpl {
     ) -> Result<PreparedApplyManifest, ApplyManifestError> {
         let manifest = parse_manifest(request.format, &request.manifest)?;
 
+        // Access is checked where the resource is placed, by the type's guard
         let target_account = self
             .resource_account_resolver
-            .resolve_target_account(&self.principal, manifest.headers.account.as_ref())
+            .resolve_account(&self.principal, manifest.headers.account.as_ref())
             .await?;
+        let account_source = if manifest.headers.account.is_some() {
+            ApplyResourceAccountSource::Manifest
+        } else {
+            ApplyResourceAccountSource::PrincipalDefault
+        };
 
         let dispatcher = self
             .dispatcher_factory
@@ -1270,18 +1420,12 @@ impl LocalResourceFacadeImpl {
             self.canonicalize_owner_references(manifest.headers.owner_references)?,
         )?;
 
-        self.ensure_manifest_id_is_accessible(
-            manifest.schema.typ(),
-            &target_account.did,
-            manifest.headers.id,
-        )
-        .await?;
-
         Ok(PreparedApplyManifest {
             provenance: request_creation_provenance(&self.principal, &self.request_origin)?,
             dispatcher,
             id: manifest.headers.id,
             header: headers,
+            account_source,
             header_warnings,
             target_account,
             spec: manifest.spec,
@@ -1341,6 +1485,7 @@ struct PreparedApplyManifest {
     dispatcher: Arc<dyn ResourceCrudDispatcher>,
     id: Option<ResourceID>,
     header: ApplyResourceHeaders,
+    account_source: ApplyResourceAccountSource,
     header_warnings: Vec<ResourceWarning>,
     target_account: odf::ResourceOwnerHandle,
     spec: serde_json::Value,
@@ -1352,6 +1497,19 @@ struct PreparedApplyManifest {
 struct IndexedResource<T> {
     request_index: usize,
     item: T,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// The same denial for another ref to the resource; an `AccessError` carries a
+/// boxed source, so it cannot be cloned
+fn repeat_access_error(err: &odf::AccessError) -> odf::AccessError {
+    use odf::AccessError as E;
+    match err {
+        E::ReadOnly(source) => E::ReadOnly(source.as_ref().map(|source| source.to_string().into())),
+        E::Unauthenticated(source) => E::Unauthenticated(source.to_string().into()),
+        E::Unauthorized(source) => E::Unauthorized(source.to_string().into()),
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

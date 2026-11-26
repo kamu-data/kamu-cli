@@ -207,7 +207,9 @@ impl ResourceHeadersExt for ResourceHeaders {
 /// populates `account` with a fully-resolved [`auth::ResourceOwnerRef`]. Panics if
 /// handed a partially-resolved reference, which would indicate a caller
 /// bypassed account resolution.
-fn account_handle_from_input(input: Option<&auth::ResourceOwnerRef>) -> auth::ResourceOwnerHandle {
+pub(crate) fn account_handle_from_input(
+    input: Option<&auth::ResourceOwnerRef>,
+) -> auth::ResourceOwnerHandle {
     match input {
         Some(auth::ResourceOwnerRef {
             r#type: Some(odf::metadata::resources::TypeRef::Uri(r#type)),

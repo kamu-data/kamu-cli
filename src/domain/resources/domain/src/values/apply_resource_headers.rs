@@ -109,6 +109,11 @@ impl ApplyResourceHeaders {
             .expect("resource headers must carry a resolved account by apply time")
     }
 
+    /// See [`Self::resolved_account_id`]
+    pub fn resolved_account_handle(&self) -> auth::ResourceOwnerHandle {
+        crate::account_handle_from_input(self.account.as_ref())
+    }
+
     /// Headers of a resource that has the name `name`, whatever `self.name` is
     pub fn into_named(self, name: ResourceName) -> ResourceHeadersInput {
         ResourceHeadersInput {

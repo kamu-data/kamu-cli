@@ -12,6 +12,8 @@ use std::sync::Arc;
 
 use kamu_resources::{
     ApplyManifestDocumentSource,
+    ApplyResourceAccessCheck,
+    ApplyResourceAccountSource,
     ApplyResourceCrudDispatcherError,
     ApplyResourceOutcome,
     ResourceCrudDispatcher,
@@ -201,6 +203,8 @@ async fn test_apply_update_returns_applied_updated() {
     // Second apply with same account but different spec value — Update
     let account = applied1.resource.headers.account.clone();
     let req2 = ResourceCrudDispatcherApplyRequest {
+        account_source: ApplyResourceAccountSource::Manifest,
+        access_check: ApplyResourceAccessCheck::ByGuard,
         id: Some(id),
         headers: BaseResourceServiceHarness::make_headers_input(account, "res-a").into(),
         spec: serde_json::json!({ "value": "value-v2" }),
@@ -230,6 +234,8 @@ async fn test_apply_untouched_returns_applied_untouched() {
 
     // Second apply — identical spec and headers
     let req2 = ResourceCrudDispatcherApplyRequest {
+        account_source: ApplyResourceAccountSource::Manifest,
+        access_check: ApplyResourceAccessCheck::ByGuard,
         id: Some(id),
         headers: BaseResourceServiceHarness::make_headers_input(account, "res-a").into(),
         spec: serde_json::json!({ "value": "same-value" }),
@@ -262,6 +268,8 @@ impl ResourceCrudDispatcherHarness {
 
     fn make_apply_request(name: &str, value: &str) -> ResourceCrudDispatcherApplyRequest {
         ResourceCrudDispatcherApplyRequest {
+            account_source: ApplyResourceAccountSource::Manifest,
+            access_check: ApplyResourceAccessCheck::ByGuard,
             id: None,
             headers: BaseResourceServiceHarness::make_headers_input(
                 odf::ResourceOwnerHandle::new_test("test"),
@@ -278,6 +286,8 @@ impl ResourceCrudDispatcherHarness {
         spec: serde_json::Value,
     ) -> ResourceCrudDispatcherApplyRequest {
         ResourceCrudDispatcherApplyRequest {
+            account_source: ApplyResourceAccountSource::Manifest,
+            access_check: ApplyResourceAccessCheck::ByGuard,
             id: None,
             headers: BaseResourceServiceHarness::make_headers_input(
                 odf::ResourceOwnerHandle::new_test("test"),

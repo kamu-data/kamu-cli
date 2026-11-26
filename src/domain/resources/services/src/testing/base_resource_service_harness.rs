@@ -40,6 +40,7 @@ use messaging_outbox::{MockOutbox, Outbox, OutboxProvider, register_message_disp
 use time_source::{FakeSystemTimeSource, SystemTimeSource, SystemTimeSourceStub};
 use wakeup_listener::{WakeupListenerConfig, WakeupListenerMetrics};
 
+use crate::testing::OwnAccountResourceAccess;
 use crate::{BackgroundWorkFinalizer, ResourceControllerRuntimeImpl, request_creation_provenance};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -140,6 +141,7 @@ impl BaseResourceServiceHarness {
 
         kamu_resources_inmem::register_dependencies(&mut b);
         b.add::<InMemoryAccountRepository>();
+        b.add::<OwnAccountResourceAccess>();
 
         if opts.transactional {
             assert!(

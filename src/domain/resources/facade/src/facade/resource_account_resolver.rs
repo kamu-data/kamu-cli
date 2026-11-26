@@ -7,34 +7,55 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use internal_error::InternalError;
+use internal_error::{ErrorIntoInternal, InternalError};
 use kamu_accounts::Principal;
-use kamu_resources::ResourceOwnerRef;
+use kamu_resources::{ResourceOperationError, ResourceOwnerRef};
 use thiserror::Error;
 
 use crate::{ResourceAccountResolutionError, ResourceAccountResolutionProblemCode};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Resolves the account selectors of facade calls, and checks the default
+/// rule on them (`ResourceAccountAccessPort`) where no type's
+/// `ResourceOperationGuard` decides instead.
 #[async_trait::async_trait]
 pub trait ResourceAccountResolver: Send + Sync {
-    async fn resolve_target_account(
+    /// Resolves `selector`, or the principal's own account without one,
+    /// without checking access. Rejects an anonymous principal
+    async fn resolve_account(
         &self,
         principal: &Principal,
         selector: Option<&ResourceOwnerRef>,
     ) -> Result<odf::ResourceOwnerHandle, ResolveManifestAccountError>;
 
+    /// Checks the default rule
+    async fn ensure_can_use_account(
+        &self,
+        principal: &Principal,
+        account: &odf::ResourceOwnerHandle,
+    ) -> Result<(), ResolveManifestAccountError>;
+
+    async fn resolve_target_account(
+        &self,
+        principal: &Principal,
+        selector: Option<&ResourceOwnerRef>,
+    ) -> Result<odf::ResourceOwnerHandle, ResolveManifestAccountError> {
+        let account = self.resolve_account(principal, selector).await?;
+        self.ensure_can_use_account(principal, &account).await?;
+        Ok(account)
+    }
+
     /// Resolves several account refs at once, for calls whose selectors each
-    /// name their own account.
+    /// name their own account, without checking access.
     ///
     /// Returns one handle per input, in order, so callers can zip the result
-    /// back onto their selectors. **Any denial fails the whole call** — a
-    /// partial result would silently narrow the caller's request.
+    /// back onto their selectors. Any failure fails the whole call.
     ///
     /// Deduplicated by spelling: the same account named twice resolves once.
     /// Two spellings of one account (by id and by name) still resolve twice,
     /// which costs a lookup but cannot produce a wrong answer.
-    async fn resolve_target_accounts(
+    async fn resolve_accounts(
         &self,
         principal: &Principal,
         selectors: &[Option<ResourceOwnerRef>],
@@ -48,9 +69,7 @@ pub trait ResourceAccountResolver: Send + Sync {
                 continue;
             }
 
-            let handle = self
-                .resolve_target_account(principal, selector.as_ref())
-                .await?;
+            let handle = self.resolve_account(principal, selector.as_ref()).await?;
             resolved.push((selector.clone(), handle.clone()));
             out.push(handle);
         }
@@ -95,6 +114,18 @@ pub enum ResourceAccountAccessError {
 }
 
 impl ResolveManifestAccountError {
+    /// A denial of a guard deciding on the account alone
+    pub fn from_operation_error(err: ResourceOperationError) -> Self {
+        match err {
+            ResourceOperationError::Access(err) => ResourceAccountAccessError::Access(err).into(),
+            ResourceOperationError::NotFound(err) => Self::Internal(
+                err.int_err()
+                    .with_context("A guard deciding on an account reported a missing resource"),
+            ),
+            ResourceOperationError::Internal(err) => Self::Internal(err),
+        }
+    }
+
     pub fn empty_selector() -> Self {
         Self::Resolution(ResourceAccountResolutionError {
             code: ResourceAccountResolutionProblemCode::EmptySelector,

@@ -557,6 +557,15 @@ pub struct ResourceDeletedNotRevealedProblem {
     pub message: String,
 }
 
+/// The caller may see the resource, but not run the operation on it
+#[derive(SimpleObject, Debug, Clone)]
+pub struct ResourceAccessDeniedProblem {
+    /// Human-readable description of the problem
+    pub message: String,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 /// Reason a resource reference could not be resolved
 #[derive(Union, Debug, Clone)]
 pub enum ResourceLookupProblem {
@@ -567,6 +576,7 @@ pub enum ResourceLookupProblem {
     EmptyRef(ResourceEmptyRefProblem),
     UntypedName(ResourceUntypedNameProblem),
     DeletedNotRevealed(ResourceDeletedNotRevealedProblem),
+    AccessDenied(ResourceAccessDeniedProblem),
 }
 
 impl From<kamu_resources_facade::ResourceLookupProblem> for ResourceLookupProblem {
@@ -612,6 +622,9 @@ impl From<kamu_resources_facade::ResourceLookupProblem> for ResourceLookupProble
                     message: e.to_string(),
                 })
             }
+            P::Access(e) => Self::AccessDenied(ResourceAccessDeniedProblem {
+                message: e.to_string(),
+            }),
         }
     }
 }

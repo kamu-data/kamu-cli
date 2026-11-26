@@ -16,6 +16,7 @@ mod oauth_device_code_generator_default;
 mod oauth_device_code_service_impl;
 mod predefined_accounts_registrator;
 mod predefined_oauth_device_code_generator;
+mod resource_account_access_adapter;
 
 pub use access_token_service_impl::*;
 pub use account_quota_service_impl::*;
@@ -26,3 +27,4 @@ pub use oauth_device_code_generator_default::*;
 pub use oauth_device_code_service_impl::*;
 pub use predefined_accounts_registrator::*;
 pub use predefined_oauth_device_code_generator::*;
+pub use resource_account_access_adapter::*;

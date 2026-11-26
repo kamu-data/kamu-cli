@@ -49,6 +49,8 @@ use kamu_datasets::{
 };
 use kamu_resources::{
     ApplyManifestApplicationDecision,
+    ApplyResourceAccessCheck,
+    ApplyResourceAccountSource,
     ApplyResourceCrudDispatcherError,
     ApplyResourcePrecondition,
     CreationProvenance,
@@ -247,6 +249,7 @@ impl DatasetEnvVarMutationAdapterImpl {
                 | ApplyResourceCrudDispatcherError::InvalidSpec { .. }
                 | ApplyResourceCrudDispatcherError::NotFound(_)
                 | ApplyResourceCrudDispatcherError::TypeMismatch(_)
+                | ApplyResourceCrudDispatcherError::Access(_)
                 | ApplyResourceCrudDispatcherError::Internal(_)),
             ) => return Err(err.int_err().into()),
         };
@@ -370,6 +373,8 @@ impl DatasetEnvVarMutationAdapterImpl {
         self.apply_and_handle_rejection(
             &dispatcher,
             ResourceCrudDispatcherApplyRequest {
+                account_source: ApplyResourceAccountSource::Manifest,
+                access_check: ApplyResourceAccessCheck::CheckedByCaller,
                 id: existing_id,
                 headers: headers.into(),
                 spec: new_spec,
@@ -475,6 +480,8 @@ impl DatasetEnvVarMutationAdapterImpl {
         self.apply_and_handle_rejection(
             &dispatcher,
             ResourceCrudDispatcherApplyRequest {
+                account_source: ApplyResourceAccountSource::Manifest,
+                access_check: ApplyResourceAccessCheck::CheckedByCaller,
                 id: existing_id,
                 headers: headers.into(),
                 spec: new_spec,
@@ -543,6 +550,8 @@ impl DatasetEnvVarMutationAdapterImpl {
             self.apply_and_handle_rejection(
                 &dispatcher,
                 ResourceCrudDispatcherApplyRequest {
+                    account_source: ApplyResourceAccountSource::Manifest,
+                    access_check: ApplyResourceAccessCheck::CheckedByCaller,
                     id: Some(resource_id),
                     headers: headers.into(),
                     spec: serde_json::to_value(spec.into_input()).int_err()?,
@@ -600,6 +609,8 @@ impl DatasetEnvVarMutationAdapterImpl {
             self.apply_and_handle_rejection(
                 &dispatcher,
                 ResourceCrudDispatcherApplyRequest {
+                    account_source: ApplyResourceAccountSource::Manifest,
+                    access_check: ApplyResourceAccessCheck::CheckedByCaller,
                     id: Some(resource_id),
                     headers: headers.into(),
                     spec: serde_json::to_value(new_spec).int_err()?,

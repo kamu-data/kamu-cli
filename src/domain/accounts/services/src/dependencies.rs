@@ -35,6 +35,7 @@ pub fn register_dependencies(
     b.add::<AuthenticationServiceImpl>();
     b.add::<LoginPasswordAuthProvider>();
     b.add::<PredefinedAccountsRegistrator>();
+    b.add::<ResourceAccountAccessAdapter>();
 
     b.add::<CreateAccountUseCaseImpl>();
     b.add::<DeleteAccountUseCaseImpl>();

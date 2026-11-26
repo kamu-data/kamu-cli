@@ -9,6 +9,8 @@
 
 use chrono::Utc;
 use kamu_resources::{
+    ApplyResourceAccessCheck,
+    ApplyResourceAccountSource,
     ApplyResourceParams,
     ManagedResource,
     ResourceEvent,
@@ -29,6 +31,8 @@ pub fn make_resource_params(
     name: &str,
 ) -> ApplyResourceParams<TestResource> {
     ApplyResourceParams {
+        account_source: ApplyResourceAccountSource::Manifest,
+        access_check: ApplyResourceAccessCheck::ByGuard,
         id: None,
         headers: BaseResourceServiceHarness::make_headers_input(account, name).into(),
         spec: TestResourceSpec {

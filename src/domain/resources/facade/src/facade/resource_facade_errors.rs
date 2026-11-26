@@ -280,6 +280,10 @@ pub enum ResourceLookupProblem {
     /// The resource was found, but the caller asked to reveal its spec
     #[error(transparent)]
     DeletedNotRevealed(#[from] ResourceDeletedNotRevealedError),
+
+    /// The caller may see the resource, but not run the operation on it
+    #[error(transparent)]
+    Access(#[from] odf::AccessError),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -468,6 +472,7 @@ impl From<ApplyResourceCrudDispatcherError> for ApplyManifestError {
             E::NotFound(err) => Self::IDNotFound(err),
             E::TypeMismatch(err) => Self::TypeMismatch(err),
             E::ConcurrentModification(err) => Self::ConcurrentModification(err),
+            E::Access(err) => Self::AccountAccess(ResourceAccountAccessError::Access(err)),
             E::InvalidSpec { schema, message } => {
                 Self::InvalidSpec(ResourceInvalidSpecError { schema, message })
             }

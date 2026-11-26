@@ -10,6 +10,8 @@
 use std::sync::Arc;
 
 use kamu_resources::{
+    ApplyResourceAccessCheck,
+    ApplyResourceAccountSource,
     ApplyResourceAction,
     ApplyResourceApplicationDecision,
     ApplyResourceOutcome,
@@ -170,6 +172,8 @@ impl ImmutableResourceHarness {
         spec: ImmutableTestResourceSpec,
     ) -> ApplyResourceParams<ImmutableTestResource> {
         ApplyResourceParams {
+            account_source: ApplyResourceAccountSource::Manifest,
+            access_check: ApplyResourceAccessCheck::ByGuard,
             id: None,
             headers: BaseResourceServiceHarness::make_headers_input(
                 odf::ResourceOwnerHandle::new_test("test"),
@@ -237,6 +241,8 @@ impl ImmutableResourceHarness {
         let planned = self
             .apply_uc
             .plan(ApplyResourceParams {
+                account_source: ApplyResourceAccountSource::Manifest,
+                access_check: ApplyResourceAccessCheck::ByGuard,
                 id: params.id,
                 headers: params.headers.clone(),
                 spec: params.spec.clone(),

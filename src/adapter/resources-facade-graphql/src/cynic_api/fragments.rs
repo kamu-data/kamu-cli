@@ -183,6 +183,11 @@ pub(crate) struct ResourceDeletedNotRevealedProblem {
     pub id: kamu_resources::ResourceID,
 }
 
+#[derive(cynic::QueryFragment, Debug, Clone)]
+pub(crate) struct ResourceAccessDeniedProblem {
+    pub message: String,
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(cynic::InlineFragments, Debug, Clone)]
@@ -192,6 +197,7 @@ pub(crate) enum ResourceLookupProblem {
     ResourceSchemaMismatchProblem(ResourceSchemaMismatchProblem),
     ResourceNameMismatchProblem(ResourceNameMismatchProblem),
     ResourceDeletedNotRevealedProblem(ResourceDeletedNotRevealedProblem),
+    ResourceAccessDeniedProblem(ResourceAccessDeniedProblem),
     #[cynic(fallback)]
     Unknown,
 }

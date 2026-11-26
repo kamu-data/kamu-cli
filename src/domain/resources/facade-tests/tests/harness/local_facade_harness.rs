@@ -33,6 +33,7 @@ use kamu_accounts_services::{
     CreateAccountUseCaseImpl,
     LoginPasswordAuthProvider,
     PredefinedAccountsRegistrator,
+    ResourceAccountAccessAdapter,
     UpdateAccountUseCaseImpl,
 };
 use kamu_auth_rebac_inmem::InMemoryRebacRepository;
@@ -59,7 +60,11 @@ use kamu_resources::{
     ResourceVisibility,
 };
 use kamu_resources_facade::{ListResourcesError, ResourceFacade, SearchResourcesRequest};
-use kamu_resources_services::testing::{register_immutable_test_resource, register_test_resource};
+use kamu_resources_services::testing::{
+    register_immutable_test_resource,
+    register_test_resource,
+    register_test_resource_access_rules,
+};
 use kamu_resources_services::{BackgroundWorkFinalizer, ResourceControllerRuntimeImpl};
 use messaging_outbox::{OutboxAgent, OutboxProvider, register_message_dispatcher};
 use strum::IntoEnumIterator;
@@ -87,6 +92,9 @@ pub struct LocalFacadeHarnessOpts {
     /// [`ImmutableTestResource`](kamu_resources_services::testing::ImmutableTestResource)
     /// beside the real types
     pub test_resources: bool,
+    /// Gives `TestResource` the placement and the operation guard of
+    /// [`register_test_resource_access_rules`]
+    pub test_resource_access_rules: bool,
 }
 
 impl LocalFacadeHarnessOpts {
@@ -94,6 +102,13 @@ impl LocalFacadeHarnessOpts {
         Self {
             test_resources: true,
             ..Default::default()
+        }
+    }
+
+    pub fn with_guarded_test_resources() -> Self {
+        Self {
+            test_resource_access_rules: true,
+            ..Self::with_test_resources()
         }
     }
 }
@@ -105,6 +120,7 @@ impl Default for LocalFacadeHarnessOpts {
                 force_immediate: true,
             },
             test_resources: false,
+            test_resource_access_rules: false,
         }
     }
 }
@@ -223,6 +239,7 @@ impl LocalFacadeHarness {
             .add::<AccountQuotaServiceImpl>()
             .add::<CreateAccountUseCaseImpl>()
             .add::<UpdateAccountUseCaseImpl>()
+            .add::<ResourceAccountAccessAdapter>()
             .add_value(DidSecretEncryptionConfig::sample())
             .add_value(predefined_accounts_config);
 
@@ -247,6 +264,9 @@ impl LocalFacadeHarness {
         if opts.test_resources {
             register_test_resource(&mut b);
             register_immutable_test_resource(&mut b);
+        }
+        if opts.test_resource_access_rules {
+            register_test_resource_access_rules(&mut b);
         }
 
         register_message_dispatcher::<ResourceLifecycleMessage>(

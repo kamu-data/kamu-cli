@@ -28,6 +28,20 @@ macro_rules! declare_resource_crud_dispatcher {
                 std::sync::Arc<dyn kamu_resources::ApplyResourceUseCase<$resource>>,
             request_resources_deletion_use_case:
                 std::sync::Arc<dyn kamu_resources::RequestResourcesDeletionUseCase<$resource>>,
+            resource_aggregate_loader:
+                std::sync::Arc<dyn kamu_resources::ResourceAggregateLoader<$resource>>,
+            maybe_resource_operation_guard:
+                Option<std::sync::Arc<dyn kamu_resources::ResourceOperationGuard<$resource>>>,
+            default_resource_operation_guard: std::sync::Arc<$crate::DefaultResourceOperationGuard>,
+        }
+
+        impl $dispatcher {
+            fn operation_guard(&self) -> &dyn kamu_resources::ResourceOperationGuard<$resource> {
+                match &self.maybe_resource_operation_guard {
+                    Some(guard) => guard.as_ref(),
+                    None => self.default_resource_operation_guard.as_ref(),
+                }
+            }
         }
 
         #[async_trait::async_trait]
@@ -61,6 +75,8 @@ macro_rules! declare_resource_crud_dispatcher {
                     .plan(kamu_resources::ApplyResourceParams {
                         id: request.id,
                         headers: request.headers,
+                        account_source: request.account_source,
+                        access_check: request.access_check,
                         spec,
                         provenance: request.provenance,
                     })
@@ -88,6 +104,8 @@ macro_rules! declare_resource_crud_dispatcher {
                         kamu_resources::ApplyResourceParams {
                             id: request.id,
                             headers: request.headers,
+                            account_source: request.account_source,
+                            access_check: request.access_check,
                             spec,
                             provenance: request.provenance,
                         },
@@ -108,6 +126,95 @@ macro_rules! declare_resource_crud_dispatcher {
                     .execute(request.account_id, request.ids)
                     .await
                     .map_err(kamu_resources::RequestResourcesDeletionCrudDispatcherError::from)
+            }
+
+            async fn check_account_access(
+                &self,
+                principal: &odf::metadata::auth::PrincipalHandle,
+                account: &odf::ResourceOwnerHandle,
+                operation: kamu_resources::ResourceAccountOperation,
+            ) -> Result<kamu_resources::ResourceAccountAccess, kamu_resources::ResourceOperationError>
+            {
+                self.operation_guard()
+                    .check_account(principal, account, operation)
+                    .await
+            }
+
+            async fn check_resource_operations(
+                &self,
+                principal: &odf::metadata::auth::PrincipalHandle,
+                account: &odf::ResourceOwnerHandle,
+                operation: kamu_resources::ResourceAccountOperation,
+                ids: &[kamu_resources::ResourceID],
+            ) -> Result<
+                Vec<Result<(), kamu_resources::ResourceOperationError>>,
+                internal_error::InternalError,
+            > {
+                use internal_error::{ErrorIntoInternal, ResultIntoInternal};
+
+                // A resource deleted since its ID was resolved is not found
+                let mut loaded = Vec::with_capacity(ids.len());
+                for (id, result) in ids
+                    .iter()
+                    .zip(self.resource_aggregate_loader.load_many(ids).await.int_err()?)
+                {
+                    match result {
+                        Ok(resource) => loaded.push(Ok(resource)),
+                        Err($crate::event_sourcing::LoadError::NotFound(_)) => loaded.push(Err(
+                            kamu_resources::ResourceOperationError::NotFound(
+                                kamu_resources::ResourceIDNotFoundError(*id),
+                            ),
+                        )),
+                        Err(err) => return Err(err.int_err()),
+                    }
+                }
+
+                let requests = loaded
+                    .iter()
+                    .filter_map(|result| result.as_ref().ok())
+                    .map(|resource| kamu_resources::ResourceOperationRequest {
+                        account,
+                        operation: match operation {
+                            kamu_resources::ResourceAccountOperation::Read => {
+                                kamu_resources::ResourceOperation::Read { resource }
+                            }
+                            kamu_resources::ResourceAccountOperation::Delete => {
+                                kamu_resources::ResourceOperation::Delete { resource }
+                            }
+                        },
+                    })
+                    .collect::<Vec<_>>();
+
+                let mut checked = self
+                    .operation_guard()
+                    .check_operations(principal, &requests)
+                    .await?
+                    .into_iter();
+
+                Ok(loaded
+                    .into_iter()
+                    .map(|result| match result {
+                        Ok(_) => checked.next().expect("one result per request"),
+                        Err(err) => Err(err),
+                    })
+                    .collect())
+            }
+
+            async fn check_list(
+                &self,
+                principal: &odf::metadata::auth::PrincipalHandle,
+                account: &odf::ResourceOwnerHandle,
+                scope: &kamu_resources::ResourceListScope,
+            ) -> Result<(), kamu_resources::ResourceOperationError> {
+                self.operation_guard()
+                    .check_operation(
+                        principal,
+                        &kamu_resources::ResourceOperationRequest {
+                            account,
+                            operation: kamu_resources::ResourceOperation::List { scope },
+                        },
+                    )
+                    .await
             }
         }
     };

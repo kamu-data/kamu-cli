@@ -15,6 +15,8 @@ use chrono::Utc;
 use dill::CatalogBuilder;
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu_resources::{
+    ApplyResourceAccessCheck,
+    ApplyResourceAccountSource,
     ApplyResourceApplicationDecision,
     ApplyResourceOutcome,
     ApplyResourceParams,
@@ -41,7 +43,6 @@ use kamu_resources::{
     ResourceValidateSpec,
     TypedResourceQueryService,
 };
-use kamu_resources_services::ApplyResourceRunner;
 use kamu_resources_services::testing::{
     BaseResourceServiceHarness,
     ImmutableTestResource,
@@ -53,6 +54,7 @@ use kamu_resources_services::testing::{
     register_immutable_test_resource,
     register_test_resource,
 };
+use kamu_resources_services::{ApplyResourceRunner, DefaultResourceOperationGuard};
 use serde::Serialize;
 
 use crate::tests::utils::make_id;
@@ -270,6 +272,7 @@ struct ApplyResourceRunnerHarness<R: EventSourcedResource> {
     aggregate_loader: Arc<dyn ResourceAggregateLoader<R>>,
     persistence_svc: Arc<dyn ResourcePersistenceService<R>>,
     name_suffix_generator: Arc<dyn ResourceNameSuffixGenerator>,
+    default_operation_guard: Arc<DefaultResourceOperationGuard>,
 }
 
 impl<R> ApplyResourceRunnerHarness<R>
@@ -292,6 +295,7 @@ where
             aggregate_loader: catalog.get_one().unwrap(),
             persistence_svc: catalog.get_one().unwrap(),
             name_suffix_generator: catalog.get_one().unwrap(),
+            default_operation_guard: catalog.get_one().unwrap(),
             base,
         }
     }
@@ -367,6 +371,9 @@ where
             resource_aggregate_loader: self.aggregate_loader.as_ref(),
             resource_persistence_service: persistence_svc,
             maybe_resource_spec_pre_apply: Some(pre_apply),
+            maybe_resource_placement: None,
+            maybe_resource_operation_guard: None,
+            default_resource_operation_guard: self.default_operation_guard.as_ref(),
             name_suffix_generator: self.name_suffix_generator.as_ref(),
             outbox: self.base.outbox(),
             time_source: self.base.time_source(),
@@ -375,6 +382,8 @@ where
         runner
             .apply(
                 ApplyResourceParams {
+                    account_source: ApplyResourceAccountSource::Manifest,
+                    access_check: ApplyResourceAccessCheck::ByGuard,
                     id: None,
                     headers: BaseResourceServiceHarness::make_headers_input(
                         account_handle(),

@@ -14,6 +14,8 @@ use serde::Serialize;
 use time_source::SystemTimeSource;
 
 use crate::domain::{
+    ApplyResourceAccessCheck,
+    ApplyResourceAccountSource,
     ApplyResourceAction,
     ApplyResourceApplicationDecision,
     ApplyResourceHeaders,
@@ -193,6 +195,9 @@ where
                 ApplyResourceParams {
                     id: None,
                     headers,
+                    // Placed already
+                    account_source: ApplyResourceAccountSource::Manifest,
+                    access_check: ApplyResourceAccessCheck::ByGuard,
                     spec: plan.resource.spec().clone().into_input(),
                     provenance,
                 },

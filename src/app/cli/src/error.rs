@@ -476,6 +476,9 @@ pub enum ResourceLookupCliError {
 
     #[error(transparent)]
     DeletedNotRevealed(ResourceDeletedNotRevealedError),
+
+    #[error(transparent)]
+    Access(odf::AccessError),
 }
 
 impl From<ResourceLookupProblem> for ResourceLookupCliError {
@@ -499,6 +502,7 @@ impl From<ResourceLookupProblem> for ResourceLookupCliError {
             ResourceLookupProblem::EmptyRef => Self::EmptyRef,
             ResourceLookupProblem::UntypedName => Self::UntypedName,
             ResourceLookupProblem::DeletedNotRevealed(err) => Self::DeletedNotRevealed(err),
+            ResourceLookupProblem::Access(err) => Self::Access(err),
         }
     }
 }

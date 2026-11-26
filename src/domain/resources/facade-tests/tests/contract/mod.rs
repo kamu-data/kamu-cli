@@ -20,6 +20,7 @@ pub mod generations;
 pub mod get_handle;
 pub mod immutable_specs;
 pub mod list_search;
+pub mod operation_guard;
 pub mod owner_references;
 pub mod render_manifest;
 pub mod search_any_type;

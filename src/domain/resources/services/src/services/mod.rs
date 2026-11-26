@@ -10,6 +10,7 @@
 mod apply_resource_plan_executor;
 mod apply_resource_planner;
 mod apply_resource_runner;
+mod default_resource_operation_guard;
 mod generic_resource_query;
 mod owner_reference_resolver;
 mod request_creation_provenance;
@@ -24,6 +25,7 @@ mod typed_resource_query;
 pub use apply_resource_plan_executor::*;
 pub use apply_resource_planner::*;
 pub use apply_resource_runner::*;
+pub use default_resource_operation_guard::*;
 pub use generic_resource_query::*;
 pub(crate) use owner_reference_resolver::*;
 pub use request_creation_provenance::*;

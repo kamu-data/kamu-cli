@@ -16,6 +16,8 @@ use database_common::testing::{in_committed_transaction, in_rolled_back_transact
 use dill::Catalog;
 use internal_error::InternalError;
 use kamu_resources::{
+    ApplyResourceAccessCheck,
+    ApplyResourceAccountSource,
     ApplyResourceParams,
     DeclarativeResource,
     MESSAGE_PRODUCER_KAMU_RESOURCE_SERVICE,
@@ -952,6 +954,8 @@ impl LifecyclePrimitivesHarness {
                 let snapshot = self.get_snapshot_by_id(id).await.unwrap();
                 self.apply_test_uc()
                     .apply(ApplyResourceParams {
+                        account_source: ApplyResourceAccountSource::Manifest,
+                        access_check: ApplyResourceAccessCheck::ByGuard,
                         id: Some(*id),
                         headers: BaseResourceServiceHarness::make_headers_input(
                             self.account.clone(),

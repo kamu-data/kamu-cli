@@ -22,6 +22,8 @@ use kamu_core::RequestOrigin;
 use kamu_datasets::{DatasetLifecycleMessage, MESSAGE_PRODUCER_KAMU_DATASET_SERVICE};
 use kamu_resources::{
     ApplyManifestApplicationDecision,
+    ApplyResourceAccessCheck,
+    ApplyResourceAccountSource,
     ResourceCrudDispatcher,
     ResourceCrudDispatcherApplyRequest,
     ResourceCrudDispatcherDeletionRequest,
@@ -211,6 +213,8 @@ impl ConfigurationDatasetLifecycleMessageConsumer {
 
             let decision = dispatcher
                 .apply(ResourceCrudDispatcherApplyRequest {
+                    account_source: ApplyResourceAccountSource::Manifest,
+                    access_check: ApplyResourceAccessCheck::ByGuard,
                     id: Some(snapshot.id),
                     headers: headers.into(),
                     // Verbatim: the dispatcher decodes it back per type, so

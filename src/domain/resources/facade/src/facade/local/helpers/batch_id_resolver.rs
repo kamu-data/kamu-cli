@@ -145,3 +145,25 @@ pub(crate) fn id_not_found(id: ResourceID) -> ResourceLookupProblem {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// A miss reported in the terms the caller selected by. A ref carrying both
+/// is resolved by its id, so it reports as an id miss.
+pub(crate) fn ref_not_found(
+    schema: &TypeUri,
+    resource_ref: &ResourceRef,
+    id: ResourceID,
+) -> ResourceLookupProblem {
+    match (&resource_ref.id, &resource_ref.name) {
+        (None, Some(name)) => resource_type_name(schema)
+            .map(|type_name| {
+                ResourceLookupProblem::NameNotFound(ResourceNameNotFoundError {
+                    type_name,
+                    name: name.clone(),
+                })
+            })
+            .unwrap_or_else(|_| id_not_found(id)),
+        _ => id_not_found(id),
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

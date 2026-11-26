@@ -139,13 +139,21 @@ impl CreationProvenanceHarness {
         }
     }
 
+    /// The account of `alice`, who may apply there, as the node may
+    fn account() -> odf::ResourceOwnerHandle {
+        let Principal::User(alice) = Principal::new_test_with(&"alice") else {
+            unreachable!()
+        };
+        (&alice).into()
+    }
+
     async fn create(
         &self,
         name: &str,
         principal: &Principal,
         request_origin: &RequestOrigin,
     ) -> ResourceID {
-        let mut params = make_resource_params(odf::ResourceOwnerHandle::new_test("test"), name);
+        let mut params = make_resource_params(Self::account(), name);
         params.provenance = request_creation_provenance(principal, request_origin).unwrap();
 
         let result = self.apply_svc.apply(params).await.unwrap().expect_applied();
@@ -160,7 +168,7 @@ impl CreationProvenanceHarness {
         principal: &Principal,
         request_origin: &RequestOrigin,
     ) -> ApplyResourceOutcome {
-        let mut params = make_resource_params(odf::ResourceOwnerHandle::new_test("test"), name);
+        let mut params = make_resource_params(Self::account(), name);
         params.spec.value = value.to_string();
         params.provenance = request_creation_provenance(principal, request_origin).unwrap();
 

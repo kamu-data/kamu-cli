@@ -9,6 +9,7 @@
 
 use std::assert_matches;
 
+use kamu_accounts::Principal;
 use kamu_configuration::{
     RESOURCE_LABEL_LEGACY_CONFIG_TARGET_DATASET_SCHEMA_URI,
     SecretSetResource,
@@ -943,6 +944,41 @@ async fn test_create_refuses_key_written_after_its_lookup() {
             );
         }
     }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_writes_for_a_principal_other_than_the_owner_are_not_checked_again() {
+    // A maintainer of another's dataset, whom the caller has checked already
+    let harness =
+        DatasetEnvVarServiceHarness::new_acting_as(Principal::new_test_with(&"maintainer"));
+
+    let (_, dataset_id) = odf::DatasetID::new_generated_ed25519();
+    let account_handle = harness.ensure_test_account("test-owner").await;
+    harness
+        .seed_dataset_entry(&dataset_id, &account_handle.did)
+        .await;
+
+    for key in ["A", "B"] {
+        let result = harness
+            .upsert_env_var(&dataset_id, key, &DatasetEnvVarValue::Regular("v1".into()))
+            .await
+            .unwrap();
+        DatasetEnvVarServiceHarness::assert_upsert_created(&result);
+    }
+    let result = harness
+        .upsert_env_var(&dataset_id, "A", &DatasetEnvVarValue::Regular("v2".into()))
+        .await
+        .unwrap();
+    DatasetEnvVarServiceHarness::assert_upsert_updated(&result);
+    // Rewrites the set, which keeps `B`
+    harness.delete_env_var(&dataset_id, "A").await.unwrap();
+
+    assert_eq!(
+        harness.variable_values(&dataset_id).await,
+        [("B".to_string(), "v1".to_string())].into()
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

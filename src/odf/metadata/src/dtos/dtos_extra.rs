@@ -367,6 +367,22 @@ impl From<auth::PrincipalHandle> for resources::ResourceRef {
     }
 }
 
+impl auth::PrincipalHandle {
+    /// Whether the principal is the node, acting in system work
+    pub fn is_node(&self) -> bool {
+        self.r#type == *auth::Node::type_uri()
+    }
+
+    /// The account of a principal that is a user; `None` for any other
+    /// principal
+    pub fn user_account_did(&self) -> Option<AccountID> {
+        if self.r#type != *auth::User::type_uri() {
+            return None;
+        }
+        self.did.clone().map(AccountID::from)
+    }
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // DatasetRef
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

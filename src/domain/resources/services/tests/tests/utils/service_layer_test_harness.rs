@@ -13,6 +13,8 @@ use chrono::TimeDelta;
 use dill::CatalogBuilder;
 use internal_error::InternalError;
 use kamu_resources::{
+    ApplyResourceAccessCheck,
+    ApplyResourceAccountSource,
     ApplyResourceApplicationDecision,
     ApplyResourceParams,
     ApplyResourceUseCase,
@@ -257,6 +259,8 @@ impl ServiceLayerTestHarness {
         value: &str,
     ) {
         let params = ApplyResourceParams {
+            account_source: ApplyResourceAccountSource::Manifest,
+            access_check: ApplyResourceAccessCheck::ByGuard,
             id: Some(id),
             headers: BaseResourceServiceHarness::make_headers_input(account_handle.clone(), name)
                 .into(),
@@ -306,6 +310,8 @@ impl ServiceLayerTestHarness {
         name: &str,
     ) -> ResourceID {
         let params = ApplyResourceParams {
+            account_source: ApplyResourceAccountSource::Manifest,
+            access_check: ApplyResourceAccessCheck::ByGuard,
             id: None,
             headers: BaseResourceServiceHarness::make_headers_input(account_handle.clone(), name)
                 .into(),

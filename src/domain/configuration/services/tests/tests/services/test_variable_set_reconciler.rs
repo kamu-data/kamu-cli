@@ -9,7 +9,12 @@
 
 use kamu_configuration::{Variable, VariableSetSpecInput};
 use kamu_configuration_services::testing::BaseConfigurationServiceHarness;
-use kamu_resources::{ApplyResourceParams, ResourcePhase};
+use kamu_resources::{
+    ApplyResourceAccessCheck,
+    ApplyResourceAccountSource,
+    ApplyResourceParams,
+    ResourcePhase,
+};
 use kamu_resources_services::testing::BaseResourceServiceHarness;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -46,6 +51,8 @@ async fn test_reconcile_variable_set_populates_projection_entries() {
     let decision = harness
         .apply_variable_use_case()
         .apply(ApplyResourceParams {
+            account_source: ApplyResourceAccountSource::Manifest,
+            access_check: ApplyResourceAccessCheck::ByGuard,
             id: None,
             headers: BaseResourceServiceHarness::make_headers_input(account_handle, "test-vars")
                 .into(),
@@ -92,6 +99,8 @@ async fn test_reconcile_variable_set_preserves_entry_id_across_reconciliations()
     let decision = harness
         .apply_variable_use_case()
         .apply(ApplyResourceParams {
+            account_source: ApplyResourceAccountSource::Manifest,
+            access_check: ApplyResourceAccessCheck::ByGuard,
             id: None,
             headers: BaseResourceServiceHarness::make_headers_input(
                 account_handle.clone(),
@@ -125,6 +134,8 @@ async fn test_reconcile_variable_set_preserves_entry_id_across_reconciliations()
     let decision2 = harness
         .apply_variable_use_case()
         .apply(ApplyResourceParams {
+            account_source: ApplyResourceAccountSource::Manifest,
+            access_check: ApplyResourceAccessCheck::ByGuard,
             id: Some(id),
             headers: BaseResourceServiceHarness::make_headers_input(
                 account_handle.clone(),

@@ -68,11 +68,17 @@ pub struct DatasetEnvVarServiceHarness {
 
 impl DatasetEnvVarServiceHarness {
     pub fn new() -> Self {
+        Self::new_acting_as(Principal::Node)
+    }
+
+    /// The adapter acts for `principal`, whose dataset permission its caller
+    /// has checked
+    pub fn new_acting_as(principal: Principal) -> Self {
         let base = BaseConfigurationServiceHarness::new();
 
         let mut b = CatalogBuilder::new_chained(base.catalog());
         b.add::<AccountServiceImpl>();
-        b.add_value(Principal::Node);
+        b.add_value(principal);
         b.add_value(RequestOrigin::Api(ApiKind::GraphQl));
 
         let catalog = b.build();

@@ -28,6 +28,11 @@ macro_rules! declare_apply_resource_use_case {
                 std::sync::Arc<dyn kamu_resources::ResourcePersistenceService<$resource>>,
             maybe_resource_spec_pre_apply:
                 Option<std::sync::Arc<dyn kamu_resources::ResourceSpecPreApply<$resource>>>,
+            maybe_resource_placement:
+                Option<std::sync::Arc<dyn kamu_resources::ResourcePlacement<$resource>>>,
+            maybe_resource_operation_guard:
+                Option<std::sync::Arc<dyn kamu_resources::ResourceOperationGuard<$resource>>>,
+            default_resource_operation_guard: std::sync::Arc<$crate::DefaultResourceOperationGuard>,
             name_suffix_generator:
                 std::sync::Arc<dyn kamu_resources::ResourceNameSuffixGenerator>,
             outbox: std::sync::Arc<dyn $crate::messaging_outbox::Outbox>,
@@ -42,6 +47,9 @@ macro_rules! declare_apply_resource_use_case {
                     resource_aggregate_loader: self.resource_aggregate_loader.as_ref(),
                     resource_persistence_service: self.resource_persistence_service.as_ref(),
                     maybe_resource_spec_pre_apply: self.maybe_resource_spec_pre_apply.as_deref(),
+                    maybe_resource_placement: self.maybe_resource_placement.as_deref(),
+                    maybe_resource_operation_guard: self.maybe_resource_operation_guard.as_deref(),
+                    default_resource_operation_guard: self.default_resource_operation_guard.as_ref(),
                     name_suffix_generator: self.name_suffix_generator.as_ref(),
                     outbox: self.outbox.as_ref(),
                     time_source: self.time_source.as_ref(),

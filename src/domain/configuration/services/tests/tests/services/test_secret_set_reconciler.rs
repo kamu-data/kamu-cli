@@ -10,7 +10,13 @@
 use kamu_configuration::SecretSetSpecInput;
 use kamu_configuration_services::testing::BaseConfigurationServiceHarness;
 use kamu_datasets::SAMPLE_SECRETS_ENCRYPTION_KEY;
-use kamu_resources::{ApplyResourceApplicationDecision, ApplyResourceParams, ResourcePhase};
+use kamu_resources::{
+    ApplyResourceAccessCheck,
+    ApplyResourceAccountSource,
+    ApplyResourceApplicationDecision,
+    ApplyResourceParams,
+    ResourcePhase,
+};
 use kamu_resources_services::testing::BaseResourceServiceHarness;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -46,6 +52,8 @@ async fn test_reconcile_secret_set_decrypts_and_reprojects_values() {
     let decision = harness
         .apply_secret_use_case()
         .apply(ApplyResourceParams {
+            account_source: ApplyResourceAccountSource::Manifest,
+            access_check: ApplyResourceAccessCheck::ByGuard,
             id: None,
             headers: BaseResourceServiceHarness::make_headers_input(account_handle, "test-secrets")
                 .into(),

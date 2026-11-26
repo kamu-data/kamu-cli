@@ -10,6 +10,8 @@
 use kamu_configuration::{SecretExt, SecretSetResource, SecretSetSpec, SecretSetSpecInput};
 use kamu_configuration_services::testing::BaseConfigurationServiceHarness;
 use kamu_resources::{
+    ApplyResourceAccessCheck,
+    ApplyResourceAccountSource,
     ApplyResourceApplicationDecision,
     ApplyResourceParams,
     ResourceSchemaProvider,
@@ -50,6 +52,8 @@ async fn test_spec_view_dispatcher_reveals_encrypted_secrets_as_plaintext() {
     let decision = harness
         .apply_secret_use_case()
         .apply(ApplyResourceParams {
+            account_source: ApplyResourceAccountSource::Manifest,
+            access_check: ApplyResourceAccessCheck::ByGuard,
             id: None,
             headers: BaseResourceServiceHarness::make_headers_input(account_handle, "test-secrets")
                 .into(),

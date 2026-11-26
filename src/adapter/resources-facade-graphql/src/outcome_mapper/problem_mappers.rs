@@ -33,6 +33,9 @@ pub(crate) fn map_batch_lookup_problem(
         P::ResourceSchemaMismatchProblem(p) => Ok(map_schema_mismatch(p)),
         P::ResourceNameMismatchProblem(p) => Ok(map_name_mismatch(p)),
         P::ResourceDeletedNotRevealedProblem(p) => Ok(map_deleted_not_revealed(p)),
+        P::ResourceAccessDeniedProblem(p) => Ok(ResourceLookupProblem::Access(
+            odf::AccessError::Unauthorized(p.message.into()),
+        )),
         P::Unknown => Err(BatchResourceError::Internal(InternalError::new(
             "Remote batch problem contains unrecognized ResourceLookupProblem variant",
         ))),

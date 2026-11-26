@@ -241,6 +241,16 @@ impl From<DidPkh> for AccountDid {
     }
 }
 
+impl From<Did> for AccountDid {
+    fn from(value: Did) -> Self {
+        match value {
+            Did::Key(v) => v.into(),
+            Did::Odf(v) => v.into(),
+            Did::Pkh(v) => v.into(),
+        }
+    }
+}
+
 impl From<AccountDid> for Did {
     fn from(value: AccountDid) -> Self {
         match value {

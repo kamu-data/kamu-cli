@@ -12,6 +12,8 @@ use std::sync::Arc;
 use chrono::Utc;
 use dill::CatalogBuilder;
 use kamu_resources::{
+    ApplyResourceAccessCheck,
+    ApplyResourceAccountSource,
     ApplyResourceAction,
     ApplyResourceApplicationDecision,
     ApplyResourceParams,
@@ -295,6 +297,8 @@ impl ApplyResourcePlannerHarness {
         value: impl Into<String>,
     ) -> ApplyResourceParams<TestResource> {
         ApplyResourceParams {
+            account_source: ApplyResourceAccountSource::Manifest,
+            access_check: ApplyResourceAccessCheck::ByGuard,
             id,
             headers: BaseResourceServiceHarness::make_headers_input(
                 self.account_handle.clone(),
@@ -314,6 +318,8 @@ impl ApplyResourcePlannerHarness {
         value: &str,
     ) -> ApplyResourceParams<TestResource> {
         ApplyResourceParams {
+            account_source: ApplyResourceAccountSource::Manifest,
+            access_check: ApplyResourceAccessCheck::ByGuard,
             id,
             headers: BaseResourceServiceHarness::make_nameless_headers(self.account_handle.clone()),
             spec: TestResourceSpec {

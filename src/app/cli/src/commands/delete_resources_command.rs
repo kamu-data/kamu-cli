@@ -504,7 +504,8 @@ fn phase_when_not_found(problem: &ResourceLookupProblem) -> Option<ResourcePhase
         | ResourceLookupProblem::NameMismatch(_)
         | ResourceLookupProblem::EmptyRef
         | ResourceLookupProblem::UntypedName
-        | ResourceLookupProblem::DeletedNotRevealed(_) => None,
+        | ResourceLookupProblem::DeletedNotRevealed(_)
+        | ResourceLookupProblem::Access(_) => None,
     }
 }
 

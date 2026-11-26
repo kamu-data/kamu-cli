@@ -10,6 +10,8 @@
 use std::assert_matches;
 
 use kamu_resources::{
+    ApplyResourceAccessCheck,
+    ApplyResourceAccountSource,
     ApplyResourceAction,
     ApplyResourceApplicationDecision,
     ApplyResourceOutcome,
@@ -389,6 +391,8 @@ fn make_params(
     value: &str,
 ) -> ApplyResourceParams<TestResource> {
     ApplyResourceParams {
+        account_source: ApplyResourceAccountSource::Manifest,
+        access_check: ApplyResourceAccessCheck::ByGuard,
         id: None,
         headers: BaseResourceServiceHarness::make_headers_input(account_handle.clone(), name)
             .into(),
@@ -406,6 +410,8 @@ fn make_nameless_params(
     value: &str,
 ) -> ApplyResourceParams<TestResource> {
     ApplyResourceParams {
+        account_source: ApplyResourceAccountSource::Manifest,
+        access_check: ApplyResourceAccessCheck::ByGuard,
         id: None,
         headers: BaseResourceServiceHarness::make_nameless_headers(account_handle.clone()),
         spec: TestResourceSpec {

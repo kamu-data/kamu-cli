@@ -26,6 +26,8 @@ use kamu_configuration_inmem::{
 };
 use kamu_datasets::SecretsEncryptionConfig;
 use kamu_resources::{
+    ApplyResourceAccessCheck,
+    ApplyResourceAccountSource,
     ApplyResourceParams,
     ApplyResourceUseCase,
     DeclarativeResource,
@@ -285,6 +287,8 @@ impl BaseConfigurationServiceHarness {
         let decision = self
             .apply_variable_use_case()
             .apply(ApplyResourceParams {
+                account_source: ApplyResourceAccountSource::Manifest,
+                access_check: ApplyResourceAccessCheck::ByGuard,
                 id: None,
                 headers: headers.into(),
                 spec,
@@ -322,6 +326,8 @@ impl BaseConfigurationServiceHarness {
         let decision = self
             .apply_secret_use_case()
             .apply(ApplyResourceParams {
+                account_source: ApplyResourceAccountSource::Manifest,
+                access_check: ApplyResourceAccessCheck::ByGuard,
                 id: None,
                 headers: headers.into(),
                 spec,

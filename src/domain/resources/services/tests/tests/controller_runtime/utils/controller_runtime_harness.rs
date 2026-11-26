@@ -17,6 +17,8 @@ use database_common::transaction;
 use dill::CatalogBuilder;
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu_resources::{
+    ApplyResourceAccessCheck,
+    ApplyResourceAccountSource,
     ApplyResourceParams,
     MESSAGE_CONSUMER_KAMU_RESOURCE_LIFECYCLE_EVENT_BRIDGE,
     MESSAGE_PRODUCER_KAMU_RESOURCE_SERVICE,
@@ -357,6 +359,8 @@ impl ControllerRuntimeHarness {
         let snapshot = self.get_snapshot_by_id(&id).await.unwrap();
         self.apply_test_uc()
             .apply(ApplyResourceParams {
+                account_source: ApplyResourceAccountSource::Manifest,
+                access_check: ApplyResourceAccessCheck::ByGuard,
                 id: Some(id),
                 headers: BaseResourceServiceHarness::make_headers_input(
                     self.account.clone(),
