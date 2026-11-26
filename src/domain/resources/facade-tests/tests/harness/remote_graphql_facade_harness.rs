@@ -15,6 +15,8 @@ use axum::Extension;
 use kamu_accounts::CurrentAccountSubject;
 use kamu_adapter_graphql::data_loader::{account_entity_data_loader, dataset_handle_data_loader};
 use kamu_adapter_resources_facade_graphql::RemoteGraphqlResourceFacadeImpl;
+use kamu_core::{ApiKind, RequestOrigin};
+use kamu_resources::{CreationOrigin, CreationOriginApi};
 use kamu_resources_facade::ResourceFacade;
 use strum::IntoEnumIterator;
 
@@ -61,6 +63,7 @@ impl RemoteGraphqlFacadeHarness {
 
             let mut b = dill::CatalogBuilder::new_chained(local.base_catalog());
             subject.register(&mut b);
+            b.add_value(RequestOrigin::Api(ApiKind::GraphQl));
             kamu_resources_facade::register_dependencies(&mut b);
             let catalog = b.build();
             token_to_catalog.insert(test_token(account), catalog);
@@ -105,6 +108,7 @@ impl RemoteGraphqlFacadeHarness {
 
         let mut b = dill::CatalogBuilder::new_chained(self.local.base_catalog());
         subject.register(&mut b);
+        b.add_value(RequestOrigin::Api(ApiKind::GraphQl));
         kamu_resources_facade::register_dependencies(&mut b);
         let catalog = b.build();
 
@@ -186,6 +190,12 @@ impl FacadeContractHarness for RemoteGraphqlFacadeHarness {
 
     async fn rename_account(&self, account: TestAccount, new_name: &odf::AccountName) {
         self.local.rename_account(account, new_name).await;
+    }
+
+    fn creation_origin(&self) -> CreationOrigin {
+        CreationOrigin::Api {
+            api: CreationOriginApi::GraphQl,
+        }
     }
 
     async fn settle(&self) {

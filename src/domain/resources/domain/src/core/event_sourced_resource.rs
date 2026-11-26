@@ -60,16 +60,17 @@ pub trait EventSourcedResource:
         id: ResourceID,
         headers: ResourceHeadersInput,
         spec: Self::SpecInput,
+        provenance: &crate::CreationProvenance,
     ) -> ResourceEvent<Self::SpecInput> {
-        let initial_conditions = Self::initial_conditions(&spec);
+        let mut initial_conditions = Self::initial_conditions(&spec);
+        provenance.insert_into(&mut initial_conditions);
 
         ResourceEvent::Created(ResourceEventCreated {
             event_time: now,
             id,
             headers,
             spec,
-            initial_conditions: Some(initial_conditions)
-                .filter(|conditions| !conditions.entries.is_empty()),
+            initial_conditions: Some(initial_conditions),
         })
     }
 
@@ -147,6 +148,7 @@ pub trait EventSourcedResource:
         id: ResourceID,
         headers: ResourceHeadersInput,
         spec: Self::SpecInput,
+        provenance: &crate::CreationProvenance,
     ) -> Result<Self, Self::LifecycleError>
     where
         Self: Sized,
@@ -155,7 +157,7 @@ pub trait EventSourcedResource:
             + From<crate::ResourceHeadersValidationError>
             + From<<Self::SpecInput as crate::ResourceValidateSpec>::ValidationError>,
     {
-        crate::try_create_resource::<Self, _, _>(now, id, headers, spec, Aggregate::new)
+        crate::try_create_resource::<Self, _, _>(now, id, headers, spec, provenance, Aggregate::new)
             .map(Self::from_aggregate)
     }
 
@@ -212,8 +214,11 @@ macro_rules! impl_event_sourced_resource {
                 id: $crate::ResourceID,
                 headers: $crate::ResourceHeadersInput,
                 spec: Self::SpecInput,
+                provenance: &$crate::CreationProvenance,
             ) -> Result<Self, Self::LifecycleError> {
-                <$resource as $crate::EventSourcedResource>::try_create(now, id, headers, spec)
+                <$resource as $crate::EventSourcedResource>::try_create(
+                    now, id, headers, spec, provenance,
+                )
             }
 
             fn try_update_headers(

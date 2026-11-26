@@ -64,6 +64,7 @@ make clippy
     - [Core traits](#core-traits)
     - [Owner references](#owner-references)
     - [Events](#events)
+    - [Creation provenance](#creation-provenance)
     - [Repository](#repository)
     - [Dispatchers](#dispatchers)
     - [Use-case traits](#use-case-traits)
@@ -165,6 +166,8 @@ long-term goal. This page documents what exists now.
   `ResourceSnapshot` row holds an `Option` (`None` before the first write completes).
 - The built-in ODF `ReconciliationError` condition (`code`, `message`) is present while the latest
   reconciliation or cleanup has failed; only the framework writes it.
+- The Kamu `CreationProvenance` condition records who created the resource and through which
+  boundary ([§5, Creation provenance](#creation-provenance)).
 
 ---
 
@@ -434,10 +437,10 @@ when the owners change. The owned resource must exist; the owner may be gone.
 `ResourceEvent<TSpec>` is the event-sourcing alphabet:
 `Created`, `HeadersUpdated`, `SpecUpdated`, `StatusUpdated`, `DeletionRequested`, `Deleted`.
 
-- `Created` carries the conditions the type starts every new resource with
-  (`ResourceStatusRules::initial_conditions`), so no `StatusUpdated` follows creation. The field is
-  absent when there are none, and in events stored before types could set them, which replay
-  without conditions.
+- `Created` carries the conditions every new resource starts with: its `CreationProvenance` and
+  the type's own (`ResourceStatusRules::initial_conditions`), so no `StatusUpdated` follows
+  creation. The field is absent in events stored before resources started with conditions, which
+  replay without them.
 - `HeadersUpdated` and `SpecUpdated` carry the new `generation`. `HeadersUpdated.new_generation` is
   optional; an event without it leaves the generation as is.
 - `StatusUpdated` carries the whole new status, written by a reconciliation or cleanup transition
@@ -455,6 +458,31 @@ event log stores what was submitted, as [prepared](#preparing-a-spec), same as
 `Created.headers`/`HeadersUpdated.new_headers` store `ResourceHeadersInput`. The `ResourceState`
 projection folds these into current state, converting `SpecInput` -> `Spec` (and `HeadersInput` ->
 `Headers`) at fold time — see `Spec` vs `SpecInput` above.
+
+### Creation provenance
+
+Work that runs after a request has ended, such as task admission, still needs to know who created
+a resource. Apply records it as the `CreationProvenance` condition
+(`https://kamu.dev/schemas/resource/v1alpha1/conditions/CreationProvenance`) in the `Created`
+event of every type:
+
+- `principal`: the ODF `PrincipalHandle` of the acting `Principal` (`User` or `Node`);
+- `origin`: `Api` with the API kind (`GraphQl`, `Rest`, `FlightSql`), `Cli`, or `Internal` with
+  the stable name of the producer and a `detail` the producer defines.
+
+It can be trusted as the creator's identity, never labels or other fields users write:
+
+- **Server-written.** `ApplyResourceParams::provenance` (and the CRUD dispatcher request) carries
+  it; it is recorded on create and ignored by an update. The facade builds it with
+  `request_creation_provenance` from the `Principal` and the `RequestOrigin` of the request
+  ([identity](identity.md#who-registers-it)); internal producers that apply directly pass their
+  own. A remote apply records the server's boundary, never an origin the client claims.
+- **Never from manifests**: apply accepts no status.
+- **Locked**: a condition patch that sets or removes it is `FrameworkOwned`
+  ([Condition patches](#condition-patches)).
+
+Resources created before it was recorded have none; readers treat a missing provenance as
+unknown.
 
 ### Repository
 
@@ -988,8 +1016,8 @@ write through `update_conditions`, which sets or removes the conditions a
    with `ResourceConditionUpdateError::StatusGenerationChanged`.
 2. **The patch** (`ResourceConditionPatchChecker`). A set condition must be registered for the
    resource type, pass its dispatcher and stay within the size limit of its registration, because
-   every `StatusUpdated` event stores the whole status. `ReconciliationError` belongs to the
-   framework and cannot be patched. A removed condition needs no registration, so one whose schema
+   every `StatusUpdated` event stores the whole status. `ReconciliationError` and
+   `CreationProvenance` belong to the framework and cannot be patched (`FrameworkOwned`). A removed condition needs no registration, so one whose schema
    is gone can still be removed. A failure is `InvalidPatch`.
 3. **Nothing changed.** A patch that only repeats the current values records and posts nothing.
 4. **The type's rules.** `ResourceStatusRules::validate_status_change` sees the old and new status
@@ -1005,8 +1033,8 @@ against their schemas as any persisted condition, but not against the size limit
 status rules, which apply to patches.
 
 **Condition ownership.** Each type documents which writer owns which of its conditions. For
-`VariableSet`, `SecretSet` and `Storage` the framework writes their only condition,
-`ReconciliationError`, and nothing patches conditions.
+`VariableSet`, `SecretSet` and `Storage` the framework writes their only conditions,
+`ReconciliationError` and `CreationProvenance`, and nothing patches conditions.
 
 ### Controller runtime
 

@@ -108,6 +108,7 @@ impl SpecMutabilityHarness {
                 "res-a",
             ),
             Self::spec(mode),
+            &BaseResourceServiceHarness::make_provenance(),
         );
         Self {
             resource: ImmutableTestResource::from_aggregate(Aggregate::new(id, event).unwrap()),

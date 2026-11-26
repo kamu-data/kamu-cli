@@ -54,6 +54,7 @@ async fn test_spec_view_dispatcher_reveals_encrypted_secrets_as_plaintext() {
             headers: BaseResourceServiceHarness::make_headers_input(account_handle, "test-secrets")
                 .into(),
             spec,
+            provenance: BaseResourceServiceHarness::make_provenance(),
         })
         .await
         .unwrap();

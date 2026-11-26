@@ -10,7 +10,11 @@
 use std::assert_matches;
 
 use kamu_resources::{ResourceEvent, ResourcePhase, ResourceStatusConflictError};
-use kamu_resources_services::testing::{TestResourceLifecycleError, test_stage_condition_key};
+use kamu_resources_services::testing::{
+    BaseResourceServiceHarness,
+    TestResourceLifecycleError,
+    test_stage_condition_key,
+};
 use pretty_assertions::assert_eq;
 
 use crate::tests::utils::{ResourceLifecycleHarness, make_id};
@@ -35,14 +39,18 @@ fn test_new_resource_starts_with_the_initial_conditions_of_its_type() {
     assert_eq!(harness.phase(), ResourcePhase::Pending);
     assert_eq!(
         harness.status().conditions.entries,
-        [(test_stage_condition_key(), serde_json::json!("queued"))].into()
+        [
+            (test_stage_condition_key(), serde_json::json!("queued")),
+            BaseResourceServiceHarness::make_provenance_entry()
+        ]
+        .into()
     );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test]
-fn test_created_event_records_initial_conditions_only_when_there_are_some() {
+fn test_created_event_records_provenance_next_to_initial_conditions() {
     let initial_conditions = |value| {
         let ResourceEvent::Created(event) =
             ResourceLifecycleHarness::created_event(make_id(), value)
@@ -54,10 +62,19 @@ fn test_created_event_records_initial_conditions_only_when_there_are_some() {
             .map(|conditions| conditions.entries)
     };
 
-    assert_eq!(initial_conditions("v1"), None);
+    assert_eq!(
+        initial_conditions("v1"),
+        Some([BaseResourceServiceHarness::make_provenance_entry()].into())
+    );
     assert_eq!(
         initial_conditions("staged:queued"),
-        Some([(test_stage_condition_key(), serde_json::json!("queued"))].into())
+        Some(
+            [
+                (test_stage_condition_key(), serde_json::json!("queued")),
+                BaseResourceServiceHarness::make_provenance_entry()
+            ]
+            .into()
+        )
     );
 }
 

@@ -204,6 +204,7 @@ async fn test_apply_update_returns_applied_updated() {
         id: Some(id),
         headers: BaseResourceServiceHarness::make_headers_input(account, "res-a").into(),
         spec: serde_json::json!({ "value": "value-v2" }),
+        provenance: BaseResourceServiceHarness::make_provenance(),
     };
     let decision2 = harness.dispatcher().apply(req2).await.unwrap();
     let applied2 = decision2.expect_applied();
@@ -232,6 +233,7 @@ async fn test_apply_untouched_returns_applied_untouched() {
         id: Some(id),
         headers: BaseResourceServiceHarness::make_headers_input(account, "res-a").into(),
         spec: serde_json::json!({ "value": "same-value" }),
+        provenance: BaseResourceServiceHarness::make_provenance(),
     };
     let decision2 = harness.dispatcher().apply(req2).await.unwrap();
     let applied2 = decision2.expect_applied();
@@ -267,6 +269,7 @@ impl ResourceCrudDispatcherHarness {
             )
             .into(),
             spec: serde_json::json!({ "value": value }),
+            provenance: BaseResourceServiceHarness::make_provenance(),
         }
     }
 
@@ -282,6 +285,7 @@ impl ResourceCrudDispatcherHarness {
             )
             .into(),
             spec,
+            provenance: BaseResourceServiceHarness::make_provenance(),
         }
     }
 }

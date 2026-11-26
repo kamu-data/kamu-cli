@@ -13,10 +13,12 @@ use std::sync::Arc;
 use chrono::Utc;
 use database_common::{InMemoryTransactionManager, NoOpDatabasePlugin};
 use dill::CatalogBuilder;
-use kamu_accounts::{Account, AccountRepository, AccountType};
+use kamu_accounts::{Account, AccountRepository, AccountType, Principal};
 use kamu_accounts_inmem::InMemoryAccountRepository;
+use kamu_core::RequestOrigin;
 use kamu_resources::{
     ApplyResourceHeaders,
+    CreationProvenance,
     GenericResourceQueryService,
     MESSAGE_PRODUCER_KAMU_RESOURCE_SERVICE,
     ReconciliationError,
@@ -29,14 +31,16 @@ use kamu_resources::{
     ResourceRepository,
     ResourceSnapshot,
     ResourceStatus,
+    TypeRef,
     TypeUri,
+    creation_provenance_type_ref,
     reconciliation_error_type_ref,
 };
 use messaging_outbox::{MockOutbox, Outbox, OutboxProvider, register_message_dispatcher};
 use time_source::{FakeSystemTimeSource, SystemTimeSource, SystemTimeSourceStub};
 use wakeup_listener::{WakeupListenerConfig, WakeupListenerMetrics};
 
-use crate::{BackgroundWorkFinalizer, ResourceControllerRuntimeImpl};
+use crate::{BackgroundWorkFinalizer, ResourceControllerRuntimeImpl, request_creation_provenance};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -281,6 +285,27 @@ impl BaseResourceServiceHarness {
             }),
             owner_references: None,
         }
+    }
+
+    /// Provenance of a resource created by the node in a test, for tests that
+    /// do not look at it
+    pub fn make_provenance() -> CreationProvenance {
+        request_creation_provenance(
+            &Principal::Node,
+            &RequestOrigin::Internal {
+                producer: "dev.kamu.test".to_string(),
+                detail: None,
+            },
+        )
+        .unwrap()
+    }
+
+    /// The condition entry [`Self::make_provenance`] is recorded as
+    pub fn make_provenance_entry() -> (TypeRef, serde_json::Value) {
+        (
+            creation_provenance_type_ref(),
+            serde_json::to_value(Self::make_provenance()).unwrap(),
+        )
     }
 
     /// Like [`Self::make_headers_input`], with the name left to the resource

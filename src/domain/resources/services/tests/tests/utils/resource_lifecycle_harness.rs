@@ -54,6 +54,7 @@ impl ResourceLifecycleHarness {
             make_id(),
             Self::headers_input(None),
             Self::spec(value),
+            &BaseResourceServiceHarness::make_provenance(),
         )
         .unwrap();
         Self { resource, now }
@@ -92,6 +93,7 @@ impl ResourceLifecycleHarness {
             id,
             Self::headers_input(None),
             Self::spec(value),
+            &BaseResourceServiceHarness::make_provenance(),
         )
     }
 

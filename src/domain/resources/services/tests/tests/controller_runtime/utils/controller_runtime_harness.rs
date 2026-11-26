@@ -366,6 +366,7 @@ impl ControllerRuntimeHarness {
                 spec: TestResourceSpec {
                     value: value.to_string(),
                 },
+                provenance: BaseResourceServiceHarness::make_provenance(),
             })
             .await
             .unwrap()

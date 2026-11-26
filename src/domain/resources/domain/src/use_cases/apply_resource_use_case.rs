@@ -12,6 +12,7 @@ use internal_error::{ErrorIntoInternal, InternalError};
 
 use crate::{
     ApplyResourceHeaders,
+    CreationProvenance,
     DeclarativeResource,
     EventSourcedResource,
     ResourceHeadersValidationError,
@@ -76,6 +77,8 @@ pub struct ApplyResourceParams<R: DeclarativeResource> {
     /// a [`DeclarativeResource::GENERATED_NAME_PREFIX`].
     pub headers: ApplyResourceHeaders,
     pub spec: R::SpecInput,
+    /// Recorded when the apply creates the resource; ignored by an update
+    pub provenance: CreationProvenance,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

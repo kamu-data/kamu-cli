@@ -36,8 +36,9 @@ pub struct ResourceEventCreated<TSpec> {
     #[serde_as(as = "odf::meta::serde::yaml::resources::ResourceHeadersInput")]
     pub headers: ResourceHeadersInput,
     pub spec: TSpec,
-    /// The conditions the resource type starts every new resource with, from
-    /// `ResourceStatusRules::initial_conditions`; absent when there are none
+    /// The conditions every new resource starts with: its `CreationProvenance`
+    /// and the type's `ResourceStatusRules::initial_conditions`. Absent in
+    /// events stored before resources started with conditions
     #[serde_as(as = "Option<odf::meta::serde::yaml::resources::ResourceConditions>")]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub initial_conditions: Option<ResourceConditions>,

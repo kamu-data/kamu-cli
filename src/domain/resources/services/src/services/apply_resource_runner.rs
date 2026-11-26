@@ -185,6 +185,7 @@ where
             id: params.id,
             headers: params.headers.clone(),
             spec,
+            provenance: params.provenance.clone(),
         }))
     }
 

@@ -34,6 +34,7 @@ pub fn make_resource_params(
         spec: TestResourceSpec {
             value: name.to_string(),
         },
+        provenance: BaseResourceServiceHarness::make_provenance(),
     }
 }
 
@@ -54,7 +55,14 @@ pub fn make_fresh_aggregate(
     let spec = TestResourceSpec {
         value: name.to_string(),
     };
-    let agg = TestResource::try_create(Utc::now(), id, headers, spec).unwrap();
+    let agg = TestResource::try_create(
+        Utc::now(),
+        id,
+        headers,
+        spec,
+        &BaseResourceServiceHarness::make_provenance(),
+    )
+    .unwrap();
     (id, agg)
 }
 

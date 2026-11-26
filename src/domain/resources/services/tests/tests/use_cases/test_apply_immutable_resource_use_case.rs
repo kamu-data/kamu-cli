@@ -177,6 +177,7 @@ impl ImmutableResourceHarness {
             )
             .into(),
             spec,
+            provenance: BaseResourceServiceHarness::make_provenance(),
         }
     }
 
@@ -239,6 +240,7 @@ impl ImmutableResourceHarness {
                 id: params.id,
                 headers: params.headers.clone(),
                 spec: params.spec.clone(),
+                provenance: BaseResourceServiceHarness::make_provenance(),
             })
             .await
             .unwrap();

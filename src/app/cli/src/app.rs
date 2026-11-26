@@ -252,6 +252,7 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
         let cli_catalog = {
             let mut b = configure_cli_catalog(cli_base_catalog, tenancy_config);
             cli_account_subject.register(&mut b);
+            b.add_value(RequestOrigin::Cli);
             b.build()
         };
 

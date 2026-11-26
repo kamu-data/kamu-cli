@@ -107,6 +107,7 @@ pub fn try_create_resource<R, TCreated, TCreate>(
     id: crate::ResourceID,
     headers: ResourceHeadersInput,
     spec: R::SpecInput,
+    provenance: &crate::CreationProvenance,
     create: TCreate,
 ) -> Result<TCreated, R::LifecycleError>
 where
@@ -123,7 +124,7 @@ where
     headers.validate()?;
     spec.validate()?;
 
-    let event = R::make_created_event(now, id, headers, spec);
+    let event = R::make_created_event(now, id, headers, spec, provenance);
 
     create(id, event).map_err(R::LifecycleError::invariant_violation)
 }

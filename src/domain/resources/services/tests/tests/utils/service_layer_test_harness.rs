@@ -263,6 +263,7 @@ impl ServiceLayerTestHarness {
             spec: TestResourceSpec {
                 value: value.to_string(),
             },
+            provenance: BaseResourceServiceHarness::make_provenance(),
         };
 
         self.apply_test_uc()
@@ -311,6 +312,7 @@ impl ServiceLayerTestHarness {
             spec: TestResourceSpec {
                 value: name.to_string(),
             },
+            provenance: BaseResourceServiceHarness::make_provenance(),
         };
 
         let decision = self.apply_test_uc().apply(params).await.unwrap();

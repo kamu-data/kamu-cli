@@ -52,11 +52,14 @@ pub trait ManagedResource: DeclarativeResource + ResourceStatusRules {
         self.headers().deletion_requested_at.is_some() && self.headers().deleted_at.is_none()
     }
 
+    /// Records `provenance` in the conditions of the `Created` event, next to
+    /// the type's initial conditions
     fn try_create(
         now: DateTime<Utc>,
         id: crate::ResourceID,
         headers: crate::ResourceHeadersInput,
         spec: Self::SpecInput,
+        provenance: &crate::CreationProvenance,
     ) -> Result<Self, Self::LifecycleError>
     where
         Self: Sized;

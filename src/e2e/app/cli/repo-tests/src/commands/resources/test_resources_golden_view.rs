@@ -27,6 +27,7 @@ use crate::resources::{ResourceCtx, fixtures};
 // Volatile fields are stripped from the actual document before comparison:
 //   - headers.id / account / generation / createdAt / updatedAt — per-run / per-context
 //   - status.observedAt / reconciledAt — controller timestamps
+//   - the CreationProvenance condition — names the per-context user
 // Everything else is asserted verbatim against an expected document built from
 // the fixture constants.
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -171,6 +172,12 @@ fn strip_volatile(mut doc: serde_json::Value) -> serde_json::Value {
     if let Some(status) = doc.get_mut("status").and_then(|s| s.as_object_mut()) {
         status.remove("observedAt").unwrap();
         status.remove("reconciledAt").unwrap();
+        status
+            .get_mut("conditions")
+            .and_then(|c| c.as_object_mut())
+            .unwrap()
+            .remove(fixtures::CREATION_PROVENANCE_CONDITION_SCHEMA)
+            .unwrap();
     }
     doc
 }

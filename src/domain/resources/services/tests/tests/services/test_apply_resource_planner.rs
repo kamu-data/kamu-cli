@@ -304,6 +304,7 @@ impl ApplyResourcePlannerHarness {
             spec: TestResourceSpec {
                 value: value.into(),
             },
+            provenance: BaseResourceServiceHarness::make_provenance(),
         }
     }
 
@@ -318,6 +319,7 @@ impl ApplyResourcePlannerHarness {
             spec: TestResourceSpec {
                 value: value.to_string(),
             },
+            provenance: BaseResourceServiceHarness::make_provenance(),
         }
     }
 

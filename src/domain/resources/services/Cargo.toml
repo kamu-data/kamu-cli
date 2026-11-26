@@ -45,6 +45,7 @@ event-sourcing = { workspace = true }
 internal-error = { workspace = true }
 kamu-accounts = { workspace = true }
 kamu-accounts-inmem = { workspace = true, optional = true }
+kamu-core = { workspace = true }
 kamu-messaging-outbox-inmem = { workspace = true, optional = true }
 kamu-resources = { workspace = true }
 kamu-resources-inmem = { workspace = true, optional = true }
@@ -84,6 +85,9 @@ database-common = { workspace = true, features = [
 ] }
 email-utils = { workspace = true }
 event-sourcing = { workspace = true }
+kamu-accounts = { workspace = true, features = [
+    "testing",
+] }
 kamu-accounts-inmem = { workspace = true }
 kamu-messaging-outbox-inmem = { workspace = true }
 kamu-resources = { workspace = true, features = [

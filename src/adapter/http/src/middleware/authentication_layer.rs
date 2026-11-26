@@ -23,6 +23,7 @@ use kamu_accounts::{
     CurrentAccountSubject,
     GetAccountInfoError,
 };
+use kamu_core::{ApiKind, RequestOrigin};
 use tower::{Layer, Service};
 
 use crate::axum_utils::*;
@@ -49,12 +50,27 @@ impl<Svc> Layer<Svc> for AuthenticationLayer {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// The path the servers mount their GraphQL endpoint at
+const GRAPHQL_PATH: &str = "/graphql";
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[derive(Debug, Clone)]
 pub struct AuthenticationMiddleware<Svc> {
     inner: Svc,
 }
 
 impl<Svc> AuthenticationMiddleware<Svc> {
+    /// Every HTTP route is a REST one, except the GraphQL endpoint
+    fn request_origin(path: &str) -> RequestOrigin {
+        let api = if path == GRAPHQL_PATH {
+            ApiKind::GraphQl
+        } else {
+            ApiKind::Rest
+        };
+        RequestOrigin::Api(api)
+    }
+
     async fn current_account_subject(
         base_catalog: &dill::Catalog,
         maybe_access_token: Option<AccessToken>,
@@ -124,6 +140,8 @@ where
     }
 
     fn call(&mut self, mut request: http::Request<Body>) -> Self::Future {
+        let request_origin = Self::request_origin(request.uri().path());
+
         // Inspired by https://github.com/maxcountryman/axum-login/blob/5239b38b2698a3db3f92075b6ad430aea79c215a/axum-login/src/auth.rs
         // TODO: PERF: Is cloning a performance concern?
         let mut inner = self.inner.clone();
@@ -152,6 +170,7 @@ where
 
             let mut derived_catalog_builder = dill::CatalogBuilder::new_chained(base_catalog);
             current_account_subject.register(&mut derived_catalog_builder);
+            derived_catalog_builder.add_value(request_origin);
             if let Some(access_token) = maybe_access_token {
                 derived_catalog_builder.add_value(access_token);
             }
@@ -163,3 +182,27 @@ where
         })
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_request_origin_names_graphql_only_for_its_endpoint() {
+        let api = |path| match AuthenticationMiddleware::<()>::request_origin(path) {
+            RequestOrigin::Api(api) => api,
+            other @ (RequestOrigin::Cli | RequestOrigin::Internal { .. }) => {
+                panic!("unexpected origin {other:?}")
+            }
+        };
+
+        assert_eq!(api("/graphql"), ApiKind::GraphQl);
+        assert_eq!(api("/graphql/"), ApiKind::Rest);
+        assert_eq!(api("/platform/login"), ApiKind::Rest);
+        assert_eq!(api("/kamu/dataset/refs/head"), ApiKind::Rest);
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

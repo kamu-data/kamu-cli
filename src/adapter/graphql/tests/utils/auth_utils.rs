@@ -19,6 +19,7 @@ use kamu_accounts_services::{
 use kamu_adapter_graphql::ANONYMOUS_ACCESS_FORBIDDEN_MESSAGE;
 use kamu_auth_rebac_inmem::InMemoryRebacRepository;
 use kamu_auth_rebac_services::*;
+use kamu_core::{ApiKind, RequestOrigin};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -67,6 +68,7 @@ pub async fn authentication_catalogs_ext(
         .add::<AccountServiceImpl>()
         .add_value(DidSecretEncryptionConfig::sample())
         .add_value(predefined_accounts_config)
+        .add_value(RequestOrigin::Api(ApiKind::GraphQl))
         .build();
 
     let catalog_anonymous = {

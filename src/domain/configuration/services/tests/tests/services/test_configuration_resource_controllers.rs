@@ -137,6 +137,7 @@ impl ControllersHarness {
                 headers: BaseResourceServiceHarness::make_headers_input(self.owner.clone(), name)
                     .into(),
                 spec,
+                provenance: BaseResourceServiceHarness::make_provenance(),
             })
             .await
             .unwrap()
@@ -175,7 +176,13 @@ impl ControllersHarness {
         let id = self.resource_repo().new_resource_id().await.unwrap();
         let headers =
             BaseResourceServiceHarness::make_headers_input(self.owner.clone(), "undecryptable");
-        let event = SecretSetResource::make_created_event(Utc::now(), id, headers, spec);
+        let event = SecretSetResource::make_created_event(
+            Utc::now(),
+            id,
+            headers,
+            spec,
+            &BaseResourceServiceHarness::make_provenance(),
+        );
         let mut resource = SecretSetResource::from_aggregate(Aggregate::new(id, event).unwrap());
 
         let persistence_service: Arc<dyn ResourcePersistenceService<SecretSetResource>> =

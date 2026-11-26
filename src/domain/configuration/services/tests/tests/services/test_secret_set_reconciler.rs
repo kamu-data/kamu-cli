@@ -50,6 +50,7 @@ async fn test_reconcile_secret_set_decrypts_and_reprojects_values() {
             headers: BaseResourceServiceHarness::make_headers_input(account_handle, "test-secrets")
                 .into(),
             spec,
+            provenance: BaseResourceServiceHarness::make_provenance(),
         })
         .await
         .unwrap();

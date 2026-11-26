@@ -98,7 +98,7 @@ pub struct ResourceStatus {                  // ODF-generated; written only by c
     pub observed_at: Option<DateTime<Utc>>,
     pub reconciled_generation: Option<u64>,  // generation the controller last reconciled successfully
     pub reconciled_at: Option<DateTime<Utc>>,
-    pub conditions: ResourceConditions,      // empty for a new resource
+    pub conditions: ResourceConditions,      // a new resource: its provenance and the type's initial ones
 }
 ```
 
@@ -187,13 +187,15 @@ The behaviorally-significant consequences of adopting these shapes:
   `DatasetEntry.owner_id`/`owner_name` before building headers). The use case enforces this
   defensively because the downstream event-sourced projector is pure/sync and cannot resolve
   accounts.
-- **The only built-in condition is ODF `ReconciliationError`**
+- **Two built-in conditions.** Kamu's `CreationProvenance` records the creator of every new
+  resource ([creation provenance](resources-framework.md#creation-provenance)). ODF
+  `ReconciliationError`
   (`https://opendatafabric.org/schemas/resources/v1alpha1/ReconciliationError`, with `code` and
-  `message`). It is present while the latest reconciliation or cleanup of the resource has failed;
-  the phase carries everything else, so Kamu defines no conditions of its own. Codes are
+  `message`) is present while the latest reconciliation or cleanup of the resource has failed;
+  the phase carries everything else. Codes are
   kebab-case: the shared ones are `RECONCILIATION_ERROR_CODE_*` constants, and each resource type
   adds its own through `ResourceReconcileError::code`.
-  New resources have no conditions; only a status update replaces them
+  A new resource starts without it; only a status update sets it
   ([state machine](resources-framework.md#lifecycle-state-machine)). Its DI-registered extension
   dispatcher carries no schema document, since ODF owns the schema; value validation is strict
   serde over the generated ODF proxy (unknown fields are rejected).

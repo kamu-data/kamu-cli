@@ -171,3 +171,4 @@ Each `RF-*` contract scenario is listed with its status. Test code and comments 
 | RF-195 | owner_references.rs | Active | Search by owner narrows the selectors, with any visibility | By id, by name, and by both; `search` and `search_handles` agree, account-scoped |
 | RF-196 | owner_references.rs | Active | The owner to search by is found by id even when gone, by name only when live | Lookup problems and unresolvable forms are typed errors |
 | RF-197 | owner_references.rs | Active | Owners carry the current name of a renamed account | In plan, apply and get |
+| RF-198 | creation_provenance.rs | Active | A created resource records its creator's principal and origin in a `CreationProvenance` condition | Local records `Cli`, remote `Api` (`GraphQl`); an update keeps it |

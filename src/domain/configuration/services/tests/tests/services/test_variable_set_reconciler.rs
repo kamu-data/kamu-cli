@@ -50,6 +50,7 @@ async fn test_reconcile_variable_set_populates_projection_entries() {
             headers: BaseResourceServiceHarness::make_headers_input(account_handle, "test-vars")
                 .into(),
             spec,
+            provenance: BaseResourceServiceHarness::make_provenance(),
         })
         .await
         .unwrap();
@@ -98,6 +99,7 @@ async fn test_reconcile_variable_set_preserves_entry_id_across_reconciliations()
             )
             .into(),
             spec,
+            provenance: BaseResourceServiceHarness::make_provenance(),
         })
         .await
         .unwrap();
@@ -130,6 +132,7 @@ async fn test_reconcile_variable_set_preserves_entry_id_across_reconciliations()
             )
             .into(),
             spec: spec2,
+            provenance: BaseResourceServiceHarness::make_provenance(),
         })
         .await
         .unwrap();

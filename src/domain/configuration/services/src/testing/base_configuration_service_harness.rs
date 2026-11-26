@@ -288,6 +288,7 @@ impl BaseConfigurationServiceHarness {
                 id: None,
                 headers: headers.into(),
                 spec,
+                provenance: BaseResourceServiceHarness::make_provenance(),
             })
             .await
             .unwrap();
@@ -324,6 +325,7 @@ impl BaseConfigurationServiceHarness {
                 id: None,
                 headers: headers.into(),
                 spec,
+                provenance: BaseResourceServiceHarness::make_provenance(),
             })
             .await
             .unwrap();

@@ -11,6 +11,7 @@ pub mod account_scoping;
 pub mod apply_manifest;
 pub mod apply_manifest_batch;
 pub mod batch_ops;
+pub mod creation_provenance;
 pub mod cross_impl;
 pub mod delete;
 pub mod error_taxonomy;

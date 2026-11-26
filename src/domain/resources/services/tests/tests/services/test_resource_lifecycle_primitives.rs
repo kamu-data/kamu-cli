@@ -20,6 +20,7 @@ use kamu_resources::{
     DeclarativeResource,
     MESSAGE_PRODUCER_KAMU_RESOURCE_SERVICE,
     ManagedResource,
+    RESOURCE_CONDITION_CREATION_PROVENANCE_SCHEMA_URI,
     RESOURCE_CONDITION_RECONCILIATION_ERROR_SCHEMA_URI,
     RESOURCE_LABEL_ENVIRONMENT_SCHEMA_URI,
     ResourceAggregateLoader,
@@ -398,6 +399,7 @@ async fn test_writers_patching_different_conditions_keep_both() {
                 condition_key(TEST_PAYLOAD_CONDITION_URI),
                 serde_json::json!({ "step": 1 })
             ),
+            BaseResourceServiceHarness::make_provenance_entry(),
         ]
         .into()
     );
@@ -481,6 +483,22 @@ async fn test_invalid_condition_patch_changes_nothing() {
                 .remove(uri(RESOURCE_CONDITION_RECONCILIATION_ERROR_SCHEMA_URI)),
             ResourceConditionPatchError::FrameworkOwned {
                 key: uri(RESOURCE_CONDITION_RECONCILIATION_ERROR_SCHEMA_URI),
+            },
+        ),
+        (
+            ResourceConditionsPatch::new().set(
+                uri(RESOURCE_CONDITION_CREATION_PROVENANCE_SCHEMA_URI),
+                serde_json::to_value(BaseResourceServiceHarness::make_provenance()).unwrap(),
+            ),
+            ResourceConditionPatchError::FrameworkOwned {
+                key: uri(RESOURCE_CONDITION_CREATION_PROVENANCE_SCHEMA_URI),
+            },
+        ),
+        (
+            ResourceConditionsPatch::new()
+                .remove(uri(RESOURCE_CONDITION_CREATION_PROVENANCE_SCHEMA_URI)),
+            ResourceConditionPatchError::FrameworkOwned {
+                key: uri(RESOURCE_CONDITION_CREATION_PROVENANCE_SCHEMA_URI),
             },
         ),
     ];
@@ -943,6 +961,7 @@ impl LifecyclePrimitivesHarness {
                         spec: TestResourceSpec {
                             value: "updated".to_string(),
                         },
+                        provenance: BaseResourceServiceHarness::make_provenance(),
                     })
                     .await
                     .unwrap()

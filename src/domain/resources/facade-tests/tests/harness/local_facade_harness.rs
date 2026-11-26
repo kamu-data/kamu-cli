@@ -47,8 +47,10 @@ use kamu_configuration_inmem::{
     InMemorySecretSetProjectionRepository,
     InMemoryVariableSetProjectionRepository,
 };
+use kamu_core::RequestOrigin;
 use kamu_datasets::SecretsEncryptionConfig;
 use kamu_resources::{
+    CreationOrigin,
     MESSAGE_PRODUCER_KAMU_RESOURCE_SERVICE,
     ResourceControllerRuntimeConfig,
     ResourceLifecycleMessage,
@@ -72,6 +74,9 @@ use crate::helpers::{VARIABLE_SET_CANONICAL_SELECTOR, sorted_handle_names};
 /// A predefined account with the admin property, outside [`TestAccount`] so
 /// the contract suite's fixture accounts stay non-admin
 const ADMIN_ACCOUNT_NAME: &str = "admin";
+
+/// The producer that [`LocalFacadeHarness::facade_for_node`] applies as
+pub const NODE_TEST_PRODUCER: &str = "dev.kamu.test.NodeFacade";
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -285,6 +290,7 @@ impl LocalFacadeHarness {
         let subject = Self::admin_subject();
         let mut b = dill::CatalogBuilder::new_chained(&self.base_catalog);
         subject.register(&mut b);
+        b.add_value(RequestOrigin::Cli);
         let catalog = b.build();
         Self::facade_in(&catalog)
     }
@@ -293,6 +299,10 @@ impl LocalFacadeHarness {
     pub fn facade_for_node(&self) -> Arc<dyn ResourceFacade> {
         let catalog = dill::CatalogBuilder::new_chained(&self.base_catalog)
             .add_value(Principal::Node)
+            .add_value(RequestOrigin::Internal {
+                producer: NODE_TEST_PRODUCER.to_string(),
+                detail: None,
+            })
             .build();
         Self::facade_in(&catalog)
     }
@@ -343,6 +353,7 @@ impl LocalFacadeHarness {
 
         let mut b = dill::CatalogBuilder::new_chained(&self.base_catalog);
         subject.register(&mut b);
+        b.add_value(RequestOrigin::Cli);
         b.build()
     }
 }
@@ -375,6 +386,10 @@ impl FacadeContractHarness for LocalFacadeHarness {
             .unwrap();
         account.account_name = new_name.clone();
         account_repo.update_account(&account).await.unwrap();
+    }
+
+    fn creation_origin(&self) -> CreationOrigin {
+        CreationOrigin::Cli
     }
 
     async fn settle(&self) {

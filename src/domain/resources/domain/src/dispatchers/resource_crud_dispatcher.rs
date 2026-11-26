@@ -18,6 +18,7 @@ use crate::{
     ApplyResourceHeaders,
     ApplyResourcePrecondition,
     ApplyResourceUseCaseError,
+    CreationProvenance,
     RequestResourcesDeletionError,
     ResourceHeadersValidationError,
     ResourceID,
@@ -66,6 +67,8 @@ pub struct ResourceCrudDispatcherApplyRequest {
     pub id: Option<ResourceID>,
     pub headers: ApplyResourceHeaders,
     pub spec: serde_json::Value,
+    /// Recorded when the apply creates the resource; ignored by an update
+    pub provenance: CreationProvenance,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -61,6 +61,13 @@ the caller is known; that job must not reach the permission layer.
 Register the caller through `CurrentAccountSubject::register`, never with a bare
 `add_value(subject)`, so the two cannot disagree.
 
+Beside the principal, each boundary that serves requests registers the `RequestOrigin` it is
+(`kamu_core`): the HTTP authentication layer `Api(GraphQl)` for the `/graphql` endpoint and `Api(Rest)` for
+any other route, the Flight SQL auth layer `Api(FlightSql)`, and the CLI catalog `Cli`. The
+background catalogs register none: background work that records an origin states its own
+`Internal` one. Resource apply records both as the creator of a resource
+([creation provenance](resources-framework.md#creation-provenance)).
+
 The process catalog (`configure_process_catalog`), between the base catalog and everything else,
 binds the CLI's saved remote-server tokens (`AccessTokenRegistryService`) to the process caller
 without registering a caller. Background pulls from remote nodes therefore authenticate with the

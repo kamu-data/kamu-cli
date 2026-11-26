@@ -91,6 +91,7 @@ async fn test_create_resource_populates_label_projection() {
         TestResourceSpec {
             value: "res-a".to_string(),
         },
+        &BaseResourceServiceHarness::make_provenance(),
     )
     .unwrap();
 

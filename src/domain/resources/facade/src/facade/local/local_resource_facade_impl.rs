@@ -12,8 +12,13 @@ use std::sync::Arc;
 
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu_accounts::Principal;
+use kamu_core::RequestOrigin;
 use kamu_resources::*;
-use kamu_resources_services::{ResourceDispatcherFactory, ResourceExtensionSchemaResolver};
+use kamu_resources_services::{
+    ResourceDispatcherFactory,
+    ResourceExtensionSchemaResolver,
+    request_creation_provenance,
+};
 
 use super::helpers::*;
 use crate::*;
@@ -26,6 +31,7 @@ pub struct LocalResourceFacadeImpl {
     dispatcher_factory: Arc<ResourceDispatcherFactory>,
     resource_account_resolver: Arc<dyn ResourceAccountResolver>,
     principal: Arc<Principal>,
+    request_origin: Arc<RequestOrigin>,
     generic_resource_query_service: Arc<dyn GenericResourceQueryService>,
     resource_extension_schema_resolver: Arc<ResourceExtensionSchemaResolver>,
 }
@@ -298,6 +304,7 @@ impl ResourceFacade for LocalResourceFacadeImpl {
                 id: prepared.id,
                 headers: prepared.header,
                 spec: prepared.spec,
+                provenance: prepared.provenance,
             })
             .await?;
 
@@ -326,6 +333,7 @@ impl ResourceFacade for LocalResourceFacadeImpl {
                 id: prepared.id,
                 headers: prepared.header,
                 spec: prepared.spec,
+                provenance: prepared.provenance,
             })
             .await?;
 
@@ -1270,6 +1278,7 @@ impl LocalResourceFacadeImpl {
         .await?;
 
         Ok(PreparedApplyManifest {
+            provenance: request_creation_provenance(&self.principal, &self.request_origin)?,
             dispatcher,
             id: manifest.headers.id,
             header: headers,
@@ -1335,6 +1344,7 @@ struct PreparedApplyManifest {
     header_warnings: Vec<ResourceWarning>,
     target_account: odf::ResourceOwnerHandle,
     spec: serde_json::Value,
+    provenance: CreationProvenance,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

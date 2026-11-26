@@ -507,6 +507,7 @@ impl ResourceDurableStateValidatorHarness {
             TestResourceSpec {
                 value: name.to_string(),
             },
+            &BaseResourceServiceHarness::make_provenance(),
         )
         .unwrap()
     }

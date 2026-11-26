@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use chrono::{DateTime, Utc};
+use internal_error::InternalError;
 use messaging_outbox::{Outbox, OutboxExt};
 use serde::Serialize;
 use time_source::SystemTimeSource;
@@ -20,6 +21,7 @@ use crate::domain::{
     ApplyResourceRejection,
     ApplyResourceResult,
     ApplyResourceUseCaseError,
+    CreationProvenance,
     DeclarativeResource,
     EventSourcedResource,
     GenericResourceQueryService,
@@ -181,6 +183,10 @@ where
             name: None,
             ..plan.resource.headers().to_input().into()
         };
+        let provenance = CreationProvenance::from_conditions(&plan.resource.status().conditions)?
+            .ok_or_else(|| {
+            InternalError::new("A resource planned for creation has no creation provenance")
+        })?;
 
         self.planner()
             .plan_create_resource(
@@ -188,6 +194,7 @@ where
                     id: None,
                     headers,
                     spec: plan.resource.spec().clone().into_input(),
+                    provenance,
                 },
                 plan.planned_at,
                 OmittedNameHandling::Generate {

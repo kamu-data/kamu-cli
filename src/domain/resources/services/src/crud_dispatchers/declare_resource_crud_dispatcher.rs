@@ -62,6 +62,7 @@ macro_rules! declare_resource_crud_dispatcher {
                         id: request.id,
                         headers: request.headers,
                         spec,
+                        provenance: request.provenance,
                     })
                     .await
                     .map_err(kamu_resources::ApplyResourceCrudDispatcherError::from)?;
@@ -88,6 +89,7 @@ macro_rules! declare_resource_crud_dispatcher {
                             id: request.id,
                             headers: request.headers,
                             spec,
+                            provenance: request.provenance,
                         },
                         precondition,
                     )

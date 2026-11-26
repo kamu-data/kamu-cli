@@ -9,6 +9,7 @@
 
 use std::sync::Arc;
 
+use kamu_resources::CreationOrigin;
 use kamu_resources_facade::ResourceFacade;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -66,6 +67,10 @@ pub trait FacadeContractHarness: Send + Sync {
     /// Writes only record desired state, so a test that reads reconciled
     /// state, or a completed deletion, calls this first.
     async fn settle(&self);
+
+    /// The origin the facades of [`Self::facade_for`] record in the
+    /// provenance of the resources they create
+    fn creation_origin(&self) -> CreationOrigin;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

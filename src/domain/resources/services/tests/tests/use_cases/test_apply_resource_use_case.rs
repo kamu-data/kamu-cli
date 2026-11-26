@@ -395,6 +395,7 @@ fn make_params(
         spec: TestResourceSpec {
             value: value.to_string(),
         },
+        provenance: BaseResourceServiceHarness::make_provenance(),
     }
 }
 
@@ -410,6 +411,7 @@ fn make_nameless_params(
         spec: TestResourceSpec {
             value: value.to_string(),
         },
+        provenance: BaseResourceServiceHarness::make_provenance(),
     }
 }
 

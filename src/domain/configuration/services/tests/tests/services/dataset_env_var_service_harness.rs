@@ -14,6 +14,7 @@ use chrono::Utc;
 use dill::CatalogBuilder;
 use event_sourcing::Aggregate;
 use internal_error::InternalError;
+use kamu_accounts::Principal;
 use kamu_accounts_services::AccountServiceImpl;
 use kamu_configuration::{
     Secret,
@@ -25,6 +26,7 @@ use kamu_configuration::{
 };
 use kamu_configuration_services::DatasetEnvVarMutationAdapterImpl;
 pub use kamu_configuration_services::testing::BaseConfigurationServiceHarness;
+use kamu_core::{ApiKind, RequestOrigin};
 use kamu_datasets::{
     CreateDatasetEnvVarError,
     DatasetEnvVar,
@@ -49,6 +51,7 @@ use kamu_resources::{
     ResourcePersistenceService,
     ResourceSchemaProvider,
 };
+use kamu_resources_services::testing::BaseResourceServiceHarness;
 use secrecy::SecretString;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -69,6 +72,8 @@ impl DatasetEnvVarServiceHarness {
 
         let mut b = CatalogBuilder::new_chained(base.catalog());
         b.add::<AccountServiceImpl>();
+        b.add_value(Principal::Node);
+        b.add_value(RequestOrigin::Api(ApiKind::GraphQl));
 
         let catalog = b.build();
 
@@ -99,6 +104,8 @@ impl DatasetEnvVarServiceHarness {
             self.catalog.get_one().unwrap(),
             self.catalog.get_one().unwrap(),
             Arc::new(racing_spec_resolver),
+            self.catalog.get_one().unwrap(),
+            self.catalog.get_one().unwrap(),
             self.catalog.get_one().unwrap(),
         ))
     }
@@ -221,7 +228,13 @@ impl DatasetEnvVarServiceHarness {
             [],
         );
 
-        let event = R::make_created_event(Utc::now(), id, headers, spec);
+        let event = R::make_created_event(
+            Utc::now(),
+            id,
+            headers,
+            spec,
+            &BaseResourceServiceHarness::make_provenance(),
+        );
         let mut resource = R::from_aggregate(Aggregate::new(id, event).unwrap());
 
         let persistence_service: Arc<dyn ResourcePersistenceService<R>> =

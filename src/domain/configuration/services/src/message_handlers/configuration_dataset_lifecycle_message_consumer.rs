@@ -12,11 +12,13 @@ use std::sync::Arc;
 
 use dill::{Catalog, component, interface, meta};
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
+use kamu_accounts::Principal;
 use kamu_configuration::{
     RESOURCE_LABEL_LEGACY_CONFIG_TARGET_DATASET_SCHEMA_URI,
     SecretSetResource,
     VariableSetResource,
 };
+use kamu_core::RequestOrigin;
 use kamu_datasets::{DatasetLifecycleMessage, MESSAGE_PRODUCER_KAMU_DATASET_SERVICE};
 use kamu_resources::{
     ApplyManifestApplicationDecision,
@@ -33,7 +35,7 @@ use kamu_resources::{
     TypeRef,
     TypeUri,
 };
-use kamu_resources_services::ResourceDispatcherFactory;
+use kamu_resources_services::{ResourceDispatcherFactory, request_creation_provenance};
 use messaging_outbox::{
     InitialConsumerBoundary,
     MessageConsumer,
@@ -183,6 +185,15 @@ impl ConfigurationDatasetLifecycleMessageConsumer {
             RESOURCE_LABEL_LEGACY_CONFIG_TARGET_DATASET_SCHEMA_URI,
         ));
 
+        // Only edits resources that exist, so it is never recorded
+        let provenance = request_creation_provenance(
+            &Principal::Node,
+            &RequestOrigin::Internal {
+                producer: MESSAGE_CONSUMER_KAMU_CONFIGURATION_DATASET_LIFECYCLE_HANDLER.to_string(),
+                detail: Some(dataset_id.to_string()),
+            },
+        )?;
+
         for snapshot in snapshots {
             // Surfaced because this edits a resource on its owner's behalf,
             // triggered by a dataset they may not own.
@@ -205,6 +216,7 @@ impl ConfigurationDatasetLifecycleMessageConsumer {
                     // Verbatim: the dispatcher decodes it back per type, so
                     // both kinds share this path without naming a spec type.
                     spec: snapshot.spec,
+                    provenance: provenance.clone(),
                 })
                 .await
                 .int_err()?;

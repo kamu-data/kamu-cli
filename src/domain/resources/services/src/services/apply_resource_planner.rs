@@ -337,7 +337,13 @@ where
             }
         };
 
-        let resource = match <R as ManagedResource>::try_create(now, id, headers, params.spec) {
+        let resource = match <R as ManagedResource>::try_create(
+            now,
+            id,
+            headers,
+            params.spec,
+            &params.provenance,
+        ) {
             Ok(resource) => resource,
             Err(err) => {
                 return Ok(PlannedApplyResourceDecision::Rejected(

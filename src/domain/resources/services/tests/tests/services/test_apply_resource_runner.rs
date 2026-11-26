@@ -302,6 +302,7 @@ where
             make_id(),
             BaseResourceServiceHarness::make_headers_input(account_handle(), "res-a"),
             spec,
+            &BaseResourceServiceHarness::make_provenance(),
         )
         .unwrap()
     }
@@ -381,6 +382,7 @@ where
                     )
                     .into(),
                     spec,
+                    provenance: BaseResourceServiceHarness::make_provenance(),
                 },
                 precondition,
             )

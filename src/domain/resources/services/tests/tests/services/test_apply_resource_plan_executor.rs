@@ -365,6 +365,7 @@ impl ApplyResourcePlanExecutorHarness {
             spec: TestResourceSpec {
                 value: "nameless".to_string(),
             },
+            provenance: BaseResourceServiceHarness::make_provenance(),
         }
     }
 
@@ -461,6 +462,7 @@ impl ApplyResourcePlanExecutorHarness {
             id: None,
             headers: BaseResourceServiceHarness::make_headers_input(account, name).into(),
             spec,
+            provenance: BaseResourceServiceHarness::make_provenance(),
         };
 
         match self.plan(params).await.unwrap() {

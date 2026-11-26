@@ -13,7 +13,7 @@ use std::sync::Arc;
 use chrono::Utc;
 use crypto_utils::{AesGcmEncryptor, Encryptor};
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
-use kamu_accounts::AccountService;
+use kamu_accounts::{AccountService, Principal};
 use kamu_configuration::{
     RESOURCE_LABEL_LEGACY_CONFIG_TARGET_DATASET_SCHEMA_URI,
     Secret,
@@ -26,6 +26,7 @@ use kamu_configuration::{
     VariableSetSpec,
     VariableSetSpecInput,
 };
+use kamu_core::RequestOrigin;
 use kamu_datasets::{
     CreateDatasetEnvVarError,
     DatasetEntry,
@@ -50,6 +51,7 @@ use kamu_resources::{
     ApplyManifestApplicationDecision,
     ApplyResourceCrudDispatcherError,
     ApplyResourcePrecondition,
+    CreationProvenance,
     GenericResourceQueryService,
     ResourceCrudDispatcher,
     ResourceCrudDispatcherApplyRequest,
@@ -65,7 +67,7 @@ use kamu_resources::{
     ResourceSpecFromInput,
     TypeUri,
 };
-use kamu_resources_services::ResourceDispatcherFactory;
+use kamu_resources_services::{ResourceDispatcherFactory, request_creation_provenance};
 use secrecy::ExposeSecret;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -77,6 +79,8 @@ pub struct DatasetEnvVarMutationAdapterImpl {
     generic_resource_query_service: Arc<dyn GenericResourceQueryService>,
     spec_resolver: Arc<dyn DatasetEnvVarSpecResolver>,
     secrets_encryption_config: Arc<SecretsEncryptionConfig>,
+    principal: Arc<Principal>,
+    request_origin: Arc<RequestOrigin>,
 }
 
 #[dill::component(pub)]
@@ -89,6 +93,8 @@ impl DatasetEnvVarMutationAdapterImpl {
         generic_resource_query_service: Arc<dyn GenericResourceQueryService>,
         spec_resolver: Arc<dyn DatasetEnvVarSpecResolver>,
         secrets_encryption_config: Arc<SecretsEncryptionConfig>,
+        principal: Arc<Principal>,
+        request_origin: Arc<RequestOrigin>,
     ) -> Self {
         Self {
             dispatcher_factory,
@@ -97,6 +103,8 @@ impl DatasetEnvVarMutationAdapterImpl {
             generic_resource_query_service,
             spec_resolver,
             secrets_encryption_config,
+            principal,
+            request_origin,
         }
     }
 }
@@ -199,6 +207,11 @@ impl DatasetEnvVarMutationAdapterImpl {
 
     pub fn legacy_secret_set_resource_name(dataset_id: &odf::DatasetID) -> ResourceName {
         ResourceName::new_unchecked(&format!("legacy-secrets-{}", dataset_id.as_multibase()))
+    }
+
+    /// Variable and secret sets are created on behalf of the caller
+    fn creation_provenance(&self) -> Result<CreationProvenance, InternalError> {
+        request_creation_provenance(&self.principal, &self.request_origin)
     }
 
     fn get_dispatcher(
@@ -360,6 +373,7 @@ impl DatasetEnvVarMutationAdapterImpl {
                 id: existing_id,
                 headers: headers.into(),
                 spec: new_spec,
+                provenance: self.creation_provenance()?,
             },
             precondition,
             "VariableSet",
@@ -464,6 +478,7 @@ impl DatasetEnvVarMutationAdapterImpl {
                 id: existing_id,
                 headers: headers.into(),
                 spec: new_spec,
+                provenance: self.creation_provenance()?,
             },
             precondition,
             "SecretSet",
@@ -531,6 +546,7 @@ impl DatasetEnvVarMutationAdapterImpl {
                     id: Some(resource_id),
                     headers: headers.into(),
                     spec: serde_json::to_value(spec.into_input()).int_err()?,
+                    provenance: self.creation_provenance()?,
                 },
                 precondition,
                 "VariableSet",
@@ -587,6 +603,7 @@ impl DatasetEnvVarMutationAdapterImpl {
                     id: Some(resource_id),
                     headers: headers.into(),
                     spec: serde_json::to_value(new_spec).int_err()?,
+                    provenance: self.creation_provenance()?,
                 },
                 precondition,
                 "SecretSet",
