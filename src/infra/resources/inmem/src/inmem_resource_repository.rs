@@ -16,7 +16,7 @@ use database_common::{InMemoryMapWrite, PaginationOpts, TransactionId, Transacti
 use dill::*;
 use event_sourcing::EventID;
 use futures::StreamExt;
-use internal_error::InternalError;
+use internal_error::{InternalError, ResultIntoInternal};
 use kamu_accounts::AccountRepository;
 use kamu_resources::{
     CreateResourceError,
@@ -32,6 +32,7 @@ use kamu_resources::{
     ResourcePurgeDeadline,
     ResourceQuery,
     ResourceRawEventQuery,
+    ResourceRemovalListener,
     ResourceRepository,
     ResourceScope,
     ResourceSnapshot,
@@ -54,6 +55,9 @@ use crate::inmem_resource_state::{ResourceLookupKey, ResourceStateView};
 
 pub struct InMemoryResourceRepository {
     state: Arc<InMemoryResourceState>,
+    // The in-memory projections register as listeners in place of the cascade
+    // of the SQL backends
+    removal_listeners: Vec<Arc<dyn ResourceRemovalListener>>,
     transaction_id: Option<TransactionId>,
     // Resolved lazily per call rather than injected: `AccountRepository` may
     // be a transaction-scoped component (whenever it is paired with a
@@ -68,11 +72,13 @@ pub struct InMemoryResourceRepository {
 impl InMemoryResourceRepository {
     pub fn new(
         state: Arc<InMemoryResourceState>,
+        removal_listeners: Vec<Arc<dyn ResourceRemovalListener>>,
         transaction_ref: Option<TransactionRef>,
         catalog: CatalogWeakRef,
     ) -> Self {
         Self {
             state,
+            removal_listeners,
             transaction_id: transaction_ref.map(|transaction_ref| transaction_ref.id()),
             catalog,
         }
@@ -666,6 +672,64 @@ impl ResourceRepository for InMemoryResourceRepository {
         due.sort_by_key(|resource| (resource.purge_at, *resource.id.as_ref()));
         due.truncate(limit);
         Ok(due)
+    }
+
+    async fn count_resources_due_for_purge(
+        &self,
+        now: DateTime<Utc>,
+    ) -> Result<u64, InternalError> {
+        let count = self.state.read(self.transaction_id, |view| {
+            view.purge_deadlines()
+                .into_iter()
+                .filter(|(_, purge_at)| *purge_at <= now)
+                .count()
+        });
+        u64::try_from(count).int_err()
+    }
+
+    /// Claims by deleting the deadlines: a concurrent claim of the same
+    /// resources fails at commit, on the deleted keys
+    async fn claim_resources_for_purge(
+        &self,
+        ids: &[ResourceID],
+        now: DateTime<Utc>,
+    ) -> Result<Vec<ResourceID>, InternalError> {
+        let claimed_ids: Vec<ResourceID> = self.state.read(self.transaction_id, |view| {
+            view.purge_deadlines()
+                .into_iter()
+                .filter(|(snapshot, purge_at)| *purge_at <= now && ids.contains(&snapshot.id))
+                .map(|(snapshot, _)| snapshot.id)
+                .collect()
+        });
+
+        self.state
+            .write_purge_deadlines(self.transaction_id, |purge_deadlines_by_id| {
+                for id in &claimed_ids {
+                    purge_deadlines_by_id.delete(*id);
+                }
+            });
+        Ok(claimed_ids)
+    }
+
+    async fn purge_resources(&self, ids: &[ResourceID]) -> Result<(), InternalError> {
+        for listener in &self.removal_listeners {
+            listener.on_resources_removed(ids).await?;
+        }
+
+        self.state
+            .write(self.transaction_id, |snapshots_by_id, ids_by_lookup_key| {
+                for id in ids {
+                    if let Some(snapshot) = snapshots_by_id.view().get(id).cloned() {
+                        let lookup_key = ResourceLookupKey::of(&snapshot);
+                        if ids_by_lookup_key.view().get(&lookup_key) == Some(id) {
+                            ids_by_lookup_key.delete(lookup_key);
+                        }
+                        snapshots_by_id.delete(*id);
+                    }
+                }
+            });
+
+        Ok(())
     }
 
     async fn find_nearest_purge_at(

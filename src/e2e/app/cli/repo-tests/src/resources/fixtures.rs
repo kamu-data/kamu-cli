@@ -44,6 +44,18 @@ pub const SECRETS_ENCRYPTION_KAMU_CONFIG: &str = indoc::indoc!(
     "#
 );
 
+/// Deleted resources are kept for a day
+pub const RETENTION_ONE_DAY_KAMU_CONFIG: &str = indoc::indoc!(
+    r#"
+    kind: CLIConfig
+    version: 1
+    content:
+      resources:
+        retention:
+          default: 1d
+    "#
+);
+
 /// [`SECRETS_ENCRYPTION_KAMU_CONFIG`] for an API server whose flows, including
 /// reactive downstream ones, finish within seconds
 pub const SECRETS_ENCRYPTION_WITH_FAST_FLOW_SYSTEM_KAMU_CONFIG: &str = indoc::indoc!(

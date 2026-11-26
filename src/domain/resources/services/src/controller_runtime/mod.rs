@@ -7,7 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-mod background_work_finalizer;
 mod resource_controller_candidate;
 mod resource_controller_drain_gate;
 mod resource_controller_drain_hold_back;
@@ -25,7 +24,6 @@ mod resource_controller_wait;
 mod resource_process_attempt;
 mod resource_process_executor;
 
-pub use background_work_finalizer::*;
 pub(crate) use resource_controller_candidate::*;
 pub(crate) use resource_controller_drain_gate::*;
 pub(crate) use resource_controller_drain_hold_back::*;

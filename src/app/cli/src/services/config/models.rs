@@ -903,6 +903,11 @@ pub struct BackgroundAgentsConfig {
     #[config(default)]
     pub resource_controllers: BackgroundAgentsResourceControllersConfig,
 
+    /// Periodic jobs removing data nobody needs any more. Each runs as an agent
+    /// of its own in the API server, and one batch after each CLI command
+    #[config(default)]
+    pub housekeeping: BackgroundAgentsHousekeepingConfig,
+
     /// Delay before an agent that failed, panicked or returned early is
     /// restarted, growing with consecutive restarts. A run that lasted at
     /// least `maxDelay` resets the count
@@ -963,6 +968,58 @@ pub struct BackgroundAgentsResourceControllersConfig {
     /// with consecutive failures
     #[config(default)]
     pub loop_restart_backoff: RestartBackoffConfig,
+}
+
+#[derive(setty::Config, setty::Default)]
+pub struct BackgroundAgentsHousekeepingConfig {
+    /// Purge of deleted resources whose retention (`resources.retention`)
+    /// ended
+    #[config(default)]
+    pub resource_retention: HousekeepingJobConfig,
+}
+
+impl BackgroundAgentsHousekeepingConfig {
+    pub fn into_system(&self) -> background_agent_host::HousekeepingConfig {
+        background_agent_host::HousekeepingConfig {
+            jobs: BTreeMap::from([(
+                kamu_resources_services::RESOURCE_RETENTION_JOB_NAME.to_string(),
+                self.resource_retention.into_system(),
+            )]),
+        }
+    }
+}
+
+/// How a housekeeping job runs
+#[derive(setty::Config, setty::Default)]
+pub struct HousekeepingJobConfig {
+    /// Whether the job runs
+    #[config(default = true)]
+    pub enabled: bool,
+
+    /// Items removed per transaction. 0 is treated as 1
+    #[config(default = 100)]
+    pub batch_size: usize,
+
+    /// The longest pause between two passes of the job. A job with deadlines
+    /// of its own wakes up at the nearest one, so this bounds how late it
+    /// notices an earlier deadline
+    #[config(default_str = "5m")]
+    pub interval: DurationString,
+
+    /// The pause between two batches while a backlog remains
+    #[config(default_str = "100ms")]
+    pub pause_between_batches: DurationString,
+}
+
+impl HousekeepingJobConfig {
+    pub fn into_system(&self) -> background_agent_host::HousekeepingJobConfig {
+        background_agent_host::HousekeepingJobConfig {
+            enabled: self.enabled,
+            batch_size: self.batch_size.max(1),
+            interval: self.interval.into(),
+            pause_between_batches: self.pause_between_batches.into(),
+        }
+    }
 }
 
 // The two backoffs are separate types only for their defaults: a partial

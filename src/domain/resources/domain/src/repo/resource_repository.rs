@@ -223,6 +223,28 @@ pub trait ResourceRepository: Send + Sync {
         limit: usize,
     ) -> Result<Vec<ResourceDueForPurge>, InternalError>;
 
+    /// Counts the resources whose purge deadline is not after `now`.
+    async fn count_resources_due_for_purge(&self, now: DateTime<Utc>)
+    -> Result<u64, InternalError>;
+
+    /// Claims the given resources whose purge deadline is not after `now` for
+    /// a purge, and returns the IDs it claimed: a compare-and-set that clears
+    /// the deadline, so a concurrent purger of the same resources claims none
+    /// of them.
+    async fn claim_resources_for_purge(
+        &self,
+        ids: &[ResourceID],
+        now: DateTime<Utc>,
+    ) -> Result<Vec<ResourceID>, InternalError>;
+
+    /// Deletes the snapshot rows of resources claimed for a purge, with what
+    /// the storage removes along with them by cascade (labels, owners,
+    /// configuration projections), after every registered
+    /// [`crate::ResourceRemovalListener`] removed what it keeps of them. The
+    /// events and the controller bookkeeping of the resources are removed
+    /// first, by their own repositories.
+    async fn purge_resources(&self, ids: &[ResourceID]) -> Result<(), InternalError>;
+
     /// Returns the earliest purge deadline after `now`.
     async fn find_nearest_purge_at(
         &self,

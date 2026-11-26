@@ -146,7 +146,7 @@ database_transactional_test!(
 
 database_transactional_test!(
     storage = postgres,
-    fixture = controller_state_repo_suite::test_delete_states_for_resource,
+    fixture = controller_state_repo_suite::test_delete_states_for_resources,
     harness = PostgresResourceControllerStateRepositoryHarness
 );
 

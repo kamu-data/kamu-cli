@@ -27,6 +27,7 @@ interface "ApplyResourceUseCase" <<i>>
 interface "AuthenticationProvider" <<i>>
 interface "AuthenticationService" <<i>>
 interface "BackgroundAgent" <<i>>
+interface "BackgroundWorkDrain" <<i>>
 interface "CommitDatasetEventUseCase" <<i>>
 interface "CompactionExecutor" <<i>>
 interface "CompactionJob" <<i>>
@@ -93,6 +94,7 @@ interface "GenericResourceQueryService" <<i>>
 interface "GetDatasetDownstreamDependenciesUseCase" <<i>>
 interface "GetDatasetSchemaUseCase" <<i>>
 interface "GetDatasetUpstreamDependenciesUseCase" <<i>>
+interface "HousekeepingJob" <<i>>
 interface "InitOnStartup" <<i>>
 interface "IpfsService" <<i>>
 interface "JwtTokenIssuer" <<i>>
@@ -316,6 +318,8 @@ class "GetDatasetSchemaUseCaseImpl"
 class "GetDatasetUpstreamDependenciesUseCaseImpl"
 class "GithubAuthenticationConfig" <<singleton>>
 class "GqlConfig" <<singleton>>
+class "HousekeepingConfig" <<singleton>>
+class "HousekeepingMetrics" <<singleton>>
 class "HttpSourceConfig" <<singleton>>
 class "IdentityConfig" <<singleton>>
 class "IngestEnvVarsResolver"
@@ -418,6 +422,7 @@ class "ResourceManifestDiscoveryServiceImpl"
 class "ResourceManifestExecutionServiceImpl"
 class "ResourceNameSuffixGeneratorImpl"
 class "ResourceRetentionConfig" <<singleton>>
+class "ResourceRetentionJob" <<singleton>>
 class "ResourceSelectionResolutionServiceImpl"
 class "ResourceSelectionSyntaxServiceImpl"
 class "ResourceSelectorResolutionServiceImpl"
@@ -548,9 +553,13 @@ class "WorkspaceService"
 class "WsSmartTransferProtocolClient"
 "BackgroundAgentHost"  --> "BackgroundAgentHostConfig"
 "BackgroundAgentHost"  --> "BackgroundAgentHostMetrics"
+"BackgroundAgentHost"  --> "HousekeepingConfig"
+"BackgroundAgentHost"  --> "HousekeepingMetrics"
 "BackgroundAgentHost" "*" --> "BackgroundAgent"
+"BackgroundAgentHost" "*" --> "HousekeepingJob"
 "BackgroundAgentHost"  --> "SystemTimeSource"
 "MetricsProvider" <|-- "BackgroundAgentHostMetrics"
+"MetricsProvider" <|-- "HousekeepingMetrics"
 "ContainerRuntime"  --> "ContainerRuntimeConfig"
 "DatabasePasswordProvider" <|-- "DatabaseNoPasswordProvider"
 "DatabaseTransactionRunner"  --> "Catalog"
@@ -1285,6 +1294,7 @@ class "WsSmartTransferProtocolClient"
 "ResourceControllerHints" <|-- "ResourceControllerHintHub"
 "ResourceControllerHintHub"  --> "WakeupListenerMetrics"
 "BackgroundAgent" <|-- "ResourceControllerRuntimeImpl"
+"BackgroundWorkDrain" <|-- "ResourceControllerRuntimeImpl"
 "ResourceControllerRuntime" <|-- "ResourceControllerRuntimeImpl"
 "ResourceControllerRuntimeImpl"  --> "CatalogWeakRef"
 "ResourceControllerRuntimeImpl"  --> "ResourceControllerHints"
@@ -1306,6 +1316,8 @@ class "WsSmartTransferProtocolClient"
 "ResourceExtensionSchemaDispatcher" <|-- "LabelEnvironmentDispatcher"
 "ResourceExtensionSchemaResolver"  --> "ResourceExtensionSchemaRegistry"
 "ResourceExtensionSchemaRegistry"  --> "Catalog"
+"HousekeepingJob" <|-- "ResourceRetentionJob"
+"ResourceRetentionJob"  --> "CatalogWeakRef"
 "DefaultResourceOperationGuard"  --> "ResourceAccountAccessPort"
 "GenericResourceQueryService" <|-- "GenericResourceQueryServiceImpl"
 "GenericResourceQueryServiceImpl"  --> "ResourceRepository"
@@ -1323,6 +1335,7 @@ class "WsSmartTransferProtocolClient"
 "SqliteResourceRawEventStore"  --> "TransactionRefT"
 "ResourceRepository" <|-- "SqliteResourceRepository"
 "SqliteResourceRepository"  --> "TransactionRefT"
+"SqliteResourceRepository" "*" --> "ResourceRemovalListener"
 "EmbeddingsCacheRepository" <|-- "SqliteEmbeddingsCacheRepository"
 "SqliteEmbeddingsCacheRepository"  --> "TransactionRefT"
 "EmbeddingsEncoder" <|-- "DummyEmbeddingsEncoder"
@@ -1403,6 +1416,7 @@ class "WsSmartTransferProtocolClient"
 "WebhookWatermarkRepository" <|-- "SqliteWebhookWatermarkRepository"
 "SqliteWebhookWatermarkRepository"  --> "TransactionRefT"
 "BackgroundAgent" <|-- "OutboxAgentImpl"
+"BackgroundWorkDrain" <|-- "OutboxAgentImpl"
 "InitOnStartup" <|-- "OutboxAgentImpl"
 "OutboxAgent" <|-- "OutboxAgentImpl"
 "OutboxAgentImpl"  --> "CatalogWeakRef"

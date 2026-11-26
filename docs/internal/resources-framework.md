@@ -71,6 +71,7 @@ make clippy
     - [5a. Resource anatomy — input vs auto-generated](#5a-resource-anatomy--input-vs-auto-generated)
   - [6. Persistence model](#6-persistence-model)
     - [Retention](#retention)
+    - [Purge](#purge)
   - [7. Account resolution \& authorization](#7-account-resolution--authorization)
   - [8. Rename \& conflict rules](#8-rename--conflict-rules)
     - [Generated names](#generated-names)
@@ -687,10 +688,57 @@ when the deletion completes, so a resource still being deleted has none.
   `RetainForever`, with `ResourceRepository::set_purge_deadlines` in its transaction. The deadline
   is a column of `resources` that no event records and the snapshot update leaves alone, so it is
   never recomputed: a policy change applies to later deletions only.
-- **Queries:** `find_resources_due_for_purge(now, limit)`, earliest deadline first, and
-  `find_nearest_purge_at(now)` span every account and type, on a partial index of `purge_at`.
+- **Queries:** `find_resources_due_for_purge(now, limit)`, earliest deadline first,
+  `count_resources_due_for_purge(now)` and `find_nearest_purge_at(now)` span every account and
+  type, on a partial index of `purge_at`.
 - **Earlier deletions:** the migration adding `purge_at` gave resources already deleted 7 days
   from their deletion. A migration cannot read the node's configuration.
+
+### Purge
+
+`ResourceRetentionJob`, a [housekeeping job](housekeeping.md), removes a deleted resource once its
+`purge_at` has passed: on the API server as an agent of its own, after a CLI command one batch at a
+time. It never runs controller logic. Each batch is one transaction:
+
+1. Find at most `batchSize` due resources (`find_resources_due_for_purge`).
+2. Claim them: `claim_resources_for_purge(ids, now)` clears `purge_at` where it is still set and
+   not after `now`, a compare-and-set in the `UPDATE`'s own `WHERE`. Of two purgers that
+   found the same resources, the second waits for the first's rows and claims none of them, so
+   each resource is purged once. The in-memory repository fails the second commit instead.
+3. Delete the claimed resources' controller bookkeeping (`delete_states_for_resources`) and
+   their events (`delete_events_of_resources`).
+4. Delete their rows (`purge_resources`). The repository first calls every registered
+   `ResourceRemovalListener` with the IDs, then deletes the rows, which take their labels, owners
+   and configuration projections with them by cascade.
+5. Post one `Purged` lifecycle message per type of the batch, and report the removed counts by
+   type and the backlog still due.
+
+A failed batch rolls back whole, so a crash loses nothing and the next batch purges the same
+resources. The purge never touches the outbox: messages already posted about a resource, such as a
+`StatusUpdated` carrying a task's outcome, are delivered after it is purged, so no consumer
+needs to read a resource to learn how it ended.
+
+**Purge contract.** Every table keyed by a resource ID (a column named `resource_id` or ending in
+`_resource_id`) has a foreign key to `resources` with `ON DELETE CASCADE`, or is declared in
+`RESOURCE_KEYED_TABLES_WITHOUT_CASCADE` with how its rows go:
+
+| How | Tables |
+| --- | --- |
+| By the purge itself | `resource_events`, `resource_controller_state` |
+| By a registered `ResourceRemovalListener` | none yet |
+| By a consumer of `Purged` | none yet |
+| They outlive the resource, with the reason | `accounts`, `dataset_entries`: the permanent resource IDs of accounts and datasets, which are not stored as resources |
+
+The contract test reads the migrated schema of each database (`test_*_resource_purge_contract.rs`)
+and fails for a resource-keyed table that is neither, and for a declaration that matches no such
+table.
+
+**Removal listeners** follow `DatasetEntryRemovalListener` of the datasets context: the repository
+takes every `dyn ResourceRemovalListener` registered in its catalog. A database-backed repository
+registers as one only for a table without a cascade, and declares it above. The in-memory
+repositories of what cascades in SQL (the labels and owners projections, the configuration
+projections) register as listeners in every in-memory catalog, so that tests on the in-memory
+stack see purged resources gone everywhere.
 
 ### Controller bookkeeping
 
@@ -699,8 +747,8 @@ when the deletion completes, so a resource still being deleted has none.
   `resources`. A row records the generation and status generation the controller finished with,
   or, with `not_before` set, a retry or a failure, with `attempts` and `last_error`.
 - Rows are not event-sourced: an upsert replaces the row. The FK means a resource's rows must be
-  removed (`delete_states_for_resource`) before the resource itself. Nothing removes a deleted
-  resource, so its rows stay too; every query leaves them out.
+  removed (`delete_states_for_resources`) before the resource itself, which the
+  [purge](#purge) does. Until then a deleted resource's rows stay; every query leaves them out.
 - Postgres stores `last_error` with NUL characters replaced by U+FFFD, since a TEXT column
   rejects them and the failed write would fail every later drain.
 - **A change clears the rows.** Saving a new generation or a deletion request removes the
@@ -1194,7 +1242,8 @@ call, which hints its own loop. The
 sleep uses `SystemTimeSource`, so tests drive it with `FakeSystemTimeSource`.
 
 **Hints.** The lifecycle message consumer hints the schema's loop on every `Applied`,
-`DeletionRequested` and `StatusUpdated`, through `ResourceControllerHints`. The hint carries no
+`DeletionRequested` and `StatusUpdated`, through `ResourceControllerHints`; `Deleted` and `Purged`
+leave nothing to do. The hint carries no
 data: the loop re-reads storage, so a missed hint costs only latency, up to the fallback timeout.
 The hub is in-process on every backend
 ([wakeup-listeners.md](wakeup-listeners.md#3-inventory)).
@@ -1203,9 +1252,9 @@ The hub is in-process on every backend
 (`new_drain_session()`), whose `drain_due_resources()` drains every controller once and does not
 wait for deadlines: a resource waiting for time stays for a later drain. The CLI, after a command,
 the e2e API server, after a mutating request, and the test harnesses, after a write, alternate
-it with the outbox until a drain is idle
-([`BackgroundWorkFinalizer`](/src/domain/resources/services/src/controller_runtime/background_work_finalizer.rs)): a message may
-make a resource actionable, and processing posts messages of its own. A session keeps what its drains held back until it ends, so
+it with the outbox until a pass finds both idle: the runtime is a `BackgroundWorkDrain` of the
+[`BackgroundWorkFinalizer`](background-agents.md#finalizing-background-work-without-agents). A
+message may make a resource actionable, and processing posts messages of its own. A session keeps what its drains held back until it ends, so
 that alternation ends too, even with a controller that never settles a resource. A session's
 drains and the agent's never overlap for one controller (`ResourceControllerDrainGate`), which
 also counts every drain's `process` calls. A session's drain is idle only when no drain of the
@@ -1982,6 +2031,7 @@ flowchart LR
     DEL["request_deletion.rs"] -->|DeletionRequested| MSG
     COMP["resource controllers"] -->|Deleted| MSG
     PRIM["lifecycle primitives:<br/>every status write"] -->|StatusUpdated| MSG
+    PURGE["ResourceRetentionJob"] -->|Purged| MSG
 
     MSG --> OB[("Outbox")]
 
@@ -1999,7 +2049,8 @@ flowchart LR
 - **Resource lifecycle** — `Applied` (from `use_cases/apply.rs`), `DeletionRequested`
   (`use_cases/request_deletion.rs`), `Deleted` (a controller completing a deletion), and
   `StatusUpdated` for every status write of a [lifecycle primitive](#lifecycle-primitives): a
-  reconciliation started, succeeded or failed, a cleanup failed, or a condition patch. Consumed by
+  reconciliation started, succeeded or failed, a cleanup failed, or a condition patch, and `Purged`
+  once deleted resources are [purged](#purge) (their IDs, one message per type). Consumed by
   the **event bridge**, which hints the [controller runtime](#controller-runtime), and by the
   configuration crate's
   projection-maintenance consumer. See
@@ -2454,6 +2505,15 @@ the agent and move the clock, asserting call counts rather than timing. The elig
 and `count_failing_resources` have a storage-agnostic suite in `kamu-resources-repo-tests`, wired
 to all three storages.
 
+**Retention and purge** —
+[`services/tests/tests/services/test_resource_retention.rs`](/src/domain/resources/services/tests/tests/services/test_resource_retention.rs)
+checks the deadlines and runs `ResourceRetentionJob` batches on the in-memory stack: what is due
+goes, what is not stays, batches are bounded, a failed batch leaves everything for the next,
+concurrent batches purge each resource once, and the outbox keeps its messages. The purge queries
+have shared repository tests, a Postgres race test of the claim, and the
+[purge contract](#purge) tests read each migrated schema. The e2e scenario
+`test_resources_purged_after_retention` checks the purge after CLI commands.
+
 **Facade contract tests** —
 [`src/domain/resources/facade-tests`](/src/domain/resources/facade-tests). The key idea: a
 `contract_test!` macro runs **each** case against **both** a `LocalFacadeHarness` and a
@@ -2510,9 +2570,9 @@ Otherwise the behavior is already guaranteed for both implementations by the con
 
 | Layer | Crate | Directory | Key files |
 | --- | --- | --- | --- |
-| Domain model | `kamu-resources` | `src/domain/resources/domain/src` | `core/`, `state/`, `values/`, `manifests/`, `repo/`, `dispatchers/`, `messages/`, `use_cases/`, `views/` |
+| Domain model | `kamu-resources` | `src/domain/resources/domain/src` | `core/`, `state/`, `values/`, `manifests/`, `repo/`, `retention/`, `dispatchers/`, `messages/`, `use_cases/`, `views/` |
 | Domain schemas | `kamu-resources` | `src/domain/resources/schemas` | Informational JSON schemas for framework-owned resource extensions: built-in labels and annotations. ODF-defined extensions, such as the `ReconciliationError` condition, have none here. |
-| Services | `kamu-resources-services` | `src/domain/resources/services/src` | `use_cases/{apply,request_deletion}.rs`, `controllers/`, `controller_runtime/`, `crud_dispatchers/resource_dispatcher_factory.rs`, `resource_extension_schemas/`, `message_handlers/`, `event_stores/`, `dependencies.rs` |
+| Services | `kamu-resources-services` | `src/domain/resources/services/src` | `use_cases/{apply,request_deletion}.rs`, `controllers/`, `controller_runtime/`, `crud_dispatchers/resource_dispatcher_factory.rs`, `resource_extension_schemas/`, `message_handlers/`, `event_stores/`, `retention/resource_retention_job.rs`, `dependencies.rs` |
 | Facade | `kamu-resources-facade` | `src/domain/resources/facade/src/facade` | `resource_facade.rs`, `local/` |
 | Remote facade | `kamu-adapter-resources-facade-graphql` | `src/adapter/resources-facade-graphql/src` | `remote_graphql_resource_facade_impl.rs`, `cynic_api/`, `outcome_mapper/` |
 | GraphQL | (adapter) | `src/adapter/graphql/src` | `queries/resources/`, `mutations/resources_mut/` |

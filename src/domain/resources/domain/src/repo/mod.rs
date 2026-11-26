@@ -16,6 +16,7 @@ mod resource_purge_deadline;
 mod resource_raw_event;
 mod resource_raw_event_query;
 mod resource_raw_event_store;
+mod resource_removal_listener;
 mod resource_repository;
 
 pub use actionable_resources_query::*;
@@ -27,4 +28,5 @@ pub use resource_purge_deadline::*;
 pub use resource_raw_event::*;
 pub use resource_raw_event_query::*;
 pub use resource_raw_event_store::*;
+pub use resource_removal_listener::*;
 pub use resource_repository::*;

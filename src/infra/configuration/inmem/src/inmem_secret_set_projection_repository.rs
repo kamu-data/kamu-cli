@@ -17,6 +17,7 @@ use kamu_configuration::{
     SecretSetEntry,
     SecretSetProjectionRepository,
 };
+use kamu_resources::ResourceRemovalListener;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -26,6 +27,7 @@ pub struct InMemorySecretSetProjectionRepository {
 
 #[component(pub)]
 #[interface(dyn SecretSetProjectionRepository)]
+#[interface(dyn ResourceRemovalListener)]
 #[scope(Singleton)]
 impl InMemorySecretSetProjectionRepository {
     pub fn new() -> Self {
@@ -152,6 +154,19 @@ impl SecretSetProjectionRepository for InMemorySecretSetProjectionRepository {
             .entries_by_resource_id_generation
             .retain(|(stored_resource_id, _), _| !resource_ids.contains(stored_resource_id));
         Ok(())
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Drops the entries of purged resources, as the cascade of the SQL backends does
+#[async_trait::async_trait]
+impl ResourceRemovalListener for InMemorySecretSetProjectionRepository {
+    async fn on_resources_removed(
+        &self,
+        ids: &[kamu_resources::ResourceID],
+    ) -> Result<(), InternalError> {
+        self.delete_all_entries(ids).await
     }
 }
 

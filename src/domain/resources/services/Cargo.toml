@@ -38,6 +38,7 @@ chrono = { version = "0.4", default-features = false, features = [
     "clock",
 ] }
 database-common = { workspace = true }
+database-common-macros = { workspace = true }
 dill = { version = "0.17", default-features = false }
 email-utils = { workspace = true }
 enum-variants = { workspace = true }
@@ -85,6 +86,7 @@ database-common = { workspace = true, features = [
 ] }
 email-utils = { workspace = true }
 event-sourcing = { workspace = true }
+futures = "0.3"
 kamu-accounts = { workspace = true, features = [
     "testing",
 ] }

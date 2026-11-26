@@ -30,6 +30,7 @@ e2e = [
 
 
 [dependencies]
+background-agent-host = { workspace = true }
 common-macros = { workspace = true }
 database-common = { workspace = true }
 database-common-macros = { workspace = true }
@@ -45,7 +46,6 @@ kamu-core = { workspace = true, features = [
     "utoipa",
 ] }
 kamu-datasets = { workspace = true }
-kamu-resources-services = { workspace = true }
 kamu-signing = { workspace = true, default-features = false, features = [
     "utoipa",
 ] }

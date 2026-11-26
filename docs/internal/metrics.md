@@ -78,6 +78,18 @@ Recorded by `BackgroundAgentHost` for every agent it runs, with the same `agent`
 wakeup listener metrics; label sets are pre-created at startup. How restarts work is in
 [background-agents.md](background-agents.md#3-supervision).
 
+### Housekeeping jobs
+
+| Metric | Type | Labels | Meaning |
+| --- | --- | --- | --- |
+| `housekeeping_items_removed_total` | counter | `job`, `kind` | Items the job removed, by a kind the job defines: the resource type for `dev.kamu.domain.resources.ResourceRetentionJob` |
+| `housekeeping_backlog` | gauge | `job` | Items still due after the job's last batch |
+| `housekeeping_last_pass_timestamp_seconds` | gauge | `job` | Unix time when the job's agent last finished a pass, leaving no backlog; `0` until it does |
+
+Recorded by `HousekeepingAgent` for every enabled job, with `job` its `job_name()`, which is also
+the agent name of the host's metrics; a CLI command's batch records the first two. The agents have
+no wakeup listener: the last pass is their heartbeat ([housekeeping.md](housekeeping.md#3-the-agent)).
+
 ### Task agent
 
 | Metric | Type | Labels | Meaning |
@@ -256,6 +268,7 @@ Thresholds are starting points; tune them to the deployment (longest normal inge
 | Outbox backlog growing | `outbox_messages_pending_total > 1000`, `for: 15m` | Consumers fall behind producers. Units are global message IDs, not messages of this producer: tune per deployment |
 | Resource controller failing | `resource_controller_failing_resources > 0`, `for: 15m` | Resources the controller keeps failing on stay unreconciled; their `last_error` is in the controller's bookkeeping. `for` rides over failures a retry fixes |
 | Agent restarting | `increase(background_agent_restarts_total[15m]) > 0` | The agent failed, panicked or returned and was restarted; its logs say why. `reason="completed"` is a bug in the agent |
+| Housekeeping falling behind | `time() - housekeeping_last_pass_timestamp_seconds > 3 * <interval>`, `for: 15m` | The job has not emptied its backlog for several intervals: it removes less than falls due, or its batches fail (see "Agent restarting"). `housekeeping_backlog` shows how far behind |
 | Resource controller loop restarting | `increase(resource_controller_loop_restarts_total[15m]) > 0` | The runtime's own work fails for that controller, usually storage; it restarts with a growing delay, so its resources wait |
 
 ### Dashboards only
@@ -268,6 +281,8 @@ Thresholds are starting points; tune them to the deployment (longest normal inge
   `1 - sum by (flow_type) (increase(flow_system_flow_retries_bucket{le="0", outcome="success"}[1d])) / sum by (flow_type) (increase(flow_system_flow_retries_count{outcome="success"}[1d]))`.
 - Successful flow duration p95 by `flow_type` against `offset 1d` — end-to-end regressions.
 - `increase(flow_system_flows_aborted_total[1h])` — abort spikes, e.g. mass trigger removals.
+- `sum by (job, kind) (increase(housekeeping_items_removed_total[1d]))` and `housekeeping_backlog` —
+  what housekeeping removes, and whether it keeps up.
 
 ---
 
@@ -316,6 +331,7 @@ for durations, `_timestamp_seconds` for Unix times. The gauges `outbox_messages_
 | `MetricsProvider`, `register_all`, `/system/metrics` handler | `src/utils/observability/src/metrics.rs` |
 | `WakeupListenerMetrics` | `src/utils/wakeup-listener/src/wakeup_listener_metrics.rs` (recorded in `hub_wakeup_listener.rs`) |
 | `BackgroundAgentHostMetrics` | `src/utils/background-agent-host/src/background_agent_host_metrics.rs` (recorded in `background_agent_supervisor.rs`) |
+| `HousekeepingMetrics` | `src/utils/background-agent-host/src/housekeeping/housekeeping_metrics.rs` (recorded in `housekeeping_agent.rs`) |
 | `TaskAgentMetrics` | `src/domain/task-system/services/src/task_agent_metrics.rs` |
 | `FlowAgentMetrics` | `src/domain/flow-system/services/src/flow/flow_agent_metrics.rs` |
 | `FlowCompletionMetrics` | `src/domain/flow-system/services/src/flow/flow_completion_metrics.rs` (recorded in `flow_agent_impl.rs`, `flow_abort_helper.rs`) |

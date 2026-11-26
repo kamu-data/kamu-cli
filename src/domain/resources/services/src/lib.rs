@@ -22,6 +22,7 @@ mod message_handlers;
 #[macro_use]
 mod resource_extension_schemas;
 mod resources;
+mod retention;
 mod services;
 mod use_cases;
 
@@ -36,5 +37,6 @@ pub use dependencies::*;
 pub use event_stores::*;
 pub use message_handlers::*;
 pub use resource_extension_schemas::*;
+pub use retention::*;
 pub use services::*;
 pub use use_cases::*;

@@ -200,7 +200,7 @@ impl ServiceLayerTestHarness {
             .unwrap();
     }
 
-    /// See [`kamu_resources_services::BackgroundWorkFinalizer`]
+    /// See [`background_agent_host::BackgroundWorkFinalizer`]
     pub async fn settle(&self) {
         self.base
             .background_work_finalizer()

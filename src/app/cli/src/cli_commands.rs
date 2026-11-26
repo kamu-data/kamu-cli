@@ -657,7 +657,7 @@ pub fn command_needs_transaction(args: &cli::Cli) -> bool {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub fn command_needs_outbox_processing(args: &cli::Cli) -> bool {
+pub fn command_needs_background_work(args: &cli::Cli) -> bool {
     match &args.command {
         cli::Command::System(c) => match &c.subcommand {
             cli::SystemSubCommand::Info(_)

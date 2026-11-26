@@ -23,6 +23,7 @@ use event_sourcing::{
 };
 use internal_error::InternalError;
 use kamu_resources::{
+    ResourceID,
     ResourceRawEvent,
     ResourceRawEventProjection,
     ResourceRawEventQuery,
@@ -143,6 +144,11 @@ impl ResourceRawEventStore for InMemoryRawResourceEventStore {
         Ok(self.state.events_count(self.transaction_id, |event| {
             event.query.schema.as_str() == schema
         }))
+    }
+
+    async fn delete_events_of_resources(&self, ids: &[ResourceID]) -> Result<(), InternalError> {
+        self.state.delete_events_of(self.transaction_id, ids);
+        Ok(())
     }
 
     fn get_all_events_by_schema(

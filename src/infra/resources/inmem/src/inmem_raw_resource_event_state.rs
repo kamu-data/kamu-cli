@@ -17,7 +17,7 @@ use database_common::{
 };
 use dill::*;
 use event_sourcing::{EventID, GetEventsOpts, SaveEventsError, SaveEventsItem};
-use kamu_resources::{ResourceRawEvent, ResourceRawEventQuery};
+use kamu_resources::{ResourceID, ResourceRawEvent, ResourceRawEventQuery};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -113,6 +113,29 @@ impl InMemoryRawResourceEventState {
                     Ok(result)
                 })
         })
+    }
+
+    /// Deletes every event of the resources, and their last event keys
+    pub(crate) fn delete_events_of(
+        &self,
+        transaction_id: Option<TransactionId>,
+        ids: &[ResourceID],
+    ) {
+        self.events_by_id.write(transaction_id, |events_by_id| {
+            self.last_event_id_by_query
+                .write(transaction_id, |last_event_id_by_query| {
+                    let event_ids: Vec<EventID> = events_by_id
+                        .view()
+                        .iter()
+                        .filter(|(_, event)| ids.contains(&event.query.id))
+                        .map(|(event_id, _)| *event_id)
+                        .collect();
+                    for event_id in event_ids {
+                        events_by_id.delete(event_id);
+                    }
+                    last_event_id_by_query.delete_where(|query| ids.contains(&query.id));
+                });
+        });
     }
 
     fn next_event_id(&self) -> EventID {

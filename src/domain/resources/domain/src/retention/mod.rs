@@ -7,8 +7,10 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+mod resource_keyed_table;
 mod resource_retention_config;
 mod resource_retention_policy;
 
+pub use resource_keyed_table::*;
 pub use resource_retention_config::*;
 pub use resource_retention_policy::*;

@@ -529,6 +529,33 @@ impl ResourceRawEventStore for SqliteResourceRawEventStore {
         Ok(usize::try_from(events_count).unwrap())
     }
 
+    async fn delete_events_of_resources(&self, ids: &[ResourceID]) -> Result<(), InternalError> {
+        if ids.is_empty() {
+            return Ok(());
+        }
+
+        let mut tr = self.transaction.lock().await;
+        let connection_mut = tr.connection_mut().await?;
+
+        // UUIDs bind as blobs, so the IDs go in as bound values, not JSON
+        let mut query_builder = sqlx::QueryBuilder::<sqlx::Sqlite>::new(
+            "DELETE FROM resource_events WHERE resource_id IN (",
+        );
+        let mut separated = query_builder.separated(", ");
+        for id in ids {
+            separated.push_bind(*id.as_ref());
+        }
+        query_builder.push(")");
+
+        query_builder
+            .build()
+            .execute(connection_mut)
+            .await
+            .int_err()?;
+
+        Ok(())
+    }
+
     fn get_all_events_by_schema(
         &self,
         schema: &str,

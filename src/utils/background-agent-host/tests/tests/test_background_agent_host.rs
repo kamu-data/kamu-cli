@@ -19,6 +19,8 @@ use background_agent_host::{
     BackgroundAgentHostMetrics,
     BackgroundAgentRestartReason,
     CancellationToken,
+    HousekeepingConfig,
+    HousekeepingMetrics,
 };
 use chrono::{TimeDelta, TimeZone, Utc};
 use internal_error::InternalError;
@@ -320,6 +322,9 @@ impl HostHarness {
                 .into_iter()
                 .map(|agent| agent as Arc<dyn BackgroundAgent>)
                 .collect(),
+            Vec::new(),
+            Arc::new(HousekeepingConfig::default()),
+            Arc::new(HousekeepingMetrics::new()),
             Arc::new(config),
             metrics.clone(),
             Arc::new(time_source.clone()),

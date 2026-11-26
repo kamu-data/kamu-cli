@@ -123,22 +123,32 @@ impl ResourceControllerStateRepository for SqliteResourceControllerStateReposito
         Ok(())
     }
 
-    async fn delete_states_for_resource(
+    async fn delete_states_for_resources(
         &self,
-        resource_id: &ResourceID,
+        resource_ids: &[ResourceID],
     ) -> Result<(), InternalError> {
+        if resource_ids.is_empty() {
+            return Ok(());
+        }
+
         let mut tr = self.transaction.lock().await;
         let connection_mut = tr.connection_mut().await?;
 
-        let resource_id: &uuid::Uuid = resource_id.as_ref();
+        // UUIDs bind as blobs, so the IDs go in as bound values, not JSON
+        let mut query_builder = sqlx::QueryBuilder::<sqlx::Sqlite>::new(
+            "DELETE FROM resource_controller_state WHERE resource_id IN (",
+        );
+        let mut separated = query_builder.separated(", ");
+        for resource_id in resource_ids {
+            separated.push_bind(*resource_id.as_ref());
+        }
+        query_builder.push(")");
 
-        sqlx::query!(
-            "DELETE FROM resource_controller_state WHERE resource_id = $1",
-            resource_id,
-        )
-        .execute(connection_mut)
-        .await
-        .int_err()?;
+        query_builder
+            .build()
+            .execute(connection_mut)
+            .await
+            .int_err()?;
 
         Ok(())
     }

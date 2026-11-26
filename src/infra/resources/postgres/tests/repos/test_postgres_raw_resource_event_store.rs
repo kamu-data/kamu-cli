@@ -37,6 +37,12 @@ database_transactional_test!(
     harness = PostgresRawResourceEventStoreHarness
 );
 
+database_transactional_test!(
+    storage = postgres,
+    fixture = event_store_suite::test_delete_events_of_resources,
+    harness = PostgresRawResourceEventStoreHarness
+);
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 database_transactional_test!(

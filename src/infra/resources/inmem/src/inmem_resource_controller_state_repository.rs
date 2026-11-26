@@ -182,12 +182,12 @@ impl ResourceControllerStateRepository for InMemoryResourceControllerStateReposi
         })
     }
 
-    async fn delete_states_for_resource(
+    async fn delete_states_for_resources(
         &self,
-        resource_id: &ResourceID,
+        resource_ids: &[ResourceID],
     ) -> Result<(), InternalError> {
         self.store.states.write(self.transaction_id, |states| {
-            states.delete_where(|(_, state_resource_id)| state_resource_id == resource_id);
+            states.delete_where(|(_, state_resource_id)| resource_ids.contains(state_resource_id));
         });
 
         Ok(())

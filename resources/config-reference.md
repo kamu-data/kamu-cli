@@ -28,6 +28,14 @@
     &quot;outboxConsumers&quot;: 1,
     &quot;resourceControllers&quot;: 1
   },
+  &quot;housekeeping&quot;: {
+    &quot;resourceRetention&quot;: {
+      &quot;batchSize&quot;: 100,
+      &quot;enabled&quot;: true,
+      &quot;interval&quot;: &quot;5m&quot;,
+      &quot;pauseBetweenBatches&quot;: &quot;100ms&quot;
+    }
+  },
   &quot;maxListeningTimeout&quot;: &quot;2s&quot;,
   &quot;minDebounceInterval&quot;: &quot;20ms&quot;,
   &quot;resourceControllers&quot;: {
@@ -523,6 +531,24 @@ treated as 1
 <td>Concurrency limits of agents processing records in parallel</td>
 </tr>
 <tr>
+<td><code>housekeeping</code></td>
+<td><a href="#backgroundagentshousekeepingconfig"><code>BackgroundAgentsHousekeepingConfig</code></a></td>
+<td><pre><code class="language-json">{
+  &quot;resourceRetention&quot;: {
+    &quot;batchSize&quot;: 100,
+    &quot;enabled&quot;: true,
+    &quot;interval&quot;: &quot;5m&quot;,
+    &quot;pauseBetweenBatches&quot;: &quot;100ms&quot;
+  }
+}</code></pre></td>
+<td>
+
+Periodic jobs removing data nobody needs any more. Each runs as an agent
+of its own in the API server, and one batch after each CLI command
+
+</td>
+</tr>
+<tr>
 <td><code>maxListeningTimeout</code></td>
 <td><a href="#durationstring"><code>DurationString</code></a></td>
 <td><code class="language-json">&quot;2s&quot;</code></td>
@@ -581,6 +607,30 @@ least `maxDelay` resets the count
 
 How long background agents and in-flight API requests get to finish
 on a shutdown, before they are aborted
+
+</td>
+</tr>
+</tbody>
+</table>
+
+## `BackgroundAgentsHousekeepingConfig`
+
+<table>
+<thead><tr><th>Field</th><th>Type</th><th>Default</th><th>Description</th></tr></thead>
+<tbody>
+<tr>
+<td><code>resourceRetention</code></td>
+<td><a href="#housekeepingjobconfig"><code>HousekeepingJobConfig</code></a></td>
+<td><pre><code class="language-json">{
+  &quot;batchSize&quot;: 100,
+  &quot;enabled&quot;: true,
+  &quot;interval&quot;: &quot;5m&quot;,
+  &quot;pauseBetweenBatches&quot;: &quot;100ms&quot;
+}</code></pre></td>
+<td>
+
+Purge of deleted resources whose retention (`resources.retention`)
+ended
 
 </td>
 </tr>
@@ -1332,6 +1382,46 @@ activations retried after it. Not a polling period
 <table>
 <thead><tr><th>Field</th><th>Type</th><th>Default</th><th>Description</th></tr></thead>
 <tbody>
+</tbody>
+</table>
+
+## `HousekeepingJobConfig`
+
+How a housekeeping job runs
+
+<table>
+<thead><tr><th>Field</th><th>Type</th><th>Default</th><th>Description</th></tr></thead>
+<tbody>
+<tr>
+<td><code>batchSize</code></td>
+<td><code>integer</code></td>
+<td><code class="language-json">100</code></td>
+<td>Items removed per transaction. 0 is treated as 1</td>
+</tr>
+<tr>
+<td><code>enabled</code></td>
+<td><code>boolean</code></td>
+<td><code class="language-json">true</code></td>
+<td>Whether the job runs</td>
+</tr>
+<tr>
+<td><code>interval</code></td>
+<td><a href="#durationstring"><code>DurationString</code></a></td>
+<td><code class="language-json">&quot;5m&quot;</code></td>
+<td>
+
+The longest pause between two passes of the job. A job with deadlines
+of its own wakes up at the nearest one, so this bounds how late it
+notices an earlier deadline
+
+</td>
+</tr>
+<tr>
+<td><code>pauseBetweenBatches</code></td>
+<td><a href="#durationstring"><code>DurationString</code></a></td>
+<td><code class="language-json">&quot;100ms&quot;</code></td>
+<td>The pause between two batches while a backlog remains</td>
+</tr>
 </tbody>
 </table>
 

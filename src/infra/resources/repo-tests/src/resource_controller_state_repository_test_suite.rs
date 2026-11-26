@@ -319,7 +319,7 @@ pub async fn test_count_failing_resources(catalog: &Catalog) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn test_delete_states_for_resource(catalog: &Catalog) {
+pub async fn test_delete_states_for_resources(catalog: &Catalog) {
     let ctx = ControllerStateTestContext::new(catalog);
     let removed = ctx.create_resource("removed").await;
     let kept = ctx.create_resource("kept").await;
@@ -504,7 +504,7 @@ impl ControllerStateTestContext {
 
     async fn delete_states(&self, snapshot: &ResourceSnapshot) {
         self.states
-            .delete_states_for_resource(&snapshot.id)
+            .delete_states_for_resources(std::slice::from_ref(&snapshot.id))
             .await
             .unwrap();
     }

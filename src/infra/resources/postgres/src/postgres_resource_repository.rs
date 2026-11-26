@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use std::collections::HashMap;
+use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
 use database_common::{PaginationOpts, TransactionRefT, sql_like_escape_pattern};
@@ -27,6 +28,7 @@ use kamu_resources::{
     ResourcePurgeDeadline,
     ResourceQuery,
     ResourceRawEventQuery,
+    ResourceRemovalListener,
     ResourceRepository,
     ResourceScope,
     ResourceSnapshot,
@@ -46,6 +48,7 @@ use odf::metadata::AsStackString;
 #[interface(dyn ResourceRepository)]
 pub struct PostgresResourceRepository {
     transaction: TransactionRefT<sqlx::Postgres>,
+    removal_listeners: Vec<Arc<dyn ResourceRemovalListener>>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1265,6 +1268,83 @@ impl ResourceRepository for PostgresResourceRepository {
                 purge_at: row.purge_at,
             })
             .collect())
+    }
+
+    async fn count_resources_due_for_purge(
+        &self,
+        now: DateTime<Utc>,
+    ) -> Result<u64, InternalError> {
+        let mut tr = self.transaction.lock().await;
+        let connection_mut = tr.connection_mut().await?;
+
+        let count = sqlx::query_scalar!(
+            r#"
+            SELECT COUNT(*) AS "count!"
+            FROM resources
+            WHERE purge_at IS NOT NULL AND purge_at <= $1
+            "#,
+            now,
+        )
+        .fetch_one(connection_mut)
+        .await
+        .int_err()?;
+
+        u64::try_from(count).int_err()
+    }
+
+    async fn claim_resources_for_purge(
+        &self,
+        ids: &[ResourceID],
+        now: DateTime<Utc>,
+    ) -> Result<Vec<ResourceID>, InternalError> {
+        if ids.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        let mut tr = self.transaction.lock().await;
+        let connection_mut = tr.connection_mut().await?;
+
+        // The deadline check is in the clause a writer waiting on the row
+        // re-checks, so the second of two purgers claims nothing
+        let ids: Vec<uuid::Uuid> = ids.iter().map(|id| *id.as_ref()).collect();
+        let claimed_ids = sqlx::query_scalar!(
+            r#"
+            UPDATE resources
+            SET purge_at = NULL
+            WHERE resource_id = ANY($1)
+              AND purge_at IS NOT NULL
+              AND purge_at <= $2
+            RETURNING resource_id AS "id: uuid::Uuid"
+            "#,
+            &ids,
+            now,
+        )
+        .fetch_all(connection_mut)
+        .await
+        .int_err()?;
+
+        Ok(claimed_ids.into_iter().map(ResourceID::new).collect())
+    }
+
+    async fn purge_resources(&self, ids: &[ResourceID]) -> Result<(), InternalError> {
+        if ids.is_empty() {
+            return Ok(());
+        }
+
+        for listener in &self.removal_listeners {
+            listener.on_resources_removed(ids).await?;
+        }
+
+        let mut tr = self.transaction.lock().await;
+        let connection_mut = tr.connection_mut().await?;
+
+        let ids: Vec<uuid::Uuid> = ids.iter().map(|id| *id.as_ref()).collect();
+        sqlx::query!("DELETE FROM resources WHERE resource_id = ANY($1)", &ids)
+            .execute(connection_mut)
+            .await
+            .int_err()?;
+
+        Ok(())
     }
 
     async fn find_nearest_purge_at(

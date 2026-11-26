@@ -177,7 +177,7 @@ where
         id: &ResourceID,
     ) -> Result<(), ResourcePersistenceError> {
         self.controller_state_repository
-            .delete_states_for_resource(id)
+            .delete_states_for_resources(std::slice::from_ref(id))
             .await
             .map_err(ResourcePersistenceError::Internal)
     }

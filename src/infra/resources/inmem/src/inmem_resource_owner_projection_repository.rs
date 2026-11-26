@@ -18,7 +18,7 @@ use database_common::{
 };
 use dill::*;
 use internal_error::InternalError;
-use kamu_resources::{ResourceID, ResourceOwnerProjectionRepository};
+use kamu_resources::{ResourceID, ResourceOwnerProjectionRepository, ResourceRemovalListener};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -48,6 +48,7 @@ pub struct InMemoryResourceOwnerProjectionRepository {
 
 #[component(pub)]
 #[interface(dyn ResourceOwnerProjectionRepository)]
+#[interface(dyn ResourceRemovalListener)]
 impl InMemoryResourceOwnerProjectionRepository {
     pub fn new(
         state: Arc<InMemoryResourceOwnerProjectionState>,
@@ -97,6 +98,25 @@ impl ResourceOwnerProjectionRepository for InMemoryResourceOwnerProjectionReposi
                     .cloned()
                     .unwrap_or_default()
             }))
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Drops the owners of purged resources, as the cascade of the SQL backends does
+#[async_trait::async_trait]
+impl ResourceRemovalListener for InMemoryResourceOwnerProjectionRepository {
+    async fn on_resources_removed(&self, ids: &[ResourceID]) -> Result<(), InternalError> {
+        self.state
+            .owners_by_resource_id
+            .write(self.transaction_id, |owners_by_resource_id| {
+                for id in ids {
+                    if owners_by_resource_id.view().contains_key(id) {
+                        owners_by_resource_id.delete(*id);
+                    }
+                }
+            });
+        Ok(())
     }
 }
 

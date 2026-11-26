@@ -12,7 +12,13 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Duration;
 
-use background_agent_host::{BackgroundAgent, CancellationToken};
+use background_agent_host::{
+    BackgroundAgent,
+    BackgroundWorkDrain,
+    BackgroundWorkDrainOutcome,
+    BackgroundWorkDrainSession,
+    CancellationToken,
+};
 use database_common_macros::transactional_method;
 use dill::*;
 use init_on_startup::{InitOnStartup, InitOnStartupMeta};
@@ -38,12 +44,16 @@ pub struct OutboxAgentImpl {
     outbox_message_bridge: Arc<dyn OutboxMessageBridge>,
     metrics: Arc<OutboxAgentMetrics>,
     run_lock: tokio::sync::Mutex<()>,
+    /// Consumer deliveries of every run, the agent's and the drains', so that a
+    /// drain session sees the work of the others
+    delivered_by_all_runs: AtomicUsize,
 }
 
 #[component(pub)]
 #[scope(Singleton)]
 #[interface(dyn InitOnStartup)]
 #[interface(dyn BackgroundAgent)]
+#[interface(dyn BackgroundWorkDrain)]
 #[interface(dyn OutboxAgent)]
 #[meta(InitOnStartupMeta {
     job_name: JOB_MESSAGING_OUTBOX_STARTUP,
@@ -90,6 +100,7 @@ impl OutboxAgentImpl {
             outbox_message_bridge,
             metrics,
             run_lock: tokio::sync::Mutex::new(()),
+            delivered_by_all_runs: AtomicUsize::new(0),
         }
     }
 
@@ -169,17 +180,20 @@ impl OutboxAgentImpl {
 
     /// Given the agent's listener, keeps its heartbeat going between batches.
     /// Given a shutdown token, stops between batches once it is cancelled, so
-    /// that messages arriving during a shutdown do not keep it going
+    /// that messages arriving during a shutdown do not keep it going. Returns
+    /// how many consumer deliveries it made
     async fn run_until_end_of_queue(
         &self,
         wakeup_listener: Option<&dyn WakeupListener>,
         shutdown: Option<&CancellationToken>,
-    ) -> Result<(), InternalError> {
+    ) -> Result<ProcessedConsumerTasksCount, InternalError> {
+        let mut total_processed_count = 0;
         loop {
             let processed_consumer_tasks_count = self
                 .run_consumption_iteration()
                 .instrument(tracing::debug_span!("OutboxAgent::tick"))
                 .await?;
+            total_processed_count += processed_consumer_tasks_count;
 
             if let Some(wakeup_listener) = wakeup_listener {
                 wakeup_listener.heartbeat();
@@ -192,7 +206,7 @@ impl OutboxAgentImpl {
             }
         }
 
-        Ok(())
+        Ok(total_processed_count)
     }
 
     fn debug_outbox_routes(&self) {
@@ -332,6 +346,10 @@ impl OutboxAgentImpl {
                         .await?;
 
                     processed_consumer_tasks_counter.fetch_add(processed, Ordering::Relaxed);
+                    // Counted while the run lock is held, so a drain waiting for
+                    // the lock sees what the run delivered
+                    self.delivered_by_all_runs
+                        .fetch_add(processed, Ordering::SeqCst);
 
                     Ok(())
                 },
@@ -434,19 +452,56 @@ impl BackgroundAgent for OutboxAgentImpl {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+impl BackgroundWorkDrain for OutboxAgentImpl {
+    fn new_drain_session(&self) -> Result<Box<dyn BackgroundWorkDrainSession + '_>, InternalError> {
+        Ok(Box::new(OutboxDrainSession {
+            agent: self,
+            delivered_by_all_runs: self.delivered_by_all_runs.load(Ordering::SeqCst),
+        }))
+    }
+}
+
+/// Delivers every committed message on each drain; idle while no run of the
+/// agent, here or in its main loop, delivered anything
+struct OutboxDrainSession<'a> {
+    agent: &'a OutboxAgentImpl,
+    /// Deliveries of every run, as of the session's start or its previous
+    /// drain
+    delivered_by_all_runs: usize,
+}
+
+#[async_trait::async_trait]
+impl BackgroundWorkDrainSession for OutboxDrainSession<'_> {
+    async fn drain(&mut self) -> Result<BackgroundWorkDrainOutcome, InternalError> {
+        self.agent.run_while_has_tasks().await?;
+
+        let delivered_by_all_runs = self.agent.delivered_by_all_runs.load(Ordering::SeqCst);
+        let outcome = if delivered_by_all_runs == self.delivered_by_all_runs {
+            BackgroundWorkDrainOutcome::Idle
+        } else {
+            BackgroundWorkDrainOutcome::Worked
+        };
+        self.delivered_by_all_runs = delivered_by_all_runs;
+        Ok(outcome)
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[async_trait::async_trait]
 impl OutboxAgent for OutboxAgentImpl {
     #[tracing::instrument(level = "debug", skip_all)]
-    async fn run_while_has_tasks(&self) -> Result<(), InternalError> {
+    async fn run_while_has_tasks(&self) -> Result<usize, InternalError> {
+        let mut total_processed_count = 0;
         loop {
             // Checked before processing, as in the main loop: checked after, it
             // would miss a release landing in between and leave its messages
             let has_held_back_messages = self.has_held_back_messages().await?;
 
-            self.run_until_end_of_queue(None, None).await?;
+            total_processed_count += self.run_until_end_of_queue(None, None).await?;
 
             if !has_held_back_messages {
-                return Ok(());
+                return Ok(total_processed_count);
             }
 
             tracing::debug!("Committed messages wait for an older transaction to end");

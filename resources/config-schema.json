@@ -211,6 +211,18 @@
           },
           "description": "Concurrency limits of agents processing records in parallel"
         },
+        "housekeeping": {
+          "$ref": "#/$defs/BackgroundAgentsHousekeepingConfig",
+          "default": {
+            "resourceRetention": {
+              "batchSize": 100,
+              "enabled": true,
+              "interval": "5m",
+              "pauseBetweenBatches": "100ms"
+            }
+          },
+          "description": "Periodic jobs removing data nobody needs any more. Each runs as an agent\nof its own in the API server, and one batch after each CLI command"
+        },
         "maxListeningTimeout": {
           "$ref": "#/$defs/DurationString",
           "default": "2s",
@@ -250,6 +262,22 @@
           "$ref": "#/$defs/DurationString",
           "default": "10s",
           "description": "How long background agents and in-flight API requests get to finish\non a shutdown, before they are aborted"
+        }
+      },
+      "type": "object"
+    },
+    "BackgroundAgentsHousekeepingConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "resourceRetention": {
+          "$ref": "#/$defs/HousekeepingJobConfig",
+          "default": {
+            "batchSize": 100,
+            "enabled": true,
+            "interval": "5m",
+            "pauseBetweenBatches": "100ms"
+          },
+          "description": "Purge of deleted resources whose retention (`resources.retention`)\nended"
         }
       },
       "type": "object"
@@ -812,6 +840,35 @@
     },
     "GqlConfig": {
       "additionalProperties": false,
+      "type": "object"
+    },
+    "HousekeepingJobConfig": {
+      "additionalProperties": false,
+      "description": "How a housekeeping job runs",
+      "properties": {
+        "batchSize": {
+          "default": 100,
+          "description": "Items removed per transaction. 0 is treated as 1",
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "enabled": {
+          "default": true,
+          "description": "Whether the job runs",
+          "type": "boolean"
+        },
+        "interval": {
+          "$ref": "#/$defs/DurationString",
+          "default": "5m",
+          "description": "The longest pause between two passes of the job. A job with deadlines\nof its own wakes up at the nearest one, so this bounds how late it\nnotices an earlier deadline"
+        },
+        "pauseBetweenBatches": {
+          "$ref": "#/$defs/DurationString",
+          "default": "100ms",
+          "description": "The pause between two batches while a backlog remains"
+        }
+      },
       "type": "object"
     },
     "HttpSourceConfig": {
@@ -1389,6 +1446,14 @@
         "concurrency": {
           "outboxConsumers": 1,
           "resourceControllers": 1
+        },
+        "housekeeping": {
+          "resourceRetention": {
+            "batchSize": 100,
+            "enabled": true,
+            "interval": "5m",
+            "pauseBetweenBatches": "100ms"
+          }
         },
         "maxListeningTimeout": "2s",
         "minDebounceInterval": "20ms",

@@ -22,6 +22,10 @@ use crate::{
     BackgroundAgentHostMetrics,
     BackgroundAgentSupervisor,
     CancellationToken,
+    HousekeepingAgent,
+    HousekeepingConfig,
+    HousekeepingJob,
+    HousekeepingMetrics,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -35,6 +39,9 @@ use crate::{
 /// then are aborted, and `run` returns once their tasks have ended.
 pub struct BackgroundAgentHost {
     agents: Vec<Arc<dyn BackgroundAgent>>,
+    housekeeping_jobs: Vec<Arc<dyn HousekeepingJob>>,
+    housekeeping_config: Arc<HousekeepingConfig>,
+    housekeeping_metrics: Arc<HousekeepingMetrics>,
     config: Arc<BackgroundAgentHostConfig>,
     metrics: Arc<BackgroundAgentHostMetrics>,
     time_source: Arc<dyn SystemTimeSource>,
@@ -42,18 +49,46 @@ pub struct BackgroundAgentHost {
 
 #[component(pub)]
 impl BackgroundAgentHost {
+    /// Hosts the registered agents, plus a [`HousekeepingAgent`] for each
+    /// enabled housekeeping job
     pub fn new(
         agents: Vec<Arc<dyn BackgroundAgent>>,
+        housekeeping_jobs: Vec<Arc<dyn HousekeepingJob>>,
+        housekeeping_config: Arc<HousekeepingConfig>,
+        housekeeping_metrics: Arc<HousekeepingMetrics>,
         config: Arc<BackgroundAgentHostConfig>,
         metrics: Arc<BackgroundAgentHostMetrics>,
         time_source: Arc<dyn SystemTimeSource>,
     ) -> Self {
         Self {
             agents,
+            housekeeping_jobs,
+            housekeeping_config,
+            housekeeping_metrics,
             config,
             metrics,
             time_source,
         }
+    }
+
+    /// The registered agents, then one per enabled housekeeping job
+    fn all_agents(&self) -> Vec<Arc<dyn BackgroundAgent>> {
+        let housekeeping_agents = self.housekeeping_jobs.iter().filter_map(|job| {
+            let job_config = self.housekeeping_config.job(job.job_name());
+            job_config.enabled.then(|| {
+                Arc::new(HousekeepingAgent::new(
+                    job.clone(),
+                    job_config,
+                    self.housekeeping_metrics.clone(),
+                    self.time_source.clone(),
+                )) as Arc<dyn BackgroundAgent>
+            })
+        });
+        self.agents
+            .iter()
+            .cloned()
+            .chain(housekeeping_agents)
+            .collect()
     }
 
     /// Runs the agents until `shutdown` is cancelled, by the caller or by a
@@ -62,21 +97,22 @@ impl BackgroundAgentHost {
     /// # Panics
     /// If no agent is registered: the catalog is misconfigured
     pub async fn run(&self, shutdown: CancellationToken) -> Result<(), InternalError> {
+        let agents = self.all_agents();
         assert!(
-            !self.agents.is_empty(),
+            !agents.is_empty(),
             "No background agents found! This indicates a DI container configuration issue. Make \
              sure all agent implementations are registered as both their specific trait (e.g., \
              TaskAgent) AND as BackgroundAgent in the DI container."
         );
 
         self.metrics
-            .init(self.agents.iter().map(|agent| agent.agent_name()));
+            .init(agents.iter().map(|agent| agent.agent_name()));
 
         // Cancelled after the shutdown bound, for the agents still running
         let abort = CancellationToken::new();
         let mut supervisors = JoinSet::new();
         let mut names_by_task = HashMap::new();
-        for agent in &self.agents {
+        for agent in &agents {
             let agent_name = agent.agent_name();
             let supervisor = BackgroundAgentSupervisor::new(
                 agent.clone(),

@@ -12,7 +12,13 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-use background_agent_host::{BackgroundAgent, CancellationToken};
+use background_agent_host::{
+    BackgroundAgent,
+    BackgroundWorkDrain,
+    BackgroundWorkDrainOutcome,
+    BackgroundWorkDrainSession,
+    CancellationToken,
+};
 use database_common::NoOpDatabasePlugin;
 use dill::*;
 use internal_error::InternalError;
@@ -1269,6 +1275,49 @@ async fn test_run_while_has_tasks_drains_backlog_with_small_batch_size() {
 }
 
 #[test_log::test(tokio::test)]
+async fn test_drain_is_not_idle_after_deliveries_of_another_run() {
+    let harness = OutboxAgentHarness::new();
+    harness.outbox_agent.run_initialization().await.unwrap();
+    let mut session = harness.new_drain_session();
+
+    harness.post_message_a("foo").await;
+    // Another run, such as the agent's main loop, delivers it first
+    harness.outbox_agent.run_while_has_tasks().await.unwrap();
+
+    assert_eq!(
+        OutboxAgentHarness::drain(&mut session).await,
+        BackgroundWorkDrainOutcome::Worked,
+        "the delivery may have made other work due"
+    );
+    assert_eq!(
+        OutboxAgentHarness::drain(&mut session).await,
+        BackgroundWorkDrainOutcome::Idle
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_drain_reports_its_own_deliveries() {
+    let harness = OutboxAgentHarness::new();
+    harness.outbox_agent.run_initialization().await.unwrap();
+    let mut session = harness.new_drain_session();
+
+    harness.post_message_a("foo").await;
+
+    assert_eq!(
+        OutboxAgentHarness::drain(&mut session).await,
+        BackgroundWorkDrainOutcome::Worked
+    );
+    assert_eq!(
+        OutboxAgentHarness::drain(&mut session).await,
+        BackgroundWorkDrainOutcome::Idle
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
 async fn test_consumers_limited_across_producers() {
     let harness = OutboxAgentConcurrencyHarness::new(1);
     harness.outbox_agent.run_initialization().await.unwrap();
@@ -1535,6 +1584,7 @@ impl OutboxAgentFailureHarness {
 #[oop::extend(BaseOutboxAgentHarness, base_harness)]
 struct OutboxAgentHarness {
     base_harness: BaseOutboxAgentHarness,
+    outbox_drain: Arc<dyn BackgroundWorkDrain>,
 }
 
 impl OutboxAgentHarness {
@@ -1559,8 +1609,31 @@ impl OutboxAgentHarness {
         let catalog = b.build();
 
         Self {
+            outbox_drain: catalog.get_one().unwrap(),
             base_harness: BaseOutboxAgentHarness::from_catalog(catalog),
         }
+    }
+
+    fn new_drain_session(&self) -> Box<dyn BackgroundWorkDrainSession + '_> {
+        self.outbox_drain.new_drain_session().unwrap()
+    }
+
+    async fn drain(
+        session: &mut Box<dyn BackgroundWorkDrainSession + '_>,
+    ) -> BackgroundWorkDrainOutcome {
+        session.drain().await.unwrap()
+    }
+
+    async fn post_message_a(&self, body: &str) {
+        self.outbox
+            .post_message(
+                TEST_PRODUCER_A,
+                TestMessageA {
+                    body: body.to_string(),
+                },
+            )
+            .await
+            .unwrap();
     }
 
     fn check_delivered_messages(

@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use background_agent_host::BackgroundWorkFinalizer;
 use kamu_configuration_inmem::{
     InMemorySecretSetProjectionRepository,
     InMemoryVariableSetProjectionRepository,
@@ -18,7 +19,7 @@ use kamu_resources::{
     ResourceLifecycleMessage,
     ResourceRetentionConfig,
 };
-use kamu_resources_services::{BackgroundWorkFinalizer, ResourceControllerRuntimeImpl};
+use kamu_resources_services::ResourceControllerRuntimeImpl;
 use messaging_outbox::{OutboxProvider, register_message_dispatcher};
 use wakeup_listener::{WakeupListenerConfig, WakeupListenerMetrics};
 
@@ -75,10 +76,9 @@ impl BaseGQLResourceHarness {
         Self::new(base_gql_harness, catalog_base)
     }
 
-    /// See [`BackgroundWorkFinalizer`]. The outbox of this harness is
-    /// immediate, or drops the messages
+    /// See [`BackgroundWorkFinalizer`]
     pub async fn settle(&self) {
-        BackgroundWorkFinalizer::for_immediate_outbox()
+        BackgroundWorkFinalizer::settle_only()
             .finalize(&self.catalog_base)
             .await
             .unwrap();

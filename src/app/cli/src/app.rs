@@ -40,6 +40,7 @@ use crate::{
     WorkspaceLayout,
     WorkspaceService,
     WorkspaceVersion,
+    background_work,
     build_db_connection_settings,
     cli,
     cli_commands,
@@ -302,8 +303,8 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
 
         let is_transactional = maybe_db_connection_settings.is_some()
             && cli_commands::command_needs_transaction(&args);
-        let is_outbox_processing_required = maybe_db_connection_settings.is_some()
-            && cli_commands::command_needs_outbox_processing(&args);
+        let is_background_work_required = maybe_db_connection_settings.is_some()
+            && cli_commands::command_needs_background_work(&args);
 
         let command_run_result = transaction!(
             #[catalog(cli_catalog)]
@@ -338,9 +339,13 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
         );
 
         // A failed command may still have committed some of its work in
-        // transactions of its own, so the Outbox is processed either way
-        if is_outbox_processing_required {
-            outbox::process_outbox_after_command(background_catalog, command_run_result).await?;
+        // transactions of its own, so its background work is finalized either way
+        if is_background_work_required {
+            background_work::finalize_background_work_after_command(
+                background_catalog,
+                command_run_result,
+            )
+            .await?;
         } else {
             command_run_result?;
         }
@@ -599,6 +604,7 @@ pub fn configure_base_catalog(
     outbox::register_outbox_components(&mut b);
     b.add::<wakeup_listener::WakeupListenerMetrics>();
     b.add::<background_agent_host::BackgroundAgentHost>();
+    b.add::<background_agent_host::HousekeepingMetrics>();
     b.add::<background_agent_host::BackgroundAgentHostMetrics>();
 
     kamu_auth_web3_services::register_dependencies(&mut b);
@@ -946,6 +952,7 @@ pub fn register_config_in_catalog(
 
     // Background agents configuration
     catalog_builder.add_value(config.background_agents.background_agent_host_config());
+    catalog_builder.add_value(config.background_agents.housekeeping.into_system());
     catalog_builder.add_value(config.background_agents.wakeup_listener_config());
     catalog_builder.add_value(config.background_agents.outbox_agent_config());
     catalog_builder.add_value(config.background_agents.flow_system_event_agent_config());

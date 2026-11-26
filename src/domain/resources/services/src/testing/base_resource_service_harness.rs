@@ -10,6 +10,7 @@
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
+use background_agent_host::BackgroundWorkFinalizer;
 use chrono::Utc;
 use database_common::{InMemoryTransactionManager, NoOpDatabasePlugin};
 use dill::CatalogBuilder;
@@ -42,7 +43,7 @@ use time_source::{FakeSystemTimeSource, SystemTimeSource, SystemTimeSourceStub};
 use wakeup_listener::{WakeupListenerConfig, WakeupListenerMetrics};
 
 use crate::testing::OwnAccountResourceAccess;
-use crate::{BackgroundWorkFinalizer, ResourceControllerRuntimeImpl, request_creation_provenance};
+use crate::{ResourceControllerRuntimeImpl, request_creation_provenance};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -55,7 +56,6 @@ pub struct BaseResourceServiceHarness {
     resource_repo: Arc<dyn ResourceRepository>,
     outbox: Arc<dyn Outbox>,
     time_source: Arc<dyn SystemTimeSource>,
-    dispatching_outbox: bool,
 }
 
 pub struct BaseResourceServiceHarnessOpts {
@@ -182,7 +182,6 @@ impl BaseResourceServiceHarness {
             resource_repo,
             outbox,
             time_source,
-            dispatching_outbox: needs_bridge,
         }
     }
 
@@ -199,13 +198,10 @@ impl BaseResourceServiceHarness {
             .unwrap();
     }
 
-    /// The finalizer for the outbox of this harness
+    /// The finalizer of this harness, which leaves housekeeping to the tests
+    /// that run it
     pub fn background_work_finalizer(&self) -> BackgroundWorkFinalizer {
-        if self.dispatching_outbox {
-            BackgroundWorkFinalizer::for_dispatching_outbox()
-        } else {
-            BackgroundWorkFinalizer::for_immediate_outbox()
-        }
+        BackgroundWorkFinalizer::settle_only()
     }
 
     pub fn catalog(&self) -> &dill::Catalog {

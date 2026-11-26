@@ -480,7 +480,9 @@ impl PostgresOutboxAgentHarness {
 
     fn spawn_drain(&self) -> tokio::task::JoinHandle<()> {
         let outbox_agent = self.outbox_agent.clone();
-        tokio::spawn(async move { outbox_agent.run_while_has_tasks().await.unwrap() })
+        tokio::spawn(async move {
+            outbox_agent.run_while_has_tasks().await.unwrap();
+        })
     }
 
     fn consumed_seq(&self) -> Vec<i64> {

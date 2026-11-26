@@ -9,24 +9,41 @@
 
 use std::collections::BTreeMap;
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 
+use background_agent_host::{
+    BackgroundWorkFinalizer,
+    HousekeepingBatchReport,
+    HousekeepingConfig,
+    HousekeepingJob,
+    HousekeepingMetrics,
+};
 use chrono::{DateTime, TimeDelta, Utc};
 use database_common::testing::in_committed_transaction;
 use dill::{Catalog, CatalogBuilder};
+use event_sourcing::GetEventsOpts;
+use futures::TryStreamExt;
+use internal_error::InternalError;
 use kamu_resources::{
     DeclarativeResource,
+    MESSAGE_PRODUCER_KAMU_RESOURCE_SERVICE,
     ResourceAggregateLoader,
     ResourceDeletionCompletion,
     ResourceID,
+    ResourceLifecycleMessage,
     ResourceLifecyclePrimitives,
+    ResourceRawEventQuery,
+    ResourceRawEventStore,
+    ResourceRemovalListener,
     ResourceRepository,
     ResourceRetentionConfig,
     ResourceRetentionPolicy,
     ResourceSchemaProvider,
     resource_type_name,
 };
+use kamu_resources_services::ResourceRetentionJob;
 use kamu_resources_services::testing::{BaseResourceServiceHarnessOpts, TestResource};
-use messaging_outbox::OutboxProvider;
+use messaging_outbox::{OutboxMessageBoundary, OutboxMessageBridge, OutboxProvider};
 
 use crate::tests::utils::{ServiceLayerTestHarness, ServiceLayerTestHarnessOpts};
 
@@ -103,6 +120,139 @@ async fn test_policy_change_applies_to_later_deletions_only() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[test_log::test(tokio::test)]
+async fn test_due_resource_is_purged_and_one_not_yet_due_kept() {
+    let harness = RetentionHarness::new(retention_config(
+        ResourceRetentionPolicy::RetainFor(TimeDelta::days(1)),
+        None,
+    ))
+    .await;
+    let due = harness.delete_completely("due").await;
+    harness.advance_time(TimeDelta::hours(12));
+    let not_yet_due = harness.delete_completely("not-yet-due").await;
+    harness.advance_time(TimeDelta::hours(13));
+
+    let report = harness
+        .run_purge_batch(harness.catalog(), 10)
+        .await
+        .unwrap();
+
+    pretty_assertions::assert_eq!(report.removed_by_kind, removed_test_resources(1));
+    pretty_assertions::assert_eq!(report.backlog, 0);
+    assert!(harness.is_purged(&due).await);
+    assert!(!harness.is_purged(&not_yet_due).await);
+    pretty_assertions::assert_eq!(
+        harness.next_due().await,
+        harness.purge_at(&not_yet_due).await
+    );
+}
+
+#[test_log::test(tokio::test)]
+async fn test_purge_batches_stay_bounded() {
+    let harness = RetentionHarness::purging_immediately().await;
+    let mut ids = Vec::new();
+    for name in ["first", "second", "third"] {
+        ids.push(harness.delete_completely(name).await);
+    }
+
+    let first = harness.run_purge_batch(harness.catalog(), 2).await.unwrap();
+    let second = harness.run_purge_batch(harness.catalog(), 2).await.unwrap();
+    let third = harness.run_purge_batch(harness.catalog(), 2).await.unwrap();
+
+    pretty_assertions::assert_eq!(
+        [first, second, third].map(|report| (report.removed(), report.backlog)),
+        [(2, 1), (1, 0), (0, 0)]
+    );
+    for id in &ids {
+        assert!(harness.is_purged(id).await);
+    }
+}
+
+#[test_log::test(tokio::test)]
+async fn test_failed_purge_batch_leaves_everything_for_the_next_one() {
+    let harness = RetentionHarness::purging_immediately().await;
+    let id = harness.delete_completely("res").await;
+    let catalog = harness.catalog_with_removal_listener_failing_once();
+
+    harness.run_purge_batch(&catalog, 10).await.unwrap_err();
+    assert!(!harness.is_purged(&id).await);
+    pretty_assertions::assert_eq!(harness.purged_ids().await, []);
+
+    let report = harness.run_purge_batch(&catalog, 10).await.unwrap();
+    pretty_assertions::assert_eq!(report.removed(), 1);
+    assert!(harness.is_purged(&id).await);
+}
+
+#[test_log::test(tokio::test)]
+async fn test_concurrent_purgers_purge_each_resource_once() {
+    let harness = RetentionHarness::purging_immediately().await;
+    let mut ids = Vec::new();
+    for name in ["first", "second", "third"] {
+        ids.push(harness.delete_completely(name).await);
+    }
+
+    // The second may fail at commit on what the first purged
+    let (first, second) = tokio::join!(
+        harness.run_purge_batch(harness.catalog(), 10),
+        harness.run_purge_batch(harness.catalog(), 10),
+    );
+    let removed: u64 = [first, second]
+        .into_iter()
+        .filter_map(Result::ok)
+        .map(|report| report.removed())
+        .sum();
+
+    pretty_assertions::assert_eq!(removed, 3);
+    let mut purged_ids = harness.purged_ids().await;
+    purged_ids.sort();
+    ids.sort();
+    pretty_assertions::assert_eq!(purged_ids, ids);
+}
+
+#[test_log::test(tokio::test)]
+async fn test_purge_keeps_the_pending_messages_of_purged_resources() {
+    let harness = RetentionHarness::purging_immediately().await;
+    let id = harness.delete_completely("res").await;
+    let pending = harness.lifecycle_messages().await;
+    assert!(
+        pending.iter().any(|message| matches!(
+            message,
+            ResourceLifecycleMessage::Deleted(m) if m.resources.iter().any(|r| r.id == id)
+        )),
+        "the deletion left its message in the outbox"
+    );
+
+    harness
+        .run_purge_batch(harness.catalog(), 10)
+        .await
+        .unwrap();
+
+    let messages = harness.lifecycle_messages().await;
+    pretty_assertions::assert_eq!(messages[..pending.len()], pending[..]);
+    pretty_assertions::assert_eq!(
+        messages[pending.len()..],
+        [ResourceLifecycleMessage::purged(
+            harness.time_source().now(),
+            TestResource::type_uri().clone(),
+            vec![id],
+        )]
+    );
+    // Consumers still get the messages of the purged resource
+    harness.settle().await;
+}
+
+#[test_log::test(tokio::test)]
+async fn test_cli_finalization_purges_one_batch() {
+    let harness = RetentionHarness::purging_immediately().await;
+    let id = harness.delete_completely("res").await;
+
+    harness.finalize_with_housekeeping().await;
+
+    assert!(harness.is_purged(&id).await);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 fn retention_config(
     default: ResourceRetentionPolicy,
     override_of_type: Option<ResourceRetentionPolicy>,
@@ -120,6 +270,17 @@ fn retention_config(
             .collect(),
     }
 }
+
+fn removed_test_resources(count: u64) -> BTreeMap<String, u64> {
+    BTreeMap::from([(
+        resource_type_name(TestResource::type_uri())
+            .unwrap()
+            .to_string(),
+        count,
+    )])
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Harness
@@ -142,11 +303,20 @@ impl RetentionHarness {
         Self::new_with(None).await
     }
 
+    async fn purging_immediately() -> Self {
+        Self::new(retention_config(
+            ResourceRetentionPolicy::PurgeImmediately,
+            None,
+        ))
+        .await
+    }
+
     async fn new_with(retention: Option<ResourceRetentionConfig>) -> Self {
         let base = ServiceLayerTestHarness::new_with_opts(ServiceLayerTestHarnessOpts {
             base_opts: BaseResourceServiceHarnessOpts {
                 outbox_provider: OutboxProvider::Dispatching,
                 transactional: true,
+                fake_time: true,
                 retention,
                 ..Default::default()
             },
@@ -221,8 +391,124 @@ impl RetentionHarness {
         .await
     }
 
+    /// The harness catalog with a removal listener whose first call fails
+    fn catalog_with_removal_listener_failing_once(&self) -> Catalog {
+        let mut b = CatalogBuilder::new_chained(self.catalog());
+        b.add_value(RemovalListenerFailingOnce::default())
+            .bind::<dyn ResourceRemovalListener, RemovalListenerFailingOnce>();
+        b.build()
+    }
+
+    async fn delete_completely(&self, name: &str) -> ResourceID {
+        let id = self.apply_and_request_deletion(name).await;
+        self.complete_deletion(self.catalog(), id).await;
+        id
+    }
+
+    /// One batch of the retention job, working on `catalog`
+    async fn run_purge_batch(
+        &self,
+        catalog: &Catalog,
+        batch_size: usize,
+    ) -> Result<HousekeepingBatchReport, InternalError> {
+        ResourceRetentionJob::new(catalog.weak_ref())
+            .run_batch(self.time_source().now(), batch_size)
+            .await
+    }
+
+    async fn next_due(&self) -> Option<DateTime<Utc>> {
+        ResourceRetentionJob::new(self.catalog().weak_ref())
+            .next_due(self.time_source().now())
+            .await
+            .unwrap()
+    }
+
+    /// Finalizes as a CLI command does, housekeeping included
+    async fn finalize_with_housekeeping(&self) {
+        let mut b = CatalogBuilder::new_chained(self.catalog());
+        b.add_value(HousekeepingConfig::default());
+        b.add::<HousekeepingMetrics>();
+        BackgroundWorkFinalizer::with_housekeeping()
+            .finalize(&b.build())
+            .await
+            .unwrap();
+    }
+
+    /// Whether the resource and its events are gone
+    async fn is_purged(&self, id: &ResourceID) -> bool {
+        let query = ResourceRawEventQuery {
+            schema: TestResource::type_uri().clone(),
+            id: *id,
+        };
+        let events: Vec<_> = self
+            .catalog()
+            .get_one::<dyn ResourceRawEventStore>()
+            .unwrap()
+            .get_events(&query, GetEventsOpts::default())
+            .try_collect()
+            .await
+            .unwrap();
+        let snapshot = self.get_snapshot_by_id(id).await;
+        assert_eq!(
+            snapshot.is_none(),
+            events.is_empty(),
+            "the events go with the resource"
+        );
+        snapshot.is_none()
+    }
+
+    async fn lifecycle_messages(&self) -> Vec<ResourceLifecycleMessage> {
+        self.catalog()
+            .get_one::<dyn OutboxMessageBridge>()
+            .unwrap()
+            .get_messages_by_producer(
+                self.catalog(),
+                MESSAGE_PRODUCER_KAMU_RESOURCE_SERVICE,
+                OutboxMessageBoundary::default(),
+                usize::MAX,
+            )
+            .await
+            .unwrap()
+            .into_iter()
+            .map(|message| serde_json::from_value(message.content_json).unwrap())
+            .collect()
+    }
+
+    /// The resources of every `Purged` message, in order
+    async fn purged_ids(&self) -> Vec<ResourceID> {
+        self.lifecycle_messages()
+            .await
+            .into_iter()
+            .flat_map(|message| match message {
+                ResourceLifecycleMessage::Purged(purged) => purged.ids,
+                ResourceLifecycleMessage::Applied(_)
+                | ResourceLifecycleMessage::DeletionRequested(_)
+                | ResourceLifecycleMessage::Deleted(_)
+                | ResourceLifecycleMessage::StatusUpdated(_) => Vec::new(),
+            })
+            .collect()
+    }
+
     fn primitives_in(catalog: &Catalog) -> Arc<dyn ResourceLifecyclePrimitives<TestResource>> {
         catalog.get_one().unwrap()
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Default)]
+struct RemovalListenerFailingOnce {
+    has_failed: AtomicBool,
+}
+
+#[async_trait::async_trait]
+impl ResourceRemovalListener for RemovalListenerFailingOnce {
+    async fn on_resources_removed(&self, _ids: &[ResourceID]) -> Result<(), InternalError> {
+        if self.has_failed.swap(true, Ordering::SeqCst) {
+            Ok(())
+        } else {
+            Err(InternalError::new("scripted removal listener failure"))
+        }
     }
 }
 

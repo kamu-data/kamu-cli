@@ -9,6 +9,7 @@
 
 use std::collections::HashMap;
 use std::num::NonZeroUsize;
+use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
 use database_common::{
@@ -34,6 +35,7 @@ use kamu_resources::{
     ResourcePurgeDeadline,
     ResourceQuery,
     ResourceRawEventQuery,
+    ResourceRemovalListener,
     ResourceRepository,
     ResourceScope,
     ResourceSnapshot,
@@ -53,6 +55,7 @@ use sqlx::AssertSqlSafe;
 #[interface(dyn ResourceRepository)]
 pub struct SqliteResourceRepository {
     transaction: TransactionRefT<sqlx::Sqlite>,
+    removal_listeners: Vec<Arc<dyn ResourceRemovalListener>>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -984,6 +987,92 @@ impl ResourceRepository for SqliteResourceRepository {
                 purge_at: row.purge_at,
             })
             .collect())
+    }
+
+    async fn count_resources_due_for_purge(
+        &self,
+        now: DateTime<Utc>,
+    ) -> Result<u64, InternalError> {
+        let mut tr = self.transaction.lock().await;
+        let connection_mut = tr.connection_mut().await?;
+
+        let count = sqlx::query_scalar!(
+            r#"
+            SELECT COUNT(*) AS "count!: i64"
+            FROM resources
+            WHERE purge_at IS NOT NULL AND purge_at <= $1
+            "#,
+            now,
+        )
+        .fetch_one(connection_mut)
+        .await
+        .int_err()?;
+
+        u64::try_from(count).int_err()
+    }
+
+    async fn claim_resources_for_purge(
+        &self,
+        ids: &[ResourceID],
+        now: DateTime<Utc>,
+    ) -> Result<Vec<ResourceID>, InternalError> {
+        if ids.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        let mut tr = self.transaction.lock().await;
+        let connection_mut = tr.connection_mut().await?;
+
+        // UUIDs bind as blobs, so the IDs go in as bound values, not JSON
+        let mut query_builder = sqlx::QueryBuilder::<sqlx::Sqlite>::new(
+            "UPDATE resources SET purge_at = NULL WHERE resource_id IN (",
+        );
+        let mut separated = query_builder.separated(", ");
+        for id in ids {
+            separated.push_bind(*id.as_ref());
+        }
+        query_builder
+            .push(") AND purge_at IS NOT NULL AND purge_at <= ")
+            .push_bind(now)
+            .push(" RETURNING resource_id");
+
+        let claimed_ids: Vec<uuid::Uuid> = query_builder
+            .build_query_scalar()
+            .fetch_all(connection_mut)
+            .await
+            .int_err()?;
+
+        Ok(claimed_ids.into_iter().map(ResourceID::new).collect())
+    }
+
+    async fn purge_resources(&self, ids: &[ResourceID]) -> Result<(), InternalError> {
+        if ids.is_empty() {
+            return Ok(());
+        }
+
+        for listener in &self.removal_listeners {
+            listener.on_resources_removed(ids).await?;
+        }
+
+        let mut tr = self.transaction.lock().await;
+        let connection_mut = tr.connection_mut().await?;
+
+        // UUIDs bind as blobs, so the IDs go in as bound values, not JSON
+        let mut query_builder =
+            sqlx::QueryBuilder::<sqlx::Sqlite>::new("DELETE FROM resources WHERE resource_id IN (");
+        let mut separated = query_builder.separated(", ");
+        for id in ids {
+            separated.push_bind(*id.as_ref());
+        }
+        query_builder.push(")");
+
+        query_builder
+            .build()
+            .execute(connection_mut)
+            .await
+            .int_err()?;
+
+        Ok(())
     }
 
     async fn find_nearest_purge_at(

@@ -11,7 +11,7 @@ use std::num::NonZeroUsize;
 use std::sync::Arc;
 use std::time::Duration;
 
-use background_agent_host::CancellationToken;
+use background_agent_host::{BackgroundWorkFinalizer, CancellationToken};
 use chrono::TimeDelta;
 use database_common::transaction;
 use dill::CatalogBuilder;
@@ -43,11 +43,7 @@ use kamu_resources_services::testing::{
     TestResourceSpec,
     test_stage_condition_key,
 };
-use kamu_resources_services::{
-    BackgroundWorkFinalizer,
-    ResourceControllerRuntimeImpl,
-    ResourceControllerRuntimeMetrics,
-};
+use kamu_resources_services::{ResourceControllerRuntimeImpl, ResourceControllerRuntimeMetrics};
 use messaging_outbox::{OutboxMessageBridge, OutboxProvider};
 use retry_backoff::{RetryBackoff, RetryBackoffType};
 use time_source::FakeSystemTimeSource;
@@ -223,7 +219,7 @@ impl ControllerRuntimeHarness {
     /// Delivers the outbox messages and drains the controllers in turn, as a
     /// CLI command does before it exits
     pub async fn try_run_outbox_and_controllers_until_idle(&self) -> Result<(), InternalError> {
-        BackgroundWorkFinalizer::for_dispatching_outbox()
+        BackgroundWorkFinalizer::settle_only()
             .finalize(&self.process_catalog)
             .await
     }
@@ -235,7 +231,7 @@ impl ControllerRuntimeHarness {
         for _ in 0..count {
             let catalog = self.process_catalog.clone();
             finalizations.spawn(async move {
-                BackgroundWorkFinalizer::for_dispatching_outbox()
+                BackgroundWorkFinalizer::settle_only()
                     .finalize(&catalog)
                     .await
             });

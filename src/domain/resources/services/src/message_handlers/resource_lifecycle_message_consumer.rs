@@ -79,8 +79,9 @@ impl MessageConsumerT<ResourceLifecycleMessage> for ResourceLifecycleMessageCons
             ResourceLifecycleMessage::StatusUpdated(status_message) => {
                 self.hints.hint(&status_message.resource.schema);
             }
-            // Nothing is left to do for a resource whose deletion completed
-            ResourceLifecycleMessage::Deleted(_) => {}
+            // Nothing is left to do for a resource whose deletion completed, or
+            // that is gone
+            ResourceLifecycleMessage::Deleted(_) | ResourceLifecycleMessage::Purged(_) => {}
         }
 
         Ok(())

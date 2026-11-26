@@ -11,9 +11,9 @@ use axum::body::{Body, Bytes};
 use axum::extract::Request;
 use axum::middleware::Next;
 use axum::response::Response;
+use background_agent_host::BackgroundWorkFinalizer;
 use http::Method;
 use http_common::ApiError;
-use kamu_resources_services::BackgroundWorkFinalizer;
 use serde::Deserialize;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -33,7 +33,7 @@ pub async fn e2e_middleware_fn(request: Request, next: Next) -> Result<Response,
     let response = next.run(request).await;
 
     if is_mutable_request && response.status().is_success() {
-        BackgroundWorkFinalizer::for_dispatching_outbox()
+        BackgroundWorkFinalizer::settle_only()
             .finalize(&base_catalog)
             .await?;
     }

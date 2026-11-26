@@ -1073,6 +1073,9 @@ impl LifecyclePrimitivesHarness {
                 ResourceLifecycleMessage::StatusUpdated(message) => {
                     format!("StatusUpdated({:?})", message.status.phase)
                 }
+                ResourceLifecycleMessage::Purged(message) => {
+                    format!("Purged({})", message.ids.len())
+                }
             })
             .collect()
     }
@@ -1089,7 +1092,8 @@ impl LifecyclePrimitivesHarness {
                 ResourceLifecycleMessage::StatusUpdated(message) => Some(message),
                 ResourceLifecycleMessage::Applied(_)
                 | ResourceLifecycleMessage::DeletionRequested(_)
-                | ResourceLifecycleMessage::Deleted(_) => None,
+                | ResourceLifecycleMessage::Deleted(_)
+                | ResourceLifecycleMessage::Purged(_) => None,
             })
             .collect()
     }

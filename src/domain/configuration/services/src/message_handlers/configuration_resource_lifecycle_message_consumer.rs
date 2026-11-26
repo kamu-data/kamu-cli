@@ -95,12 +95,14 @@ impl MessageConsumerT<ResourceLifecycleMessage> for ConfigurationResourceLifecyc
                     _ => Ok(()),
                 }
             }
-            // Only a reconciled generation supersedes projection entries, and
-            // deletion cleanup belongs to the reconcilers
+            // Only a reconciled generation supersedes projection entries,
+            // deletion cleanup belongs to the reconcilers, and the entries of a
+            // purged resource go with its row by cascade
             ResourceLifecycleMessage::Applied(_)
             | ResourceLifecycleMessage::DeletionRequested(_)
             | ResourceLifecycleMessage::Deleted(_)
-            | ResourceLifecycleMessage::StatusUpdated(_) => Ok(()),
+            | ResourceLifecycleMessage::StatusUpdated(_)
+            | ResourceLifecycleMessage::Purged(_) => Ok(()),
         }
     }
 }

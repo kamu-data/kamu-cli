@@ -44,10 +44,10 @@ pub trait ResourceControllerStateRepository: Send + Sync {
     /// Inserts the row or replaces the stored one.
     async fn upsert_state(&self, state: &ResourceControllerState) -> Result<(), InternalError>;
 
-    /// Removes the rows of every controller for the resource.
-    async fn delete_states_for_resource(
+    /// Removes the rows of every controller for the resources.
+    async fn delete_states_for_resources(
         &self,
-        resource_id: &ResourceID,
+        resource_ids: &[ResourceID],
     ) -> Result<(), InternalError>;
 
     /// Returns at most `limit` distinct actionable resources, in no

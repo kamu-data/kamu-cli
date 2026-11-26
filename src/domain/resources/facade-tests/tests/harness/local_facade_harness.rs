@@ -10,6 +10,7 @@
 use std::collections::HashSet;
 use std::sync::Arc;
 
+use background_agent_host::BackgroundWorkFinalizer;
 use database_common::{NoOpDatabasePlugin, PaginationOpts};
 use dill::CatalogBuilder;
 use kamu_accounts::{
@@ -61,12 +62,12 @@ use kamu_resources::{
     ResourceVisibility,
 };
 use kamu_resources_facade::{ListResourcesError, ResourceFacade, SearchResourcesRequest};
+use kamu_resources_services::ResourceControllerRuntimeImpl;
 use kamu_resources_services::testing::{
     register_immutable_test_resource,
     register_test_resource,
     register_test_resource_access_rules,
 };
-use kamu_resources_services::{BackgroundWorkFinalizer, ResourceControllerRuntimeImpl};
 use messaging_outbox::{OutboxAgent, OutboxProvider, register_message_dispatcher};
 use strum::IntoEnumIterator;
 use time_source::SystemTimeSourceProvider;
@@ -130,7 +131,6 @@ impl Default for LocalFacadeHarnessOpts {
 
 pub struct LocalFacadeHarness {
     base_catalog: dill::Catalog,
-    dispatching_outbox: bool,
     alice_account_id: odf::AccountID,
     bob_account_id: odf::AccountID,
 }
@@ -179,7 +179,6 @@ impl LocalFacadeHarness {
             base_catalog,
             alice_account_id,
             bob_account_id,
-            dispatching_outbox: is_dispatching,
         }
     }
 
@@ -299,12 +298,10 @@ impl LocalFacadeHarness {
 
     /// See [`FacadeContractHarness::settle`]
     pub async fn settle(&self) {
-        let finalizer = if self.dispatching_outbox {
-            BackgroundWorkFinalizer::for_dispatching_outbox()
-        } else {
-            BackgroundWorkFinalizer::for_immediate_outbox()
-        };
-        finalizer.finalize(&self.base_catalog).await.unwrap();
+        BackgroundWorkFinalizer::settle_only()
+            .finalize(&self.base_catalog)
+            .await
+            .unwrap();
     }
 
     /// A facade acting as the admin account

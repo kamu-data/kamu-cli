@@ -3283,6 +3283,14 @@ pub async fn test_find_resources_due_for_purge(catalog: &Catalog) {
     );
     assert_eq!(due(at(5), 10).await.len(), 3);
 
+    for (now, count) in [(at(1), 0), (at(2), 1), (at(3), 2), (at(5), 3)] {
+        assert_eq!(
+            repo.count_resources_due_for_purge(now).await.unwrap(),
+            count,
+            "now={now}"
+        );
+    }
+
     for (now, nearest) in [
         (at(1), Some(at(2))),
         (at(2), Some(at(3))),
@@ -3346,6 +3354,119 @@ pub async fn test_purge_deadline_is_kept_apart_from_snapshot(catalog: &Catalog) 
     .unwrap();
     assert_eq!(
         repo.find_nearest_purge_at(at(2)).await.unwrap(),
+        Some(at(4))
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_purge_resources(catalog: &Catalog) {
+    let repo = catalog.get_one::<dyn ResourceRepository>().unwrap();
+    let labels = catalog
+        .get_one::<dyn ResourceLabelProjectionRepository>()
+        .unwrap();
+    let owners = catalog
+        .get_one::<dyn ResourceOwnerProjectionRepository>()
+        .unwrap();
+    let account_handle = odf::ResourceOwnerHandle::new_test("test-account");
+    let at = |hour| Utc.with_ymd_and_hms(2026, 1, 1, hour, 0, 0).unwrap();
+
+    let live = create_test_resource(repo.as_ref(), &account_handle, "live").await;
+    let mut deleted = Vec::new();
+    for name in ["due", "also-due", "not-yet-due"] {
+        let snapshot = create_labelled_test_resource(
+            repo.as_ref(),
+            labels.as_ref(),
+            &account_handle,
+            name,
+            ("team", "a"),
+        )
+        .await;
+        owners
+            .replace_owners(&snapshot.id, &[live.id])
+            .await
+            .unwrap();
+        deleted.push(delete_test_resource(repo.as_ref(), snapshot, at(0), at(1)).await);
+    }
+    repo.set_purge_deadlines(&[
+        ResourcePurgeDeadline {
+            id: deleted[0].id,
+            purge_at: at(2),
+        },
+        ResourcePurgeDeadline {
+            id: deleted[1].id,
+            purge_at: at(2),
+        },
+        ResourcePurgeDeadline {
+            id: deleted[2].id,
+            purge_at: at(4),
+        },
+    ])
+    .await
+    .unwrap();
+
+    let mut claimed = repo
+        .claim_resources_for_purge(
+            &[
+                deleted[0].id,
+                deleted[1].id,
+                deleted[2].id,
+                live.id,
+                ResourceID::new(uuid::Uuid::new_v4()),
+            ],
+            at(3),
+        )
+        .await
+        .unwrap();
+    claimed.sort();
+    let mut expected = vec![deleted[0].id, deleted[1].id];
+    expected.sort();
+    assert_eq!(claimed, expected, "only resources past their deadline");
+    assert_eq!(
+        repo.claim_resources_for_purge(&expected, at(5))
+            .await
+            .unwrap(),
+        [],
+        "a claimed resource is not claimed again"
+    );
+    assert_eq!(repo.count_resources_due_for_purge(at(3)).await.unwrap(), 0);
+
+    repo.purge_resources(&claimed).await.unwrap();
+
+    for (resource, is_purged) in [
+        (&deleted[0], true),
+        (&deleted[1], true),
+        (&deleted[2], false),
+        (&live, false),
+    ] {
+        let query = ResourceRawEventQuery {
+            schema: resource.schema.clone(),
+            id: resource.id,
+        };
+        assert_eq!(
+            repo.find_resource_snapshot(&query).await.unwrap().is_none(),
+            is_purged,
+            "{}",
+            resource.headers.name
+        );
+    }
+    for (resource, is_purged) in [(&deleted[0], true), (&deleted[2], false)] {
+        assert_eq!(
+            labels.find_entries(&resource.id).await.unwrap().is_empty(),
+            is_purged,
+            "labels of {}",
+            resource.headers.name
+        );
+        assert_eq!(
+            owners.find_owners(&resource.id).await.unwrap().is_empty(),
+            is_purged,
+            "owners of {}",
+            resource.headers.name
+        );
+    }
+
+    assert_eq!(
+        repo.find_nearest_purge_at(at(3)).await.unwrap(),
         Some(at(4))
     );
 }

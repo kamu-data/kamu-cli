@@ -328,6 +328,12 @@ database_transactional_test!(
     harness = PostgresResourceRepositoryHarness
 );
 
+database_transactional_test!(
+    storage = postgres,
+    fixture = resource_repo_suite::test_purge_resources,
+    harness = PostgresResourceRepositoryHarness
+);
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 database_transactional_test!(

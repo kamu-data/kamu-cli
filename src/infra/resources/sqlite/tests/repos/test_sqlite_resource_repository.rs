@@ -328,6 +328,12 @@ database_transactional_test!(
     harness = SqliteResourceRepositoryHarness
 );
 
+database_transactional_test!(
+    storage = sqlite,
+    fixture = resource_repo_suite::test_purge_resources,
+    harness = SqliteResourceRepositoryHarness
+);
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 database_transactional_test!(

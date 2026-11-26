@@ -8,3 +8,6 @@
 // by the Apache License, Version 2.0.
 
 mod test_background_agent_host;
+mod test_background_work_finalizer;
+mod test_housekeeping_agent;
+mod utils;

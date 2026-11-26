@@ -10,7 +10,7 @@
 use std::assert_matches;
 use std::time::Duration;
 
-use chrono::Utc;
+use chrono::{TimeDelta, Utc};
 use database_common::TransactionRefT;
 use dill::{Catalog, CatalogBuilder};
 use event_sourcing::EventID;
@@ -18,6 +18,7 @@ use kamu_resources::{
     ResourceHeaders,
     ResourceHeadersExt,
     ResourceID,
+    ResourcePurgeDeadline,
     ResourceRepository,
     ResourceSnapshot,
     TypeUri,
@@ -40,6 +41,26 @@ async fn test_update_resource_in_concurrent_transactions(pg_pool: PgPool) {
         .await;
 
     assert_matches!(res, Err(UpdateResourceError::ConcurrentModification(_)));
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_group::group(database, postgres)]
+#[test_log::test(sqlx::test(migrations = "../../../../migrations/postgres"))]
+async fn test_second_of_concurrent_purgers_claims_nothing(pg_pool: PgPool) {
+    let harness = ConcurrentResourceUpdatesHarness::new(pg_pool);
+
+    let mut due_ids = Vec::new();
+    for name in ["first", "second"] {
+        due_ids.push(harness.create_resource_due_for_purge(name).await);
+    }
+    due_ids.sort();
+
+    let (mut first_claim, second_claim) = harness.claim_in_racing_transactions(&due_ids).await;
+
+    first_claim.sort();
+    assert_eq!(first_claim, due_ids);
+    assert_eq!(second_claim, [], "the deadline the first purger cleared");
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -76,6 +97,74 @@ impl ConcurrentResourceUpdatesHarness {
         drop(repo);
         Self::commit(transaction).await;
         snapshot
+    }
+
+    /// A committed resource whose purge deadline has passed
+    async fn create_resource_due_for_purge(&self, name: &str) -> ResourceID {
+        let transaction = TransactionRefT::<Postgres>::new(self.pg_pool.clone());
+        let repo = Self::repo_in(&transaction);
+
+        let id: ResourceID = repo.new_resource_id().await.unwrap();
+        let snapshot = ResourceSnapshot {
+            id,
+            schema: TypeUri::new_unchecked("TestKind"),
+            headers: ResourceHeaders::simple(
+                Utc::now(),
+                id,
+                odf::ResourceOwnerHandle::new_test("test-account"),
+                name,
+            ),
+            spec: serde_json::json!({}),
+            status: None,
+            last_event_id: None,
+        };
+        repo.create_resource(&snapshot).await.unwrap();
+        repo.set_purge_deadlines(&[ResourcePurgeDeadline {
+            id,
+            purge_at: Utc::now() - TimeDelta::hours(1),
+        }])
+        .await
+        .unwrap();
+
+        drop(repo);
+        Self::commit(transaction).await;
+        id
+    }
+
+    /// Both transactions claim `ids`, which both found due. The first commits
+    /// while the claim of the second is in flight; returns both claims.
+    async fn claim_in_racing_transactions(
+        &self,
+        ids: &[ResourceID],
+    ) -> (Vec<ResourceID>, Vec<ResourceID>) {
+        let first_transaction = TransactionRefT::<Postgres>::new(self.pg_pool.clone());
+        let second_transaction = TransactionRefT::<Postgres>::new(self.pg_pool.clone());
+        let now = Utc::now();
+
+        let first_repo = Self::repo_in(&first_transaction);
+        let first_claim = first_repo
+            .claim_resources_for_purge(ids, now)
+            .await
+            .unwrap();
+        drop(first_repo);
+
+        let second_repo = Self::repo_in(&second_transaction);
+        let second_ids = ids.to_vec();
+        let second_claim = tokio::spawn(async move {
+            second_repo
+                .claim_resources_for_purge(&second_ids, now)
+                .await
+                .unwrap()
+        });
+
+        // Let the second claim reach the database before the first commits
+        tokio::time::sleep(Duration::from_millis(200)).await;
+
+        Self::commit(first_transaction).await;
+        let second_claim = second_claim.await.unwrap();
+        Self::commit(second_transaction).await;
+
+        (first_claim, second_claim)
     }
 
     /// Both transactions update `snapshot` expecting its current last event.

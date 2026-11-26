@@ -1,0 +1,29 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            UPDATE resources\n            SET purge_at = NULL\n            WHERE resource_id = ANY($1)\n              AND purge_at IS NOT NULL\n              AND purge_at <= $2\n            RETURNING resource_id AS \"id: uuid::Uuid\"\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id: uuid::Uuid",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "resources",
+            "name": "resource_id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "UuidArray",
+        "Timestamptz"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "1a93731022922ad41e92ec0f1dfc29d284fc4f0f4b42b7f7fbae302630b54ffb"
+}
