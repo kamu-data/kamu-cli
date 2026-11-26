@@ -141,7 +141,7 @@ long-term goal. This page documents what exists now.
 | **Spec** | The desired-state portion authored by the user; stored as `serde_json::Value`. |
 | **Status** | Server-owned observed state (`ResourceStatus`), written only by the lifecycle primitives ([§9](#lifecycle-primitives)); see [Status fields](#status-fields). `generation` lives in **headers**, not status. |
 | **Snapshot** | The persisted materialized form of a resource (`ResourceSnapshot`). |
-| **Phase** | Lifecycle stage: `Pending`, `Reconciling`, `Ready`, `Degraded`, `Failed`, `Deleting`, `Deleted` (ODF `ResourcePhase`). `Pending`, `Deleting` and `Deleted` are derived from the headers, deletion first: `Deleted` once `deletedAt` is set, `Deleting` once `deletionRequestedAt` is set, otherwise `Pending` whenever `observedGeneration` is absent or lower than `generation`. See [§13 state machine](#lifecycle-state-machine). |
+| **Phase** | Lifecycle stage: `Pending`, `Reconciling`, `Ready`, `Degraded`, `Failed`, `Deleting`, `Deleted` (ODF `ResourcePhase`). Never written by a status writer: derived from the headers and the rest of the status. See [§13 state machine](#lifecycle-state-machine). |
 | **Two-phase deletion** | Deleting a resource requests its deletion (`Deleting`); its main controller cleans up, then the deletion completes (`Deleted`). A resource being deleted gives up its name at once. See [(c) Deletion](#c-deletion). |
 | **Condition** | A status signal keyed by a registered condition schema URI, set and removed one by one through [condition patches](#condition-patches). See [Status fields](#status-fields) for the built-in one. |
 | **generation / observedGeneration / reconciledGeneration** | `generation` bumps on each spec/headers change; `observedGeneration` is the last one a reconciliation started on, `reconciledGeneration` the last one reconciled successfully. Reconciliation is needed while `reconciledGeneration` is absent or lower than `generation`. |
@@ -450,7 +450,7 @@ when the owners change. The owned resource must exist; the owner may be gone.
 - `Deleted` sets `deletedAt` and bumps `statusGeneration`. Resources deleted before
   `DeletionRequested` existed have a `Deleted` event alone; replaying it also sets
   `deletionRequestedAt`. The `tombstone_name` of older `Deleted` events is ignored.
-- The projector derives the `Pending`, `Deleting` and `Deleted` phases after each of them
+- The projector derives the phase after each of them, and after every other event
   ([state machine](#lifecycle-state-machine)); that derivation is not a status update.
 
 `Created.spec` and `SpecUpdated.new_spec` are instantiated with `R::SpecInput`, not `R::Spec` — the
@@ -1982,14 +1982,30 @@ projections**.
 
 ### Lifecycle state machine
 
-Below is the machine as implemented for `VariableSet`, `SecretSet` and `Storage`. The status transitions
-come from `ResourceStatusExt` in
-[`state/resource_status.rs`](/src/domain/resources/domain/src/state/resource_status.rs)
-(`mark_reconciling` → `Reconciling`, `mark_ready` → `Ready`, `mark_failed_or_degraded` → `Failed`
-or `Degraded`, `mark_cleanup_failed` → still `Deleting`); `Pending`, `Deleting` and `Deleted` are
-derived by `align_phase`. A `mark_reconciling` that would move `observedGeneration` back, or a
-`mark_ready` for a generation not observed or already reconciled, fails the command with an
-invariant violation and leaves the status unchanged.
+Below is the machine as implemented for `VariableSet`, `SecretSet` and `Storage`. No status writer
+sets the phase: `ResourceStatusExt::derive_phase` in
+[`state/resource_status.rs`](/src/domain/resources/domain/src/state/resource_status.rs) computes it
+from the headers and the rest of the status. The projector applies it after every event, also
+when old events are replayed, and `try_update_resource_status` applies it to a new status before
+saving it, so a stored `StatusUpdated` carries the phase the projector would compute. The first
+matching row wins:
+
+| Headers and status | Phase |
+|---|---|
+| `deletedAt` set | `Deleted` |
+| `deletionRequestedAt` set | `Deleting` |
+| `observedGeneration` absent or lower than `generation` | `Pending` |
+| `reconciledGeneration` at least `generation` | `Ready` |
+| no `ReconciliationError` condition | `Reconciling` |
+| no `reconciledGeneration` | `Failed` |
+| otherwise | `Degraded` |
+
+The `ResourceStatusExt` transitions change only those inputs: `mark_reconciling` sets
+`observedGeneration` and removes the `ReconciliationError`, `mark_ready` sets
+`reconciledGeneration` and removes it, `mark_failed_or_degraded` and `mark_cleanup_failed` set it.
+A `mark_reconciling` that would move `observedGeneration` back, or a `mark_ready` for a generation
+not observed or already reconciled, fails the command with an invariant violation and leaves the
+status unchanged.
 
 ```mermaid
 stateDiagram-v2
@@ -2000,6 +2016,8 @@ stateDiagram-v2
     Reconciling --> Degraded: failed, an earlier generation reconciled
     Reconciling --> Pending: spec/headers changed<br/>(outcome discarded)
     Ready --> Pending: spec/headers changed<br/>(generation bumps)
+    Failed --> Reconciling: transient failure retried<br/>(error removed)
+    Degraded --> Reconciling: transient failure retried<br/>(error removed)
     Failed --> Pending: re-apply (generation bumps)
     Degraded --> Pending: re-apply (generation bumps)
     Ready --> Deleting: delete
@@ -2014,13 +2032,13 @@ stateDiagram-v2
 
 **Notes on current behavior:**
 
-- **`Pending` is not written, it is derived.** A spec or header change bumps `generation` and leaves
-  the status as it was last written, so the conditions of the previous reconciliation stay
-  visible while the phase shows `Pending` and then `Reconciling`. The outcome of that
-  reconciliation replaces them: success clears `ReconciliationError`, a failure sets it again.
-- **`Failed` and `Degraded` are the unhealthy phases**, set by `mark_failed_or_degraded` with a
-  `ReconciliationError` condition carrying the code and message: `Failed` when no generation was ever
-  reconciled, `Degraded` when an earlier one was and is presumably still in effect.
+- **A spec or header change leaves the status as it was last written.** `generation` bumps, so the
+  phase shows `Pending` while the conditions of the previous reconciliation stay visible. Starting
+  the next reconciliation removes the previous `ReconciliationError`, so the phase shows
+  `Reconciling`; a failure writes it again.
+- **`Failed` and `Degraded` are the unhealthy phases**, shown while a `ReconciliationError`
+  condition with the code and message is present: `Failed` when no generation was ever reconciled,
+  `Degraded` when an earlier one was and is presumably still in effect.
 - **Neither is terminal.** A failure the reconciler marks transient is retried by the controller
   runtime with a growing backoff. Any other failure waits for the user to re-apply a changed
   manifest: the generation bumps and the runtime reconciles it again.
@@ -2028,6 +2046,9 @@ stateDiagram-v2
   reconciliation.
 - **Deletion phases take precedence** over every other phase, and are final: a resource being
   deleted is never reconciled again.
+- **Replay ignores the phase stored in an event.** A `StatusUpdated` whose phase disagrees with
+  its inputs, such as `Reconciling` with the error of the previous attempt still present, loads
+  with the derived one (`Failed`) until the next reconciliation starts.
 
 ---
 

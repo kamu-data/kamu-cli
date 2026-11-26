@@ -223,10 +223,10 @@ fn test_failed_then_retried_then_degraded() {
     assert!(harness.needs_reconciliation());
     harness.assert_reconciliation_error(Some("internal-error"));
 
-    // The error of the previous attempt stays visible during a retry
+    // A retry removes the error of the previous attempt
     harness.mark_started();
     assert_eq!(harness.phase(), ResourcePhase::Reconciling);
-    harness.assert_reconciliation_error(Some("internal-error"));
+    harness.assert_reconciliation_error(None);
 
     harness.mark_succeeded();
     assert_eq!(harness.phase(), ResourcePhase::Ready);
@@ -276,6 +276,9 @@ fn test_success_of_unobserved_generation_is_an_invariant_violation() {
 #[test]
 fn test_observing_an_older_generation_is_an_invariant_violation() {
     let mut harness = ResourceLifecycleHarness::new();
+    // A failed attempt, so that the start is not skipped as already reconciling
+    harness.mark_started();
+    harness.mark_failed();
     let mut status = harness.status();
     status.observed_generation = Some(5);
     let status_generation = harness.generations().1;

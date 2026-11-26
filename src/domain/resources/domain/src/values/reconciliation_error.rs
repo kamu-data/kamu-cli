@@ -41,6 +41,8 @@ pub trait ResourceConditionsReconciliationErrorExt {
     fn set_reconciliation_error(&mut self, error: ReconciliationError);
 
     fn clear_reconciliation_error(&mut self);
+
+    fn has_reconciliation_error(&self) -> bool;
 }
 
 impl ResourceConditionsReconciliationErrorExt for ResourceConditions {
@@ -54,6 +56,10 @@ impl ResourceConditionsReconciliationErrorExt for ResourceConditions {
 
     fn clear_reconciliation_error(&mut self) {
         self.entries.remove(&reconciliation_error_type_ref());
+    }
+
+    fn has_reconciliation_error(&self) -> bool {
+        self.entries.contains_key(&reconciliation_error_type_ref())
     }
 }
 

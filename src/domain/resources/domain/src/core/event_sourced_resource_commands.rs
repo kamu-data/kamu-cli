@@ -266,12 +266,13 @@ where
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// Replaces the status, provided it is still at `expected_status_generation`.
-/// A status equal to the current one is not an update.
+/// The phase of `new_status` is replaced by the derived one, and a status
+/// equal to the current one after that is not an update.
 pub fn try_update_resource_status<R>(
     resource: &mut R,
     now: DateTime<Utc>,
     expected_status_generation: u64,
-    new_status: ResourceStatus,
+    mut new_status: ResourceStatus,
 ) -> Result<(), R::LifecycleError>
 where
     R: EventSourcedResource,
@@ -279,6 +280,7 @@ where
 {
     ensure_status_generation(resource, expected_status_generation)?;
 
+    new_status.align_phase(resource.headers());
     if resource.status() == &new_status {
         return Ok(());
     }

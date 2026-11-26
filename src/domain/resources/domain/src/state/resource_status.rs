@@ -58,13 +58,21 @@ pub trait ResourceStatusExt {
 
     fn was_reconciled(&self, generation: u64) -> bool;
 
-    /// Derives the phase from the headers: deletion phases take precedence,
-    /// then `Pending` while the main controller has not observed the current
-    /// generation. Runs after every change of the resource.
+    /// The phase the headers and the rest of the status imply. Deletion phases
+    /// take precedence, then `Pending` while the main controller has not
+    /// observed the current generation; an observed generation is `Ready` once
+    /// reconciled, `Failed` or `Degraded` while a `ReconciliationError` is
+    /// present (`Degraded` if an earlier generation was reconciled), and
+    /// `Reconciling` otherwise.
+    fn derive_phase(&self, headers: &ResourceHeaders) -> ResourcePhase;
+
+    /// Sets the phase to [`Self::derive_phase`]. Runs after every change of the
+    /// resource and before every status update is saved, so no status writer
+    /// sets the phase itself.
     fn align_phase(&mut self, headers: &ResourceHeaders);
 
-    /// Updates observed generation and indicates that reconciliation had started.
-    /// The error of a previous attempt stays until this one has a result.
+    /// Updates observed generation and indicates that reconciliation had
+    /// started, removing the error of a previous attempt.
     /// Fails, leaving the status as is, if the generation moves backwards.
     fn mark_reconciling(
         &mut self,
@@ -81,7 +89,8 @@ pub trait ResourceStatusExt {
         now: DateTime<Utc>,
     ) -> Result<(), IllegalStatusTransitionError>;
 
-    /// Indicates failed reconciliation attempt
+    /// Records the error of a failed reconciliation attempt, which makes the
+    /// phase `Failed` or `Degraded`
     fn mark_failed_or_degraded(&mut self, code: impl Into<String>, message: impl Into<String>);
 
     /// Indicates that cleaning up a resource being deleted failed
@@ -99,14 +108,26 @@ impl ResourceStatusExt for ResourceStatus {
             .is_some_and(|reconciled_generation| reconciled_generation >= generation)
     }
 
-    fn align_phase(&mut self, headers: &ResourceHeaders) {
+    fn derive_phase(&self, headers: &ResourceHeaders) -> ResourcePhase {
         if headers.deleted_at.is_some() {
-            self.phase = ResourcePhase::Deleted;
+            ResourcePhase::Deleted
         } else if headers.deletion_requested_at.is_some() {
-            self.phase = ResourcePhase::Deleting;
+            ResourcePhase::Deleting
         } else if !self.was_observed(headers.generation) {
-            self.phase = ResourcePhase::Pending;
+            ResourcePhase::Pending
+        } else if self.was_reconciled(headers.generation) {
+            ResourcePhase::Ready
+        } else if !self.conditions.has_reconciliation_error() {
+            ResourcePhase::Reconciling
+        } else if self.reconciled_generation.is_none() {
+            ResourcePhase::Failed
+        } else {
+            ResourcePhase::Degraded
         }
+    }
+
+    fn align_phase(&mut self, headers: &ResourceHeaders) {
+        self.phase = self.derive_phase(headers);
     }
 
     fn mark_reconciling(
@@ -123,9 +144,9 @@ impl ResourceStatusExt for ResourceStatus {
             )));
         }
 
-        self.phase = ResourcePhase::Reconciling;
         self.observed_generation = Some(observed_generation);
         self.observed_at = Some(now);
+        self.conditions.clear_reconciliation_error();
         Ok(())
     }
 
@@ -147,7 +168,6 @@ impl ResourceStatusExt for ResourceStatus {
             )));
         }
 
-        self.phase = ResourcePhase::Ready;
         self.reconciled_generation = Some(reconciled_generation);
         self.reconciled_at = Some(now);
         self.conditions.clear_reconciliation_error();
@@ -155,12 +175,6 @@ impl ResourceStatusExt for ResourceStatus {
     }
 
     fn mark_failed_or_degraded(&mut self, code: impl Into<String>, message: impl Into<String>) {
-        self.phase = if self.reconciled_generation.is_none() {
-            ResourcePhase::Failed
-        } else {
-            ResourcePhase::Degraded
-        };
-
         self.conditions
             .set_reconciliation_error(ReconciliationError {
                 code: code.into(),
@@ -189,6 +203,110 @@ pub struct IllegalStatusTransitionError {
 impl IllegalStatusTransitionError {
     fn new(message: String) -> Self {
         Self { message }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[cfg(test)]
+mod tests {
+    use chrono::{DateTime, Utc};
+    use pretty_assertions::assert_eq;
+
+    use super::*;
+    use crate::{ResourceHeadersExt, ResourceID};
+
+    const GENERATION: u64 = 2;
+
+    #[derive(Clone, Copy, Debug)]
+    enum Deletion {
+        None,
+        Requested,
+        Completed,
+    }
+
+    // (observed generation, reconciled generation, has a reconciliation error,
+    // phase without deletion)
+    const CASES: &[(Option<u64>, Option<u64>, bool, ResourcePhase)] = &[
+        (None, None, false, ResourcePhase::Pending),
+        (None, None, true, ResourcePhase::Pending),
+        (Some(1), None, false, ResourcePhase::Pending),
+        (Some(1), None, true, ResourcePhase::Pending),
+        (Some(1), Some(1), false, ResourcePhase::Pending),
+        (Some(1), Some(1), true, ResourcePhase::Pending),
+        (Some(2), None, false, ResourcePhase::Reconciling),
+        (Some(2), None, true, ResourcePhase::Failed),
+        (Some(2), Some(1), false, ResourcePhase::Reconciling),
+        (Some(2), Some(1), true, ResourcePhase::Degraded),
+        (Some(2), Some(2), false, ResourcePhase::Ready),
+        (Some(2), Some(2), true, ResourcePhase::Ready),
+    ];
+
+    #[test]
+    fn test_derive_phase_over_all_inputs() {
+        for &(observed, reconciled, has_error, phase) in CASES {
+            for deletion in [Deletion::None, Deletion::Requested, Deletion::Completed] {
+                let expected = match deletion {
+                    Deletion::None => phase,
+                    Deletion::Requested => ResourcePhase::Deleting,
+                    Deletion::Completed => ResourcePhase::Deleted,
+                };
+
+                let status = status(observed, reconciled, has_error);
+                assert_eq!(
+                    status.derive_phase(&headers(deletion)),
+                    expected,
+                    "observed {observed:?}, reconciled {reconciled:?}, error {has_error}, \
+                     deletion {deletion:?}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn test_reconciliation_start_clears_previous_error() {
+        let mut status = status(Some(1), Some(1), true);
+
+        status.mark_reconciling(GENERATION, now()).unwrap();
+
+        assert!(!status.conditions.has_reconciliation_error());
+        assert_eq!(
+            status.derive_phase(&headers(Deletion::None)),
+            ResourcePhase::Reconciling
+        );
+    }
+
+    fn status(observed: Option<u64>, reconciled: Option<u64>, has_error: bool) -> ResourceStatus {
+        let mut status = new_pending_resource_status();
+        status.observed_generation = observed;
+        status.reconciled_generation = reconciled;
+        if has_error {
+            status.mark_failed_or_degraded("code", "message");
+        }
+        status
+    }
+
+    fn headers(deletion: Deletion) -> ResourceHeaders {
+        let mut headers = ResourceHeaders::simple(
+            now(),
+            ResourceID::new(uuid::Uuid::nil()),
+            odf::ResourceOwnerHandle::new_test("owner"),
+            "res",
+        );
+        headers.generation = GENERATION;
+        match deletion {
+            Deletion::None => {}
+            Deletion::Requested => headers.deletion_requested_at = Some(now()),
+            Deletion::Completed => {
+                headers.deletion_requested_at = Some(now());
+                headers.deleted_at = Some(now());
+            }
+        }
+        headers
+    }
+
+    fn now() -> DateTime<Utc> {
+        DateTime::UNIX_EPOCH
     }
 }
 
