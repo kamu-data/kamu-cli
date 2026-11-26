@@ -56,6 +56,7 @@ use kamu_resources::{
     ResourceControllerRuntimeConfig,
     ResourceLifecycleMessage,
     ResourceOwnerRef,
+    ResourceRetentionConfig,
     ResourceSelector,
     ResourceVisibility,
 };
@@ -227,7 +228,8 @@ impl LocalFacadeHarness {
 
         // Resource controllers
         b.add::<ResourceControllerRuntimeImpl>()
-            .add_value(ResourceControllerRuntimeConfig::default());
+            .add_value(ResourceControllerRuntimeConfig::default())
+            .add_value(ResourceRetentionConfig::default());
 
         // Accounts
         b.add::<InMemoryAccountRepository>()

@@ -57,6 +57,10 @@ pub struct CLIConfig {
     #[config(default)]
     pub background_agents: BackgroundAgentsConfig,
 
+    /// Resources configuration
+    #[config(default)]
+    pub resources: ResourcesConfig,
+
     /// Network protocols configuration
     #[config(default)]
     pub protocol: ProtocolConfig,
@@ -92,6 +96,145 @@ pub struct CLIConfig {
     /// Experimental and temporary configuration options
     #[config(default)]
     pub extra: ExtraConfig,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Resources
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(setty::Config, setty::Default)]
+pub struct ResourcesConfig {
+    /// How long deleted resources are kept before they may be purged
+    #[config(default)]
+    pub retention: ResourceRetentionConfig,
+}
+
+/// A type's retention is, first found: its entry in `types`, the type's own
+/// default, `default`. Each value is a duration such as `7d`, `forever` or
+/// `immediately`
+#[derive(setty::Config, setty::Default)]
+pub struct ResourceRetentionConfig {
+    /// Retention of the types that neither are listed in `types` nor declare
+    /// their own
+    #[config(default_str = "7d", combine(replace))]
+    pub default: ResourceRetentionValue,
+
+    /// Retention per resource type, by short type name such as `VariableSet`
+    #[config(default)]
+    pub types: BTreeMap<String, ResourceRetentionValue>,
+}
+
+impl ResourceRetentionConfig {
+    pub fn into_system(&self) -> Result<kamu_resources::ResourceRetentionConfig, CLIError> {
+        let types = self
+            .types
+            .iter()
+            .map(|(type_name, value)| {
+                let type_name = type_name
+                    .parse::<kamu_resources::TypeName>()
+                    .map_err(|err| {
+                        CLIError::usage_error(format!(
+                            "Invalid resource type '{type_name}' in resources.retention.types: \
+                             {err}"
+                        ))
+                    })?;
+                Ok((type_name, value.into_system()))
+            })
+            .collect::<Result<_, CLIError>>()?;
+
+        Ok(kamu_resources::ResourceRetentionConfig {
+            default: self.default.into_system(),
+            types,
+        })
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// A retention period: a duration, `forever` or `immediately`
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub enum ResourceRetentionValue {
+    Immediately,
+    For(DurationString),
+    Forever,
+}
+
+impl ResourceRetentionValue {
+    const FOREVER: &str = "forever";
+    const IMMEDIATELY: &str = "immediately";
+
+    pub fn into_system(self) -> kamu_resources::ResourceRetentionPolicy {
+        use kamu_resources::ResourceRetentionPolicy as P;
+
+        match self {
+            Self::Immediately => P::PurgeImmediately,
+            Self::For(duration) => P::RetainFor(
+                chrono::TimeDelta::from_std(duration.into()).unwrap_or(chrono::TimeDelta::MAX),
+            ),
+            Self::Forever => P::RetainForever,
+        }
+    }
+}
+
+impl std::str::FromStr for ResourceRetentionValue {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            Self::FOREVER => Ok(Self::Forever),
+            Self::IMMEDIATELY => Ok(Self::Immediately),
+            duration => duration.parse().map(Self::For).map_err(|_| {
+                format!(
+                    "Invalid retention '{duration}': expected a duration such as '7d', '{}' or \
+                     '{}'",
+                    Self::FOREVER,
+                    Self::IMMEDIATELY
+                )
+            }),
+        }
+    }
+}
+
+impl std::fmt::Display for ResourceRetentionValue {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Immediately => f.write_str(Self::IMMEDIATELY),
+            Self::For(duration) => duration.fmt(f),
+            Self::Forever => f.write_str(Self::FOREVER),
+        }
+    }
+}
+
+impl std::fmt::Debug for ResourceRetentionValue {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        std::fmt::Display::fmt(self, f)
+    }
+}
+
+impl serde::Serialize for ResourceRetentionValue {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        serializer.collect_str(self)
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for ResourceRetentionValue {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let s = String::deserialize(deserializer)?;
+        s.parse().map_err(serde::de::Error::custom)
+    }
+}
+
+impl schemars::JsonSchema for ResourceRetentionValue {
+    fn schema_name() -> std::borrow::Cow<'static, str> {
+        "ResourceRetentionValue".into()
+    }
+
+    fn json_schema(_generator: &mut schemars::SchemaGenerator) -> schemars::Schema {
+        schemars::json_schema!({
+            "type": "string",
+            "description": "A duration such as `7d`, `forever` or `immediately`",
+        })
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

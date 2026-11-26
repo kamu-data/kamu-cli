@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use chrono::{DateTime, Utc};
 use database_common::{
     InMemoryMapView,
     InMemoryMapWrite,
@@ -42,10 +43,12 @@ impl ResourceLookupKey {
 
 /// Resource snapshots and the names they hold. A name is a key of its own, as
 /// the partial unique index of the SQL backends makes it a row of its own, so
-/// two transactions taking one name conflict at commit
+/// two transactions taking one name conflict at commit. Purge deadlines are a
+/// map of their own, which snapshot writes leave alone
 pub struct InMemoryResourceState {
     snapshots_by_id: InMemoryTransactionalMap<ResourceID, ResourceSnapshot>,
     ids_by_lookup_key: InMemoryTransactionalMap<ResourceLookupKey, ResourceID>,
+    purge_deadlines_by_id: InMemoryTransactionalMap<ResourceID, DateTime<Utc>>,
 }
 
 #[component(pub)]
@@ -56,10 +59,11 @@ impl InMemoryResourceState {
         Self {
             snapshots_by_id: InMemoryTransactionalMap::new(),
             ids_by_lookup_key: InMemoryTransactionalMap::new(),
+            purge_deadlines_by_id: InMemoryTransactionalMap::new(),
         }
     }
 
-    /// Reads both maps as one transaction sees them
+    /// Reads the maps as one transaction sees them
     pub(crate) fn read<R>(
         &self,
         transaction_id: Option<TransactionId>,
@@ -69,10 +73,14 @@ impl InMemoryResourceState {
             .read(transaction_id, |snapshots_by_id| {
                 self.ids_by_lookup_key
                     .read(transaction_id, |ids_by_lookup_key| {
-                        read(&ResourceStateView {
-                            snapshots_by_id,
-                            ids_by_lookup_key,
-                        })
+                        self.purge_deadlines_by_id
+                            .read(transaction_id, |purge_deadlines_by_id| {
+                                read(&ResourceStateView {
+                                    snapshots_by_id,
+                                    ids_by_lookup_key,
+                                    purge_deadlines_by_id,
+                                })
+                            })
                     })
             })
     }
@@ -95,9 +103,23 @@ impl InMemoryResourceState {
                     })
             })
     }
+
+    /// Changes the purge deadlines, which no snapshot write touches
+    pub(crate) fn write_purge_deadlines<R>(
+        &self,
+        transaction_id: Option<TransactionId>,
+        write: impl FnOnce(&mut InMemoryMapWrite<'_, ResourceID, DateTime<Utc>>) -> R,
+    ) -> R {
+        self.purge_deadlines_by_id.write(transaction_id, write)
+    }
 }
 
-in_memory_transaction_participant!(InMemoryResourceState, snapshots_by_id, ids_by_lookup_key);
+in_memory_transaction_participant!(
+    InMemoryResourceState,
+    snapshots_by_id,
+    ids_by_lookup_key,
+    purge_deadlines_by_id
+);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -105,6 +127,7 @@ in_memory_transaction_participant!(InMemoryResourceState, snapshots_by_id, ids_b
 pub(crate) struct ResourceStateView<'v, 'a> {
     snapshots_by_id: &'v InMemoryMapView<'a, ResourceID, ResourceSnapshot>,
     ids_by_lookup_key: &'v InMemoryMapView<'a, ResourceLookupKey, ResourceID>,
+    purge_deadlines_by_id: &'v InMemoryMapView<'a, ResourceID, DateTime<Utc>>,
 }
 
 impl<'a> ResourceStateView<'_, 'a> {
@@ -114,6 +137,14 @@ impl<'a> ResourceStateView<'_, 'a> {
 
     pub(crate) fn snapshots(&self) -> impl Iterator<Item = &'a ResourceSnapshot> + 'a {
         self.snapshots_by_id.iter().map(|(_, snapshot)| snapshot)
+    }
+
+    /// The resources that have a purge deadline, with it
+    pub(crate) fn purge_deadlines(&self) -> Vec<(&'a ResourceSnapshot, DateTime<Utc>)> {
+        self.purge_deadlines_by_id
+            .iter()
+            .filter_map(|(id, purge_at)| Some((self.snapshots_by_id.get(id)?, *purge_at)))
+            .collect()
     }
 
     /// The live resource holding the name

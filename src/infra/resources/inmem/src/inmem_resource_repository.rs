@@ -11,6 +11,7 @@ use std::cmp::Reverse;
 use std::collections::HashMap;
 use std::sync::Arc;
 
+use chrono::{DateTime, Utc};
 use database_common::{InMemoryMapWrite, PaginationOpts, TransactionId, TransactionRef};
 use dill::*;
 use event_sourcing::EventID;
@@ -19,6 +20,7 @@ use internal_error::InternalError;
 use kamu_accounts::AccountRepository;
 use kamu_resources::{
     CreateResourceError,
+    ResourceDueForPurge,
     ResourceDuplicateError,
     ResourceHandleRow,
     ResourceHeadersExt,
@@ -27,6 +29,7 @@ use kamu_resources::{
     ResourceName,
     ResourcePhase,
     ResourcePhaseCounts,
+    ResourcePurgeDeadline,
     ResourceQuery,
     ResourceRawEventQuery,
     ResourceRepository,
@@ -619,6 +622,63 @@ impl ResourceRepository for InMemoryResourceRepository {
         rows.sort_by(|lhs, rhs| lhs.schema.cmp(&rhs.schema));
 
         Ok(rows)
+    }
+
+    async fn set_purge_deadlines(
+        &self,
+        deadlines: &[ResourcePurgeDeadline],
+    ) -> Result<(), InternalError> {
+        let existing = self.state.read(self.transaction_id, |view| {
+            deadlines
+                .iter()
+                .filter(|deadline| view.snapshot(&deadline.id).is_some())
+                .copied()
+                .collect::<Vec<_>>()
+        });
+
+        self.state
+            .write_purge_deadlines(self.transaction_id, |purge_deadlines_by_id| {
+                for deadline in existing {
+                    purge_deadlines_by_id.overwrite(deadline.id, deadline.purge_at);
+                }
+            });
+
+        Ok(())
+    }
+
+    async fn find_resources_due_for_purge(
+        &self,
+        now: DateTime<Utc>,
+        limit: usize,
+    ) -> Result<Vec<ResourceDueForPurge>, InternalError> {
+        let mut due = self.state.read(self.transaction_id, |view| {
+            view.purge_deadlines()
+                .into_iter()
+                .filter(|(_, purge_at)| *purge_at <= now)
+                .map(|(snapshot, purge_at)| ResourceDueForPurge {
+                    id: snapshot.id,
+                    schema: snapshot.schema.clone(),
+                    purge_at,
+                })
+                .collect::<Vec<_>>()
+        });
+
+        due.sort_by_key(|resource| (resource.purge_at, *resource.id.as_ref()));
+        due.truncate(limit);
+        Ok(due)
+    }
+
+    async fn find_nearest_purge_at(
+        &self,
+        now: DateTime<Utc>,
+    ) -> Result<Option<DateTime<Utc>>, InternalError> {
+        Ok(self.state.read(self.transaction_id, |view| {
+            view.purge_deadlines()
+                .into_iter()
+                .map(|(_, purge_at)| purge_at)
+                .filter(|purge_at| *purge_at > now)
+                .min()
+        }))
     }
 }
 

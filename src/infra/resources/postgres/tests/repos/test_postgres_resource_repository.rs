@@ -316,6 +316,18 @@ database_transactional_test!(
     harness = PostgresResourceRepositoryHarness
 );
 
+database_transactional_test!(
+    storage = postgres,
+    fixture = resource_repo_suite::test_find_resources_due_for_purge,
+    harness = PostgresResourceRepositoryHarness
+);
+
+database_transactional_test!(
+    storage = postgres,
+    fixture = resource_repo_suite::test_purge_deadline_is_kept_apart_from_snapshot,
+    harness = PostgresResourceRepositoryHarness
+);
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 database_transactional_test!(

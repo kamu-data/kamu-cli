@@ -228,6 +228,10 @@ CREATE INDEX idx_resources_not_reconciled
     ON resources (resource_schema, resource_id)
     WHERE deletion_requested_at IS NULL AND reconciled_generation < generation;
 
+CREATE INDEX idx_resources_purge_at
+    ON resources (purge_at)
+    WHERE purge_at IS NOT NULL;
+
 CREATE INDEX idx_resources_summary_projection
     ON resources (
         account_id,
@@ -634,7 +638,7 @@ CREATE TABLE resources (
     deleted_at             TIMESTAMPTZ NULL,
     last_event_id          BIGINT NULL
 , status_generation BIGINT NOT NULL DEFAULT 1, deletion_requested_at TIMESTAMPTZ NULL, reconciled_generation INTEGER
-    GENERATED ALWAYS AS (COALESCE(json_extract(status, '$.reconciledGeneration'), 0)) VIRTUAL, owner_references JSONB);
+    GENERATED ALWAYS AS (COALESCE(json_extract(status, '$.reconciledGeneration'), 0)) VIRTUAL, owner_references JSONB, purge_at TIMESTAMPTZ NULL);
 
 CREATE TABLE sqlite_sequence(name,seq);
 

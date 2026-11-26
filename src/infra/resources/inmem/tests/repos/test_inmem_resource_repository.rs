@@ -309,6 +309,18 @@ database_transactional_test!(
     harness = InMemoryResourceRepositoriesHarness
 );
 
+database_transactional_test!(
+    storage = inmem_with_transaction,
+    fixture = resource_repo_suite::test_find_resources_due_for_purge,
+    harness = InMemoryResourceRepositoriesHarness
+);
+
+database_transactional_test!(
+    storage = inmem_with_transaction,
+    fixture = resource_repo_suite::test_purge_deadline_is_kept_apart_from_snapshot,
+    harness = InMemoryResourceRepositoriesHarness
+);
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 database_transactional_test!(

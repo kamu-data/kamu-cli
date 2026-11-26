@@ -16,4 +16,5 @@ mod test_generic_resource_query_service;
 mod test_resource_durable_state_validator;
 mod test_resource_lifecycle_primitives;
 mod test_resource_persistence_service;
+mod test_resource_retention;
 mod test_typed_resource_query_service;

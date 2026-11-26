@@ -9,6 +9,7 @@
 
 use std::collections::HashMap;
 
+use chrono::{DateTime, Utc};
 use database_common::{PaginationOpts, TransactionRefT, sql_like_escape_pattern};
 use dill::{component, interface};
 use event_sourcing::EventID;
@@ -16,12 +17,14 @@ use futures::TryStreamExt;
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_resources::{
     CreateResourceError,
+    ResourceDueForPurge,
     ResourceDuplicateError,
     ResourceHandleRow,
     ResourceID,
     ResourceLabelPair,
     ResourceName,
     ResourcePhaseCounts,
+    ResourcePurgeDeadline,
     ResourceQuery,
     ResourceRawEventQuery,
     ResourceRepository,
@@ -1189,6 +1192,101 @@ impl ResourceRepository for PostgresResourceRepository {
                 },
             })
             .collect())
+    }
+
+    async fn set_purge_deadlines(
+        &self,
+        deadlines: &[ResourcePurgeDeadline],
+    ) -> Result<(), InternalError> {
+        if deadlines.is_empty() {
+            return Ok(());
+        }
+
+        let mut tr = self.transaction.lock().await;
+        let connection_mut = tr.connection_mut().await?;
+
+        let ids = deadlines
+            .iter()
+            .map(|deadline| *deadline.id.as_ref())
+            .collect::<Vec<uuid::Uuid>>();
+        let purge_ats = deadlines
+            .iter()
+            .map(|deadline| deadline.purge_at)
+            .collect::<Vec<_>>();
+
+        sqlx::query!(
+            r#"
+            UPDATE resources AS r
+            SET purge_at = d.purge_at
+            FROM UNNEST($1::uuid[], $2::timestamptz[]) AS d(resource_id, purge_at)
+            WHERE r.resource_id = d.resource_id
+            "#,
+            &ids,
+            &purge_ats,
+        )
+        .execute(connection_mut)
+        .await
+        .int_err()?;
+
+        Ok(())
+    }
+
+    async fn find_resources_due_for_purge(
+        &self,
+        now: DateTime<Utc>,
+        limit: usize,
+    ) -> Result<Vec<ResourceDueForPurge>, InternalError> {
+        let mut tr = self.transaction.lock().await;
+        let connection_mut = tr.connection_mut().await?;
+
+        let rows = sqlx::query!(
+            r#"
+            SELECT
+                resource_id AS "id: uuid::Uuid",
+                resource_schema,
+                purge_at AS "purge_at!: DateTime<Utc>"
+            FROM resources
+            WHERE purge_at IS NOT NULL AND purge_at <= $1
+            ORDER BY purge_at ASC, resource_id ASC
+            LIMIT $2
+            "#,
+            now,
+            i64::try_from(limit).unwrap_or(i64::MAX),
+        )
+        .fetch_all(connection_mut)
+        .await
+        .int_err()?;
+
+        Ok(rows
+            .into_iter()
+            .map(|row| ResourceDueForPurge {
+                id: ResourceID::new(row.id),
+                schema: TypeUri::new_unchecked(&row.resource_schema),
+                purge_at: row.purge_at,
+            })
+            .collect())
+    }
+
+    async fn find_nearest_purge_at(
+        &self,
+        now: DateTime<Utc>,
+    ) -> Result<Option<DateTime<Utc>>, InternalError> {
+        let mut tr = self.transaction.lock().await;
+        let connection_mut = tr.connection_mut().await?;
+
+        sqlx::query_scalar!(
+            r#"
+            SELECT purge_at AS "purge_at!: DateTime<Utc>"
+            FROM resources
+            WHERE purge_at IS NOT NULL AND purge_at > $1
+            ORDER BY purge_at ASC
+            LIMIT 1
+            "#,
+            now,
+        )
+        .fetch_optional(connection_mut)
+        .await
+        .int_err()
     }
 }
 

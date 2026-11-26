@@ -925,7 +925,8 @@ CREATE TABLE public.resources (
     last_event_id bigint,
     status_generation bigint DEFAULT 1 NOT NULL,
     deletion_requested_at timestamp with time zone,
-    owner_references jsonb
+    owner_references jsonb,
+    purge_at timestamp with time zone
 );
 
 
@@ -1830,6 +1831,13 @@ CREATE INDEX idx_resources_deletion_time ON public.resources USING btree (accoun
 --
 
 CREATE INDEX idx_resources_not_reconciled ON public.resources USING btree (resource_schema, resource_id) WHERE ((deletion_requested_at IS NULL) AND (COALESCE(((status ->> 'reconciledGeneration'::text))::bigint, (0)::bigint) < generation));
+
+
+--
+-- Name: idx_resources_purge_at; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_resources_purge_at ON public.resources USING btree (purge_at) WHERE (purge_at IS NOT NULL);
 
 
 --

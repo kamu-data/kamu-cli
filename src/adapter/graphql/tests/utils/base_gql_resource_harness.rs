@@ -16,6 +16,7 @@ use kamu_resources::{
     MESSAGE_PRODUCER_KAMU_RESOURCE_SERVICE,
     ResourceControllerRuntimeConfig,
     ResourceLifecycleMessage,
+    ResourceRetentionConfig,
 };
 use kamu_resources_services::{BackgroundWorkFinalizer, ResourceControllerRuntimeImpl};
 use messaging_outbox::{OutboxProvider, register_message_dispatcher};
@@ -52,6 +53,7 @@ impl BaseGQLResourceHarness {
         kamu_configuration_services::register_dependencies(&mut b);
         b.add::<ResourceControllerRuntimeImpl>()
             .add_value(ResourceControllerRuntimeConfig::default())
+            .add_value(ResourceRetentionConfig::default())
             .add_value(WakeupListenerConfig::local_default());
 
         register_message_dispatcher::<ResourceLifecycleMessage>(

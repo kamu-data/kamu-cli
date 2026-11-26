@@ -24,12 +24,14 @@ use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_resources::{
     CreateResourceError,
     DELETED_ACCOUNT_NAME_SENTINEL,
+    ResourceDueForPurge,
     ResourceDuplicateError,
     ResourceHandleRow,
     ResourceID,
     ResourceLabelPair,
     ResourceName,
     ResourcePhaseCounts,
+    ResourcePurgeDeadline,
     ResourceQuery,
     ResourceRawEventQuery,
     ResourceRepository,
@@ -908,6 +910,102 @@ impl ResourceRepository for SqliteResourceRepository {
                 },
             })
             .collect())
+    }
+
+    async fn set_purge_deadlines(
+        &self,
+        deadlines: &[ResourcePurgeDeadline],
+    ) -> Result<(), InternalError> {
+        if deadlines.is_empty() {
+            return Ok(());
+        }
+
+        let mut tr = self.transaction.lock().await;
+        let connection_mut = tr.connection_mut().await?;
+
+        // UUIDs bind as blobs, so the rows go in as bound values, not JSON
+        let mut query_builder = sqlx::QueryBuilder::<sqlx::Sqlite>::new(
+            "WITH deadlines (resource_id, purge_at) AS (VALUES ",
+        );
+        let mut rows = query_builder.separated(", ");
+        for deadline in deadlines {
+            rows.push("(")
+                .push_bind_unseparated(*deadline.id.as_ref())
+                .push_unseparated(", ")
+                .push_bind_unseparated(deadline.purge_at)
+                .push_unseparated(")");
+        }
+        query_builder.push(
+            ") UPDATE resources SET purge_at = deadlines.purge_at FROM deadlines WHERE \
+             resources.resource_id = deadlines.resource_id",
+        );
+
+        query_builder
+            .build()
+            .execute(connection_mut)
+            .await
+            .int_err()?;
+
+        Ok(())
+    }
+
+    async fn find_resources_due_for_purge(
+        &self,
+        now: DateTime<Utc>,
+        limit: usize,
+    ) -> Result<Vec<ResourceDueForPurge>, InternalError> {
+        let mut tr = self.transaction.lock().await;
+        let connection_mut = tr.connection_mut().await?;
+
+        let limit = i64::try_from(limit).unwrap_or(i64::MAX);
+        let rows = sqlx::query!(
+            r#"
+            SELECT
+                resource_id AS "id: uuid::Uuid",
+                resource_schema,
+                purge_at AS "purge_at!: DateTime<Utc>"
+            FROM resources
+            WHERE purge_at IS NOT NULL AND purge_at <= $1
+            ORDER BY purge_at ASC, resource_id ASC
+            LIMIT $2
+            "#,
+            now,
+            limit,
+        )
+        .fetch_all(connection_mut)
+        .await
+        .int_err()?;
+
+        Ok(rows
+            .into_iter()
+            .map(|row| ResourceDueForPurge {
+                id: ResourceID::new(row.id),
+                schema: TypeUri::new_unchecked(&row.resource_schema),
+                purge_at: row.purge_at,
+            })
+            .collect())
+    }
+
+    async fn find_nearest_purge_at(
+        &self,
+        now: DateTime<Utc>,
+    ) -> Result<Option<DateTime<Utc>>, InternalError> {
+        let mut tr = self.transaction.lock().await;
+        let connection_mut = tr.connection_mut().await?;
+
+        sqlx::query_scalar!(
+            r#"
+            SELECT purge_at AS "purge_at!: DateTime<Utc>"
+            FROM resources
+            WHERE purge_at IS NOT NULL AND purge_at > $1
+            ORDER BY purge_at ASC
+            LIMIT 1
+            "#,
+            now,
+        )
+        .fetch_optional(connection_mut)
+        .await
+        .int_err()
     }
 }
 

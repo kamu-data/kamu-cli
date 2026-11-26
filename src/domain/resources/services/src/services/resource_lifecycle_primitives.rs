@@ -37,6 +37,9 @@ use crate::domain::{
     ResourceLoadError,
     ResourcePersistenceError,
     ResourcePersistenceService,
+    ResourcePurgeDeadline,
+    ResourceRepository,
+    ResourceRetentionConfig,
     ResourceSchemaId,
     ResourceSchemaProvider,
     ResourceStaleExpectationError,
@@ -47,6 +50,7 @@ use crate::domain::{
     StatusConflictOf,
     TypeRef,
     TypeUri,
+    resource_type_name,
 };
 use crate::{ResourceConditionPatchChecker, ResourceExtensionSchemaRegistry};
 
@@ -63,6 +67,8 @@ where
     outbox: &'a dyn Outbox,
     time_source: &'a dyn SystemTimeSource,
     extension_schema_registry: &'a ResourceExtensionSchemaRegistry,
+    resource_repository: &'a dyn ResourceRepository,
+    retention_config: &'a ResourceRetentionConfig,
 }
 
 type TransitionResult<T, R> = Result<T, ResourceLifecycleTransitionError<R>>;
@@ -79,6 +85,8 @@ where
         outbox: &'a dyn Outbox,
         time_source: &'a dyn SystemTimeSource,
         extension_schema_registry: &'a ResourceExtensionSchemaRegistry,
+        resource_repository: &'a dyn ResourceRepository,
+        retention_config: &'a ResourceRetentionConfig,
     ) -> Self {
         Self {
             resource_aggregate_loader,
@@ -86,6 +94,8 @@ where
             outbox,
             time_source,
             extension_schema_registry,
+            resource_repository,
+            retention_config,
         }
     }
 
@@ -220,6 +230,8 @@ where
             })
             .await?;
 
+        self.set_purge_deadlines(&transition.transitioned).await?;
+
         let deleted = transition
             .transitioned
             .iter()
@@ -232,6 +244,27 @@ where
         }
 
         Ok(transition)
+    }
+
+    /// Starts the retention of the resources whose deletion completed
+    async fn set_purge_deadlines(&self, resources: &[R]) -> Result<(), InternalError> {
+        let policy = self
+            .retention_config
+            .policy_for(&resource_type_name(R::type_uri())?, R::RETENTION_POLICY);
+        let deadlines = resources
+            .iter()
+            .filter_map(|resource| {
+                let purge_at = policy.purge_at(resource.headers().deleted_at?)?;
+                Some(ResourcePurgeDeadline {
+                    id: *resource.id(),
+                    purge_at,
+                })
+            })
+            .collect::<Vec<_>>();
+
+        self.resource_repository
+            .set_purge_deadlines(&deadlines)
+            .await
     }
 
     pub async fn record_cleanup_failure(
@@ -552,6 +585,8 @@ macro_rules! declare_resource_lifecycle_primitives {
             outbox: std::sync::Arc<dyn $crate::messaging_outbox::Outbox>,
             time_source: std::sync::Arc<dyn time_source::SystemTimeSource>,
             extension_schema_registry: std::sync::Arc<$crate::ResourceExtensionSchemaRegistry>,
+            resource_repository: std::sync::Arc<dyn kamu_resources::ResourceRepository>,
+            retention_config: std::sync::Arc<kamu_resources::ResourceRetentionConfig>,
         }
 
         impl $primitives {
@@ -562,6 +597,8 @@ macro_rules! declare_resource_lifecycle_primitives {
                     self.outbox.as_ref(),
                     self.time_source.as_ref(),
                     self.extension_schema_registry.as_ref(),
+                    self.resource_repository.as_ref(),
+                    self.retention_config.as_ref(),
                 )
             }
         }

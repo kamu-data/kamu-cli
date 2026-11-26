@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            UPDATE resources AS r\n            SET purge_at = d.purge_at\n            FROM UNNEST($1::uuid[], $2::timestamptz[]) AS d(resource_id, purge_at)\n            WHERE r.resource_id = d.resource_id\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "UuidArray",
+        "TimestamptzArray"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "eeab545514c3a6292941af292ad809ab0e730456dc13acae2fa3a5f99ebba0ae"
+}

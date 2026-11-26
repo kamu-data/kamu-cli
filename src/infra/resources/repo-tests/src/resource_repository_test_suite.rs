@@ -34,6 +34,7 @@ use kamu_resources::{
     ResourceOwnerProjectionRepository,
     ResourcePhase,
     ResourcePhaseCounts,
+    ResourcePurgeDeadline,
     ResourceQuery,
     ResourceRawEventQuery,
     ResourceRepository,
@@ -3219,12 +3220,153 @@ pub async fn test_summarize_resources_counts_deleting_and_deleted(catalog: &Cata
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+pub async fn test_find_resources_due_for_purge(catalog: &Catalog) {
+    let repo = catalog.get_one::<dyn ResourceRepository>().unwrap();
+    let alice = odf::ResourceOwnerHandle::new_test("alice");
+    let bob = odf::ResourceOwnerHandle::new_test("bob");
+    // Whole seconds: storages keep timestamps at different precisions
+    let at = |hour| Utc.with_ymd_and_hms(2026, 1, 1, hour, 0, 0).unwrap();
+
+    let mut deleted = Vec::new();
+    for (account, schema, name) in [
+        (&alice, &*TEST_KIND, "first"),
+        (&bob, &*OTHER_KIND, "second"),
+        (&alice, &*OTHER_KIND, "third"),
+        (&bob, &*TEST_KIND, "kept-forever"),
+    ] {
+        let snapshot = create_test_resource_of(repo.as_ref(), account, schema, name).await;
+        deleted.push(delete_test_resource(repo.as_ref(), snapshot, at(0), at(1)).await);
+    }
+    create_test_resource(repo.as_ref(), &alice, "live").await;
+
+    // Set out of order, to check the ordering of the due query
+    repo.set_purge_deadlines(&[
+        ResourcePurgeDeadline {
+            id: deleted[2].id,
+            purge_at: at(4),
+        },
+        ResourcePurgeDeadline {
+            id: deleted[0].id,
+            purge_at: at(2),
+        },
+        ResourcePurgeDeadline {
+            id: deleted[1].id,
+            purge_at: at(3),
+        },
+    ])
+    .await
+    .unwrap();
+
+    let due = |now, limit| {
+        let repo = repo.clone();
+        async move {
+            repo.find_resources_due_for_purge(now, limit)
+                .await
+                .unwrap()
+                .into_iter()
+                .map(|resource| (resource.id, resource.schema, resource.purge_at))
+                .collect::<Vec<_>>()
+        }
+    };
+
+    assert_eq!(due(at(1), 10).await, []);
+    assert_eq!(
+        due(at(3), 10).await,
+        [
+            (deleted[0].id, TEST_KIND.clone(), at(2)),
+            (deleted[1].id, OTHER_KIND.clone(), at(3)),
+        ]
+    );
+    assert_eq!(
+        due(at(5), 1).await,
+        [(deleted[0].id, TEST_KIND.clone(), at(2))]
+    );
+    assert_eq!(due(at(5), 10).await.len(), 3);
+
+    for (now, nearest) in [
+        (at(1), Some(at(2))),
+        (at(2), Some(at(3))),
+        (at(3), Some(at(4))),
+        (at(4), None),
+    ] {
+        assert_eq!(
+            repo.find_nearest_purge_at(now).await.unwrap(),
+            nearest,
+            "now={now}"
+        );
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_purge_deadline_is_kept_apart_from_snapshot(catalog: &Catalog) {
+    let repo = catalog.get_one::<dyn ResourceRepository>().unwrap();
+    let account_handle = odf::ResourceOwnerHandle::new_test("test-account");
+    let at = |hour| Utc.with_ymd_and_hms(2026, 1, 1, hour, 0, 0).unwrap();
+
+    let snapshot = create_test_resource(repo.as_ref(), &account_handle, "deleted").await;
+    let deleted = delete_test_resource(repo.as_ref(), snapshot, at(0), at(1)).await;
+
+    repo.set_purge_deadlines(&[
+        ResourcePurgeDeadline {
+            id: deleted.id,
+            purge_at: at(2),
+        },
+        ResourcePurgeDeadline {
+            id: ResourceID::new(uuid::Uuid::new_v4()),
+            purge_at: at(2),
+        },
+    ])
+    .await
+    .unwrap();
+
+    let mut updated = deleted.clone();
+    updated.headers.updated_at = at(3);
+    updated.last_event_id = Some(EventID::new(
+        deleted.last_event_id.unwrap().into_inner() + 1,
+    ));
+    repo.update_resource(&updated, deleted.last_event_id)
+        .await
+        .unwrap();
+
+    let due = repo.find_resources_due_for_purge(at(5), 10).await.unwrap();
+    assert_eq!(
+        due.iter()
+            .map(|resource| (resource.id, resource.purge_at))
+            .collect::<Vec<_>>(),
+        [(deleted.id, at(2))],
+        "the update leaves the deadline, and a missing resource gets none"
+    );
+
+    repo.set_purge_deadlines(&[ResourcePurgeDeadline {
+        id: deleted.id,
+        purge_at: at(4),
+    }])
+    .await
+    .unwrap();
+    assert_eq!(
+        repo.find_nearest_purge_at(at(2)).await.unwrap(),
+        Some(at(4))
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 async fn create_test_resource(
     repo: &dyn ResourceRepository,
     account_handle: &odf::ResourceOwnerHandle,
     name: &str,
 ) -> ResourceSnapshot {
-    let mut snapshot = make_test_snapshot(account_handle, &TEST_KIND, name);
+    create_test_resource_of(repo, account_handle, &TEST_KIND, name).await
+}
+
+async fn create_test_resource_of(
+    repo: &dyn ResourceRepository,
+    account_handle: &odf::ResourceOwnerHandle,
+    schema: &TypeUri,
+    name: &str,
+) -> ResourceSnapshot {
+    let mut snapshot = make_test_snapshot(account_handle, schema, name);
     snapshot.id = repo.new_resource_id().await.unwrap();
     snapshot.status = Some(new_pending_resource_status());
     snapshot.last_event_id = Some(EventID::new(1));

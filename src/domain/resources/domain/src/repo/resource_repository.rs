@@ -14,11 +14,13 @@ use internal_error::InternalError;
 use thiserror::Error;
 
 use crate::{
+    ResourceDueForPurge,
     ResourceHandle,
     ResourceHeaders,
     ResourceID,
     ResourceName,
     ResourcePhaseCounts,
+    ResourcePurgeDeadline,
     ResourceRawEventQuery,
     ResourceSnapshot,
     ResourceSnapshotStream,
@@ -204,6 +206,28 @@ pub trait ResourceRepository: Send + Sync {
         &self,
         account_id: odf::AccountID,
     ) -> Result<Vec<ResourceSummaryRow>, InternalError>;
+
+    /// Sets when deleted resources may be purged, ignoring IDs of no resource.
+    /// The deadline is kept apart from the snapshot: updating a resource leaves
+    /// it as it is.
+    async fn set_purge_deadlines(
+        &self,
+        deadlines: &[ResourcePurgeDeadline],
+    ) -> Result<(), InternalError>;
+
+    /// Returns at most `limit` resources, of every account and type, whose
+    /// purge deadline is not after `now`, earliest deadline first.
+    async fn find_resources_due_for_purge(
+        &self,
+        now: DateTime<Utc>,
+        limit: usize,
+    ) -> Result<Vec<ResourceDueForPurge>, InternalError>;
+
+    /// Returns the earliest purge deadline after `now`.
+    async fn find_nearest_purge_at(
+        &self,
+        now: DateTime<Utc>,
+    ) -> Result<Option<DateTime<Utc>>, InternalError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

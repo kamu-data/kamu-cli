@@ -12,6 +12,7 @@ use internal_error::InternalError;
 use crate::{
     ResourceHeaders,
     ResourceID,
+    ResourceRetentionPolicy,
     ResourceSnapshot,
     ResourceStatus,
     ResourceStatusConflictError,
@@ -39,6 +40,10 @@ pub trait DeclarativeResource:
     ///
     /// Deviates from ODF, whose `ResourceHeadersInput` requires a name.
     const GENERATED_NAME_PREFIX: Option<fn(&Self::SpecInput) -> String> = None;
+
+    /// The type's retention policy, which the node's configuration may
+    /// override; `None` takes the node's default
+    const RETENTION_POLICY: Option<ResourceRetentionPolicy> = None;
 
     fn id(&self) -> &ResourceID {
         self.as_ref().id()

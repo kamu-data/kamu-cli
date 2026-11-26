@@ -316,6 +316,18 @@ database_transactional_test!(
     harness = SqliteResourceRepositoryHarness
 );
 
+database_transactional_test!(
+    storage = sqlite,
+    fixture = resource_repo_suite::test_find_resources_due_for_purge,
+    harness = SqliteResourceRepositoryHarness
+);
+
+database_transactional_test!(
+    storage = sqlite,
+    fixture = resource_repo_suite::test_purge_deadline_is_kept_apart_from_snapshot,
+    harness = SqliteResourceRepositoryHarness
+);
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 database_transactional_test!(

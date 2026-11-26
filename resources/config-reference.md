@@ -168,6 +168,17 @@ resource controllers)
 <td>Default quotas configured by type</td>
 </tr>
 <tr>
+<td><code>resources</code></td>
+<td><a href="#resourcesconfig"><code>ResourcesConfig</code></a></td>
+<td><pre><code class="language-json">{
+  &quot;retention&quot;: {
+    &quot;default&quot;: &quot;1w&quot;,
+    &quot;types&quot;: {}
+  }
+}</code></pre></td>
+<td>Resources configuration</td>
+</tr>
+<tr>
 <td><code>search</code></td>
 <td><a href="#searchconfig"><code>SearchConfig</code></a></td>
 <td><pre><code class="language-json">{
@@ -1593,6 +1604,62 @@ up to `maxDelay`
 <td><a href="#durationstring"><code>DurationString</code></a></td>
 <td><code class="language-json">&quot;1s&quot;</code></td>
 <td></td>
+</tr>
+</tbody>
+</table>
+
+## `ResourceRetentionConfig`
+
+A type's retention is, first found: its entry in `types`, the type's own
+default, `default`. Each value is a duration such as `7d`, `forever` or
+`immediately`
+
+<table>
+<thead><tr><th>Field</th><th>Type</th><th>Default</th><th>Description</th></tr></thead>
+<tbody>
+<tr>
+<td><code>default</code></td>
+<td><a href="#resourceretentionvalue"><code>ResourceRetentionValue</code></a></td>
+<td><code class="language-json">&quot;1w&quot;</code></td>
+<td>
+
+Retention of the types that neither are listed in `types` nor declare
+their own
+
+</td>
+</tr>
+<tr>
+<td><code>types</code></td>
+<td><code>object</code></td>
+<td><code class="language-json">{}</code></td>
+<td>
+
+Retention per resource type, by short type name such as `VariableSet`
+
+</td>
+</tr>
+</tbody>
+</table>
+
+## `ResourceRetentionValue`
+
+A duration such as `7d`, `forever` or `immediately`
+
+Base type: `string`
+
+## `ResourcesConfig`
+
+<table>
+<thead><tr><th>Field</th><th>Type</th><th>Default</th><th>Description</th></tr></thead>
+<tbody>
+<tr>
+<td><code>retention</code></td>
+<td><a href="#resourceretentionconfig"><code>ResourceRetentionConfig</code></a></td>
+<td><pre><code class="language-json">{
+  &quot;default&quot;: &quot;1w&quot;,
+  &quot;types&quot;: {}
+}</code></pre></td>
+<td>How long deleted resources are kept before they may be purged</td>
 </tr>
 </tbody>
 </table>

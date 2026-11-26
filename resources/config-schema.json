@@ -1003,6 +1003,45 @@
       },
       "type": "object"
     },
+    "ResourceRetentionConfig": {
+      "additionalProperties": false,
+      "description": "A type's retention is, first found: its entry in `types`, the type's own\ndefault, `default`. Each value is a duration such as `7d`, `forever` or\n`immediately`",
+      "properties": {
+        "default": {
+          "$ref": "#/$defs/ResourceRetentionValue",
+          "combine": "replace",
+          "default": "1w",
+          "description": "Retention of the types that neither are listed in `types` nor declare\ntheir own"
+        },
+        "types": {
+          "additionalProperties": {
+            "$ref": "#/$defs/ResourceRetentionValue"
+          },
+          "default": {},
+          "description": "Retention per resource type, by short type name such as `VariableSet`",
+          "type": "object"
+        }
+      },
+      "type": "object"
+    },
+    "ResourceRetentionValue": {
+      "description": "A duration such as `7d`, `forever` or `immediately`",
+      "type": "string"
+    },
+    "ResourcesConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "retention": {
+          "$ref": "#/$defs/ResourceRetentionConfig",
+          "default": {
+            "default": "1w",
+            "types": {}
+          },
+          "description": "How long deleted resources are kept before they may be purged"
+        }
+      },
+      "type": "object"
+    },
     "RestartBackoffConfig": {
       "additionalProperties": false,
       "description": "Delay before a retry: a function of the attempt number, from `minDelay`\nup to `maxDelay`",
@@ -1481,6 +1520,16 @@
         "storage": 1000000000
       },
       "description": "Default quotas configured by type"
+    },
+    "resources": {
+      "$ref": "#/$defs/ResourcesConfig",
+      "default": {
+        "retention": {
+          "default": "1w",
+          "types": {}
+        }
+      },
+      "description": "Resources configuration"
     },
     "search": {
       "$ref": "#/$defs/SearchConfig",

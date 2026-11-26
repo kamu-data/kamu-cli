@@ -70,6 +70,7 @@ make clippy
     - [Use-case traits](#use-case-traits)
     - [5a. Resource anatomy — input vs auto-generated](#5a-resource-anatomy--input-vs-auto-generated)
   - [6. Persistence model](#6-persistence-model)
+    - [Retention](#retention)
   - [7. Account resolution \& authorization](#7-account-resolution--authorization)
   - [8. Rename \& conflict rules](#8-rename--conflict-rules)
     - [Generated names](#generated-names)
@@ -585,7 +586,8 @@ and the later `*_resource_*` migrations (SQLite mirrors alongside).
   `account_id`, `resource_schema`, `resource_name`, `labels`/`annotations`
   (JSONB), `owner_references` (JSONB, nullable), `spec` (JSONB), `status` (JSONB, nullable),
   `generation`, `status_generation`, `created_at`/`updated_at`,
-  `deletion_requested_at`/`deleted_at` (nullable), `last_event_id`. **Uniqueness:** a unique index
+  `deletion_requested_at`/`deleted_at` (nullable), `last_event_id`, and `purge_at` (nullable,
+  not part of the snapshot: [Retention](#retention)). **Uniqueness:** a unique index
   on `(account_id, resource_schema, resource_name)`, case-insensitive, partial
   `WHERE deletion_requested_at IS NULL`.
   An index on `(account_id, resource_schema, status->>'phase')` backs the summary projection.
@@ -599,7 +601,8 @@ and the later `*_resource_*` migrations (SQLite mirrors alongside).
 **Source of truth.** The event log is authoritative — aggregates are rebuilt by projecting events
 (`ResourceAggregateLoader`). The `resources` row is a **derived snapshot** maintained in the same
 transaction as the event append; it exists for efficient queries/listing/uniqueness and should never
-diverge. If they ever disagree, the events win and the snapshot is the bug.
+diverge. If they ever disagree, the events win and the snapshot is the bug. `purge_at` is the
+one column no event records ([Retention](#retention)).
 
 **List columns.** Concrete resources do not extend status with per-type `stats`. Presentation
 columns are derived from the current spec/read model instead: `VariableSet.variables` is
@@ -669,6 +672,25 @@ through the API:
 segment. Supporting a new schema version therefore requires an explicit compatibility/migration
 story for that resource type: update manifests, projections, dispatcher registration, and any
 existing rows/events that should move to the new schema.
+
+### Retention
+
+A deleted resource is kept for a retention period, after which it may be purged. The period starts
+when the deletion completes, so a resource still being deleted has none.
+
+- **Policy:** `ResourceRetentionPolicy` is `PurgeImmediately`, `RetainFor(duration)` or
+  `RetainForever`. A type's policy is, first found: the node's entry for the type in
+  `resources.retention.types`, the type's `DeclarativeResource::RETENTION_POLICY`, the node's
+  `resources.retention.default`, which is 7 days unless configured. The configuration lists types
+  by short name, and one that no registered type has stops the CLI at startup.
+- **Deadline:** `complete_deletion` writes `purge_at = deleted_at + retention`, none for
+  `RetainForever`, with `ResourceRepository::set_purge_deadlines` in its transaction. The deadline
+  is a column of `resources` that no event records and the snapshot update leaves alone, so it is
+  never recomputed: a policy change applies to later deletions only.
+- **Queries:** `find_resources_due_for_purge(now, limit)`, earliest deadline first, and
+  `find_nearest_purge_at(now)` span every account and type, on a partial index of `purge_at`.
+- **Earlier deletions:** the migration adding `purge_at` gave resources already deleted 7 days
+  from their deletion. A migration cannot read the node's configuration.
 
 ### Controller bookkeeping
 
@@ -1016,7 +1038,7 @@ persists its event and posts the matching lifecycle message:
 | `complete_reconciliation(id, expected)` | `Ready`, reconciled generation recorded | `StatusUpdated` |
 | `fail_reconciliation(id, expected, error)` | `Failed` or `Degraded`, `ReconciliationError` | `StatusUpdated` |
 | `request_deletion(ids)` | `Deleting` | one `DeletionRequested` for the batch |
-| `complete_deletion(completions)` | `Deleted` | one `Deleted` for the completed ones |
+| `complete_deletion(completions)` | `Deleted`, purge deadline set ([Retention](#retention)) | one `Deleted` for the completed ones |
 | `record_cleanup_failure(failures)` | stays `Deleting`, `ReconciliationError{code: cleanup-failed}` | one `StatusUpdated` per resource |
 | `update_conditions(id, expected_status_generation, patch)` | the named conditions set or removed ([below](#condition-patches)) | `StatusUpdated` |
 

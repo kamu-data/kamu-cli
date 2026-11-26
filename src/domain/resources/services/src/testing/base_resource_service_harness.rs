@@ -29,6 +29,7 @@ use kamu_resources::{
     ResourceLifecycleMessageOutcome,
     ResourcePhase,
     ResourceRepository,
+    ResourceRetentionConfig,
     ResourceSnapshot,
     ResourceStatus,
     TypeRef,
@@ -73,6 +74,8 @@ pub struct BaseResourceServiceHarnessOpts {
     /// [`BaseResourceServiceHarness::register_controller_runtime`], and
     /// finalizes that catalog with [`BackgroundWorkFinalizer`]
     pub controller_runtime: bool,
+    /// `None` leaves the retention configuration to a chained catalog
+    pub retention: Option<ResourceRetentionConfig>,
 }
 
 impl Default for BaseResourceServiceHarnessOpts {
@@ -84,6 +87,7 @@ impl Default for BaseResourceServiceHarnessOpts {
             transactional: false,
             fake_time: false,
             controller_runtime: true,
+            retention: Some(ResourceRetentionConfig::default()),
         }
     }
 }
@@ -142,6 +146,9 @@ impl BaseResourceServiceHarness {
         kamu_resources_inmem::register_dependencies(&mut b);
         b.add::<InMemoryAccountRepository>();
         b.add::<OwnAccountResourceAccess>();
+        if let Some(retention) = opts.retention {
+            b.add_value(retention);
+        }
 
         if opts.transactional {
             assert!(

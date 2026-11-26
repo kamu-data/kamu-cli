@@ -8829,6 +8829,7 @@ dependencies = [
  "retry-backoff",
  "rust-embed",
  "rustls",
+ "schemars 1.2.3",
  "secrecy",
  "serde",
  "serde_json",

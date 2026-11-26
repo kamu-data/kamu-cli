@@ -235,6 +235,7 @@ rust-embed = { optional = true, version = "8", features = [
     "compression",
     "interpolate-folder-path",
 ] }
+schemars = { version = "1", default-features = false }
 secrecy = "0.10"
 serde = { version = "1", features = [
     "derive",

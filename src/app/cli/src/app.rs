@@ -190,6 +190,7 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
             )?;
 
             let base_catalog = base_catalog_builder.build();
+            check_resource_retention_config(&base_catalog)?;
 
             // Database requires extra actions:
             if let Some(db_config) = &database_config {
@@ -734,6 +735,20 @@ async fn run_startup_initializations(
 // Config
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Fails on retention configured for a type the node does not have
+fn check_resource_retention_config(catalog: &dill::Catalog) -> Result<(), CLIError> {
+    let registered =
+        kamu_resources_services::ResourceDispatcherFactory::registered_type_names_in(catalog)
+            .map_err(CLIError::critical)?;
+    catalog
+        .get_one::<kamu_resources::ResourceRetentionConfig>()
+        .map_err(CLIError::critical)?
+        .check_types(&registered)
+        .map_err(CLIError::usage_error_from)
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 fn load_config(workspace_layout: &WorkspaceLayout) -> Result<config::CLIConfig, CLIError> {
     let config_svc = config::ConfigService::new(workspace_layout);
     let config = config_svc.load(config::ConfigScope::Combined)?;
@@ -940,6 +955,10 @@ pub fn register_config_in_catalog(
             .background_agents
             .resource_controller_runtime_config(),
     );
+    //
+
+    // Resources configuration
+    catalog_builder.add_value(config.resources.retention.into_system()?);
     //
 
     // Password hashing mode configuration
