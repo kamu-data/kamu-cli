@@ -202,6 +202,34 @@ database_concurrent_transactions_test!(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+// The held-back fixtures have no SQLite wiring: SQLite serialises writers, so
+// no message is ever held back there
+database_concurrent_transactions_test!(
+    storage = postgres,
+    fixture = kamu_messaging_outbox_repo_tests::test_drain_waits_for_messages_held_back_by_older_transaction,
+    harness = PostgresOutboxMessageBridgeHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_concurrent_transactions_test!(
+    storage = postgres,
+    fixture =
+        kamu_messaging_outbox_repo_tests::test_drain_ignores_held_back_messages_nobody_consumes,
+    harness = PostgresOutboxMessageBridgeHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_concurrent_transactions_test!(
+    storage = postgres,
+    fixture =
+        kamu_messaging_outbox_repo_tests::test_drain_ignores_held_back_messages_of_failed_consumers,
+    harness = PostgresOutboxMessageBridgeHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 struct PostgresOutboxMessageBridgeHarness {
     catalog: Catalog,
 }

@@ -9674,7 +9674,7 @@ dependencies = [
  "kamu-messaging-outbox-repo-tests",
  "kamu-wakeup-listener-postgres",
  "messaging-outbox",
- "serde",
+ "oop",
  "serde_json",
  "sqlx",
  "test-group",
@@ -9688,6 +9688,7 @@ dependencies = [
 name = "kamu-messaging-outbox-repo-tests"
 version = "0.273.0"
 dependencies = [
+ "async-trait",
  "chrono",
  "database-common",
  "dill",
@@ -9696,6 +9697,8 @@ dependencies = [
  "messaging-outbox",
  "serde",
  "serde_json",
+ "tokio",
+ "wakeup-listener",
 ]
 
 [[package]]
@@ -10487,7 +10490,6 @@ dependencies = [
  "dill",
  "futures",
  "http",
- "kamu-datasets",
  "kamu-webhooks",
  "opendatafabric",
  "secrecy",

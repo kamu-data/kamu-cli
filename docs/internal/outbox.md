@@ -488,7 +488,9 @@ Recommended alerts on these metrics are in [metrics.md](metrics.md#4-recommended
 `OutboxProvider` lives in `messaging_outbox::testing` (feature `testing`). The agent's own tests
 (`src/utils/messaging-outbox/tests/tests/test_outbox_agent.rs`) cover routing, `Latest`/`All`
 boundaries, failure isolation, self-managed consumers, batching and concurrency limits;
-`src/infra/messaging-outbox/postgres/tests/agent` covers `tx_id` ordering on a real database.
+`src/infra/messaging-outbox/postgres/tests/agent` covers `tx_id` ordering on a real database;
+`outbox_agent_test_suite.rs` in `src/infra/messaging-outbox/repo-tests` runs the agent over
+held-back messages on Postgres and in memory.
 
 ---
 

@@ -25,7 +25,6 @@ doctest = false
 database-common = { workspace = true, features = [
     "testing",
 ] }
-kamu-datasets = { workspace = true }
 kamu-webhooks = { workspace = true }
 odf = { workspace = true }
 

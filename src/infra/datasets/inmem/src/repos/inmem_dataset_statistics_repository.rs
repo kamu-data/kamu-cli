@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::collections::HashSet;
 use std::sync::Arc;
 
 use cheap_clone::CheapClone;
@@ -23,12 +24,13 @@ use kamu_datasets::{
     TotalStatistic,
 };
 
-use super::InMemoryDatasetStatisticsState;
+use super::{InMemoryDatasetEntryState, InMemoryDatasetStatisticsState};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub(crate) struct InMemoryDatasetStatisticsRepository {
     state: Arc<InMemoryDatasetStatisticsState>,
+    entries: Arc<InMemoryDatasetEntryState>,
     transaction_id: Option<TransactionId>,
 }
 
@@ -38,10 +40,12 @@ pub(crate) struct InMemoryDatasetStatisticsRepository {
 impl InMemoryDatasetStatisticsRepository {
     pub fn new(
         state: Arc<InMemoryDatasetStatisticsState>,
+        entries: Arc<InMemoryDatasetEntryState>,
         transaction_ref: Option<TransactionRef>,
     ) -> Self {
         Self {
             state,
+            entries,
             transaction_id: transaction_ref.map(|transaction_ref| transaction_ref.id()),
         }
     }
@@ -60,17 +64,24 @@ impl DatasetStatisticsRepository for InMemoryDatasetStatisticsRepository {
 
     async fn get_total_statistic_by_account_id(
         &self,
-        _account_id: &odf::AccountID,
+        account_id: &odf::AccountID,
     ) -> Result<TotalStatistic, InternalError> {
-        // TODO: this is a dummy implementation that does not filter by account_id
-        // To implement real logic requires to handle issues with transaction leaks
+        let owned_dataset_ids = self.entries.rows.read(self.transaction_id, |rows| {
+            rows.iter()
+                .filter(|(_, entry)| entry.owner_id == *account_id)
+                .map(|(id, _)| id.clone())
+                .collect::<HashSet<_>>()
+        });
+
         Ok(self
             .state
             .statistics
             .read(self.transaction_id, |statistics| {
                 let mut total = TotalStatistic::default();
-                for (_, stat) in statistics.iter() {
-                    total.add_dataset_statistic(stat);
+                for ((dataset_id, _), stat) in statistics.iter() {
+                    if owned_dataset_ids.contains(dataset_id) {
+                        total.add_dataset_statistic(stat);
+                    }
                 }
                 total
             }))

@@ -7,6 +7,11 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+mod outbox_agent_harness;
+mod outbox_agent_test_consumers;
+mod outbox_agent_test_suite;
 mod outbox_message_bridge_test_suite;
 
+pub use outbox_agent_harness::*;
+pub use outbox_agent_test_suite::*;
 pub use outbox_message_bridge_test_suite::*;

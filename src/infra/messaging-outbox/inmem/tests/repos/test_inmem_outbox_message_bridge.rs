@@ -72,6 +72,32 @@ database_concurrent_transactions_test!(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+database_concurrent_transactions_test!(
+    storage = inmem,
+    fixture = kamu_messaging_outbox_repo_tests::test_drain_waits_for_messages_held_back_by_older_transaction,
+    harness = InMemoryOutboxMessageBridgeHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_concurrent_transactions_test!(
+    storage = inmem,
+    fixture =
+        kamu_messaging_outbox_repo_tests::test_drain_ignores_held_back_messages_nobody_consumes,
+    harness = InMemoryOutboxMessageBridgeHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_concurrent_transactions_test!(
+    storage = inmem,
+    fixture =
+        kamu_messaging_outbox_repo_tests::test_drain_ignores_held_back_messages_of_failed_consumers,
+    harness = InMemoryOutboxMessageBridgeHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 struct InMemoryOutboxMessageBridgeHarness {
     catalog: Catalog,
 }
