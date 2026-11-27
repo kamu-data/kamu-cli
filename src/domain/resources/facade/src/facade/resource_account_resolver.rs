@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use internal_error::{ErrorIntoInternal, InternalError};
+use internal_error::InternalError;
 use kamu_accounts::{AnonymousPrincipalError, Principal};
 use kamu_resources::{ResourceOperationError, ResourceOwnerRef};
 use thiserror::Error;
@@ -126,14 +126,24 @@ impl From<AnonymousPrincipalError> for ResolveManifestAccountError {
 }
 
 impl ResolveManifestAccountError {
-    /// A denial of a guard deciding on the account alone
-    pub(crate) fn from_operation_error(err: ResourceOperationError) -> Self {
+    /// A denial of a guard deciding on `account` alone. A resource hidden
+    /// from the principal there means they may not use the account
+    pub(crate) fn from_operation_error(
+        account: &odf::ResourceOwnerHandle,
+        err: ResourceOperationError,
+    ) -> Self {
         match err {
             ResourceOperationError::Access(err) => ResourceAccountAccessError::Access(err).into(),
-            ResourceOperationError::NotFound(err) => Self::Internal(
-                err.int_err()
-                    .with_context("A guard deciding on an account reported a missing resource"),
-            ),
+            ResourceOperationError::NotFound(_) => {
+                ResourceAccountAccessError::Access(odf::AccessError::Unauthorized(
+                    format!(
+                        "Current subject is not allowed to use resources of account '{}'",
+                        account.name
+                    )
+                    .into(),
+                ))
+                .into()
+            }
             ResourceOperationError::Internal(err) => Self::Internal(err),
         }
     }
@@ -194,6 +204,41 @@ impl From<kamu_accounts::GetAccountByNameError> for ResolveManifestAccountError 
             }
             kamu_accounts::GetAccountByNameError::Internal(err) => Self::Internal(err),
         }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[cfg(test)]
+mod tests {
+    use kamu_resources::{ResourceID, ResourceIDNotFoundError};
+    use pretty_assertions::assert_eq;
+
+    use super::*;
+
+    #[test]
+    fn guard_hiding_a_resource_denies_the_account() {
+        let account = odf::ResourceOwnerHandle::new_test("bob");
+
+        let err = ResolveManifestAccountError::from_operation_error(
+            &account,
+            ResourceOperationError::NotFound(ResourceIDNotFoundError(
+                "00000000-0000-0000-0000-000000000001"
+                    .parse::<ResourceID>()
+                    .unwrap(),
+            )),
+        );
+
+        let ResolveManifestAccountError::AccountAccess(ResourceAccountAccessError::Access(
+            odf::AccessError::Unauthorized(source),
+        )) = err
+        else {
+            panic!("expected an account access denial, got: {err:?}");
+        };
+        assert_eq!(
+            source.to_string(),
+            "Current subject is not allowed to use resources of account 'bob'"
+        );
     }
 }
 

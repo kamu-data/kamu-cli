@@ -14,9 +14,12 @@ use std::sync::{Arc, Mutex};
 use chrono::Utc;
 use dill::CatalogBuilder;
 use internal_error::{InternalError, ResultIntoInternal};
+use kamu_accounts::Principal;
+use kamu_core::RequestOrigin;
 use kamu_resources::{
     ApplyResourceApplicationDecision,
     ApplyResourceOutcome,
+    ApplyResourceParams,
     ApplyResourcePrecondition,
     ApplyResourceRejection,
     ApplyResourceRejectionCategory,
@@ -51,7 +54,12 @@ use kamu_resources_services::testing::{
     register_immutable_test_resource,
     register_test_resource,
 };
-use kamu_resources_services::{ApplyResourceRunner, DefaultResourceOperationGuard};
+use kamu_resources_services::{
+    ApplyResourceRunner,
+    DefaultResourceOperationGuard,
+    ResourceDispatcherFactory,
+    request_creation_provenance,
+};
 use serde::Serialize;
 
 use crate::tests::utils::make_id;
@@ -255,6 +263,30 @@ async fn test_resource_changed_during_preparation_fails() {
     }
 }
 
+#[test_log::test(tokio::test)]
+async fn test_apply_in_an_account_the_principal_may_not_use_prepares_nothing() {
+    let harness = ApplyResourceRunnerHarness::<TestResource>::new(register_test_resource);
+    let mut resource = harness.make_resource(spec("theirs"));
+    harness.persistence_svc.create(&mut resource).await.unwrap();
+
+    let pre_apply = RecordingPreApply::default();
+    assert_matches!(
+        harness
+            .apply_as(
+                &Principal::new_test_with(&"alice"),
+                spec("mine"),
+                &pre_apply
+            )
+            .await,
+        Err(ApplyResourceUseCaseError::Access(
+            odf::AccessError::Unauthorized(_)
+        ))
+    );
+
+    // The resource of the account was not prepared against
+    assert_eq!(*pre_apply.calls.lock().unwrap(), []);
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Harness
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -264,6 +296,7 @@ struct ApplyResourceRunnerHarness<R: EventSourcedResource> {
     typed_query_svc: Arc<dyn TypedResourceQueryService<R>>,
     aggregate_loader: Arc<dyn ResourceAggregateLoader<R>>,
     persistence_svc: Arc<dyn ResourcePersistenceService<R>>,
+    dispatcher_factory: Arc<ResourceDispatcherFactory>,
     name_suffix_generator: Arc<dyn ResourceNameSuffixGenerator>,
     default_operation_guard: Arc<DefaultResourceOperationGuard>,
 }
@@ -287,6 +320,7 @@ where
             typed_query_svc: catalog.get_one().unwrap(),
             aggregate_loader: catalog.get_one().unwrap(),
             persistence_svc: catalog.get_one().unwrap(),
+            dispatcher_factory: catalog.get_one().unwrap(),
             name_suffix_generator: catalog.get_one().unwrap(),
             default_operation_guard: catalog.get_one().unwrap(),
             base,
@@ -356,9 +390,45 @@ where
         }
     }
 
+    /// Applies `res-a` as `principal`
+    async fn apply_as(
+        &self,
+        principal: &Principal,
+        spec: R::SpecInput,
+        pre_apply: &dyn ResourceSpecPreApply<R>,
+    ) -> Result<ApplyResourceApplicationDecision<R>, ApplyResourceUseCaseError<R>> {
+        let params = ApplyResourceParams {
+            provenance: request_creation_provenance(principal, &RequestOrigin::Cli).unwrap(),
+            ..BaseResourceServiceHarness::make_apply_params(account_handle(), Some("res-a"), spec)
+        };
+        Box::pin(self.run(
+            params,
+            pre_apply,
+            self.persistence_svc.as_ref(),
+            ApplyResourcePrecondition::None,
+        ))
+        .await
+    }
+
     async fn apply(
         &self,
         spec: R::SpecInput,
+        pre_apply: &dyn ResourceSpecPreApply<R>,
+        persistence_svc: &dyn ResourcePersistenceService<R>,
+        precondition: ApplyResourcePrecondition,
+    ) -> Result<ApplyResourceApplicationDecision<R>, ApplyResourceUseCaseError<R>> {
+        Box::pin(self.run(
+            BaseResourceServiceHarness::make_apply_params(account_handle(), Some("res-a"), spec),
+            pre_apply,
+            persistence_svc,
+            precondition,
+        ))
+        .await
+    }
+
+    async fn run(
+        &self,
+        params: ApplyResourceParams<R>,
         pre_apply: &dyn ResourceSpecPreApply<R>,
         persistence_svc: &dyn ResourcePersistenceService<R>,
         precondition: ApplyResourcePrecondition,
@@ -368,6 +438,7 @@ where
             typed_resource_query_service: self.typed_query_svc.as_ref(),
             resource_aggregate_loader: self.aggregate_loader.as_ref(),
             resource_persistence_service: persistence_svc,
+            resource_dispatcher_factory: self.dispatcher_factory.as_ref(),
             maybe_resource_spec_pre_apply: Some(pre_apply),
             maybe_resource_placement: None,
             maybe_resource_operation_guard: None,
@@ -377,16 +448,7 @@ where
             time_source: self.base.time_source(),
         };
 
-        runner
-            .apply(
-                BaseResourceServiceHarness::make_apply_params(
-                    account_handle(),
-                    Some("res-a"),
-                    spec,
-                ),
-                precondition,
-            )
-            .await
+        runner.apply(params, precondition).await
     }
 }
 

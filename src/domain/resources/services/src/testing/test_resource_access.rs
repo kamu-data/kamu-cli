@@ -30,7 +30,8 @@ use crate::testing::{TestResource, TestResourceSpec};
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// Registers [`TestResourcePlacement`] and [`TestResourceOperationGuard`],
-/// which grant access by tokens of the spec value rather than by the account
+/// which grant access by tokens of the spec value and by `public-` names
+/// rather than by the account
 pub fn register_test_resource_access_rules(catalog_builder: &mut dill::CatalogBuilder) {
     catalog_builder.add::<TestResourcePlacement>();
     catalog_builder.add::<TestResourceOperationGuard>();
@@ -69,14 +70,14 @@ impl ResourcePlacement<TestResource> for TestResourcePlacement {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// The default rule, widened by tokens of the spec value:
+/// The default rule, widened by tokens of the spec value and by `public-` names:
 ///
 /// | Operation | Also allowed for |
 /// | --- | --- |
 /// | Create, Update | Anyone, in the account the spec places the resource in |
-/// | Read | A principal named by a `read:` or `delete:` token |
+/// | Read | A principal named by a `read:` or `delete:` token; anyone, for a `public-` name |
 /// | Delete | A principal named by a `delete:` token |
-/// | List | Anyone, with a name pattern |
+/// | List | Anyone, with a name pattern starting with `public-`: it finds what anyone may read |
 #[dill::component]
 #[dill::interface(dyn ResourceOperationGuard<TestResource>)]
 struct TestResourceOperationGuard {
@@ -84,6 +85,8 @@ struct TestResourceOperationGuard {
 }
 
 impl TestResourceOperationGuard {
+    const PUBLIC_NAME_PREFIX: &str = "public-";
+
     fn is_granted(
         principal: &odf::metadata::auth::PrincipalHandle,
         resource: &TestResource,
@@ -92,6 +95,14 @@ impl TestResourceOperationGuard {
         tokens.iter().any(|token| {
             token_values(resource.spec(), token).any(|name| name == principal.name.as_str())
         })
+    }
+
+    fn is_public(resource: &TestResource) -> bool {
+        resource
+            .headers()
+            .name
+            .as_str()
+            .starts_with(Self::PUBLIC_NAME_PREFIX)
     }
 }
 
@@ -147,7 +158,9 @@ impl ResourceOperationGuard<TestResource> for TestResourceOperationGuard {
                 }
             }
             ResourceOperation::Read { resource } => {
-                if Self::is_granted(principal, resource, &["read", "delete"]) {
+                if Self::is_public(resource)
+                    || Self::is_granted(principal, resource, &["read", "delete"])
+                {
                     Ok(())
                 } else {
                     Err(hidden(resource))
@@ -156,14 +169,21 @@ impl ResourceOperationGuard<TestResource> for TestResourceOperationGuard {
             ResourceOperation::Delete { resource } => {
                 if Self::is_granted(principal, resource, &["delete"]) {
                     Ok(())
-                } else if Self::is_granted(principal, resource, &["read"]) {
+                } else if Self::is_public(resource)
+                    || Self::is_granted(principal, resource, &["read"])
+                {
                     Err(denial)
                 } else {
                     Err(hidden(resource))
                 }
             }
             ResourceOperation::List { scope } => {
-                if scope.name_pattern.is_some() {
+                // The prefix has no `LIKE` wildcard, so every match starts with it
+                if scope
+                    .name_pattern
+                    .as_deref()
+                    .is_some_and(|pattern| pattern.starts_with(Self::PUBLIC_NAME_PREFIX))
+                {
                     Ok(())
                 } else {
                     Err(denial)

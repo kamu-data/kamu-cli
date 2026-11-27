@@ -848,7 +848,7 @@
       "properties": {
         "batchSize": {
           "default": 100,
-          "description": "Items removed per transaction. 0 is treated as 1",
+          "description": "Items removed per transaction, at most 1000. 0 is treated as 1",
           "format": "uint",
           "minimum": 0,
           "type": "integer"
@@ -861,7 +861,7 @@
         "interval": {
           "$ref": "#/$defs/DurationString",
           "default": "5m",
-          "description": "The longest pause between two passes of the job. A job with deadlines\nof its own wakes up at the nearest one, so this bounds how late it\nnotices an earlier deadline"
+          "description": "The longest pause between two passes of the job, greater than zero. A\njob with deadlines of its own wakes up at the nearest one, so this\nbounds how late it notices an earlier deadline"
         },
         "pauseBetweenBatches": {
           "$ref": "#/$defs/DurationString",

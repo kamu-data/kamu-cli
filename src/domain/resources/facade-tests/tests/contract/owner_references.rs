@@ -503,6 +503,27 @@ pub async fn test_owner_to_search_by_is_resolved(h: &impl FacadeContractHarness)
             UnsupportedSelectorFieldError::UntypedName
         ))
     );
+
+    // A selector the facade cannot resolve fails the request before its owner
+    // is looked up
+    assert_matches!(
+        search(
+            facade,
+            SearchResourcesRequest {
+                selectors: vec![ResourceSelector {
+                    did: Some(odf::metadata::Did::Odf(
+                        odf::metadata::DidOdf::new_seeded_ed25519(b"owner"),
+                    )),
+                    ..ResourceSelector::default()
+                }],
+                ..search_request(variable_set_ref_by_name("missing"), V::Active)
+            }
+        )
+        .await,
+        Err(E::UnsupportedSelectorField(
+            UnsupportedSelectorFieldError::Did
+        ))
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -979,13 +979,14 @@ pub struct BackgroundAgentsHousekeepingConfig {
 }
 
 impl BackgroundAgentsHousekeepingConfig {
-    pub fn into_system(&self) -> background_agent_host::HousekeepingConfig {
-        background_agent_host::HousekeepingConfig {
+    pub fn into_system(&self) -> Result<background_agent_host::HousekeepingConfig, CLIError> {
+        Ok(background_agent_host::HousekeepingConfig {
             jobs: BTreeMap::from([(
                 kamu_resources_services::RESOURCE_RETENTION_JOB_NAME.to_string(),
-                self.resource_retention.into_system(),
+                self.resource_retention
+                    .into_system("backgroundAgents.housekeeping.resourceRetention")?,
             )]),
-        }
+        })
     }
 }
 
@@ -996,13 +997,13 @@ pub struct HousekeepingJobConfig {
     #[config(default = true)]
     pub enabled: bool,
 
-    /// Items removed per transaction. 0 is treated as 1
+    /// Items removed per transaction, at most 1000. 0 is treated as 1
     #[config(default = 100)]
     pub batch_size: usize,
 
-    /// The longest pause between two passes of the job. A job with deadlines
-    /// of its own wakes up at the nearest one, so this bounds how late it
-    /// notices an earlier deadline
+    /// The longest pause between two passes of the job, greater than zero. A
+    /// job with deadlines of its own wakes up at the nearest one, so this
+    /// bounds how late it notices an earlier deadline
     #[config(default_str = "5m")]
     pub interval: DurationString,
 
@@ -1012,13 +1013,34 @@ pub struct HousekeepingJobConfig {
 }
 
 impl HousekeepingJobConfig {
-    pub fn into_system(&self) -> background_agent_host::HousekeepingJobConfig {
-        background_agent_host::HousekeepingJobConfig {
+    /// A batch binds a statement parameter per item, and `SQLite` allows
+    /// 32766 per statement
+    pub const MAX_BATCH_SIZE: usize = 1000;
+
+    /// Fails with a usage error naming `key`, the job's configuration key, on
+    /// a value the job cannot run with
+    pub fn into_system(
+        &self,
+        key: &str,
+    ) -> Result<background_agent_host::HousekeepingJobConfig, CLIError> {
+        if self.batch_size > Self::MAX_BATCH_SIZE {
+            return Err(CLIError::usage_error(format!(
+                "{key}.batchSize must be at most {}",
+                Self::MAX_BATCH_SIZE
+            )));
+        }
+        let interval: std::time::Duration = self.interval.into();
+        if interval.is_zero() {
+            return Err(CLIError::usage_error(format!(
+                "{key}.interval must be greater than zero"
+            )));
+        }
+        Ok(background_agent_host::HousekeepingJobConfig {
             enabled: self.enabled,
             batch_size: self.batch_size.max(1),
-            interval: self.interval.into(),
+            interval,
             pause_between_batches: self.pause_between_batches.into(),
-        }
+        })
     }
 }
 
@@ -1227,6 +1249,53 @@ pub struct WebhooksConfig {
     /// Some(String::from("aBcDeFgHiJkLmNoPqRsTuVwXyZ012345")) };
     /// ```
     pub secret_encryption_key: Option<String>,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const KEY: &str = "backgroundAgents.housekeeping.resourceRetention";
+
+    fn job_config(batch_size: usize, interval: &str) -> HousekeepingJobConfig {
+        HousekeepingJobConfig {
+            batch_size,
+            interval: interval.parse().unwrap(),
+            ..HousekeepingJobConfig::default()
+        }
+    }
+
+    fn validation_error(config: &HousekeepingJobConfig) -> Option<String> {
+        config.into_system(KEY).err().map(|e| e.to_string())
+    }
+
+    #[test]
+    fn test_housekeeping_job_config_validation() {
+        let max = HousekeepingJobConfig::MAX_BATCH_SIZE;
+        let cases = [
+            (job_config(0, "5m"), None),
+            (job_config(max, "1s"), None),
+            (
+                job_config(max + 1, "5m"),
+                Some(format!("{KEY}.batchSize must be at most {max}")),
+            ),
+            (
+                job_config(100, "0s"),
+                Some(format!("{KEY}.interval must be greater than zero")),
+            ),
+        ];
+
+        for (config, expected) in cases {
+            pretty_assertions::assert_eq!(validation_error(&config), expected);
+        }
+    }
+
+    #[test]
+    fn test_housekeeping_job_batch_size_zero_runs_batches_of_one() {
+        pretty_assertions::assert_eq!(job_config(0, "5m").into_system(KEY).unwrap().batch_size, 1);
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

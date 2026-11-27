@@ -719,8 +719,11 @@ resources. The purge never touches the outbox: messages already posted about a r
 needs to read a resource to learn how it ended.
 
 **Purge contract.** Every table keyed by a resource ID (a column named `resource_id` or ending in
-`_resource_id`) has a foreign key to `resources` with `ON DELETE CASCADE`, or is declared in
-`RESOURCE_KEYED_TABLES_WITHOUT_CASCADE` with how its rows go:
+`_resource_id`, or one listed in `RESOURCE_ID_COLUMNS_OF_OTHER_NAMES`) has a foreign key to
+`resources` with `ON DELETE CASCADE`, or is declared in `RESOURCE_KEYED_TABLES_WITHOUT_CASCADE`
+with how its rows go. A column of another name is listed with a cascade or with the reason its rows
+stay: `resource_owners_projection.owner_id` stays, since an owner may be purged before what it
+owns, and the row goes with the owned resource.
 
 | How | Tables |
 | --- | --- |
@@ -731,7 +734,7 @@ needs to read a resource to learn how it ended.
 
 The contract test reads the migrated schema of each database (`test_*_resource_purge_contract.rs`)
 and fails for a resource-keyed table that is neither, and for a declaration that matches no such
-table.
+table or column.
 
 **Removal listeners** follow `DatasetEntryRemovalListener` of the datasets context: the repository
 takes every `dyn ResourceRemovalListener` registered in its catalog. A database-backed repository
@@ -746,7 +749,9 @@ stack see purged resources gone everywhere.
   `(controller, resource_id)`, where `controller` is a `ResourceControllerName`, and has an FK to
   `resources`. A row records the generation and status generation the controller finished with,
   or, with `not_before` set, a retry or a failure, with `attempts` and `last_error`.
-- Rows are not event-sourced: an upsert replaces the row. The FK means a resource's rows must be
+- Rows are not event-sourced: an upsert replaces the row, and writes nothing for a resource that
+  does not exist, since a purge may remove it between `process` and the record of its outcome. The
+  FK means a resource's rows must be
   removed (`delete_states_for_resources`) before the resource itself, which the
   [purge](#purge) does. Until then a deleted resource's rows stay; every query leaves them out.
 - Postgres stores `last_error` with NUL characters replaced by U+FFFD, since a TEXT column

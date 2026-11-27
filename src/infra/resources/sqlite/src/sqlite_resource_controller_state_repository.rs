@@ -94,7 +94,9 @@ impl ResourceControllerStateRepository for SqliteResourceControllerStateReposito
                 attempts,
                 last_error
             )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+            SELECT $1, r.resource_id, $3, $4, $5, $6, $7, $8
+            FROM resources r
+            WHERE r.resource_id = $2
             ON CONFLICT (controller, resource_id) DO UPDATE SET
                 controller_revision = EXCLUDED.controller_revision,
                 handled_generation = EXCLUDED.handled_generation,

@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_resources_repo_tests::{ResourceKeyedColumn, purge_contract_violations};
+use kamu_resources_repo_tests::{SchemaColumn, purge_contract_violations};
 use sqlx::SqlitePool;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -20,7 +20,7 @@ use sqlx::SqlitePool;
 async fn test_every_resource_keyed_table_is_purged_with_the_resource(pool: SqlitePool) {
     let harness = PurgeContractHarness::new(pool);
 
-    let violations = purge_contract_violations(&harness.resource_keyed_columns().await);
+    let violations = purge_contract_violations(&harness.columns().await);
 
     assert_eq!(violations, Vec::<String>::new());
 }
@@ -43,7 +43,7 @@ async fn test_purge_contract_rejects_an_unregistered_resource_keyed_table(pool: 
         )
         .await;
 
-    let violations = purge_contract_violations(&harness.resource_keyed_columns().await);
+    let violations = purge_contract_violations(&harness.columns().await);
 
     assert_eq!(violations.len(), 1, "{violations:?}");
     assert!(
@@ -69,7 +69,7 @@ impl PurgeContractHarness {
         sqlx::raw_sql(sql).execute(&self.pool).await.unwrap();
     }
 
-    async fn resource_keyed_columns(&self) -> Vec<ResourceKeyedColumn> {
+    async fn columns(&self) -> Vec<SchemaColumn> {
         let rows: Vec<(String, String, bool)> = sqlx::query_as(
             r#"
             SELECT
@@ -86,7 +86,6 @@ impl PurgeContractHarness {
             JOIN pragma_table_info(m.name) AS p
             WHERE m.type = 'table'
               AND m.name <> 'resources'
-              AND (p.name = 'resource_id' OR p.name GLOB '*_resource_id')
             ORDER BY 1, 2
             "#,
         )
@@ -95,7 +94,7 @@ impl PurgeContractHarness {
         .unwrap();
 
         rows.into_iter()
-            .map(|(table, column, cascades)| ResourceKeyedColumn::new(table, column, cascades))
+            .map(|(table, column, cascades)| SchemaColumn::new(table, column, cascades))
             .collect()
     }
 }

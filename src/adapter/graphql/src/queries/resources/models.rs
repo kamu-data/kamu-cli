@@ -564,6 +564,22 @@ pub struct ResourceAccessDeniedProblem {
     pub message: String,
 }
 
+impl From<odf::AccessError> for ResourceAccessDeniedProblem {
+    /// The message is the detail the denial carries, when it has one
+    fn from(err: odf::AccessError) -> Self {
+        let detail = match &err {
+            odf::AccessError::ReadOnly(detail) => detail.as_ref(),
+            odf::AccessError::Unauthenticated(detail) | odf::AccessError::Unauthorized(detail) => {
+                Some(detail)
+            }
+        };
+
+        Self {
+            message: detail.map_or_else(|| err.to_string(), ToString::to_string),
+        }
+    }
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// Reason a resource reference could not be resolved
@@ -622,9 +638,7 @@ impl From<kamu_resources_facade::ResourceLookupProblem> for ResourceLookupProble
                     message: e.to_string(),
                 })
             }
-            P::Access(e) => Self::AccessDenied(ResourceAccessDeniedProblem {
-                message: e.to_string(),
-            }),
+            P::Access(e) => Self::AccessDenied(e.into()),
         }
     }
 }

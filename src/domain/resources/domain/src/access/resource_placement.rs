@@ -20,6 +20,10 @@ use crate::{ApplyResourceRejection, DeclarativeResource};
 /// naming another account than the placement is rejected. A manifest naming none is applied in
 /// the placed account, so the current spec is looked up there and the spec is prepared again.
 /// Placing that spec again gives the same account.
+///
+/// Access is checked in the placed account, so a rejection reaches a principal who may not be
+/// allowed to read the objects the spec targets: it says nothing about them that the principal
+/// could not read otherwise.
 #[async_trait::async_trait]
 pub trait ResourcePlacement<R: DeclarativeResource>: Send + Sync {
     async fn place(

@@ -11,9 +11,10 @@
 **One-paragraph mental model.** A **housekeeping job** removes data that has outlived its use,
 such as deleted resources past their retention. It implements `HousekeepingJob`: one method
 removes a bounded batch of what is due, in short transactions of its own, and reports what it
-removed and what is still due; another says when the next item falls due. The job never decides
+removed and whether more is due; another counts what is due; a third says when the next item
+falls due. The job never decides
 when it runs. On the API server, `BackgroundAgentHost` runs each enabled job as an agent of its own,
-`HousekeepingAgent`, which runs batches while a backlog remains, then sleeps until the job's next
+`HousekeepingAgent`, which runs batches while items remain due, then sleeps until the job's next
 deadline, never longer than the job's interval. After a CLI command, `BackgroundWorkFinalizer`
 runs one batch of each enabled job, so a workspace that never runs `api-server` is cleaned too.
 Every process may run a job at once, so a batch must be idempotent and safe next to another runner.
@@ -64,14 +65,15 @@ removes: the resource retention job never calls a controller, for example.
 | --- | --- |
 | `job_name()` | A stable name: the agent name, the `job` label of the [metrics](#7-metrics) and the key of the job's [configuration](#6-configuration) |
 | `run_batch(now, batch_size)` | Removes at most `batch_size` items due at `now`, in short transactions of its own, and returns a `HousekeepingBatchReport` |
+| `count_due(now)` | The number of items due at `now`, for the backlog metric. It may scan the whole backlog, so the agent calls it at most once per pass |
 | `next_due(now)` | The moment after `now` when an item next falls due, or `None` for a job without deadlines of its own |
 
 `HousekeepingBatchReport` carries:
 
 - `removed_by_kind`: the items the batch removed, by a kind the job defines (the resource type for
   resource retention). The kinds are a metric label: keep them few and stable.
-- `backlog`: the items still due once the batch ended. A non-zero backlog makes the agent run
-  another batch.
+- `more_due`: whether items were still due once the batch ended, which makes the agent run
+  another batch. A batch learns it without counting, by finding one item past its size.
 
 A job is a `#[scope(Singleton)]` component bound as `dyn HousekeepingJob`. It resolves its
 repositories per call through `CatalogWeakRef`, opening its transactions with `transaction!`
@@ -87,15 +89,18 @@ The host builds one `HousekeepingAgent` per enabled job, next to the agents regi
 
 ```mermaid
 flowchart LR
-    Pass["Pass: run_batch"] -->|backlog > 0| Pause["Pause between batches"]
+    Pass["Pass: run_batch"] -->|more_due| Pause["Pause between batches"]
     Pause --> Pass
-    Pass -->|backlog = 0| Due["next_due(now)"]
+    Pass -->|no more due| Due["next_due(now)"]
     Due --> Sleep["Sleep until next_due,<br/>at most interval"]
     Sleep --> Pass
 ```
 
-- **A pass** runs batches until a batch reports no backlog, with `pauseBetweenBatches` between
-  them. It records the time it ended as the job's heartbeat.
+- **A pass** runs batches until a batch reports nothing more due, with `pauseBetweenBatches`
+  between them. It records the time it ended as the job's heartbeat.
+- **The backlog** is counted with `count_due` after the first batch of a pass that leaves items
+  due, then lowered by what each later batch removes, and set to 0 when the pass ends.
+- **Each batch** runs in a root span `HousekeepingAgent::run_batch` with the `job` field.
 - **The sleep** lasts until the job's next deadline, but never longer than `interval`. A job
   without deadlines therefore runs once per interval. A job with deadlines learns of an earlier
   deadline within one interval, when it reads `next_due` again: no wakeup signal tells it.
@@ -135,7 +140,7 @@ command may run a batch while a server runs on the same workspace database.
 | **Concurrency-safe.** Two runners never remove an item twice, and never act on an item the other removed | Several processes run the job | A compare-and-set claim on the deadline before anything is removed. Concurrency control is optimistic only: no row locks are taken ([kamu-sqlx-database-work](../../.claude/skills/kamu-sqlx-database-work/SKILL.md#concurrent-modifications-in-event-stores)) |
 | **Bounded.** A batch takes at most `batch_size` items | Short transactions do not hold up writers | `LIMIT` on the due query |
 | **Leave the outbox alone.** A job never removes messages a consumer has not processed | Consumers learn outcomes from messages, not from the data the job removes | The purge does not touch the outbox |
-| **Report the backlog.** Count what is still due, not what was found | The agent keeps going while a backlog remains; the metric shows a job falling behind | `count_resources_due_for_purge`, on the partial index of `purge_at` |
+| **Report whether more is due, cheaply.** Fetch one item past the batch rather than counting in the batch; count only in `count_due`, in a transaction of its own | The agent keeps going while items remain due; a count inside every batch would scan the backlog per batch | `LIMIT batch_size + 1` on the due query; `count_resources_due_for_purge`, on the partial index of `purge_at` |
 
 ---
 
@@ -149,16 +154,16 @@ backgroundAgents:
   housekeeping:
     resourceRetention:        # ResourceRetentionJob
       enabled: true
-      batchSize: 100          # 0 is treated as 1
-      interval: 5m
+      batchSize: 100          # at most 1000; 0 is treated as 1
+      interval: 5m            # greater than zero
       pauseBetweenBatches: 100ms
 ```
 
 | Key | Meaning |
 | --- | --- |
 | `enabled` | Whether the job runs, on the server and after CLI commands |
-| `batchSize` | Items removed per batch |
-| `interval` | The longest sleep between two passes |
+| `batchSize` | Items removed per batch, at most 1000: a batch binds a statement parameter per item |
+| `interval` | The longest sleep between two passes, greater than zero |
 | `pauseBetweenBatches` | The pause between the batches of one pass, which leaves room to other writers while a backlog drains |
 
 What a job removes and when it falls due is the job's own configuration, such as
@@ -170,7 +175,7 @@ What a job removes and when it falls due is the job's own configuration, such as
 ## 7. Metrics
 
 The runner records the same metrics for every job, labelled by `job`: the items removed by kind,
-the backlog after the last batch, and the time of the last finished pass, which serves as the
+the backlog (counted once per pass, then lowered by what later batches remove), and the time of the last finished pass, which serves as the
 job's heartbeat. The catalog and the alerts are in
 [metrics.md](metrics.md#housekeeping-jobs).
 
@@ -192,7 +197,7 @@ rules ([kamu-renaming-a-concept](../../.claude/skills/kamu-renaming-a-concept/SK
 1. Implement `HousekeepingJob` on a `#[scope(Singleton)]` component bound as
    `dyn HousekeepingJob`, resolving repositories per call (§2). Follow the rules of §5.
 2. Give its storage the queries a batch needs: find the due items, claim them with a
-   compare-and-set, remove them, count the backlog, and find the next deadline if it has one.
+   compare-and-set, remove them, count what is due, and find the next deadline if it has one.
    Test them in the shared repository suites
    ([kamu-repository-tests](../../.claude/skills/kamu-repository-tests/SKILL.md)).
 3. Register the component in its domain's `register_dependencies`. The host and the finalizer

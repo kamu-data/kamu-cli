@@ -83,7 +83,7 @@ wakeup listener metrics; label sets are pre-created at startup. How restarts wor
 | Metric | Type | Labels | Meaning |
 | --- | --- | --- | --- |
 | `housekeeping_items_removed_total` | counter | `job`, `kind` | Items the job removed, by a kind the job defines: the resource type for `dev.kamu.domain.resources.ResourceRetentionJob` |
-| `housekeeping_backlog` | gauge | `job` | Items still due after the job's last batch |
+| `housekeeping_backlog` | gauge | `job` | Items still due after the job's last batch: counted once per pass, then lowered by what later batches remove; 0 when a pass ends |
 | `housekeeping_last_pass_timestamp_seconds` | gauge | `job` | Unix time when the job's agent last finished a pass, leaving no backlog; `0` until it does |
 
 Recorded by `HousekeepingAgent` for every enabled job, with `job` its `job_name()`, which is also

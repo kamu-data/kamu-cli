@@ -1799,6 +1799,13 @@ CREATE INDEX idx_resource_owners_projection_owner_id ON public.resource_owners_p
 
 
 --
+-- Name: idx_resources_account_schema_name_any_visibility; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_resources_account_schema_name_any_visibility ON public.resources USING btree (account_id, resource_schema, lower((resource_name)::text));
+
+
+--
 -- Name: idx_resources_account_schema_name_ci; Type: INDEX; Schema: public; Owner: -
 --
 

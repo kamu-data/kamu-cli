@@ -12,7 +12,9 @@ use std::time::Duration;
 
 use chrono::TimeDelta;
 use internal_error::InternalError;
+use observability::tracing::root_span;
 use time_source::SystemTimeSource;
+use tracing::Instrument;
 
 use crate::{
     BackgroundAgent,
@@ -26,7 +28,7 @@ use crate::{
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Runs one [`HousekeepingJob`]: a pass of batches while a backlog remains,
+/// Runs one [`HousekeepingJob`]: a pass of batches while items remain due,
 /// then a sleep until the job's next deadline, never longer than its interval.
 /// The host builds one per enabled job.
 pub struct HousekeepingAgent {
@@ -70,6 +72,15 @@ impl HousekeepingAgent {
     /// Runs one batch of the job at the current time
     pub(crate) async fn run_batch(&self) -> Result<HousekeepingBatchReport, InternalError> {
         let job_name = self.job.job_name();
+        self.run_batch_impl(job_name)
+            .instrument(root_span!("HousekeepingAgent::run_batch", job = job_name,))
+            .await
+    }
+
+    async fn run_batch_impl(
+        &self,
+        job_name: &'static str,
+    ) -> Result<HousekeepingBatchReport, InternalError> {
         let report = self
             .job
             .run_batch(self.time_source.now(), self.config.batch_size)
@@ -82,25 +93,40 @@ impl HousekeepingAgent {
                 job = job_name,
                 removed,
                 removed_by_kind = ?report.removed_by_kind,
-                backlog = report.backlog,
+                more_due = report.more_due,
                 "Housekeeping batch done"
             );
         }
         Ok(report)
     }
 
-    /// Runs batches until no backlog remains, or `shutdown` stops it between
-    /// two batches
+    /// Runs batches until none leaves items due, or `shutdown` stops it
+    /// between two batches
     async fn run_pass(&self, shutdown: &CancellationToken) -> Result<PassEnd, InternalError> {
+        let job_name = self.job.job_name();
+        // Counted after the first batch that leaves items due, then lowered by
+        // what each later batch removes: a count may scan the whole backlog
+        let mut backlog: Option<u64> = None;
         loop {
             if shutdown.is_cancelled() {
                 return Ok(PassEnd::Stopped);
             }
-            if self.run_batch().await?.backlog == 0 {
-                self.metrics
-                    .on_pass(self.job.job_name(), self.time_source.now());
+            let report = self.run_batch().await?;
+            if !report.more_due {
+                self.metrics.on_backlog(job_name, 0);
+                self.metrics.on_pass(job_name, self.time_source.now());
                 return Ok(PassEnd::Finished);
             }
+
+            let remaining = match backlog {
+                None => self.count_due().await?,
+                Some(previous) => previous.saturating_sub(report.removed()),
+            };
+            // The batch left items due, even where the estimate runs out
+            let remaining = remaining.max(1);
+            backlog = Some(remaining);
+            self.metrics.on_backlog(job_name, remaining);
+
             shutdown
                 .run_until_cancelled(
                     self.time_source
@@ -108,6 +134,16 @@ impl HousekeepingAgent {
                 )
                 .await;
         }
+    }
+
+    async fn count_due(&self) -> Result<u64, InternalError> {
+        self.job
+            .count_due(self.time_source.now())
+            .instrument(root_span!(
+                "HousekeepingAgent::count_due",
+                job = self.job.job_name(),
+            ))
+            .await
     }
 
     /// How long to sleep after a pass: until the job's next deadline, at most

@@ -83,6 +83,7 @@ impl ResourceRetentionJob {
         removed_by_type
     }
 
+    #[tracing::instrument(level = "debug", skip_all, fields(%now, batch_size))]
     #[transactional_method4(
         resource_repository: Arc<dyn ResourceRepository>,
         controller_states: Arc<dyn ResourceControllerStateRepository>,
@@ -94,9 +95,13 @@ impl ResourceRetentionJob {
         now: DateTime<Utc>,
         batch_size: usize,
     ) -> Result<HousekeepingBatchReport, InternalError> {
-        let due = resource_repository
-            .find_resources_due_for_purge(now, batch_size)
+        // One row past the batch tells whether more is due, without counting
+        let mut due = resource_repository
+            .find_resources_due_for_purge(now, batch_size.saturating_add(1))
             .await?;
+        let more_due = due.len() > batch_size;
+        due.truncate(batch_size);
+
         let due_ids: Vec<ResourceID> = due.iter().map(|resource| resource.id).collect();
         let claimed_ids = resource_repository
             .claim_resources_for_purge(&due_ids, now)
@@ -104,9 +109,7 @@ impl ResourceRetentionJob {
         if claimed_ids.is_empty() {
             return Ok(HousekeepingBatchReport {
                 removed_by_kind: BTreeMap::new(),
-                backlog: resource_repository
-                    .count_resources_due_for_purge(now)
-                    .await?,
+                more_due,
             });
         }
         let claimed: Vec<ResourceDueForPurge> = due
@@ -133,10 +136,13 @@ impl ResourceRetentionJob {
 
         Ok(HousekeepingBatchReport {
             removed_by_kind,
-            backlog: resource_repository
-                .count_resources_due_for_purge(now)
-                .await?,
+            more_due,
         })
+    }
+
+    #[transactional_method1(resource_repository: Arc<dyn ResourceRepository>)]
+    async fn count_due_for_purge(&self, now: DateTime<Utc>) -> Result<u64, InternalError> {
+        resource_repository.count_resources_due_for_purge(now).await
     }
 
     #[transactional_method1(resource_repository: Arc<dyn ResourceRepository>)]
@@ -160,6 +166,10 @@ impl HousekeepingJob for ResourceRetentionJob {
         batch_size: usize,
     ) -> Result<HousekeepingBatchReport, InternalError> {
         self.purge_batch(now, batch_size).await
+    }
+
+    async fn count_due(&self, now: DateTime<Utc>) -> Result<u64, InternalError> {
+        self.count_due_for_purge(now).await
     }
 
     async fn next_due(&self, now: DateTime<Utc>) -> Result<Option<DateTime<Utc>>, InternalError> {

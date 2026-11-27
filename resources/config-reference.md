@@ -1396,7 +1396,7 @@ How a housekeeping job runs
 <td><code>batchSize</code></td>
 <td><code>integer</code></td>
 <td><code class="language-json">100</code></td>
-<td>Items removed per transaction. 0 is treated as 1</td>
+<td>Items removed per transaction, at most 1000. 0 is treated as 1</td>
 </tr>
 <tr>
 <td><code>enabled</code></td>
@@ -1410,9 +1410,9 @@ How a housekeeping job runs
 <td><code class="language-json">&quot;5m&quot;</code></td>
 <td>
 
-The longest pause between two passes of the job. A job with deadlines
-of its own wakes up at the nearest one, so this bounds how late it
-notices an earlier deadline
+The longest pause between two passes of the job, greater than zero. A
+job with deadlines of its own wakes up at the nearest one, so this
+bounds how late it notices an earlier deadline
 
 </td>
 </tr>

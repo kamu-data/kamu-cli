@@ -142,7 +142,7 @@ async fn test_due_resource_is_purged_and_one_not_yet_due_kept() {
         .unwrap();
 
     assert_eq!(report.removed_by_kind, removed_test_resources(1));
-    assert_eq!(report.backlog, 0);
+    assert!(!report.more_due);
     assert!(harness.is_purged(&due).await);
     assert!(!harness.is_purged(&not_yet_due).await);
     assert_eq!(
@@ -162,12 +162,13 @@ async fn test_purge_batches_stay_bounded() {
     }
 
     let first = harness.run_purge_batch(harness.catalog(), 2).await.unwrap();
+    assert_eq!(harness.count_due().await, 1);
     let second = harness.run_purge_batch(harness.catalog(), 2).await.unwrap();
     let third = harness.run_purge_batch(harness.catalog(), 2).await.unwrap();
 
     assert_eq!(
-        [first, second, third].map(|report| (report.removed(), report.backlog)),
-        [(2, 1), (1, 0), (0, 0)]
+        [first, second, third].map(|report| (report.removed(), report.more_due)),
+        [(2, true), (1, false), (0, false)]
     );
     for id in &ids {
         assert!(harness.is_purged(id).await);
@@ -430,6 +431,13 @@ impl RetentionHarness {
         ResourceRetentionJob::new(catalog.weak_ref())
             .run_batch(self.time_source().now(), batch_size)
             .await
+    }
+
+    async fn count_due(&self) -> u64 {
+        ResourceRetentionJob::new(self.catalog().weak_ref())
+            .count_due(self.time_source().now())
+            .await
+            .unwrap()
     }
 
     async fn next_due(&self) -> Option<DateTime<Utc>> {

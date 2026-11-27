@@ -26,6 +26,7 @@ macro_rules! declare_apply_resource_use_case {
                 std::sync::Arc<dyn kamu_resources::ResourceAggregateLoader<$resource>>,
             resource_persistence_service:
                 std::sync::Arc<dyn kamu_resources::ResourcePersistenceService<$resource>>,
+            resource_dispatcher_factory: std::sync::Arc<$crate::ResourceDispatcherFactory>,
             maybe_resource_spec_pre_apply:
                 Option<std::sync::Arc<dyn kamu_resources::ResourceSpecPreApply<$resource>>>,
             maybe_resource_placement:
@@ -46,6 +47,7 @@ macro_rules! declare_apply_resource_use_case {
                     typed_resource_query_service: self.typed_resource_query_service.as_ref(),
                     resource_aggregate_loader: self.resource_aggregate_loader.as_ref(),
                     resource_persistence_service: self.resource_persistence_service.as_ref(),
+                    resource_dispatcher_factory: self.resource_dispatcher_factory.as_ref(),
                     maybe_resource_spec_pre_apply: self.maybe_resource_spec_pre_apply.as_deref(),
                     maybe_resource_placement: self.maybe_resource_placement.as_deref(),
                     maybe_resource_operation_guard: self.maybe_resource_operation_guard.as_deref(),

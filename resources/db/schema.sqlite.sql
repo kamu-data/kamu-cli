@@ -203,6 +203,9 @@ CREATE INDEX idx_resource_labels_projection_key_value_resource_id
 CREATE INDEX idx_resource_owners_projection_owner_id
     ON resource_owners_projection (owner_id, resource_id);
 
+CREATE INDEX idx_resources_account_schema_name_any_visibility
+    ON resources (account_id, resource_schema, resource_name);
+
 CREATE UNIQUE INDEX idx_resources_account_schema_name_ci
     ON resources (account_id, resource_schema, resource_name)
     WHERE deletion_requested_at IS NULL;

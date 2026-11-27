@@ -91,7 +91,7 @@ impl ResourceAccountResolver for ResourceAccountResolverImpl {
         self.default_resource_operation_guard
             .check_account_rule(&principal, account)
             .await
-            .map_err(ResolveManifestAccountError::from_operation_error)
+            .map_err(|err| ResolveManifestAccountError::from_operation_error(account, err))
     }
 }
 

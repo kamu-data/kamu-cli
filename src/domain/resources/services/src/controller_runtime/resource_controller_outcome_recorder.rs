@@ -20,7 +20,8 @@ use crate::domain::{ResourceControllerStateRepository, ResourceID};
 ///
 /// The caller runs it in a transaction of its own, after `process` committed
 /// its own work. A crash between the two loses only the record: the resource stays
-/// eligible and `process`, being idempotent, is asked again.
+/// eligible and `process`, being idempotent, is asked again. A resource purged
+/// between the two gets no record.
 pub(crate) struct ResourceControllerOutcomeRecorder<'a> {
     registration: &'a ResourceControllerRegistration,
     failure_backoff: &'a RetryBackoff,

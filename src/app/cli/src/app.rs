@@ -952,7 +952,7 @@ pub fn register_config_in_catalog(
 
     // Background agents configuration
     catalog_builder.add_value(config.background_agents.background_agent_host_config());
-    catalog_builder.add_value(config.background_agents.housekeeping.into_system());
+    catalog_builder.add_value(config.background_agents.housekeeping.into_system()?);
     catalog_builder.add_value(config.background_agents.wakeup_listener_config());
     catalog_builder.add_value(config.background_agents.outbox_agent_config());
     catalog_builder.add_value(config.background_agents.flow_system_event_agent_config());

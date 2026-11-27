@@ -20,7 +20,8 @@ use super::EventCounter;
 
 /// One batch of a [`ScriptedHousekeepingJob`]
 pub enum ScriptedBatch {
-    /// Removes `removed` items, leaving `backlog`
+    /// Removes `removed` items, leaving `backlog`, which counts of the due
+    /// items report until the next batch
     Removes {
         removed: u64,
         backlog: u64,
@@ -36,6 +37,8 @@ pub struct ScriptedHousekeepingJob {
     name: &'static str,
     script: Mutex<VecDeque<ScriptedBatch>>,
     next_due: Mutex<Option<DateTime<Utc>>>,
+    backlog: Mutex<u64>,
+    count_calls: EventCounter,
     batches: Mutex<Vec<(DateTime<Utc>, usize)>>,
     batch_count: EventCounter,
 }
@@ -48,6 +51,8 @@ impl ScriptedHousekeepingJob {
             name,
             script: Mutex::new(script.into()),
             next_due: Mutex::new(None),
+            backlog: Mutex::new(0),
+            count_calls: EventCounter::new(),
             batches: Mutex::new(Vec::new()),
             batch_count: EventCounter::new(),
         }
@@ -59,6 +64,11 @@ impl ScriptedHousekeepingJob {
 
     pub fn batch_count(&self) -> usize {
         self.batch_count.get()
+    }
+
+    /// How many times the due items were counted
+    pub fn count_calls(&self) -> usize {
+        self.count_calls.get()
     }
 
     /// The time and size of each batch run so far
@@ -89,13 +99,24 @@ impl HousekeepingJob for ScriptedHousekeepingJob {
         self.batch_count.increment();
 
         match batch {
-            None => Ok(HousekeepingBatchReport::default()),
-            Some(ScriptedBatch::Removes { removed, backlog }) => Ok(HousekeepingBatchReport {
-                removed_by_kind: BTreeMap::from([(Self::KIND.to_string(), removed)]),
-                backlog,
-            }),
+            None => {
+                *self.backlog.lock().unwrap() = 0;
+                Ok(HousekeepingBatchReport::default())
+            }
+            Some(ScriptedBatch::Removes { removed, backlog }) => {
+                *self.backlog.lock().unwrap() = backlog;
+                Ok(HousekeepingBatchReport {
+                    removed_by_kind: BTreeMap::from([(Self::KIND.to_string(), removed)]),
+                    more_due: backlog > 0,
+                })
+            }
             Some(ScriptedBatch::Fails) => Err(InternalError::new("scripted batch failure")),
         }
+    }
+
+    async fn count_due(&self, _now: DateTime<Utc>) -> Result<u64, InternalError> {
+        self.count_calls.increment();
+        Ok(*self.backlog.lock().unwrap())
     }
 
     async fn next_due(&self, _now: DateTime<Utc>) -> Result<Option<DateTime<Utc>>, InternalError> {

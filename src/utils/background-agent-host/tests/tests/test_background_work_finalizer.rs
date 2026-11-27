@@ -252,6 +252,10 @@ impl<const I: usize> HousekeepingJob for Slot<I, ScriptedHousekeepingJob> {
         self.0.run_batch(now, batch_size).await
     }
 
+    async fn count_due(&self, now: DateTime<Utc>) -> Result<u64, InternalError> {
+        self.0.count_due(now).await
+    }
+
     async fn next_due(&self, now: DateTime<Utc>) -> Result<Option<DateTime<Utc>>, InternalError> {
         self.0.next_due(now).await
     }

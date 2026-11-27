@@ -37,6 +37,11 @@ pub trait HousekeepingJob: Send + Sync {
         batch_size: usize,
     ) -> Result<HousekeepingBatchReport, InternalError>;
 
+    /// Counts the items due at `now`, for the backlog metric. It may scan the
+    /// whole backlog, so the agent calls it at most once per pass, and only
+    /// when a batch left items due.
+    async fn count_due(&self, now: DateTime<Utc>) -> Result<u64, InternalError>;
+
     /// The moment after `now` when an item next falls due, or `None` for a job
     /// without deadlines of its own, which runs once per interval
     async fn next_due(&self, now: DateTime<Utc>) -> Result<Option<DateTime<Utc>>, InternalError>;
@@ -50,8 +55,9 @@ pub struct HousekeepingBatchReport {
     /// Items the batch removed, by a kind the job defines, such as the
     /// resource type
     pub removed_by_kind: BTreeMap<String, u64>,
-    /// Items still due once the batch ended
-    pub backlog: u64,
+    /// Whether items were still due once the batch ended, which keeps the
+    /// pass going
+    pub more_due: bool,
 }
 
 impl HousekeepingBatchReport {

@@ -11,14 +11,15 @@ use std::sync::Arc;
 
 use dill::CatalogBuilder;
 use kamu_resources::{ResourceAggregateLoader, TypedResourceQueryService};
-use kamu_resources_services::ApplyResourcePlanner;
 use kamu_resources_services::testing::{
     BaseResourceServiceHarness,
     BaseResourceServiceHarnessOpts,
     TestResource,
     TestResourceReconciler,
+    register_test_resource_crud_dispatcher,
     register_test_resource_resource_service_layer,
 };
+use kamu_resources_services::{ApplyResourcePlanner, ResourceDispatcherFactory};
 
 use crate::tests::utils::ScriptedNameSuffixGenerator;
 
@@ -32,6 +33,7 @@ pub struct ApplyResourcePlanningHarness {
     catalog: dill::Catalog,
     typed_query_svc: Arc<dyn TypedResourceQueryService<TestResource>>,
     aggregate_loader: Arc<dyn ResourceAggregateLoader<TestResource>>,
+    dispatcher_factory: Arc<ResourceDispatcherFactory>,
     name_suffix_generator: ScriptedNameSuffixGenerator,
 }
 
@@ -44,18 +46,22 @@ impl ApplyResourcePlanningHarness {
 
         let mut b = CatalogBuilder::new_chained(base.catalog());
         register_test_resource_resource_service_layer(&mut b);
+        // Owners are read through the dispatcher of their type
+        register_test_resource_crud_dispatcher(&mut b);
         b.add::<TestResourceReconciler>();
 
         let catalog = b.build();
 
         let typed_query_svc = catalog.get_one().unwrap();
         let aggregate_loader = catalog.get_one().unwrap();
+        let dispatcher_factory = catalog.get_one().unwrap();
 
         Self {
             base,
             catalog,
             typed_query_svc,
             aggregate_loader,
+            dispatcher_factory,
             name_suffix_generator,
         }
     }
@@ -77,6 +83,7 @@ impl ApplyResourcePlanningHarness {
             self.generic_query_svc(),
             self.typed_query_svc.as_ref(),
             self.aggregate_loader.as_ref(),
+            self.dispatcher_factory.as_ref(),
             &self.name_suffix_generator,
             self.time_source(),
         )

@@ -75,7 +75,8 @@ impl ApplyResourceHeaders {
         })
     }
 
-    fn parse_name(name: &str) -> Result<ResourceName, ResourceHeadersValidationError> {
+    /// Parses a name as the headers of an apply take it
+    pub fn parse_name(name: &str) -> Result<ResourceName, ResourceHeadersValidationError> {
         if name.is_empty() {
             return Err(ResourceHeadersValidationError::EmptyName);
         }

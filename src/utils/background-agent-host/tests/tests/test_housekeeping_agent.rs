@@ -78,6 +78,7 @@ async fn test_pass_drains_the_backlog_in_bounded_batches() {
     );
     assert_eq!(harness.removed(), 7);
     assert_eq!(harness.backlog(), 0);
+    assert_eq!(harness.job.count_calls(), 1, "counted once per pass");
     assert!(harness.finished_a_pass_now());
 
     agent.stop(&harness).await.unwrap();

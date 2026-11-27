@@ -135,7 +135,7 @@ database_transactional_test!(
 
 database_transactional_test!(
     storage = sqlite,
-    fixture = controller_state_repo_suite::test_upsert_state_of_unknown_resource_fails,
+    fixture = controller_state_repo_suite::test_upsert_state_of_absent_resource_writes_nothing,
     harness = SqliteResourceControllerStateRepositoryHarness
 );
 

@@ -53,6 +53,7 @@ use crate::{
     ApplyResourcePlanner,
     DefaultResourceOperationGuard,
     PlannedApplyResourceDecision,
+    ResourceDispatcherFactory,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -71,6 +72,7 @@ where
     pub typed_resource_query_service: &'a dyn TypedResourceQueryService<R>,
     pub resource_aggregate_loader: &'a dyn ResourceAggregateLoader<R>,
     pub resource_persistence_service: &'a dyn ResourcePersistenceService<R>,
+    pub resource_dispatcher_factory: &'a ResourceDispatcherFactory,
     pub maybe_resource_spec_pre_apply: Option<&'a dyn ResourceSpecPreApply<R>>,
     pub maybe_resource_placement: Option<&'a dyn ResourcePlacement<R>>,
     pub maybe_resource_operation_guard: Option<&'a dyn ResourceOperationGuard<R>>,
@@ -166,11 +168,31 @@ where
 
     /// Places and prepares the resource, then checks that the principal may
     /// apply it there. Preparation and planning must see the same resource,
-    /// so the one found here is planned against
+    /// so the one found here is planned against.
+    ///
+    /// A type with neither a placement nor a guard of its own is applied in
+    /// the account the params name under the default rule, which needs no
+    /// current resource: it is checked first, so a principal who may not use
+    /// the account never has a resource there loaded or prepared for them
     async fn prepare_with_access(
         &self,
         params: ApplyResourceParams<R>,
     ) -> Result<PreparedApplyResource<R>, ApplyResourceUseCaseError<R>> {
+        let checked_by_account_rule = match params.access_check {
+            ApplyResourceAccessCheck::ByGuard => {
+                self.maybe_resource_placement.is_none()
+                    && self.maybe_resource_operation_guard.is_none()
+            }
+            ApplyResourceAccessCheck::CheckedByCaller => false,
+        };
+        if checked_by_account_rule {
+            let account = params.headers.resolved_account_handle();
+            self.default_resource_operation_guard
+                .check_account_rule(&params.provenance.principal, &account)
+                .await
+                .map_err(|err| Self::apply_access_error(&account, err))?;
+        }
+
         let (prepared, existing) = match self.place_and_prepare(params).await? {
             PlacedApplyResource::Prepared(prepared, existing) => (prepared, existing),
             PlacedApplyResource::Rejected(rejection) => {
@@ -179,6 +201,7 @@ where
         };
 
         match prepared.access_check {
+            ApplyResourceAccessCheck::ByGuard if checked_by_account_rule => {}
             ApplyResourceAccessCheck::ByGuard => {
                 let account = prepared.headers.resolved_account_handle();
                 let operation = match &existing {
@@ -228,20 +251,29 @@ where
             self.default_resource_operation_guard,
         );
 
-        match guard.check_operation(principal, request).await {
-            Ok(()) => Ok(()),
-            Err(ResourceOperationError::Access(err)) => Err(err.into()),
+        guard
+            .check_operation(principal, request)
+            .await
+            .map_err(|err| Self::apply_access_error(request.account, err))
+    }
+
+    fn apply_access_error(
+        account: &odf::ResourceOwnerHandle,
+        err: ResourceOperationError,
+    ) -> ApplyResourceUseCaseError<R> {
+        match err {
+            ResourceOperationError::Access(err) => err.into(),
             // Applying a resource the principal may not read is applying in an
             // account they may not use
-            Err(ResourceOperationError::NotFound(_)) => Err(odf::AccessError::Unauthorized(
+            ResourceOperationError::NotFound(_) => odf::AccessError::Unauthorized(
                 format!(
                     "Current subject is not allowed to apply resources of account '{}'",
-                    request.account.name
+                    account.name
                 )
                 .into(),
             )
-            .into()),
-            Err(ResourceOperationError::Internal(err)) => Err(err.into()),
+            .into(),
+            ResourceOperationError::Internal(err) => err.into(),
         }
     }
 
@@ -443,6 +475,7 @@ where
             self.generic_resource_query_service,
             self.typed_resource_query_service,
             self.resource_aggregate_loader,
+            self.resource_dispatcher_factory,
             self.name_suffix_generator,
             self.time_source,
         )

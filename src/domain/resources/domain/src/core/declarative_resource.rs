@@ -36,7 +36,10 @@ pub trait DeclarativeResource:
         + From<Self>;
 
     /// Given by a type whose resources may be applied without a name: the
-    /// prefix of the generated name `<prefix>-<random suffix>`
+    /// prefix of the generated name `<prefix>-<random suffix>`. The prefix
+    /// starts a valid resource name and leaves room for the suffix within
+    /// [`MAX_NAME_LEN`](crate::MAX_NAME_LEN); a generated name that is not
+    /// valid rejects the apply as invalid headers.
     ///
     /// Deviates from ODF, whose `ResourceHeadersInput` requires a name.
     const GENERATED_NAME_PREFIX: Option<fn(&Self::SpecInput) -> String> = None;

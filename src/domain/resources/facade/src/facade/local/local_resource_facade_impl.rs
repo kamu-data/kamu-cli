@@ -434,7 +434,7 @@ impl ResourceFacade for LocalResourceFacadeImpl {
                     .get(id.as_ref())
                     .filter(|row| row.deleted_at.is_none())
                     .cloned()
-                    .ok_or_else(|| id_not_found(id));
+                    .ok_or_else(|| ref_not_found(&group.schema, &resource_ref, id));
 
                 // Only a ref that supplied its own id asserts a name to verify:
                 // for a name-keyed ref the name *is* how the id was found.
@@ -706,7 +706,9 @@ impl LocalResourceFacadeImpl {
                 .crud_dispatcher_for_trusted_schema(group.schema.as_str())?
                 .check_account_access(&self.principal.handle()?, &group.account, operation)
                 .await
-                .map_err(ResolveManifestAccountError::from_operation_error)?;
+                .map_err(|err| {
+                    ResolveManifestAccountError::from_operation_error(&group.account, err)
+                })?;
             groups.push((group, access));
         }
 
@@ -751,8 +753,10 @@ impl LocalResourceFacadeImpl {
     }
 
     /// Keeps the entries whose resources the principal may run `operation`
-    /// on, and reports each other one as a problem of its ref: one the
-    /// principal may not read as not found, so a denial does not reveal it
+    /// on, and reports each other one as a problem of its ref. A resource the
+    /// principal may not read is not found, so a denial does not reveal it: a
+    /// name matching several resources keeps the others silently, and is not
+    /// found only when none of them is answered.
     async fn retain_permitted_entries(
         &self,
         account: &odf::ResourceOwnerHandle,
@@ -769,21 +773,25 @@ impl LocalResourceFacadeImpl {
 
         let ids = id_entries.iter().map(|(_, _, id)| *id).collect::<Vec<_>>();
         // Only resources of the type in the account are checked; any other
-        // ID names nothing the principal may see
-        let of_type = self
+        // ID names nothing the principal may see. A deleted resource cannot be
+        // deleted again, so its guard is not asked to.
+        let checkable = self
             .generic_resource_query_service
             .find_resource_handles_by_ids(&account.did, &ids)
             .await?
             .into_iter()
             .filter(|row| row.schema == schema.as_str())
+            .filter(|row| match operation {
+                ResourceAccountOperation::Read => true,
+                ResourceAccountOperation::Delete => row.deleted_at.is_none(),
+            })
             .map(|row| ResourceID::new(row.id))
             .collect::<HashSet<_>>();
-        let mut checked_ids = Vec::with_capacity(ids.len());
-        for id in ids {
-            if of_type.contains(&id) && !checked_ids.contains(&id) {
-                checked_ids.push(id);
-            }
-        }
+        let mut seen_ids = HashSet::with_capacity(ids.len());
+        let checked_ids = ids
+            .into_iter()
+            .filter(|id| checkable.contains(id) && seen_ids.insert(*id))
+            .collect::<Vec<_>>();
 
         let checked = self
             .dispatcher_factory
@@ -807,50 +815,78 @@ impl LocalResourceFacadeImpl {
 
         // A resource named by several refs gets the same answer for each
         let mut permitted = Vec::with_capacity(id_entries.len());
+        let mut answered_indexes = HashSet::new();
+        let mut hidden = Vec::new();
         for (request_index, resource_ref, id) in id_entries {
-            let error = match results.get(&id) {
+            match results.get(&id) {
                 Some(Ok(())) => {
+                    answered_indexes.insert(request_index);
                     permitted.push((request_index, resource_ref, id));
-                    continue;
                 }
                 Some(Err(ResourceOperationError::Access(err))) => {
-                    ResourceLookupProblem::Access(repeat_access_error(err))
+                    answered_indexes.insert(request_index);
+                    problems.push(BatchResourceProblem {
+                        request_index,
+                        error: ResourceLookupProblem::Access(repeat_access_error(err)),
+                    });
                 }
                 Some(Err(
                     ResourceOperationError::NotFound(_) | ResourceOperationError::Internal(_),
                 ))
-                | None => ref_not_found(schema, &resource_ref, id),
-            };
-            problems.push(BatchResourceProblem {
-                request_index,
-                error,
-            });
+                | None => hidden.push((request_index, resource_ref, id)),
+            }
+        }
+
+        for (request_index, resource_ref, id) in hidden {
+            if answered_indexes.insert(request_index) {
+                problems.push(BatchResourceProblem {
+                    request_index,
+                    error: ref_not_found(schema, &resource_ref, id),
+                });
+            }
         }
 
         Ok(permitted)
     }
 
     /// A selector of a type is checked by the type's guard; one without a
-    /// type by the default rule
+    /// type by the default rule. Each check runs once per call: `checked`
+    /// holds those already passed
     async fn ensure_can_list(
         &self,
         account: &odf::ResourceOwnerHandle,
         schema: Option<&TypeUri>,
         scope: &ResourceListScope,
+        checked: &mut Vec<ListCheck>,
     ) -> Result<(), ResolveManifestAccountError> {
-        let Some(schema) = schema else {
-            return self
-                .resource_account_resolver
-                .ensure_can_use_account(&self.principal, account)
-                .await;
-        };
+        let check = (
+            account.did.clone(),
+            schema.map(|schema| (schema.clone(), scope.clone())),
+        );
+        if checked.contains(&check) {
+            return Ok(());
+        }
 
-        self.dispatcher_factory
-            .crud_dispatcher_for_trusted_schema(schema.as_str())
-            .int_err()?
-            .check_list(&self.principal.handle()?, account, scope)
-            .await
-            .map_err(ResolveManifestAccountError::from_operation_error)
+        match schema {
+            None => {
+                self.resource_account_resolver
+                    .ensure_can_use_account(&self.principal, account)
+                    .await?;
+            }
+            Some(schema) => {
+                self.dispatcher_factory
+                    .crud_dispatcher_for_trusted_schema(schema.as_str())
+                    .int_err()?
+                    .check_list(&self.principal.handle()?, account, scope)
+                    .await
+                    .map_err(|err| {
+                        ResolveManifestAccountError::from_operation_error(account, err)
+                    })?;
+            }
+        }
+
+        checked.push(check);
+        Ok(())
     }
 
     /// Converts snapshots into summary views, rendering each one's typed list
@@ -898,6 +934,14 @@ impl LocalResourceFacadeImpl {
         &self,
         request: SearchResourcesRequest,
     ) -> Result<Option<PreparedSearch>, ListResourcesError> {
+        // First, as the remote facade does, so a request with several faults
+        // fails the same way on both. And before the fast path of
+        // `resolve_scope`: a selector narrowed *only* by a field the facade
+        // cannot resolve reads as unnarrowed there and would widen into
+        // "every resource". The trait is public, so this is the boundary that
+        // has to hold — not the GraphQL adapter alone.
+        validate_search_request(&request)?;
+
         // The principal's own account: the default for selectors naming no
         // account, and the check that a principal without one cannot search.
         let target_account = self
@@ -905,8 +949,11 @@ impl LocalResourceFacadeImpl {
             .resolve_target_account(&self.principal, None)
             .await?;
 
-        let owner_id = self.resolve_owner(request.owner).await?;
-        let scope = self.resolve_scope(request.selectors, owner_id).await?;
+        let owner = self.resolve_owner(request.owner).await?;
+        let scope = self
+            .resolve_scope(request.selectors, owner, request.visibility)
+            .await?;
+        let owner_id = owner.map(ResourceListOwner::id);
 
         // Empty exact-name/id queries are vacuous.
         if scope.is_vacuous() {
@@ -938,12 +985,10 @@ impl LocalResourceFacadeImpl {
     async fn resolve_owner(
         &self,
         maybe_owner: Option<ResourceRef>,
-    ) -> Result<Option<ResourceID>, ListResourcesError> {
+    ) -> Result<Option<ResourceListOwner>, ListResourcesError> {
         let Some(owner) = maybe_owner else {
             return Ok(None);
         };
-
-        validate_ref(&owner)?;
 
         let owner_id = owner.id;
         let response = self
@@ -951,7 +996,7 @@ impl LocalResourceFacadeImpl {
             .await?;
 
         if let Some(owner) = response.successes.into_iter().next() {
-            return Ok(Some(owner.item.id));
+            return Ok(Some(ResourceListOwner::Found(owner.item.id)));
         }
 
         let Some(problem) = response.problems.into_iter().next() else {
@@ -960,16 +1005,21 @@ impl LocalResourceFacadeImpl {
             )));
         };
 
-        match problem.error {
-            ResourceLookupProblem::IDNotFound(_) if owner_id.is_some() => Ok(owner_id),
-            error @ (ResourceLookupProblem::IDNotFound(_)
-            | ResourceLookupProblem::NameNotFound(_)
-            | ResourceLookupProblem::SchemaMismatch(_)
-            | ResourceLookupProblem::NameMismatch(_)
-            | ResourceLookupProblem::EmptyRef
-            | ResourceLookupProblem::UntypedName
-            | ResourceLookupProblem::DeletedNotRevealed(_)
-            | ResourceLookupProblem::Access(_)) => Err(ListResourcesError::OwnerLookup(error)),
+        match (problem.error, owner_id) {
+            (ResourceLookupProblem::IDNotFound(_), Some(owner_id)) => {
+                Ok(Some(ResourceListOwner::NotFound(owner_id)))
+            }
+            (
+                error @ (ResourceLookupProblem::IDNotFound(_)
+                | ResourceLookupProblem::NameNotFound(_)
+                | ResourceLookupProblem::SchemaMismatch(_)
+                | ResourceLookupProblem::NameMismatch(_)
+                | ResourceLookupProblem::EmptyRef
+                | ResourceLookupProblem::UntypedName
+                | ResourceLookupProblem::DeletedNotRevealed(_)
+                | ResourceLookupProblem::Access(_)),
+                _,
+            ) => Err(ListResourcesError::OwnerLookup(error)),
         }
     }
 
@@ -982,16 +1032,9 @@ impl LocalResourceFacadeImpl {
     async fn resolve_scope(
         &self,
         selectors: Vec<ResourceSelector>,
-        owner_id: Option<ResourceID>,
+        owner: Option<ResourceListOwner>,
+        visibility: ResourceVisibility,
     ) -> Result<ResourceScope, ListResourcesError> {
-        // Before the fast path below: a selector narrowed *only* by a field the
-        // facade cannot resolve reads as unnarrowed there and would widen into
-        // "every resource". The trait is public, so this is the boundary that
-        // has to hold — not the GraphQL adapter alone.
-        for selector in &selectors {
-            validate_selector(selector)?;
-        }
-
         // A lone type-less, unnarrowed, account-less, unlabelled selector needs
         // no schemas at all, so it can answer before touching the catalog or
         // resolving any account.
@@ -1041,6 +1084,9 @@ impl LocalResourceFacadeImpl {
             .collect::<Result<Vec<_>, _>>()?;
 
         let mut applicable = Vec::with_capacity(selectors.len());
+        // A scope holds label pairs, which cannot be hashed; a request has
+        // few selectors
+        let mut list_checks = Vec::new();
 
         for (selector, account) in selectors.into_iter().zip(accounts) {
             let schema = selector
@@ -1073,7 +1119,8 @@ impl LocalResourceFacadeImpl {
                 id: selector.id,
                 name_pattern: selector.name.clone(),
                 label_pairs,
-                owner_id,
+                owner,
+                visibility,
             };
 
             // This selector's schema cannot carry its labels, so it can never
@@ -1081,8 +1128,13 @@ impl LocalResourceFacadeImpl {
             // may list the account at all, judged without the labels.
             if applicable_schema_ids.is_empty() {
                 if let Some(account) = &account {
-                    self.ensure_can_list(account, schema.as_ref(), &list_scope(Vec::new()))
-                        .await?;
+                    self.ensure_can_list(
+                        account,
+                        schema.as_ref(),
+                        &list_scope(Vec::new()),
+                        &mut list_checks,
+                    )
+                    .await?;
                 }
                 continue;
             }
@@ -1101,8 +1153,13 @@ impl LocalResourceFacadeImpl {
                     .collect::<Vec<_>>();
 
             if let Some(account) = &account {
-                self.ensure_can_list(account, schema.as_ref(), &list_scope(label_pairs.clone()))
-                    .await?;
+                self.ensure_can_list(
+                    account,
+                    schema.as_ref(),
+                    &list_scope(label_pairs.clone()),
+                    &mut list_checks,
+                )
+                .await?;
             }
 
             applicable.push(ResolvedSelector {
@@ -1193,9 +1250,7 @@ impl LocalResourceFacadeImpl {
                         )
                     })
                     .cloned()
-                    .ok_or(ResourceLookupProblem::IDNotFound(ResourceIDNotFoundError(
-                        id,
-                    )))
+                    .ok_or_else(|| ref_not_found(&group.schema, &resource_ref, id))
                     .and_then(|snapshot| {
                         ensure_schema_matches::<ResourceLookupProblem>(
                             snapshot.id,
@@ -1506,6 +1561,12 @@ struct PreparedSearch {
     pagination: PaginationOpts,
     total_count: usize,
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// A list check that passed: the account, and the type with the selector's
+/// scope, or none for the default rule
+type ListCheck = (odf::AccountID, Option<(TypeUri, ResourceListScope)>);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

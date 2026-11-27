@@ -7,21 +7,24 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 
 use internal_error::{InternalError, ResultIntoInternal};
 
+use crate::ResourceDispatcherFactory;
 use crate::domain::{
     ApplyResourceRejection,
     ApplyResourceRejectionCategory,
     GenericResourceQueryService,
     InvalidOwnerReferenceError,
+    ResourceAccountAccess,
+    ResourceAccountOperation,
     ResourceHandle,
     ResourceHandleRow,
     ResourceHeadersValidationError,
     ResourceID,
     ResourceName,
-    ResourceOwnerRef,
+    ResourceOperationError,
     ResourceRef,
     TypeRef,
     TypeUri,
@@ -31,11 +34,16 @@ use crate::domain::{
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Resolves the owners named by an apply
+/// Resolves the owners named by an apply. A new owner the principal may not
+/// read, as the guard of its type decides, is not found, so a rejection says
+/// nothing about it
 pub(crate) struct OwnerReferenceResolver<'a> {
     pub generic_resource_query_service: &'a dyn GenericResourceQueryService,
-    /// Resolved account of the owned resource, which its owners share
-    pub account: &'a ResourceOwnerRef,
+    pub resource_dispatcher_factory: &'a ResourceDispatcherFactory,
+    /// The principal of the apply
+    pub principal: &'a odf::metadata::auth::PrincipalHandle,
+    /// Account of the owned resource, which its owners share
+    pub account: &'a odf::ResourceOwnerHandle,
     /// `None` for a resource to create
     pub owned_id: Option<ResourceID>,
     /// References the owned resource already has. They stay as they are,
@@ -56,35 +64,39 @@ impl OwnerReferenceResolver<'_> {
                 ResourceHeadersValidationError::from(InvalidOwnerReferenceError::from(err))
             })?;
 
-            let id = self.resolve_id(owner_reference).await?;
-            if self.owned_id == Some(id) {
-                return Err(OwnerReferenceRejectedError::OwnsItself { id }.into());
-            }
-            if !seen_ids.insert(id) {
-                return Err(OwnerReferenceRejectedError::Duplicate { id }.into());
-            }
-            owner_ids.push(id);
+            owner_ids.push(self.resolve_id(owner_reference).await?);
         }
 
         let mut rows_by_id = self.find_new_owners(&owner_ids).await?;
+        self.retain_readable(&mut rows_by_id).await?;
 
         owner_references
             .iter()
             .zip(owner_ids)
             .map(|(owner_reference, id)| {
-                if let Some(handle) = self.current_owner(id) {
-                    self.check_account_and_type(owner_reference, id, &handle.r#type)?;
-                    return Ok(handle.clone());
+                if self.owned_id == Some(id) {
+                    return Err(OwnerReferenceRejectedError::OwnsItself { id }.into());
                 }
 
-                let handle = rows_by_id
-                    .remove(&id)
-                    .ok_or_else(|| OwnerReferenceRejectedError::not_found(owner_reference))
-                    .and_then(Self::into_live_owner)?;
-                self.check_account_and_type(owner_reference, id, &handle.r#type)?;
-                Self::check_name(owner_reference, &handle)?;
-
-                Ok(handle)
+                // An unreadable owner is not found before it is a duplicate,
+                // which would reveal the ID its name resolves to
+                match (self.current_owner(id), rows_by_id.get(&id)) {
+                    (Some(handle), _) => {
+                        Self::ensure_first_reference(&mut seen_ids, id)?;
+                        self.check_account_and_type(owner_reference, id, &handle.r#type)?;
+                        Ok(handle.clone())
+                    }
+                    (None, Some(row)) => {
+                        Self::ensure_first_reference(&mut seen_ids, id)?;
+                        let handle = Self::into_live_owner(row.clone())?;
+                        self.check_account_and_type(owner_reference, id, &handle.r#type)?;
+                        Self::check_name(owner_reference, &handle)?;
+                        Ok(handle)
+                    }
+                    (None, None) => {
+                        Err(OwnerReferenceRejectedError::not_found(owner_reference).into())
+                    }
+                }
             })
             .collect()
     }
@@ -138,6 +150,75 @@ impl OwnerReferenceResolver<'_> {
             .into_iter()
             .map(|row| (ResourceID::new(row.id), row))
             .collect())
+    }
+
+    /// Drops the owners the principal may not read
+    async fn retain_readable(
+        &self,
+        rows_by_id: &mut HashMap<ResourceID, ResourceHandleRow>,
+    ) -> Result<(), InternalError> {
+        let mut ids_by_schema = BTreeMap::<String, Vec<ResourceID>>::new();
+        for (id, row) in rows_by_id.iter() {
+            ids_by_schema
+                .entry(row.schema.clone())
+                .or_default()
+                .push(*id);
+        }
+
+        for (schema, ids) in ids_by_schema {
+            // A stored resource's type has a dispatcher
+            let dispatcher = self
+                .resource_dispatcher_factory
+                .crud_dispatcher_for_trusted_schema(&schema)?;
+
+            let results = match dispatcher
+                .check_account_access(self.principal, self.account, ResourceAccountOperation::Read)
+                .await
+            {
+                Ok(ResourceAccountAccess::Allowed) => continue,
+                Ok(ResourceAccountAccess::PerResource) => {
+                    dispatcher
+                        .check_resource_operations(
+                            self.principal,
+                            self.account,
+                            ResourceAccountOperation::Read,
+                            &ids,
+                        )
+                        .await?
+                }
+                Err(ResourceOperationError::Access(_) | ResourceOperationError::NotFound(_)) => {
+                    for id in &ids {
+                        rows_by_id.remove(id);
+                    }
+                    continue;
+                }
+                Err(ResourceOperationError::Internal(err)) => return Err(err),
+            };
+
+            for (id, result) in ids.into_iter().zip(results) {
+                match result {
+                    Ok(()) => {}
+                    Err(
+                        ResourceOperationError::Access(_) | ResourceOperationError::NotFound(_),
+                    ) => {
+                        rows_by_id.remove(&id);
+                    }
+                    Err(ResourceOperationError::Internal(err)) => return Err(err),
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    fn ensure_first_reference(
+        seen_ids: &mut HashSet<ResourceID>,
+        id: ResourceID,
+    ) -> Result<(), OwnerReferenceRejectedError> {
+        if !seen_ids.insert(id) {
+            return Err(OwnerReferenceRejectedError::Duplicate { id });
+        }
+        Ok(())
     }
 
     fn into_live_owner(
@@ -203,10 +284,7 @@ impl OwnerReferenceResolver<'_> {
     }
 
     fn account_id(&self) -> &odf::AccountID {
-        self.account
-            .did
-            .as_ref()
-            .expect("the account of the owned resource is resolved")
+        &self.account.did
     }
 
     /// Rejects a reference unless every given part of its account is that of
@@ -223,9 +301,9 @@ impl OwnerReferenceResolver<'_> {
             given.is_none() || given == actual
         }
 
-        if given_matches(account.id.as_ref(), self.account.id.as_ref())
-            && given_matches(account.did.as_ref(), self.account.did.as_ref())
-            && given_matches(account.name.as_ref(), self.account.name.as_ref())
+        if given_matches(account.id.as_ref(), Some(&self.account.id))
+            && given_matches(account.did.as_ref(), Some(&self.account.did))
+            && given_matches(account.name.as_ref(), Some(&self.account.name))
         {
             Ok(())
         } else {

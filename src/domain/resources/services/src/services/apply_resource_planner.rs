@@ -9,7 +9,7 @@
 
 use chrono::{DateTime, Utc};
 use event_sourcing::ConcurrentModificationError;
-use internal_error::{ErrorIntoInternal, ResultIntoInternal};
+use internal_error::ErrorIntoInternal;
 use kamu_resources::{
     ResourceVisibility,
     ResourceWarning,
@@ -48,7 +48,12 @@ use crate::domain::{
     ResourceValidateSpec,
     TypedResourceQueryService,
 };
-use crate::{GENERATED_NAME_SUFFIX_LENGTH, OwnerReferenceResolver, ResolveOwnerReferencesError};
+use crate::{
+    GENERATED_NAME_SUFFIX_LENGTH,
+    OwnerReferenceResolver,
+    ResolveOwnerReferencesError,
+    ResourceDispatcherFactory,
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -67,6 +72,7 @@ where
     generic_resource_query_service: &'a dyn GenericResourceQueryService,
     typed_resource_query_service: &'a dyn TypedResourceQueryService<R>,
     resource_aggregate_loader: &'a dyn ResourceAggregateLoader<R>,
+    resource_dispatcher_factory: &'a ResourceDispatcherFactory,
     name_suffix_generator: &'a dyn ResourceNameSuffixGenerator,
     time_source: &'a dyn SystemTimeSource,
 }
@@ -85,6 +91,7 @@ where
         generic_resource_query_service: &'a dyn GenericResourceQueryService,
         typed_resource_query_service: &'a dyn TypedResourceQueryService<R>,
         resource_aggregate_loader: &'a dyn ResourceAggregateLoader<R>,
+        resource_dispatcher_factory: &'a ResourceDispatcherFactory,
         name_suffix_generator: &'a dyn ResourceNameSuffixGenerator,
         time_source: &'a dyn SystemTimeSource,
     ) -> Self {
@@ -92,6 +99,7 @@ where
             generic_resource_query_service,
             typed_resource_query_service,
             resource_aggregate_loader,
+            resource_dispatcher_factory,
             name_suffix_generator,
             time_source,
         }
@@ -212,9 +220,12 @@ where
             return Ok(OwnerReferencesResolution::Resolved(params));
         };
 
+        let account = params.headers.resolved_account_handle();
         let resolver = OwnerReferenceResolver {
             generic_resource_query_service: self.generic_resource_query_service,
-            account: params.headers.resolved_account(),
+            resource_dispatcher_factory: self.resource_dispatcher_factory,
+            principal: &params.provenance.principal,
+            account: &account,
             owned_id: maybe_existing.map(|resource| *resource.id()),
             current_owners: maybe_existing
                 .and_then(|resource| resource.headers().owner_references.as_deref())
@@ -408,10 +419,9 @@ where
     }
 
     fn make_name(prefix: &str, suffix: &str) -> Result<ResourceName, ApplyResourceUseCaseError<R>> {
-        format!("{prefix}-{suffix}")
-            .parse::<ResourceName>()
-            .int_err()
-            .map_err(ApplyResourceUseCaseError::Internal)
+        Ok(ApplyResourceHeaders::parse_name(&format!(
+            "{prefix}-{suffix}"
+        ))?)
     }
 
     /// Counts deleted resources as well, which keep their names, so that a
@@ -613,6 +623,28 @@ where
             warnings: self.warnings,
             previous_state: self.previous_state,
             name_pending: self.naming == ResourceNaming::Pending,
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[cfg(test)]
+mod tests {
+    use std::assert_matches;
+
+    use super::*;
+    use crate::domain::MAX_NAME_LEN;
+    use crate::testing::TestResource;
+
+    #[test]
+    fn test_generated_name_that_is_not_valid_is_invalid_headers() {
+        let too_long = "a".repeat(MAX_NAME_LEN);
+        for prefix in ["Not A Name", too_long.as_str()] {
+            assert_matches!(
+                ApplyResourcePlanner::<TestResource>::make_name(prefix, "abc123"),
+                Err(ApplyResourceUseCaseError::InvalidHeaders(_))
+            );
         }
     }
 }

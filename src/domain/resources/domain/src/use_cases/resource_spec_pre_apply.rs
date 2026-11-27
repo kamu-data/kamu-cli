@@ -29,6 +29,9 @@ use crate::{ApplyResourceRejection, DeclarativeResource};
 ///   which runs on every replay: a changed default would change specs already stored.
 /// - A default of a type with an immutable spec never changes: applying again a manifest that omits
 ///   the field would be rejected as a change.
+/// - Its rejections and errors reach a principal who may not be allowed to read the account: a type
+///   with a guard or a placement of its own is prepared before access is checked. They say nothing
+///   about the current spec or other objects the principal could not read otherwise.
 #[async_trait::async_trait]
 pub trait ResourceSpecPreApply<R: DeclarativeResource>: Send + Sync {
     /// `new_spec` is not validated yet: the prepared spec is.

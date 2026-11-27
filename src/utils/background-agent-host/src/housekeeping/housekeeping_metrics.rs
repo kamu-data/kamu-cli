@@ -40,7 +40,8 @@ impl HousekeepingMetrics {
             backlog: IntGaugeVec::new(
                 Opts::new(
                     "housekeeping_backlog",
-                    "Items a housekeeping job found still due after its last batch",
+                    "Items a housekeeping job left due after its last batch: counted once per \
+                     pass, then lowered by what later batches remove",
                 ),
                 &["job"],
             )
@@ -69,9 +70,12 @@ impl HousekeepingMetrics {
                 .with_label_values(&[job, kind.as_str()])
                 .inc_by(*removed);
         }
+    }
+
+    pub(crate) fn on_backlog(&self, job: &str, backlog: u64) {
         self.backlog
             .with_label_values(&[job])
-            .set(i64::try_from(report.backlog).unwrap_or(i64::MAX));
+            .set(i64::try_from(backlog).unwrap_or(i64::MAX));
     }
 
     pub(crate) fn on_pass(&self, job: &str, at: DateTime<Utc>) {

@@ -10,7 +10,13 @@
 use internal_error::InternalError;
 use thiserror::Error;
 
-use crate::{DeclarativeResource, ResourceID, ResourceIDNotFoundError, ResourceLabelPair};
+use crate::{
+    DeclarativeResource,
+    ResourceID,
+    ResourceIDNotFoundError,
+    ResourceLabelPair,
+    ResourceVisibility,
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -28,6 +34,9 @@ use crate::{DeclarativeResource, ResourceID, ResourceIDNotFoundError, ResourceLa
 /// A resource the principal may not read fails as not found, so a denial does
 /// not reveal that it exists; a readable one fails with the missing
 /// permission.
+///
+/// A `List` the guard allows returns every resource of the selector without a
+/// further check, so it must not admit a resource that `Read` would hide.
 #[async_trait::async_trait]
 pub trait ResourceOperationGuard<R: DeclarativeResource>: Send + Sync {
     /// Decides on the account before any resource is loaded. With
@@ -129,7 +138,29 @@ pub struct ResourceListScope {
     /// Canonical label pairs, all of which a listed resource carries
     pub label_pairs: Vec<ResourceLabelPair>,
     /// The resource that listed resources must name as an owner
-    pub owner_id: Option<ResourceID>,
+    pub owner: Option<ResourceListOwner>,
+    /// The states of deletion listed resources may be in
+    pub visibility: ResourceVisibility,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// The owner a search narrows by, and whether the principal may read it
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ResourceListOwner {
+    /// A live resource the principal may read
+    Found(ResourceID),
+    /// An ID that names no live resource the principal may read: the owner
+    /// may be gone, hidden from the principal, or never have existed
+    NotFound(ResourceID),
+}
+
+impl ResourceListOwner {
+    pub fn id(self) -> ResourceID {
+        match self {
+            Self::Found(id) | Self::NotFound(id) => id,
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

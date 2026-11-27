@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_resources_repo_tests::{ResourceKeyedColumn, purge_contract_violations};
+use kamu_resources_repo_tests::{SchemaColumn, purge_contract_violations};
 use sqlx::PgPool;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -20,7 +20,7 @@ use sqlx::PgPool;
 async fn test_every_resource_keyed_table_is_purged_with_the_resource(pool: PgPool) {
     let harness = PurgeContractHarness::new(pool);
 
-    let violations = purge_contract_violations(&harness.resource_keyed_columns().await);
+    let violations = purge_contract_violations(&harness.columns().await);
 
     assert_eq!(violations, Vec::<String>::new());
 }
@@ -41,7 +41,7 @@ async fn test_purge_contract_rejects_an_unregistered_resource_keyed_table(pool: 
         .create_table("CREATE TABLE test_unregistered_projection (owner_resource_id uuid NOT NULL)")
         .await;
 
-    let violations = purge_contract_violations(&harness.resource_keyed_columns().await);
+    let violations = purge_contract_violations(&harness.columns().await);
 
     assert_eq!(violations.len(), 1, "{violations:?}");
     assert!(
@@ -67,7 +67,7 @@ impl PurgeContractHarness {
         sqlx::raw_sql(sql).execute(&self.pool).await.unwrap();
     }
 
-    async fn resource_keyed_columns(&self) -> Vec<ResourceKeyedColumn> {
+    async fn columns(&self) -> Vec<SchemaColumn> {
         let rows: Vec<(String, String, bool)> = sqlx::query_as(
             r#"
             SELECT
@@ -91,7 +91,6 @@ impl PurgeContractHarness {
                 AND t.table_type = 'BASE TABLE'
             WHERE c.table_schema = current_schema()
               AND c.table_name <> 'resources'
-              AND (c.column_name = 'resource_id' OR c.column_name LIKE '%\_resource\_id')
             ORDER BY 1, 2
             "#,
         )
@@ -100,7 +99,7 @@ impl PurgeContractHarness {
         .unwrap();
 
         rows.into_iter()
-            .map(|(table, column, cascades)| ResourceKeyedColumn::new(table, column, cascades))
+            .map(|(table, column, cascades)| SchemaColumn::new(table, column, cascades))
             .collect()
     }
 }

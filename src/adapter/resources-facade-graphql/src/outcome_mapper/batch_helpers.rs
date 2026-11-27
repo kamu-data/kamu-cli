@@ -85,9 +85,10 @@ pub(crate) fn collect_batch_problems(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Several successes may share an index only when not just live resources are
-/// visible, since a name may then match several. With deleted resources visible
-/// some of them may be problems: their specs are not revealed.
+/// An index may repeat only when not just live resources are visible: a name
+/// may then match several resources, and each is a success or a problem of its
+/// own, such as a deleted one whose spec is not revealed or one the caller may
+/// read but not run the operation on.
 pub(crate) fn validate_batch_response_indexes<T, E>(
     successes: &[BatchResourceSuccess<T>],
     problems: &[BatchResourceProblem<E>],
@@ -120,7 +121,7 @@ pub(crate) fn validate_batch_response_indexes<T, E>(
             ))));
         }
         if let Some(previous) = seen.insert(p.request_index, "problem")
-            && !visibility.includes_deleted()
+            && !visibility.includes_deleting()
         {
             return Err(BatchResourceError::Internal(InternalError::new(format!(
                 "Remote {context} returned both {previous} and problem for index {}",
@@ -309,19 +310,19 @@ mod tests {
     }
 
     #[test]
-    fn validate_batch_response_indexes_allows_overlap_including_deleted() {
+    fn validate_batch_response_indexes_allows_overlap_including_deleting() {
         let successes = vec![make_success(0)];
         let problems = vec![make_domain_problem(0), make_domain_problem(0)];
-        assert!(
-            validate_batch_response_indexes(
-                &successes,
-                &problems,
-                1,
-                ResourceVisibility::IncludeDeleted,
-                "test",
-            )
-            .is_ok()
-        );
+        for visibility in [
+            ResourceVisibility::IncludeDeleting,
+            ResourceVisibility::IncludeDeleted,
+        ] {
+            assert!(
+                validate_batch_response_indexes(&successes, &problems, 1, visibility, "test")
+                    .is_ok(),
+                "{visibility:?}"
+            );
+        }
     }
 
     #[test]
