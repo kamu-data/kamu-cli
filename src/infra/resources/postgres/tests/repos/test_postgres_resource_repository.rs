@@ -334,6 +334,12 @@ database_transactional_test!(
     harness = PostgresResourceRepositoryHarness
 );
 
+database_transactional_test!(
+    storage = postgres,
+    fixture = resource_repo_suite::test_purging_an_owner_keeps_owner_rows_of_owned_resources,
+    harness = PostgresResourceRepositoryHarness
+);
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 database_transactional_test!(

@@ -41,6 +41,7 @@ use crate::helpers::{
     assert_single_batch_success,
     secret_set_manifest_json,
     variable_set_manifest_json,
+    variable_set_manifest_json_with_id,
     variable_set_ref_by_name,
 };
 
@@ -83,24 +84,6 @@ fn variable_set_manifest_json_with_unknown_account(name: &str) -> String {
         "headers": {
             "name": name,
             "account": {"name": "unknown-resource-contract-account"}
-        },
-        "spec": {
-            "variables": {
-                "K": {"value": "v"}
-            }
-        }
-    })
-    .to_string()
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-fn variable_set_manifest_json_with_id(id: ResourceID, name: &str) -> String {
-    serde_json::json!({
-        "$schema": VARIABLE_SET_SCHEMA_STR,
-        "headers": {
-            "id": id,
-            "name": name
         },
         "spec": {
             "variables": {
@@ -375,7 +358,7 @@ pub async fn test_batch_apply_rollback_reconstructs_id_not_found(h: &impl Facade
         .facade_for(TestAccount::Alice)
         .apply_manifests(batch_request(vec![
             variable_set_manifest_json("batch-id-not-found-before", None, &[("K", "1")]),
-            variable_set_manifest_json_with_id(missing_id, "batch-id-not-found-missing"),
+            variable_set_manifest_json_with_id(missing_id, "batch-id-not-found-missing", "v"),
             variable_set_manifest_json("batch-id-not-found-after", None, &[("K", "2")]),
         ]))
         .await
@@ -470,7 +453,7 @@ pub async fn test_batch_apply_rollback_reconstructs_type_mismatch(h: &impl Facad
         .facade_for(TestAccount::Alice)
         .apply_manifests(batch_request(vec![
             variable_set_manifest_json("batch-type-mismatch-before", None, &[("K", "1")]),
-            variable_set_manifest_json_with_id(secret_id, "batch-type-mismatch-variable"),
+            variable_set_manifest_json_with_id(secret_id, "batch-type-mismatch-variable", "v"),
             variable_set_manifest_json("batch-type-mismatch-after", None, &[("K", "2")]),
         ]))
         .await

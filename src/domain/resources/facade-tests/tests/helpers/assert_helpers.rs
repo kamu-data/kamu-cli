@@ -7,6 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::error::Error;
+
 use kamu_resources::{
     ApplyManifestApplicationDecision,
     ApplyManifestPlanningDecision,
@@ -217,6 +219,20 @@ pub async fn assert_plan_and_apply_rejected(
     assert_eq!(rejection.category, category);
     assert_eq!(plan_rejection.message, rejection.message);
     rejection.message
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Asserts that `err` denies access to an account. The remote facade gets the
+/// denial of the server as a request error, so its message is checked rather
+/// than its variant
+#[track_caller]
+pub fn assert_access_denied(err: &dyn Error) {
+    let message = err.to_string();
+    assert!(
+        message.contains("not allowed to use resources") || message.contains("Unauthorized"),
+        "expected an access denial, got: {message}"
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

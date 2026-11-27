@@ -39,7 +39,6 @@ use crate::harness::{FacadeContractHarness, TestAccount};
 use crate::helpers::{
     SECRET_SET_CANONICAL_SELECTOR,
     VARIABLE_SET_CANONICAL_SELECTOR,
-    VARIABLE_SET_SCHEMA_STR,
     assert_applied_outcome,
     assert_single_batch_problem,
     assert_single_batch_success,
@@ -47,6 +46,7 @@ use crate::helpers::{
     create_variable_set_with_labels,
     label_filter,
     variable_set_manifest_json,
+    variable_set_manifest_json_with_id,
     variable_set_ref_by_id,
     variable_set_ref_by_name,
 };
@@ -1023,22 +1023,6 @@ async fn searched_summaries(
         .into_iter()
         .map(|summary| (summary.id, summary.status.and_then(|status| status.phase)))
         .collect()
-}
-
-fn variable_set_manifest_json_with_id(id: ResourceID, name: &str, value: &str) -> String {
-    serde_json::json!({
-        "$schema": VARIABLE_SET_SCHEMA_STR,
-        "headers": {
-            "id": id,
-            "name": name
-        },
-        "spec": {
-            "variables": {
-                "K": {"value": value}
-            }
-        }
-    })
-    .to_string()
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -110,6 +110,14 @@ database_transactional_test!(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+database_transactional_test!(
+    storage = inmem_with_transaction,
+    fixture = variable_set_repo::test_purging_the_resource_removes_its_entries,
+    harness = InMemoryConfigurationRepositoriesHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 database_concurrent_transactions_test!(
     storage = inmem,
     fixture = variable_set_repo::test_rolled_back_delete_all_entries_keeps_entries,

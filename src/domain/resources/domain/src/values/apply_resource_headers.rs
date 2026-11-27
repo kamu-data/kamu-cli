@@ -179,7 +179,7 @@ mod tests {
     use pretty_assertions::assert_matches;
 
     use super::*;
-    use crate::{MAX_ANNOTATIONS, MAX_LABELS, MAX_OWNER_REFERENCES, ResourceID};
+    use crate::{MAX_ANNOTATIONS, MAX_LABELS, MAX_NAME_LEN, MAX_OWNER_REFERENCES, ResourceID};
 
     fn account() -> odf::metadata::auth::ResourceOwnerRef {
         odf::metadata::auth::ResourceOwnerRef {
@@ -225,6 +225,45 @@ mod tests {
         assert_matches!(
             ApplyResourceHeaders::try_new(Some(account()), Some(""), vec![], vec![]),
             Err(ResourceHeadersValidationError::EmptyName)
+        );
+    }
+
+    #[test]
+    fn parse_name_rejects_invalid_and_over_long_names() {
+        let over_long = "a".repeat(MAX_NAME_LEN + 1);
+        let cases = [
+            ("my_name", "invalid resource name 'my_name'".to_string()),
+            ("my name", "invalid resource name 'my name'".to_string()),
+            (
+                "-leading-dash",
+                "invalid resource name '-leading-dash'".to_string(),
+            ),
+            ("trailing.", "invalid resource name 'trailing.'".to_string()),
+            (
+                over_long.as_str(),
+                format!(
+                    "resource name is too long: got {}, max is {MAX_NAME_LEN}",
+                    MAX_NAME_LEN + 1
+                ),
+            ),
+        ];
+
+        for (name, expected_error) in cases {
+            let error = ApplyResourceHeaders::parse_name(name).unwrap_err();
+            assert_eq!(error.to_string(), expected_error, "{name}");
+        }
+
+        assert_matches!(
+            ApplyResourceHeaders::parse_name("my_name"),
+            Err(ResourceHeadersValidationError::InvalidName { .. })
+        );
+        assert_matches!(
+            ApplyResourceHeaders::parse_name(&over_long),
+            Err(ResourceHeadersValidationError::NameTooLong { .. })
+        );
+        assert_matches!(
+            ApplyResourceHeaders::parse_name(&over_long[1..]),
+            Ok(name) if name.len() == MAX_NAME_LEN
         );
     }
 

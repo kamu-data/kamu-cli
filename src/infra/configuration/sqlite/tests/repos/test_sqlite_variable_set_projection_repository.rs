@@ -113,6 +113,14 @@ database_transactional_test!(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+database_transactional_test!(
+    storage = sqlite,
+    fixture = variable_set_repo::test_purging_the_resource_removes_its_entries,
+    harness = SqliteVariableSetProjectionRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 database_concurrent_transactions_test!(
     storage = sqlite,
     fixture = variable_set_repo::test_rolled_back_delete_all_entries_keeps_entries,

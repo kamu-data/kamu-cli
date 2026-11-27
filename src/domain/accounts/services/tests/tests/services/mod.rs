@@ -12,3 +12,4 @@ mod test_access_token_service_impl;
 mod test_account_service;
 mod test_authentication_service;
 mod test_predefined_accounts_registrator;
+mod test_resource_account_access_adapter;

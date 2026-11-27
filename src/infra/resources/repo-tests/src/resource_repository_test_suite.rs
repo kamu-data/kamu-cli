@@ -3522,6 +3522,60 @@ pub async fn test_purge_resources(catalog: &Catalog) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+pub async fn test_purging_an_owner_keeps_owner_rows_of_owned_resources(catalog: &Catalog) {
+    let repo = catalog.get_one::<dyn ResourceRepository>().unwrap();
+    let owners = catalog
+        .get_one::<dyn ResourceOwnerProjectionRepository>()
+        .unwrap();
+    let account_handle = odf::ResourceOwnerHandle::new_test("test-account");
+    let at = |hour| Utc.with_ymd_and_hms(2026, 1, 1, hour, 0, 0).unwrap();
+
+    let owner = create_test_resource(repo.as_ref(), &account_handle, "owner").await;
+    let owner_handle = ResourceHandle {
+        id: owner.id,
+        ..make_owner_handle(&account_handle, "owner")
+    };
+    let owned = create_owned_resource(
+        catalog,
+        &account_handle,
+        &TEST_KIND,
+        "owned",
+        &[&owner_handle],
+        false,
+    )
+    .await;
+
+    let owner = delete_test_resource(repo.as_ref(), owner, at(0), at(1)).await;
+    repo.set_purge_deadlines(&[ResourcePurgeDeadline {
+        id: owner.id,
+        purge_at: at(2),
+    }])
+    .await
+    .unwrap();
+    let claimed = repo
+        .claim_resources_for_purge(&[owner.id], at(3))
+        .await
+        .unwrap();
+    assert_eq!(claimed, [owner.id]);
+    repo.purge_resources(&claimed).await.unwrap();
+
+    assert_eq!(owners.find_owners(&owned.id).await.unwrap(), [owner.id]);
+    let reads = run_listing_reads(
+        repo.as_ref(),
+        &account_handle.did,
+        &ResourceScope::any_type(),
+        ResourceVisibility::Active,
+        Some(owner.id),
+        PaginationOpts::from_max_results(10),
+    )
+    .await;
+    assert_eq!(reads.searched_ids(), [owned.id]);
+    assert_eq!(reads.listed_ids(), [owned.id]);
+    assert_eq!(reads.count, 1);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 async fn create_test_resource(
     repo: &dyn ResourceRepository,
     account_handle: &odf::ResourceOwnerHandle,
@@ -4769,7 +4823,7 @@ async fn create_owned_resource(
     name: &str,
     owners: &[&ResourceHandle],
     deleted: bool,
-) {
+) -> ResourceSnapshot {
     let mut snapshot = make_test_snapshot(account, schema, name);
     let headers = &mut snapshot.headers;
     headers.owner_references =
@@ -4794,6 +4848,7 @@ async fn create_owned_resource(
         )
         .await
         .unwrap();
+    snapshot
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

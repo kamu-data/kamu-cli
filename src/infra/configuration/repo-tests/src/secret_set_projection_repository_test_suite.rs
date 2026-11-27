@@ -9,7 +9,7 @@
 
 use std::assert_matches;
 
-use chrono::{SubsecRound, Utc};
+use chrono::{SubsecRound, TimeDelta, Utc};
 use database_common::testing::{in_committed_transaction, in_rolled_back_transaction};
 use dill::Catalog;
 use kamu_configuration::{
@@ -23,6 +23,7 @@ use kamu_resources::{
     ResourceHeaders,
     ResourceHeadersExt,
     ResourceID,
+    ResourcePurgeDeadline,
     ResourceRepository,
     ResourceSchemaProvider,
     ResourceSnapshot,
@@ -79,6 +80,26 @@ async fn make_secret_set_resource(catalog: &Catalog) -> ResourceID {
     .unwrap();
 
     secret_set_id
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Claims the resources for a purge and purges them, as the purger does
+async fn purge_resources(catalog: &Catalog, ids: &[ResourceID]) {
+    let repo = catalog.get_one::<dyn ResourceRepository>().unwrap();
+    let now = Utc::now();
+    let deadlines = ids
+        .iter()
+        .map(|id| ResourcePurgeDeadline {
+            id: *id,
+            purge_at: now - TimeDelta::hours(1),
+        })
+        .collect::<Vec<_>>();
+    repo.set_purge_deadlines(&deadlines).await.unwrap();
+
+    let claimed = repo.claim_resources_for_purge(ids, now).await.unwrap();
+    assert_eq!(claimed.len(), ids.len());
+    repo.purge_resources(&claimed).await.unwrap();
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -432,6 +453,38 @@ pub async fn test_delete_all_entries(catalog: &Catalog) {
     let c_entries = repo.get_entries(&resource_c, 1).await.unwrap();
     assert_eq!(1, c_entries.len());
     assert_eq!(c_entries[0].value, b"c-gen1");
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_purging_the_resource_removes_its_entries(catalog: &Catalog) {
+    let repo = catalog
+        .get_one::<dyn SecretSetProjectionRepository>()
+        .unwrap();
+    let purged = make_secret_set_resource(catalog).await;
+    let kept = make_secret_set_resource(catalog).await;
+
+    repo.replace_entries(&purged, 0, &[make_entry("K1", b"gen0")])
+        .await
+        .unwrap();
+    repo.replace_entries(&purged, 1, &[make_entry("K1", b"gen1")])
+        .await
+        .unwrap();
+    repo.replace_entries(&kept, 0, &[make_entry("K1", b"kept")])
+        .await
+        .unwrap();
+
+    assert_eq!(repo.get_latest_entries(&purged).await.unwrap().len(), 1);
+
+    purge_resources(catalog, &[purged]).await;
+
+    assert_eq!(repo.get_entries(&purged, 0).await.unwrap(), []);
+    assert_eq!(repo.get_entries(&purged, 1).await.unwrap(), []);
+    assert_eq!(repo.get_latest_entries(&purged).await.unwrap(), []);
+
+    let kept_entries = repo.get_latest_entries(&kept).await.unwrap();
+    assert_eq!(1, kept_entries.len());
+    assert_eq!(kept_entries[0].value, b"kept");
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

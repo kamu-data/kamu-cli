@@ -86,6 +86,26 @@ pub fn variable_set_manifest_json(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Builds a `VariableSet` manifest JSON string addressing the resource by
+/// `headers.id`, with one `K` variable.
+pub fn variable_set_manifest_json_with_id(id: ResourceID, name: &str, value: &str) -> String {
+    serde_json::json!({
+        "$schema": VARIABLE_SET_SCHEMA_STR,
+        "headers": {
+            "id": id,
+            "name": name
+        },
+        "spec": {
+            "variables": {
+                "K": {"value": value}
+            }
+        }
+    })
+    .to_string()
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 /// Builds a `VariableSet` manifest YAML string.
 pub fn variable_set_manifest_yaml(
     name: &str,

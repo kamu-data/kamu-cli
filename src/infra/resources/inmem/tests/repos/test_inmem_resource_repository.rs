@@ -327,6 +327,12 @@ database_transactional_test!(
     harness = InMemoryResourceRepositoriesHarness
 );
 
+database_transactional_test!(
+    storage = inmem_with_transaction,
+    fixture = resource_repo_suite::test_purging_an_owner_keeps_owner_rows_of_owned_resources,
+    harness = InMemoryResourceRepositoriesHarness
+);
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 database_transactional_test!(

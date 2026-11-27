@@ -742,7 +742,7 @@ async fn run_startup_initializations(
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// Fails on retention configured for a type the node does not have
-fn check_resource_retention_config(catalog: &dill::Catalog) -> Result<(), CLIError> {
+pub fn check_resource_retention_config(catalog: &dill::Catalog) -> Result<(), CLIError> {
     let registered =
         kamu_resources_services::ResourceDispatcherFactory::registered_type_names_in(catalog)
             .map_err(CLIError::critical)?;

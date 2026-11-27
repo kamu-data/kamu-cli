@@ -24,7 +24,13 @@ use kamu_datasets::{
     UpsertDatasetEnvVarError,
     UpsertDatasetEnvVarStatus,
 };
-use kamu_resources::{ResourceHandle, ResourceSchemaProvider};
+use kamu_resources::{
+    CreationOrigin,
+    CreationOriginApi,
+    CreationProvenance,
+    ResourceHandle,
+    ResourceSchemaProvider,
+};
 use secrecy::SecretString;
 
 use crate::tests::services::dataset_env_var_service_harness::DatasetEnvVarServiceHarness;
@@ -979,6 +985,59 @@ async fn test_writes_for_a_principal_other_than_the_owner_are_not_checked_again(
         harness.variable_values(&dataset_id).await,
         [("B".to_string(), "v1".to_string())].into()
     );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_auto_created_sets_record_the_caller_as_their_creator() {
+    let caller = Principal::new_test_with(&"maintainer");
+    let harness = DatasetEnvVarServiceHarness::new_acting_as(caller.clone());
+
+    let (_, dataset_id) = odf::DatasetID::new_generated_ed25519();
+    let account_handle = harness.ensure_test_account("test-owner").await;
+    harness
+        .seed_dataset_entry(&dataset_id, &account_handle.did)
+        .await;
+
+    let expected = CreationProvenance {
+        principal: caller.handle().unwrap(),
+        origin: CreationOrigin::Api {
+            api: CreationOriginApi::GraphQl,
+        },
+    };
+
+    for value in ["v1", "v2"] {
+        harness
+            .upsert_variable(&dataset_id, "VAR", value)
+            .await
+            .unwrap();
+        harness
+            .upsert_secret(&dataset_id, "SECRET", value)
+            .await
+            .unwrap();
+
+        let variable_set_id = harness
+            .variable_sets_targeting(&account_handle, &dataset_id)
+            .await[0];
+        let secret_set_id = harness
+            .secret_sets_targeting(&account_handle, &dataset_id)
+            .await[0];
+        assert_eq!(
+            harness
+                .creation_provenance::<VariableSetResource>(&variable_set_id)
+                .await,
+            expected,
+            "{value}"
+        );
+        assert_eq!(
+            harness
+                .creation_provenance::<SecretSetResource>(&secret_set_id)
+                .await,
+            expected,
+            "{value}"
+        );
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

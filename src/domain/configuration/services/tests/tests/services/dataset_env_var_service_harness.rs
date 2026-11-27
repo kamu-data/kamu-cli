@@ -41,6 +41,7 @@ use kamu_datasets::{
     UpsertDatasetEnvVarStatus,
 };
 use kamu_resources::{
+    CreationProvenance,
     EventSourcedResource,
     ManagedResource,
     ResourceAggregateLoader,
@@ -281,6 +282,20 @@ impl DatasetEnvVarServiceHarness {
         persistence_service.save(&mut resource).await.unwrap();
 
         owner
+    }
+
+    /// The provenance the resource's creation recorded
+    pub async fn creation_provenance<R>(&self, id: &ResourceID) -> CreationProvenance
+    where
+        R: EventSourcedResource + ManagedResource + 'static,
+        R::ResourceState: std::fmt::Debug,
+        R::LifecycleError: std::fmt::Debug,
+    {
+        let loader: Arc<dyn ResourceAggregateLoader<R>> = self.catalog.get_one().unwrap();
+        let resource = loader.load(id).await.unwrap();
+        CreationProvenance::from_conditions(&resource.status().conditions)
+            .unwrap()
+            .expect("the resource must record its creation provenance")
     }
 
     /// Upserts through the mutation adapter, then lets the controller runtime

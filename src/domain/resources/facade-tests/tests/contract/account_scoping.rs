@@ -31,16 +31,21 @@ use kamu_resources_facade::{
 use pretty_assertions::{assert_eq, assert_matches};
 
 use crate::contract_test;
-use crate::harness::{FacadeContractHarness, TestAccount};
+use crate::harness::{FacadeContractHarness, LocalFacadeHarness, TestAccount};
 use crate::helpers::{
     VARIABLE_SET_CANONICAL_SELECTOR,
     VARIABLE_SET_SCHEMA_STR,
     apply_manifest_and_get_id,
+    assert_access_denied,
     assert_single_batch_success,
     create_variable_set,
+    get_resource,
     search_request,
     sorted_handle_names,
     total_schema_count,
+    variable_set_manifest_json_with_id,
+    variable_set_ref_by_id,
+    variable_set_ref_by_name,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -149,6 +154,18 @@ fn selector_by_name(name: &str, account: Option<ResourceOwnerRef>) -> ResourceRe
 
 fn batch_selector_by_name(name: &str, account: Option<ResourceOwnerRef>) -> Vec<ResourceRef> {
     vec![selector_by_name(name, account)]
+}
+
+/// Refs to the `VariableSet` of `name` and `id` in `account`: one by name, one
+/// by id
+fn refs_in_account(account: &odf::AccountName, name: &str, id: ResourceID) -> Vec<ResourceRef> {
+    vec![
+        selector_by_name(name, Some(account_by_name(account))),
+        ResourceRef {
+            account: Some(account_by_name(account)),
+            ..variable_set_ref_by_id(id)
+        },
+    ]
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -592,6 +609,171 @@ pub async fn test_empty_account_selector_is_rejected(h: &impl FacadeContractHarn
         "an empty account selector `{{}}` must be rejected during account resolution, got: \
          {result:?}"
     );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// RF-207
+contract_test!(
+    apply_by_id_finds_resources_of_its_own_account_only,
+    super::test_apply_by_id_finds_resources_of_its_own_account_only
+);
+
+pub async fn test_apply_by_id_finds_resources_of_its_own_account_only(
+    h: &impl FacadeContractHarness,
+) {
+    let bob_id = create_variable_set(h, TestAccount::Bob, "bob-own").await;
+    let bob_facade = h.facade_for(TestAccount::Bob);
+    let bob_spec = get_resource(bob_facade.as_ref(), variable_set_ref_by_id(bob_id))
+        .await
+        .spec;
+
+    let facade = h.facade_for(TestAccount::Alice);
+    let request = ApplyManifestRequest {
+        format: ResourceManifestFormat::Json,
+        manifest: variable_set_manifest_json_with_id(bob_id, "bob-own", "v2"),
+    };
+    // A remote facade reports a single apply as an untyped request error
+    let not_found = format!("Resource with id {bob_id} was not found");
+    let planned = facade.plan_apply_manifest(request.clone()).await;
+    let applied = facade.apply_manifest(request).await;
+
+    for error in [planned.unwrap_err(), applied.unwrap_err()] {
+        assert_matches!(
+            error,
+            ApplyManifestError::IDNotFound(_) | ApplyManifestError::RemoteRequest(_)
+        );
+        assert!(error.to_string().contains(&not_found), "{error}");
+    }
+    assert_eq!(
+        get_resource(bob_facade.as_ref(), variable_set_ref_by_id(bob_id))
+            .await
+            .spec,
+        bob_spec
+    );
+    assert!(
+        facade
+            .get_handles(
+                vec![variable_set_ref_by_name("bob-own")],
+                ResourceVisibility::Active,
+            )
+            .await
+            .unwrap()
+            .successes
+            .is_empty()
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// RF-208
+contract_test!(
+    batch_refs_to_another_account_are_denied_as_a_whole,
+    super::test_batch_refs_to_another_account_are_denied_as_a_whole
+);
+
+/// Under the default rule a ref naming an account the caller may not use
+/// fails the whole call, beside a ref the caller may use, and the denial
+/// names none of the resources
+pub async fn test_batch_refs_to_another_account_are_denied_as_a_whole(
+    h: &impl FacadeContractHarness,
+) {
+    let bob_id = create_variable_set(h, TestAccount::Bob, "bob-secret").await;
+    create_variable_set(h, TestAccount::Alice, "alice-own").await;
+    let facade = h.facade_for(TestAccount::Alice);
+    let mut refs = vec![variable_set_ref_by_name("alice-own")];
+    refs.extend(refs_in_account(
+        &h.account_name(TestAccount::Bob),
+        "bob-secret",
+        bob_id,
+    ));
+
+    let errors = [
+        facade
+            .get(
+                refs.clone(),
+                SpecViewOpts::ENCRYPTED,
+                ResourceVisibility::Active,
+            )
+            .await
+            .unwrap_err(),
+        facade
+            .get_handles(refs.clone(), ResourceVisibility::Active)
+            .await
+            .unwrap_err(),
+        facade
+            .render_manifests(
+                refs.clone(),
+                ResourceManifestFormat::Json,
+                SpecViewOpts::ENCRYPTED,
+                ResourceVisibility::Active,
+            )
+            .await
+            .unwrap_err(),
+        facade.delete(refs).await.unwrap_err(),
+    ];
+
+    for err in errors {
+        assert_matches!(
+            err,
+            BatchResourceError::AccountAccess(_) | BatchResourceError::RemoteRequest(_)
+        );
+        assert_access_denied(&err);
+        let message = err.to_string();
+        assert!(
+            !message.contains("bob-secret") && !message.contains(&bob_id.to_string()),
+            "the denial must not leak resources: {message}"
+        );
+    }
+    get_resource(facade.as_ref(), variable_set_ref_by_name("alice-own")).await;
+    get_resource(
+        h.facade_for(TestAccount::Bob).as_ref(),
+        variable_set_ref_by_id(bob_id),
+    )
+    .await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// RF-208B
+#[test_log::test(tokio::test)]
+async fn test_admin_may_use_batch_refs_to_another_account() {
+    let h = LocalFacadeHarness::new().await;
+    let bob_id = create_variable_set(&h, TestAccount::Bob, "bob-own").await;
+    let admin = h.facade_for_admin();
+    let refs = refs_in_account(&h.account_name(TestAccount::Bob), "bob-own", bob_id);
+
+    let got = admin
+        .get(
+            refs.clone(),
+            SpecViewOpts::ENCRYPTED,
+            ResourceVisibility::Active,
+        )
+        .await
+        .unwrap();
+    let handles = admin
+        .get_handles(refs.clone(), ResourceVisibility::Active)
+        .await
+        .unwrap();
+    let manifests = admin
+        .render_manifests(
+            refs.clone(),
+            ResourceManifestFormat::Json,
+            SpecViewOpts::ENCRYPTED,
+            ResourceVisibility::Active,
+        )
+        .await
+        .unwrap();
+
+    for (successes, problems) in [
+        (got.successes.len(), got.problems.len()),
+        (handles.successes.len(), handles.problems.len()),
+        (manifests.successes.len(), manifests.problems.len()),
+    ] {
+        assert_eq!((successes, problems), (2, 0));
+    }
+    let deleted = assert_single_batch_success(admin.delete(refs[1..].to_vec()).await.unwrap());
+    assert_eq!(deleted.id, bob_id);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -41,11 +41,13 @@ use crate::contract_test;
 use crate::harness::{FacadeContractHarness, TestAccount};
 use crate::helpers::{
     SECRET_SET_CANONICAL_SELECTOR,
+    SECRET_SET_SCHEMA_STR,
     VARIABLE_SET_CANONICAL_SELECTOR,
     VARIABLE_SET_SCHEMA_STR,
     apply_manifest_and_get_id,
     assert_plan_and_apply_rejected,
     assert_single_batch_success,
+    create_secret_set,
     create_variable_set,
     get_resource,
     ref_by_id,
@@ -100,6 +102,51 @@ pub async fn test_owners_are_stored_and_rendered(h: &impl FacadeContractHarness)
     assert_eq!(
         reapply(facade.as_ref(), rendered).await,
         ApplyResourceOutcome::Untouched
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// RF-211
+contract_test!(
+    owners_of_one_name_in_several_types_are_told_apart,
+    super::test_owners_of_one_name_in_several_types_are_told_apart
+);
+
+pub async fn test_owners_of_one_name_in_several_types_are_told_apart(
+    h: &impl FacadeContractHarness,
+) {
+    let facade = h.facade_for(TestAccount::Alice);
+    let variable_set = create_variable_set(h, TestAccount::Alice, "shared-name").await;
+    let secret_set =
+        create_secret_set(h, TestAccount::Alice, "shared-name", &[("S", "secret")]).await;
+    let other_variable_set = create_variable_set(h, TestAccount::Alice, "other-name").await;
+
+    let id = create_owned(
+        h,
+        "owned",
+        serde_json::json!([
+            format!("{VARIABLE_SET_CANONICAL_SELECTOR}:shared-name"),
+            format!("{SECRET_SET_CANONICAL_SELECTOR}:shared-name"),
+            format!("{VARIABLE_SET_CANONICAL_SELECTOR}:other-name"),
+        ]),
+    )
+    .await;
+
+    let resource = get_resource(facade.as_ref(), ref_by_id(id)).await;
+    assert_eq!(
+        resource
+            .headers
+            .owner_references
+            .unwrap()
+            .iter()
+            .map(|owner| (owner.id, owner.name.as_str(), owner.r#type.as_str()))
+            .collect::<Vec<_>>(),
+        [
+            (variable_set, "shared-name", VARIABLE_SET_SCHEMA_STR),
+            (secret_set, "shared-name", SECRET_SET_SCHEMA_STR),
+            (other_variable_set, "other-name", VARIABLE_SET_SCHEMA_STR),
+        ]
     );
 }
 

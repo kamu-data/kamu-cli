@@ -9,9 +9,11 @@
 
 use std::sync::Arc;
 
-use internal_error::{InternalError, ResultIntoInternal};
-use kamu_accounts::{AccountHandle, AccountService};
+use internal_error::InternalError;
+use kamu_accounts::{AccountHandle, AccountService, GetAccountByNameError};
 use kamu_resources::{
+    ApplyResourceRejection,
+    ApplyResourceRejectionCategory,
     DeclarativeResource,
     ResourceAccountAccess,
     ResourceAccountOperation,
@@ -39,7 +41,8 @@ pub fn register_test_resource_access_rules(catalog_builder: &mut dill::CatalogBu
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Places a resource whose value has a `place:<account>` token in that account
+/// Places a resource whose value has a `place:<account>` token in that account,
+/// and rejects one whose token names a missing account
 #[dill::component]
 #[dill::interface(dyn ResourcePlacement<TestResource>)]
 struct TestResourcePlacement {
@@ -57,14 +60,22 @@ impl ResourcePlacement<TestResource> for TestResourcePlacement {
             return Ok(ResourcePlacementOutcome::Default);
         };
 
-        let account = self
+        match self
             .account_service
             .get_account_by_name(&odf::AccountName::new_unchecked(name))
             .await
-            .int_err()?;
-        Ok(ResourcePlacementOutcome::Account(
-            AccountHandle::from(&account).into(),
-        ))
+        {
+            Ok(account) => Ok(ResourcePlacementOutcome::Account(
+                AccountHandle::from(&account).into(),
+            )),
+            Err(GetAccountByNameError::NotFound(err)) => {
+                Ok(ResourcePlacementOutcome::Rejected(ApplyResourceRejection {
+                    category: ApplyResourceRejectionCategory::ReferencedObjectMissing,
+                    message: err.to_string(),
+                }))
+            }
+            Err(GetAccountByNameError::Internal(err)) => Err(err),
+        }
     }
 }
 
@@ -74,7 +85,8 @@ impl ResourcePlacement<TestResource> for TestResourcePlacement {
 ///
 /// | Operation | Also allowed for |
 /// | --- | --- |
-/// | Create, Update | Anyone, in the account the spec places the resource in |
+/// | Create | Anyone, in the account the spec places the resource in |
+/// | Update | Anyone, in the account both the current and the new spec place the resource in |
 /// | Read | A principal named by a `read:` or `delete:` token; anyone, for a `public-` name |
 /// | Delete | A principal named by a `delete:` token |
 /// | List | Anyone, with a name pattern starting with `public-`: it finds what anyone may read |
@@ -148,10 +160,20 @@ impl ResourceOperationGuard<TestResource> for TestResourceOperationGuard {
             ResourceOperationError::NotFound(ResourceIDNotFoundError(resource.headers().id))
         };
 
+        let places_in_account = |spec: &TestResourceSpec| {
+            token_values(spec, "place").any(|name| name == request.account.name.as_str())
+        };
+
         match &request.operation {
-            ResourceOperation::Create { spec }
-            | ResourceOperation::Update { new_spec: spec, .. } => {
-                if token_values(spec, "place").any(|name| name == request.account.name.as_str()) {
+            ResourceOperation::Create { spec } => {
+                if places_in_account(spec) {
+                    Ok(())
+                } else {
+                    Err(denial)
+                }
+            }
+            ResourceOperation::Update { current, new_spec } => {
+                if places_in_account(current.spec()) && places_in_account(new_spec) {
                     Ok(())
                 } else {
                     Err(denial)

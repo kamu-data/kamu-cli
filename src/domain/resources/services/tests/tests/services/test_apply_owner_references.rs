@@ -8,31 +8,47 @@
 // by the Apache License, Version 2.0.
 
 use std::assert_matches;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
+use database_common::PaginationOpts;
+use internal_error::InternalError;
 use kamu_resources::{
     ApplyResourceAction,
     ApplyResourceApplicationDecision,
     ApplyResourceOutcome,
     ApplyResourceParams,
     ApplyResourcePlanningDecision,
+    ApplyResourcePrecondition,
     ApplyResourceRejection,
     ApplyResourceRejectionCategory,
     ApplyResourceUseCase,
     ApplyResourceUseCaseError,
     DeclarativeResource,
+    FindOwnedResourceError,
+    FindOwnedSnapshotsOutcome,
+    GenericResourceQueryService,
     InvalidOwnerReferenceError,
+    ResourceAggregateLoader,
     ResourceHandle,
+    ResourceHandleRow,
     ResourceHeaders,
     ResourceHeadersValidationError,
     ResourceID,
+    ResourceName,
+    ResourceNameSuffixGenerator,
     ResourceOwnerProjectionRepository,
     ResourceRef,
     ResourceSchemaProvider,
+    ResourceScope,
+    ResourceSnapshot,
+    ResourceSummaryRow,
+    ResourceVisibility,
     TypeUri,
+    TypedResourceQueryService,
     owner_ids,
 };
 use kamu_resources_services::testing::TestResource;
+use kamu_resources_services::{ApplyResourcePlanner, ResourceDispatcherFactory};
 use odf::metadata::auth::ResourceOwnerRef;
 use pretty_assertions::assert_eq;
 
@@ -362,6 +378,30 @@ async fn test_plan_shows_resolved_owners() {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+#[test_log::test(tokio::test)]
+async fn test_apply_touches_only_its_new_owners_and_a_plan_touches_none() {
+    let harness = OwnerReferencesHarness::new();
+    let current = harness.create("current").await.id;
+    let first_new = harness.create("first-new").await.id;
+    let second_new = harness.create("second-new").await.id;
+    harness.create_owned("owned", vec![by_id(current)]).await;
+    let owner_references = vec![by_id(current), by_id(first_new), by_name("second-new")];
+
+    assert_eq!(
+        harness
+            .touched_in_planning(PlanningFor::Plan, "owned", owner_references.clone())
+            .await,
+        []
+    );
+    assert_eq!(
+        harness
+            .touched_in_planning(PlanningFor::Apply, "owned", owner_references)
+            .await,
+        sorted([first_new, second_new])
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Harness
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -490,6 +530,199 @@ impl OwnerReferencesHarness {
             .find_owners(&id)
             .await
             .unwrap()
+    }
+
+    /// The resources touched while planning `name` with the owners, through a
+    /// planner whose touches are recorded
+    async fn touched_in_planning(
+        &self,
+        planning_for: PlanningFor,
+        name: &str,
+        owner_references: Vec<ResourceRef>,
+    ) -> Vec<ResourceID> {
+        let query_svc = TouchRecordingQueryService {
+            inner: self.catalog().get_one().unwrap(),
+            touched: Mutex::new(Vec::new()),
+        };
+        let typed_query_svc: Arc<dyn TypedResourceQueryService<TestResource>> =
+            self.catalog().get_one().unwrap();
+        let aggregate_loader: Arc<dyn ResourceAggregateLoader<TestResource>> =
+            self.catalog().get_one().unwrap();
+        let dispatcher_factory: Arc<ResourceDispatcherFactory> = self.catalog().get_one().unwrap();
+        let name_suffix_generator: Arc<dyn ResourceNameSuffixGenerator> =
+            self.catalog().get_one().unwrap();
+        let planner = ApplyResourcePlanner::new(
+            &query_svc,
+            typed_query_svc.as_ref(),
+            aggregate_loader.as_ref(),
+            dispatcher_factory.as_ref(),
+            name_suffix_generator.as_ref(),
+            self.time_source(),
+        );
+
+        let params = self.make_params(name, owner_references);
+        let maybe_existing = planner.find_existing_resource(&params).await.unwrap();
+        match planning_for {
+            PlanningFor::Plan => {
+                planner.plan(params, maybe_existing).await.unwrap();
+            }
+            PlanningFor::Apply => {
+                planner
+                    .plan_internal(params, maybe_existing, ApplyResourcePrecondition::None)
+                    .await
+                    .unwrap();
+            }
+        }
+
+        let mut touched = query_svc.touched.into_inner().unwrap();
+        touched.sort();
+        touched
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Clone, Copy)]
+enum PlanningFor {
+    Plan,
+    Apply,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Records the IDs every [`GenericResourceQueryService::touch_live_resources`]
+/// call is given
+struct TouchRecordingQueryService {
+    inner: Arc<dyn GenericResourceQueryService>,
+    touched: Mutex<Vec<ResourceID>>,
+}
+
+#[async_trait::async_trait]
+impl GenericResourceQueryService for TouchRecordingQueryService {
+    async fn allocate_id(&self) -> Result<ResourceID, InternalError> {
+        self.inner.allocate_id().await
+    }
+
+    async fn find_resource_id_by_name(
+        &self,
+        account_id: &odf::AccountID,
+        schema: &TypeUri,
+        name: &ResourceName,
+    ) -> Result<Option<ResourceID>, InternalError> {
+        self.inner
+            .find_resource_id_by_name(account_id, schema, name)
+            .await
+    }
+
+    async fn find_resource_handles_by_ids(
+        &self,
+        account_id: &odf::AccountID,
+        ids: &[ResourceID],
+    ) -> Result<Vec<ResourceHandleRow>, InternalError> {
+        self.inner
+            .find_resource_handles_by_ids(account_id, ids)
+            .await
+    }
+
+    async fn touch_live_resources(
+        &self,
+        account_id: &odf::AccountID,
+        ids: &[ResourceID],
+    ) -> Result<Vec<ResourceID>, InternalError> {
+        self.touched.lock().unwrap().extend_from_slice(ids);
+        self.inner.touch_live_resources(account_id, ids).await
+    }
+
+    async fn resolve_resource_ids_by_names(
+        &self,
+        account_id: &odf::AccountID,
+        schema: &TypeUri,
+        names: &[ResourceName],
+        visibility: ResourceVisibility,
+    ) -> Result<Vec<(ResourceName, ResourceID)>, InternalError> {
+        self.inner
+            .resolve_resource_ids_by_names(account_id, schema, names, visibility)
+            .await
+    }
+
+    async fn search_resource_handles(
+        &self,
+        account_id: &odf::AccountID,
+        scope: &ResourceScope,
+        visibility: ResourceVisibility,
+        owner_id: Option<ResourceID>,
+        pagination: PaginationOpts,
+    ) -> Result<Vec<ResourceHandleRow>, InternalError> {
+        self.inner
+            .search_resource_handles(account_id, scope, visibility, owner_id, pagination)
+            .await
+    }
+
+    async fn count_search_resource_handles(
+        &self,
+        account_id: &odf::AccountID,
+        scope: &ResourceScope,
+        visibility: ResourceVisibility,
+        owner_id: Option<ResourceID>,
+    ) -> Result<usize, InternalError> {
+        self.inner
+            .count_search_resource_handles(account_id, scope, visibility, owner_id)
+            .await
+    }
+
+    async fn find_owned_snapshot(
+        &self,
+        account_id: &odf::AccountID,
+        schema: &'static TypeUri,
+        id: ResourceID,
+    ) -> Result<Option<ResourceSnapshot>, FindOwnedResourceError> {
+        self.inner.find_owned_snapshot(account_id, schema, id).await
+    }
+
+    async fn find_owned_snapshots(
+        &self,
+        account_id: &odf::AccountID,
+        schema: &'static TypeUri,
+        ids: &[ResourceID],
+    ) -> Result<FindOwnedSnapshotsOutcome, InternalError> {
+        self.inner
+            .find_owned_snapshots(account_id, schema, ids)
+            .await
+    }
+
+    async fn get_snapshot_by_id(
+        &self,
+        id: &ResourceID,
+    ) -> Result<Option<ResourceSnapshot>, InternalError> {
+        self.inner.get_snapshot_by_id(id).await
+    }
+
+    async fn find_snapshots_by_ids(
+        &self,
+        account_id: &odf::AccountID,
+        ids: &[ResourceID],
+    ) -> Result<Vec<ResourceSnapshot>, InternalError> {
+        self.inner.find_snapshots_by_ids(account_id, ids).await
+    }
+
+    async fn list_snapshots(
+        &self,
+        account_id: &odf::AccountID,
+        scope: &ResourceScope,
+        visibility: ResourceVisibility,
+        owner_id: Option<ResourceID>,
+        pagination: PaginationOpts,
+    ) -> Result<Vec<ResourceSnapshot>, InternalError> {
+        self.inner
+            .list_snapshots(account_id, scope, visibility, owner_id, pagination)
+            .await
+    }
+
+    async fn summarize_resources(
+        &self,
+        account_id: odf::AccountID,
+    ) -> Result<Vec<ResourceSummaryRow>, InternalError> {
+        self.inner.summarize_resources(account_id).await
     }
 }
 

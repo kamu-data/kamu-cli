@@ -1255,6 +1255,13 @@ pub struct WebhooksConfig {
 
 #[cfg(test)]
 mod tests {
+    use std::assert_matches;
+
+    use chrono::TimeDelta;
+    use kamu_resources::ResourceRetentionPolicy;
+    use kamu_resources_services::RESOURCE_RETENTION_JOB_NAME;
+    use pretty_assertions::assert_eq;
+
     use super::*;
 
     const KEY: &str = "backgroundAgents.housekeeping.resourceRetention";
@@ -1288,13 +1295,82 @@ mod tests {
         ];
 
         for (config, expected) in cases {
-            pretty_assertions::assert_eq!(validation_error(&config), expected);
+            assert_eq!(validation_error(&config), expected);
         }
     }
 
     #[test]
     fn test_housekeeping_job_batch_size_zero_runs_batches_of_one() {
-        pretty_assertions::assert_eq!(job_config(0, "5m").into_system(KEY).unwrap().batch_size, 1);
+        assert_eq!(job_config(0, "5m").into_system(KEY).unwrap().batch_size, 1);
+    }
+
+    #[test]
+    fn test_housekeeping_config_is_keyed_by_the_retention_job_name() {
+        let config = BackgroundAgentsHousekeepingConfig {
+            resource_retention: HousekeepingJobConfig {
+                enabled: false,
+                batch_size: 7,
+                ..HousekeepingJobConfig::default()
+            },
+        };
+
+        let job = config
+            .into_system()
+            .unwrap()
+            .job(RESOURCE_RETENTION_JOB_NAME);
+
+        assert_eq!((job.enabled, job.batch_size), (false, 7));
+    }
+
+    #[test]
+    fn test_resource_retention_value_maps_to_a_policy() {
+        let cases = [
+            ("forever", Ok(ResourceRetentionPolicy::RetainForever)),
+            ("immediately", Ok(ResourceRetentionPolicy::PurgeImmediately)),
+            (
+                "7d",
+                Ok(ResourceRetentionPolicy::RetainFor(TimeDelta::days(7))),
+            ),
+            (
+                "1000000000y",
+                Ok(ResourceRetentionPolicy::RetainFor(TimeDelta::MAX)),
+            ),
+            (
+                "bogus",
+                Err(
+                    "Invalid retention 'bogus': expected a duration such as '7d', 'forever' or \
+                     'immediately'"
+                        .to_string(),
+                ),
+            ),
+        ];
+
+        for (value, expected) in cases {
+            assert_eq!(
+                value
+                    .parse::<ResourceRetentionValue>()
+                    .map(ResourceRetentionValue::into_system),
+                expected,
+                "{value}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_resource_retention_of_an_invalid_type_name_is_a_usage_error() {
+        let config = ResourceRetentionConfig {
+            types: BTreeMap::from([("Bad Type".to_string(), ResourceRetentionValue::Forever)]),
+            ..ResourceRetentionConfig::default()
+        };
+
+        let err = config.into_system().unwrap_err();
+
+        assert_matches!(err, CLIError::UsageError(_));
+        assert!(
+            err.to_string()
+                .starts_with("Invalid resource type 'Bad Type' in resources.retention.types"),
+            "{err}"
+        );
     }
 }
 

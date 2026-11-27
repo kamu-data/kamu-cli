@@ -36,3 +36,32 @@ impl ResourceRetentionPolicy {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[cfg(test)]
+mod tests {
+    use chrono::TimeZone;
+    use pretty_assertions::assert_eq;
+
+    use super::*;
+
+    #[test]
+    fn test_purge_at_adds_the_retention_to_the_deletion_time() {
+        use ResourceRetentionPolicy::{PurgeImmediately, RetainFor, RetainForever};
+
+        let deleted_at = Utc.with_ymd_and_hms(2026, 1, 1, 0, 0, 0).unwrap();
+        for (policy, expected) in [
+            (PurgeImmediately, Some(deleted_at)),
+            (RetainFor(TimeDelta::zero()), Some(deleted_at)),
+            (
+                RetainFor(TimeDelta::days(7)),
+                Some(Utc.with_ymd_and_hms(2026, 1, 8, 0, 0, 0).unwrap()),
+            ),
+            (RetainFor(TimeDelta::MAX), None),
+            (RetainForever, None),
+        ] {
+            assert_eq!(policy.purge_at(deleted_at), expected, "{policy:?}");
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
