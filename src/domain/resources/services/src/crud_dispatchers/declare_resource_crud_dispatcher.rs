@@ -131,54 +131,15 @@ macro_rules! declare_resource_crud_dispatcher {
                 Vec<Result<(), kamu_resources::ResourceOperationError>>,
                 internal_error::InternalError,
             > {
-                use internal_error::{ErrorIntoInternal, ResultIntoInternal};
-
-                // A resource deleted since its ID was resolved is not found
-                let mut loaded = Vec::with_capacity(ids.len());
-                for (id, result) in ids
-                    .iter()
-                    .zip(self.resource_aggregate_loader.load_many(ids).await.int_err()?)
-                {
-                    match result {
-                        Ok(resource) => loaded.push(Ok(resource)),
-                        Err($crate::event_sourcing::LoadError::NotFound(_)) => loaded.push(Err(
-                            kamu_resources::ResourceOperationError::NotFound(
-                                kamu_resources::ResourceIDNotFoundError(*id),
-                            ),
-                        )),
-                        Err(err) => return Err(err.int_err()),
-                    }
-                }
-
-                let requests = loaded
-                    .iter()
-                    .filter_map(|result| result.as_ref().ok())
-                    .map(|resource| kamu_resources::ResourceOperationRequest {
-                        account,
-                        operation: match operation {
-                            kamu_resources::ResourceAccountOperation::Read => {
-                                kamu_resources::ResourceOperation::Read { resource }
-                            }
-                            kamu_resources::ResourceAccountOperation::Delete => {
-                                kamu_resources::ResourceOperation::Delete { resource }
-                            }
-                        },
-                    })
-                    .collect::<Vec<_>>();
-
-                let mut checked = self
-                    .operation_guard()
-                    .check_operations(principal, &requests)
-                    .await?
-                    .into_iter();
-
-                Ok(loaded
-                    .into_iter()
-                    .map(|result| match result {
-                        Ok(_) => checked.next().expect("one result per request"),
-                        Err(err) => Err(err),
-                    })
-                    .collect())
+                $crate::check_resource_operations(
+                    self.resource_aggregate_loader.as_ref(),
+                    self.operation_guard(),
+                    principal,
+                    account,
+                    operation,
+                    ids,
+                )
+                .await
             }
 
             async fn check_list(

@@ -18,7 +18,7 @@ pub(crate) const GENERATED_NAME_SUFFIX_LENGTH: usize = 6;
 
 #[dill::component]
 #[dill::interface(dyn ResourceNameSuffixGenerator)]
-pub struct ResourceNameSuffixGeneratorImpl;
+pub(crate) struct ResourceNameSuffixGeneratorImpl;
 
 impl ResourceNameSuffixGenerator for ResourceNameSuffixGeneratorImpl {
     fn generate_suffix(&self) -> String {

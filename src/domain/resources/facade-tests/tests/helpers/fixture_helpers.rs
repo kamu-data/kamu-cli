@@ -13,11 +13,14 @@ use kamu_resources::{
     ApplyManifestApplicationDecision,
     ApplyResourceOutcome,
     Resource,
+    ResourceHandle,
     ResourceID,
     ResourceLabelFilterInput,
     ResourceRef,
     ResourceSelector,
+    ResourceSummaryView,
     ResourceVisibility,
+    ResourcesSummary,
     TypeUri,
 };
 use kamu_resources_facade::{
@@ -118,7 +121,7 @@ pub fn variable_set_manifest_yaml(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub fn sorted_handle_names(mut items: Vec<kamu_resources::ResourceHandle>) -> Vec<String> {
+pub fn sorted_handle_names(mut items: Vec<ResourceHandle>) -> Vec<String> {
     crate::helpers::normalize_handles(&mut items);
     items
         .into_iter()
@@ -126,7 +129,7 @@ pub fn sorted_handle_names(mut items: Vec<kamu_resources::ResourceHandle>) -> Ve
         .collect()
 }
 
-pub fn sorted_summary_names(mut items: Vec<kamu_resources::ResourceSummaryView>) -> Vec<String> {
+pub fn sorted_summary_names(mut items: Vec<ResourceSummaryView>) -> Vec<String> {
     crate::helpers::normalize_summary_views(&mut items);
     items
         .into_iter()
@@ -134,7 +137,7 @@ pub fn sorted_summary_names(mut items: Vec<kamu_resources::ResourceSummaryView>)
         .collect()
 }
 
-pub fn total_schema_count(summary: kamu_resources::ResourcesSummary, schema: &TypeUri) -> u64 {
+pub fn total_schema_count(summary: ResourcesSummary, schema: &TypeUri) -> u64 {
     summary
         .resource_counts
         .into_iter()

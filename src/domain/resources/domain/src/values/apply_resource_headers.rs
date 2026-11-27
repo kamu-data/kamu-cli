@@ -9,8 +9,6 @@
 
 use std::collections::BTreeMap;
 
-use odf::metadata::auth;
-
 use crate::{
     ResourceAnnotations,
     ResourceHeadersInput,
@@ -33,7 +31,7 @@ pub struct ApplyResourceHeaders {
     /// `None` keeps the name of an existing resource and has a new one's name
     /// generated
     pub name: Option<ResourceName>,
-    pub account: Option<auth::ResourceOwnerRef>,
+    pub account: Option<odf::metadata::auth::ResourceOwnerRef>,
     pub labels: Option<ResourceLabels>,
     pub annotations: Option<ResourceAnnotations>,
     pub owner_references: Option<Vec<ResourceRef>>,
@@ -41,7 +39,7 @@ pub struct ApplyResourceHeaders {
 
 impl ApplyResourceHeaders {
     pub fn try_new(
-        account: Option<auth::ResourceOwnerRef>,
+        account: Option<odf::metadata::auth::ResourceOwnerRef>,
         name: Option<&str>,
         labels: Vec<(TypeRef, serde_json::Value)>,
         annotations: Vec<(TypeRef, serde_json::Value)>,
@@ -103,14 +101,14 @@ impl ApplyResourceHeaders {
     }
 
     /// See [`Self::resolved_account_id`]
-    pub fn resolved_account(&self) -> &auth::ResourceOwnerRef {
+    pub fn resolved_account(&self) -> &odf::metadata::auth::ResourceOwnerRef {
         self.account
             .as_ref()
             .expect("resource headers must carry a resolved account by apply time")
     }
 
     /// See [`Self::resolved_account_id`]
-    pub fn resolved_account_handle(&self) -> auth::ResourceOwnerHandle {
+    pub fn resolved_account_handle(&self) -> odf::ResourceOwnerHandle {
         crate::account_handle_from_input(self.account.as_ref())
     }
 
@@ -182,8 +180,8 @@ mod tests {
     use super::*;
     use crate::{MAX_ANNOTATIONS, MAX_LABELS, MAX_OWNER_REFERENCES, ResourceID};
 
-    fn account() -> auth::ResourceOwnerRef {
-        auth::ResourceOwnerRef {
+    fn account() -> odf::metadata::auth::ResourceOwnerRef {
+        odf::metadata::auth::ResourceOwnerRef {
             r#type: None,
             id: None,
             did: Some(odf::AccountID::new_seeded_ed25519(b"test-account")),

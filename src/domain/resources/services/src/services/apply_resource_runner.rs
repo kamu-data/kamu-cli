@@ -294,13 +294,16 @@ where
             Ok(Some(account)) if account.did == placed_account.did => {
                 Ok(PlacedApplyResource::Prepared(prepared, existing))
             }
-            Ok(other) => Err(InternalError::new(format!(
-                "Placing a prepared {} spec again gave another account: first '{}', then {:?}",
-                R::type_uri(),
-                placed_account.name,
-                other.map(|account| account.name),
-            ))
-            .into()),
+            Ok(other) => Err(ApplyResourceUseCaseError::Internal(
+                "Placing a prepared spec again gave another account"
+                    .int_err()
+                    .with_context(format!(
+                        "schema='{}', first='{}', then={:?}",
+                        R::type_uri(),
+                        placed_account.name,
+                        other.map(|account| account.name),
+                    )),
+            )),
             Err(rejection) => Ok(PlacedApplyResource::Rejected(rejection)),
         }
     }
@@ -370,7 +373,14 @@ where
             Err(err @ ApplyResourceUseCaseError::ResourceTypeMismatch(_)) => {
                 Ok(ExistingResource::Unavailable(err))
             }
-            Err(err) => Err(err),
+            Err(
+                err @ (ApplyResourceUseCaseError::InvalidHeaders(_)
+                | ApplyResourceUseCaseError::LoadFailed(_)
+                | ApplyResourceUseCaseError::ResourceIDNotFound(_)
+                | ApplyResourceUseCaseError::ConcurrentModification(_)
+                | ApplyResourceUseCaseError::Access(_)
+                | ApplyResourceUseCaseError::Internal(_)),
+            ) => Err(err),
         }
     }
 

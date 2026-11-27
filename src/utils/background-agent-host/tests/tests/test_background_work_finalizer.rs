@@ -11,7 +11,6 @@ use std::collections::{BTreeMap, VecDeque};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 use BackgroundWorkDrainOutcome::{Idle, Worked};
 use background_agent_host::{
     BackgroundWorkDrain,
@@ -30,6 +29,8 @@ use pretty_assertions::assert_eq;
 use time_source::{FakeSystemTimeSource, SystemTimeSource};
 
 use crate::tests::utils::{FakeClock, ScriptedBatch, ScriptedHousekeepingJob};
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
 async fn test_settle_drains_until_a_full_pass_finds_all_idle() {
@@ -212,6 +213,8 @@ impl FinalizerHarness {
     }
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 /// One of several test doubles of one type in a catalog, which keeps a single
 /// registration per concrete type
 struct Slot<const I: usize, T: ?Sized>(Arc<T>);
@@ -254,6 +257,8 @@ impl<const I: usize> HousekeepingJob for Slot<I, ScriptedHousekeepingJob> {
     }
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 /// Reports its script, one outcome per drain, then idle drains
 struct ScriptedDrain {
     script: Mutex<VecDeque<BackgroundWorkDrainOutcome>>,
@@ -287,6 +292,8 @@ impl BackgroundWorkDrain for ScriptedDrain {
         Ok(Box::new(ScriptedDrainSession { drain: self }))
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 struct ScriptedDrainSession<'a> {
     drain: &'a ScriptedDrain,

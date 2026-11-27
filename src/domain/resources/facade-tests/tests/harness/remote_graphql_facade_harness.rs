@@ -12,7 +12,7 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 
 use axum::Extension;
-use kamu_accounts::CurrentAccountSubject;
+use kamu_accounts::{Account, CurrentAccountSubject};
 use kamu_adapter_graphql::data_loader::{account_entity_data_loader, dataset_handle_data_loader};
 use kamu_adapter_resources_facade_graphql::RemoteGraphqlResourceFacadeImpl;
 use kamu_core::{ApiKind, RequestOrigin};
@@ -81,7 +81,7 @@ impl RemoteGraphqlFacadeHarness {
         let account_name = local.account_name(account);
         let account_id = local.account_id(account);
         let subject = CurrentAccountSubject::logged(
-            kamu_accounts::Account::seed_resource_id_from_name(account_name.as_str()),
+            Account::seed_resource_id_from_name(account_name.as_str()),
             account_id,
             account_name,
         );

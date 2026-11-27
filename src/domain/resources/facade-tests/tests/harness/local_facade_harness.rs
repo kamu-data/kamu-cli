@@ -14,6 +14,7 @@ use background_agent_host::BackgroundWorkFinalizer;
 use database_common::{NoOpDatabasePlugin, PaginationOpts};
 use dill::CatalogBuilder;
 use kamu_accounts::{
+    Account,
     AccountConfig,
     AccountPropertyName,
     AccountRepository,
@@ -310,7 +311,7 @@ impl LocalFacadeHarness {
 
     /// A facade of background work: [`Principal::Node`] acting, with no caller
     pub fn facade_for_node(&self) -> Arc<dyn ResourceFacade> {
-        let catalog = dill::CatalogBuilder::new_chained(&self.base_catalog)
+        let catalog = CatalogBuilder::new_chained(&self.base_catalog)
             .add_value(Principal::Node)
             .add_value(RequestOrigin::Internal {
                 producer: NODE_TEST_PRODUCER.to_string(),
@@ -349,7 +350,7 @@ impl LocalFacadeHarness {
     }
 
     fn facade_in(catalog: &dill::Catalog) -> Arc<dyn ResourceFacade> {
-        let mut b = dill::CatalogBuilder::new_chained(catalog);
+        let mut b = CatalogBuilder::new_chained(catalog);
         kamu_resources_facade::register_dependencies(&mut b);
         b.build().get_one::<dyn ResourceFacade>().unwrap()
     }
@@ -357,7 +358,7 @@ impl LocalFacadeHarness {
     fn catalog_for_account(&self, account: TestAccount) -> dill::Catalog {
         let account_id = self.account_id(account);
         let subject = CurrentAccountSubject::logged(
-            kamu_accounts::Account::seed_resource_id_from_name(account.name()),
+            Account::seed_resource_id_from_name(account.name()),
             account_id,
             odf::AccountName::new_unchecked(account.name()),
         );
@@ -367,7 +368,7 @@ impl LocalFacadeHarness {
 
     /// The catalog of a CLI command `subject` runs
     fn subject_catalog(&self, subject: CurrentAccountSubject) -> dill::Catalog {
-        let mut b = dill::CatalogBuilder::new_chained(&self.base_catalog);
+        let mut b = CatalogBuilder::new_chained(&self.base_catalog);
         subject.register(&mut b);
         b.add_value(RequestOrigin::Cli);
         b.build()

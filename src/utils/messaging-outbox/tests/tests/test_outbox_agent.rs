@@ -1274,6 +1274,8 @@ async fn test_run_while_has_tasks_drains_backlog_with_small_batch_size() {
     harness.check_metric_pending(TEST_PRODUCER_A, TEST_CONSUMER_A, 0);
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[test_log::test(tokio::test)]
 async fn test_drain_reports_deliveries_until_idle() {
     for (case, another_run_delivers_first) in [

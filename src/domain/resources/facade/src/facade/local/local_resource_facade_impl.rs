@@ -796,7 +796,10 @@ impl LocalResourceFacadeImpl {
                 Err(ResourceOperationError::Internal(err)) => {
                     return Err(BatchResourceError::Internal(err));
                 }
-                result => {
+                result @ (Ok(())
+                | Err(
+                    ResourceOperationError::NotFound(_) | ResourceOperationError::Access(_),
+                )) => {
                     results.insert(id, result);
                 }
             }
@@ -951,16 +954,22 @@ impl LocalResourceFacadeImpl {
             return Ok(Some(owner.item.id));
         }
 
-        match (response.problems.into_iter().next(), owner_id) {
-            (Some(problem), Some(_))
-                if matches!(problem.error, ResourceLookupProblem::IDNotFound(_)) =>
-            {
-                Ok(owner_id)
-            }
-            (Some(problem), _) => Err(ListResourcesError::OwnerLookup(problem.error)),
-            (None, _) => Err(ListResourcesError::Internal(InternalError::new(
+        let Some(problem) = response.problems.into_iter().next() else {
+            return Err(ListResourcesError::Internal(InternalError::new(
                 "Owner lookup gave neither a resource nor a problem",
-            ))),
+            )));
+        };
+
+        match problem.error {
+            ResourceLookupProblem::IDNotFound(_) if owner_id.is_some() => Ok(owner_id),
+            error @ (ResourceLookupProblem::IDNotFound(_)
+            | ResourceLookupProblem::NameNotFound(_)
+            | ResourceLookupProblem::SchemaMismatch(_)
+            | ResourceLookupProblem::NameMismatch(_)
+            | ResourceLookupProblem::EmptyRef
+            | ResourceLookupProblem::UntypedName
+            | ResourceLookupProblem::DeletedNotRevealed(_)
+            | ResourceLookupProblem::Access(_)) => Err(ListResourcesError::OwnerLookup(error)),
         }
     }
 

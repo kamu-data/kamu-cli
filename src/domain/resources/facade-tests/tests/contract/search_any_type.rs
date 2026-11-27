@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use database_common::PaginationOpts;
-use kamu_resources::ResourceSelector;
+use kamu_resources::{ResourceHandle, ResourceSelector, ResourceSummaryView};
 use kamu_resources_facade::SearchResourcesRequest;
 use pretty_assertions::assert_eq;
 
@@ -29,7 +29,7 @@ use crate::helpers::{
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-fn summary_keys(mut items: Vec<kamu_resources::ResourceSummaryView>) -> Vec<(String, String)> {
+fn summary_keys(mut items: Vec<ResourceSummaryView>) -> Vec<(String, String)> {
     normalize_summary_views(&mut items);
     items
         .into_iter()
@@ -37,7 +37,7 @@ fn summary_keys(mut items: Vec<kamu_resources::ResourceSummaryView>) -> Vec<(Str
         .collect()
 }
 
-fn handle_keys(mut items: Vec<kamu_resources::ResourceHandle>) -> Vec<(String, String)> {
+fn handle_keys(mut items: Vec<ResourceHandle>) -> Vec<(String, String)> {
     normalize_handles(&mut items);
     items
         .into_iter()

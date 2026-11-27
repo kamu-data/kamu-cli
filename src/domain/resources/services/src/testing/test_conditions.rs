@@ -26,7 +26,7 @@ use crate::testing::TestResource;
 pub const TEST_STAGE_CONDITION_URI: &str =
     "https://test.kamu.dev/schemas/test/v1/conditions/TestStage";
 
-pub const TEST_STAGE_MAX_SERIALIZED_SIZE: usize = 64;
+const TEST_STAGE_MAX_SERIALIZED_SIZE: usize = 64;
 
 pub fn test_stage_condition_key() -> TypeRef {
     TypeRef::Uri(TypeUri::new_unchecked(TEST_STAGE_CONDITION_URI))
@@ -37,7 +37,7 @@ pub fn test_stage_condition_key() -> TypeRef {
 pub const TEST_PAYLOAD_CONDITION_URI: &str =
     "https://test.kamu.dev/schemas/test/v1/conditions/TestPayload";
 
-pub const TEST_PAYLOAD_MAX_SERIALIZED_SIZE: usize = 1024;
+const TEST_PAYLOAD_MAX_SERIALIZED_SIZE: usize = 1024;
 
 /// A condition registered for another resource type only
 pub const TEST_OTHER_TYPE_CONDITION_URI: &str =
@@ -56,7 +56,7 @@ const TEST_RESOURCE_APPLICATIONS: &[ResourceExtensionApplicationMeta] =
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct TestStageCondition;
+struct TestStageCondition;
 
 impl ResourceValidateSchemaValue for TestStageCondition {
     type ValidationError = ResourceExtensionValueError;
@@ -85,7 +85,7 @@ declare_resource_extension_schema_dispatcher!(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct TestPayloadCondition;
+struct TestPayloadCondition;
 
 impl ResourceValidateSchemaValue for TestPayloadCondition {
     type ValidationError = ResourceExtensionValueError;

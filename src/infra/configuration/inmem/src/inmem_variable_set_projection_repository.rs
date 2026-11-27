@@ -17,7 +17,7 @@ use kamu_configuration::{
     VariableSetEntry,
     VariableSetProjectionRepository,
 };
-use kamu_resources::ResourceRemovalListener;
+use kamu_resources::{ResourceID, ResourceRemovalListener};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -41,8 +41,7 @@ impl InMemoryVariableSetProjectionRepository {
 
 #[derive(Default)]
 struct State {
-    entries_by_resource_id_generation:
-        HashMap<(kamu_resources::ResourceID, u64), Vec<VariableSetEntry>>,
+    entries_by_resource_id_generation: HashMap<(ResourceID, u64), Vec<VariableSetEntry>>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -51,7 +50,7 @@ struct State {
 impl VariableSetProjectionRepository for InMemoryVariableSetProjectionRepository {
     async fn find_entry(
         &self,
-        resource_id: &kamu_resources::ResourceID,
+        resource_id: &ResourceID,
         resource_generation: u64,
         key: &str,
     ) -> Result<Option<VariableSetEntry>, InternalError> {
@@ -65,7 +64,7 @@ impl VariableSetProjectionRepository for InMemoryVariableSetProjectionRepository
 
     async fn get_entries(
         &self,
-        resource_id: &kamu_resources::ResourceID,
+        resource_id: &ResourceID,
         resource_generation: u64,
     ) -> Result<Vec<VariableSetEntry>, InternalError> {
         let guard = self.state.lock().unwrap();
@@ -78,7 +77,7 @@ impl VariableSetProjectionRepository for InMemoryVariableSetProjectionRepository
 
     async fn get_latest_entries(
         &self,
-        resource_id: &kamu_resources::ResourceID,
+        resource_id: &ResourceID,
     ) -> Result<Vec<VariableSetEntry>, InternalError> {
         let guard = self.state.lock().unwrap();
         let max_gen = guard
@@ -99,7 +98,7 @@ impl VariableSetProjectionRepository for InMemoryVariableSetProjectionRepository
 
     async fn get_latest_entries_before_generation(
         &self,
-        resource_id: &kamu_resources::ResourceID,
+        resource_id: &ResourceID,
         resource_generation: u64,
     ) -> Result<Vec<VariableSetEntry>, InternalError> {
         let guard = self.state.lock().unwrap();
@@ -116,7 +115,7 @@ impl VariableSetProjectionRepository for InMemoryVariableSetProjectionRepository
 
     async fn replace_entries(
         &self,
-        resource_id: &kamu_resources::ResourceID,
+        resource_id: &ResourceID,
         resource_generation: u64,
         entries: &[VariableSetEntry],
     ) -> Result<(), ReplaceProjectionEntriesError> {
@@ -133,7 +132,7 @@ impl VariableSetProjectionRepository for InMemoryVariableSetProjectionRepository
 
     async fn cleanup_entries_before_generation(
         &self,
-        resource_id: &kamu_resources::ResourceID,
+        resource_id: &ResourceID,
         resource_generation: u64,
     ) -> Result<(), InternalError> {
         let mut guard = self.state.lock().unwrap();
@@ -145,10 +144,7 @@ impl VariableSetProjectionRepository for InMemoryVariableSetProjectionRepository
         Ok(())
     }
 
-    async fn delete_all_entries(
-        &self,
-        resource_ids: &[kamu_resources::ResourceID],
-    ) -> Result<(), InternalError> {
+    async fn delete_all_entries(&self, resource_ids: &[ResourceID]) -> Result<(), InternalError> {
         let mut guard = self.state.lock().unwrap();
         guard
             .entries_by_resource_id_generation
@@ -162,10 +158,7 @@ impl VariableSetProjectionRepository for InMemoryVariableSetProjectionRepository
 /// Drops the entries of purged resources, as the cascade of the SQL backends does
 #[async_trait::async_trait]
 impl ResourceRemovalListener for InMemoryVariableSetProjectionRepository {
-    async fn on_resources_removed(
-        &self,
-        ids: &[kamu_resources::ResourceID],
-    ) -> Result<(), InternalError> {
+    async fn on_resources_removed(&self, ids: &[ResourceID]) -> Result<(), InternalError> {
         self.delete_all_entries(ids).await
     }
 }

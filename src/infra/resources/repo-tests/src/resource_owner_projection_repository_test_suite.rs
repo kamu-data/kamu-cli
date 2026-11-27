@@ -13,6 +13,8 @@ use database_common::testing::{in_committed_transaction, in_rolled_back_transact
 use dill::Catalog;
 use kamu_resources::{ResourceID, ResourceOwnerProjectionRepository, ResourceRepository, TypeUri};
 
+use crate::make_test_snapshot;
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 static TEST_KIND: LazyLock<TypeUri> = LazyLock::new(|| TypeUri::new_unchecked("TestKind"));
@@ -24,8 +26,7 @@ async fn create_test_resource(catalog: &Catalog, name: &str) -> ResourceID {
     let repo = catalog.get_one::<dyn ResourceRepository>().unwrap();
 
     let account = odf::ResourceOwnerHandle::new_test("test-account");
-    let snapshot =
-        crate::resource_repository_test_suite::make_test_snapshot(&account, &TEST_KIND, name);
+    let snapshot = make_test_snapshot(&account, &TEST_KIND, name);
     let id = snapshot.id;
 
     repo.create_resource(&snapshot).await.unwrap();
@@ -33,11 +34,15 @@ async fn create_test_resource(catalog: &Catalog, name: &str) -> ResourceID {
     id
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 fn make_owner_ids() -> [ResourceID; 2] {
     let mut ids = [(); 2].map(|()| ResourceID::new(uuid::Uuid::new_v4()));
     ids.sort();
     ids
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 async fn replace_owners(catalog: &Catalog, id: ResourceID, owner_ids: &[ResourceID]) {
     catalog
@@ -47,6 +52,8 @@ async fn replace_owners(catalog: &Catalog, id: ResourceID, owner_ids: &[Resource
         .await
         .unwrap();
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 async fn find_owners(catalog: &Catalog, id: ResourceID) -> Vec<ResourceID> {
     catalog

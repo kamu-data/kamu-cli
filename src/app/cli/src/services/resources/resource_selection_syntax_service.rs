@@ -28,7 +28,7 @@ pub enum ExactResourceRef {
 }
 
 impl ExactResourceRef {
-    pub fn into_resource_ref(self, r#type: Option<TypeUri>) -> ResourceRef {
+    pub(crate) fn into_resource_ref(self, r#type: Option<TypeUri>) -> ResourceRef {
         let (id, name) = match self {
             Self::ById(id) => (Some(id), None),
             Self::ByName(name) => (None, Some(name)),

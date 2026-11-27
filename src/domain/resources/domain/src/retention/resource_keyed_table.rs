@@ -18,6 +18,8 @@ pub struct ResourceKeyedTable {
     pub purge: ResourceKeyedTablePurge,
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ResourceKeyedTablePurge {
     /// The purge deletes the rows itself, before the resource's row
@@ -26,6 +28,8 @@ pub enum ResourceKeyedTablePurge {
     /// given
     Outlives(&'static str),
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// Every table keyed by a resource ID, other than `resources`, without a
 /// cascading foreign key to it. The purge contract test fails for a table

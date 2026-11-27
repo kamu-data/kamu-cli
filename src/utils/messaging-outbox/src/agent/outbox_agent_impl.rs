@@ -458,6 +458,8 @@ impl BackgroundWorkDrain for OutboxAgentImpl {
     }
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 /// Delivers every committed message on each drain; idle while no run of the
 /// agent, here or in its main loop, delivered anything
 struct OutboxDrainSession<'a> {

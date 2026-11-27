@@ -7,7 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-pub use event_sourcing;
 use kamu_resources as domain;
 pub use messaging_outbox;
 pub use paste;

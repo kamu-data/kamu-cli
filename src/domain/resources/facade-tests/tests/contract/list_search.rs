@@ -7,8 +7,18 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::collections::{BTreeMap, HashSet};
+
 use database_common::PaginationOpts;
-use kamu_resources::{RESOURCE_LABEL_ENVIRONMENT_SCHEMA_URI, ResourceID, ResourceSelector};
+use kamu_resources::{
+    RESOURCE_LABEL_ENVIRONMENT_SCHEMA_URI,
+    ResourceID,
+    ResourceLabelFilterInput,
+    ResourceOwnerRef,
+    ResourceSelector,
+    UnsupportedResourceSelectorError,
+    resource_type_name,
+};
 use kamu_resources_facade::{
     ListResourcesError,
     ResourceAccountResolutionError,
@@ -17,6 +27,7 @@ use kamu_resources_facade::{
     SearchResourcesRequest,
 };
 use pretty_assertions::{assert_eq, assert_matches};
+use uuid::Uuid;
 
 use crate::contract_test;
 use crate::harness::{FacadeContractHarness, LocalFacadeHarness, TestAccount};
@@ -198,7 +209,7 @@ pub async fn test_per_selector_account_is_authorized(h: &impl FacadeContractHarn
     let facade = h.facade_for(TestAccount::Alice);
 
     let bobs_selector = ResourceSelector {
-        account: Some(kamu_resources::ResourceOwnerRef {
+        account: Some(ResourceOwnerRef {
             r#type: None,
             id: None,
             did: None,
@@ -316,7 +327,7 @@ pub async fn test_type_less_selector_may_name_an_account(h: &impl FacadeContract
     create_variable_set(h, TestAccount::Bob, "default-bob").await;
 
     let facade = h.facade_for(TestAccount::Alice);
-    let account_ref = |account| kamu_resources::ResourceOwnerRef {
+    let account_ref = |account| ResourceOwnerRef {
         r#type: None,
         id: None,
         did: None,
@@ -397,7 +408,7 @@ pub async fn test_any_type_selector_scope_limits(h: &impl FacadeContractHarness)
     // but `AnyType` carries only one.
     let err = search(vec![
         ResourceSelector::any_type_name_pattern("modes-%"),
-        ResourceSelector::any_type_id(ResourceID::new(uuid::Uuid::new_v4())),
+        ResourceSelector::any_type_id(ResourceID::new(Uuid::new_v4())),
     ])
     .await
     .expect_err("a type-less selector may narrow by only one mode");
@@ -412,7 +423,7 @@ pub async fn test_any_type_selector_scope_limits(h: &impl FacadeContractHarness)
     // denied before this limit is reached.
     let err = search(vec![
         ResourceSelector {
-            account: Some(kamu_resources::ResourceOwnerRef {
+            account: Some(ResourceOwnerRef {
                 r#type: None,
                 id: None,
                 did: None,
@@ -517,12 +528,7 @@ pub async fn test_search_handles_for_account(h: &impl FacadeContractHarness) {
 
     for i in &handles {
         assert_eq!(i.r#type.as_str(), VARIABLE_SET_SCHEMA_STR);
-        assert_ne!(
-            kamu_resources::resource_type_name(&i.r#type)
-                .unwrap()
-                .as_str(),
-            ""
-        );
+        assert_ne!(resource_type_name(&i.r#type).unwrap().as_str(), "");
     }
 }
 
@@ -706,14 +712,14 @@ pub async fn test_search_unsupported_kind_returns_error(h: &impl FacadeContractH
     assert_matches!(
         summaries,
         Err(ListResourcesError::UnsupportedSelector(
-            kamu_resources::UnsupportedResourceSelectorError::NotFound { raw_selector }
+            UnsupportedResourceSelectorError::NotFound { raw_selector }
         )) if raw_selector.as_str() == unsupported_selector,
         "unsupported selector must be rejected, got: {summaries:?}"
     );
     assert_matches!(
         handles,
         Err(ListResourcesError::UnsupportedSelector(
-            kamu_resources::UnsupportedResourceSelectorError::NotFound { raw_selector }
+            UnsupportedResourceSelectorError::NotFound { raw_selector }
         )) if raw_selector.as_str() == unsupported_selector,
         "unsupported selector must be rejected, got: {handles:?}"
     );
@@ -834,7 +840,7 @@ pub async fn test_search_exact_ids_ignores_missing(h: &impl FacadeContractHarnes
         variable_set_manifest_json("search-id-missing-present", None, &[("K", "v")]),
     )
     .await;
-    let missing_id = ResourceID::new(uuid::Uuid::new_v4());
+    let missing_id = ResourceID::new(Uuid::new_v4());
 
     let facade = h.facade_for(TestAccount::Alice);
     let response = facade
@@ -967,8 +973,7 @@ pub async fn test_search_multi_type(h: &impl FacadeContractHarness) {
     );
 
     // Both schemas must be represented in the result
-    let schemas: std::collections::HashSet<_> =
-        response.items.iter().map(|i| i.r#type.as_str()).collect();
+    let schemas: HashSet<_> = response.items.iter().map(|i| i.r#type.as_str()).collect();
     assert!(
         schemas.contains(VARIABLE_SET_SCHEMA_STR),
         "result must include VariableSet schema"
@@ -1018,8 +1023,7 @@ pub async fn test_search_any_type(h: &impl FacadeContractHarness) {
         "AnyType must find matches across every schema without a type selector"
     );
 
-    let schemas: std::collections::HashSet<_> =
-        response.items.iter().map(|i| i.r#type.as_str()).collect();
+    let schemas: HashSet<_> = response.items.iter().map(|i| i.r#type.as_str()).collect();
     assert!(
         schemas.contains(VARIABLE_SET_SCHEMA_STR),
         "result must include VariableSet schema"
@@ -1317,8 +1321,8 @@ pub async fn test_search_filter_non_string_value_fails_whole_call(h: &impl Facad
             },
             // Only this one is malformed.
             ResourceSelector {
-                labels: Some(kamu_resources::ResourceLabelFilterInput {
-                    entries: std::collections::BTreeMap::from([(
+                labels: Some(ResourceLabelFilterInput {
+                    entries: BTreeMap::from([(
                         "environment".to_string(),
                         serde_json::json!({"not": "a string"}),
                     )]),
@@ -1470,8 +1474,8 @@ pub async fn test_search_filter_non_string_value_is_rejected(h: &impl FacadeCont
 
     let result = facade
         .search(search_request(vec![ResourceSelector {
-            labels: Some(kamu_resources::ResourceLabelFilterInput {
-                entries: std::collections::BTreeMap::from([(
+            labels: Some(ResourceLabelFilterInput {
+                entries: BTreeMap::from([(
                     "environment".to_string(),
                     serde_json::json!({"not": "a string"}),
                 )]),
@@ -1531,8 +1535,8 @@ pub async fn test_search_filter_not_operator_is_rejected(h: &impl FacadeContract
 
     let result = facade
         .search(search_request(vec![ResourceSelector {
-            labels: Some(kamu_resources::ResourceLabelFilterInput {
-                entries: std::collections::BTreeMap::from([(
+            labels: Some(ResourceLabelFilterInput {
+                entries: BTreeMap::from([(
                     "$not".to_string(),
                     serde_json::json!({"environment": "prod"}),
                 )]),
@@ -1563,8 +1567,8 @@ pub async fn test_search_filter_or_operator_is_rejected(h: &impl FacadeContractH
 
     let result = facade
         .search(search_request(vec![ResourceSelector {
-            labels: Some(kamu_resources::ResourceLabelFilterInput {
-                entries: std::collections::BTreeMap::from([(
+            labels: Some(ResourceLabelFilterInput {
+                entries: BTreeMap::from([(
                     "$or".to_string(),
                     serde_json::json!([{"environment": "prod"}, {"environment": "staging"}]),
                 )]),
@@ -1595,11 +1599,8 @@ pub async fn test_search_filter_malformed_not_operator_is_rejected(h: &impl Faca
 
     let result = facade
         .search(search_request(vec![ResourceSelector {
-            labels: Some(kamu_resources::ResourceLabelFilterInput {
-                entries: std::collections::BTreeMap::from([(
-                    "$not".to_string(),
-                    serde_json::json!("not-an-object"),
-                )]),
+            labels: Some(ResourceLabelFilterInput {
+                entries: BTreeMap::from([("$not".to_string(), serde_json::json!("not-an-object"))]),
             }),
             ..ResourceSelector::of_type(VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap())
         }]))

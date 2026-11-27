@@ -102,8 +102,13 @@ where
             .create(&mut plan.resource)
             .await
         {
-            if !matches!(err, ResourcePersistenceError::Duplicate(_)) {
-                return Err(ApplyResourceUseCaseError::from(err));
+            match err {
+                ResourcePersistenceError::Duplicate(_) => {}
+                err @ (ResourcePersistenceError::ConcurrentModification(_)
+                | ResourcePersistenceError::InvalidDurableState(_)
+                | ResourcePersistenceError::Internal(_)) => {
+                    return Err(ApplyResourceUseCaseError::from(err));
+                }
             }
 
             match plan.naming {

@@ -33,8 +33,11 @@ impl ResourceAccountResolver for ResourceAccountResolverImpl {
         principal: &Principal,
         selector: Option<&ResourceOwnerRef>,
     ) -> Result<odf::ResourceOwnerHandle, ResolveManifestAccountError> {
-        if *principal == Principal::Anonymous {
-            return Err(ResourceAccountAccessError::AnonymousSubject.into());
+        match principal {
+            Principal::User(_) | Principal::Node => {}
+            Principal::Anonymous => {
+                return Err(ResourceAccountAccessError::AnonymousSubject.into());
+            }
         }
 
         let Some(selector) = selector else {

@@ -7,6 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::sync::LazyLock;
+
 use event_sourcing::*;
 use kamu_resources::*;
 use serde::{Deserialize, Serialize};
@@ -174,7 +176,7 @@ impl TestResource {
 
     /// A spec value `staged:<stage>` starts the resource with that
     /// `TestStage` condition
-    pub const STAGED_VALUE_PREFIX: &'static str = "staged:";
+    const STAGED_VALUE_PREFIX: &'static str = "staged:";
 
     /// The `TestStage` a resource never leaves, as a task never leaves
     /// `Finished`
@@ -182,11 +184,9 @@ impl TestResource {
 }
 
 impl ResourceSchemaProvider for TestResource {
-    fn type_uri() -> &'static kamu_resources::TypeUri {
-        static TEST_RESOURCE_SCHEMA: std::sync::LazyLock<kamu_resources::TypeUri> =
-            std::sync::LazyLock::new(|| {
-                kamu_resources::TypeUri::new_unchecked(TestResource::SCHEMA_STR)
-            });
+    fn type_uri() -> &'static TypeUri {
+        static TEST_RESOURCE_SCHEMA: LazyLock<TypeUri> =
+            LazyLock::new(|| TypeUri::new_unchecked(TestResource::SCHEMA_STR));
         &TEST_RESOURCE_SCHEMA
     }
 }

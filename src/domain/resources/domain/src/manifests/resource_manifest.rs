@@ -10,7 +10,6 @@
 use std::collections::BTreeSet;
 
 use internal_error::{InternalError, ResultIntoInternal};
-use odf::metadata::serde::yaml::StructOrString;
 use serde::de::{MapAccess, SeqAccess, Visitor};
 use serde::ser::SerializeMap;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
@@ -169,7 +168,11 @@ where
     D: Deserializer<'de>,
 {
     let proxies = Option::<
-        Vec<StructOrString<odf::metadata::serde::yaml::resources::ResourceRef>>,
+        Vec<
+            odf::metadata::serde::yaml::StructOrString<
+                odf::metadata::serde::yaml::resources::ResourceRef,
+            >,
+        >,
     >::deserialize(deserializer)?;
 
     proxies

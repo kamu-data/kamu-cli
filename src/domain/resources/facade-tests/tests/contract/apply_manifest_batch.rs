@@ -14,6 +14,7 @@ use kamu_resources::{
     ApplyManifestRejection,
     ApplyResourceOutcome,
     ApplyResourceRejectionCategory,
+    ResourceID,
     ResourceSchemaProvider,
     ResourceVisibility,
 };
@@ -28,6 +29,7 @@ use kamu_resources_facade::{
     SpecViewOpts,
 };
 use pretty_assertions::{assert_eq, assert_matches};
+use uuid::Uuid;
 
 use crate::contract_test;
 use crate::harness::{FacadeContractHarness, RemoteGraphqlFacadeHarness, TestAccount};
@@ -93,7 +95,7 @@ fn variable_set_manifest_json_with_unknown_account(name: &str) -> String {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-fn variable_set_manifest_json_with_id(id: kamu_resources::ResourceID, name: &str) -> String {
+fn variable_set_manifest_json_with_id(id: ResourceID, name: &str) -> String {
     serde_json::json!({
         "$schema": VARIABLE_SET_SCHEMA_STR,
         "headers": {
@@ -368,7 +370,7 @@ contract_test!(
 );
 
 pub async fn test_batch_apply_rollback_reconstructs_id_not_found(h: &impl FacadeContractHarness) {
-    let missing_id = kamu_resources::ResourceID::new(uuid::Uuid::new_v4());
+    let missing_id = ResourceID::new(Uuid::new_v4());
     let response = h
         .facade_for(TestAccount::Alice)
         .apply_manifests(batch_request(vec![

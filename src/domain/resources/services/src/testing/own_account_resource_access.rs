@@ -13,9 +13,9 @@ use kamu_resources::{ResourceAccountAccessPort, ResourceOperationError};
 
 /// A stand-in for the accounts adapter without administrators: the node may
 /// use any account, a user their own
-#[dill::component(pub)]
+#[dill::component]
 #[dill::interface(dyn ResourceAccountAccessPort)]
-pub struct OwnAccountResourceAccess;
+pub(crate) struct OwnAccountResourceAccess;
 
 #[async_trait::async_trait]
 impl ResourceAccountAccessPort for OwnAccountResourceAccess {

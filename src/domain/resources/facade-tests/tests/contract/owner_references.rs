@@ -35,6 +35,7 @@ use kamu_resources_facade::{
     UnsupportedSelectorFieldError,
 };
 use pretty_assertions::{assert_eq, assert_matches};
+use uuid::Uuid;
 
 use crate::contract_test;
 use crate::harness::{FacadeContractHarness, TestAccount};
@@ -121,7 +122,7 @@ pub async fn test_wrong_owners_are_rejected(h: &impl FacadeContractHarness) {
     use ApplyResourceRejectionCategory as C;
     for (owner_references, expected) in [
         (
-            serde_json::json!([{ "id": ResourceID::new(uuid::Uuid::new_v4()) }]),
+            serde_json::json!([{ "id": ResourceID::new(Uuid::new_v4()) }]),
             C::ReferencedObjectMissing,
         ),
         (
@@ -436,7 +437,7 @@ pub async fn test_owner_to_search_by_is_resolved(h: &impl FacadeContractHarness)
     assert_eq!(
         search_owned(
             facade,
-            ref_by_id(ResourceID::new(uuid::Uuid::new_v4())),
+            ref_by_id(ResourceID::new(Uuid::new_v4())),
             V::Active
         )
         .await

@@ -25,6 +25,7 @@ use internal_error::InternalError;
 use kamu_accounts::{Account, AccountRepository, AccountType};
 use kamu_resources::{
     CreateResourceError,
+    ResourceAnnotations,
     ResourceHandle,
     ResourceHandleRow,
     ResourceHeaders,
@@ -43,12 +44,14 @@ use kamu_resources::{
     ResourceScope,
     ResourceSnapshot,
     ResourceSnapshotUpdate,
+    ResourceStatus,
     ResourceSummaryRow,
     ResourceTypeQuery,
     ResourceVisibility,
     TypeRef,
     TypeUri,
     UpdateResourceError,
+    deleted_account_name_sentinel,
     description_annotation_type_ref,
     get_description,
     new_pending_resource_status,
@@ -83,7 +86,7 @@ pub fn make_test_snapshot(
     }
 }
 
-fn status_with_phase(phase: ResourcePhase) -> kamu_resources::ResourceStatus {
+fn status_with_phase(phase: ResourcePhase) -> ResourceStatus {
     let mut status = new_pending_resource_status();
     status.phase = phase;
     status
@@ -1900,7 +1903,7 @@ pub async fn test_update_resource(catalog: &Catalog) {
     );
     let updated = ResourceSnapshot {
         headers: ResourceHeaders {
-            annotations: kamu_resources::ResourceAnnotations {
+            annotations: ResourceAnnotations {
                 entries: annotations,
             },
             generation: 1,
@@ -2091,7 +2094,7 @@ pub async fn test_update_resources(catalog: &Catalog) {
 
     let updated_first = ResourceSnapshot {
         headers: ResourceHeaders {
-            annotations: kamu_resources::ResourceAnnotations {
+            annotations: ResourceAnnotations {
                 entries: first_annotations,
             },
             generation: 1,
@@ -2103,7 +2106,7 @@ pub async fn test_update_resources(catalog: &Catalog) {
     };
     let updated_second = ResourceSnapshot {
         headers: ResourceHeaders {
-            annotations: kamu_resources::ResourceAnnotations {
+            annotations: ResourceAnnotations {
                 entries: second_annotations,
             },
             generation: 1,
@@ -3667,7 +3670,7 @@ pub async fn test_deleted_account_falls_back_to_sentinel_name(catalog: &Catalog)
     assert_eq!(found.headers.account.did, account_handle.did);
     assert_eq!(
         found.headers.account.name,
-        kamu_resources::deleted_account_name_sentinel(),
+        deleted_account_name_sentinel(),
         "reads for a resource whose account is gone must fall back to the sentinel name, not fail"
     );
 }
@@ -4441,6 +4444,8 @@ fn make_owner_handle(account_handle: &odf::ResourceOwnerHandle, name: &str) -> R
     }
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 pub async fn test_owner_references_round_trip(catalog: &Catalog) {
     let repo = catalog.get_one::<dyn ResourceRepository>().unwrap();
     let account_handle = odf::ResourceOwnerHandle::new_test("test-account");
@@ -4467,6 +4472,8 @@ pub async fn test_owner_references_round_trip(catalog: &Catalog) {
     repo.update_resource(&snapshot, None).await.unwrap();
     assert_owner_references(repo.as_ref(), &snapshot).await;
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// Checks every read that returns snapshots
 async fn assert_owner_references(repo: &dyn ResourceRepository, expected: &ResourceSnapshot) {
@@ -4585,6 +4592,8 @@ pub async fn test_search_by_owner(catalog: &Catalog) {
         assert_eq!(reads.count, expected.len());
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 async fn create_owned_resource(
     catalog: &Catalog,

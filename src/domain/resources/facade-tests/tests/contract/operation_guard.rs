@@ -105,13 +105,11 @@ pub async fn test_guard_decides_create_in_another_account(h: &impl FacadeContrac
     let result = apply(h, TestAccount::Alice, Some(&bob), "unplaced", "plain").await;
 
     let err = result.unwrap_err();
-    assert_access_denied(
-        &err,
-        matches!(
-            err,
-            ApplyManifestError::AccountAccess(_) | ApplyManifestError::RemoteRequest(_)
-        ),
+    assert_matches!(
+        err,
+        ApplyManifestError::AccountAccess(_) | ApplyManifestError::RemoteRequest(_)
     );
+    assert_access_denied(&err);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -246,13 +244,11 @@ pub async fn test_listing_another_account_needs_the_guards_filter(h: &impl Facad
         ResourceSelector::default(),
     ] {
         let err = search(selector).await.unwrap_err();
-        assert_access_denied(
-            &err,
-            matches!(
-                err,
-                ListResourcesError::AccountAccess(_) | ListResourcesError::RemoteRequest(_)
-            ),
+        assert_matches!(
+            err,
+            ListResourcesError::AccountAccess(_) | ListResourcesError::RemoteRequest(_)
         );
+        assert_access_denied(&err);
     }
 
     let listed = search(ResourceSelector::name_pattern(
@@ -277,8 +273,7 @@ pub async fn test_listing_another_account_needs_the_guards_filter(h: &impl Facad
 
 /// The remote facade gets the denial of the server as a request error, so
 /// its message is checked too
-fn assert_access_denied(err: &dyn std::error::Error, is_access_variant: bool) {
-    assert!(is_access_variant, "expected an access denial, got: {err:?}");
+fn assert_access_denied(err: &dyn std::error::Error) {
     let message = err.to_string();
     assert!(
         message.contains("not allowed to use resources") || message.contains("Unauthorized"),

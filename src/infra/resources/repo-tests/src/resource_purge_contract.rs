@@ -31,6 +31,8 @@ impl ResourceKeyedColumn {
     }
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 /// Checks the purge contract over the resource-keyed columns of a schema:
 /// each one cascades from `resources`, or its table is declared in
 /// [`RESOURCE_KEYED_TABLES_WITHOUT_CASCADE`], and each declared table exists

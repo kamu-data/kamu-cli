@@ -55,8 +55,11 @@ pub trait ResourceOperationGuard<R: DeclarativeResource>: Send + Sync {
         let mut results = Vec::with_capacity(requests.len());
         for request in requests {
             results.push(match self.check_operation(principal, request).await {
+                Ok(()) => Ok(()),
                 Err(ResourceOperationError::Internal(err)) => return Err(err),
-                result => result,
+                Err(
+                    err @ (ResourceOperationError::NotFound(_) | ResourceOperationError::Access(_)),
+                ) => Err(err),
             });
         }
         Ok(results)

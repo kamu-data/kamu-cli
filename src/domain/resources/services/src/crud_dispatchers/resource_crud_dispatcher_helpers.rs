@@ -7,7 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use internal_error::{InternalError, ResultIntoInternal};
+use event_sourcing::LoadError;
+use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_resources::{
     ApplyManifestApplicationDecision,
     ApplyManifestDocumentSource,
@@ -22,7 +23,15 @@ use kamu_resources::{
     DeclarativeResourceState,
     EventSourcedResource,
     Resource,
+    ResourceAccountOperation,
+    ResourceAggregateLoader,
     ResourceCrudDispatcherApplyRequest,
+    ResourceID,
+    ResourceIDNotFoundError,
+    ResourceOperation,
+    ResourceOperationError,
+    ResourceOperationGuard,
+    ResourceOperationRequest,
     ResourceSchemaProvider,
 };
 use serde::Serialize;
@@ -171,3 +180,62 @@ where
         status,
     })
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// One result per ID, in ID order. A resource deleted since its ID was
+/// resolved is not found
+pub async fn check_resource_operations<R>(
+    resource_aggregate_loader: &dyn ResourceAggregateLoader<R>,
+    operation_guard: &dyn ResourceOperationGuard<R>,
+    principal: &odf::metadata::auth::PrincipalHandle,
+    account: &odf::ResourceOwnerHandle,
+    operation: ResourceAccountOperation,
+    ids: &[ResourceID],
+) -> Result<Vec<Result<(), ResourceOperationError>>, InternalError>
+where
+    R: EventSourcedResource,
+{
+    let mut loaded = Vec::with_capacity(ids.len());
+    for (id, result) in ids
+        .iter()
+        .zip(resource_aggregate_loader.load_many(ids).await.int_err()?)
+    {
+        match result {
+            Ok(resource) => loaded.push(Ok(resource)),
+            Err(LoadError::NotFound(_)) => loaded.push(Err(ResourceOperationError::NotFound(
+                ResourceIDNotFoundError(*id),
+            ))),
+            Err(err @ (LoadError::ProjectionError(_) | LoadError::Internal(_))) => {
+                return Err(err.int_err());
+            }
+        }
+    }
+
+    let requests = loaded
+        .iter()
+        .filter_map(|result| result.as_ref().ok())
+        .map(|resource| ResourceOperationRequest {
+            account,
+            operation: match operation {
+                ResourceAccountOperation::Read => ResourceOperation::Read { resource },
+                ResourceAccountOperation::Delete => ResourceOperation::Delete { resource },
+            },
+        })
+        .collect::<Vec<_>>();
+
+    let mut checked = operation_guard
+        .check_operations(principal, &requests)
+        .await?
+        .into_iter();
+
+    Ok(loaded
+        .into_iter()
+        .map(|result| match result {
+            Ok(_) => checked.next().expect("one result per request"),
+            Err(err) => Err(err),
+        })
+        .collect())
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use std::collections::BTreeMap;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, LazyLock, Mutex};
 
 use event_sourcing::*;
 use internal_error::InternalError;
@@ -153,8 +153,8 @@ impl ImmutableTestResource {
 
 impl ResourceSchemaProvider for ImmutableTestResource {
     fn type_uri() -> &'static TypeUri {
-        static IMMUTABLE_TEST_RESOURCE_SCHEMA: std::sync::LazyLock<TypeUri> =
-            std::sync::LazyLock::new(|| TypeUri::new_unchecked(ImmutableTestResource::SCHEMA_STR));
+        static IMMUTABLE_TEST_RESOURCE_SCHEMA: LazyLock<TypeUri> =
+            LazyLock::new(|| TypeUri::new_unchecked(ImmutableTestResource::SCHEMA_STR));
         &IMMUTABLE_TEST_RESOURCE_SCHEMA
     }
 }
@@ -246,7 +246,7 @@ impl Default for TestTargets {
 /// Fills the default mode and resolves the target
 #[dill::component]
 #[dill::interface(dyn ResourceSpecPreApply<ImmutableTestResource>)]
-pub struct ImmutableTestResourcePreApply {
+struct ImmutableTestResourcePreApply {
     targets: Arc<TestTargets>,
 }
 
@@ -297,7 +297,7 @@ impl ResourceSpecPreApply<ImmutableTestResource> for ImmutableTestResourcePreApp
 
 #[dill::component]
 #[dill::interface(dyn SimpleResourceReconciler<ImmutableTestResource>)]
-pub struct ImmutableTestResourceReconciler;
+struct ImmutableTestResourceReconciler;
 
 #[async_trait::async_trait]
 impl SimpleResourceReconciler<ImmutableTestResource> for ImmutableTestResourceReconciler {

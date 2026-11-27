@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use std::assert_matches;
+use std::collections::HashSet;
 
 use kamu_configuration::{SecretSetResource, VariableSetResource};
 use kamu_resources::{
@@ -18,7 +19,14 @@ use kamu_resources::{
     TypeName,
     UnsupportedResourceSelectorError,
 };
-use kamu_resources_facade::{BatchResourceError, ListResourcesError, SpecViewOpts};
+use kamu_resources_facade::{
+    ApplyManifestError,
+    ApplyManifestRequest,
+    BatchResourceError,
+    ListResourcesError,
+    ResourceManifestFormat,
+    SpecViewOpts,
+};
 
 use crate::contract_test;
 use crate::harness::{FacadeContractHarness, TestAccount};
@@ -29,15 +37,6 @@ use crate::helpers::{
     search_request,
     variable_set_manifest_json,
 };
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-fn assert_unsupported_selector(err: &UnsupportedResourceSelectorError, expected_selector: &str) {
-    let UnsupportedResourceSelectorError::NotFound {
-        raw_selector: selector,
-    } = err;
-    assert_eq!(selector.as_str(), expected_selector);
-}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -69,7 +68,7 @@ pub async fn test_lists_supported_resource_types(h: &impl FacadeContractHarness)
         .map(|d| d.canonical_selector.as_str())
         .collect();
     let name_count = names.len();
-    let unique_names: std::collections::HashSet<_> = names.into_iter().collect();
+    let unique_names: HashSet<_> = names.into_iter().collect();
     assert_eq!(
         unique_names.len(),
         name_count,
@@ -79,7 +78,7 @@ pub async fn test_lists_supported_resource_types(h: &impl FacadeContractHarness)
     // Schemas are unique
     let schemas: Vec<_> = descriptors.iter().map(|d| d.schema.as_str()).collect();
     let schema_count = schemas.len();
-    let unique_schemas: std::collections::HashSet<_> = schemas.into_iter().collect();
+    let unique_schemas: HashSet<_> = schemas.into_iter().collect();
     assert_eq!(
         unique_schemas.len(),
         schema_count,
@@ -211,12 +210,13 @@ pub async fn test_selector_aliases_resolve_consistently(h: &impl FacadeContractH
             "NoSuchResourceTypeXYZ".parse().unwrap(),
         )]))
         .await;
-    match bad_result {
-        Err(ListResourcesError::UnsupportedSelector(err)) => {
-            assert_unsupported_selector(&err, "NoSuchResourceTypeXYZ");
-        }
-        other => panic!("unregistered selector must not resolve, got: {other:?}"),
-    }
+    assert_matches!(
+        bad_result,
+        Err(ListResourcesError::UnsupportedSelector(
+            UnsupportedResourceSelectorError::NotFound { raw_selector }
+        )) if raw_selector.as_str() == "NoSuchResourceTypeXYZ",
+        "unregistered selector must not resolve"
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -267,14 +267,13 @@ pub async fn test_unsupported_schema_rejected_consistently(h: &impl FacadeContra
             ResourceVisibility::Active,
         )
         .await;
-    match get_by_name {
-        Err(BatchResourceError::UnsupportedSelector(err)) => {
-            assert_unsupported_selector(&err, bad_type);
-        }
-        other => panic!(
-            "get by ByName with unknown selector must return UnsupportedSelector, got: {other:?}"
-        ),
-    }
+    assert_matches!(
+        get_by_name,
+        Err(BatchResourceError::UnsupportedSelector(
+            UnsupportedResourceSelectorError::NotFound { raw_selector }
+        )) if raw_selector.as_str() == bad_type,
+        "get by ByName with unknown selector must return UnsupportedSelector"
+    );
 
     // get_handle by ByName — same UnsupportedSelector behavior
     let gi_by_name = facade
@@ -289,15 +288,13 @@ pub async fn test_unsupported_schema_rejected_consistently(h: &impl FacadeContra
             ResourceVisibility::Active,
         )
         .await;
-    match gi_by_name {
-        Err(BatchResourceError::UnsupportedSelector(err)) => {
-            assert_unsupported_selector(&err, bad_type);
-        }
-        other => panic!(
-            "get_handle by ByName with unknown selector must return UnsupportedSelector, got: \
-             {other:?}"
-        ),
-    }
+    assert_matches!(
+        gi_by_name,
+        Err(BatchResourceError::UnsupportedSelector(
+            UnsupportedResourceSelectorError::NotFound { raw_selector }
+        )) if raw_selector.as_str() == bad_type,
+        "get_handle by ByName with unknown selector must return UnsupportedSelector"
+    );
 
     // search — UnsupportedSelector (type validated before DB query)
     let list_result = facade
@@ -305,14 +302,13 @@ pub async fn test_unsupported_schema_rejected_consistently(h: &impl FacadeContra
             bad_type.parse().unwrap(),
         )]))
         .await;
-    match list_result {
-        Err(ListResourcesError::UnsupportedSelector(err)) => {
-            assert_unsupported_selector(&err, bad_type);
-        }
-        other => {
-            panic!("search: unsupported selector must return UnsupportedSelector, got: {other:?}")
-        }
-    }
+    assert_matches!(
+        list_result,
+        Err(ListResourcesError::UnsupportedSelector(
+            UnsupportedResourceSelectorError::NotFound { raw_selector }
+        )) if raw_selector.as_str() == bad_type,
+        "search: unsupported selector must return UnsupportedSelector"
+    );
 
     // search_handles — UnsupportedSelector
     let li_result = facade
@@ -320,28 +316,27 @@ pub async fn test_unsupported_schema_rejected_consistently(h: &impl FacadeContra
             bad_type.parse().unwrap(),
         )]))
         .await;
-    match li_result {
-        Err(ListResourcesError::UnsupportedSelector(err)) => {
-            assert_unsupported_selector(&err, bad_type);
-        }
-        other => panic!(
-            "search_handles: unsupported selector must return UnsupportedSelector, got: {other:?}"
-        ),
-    }
+    assert_matches!(
+        li_result,
+        Err(ListResourcesError::UnsupportedSelector(
+            UnsupportedResourceSelectorError::NotFound { raw_selector }
+        )) if raw_selector.as_str() == bad_type,
+        "search_handles: unsupported selector must return UnsupportedSelector"
+    );
 
     // apply_manifest — UnsupportedDescriptor
     let bad_manifest =
         format!(r#"{{"$schema":"{bad_schema}","headers":{{"name":"x"}},"spec":{{}}}}"#);
     let apply_result = facade
-        .apply_manifest(kamu_resources_facade::ApplyManifestRequest {
-            format: kamu_resources_facade::ResourceManifestFormat::Json,
+        .apply_manifest(ApplyManifestRequest {
+            format: ResourceManifestFormat::Json,
             manifest: bad_manifest,
         })
         .await;
     assert_matches!(
         apply_result,
-        Err(kamu_resources_facade::ApplyManifestError::UnsupportedDescriptor(_)),
-        "apply_manifest: unsupported type must return UnsupportedDescriptor, got: {apply_result:?}"
+        Err(ApplyManifestError::UnsupportedDescriptor(_)),
+        "apply_manifest: unsupported type must return UnsupportedDescriptor"
     );
 
     // delete by ById — UnsupportedSelector (type validated after UID is known)
@@ -354,14 +349,13 @@ pub async fn test_unsupported_schema_rejected_consistently(h: &impl FacadeContra
             name: None,
         }])
         .await;
-    match delete_result {
-        Err(BatchResourceError::UnsupportedSelector(err)) => {
-            assert_unsupported_selector(&err, bad_type);
-        }
-        other => panic!(
-            "delete by ById: unsupported selector must return UnsupportedSelector, got: {other:?}"
-        ),
-    }
+    assert_matches!(
+        delete_result,
+        Err(BatchResourceError::UnsupportedSelector(
+            UnsupportedResourceSelectorError::NotFound { raw_selector }
+        )) if raw_selector.as_str() == bad_type,
+        "delete by ById: unsupported selector must return UnsupportedSelector"
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

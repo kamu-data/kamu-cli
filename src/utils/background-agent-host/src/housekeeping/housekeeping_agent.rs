@@ -53,7 +53,7 @@ impl HousekeepingAgent {
     }
 
     /// One agent per job of `jobs` that `config` enables
-    pub fn for_enabled_jobs(
+    pub(crate) fn for_enabled_jobs(
         jobs: impl IntoIterator<Item = Arc<dyn HousekeepingJob>>,
         config: &HousekeepingConfig,
         metrics: &Arc<HousekeepingMetrics>,
@@ -68,7 +68,7 @@ impl HousekeepingAgent {
     }
 
     /// Runs one batch of the job at the current time
-    pub async fn run_batch(&self) -> Result<HousekeepingBatchReport, InternalError> {
+    pub(crate) async fn run_batch(&self) -> Result<HousekeepingBatchReport, InternalError> {
         let job_name = self.job.job_name();
         let report = self
             .job

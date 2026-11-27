@@ -17,6 +17,7 @@
 
 use database_common::PaginationOpts;
 use kamu_resources::{
+    ResourceID,
     ResourceOwnerRef,
     ResourceRef,
     ResourceSelector,
@@ -36,6 +37,7 @@ use kamu_resources_facade::{
     SpecViewOpts,
 };
 use pretty_assertions::assert_matches;
+use uuid::Uuid;
 
 use crate::contract_test;
 use crate::harness::{FacadeContractHarness, TestAccount};
@@ -63,7 +65,7 @@ fn batch_by_name_for_account(name: &str, account: ResourceOwnerRef) -> Vec<Resou
     }]
 }
 
-fn batch_by_id(id: kamu_resources::ResourceID) -> Vec<ResourceRef> {
+fn batch_by_id(id: ResourceID) -> Vec<ResourceRef> {
     vec![variable_set_ref_by_id(id)]
 }
 
@@ -78,7 +80,7 @@ contract_test!(
 
 pub async fn test_single_resource_lookup_taxonomy(h: &impl FacadeContractHarness) {
     let id = create_variable_set(h, TestAccount::Alice, "taxonomy-single").await;
-    let absent_uid = kamu_resources::ResourceID::new(uuid::Uuid::new_v4());
+    let absent_uid = ResourceID::new(Uuid::new_v4());
     let facade = h.facade_for(TestAccount::Alice);
 
     // --- NameNotFound ---
@@ -272,6 +274,8 @@ fn assert_remote_refusal(error: &BatchResourceError, api: &str) {
     );
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 contract_test!(
     untyped_name_ref_is_refused,
     super::test_untyped_name_ref_is_refused
@@ -357,7 +361,7 @@ pub async fn test_untyped_name_ref_is_refused(h: &impl FacadeContractHarness) {
 contract_test!(batch_lookup_taxonomy, super::test_batch_lookup_taxonomy);
 
 pub async fn test_batch_lookup_taxonomy(h: &impl FacadeContractHarness) {
-    let absent_uid = kamu_resources::ResourceID::new(uuid::Uuid::new_v4());
+    let absent_uid = ResourceID::new(Uuid::new_v4());
     let facade = h.facade_for(TestAccount::Alice);
 
     // --- NameNotFound in get ---

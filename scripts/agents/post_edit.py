@@ -10,6 +10,8 @@ from __future__ import annotations
 import re
 import shutil
 import subprocess
+import tomllib
+from functools import cache
 from pathlib import Path
 
 from scripts.agents.common import ROOT, matches, repo_relative
@@ -31,6 +33,14 @@ RULES: list[tuple[re.Pattern[str], str, bool]] = [
 ]
 DIVIDER = re.compile(r"^/{4,119}$|^/{121,}$")
 IGNORED_UPPER_TOKENS = re.compile(r"\b(UTF|SHA|ISO|RFC|HTTP|TLS|AES|RSA|ECDSA|ED|CRC|X|BLAKE|MD|S|UUID|IPV|HMAC|PKCS)-\d+\b", re.I)
+
+# An item named through its crate: `kamu_resources::ResourceRef`, `std::sync::LazyLock::new`.
+# Macro calls (`tracing::info!`) and `$crate::` in macro templates are not imports.
+INLINE_PATH = re.compile(r"(?<![\w:$])([a-z_][a-z0-9_]*)::((?:[a-z_][a-z0-9_]*::)*[A-Za-z_]\w*)\b(?!\s*!)")
+STRING_LITERAL = re.compile(r'"(?:[^"\\]|\\.)*"')
+# App wiring qualifies components on purpose; ODF types are always written with `odf::` (kamu-rust-style)
+INLINE_PATH_EXEMPT_FILES = ["src/app/cli/src/app.rs", "src/app/cli/src/database.rs", "src/app/cli/src/outbox.rs"]
+INLINE_PATH_EXEMPT_CRATES = {"odf"}
 
 
 def added_lines(old: str, new: str) -> list[str]:
@@ -100,8 +110,40 @@ def format_manifest(path: Path) -> str | None:
     return None
 
 
+@cache
+def crate_names() -> frozenset[str]:
+    """Names a path can start with to reach another crate: the standard ones and the workspace's."""
+    workspace = tomllib.loads((ROOT / "Cargo.toml").read_text())["workspace"]
+    names = {"std", "core", "alloc", "crate"} | set(workspace.get("dependencies", {}))
+    for member in workspace.get("members", []):
+        try:
+            names.add(tomllib.loads((ROOT / member / "Cargo.toml").read_text())["package"]["name"])
+        except (OSError, KeyError, tomllib.TOMLDecodeError):
+            pass
+    return frozenset(name.replace("-", "_") for name in names) - INLINE_PATH_EXEMPT_CRATES
+
+
+def inline_paths(rel: str, added: list[str]) -> list[str]:
+    """Added code lines that name an item through its crate instead of importing it."""
+    if not rel.endswith(".rs") or rel in INLINE_PATH_EXEMPT_FILES:
+        return []
+    found = []
+    for line in added:
+        code = line.strip()
+        # Test-wiring macros take the fixture by its full path (kamu-repository-tests, kamu-cli-e2e-tests)
+        if code.startswith(("use ", "pub use ", "pub(crate) use ", "//", "#[", "#![", "*", "fixture =")):
+            continue
+        code = STRING_LITERAL.sub('""', COMMENT.sub("", code))
+        found += [m.group(0) for m in INLINE_PATH.finditer(code) if m.group(1) in crate_names()]
+    return found
+
+
 def nudges(rel: str, added: list[str]) -> list[str]:
     out = []
+    if paths := inline_paths(rel, added):
+        shown = ", ".join(f"`{p}`" for p in dict.fromkeys(paths))
+        out.append(f"Inline crate paths added in {rel}: {shown}. Import them with `use`; qualify a name "
+                   "only to resolve a clash (kamu-rust-style, 'Imports and paths').")
     text = "\n".join(added)
     crate = re.match(r"(.*?/(?:postgres|sqlite|cache-postgres|cache-sqlite))/", rel)
     if rel.startswith("migrations/"):

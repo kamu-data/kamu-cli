@@ -14,6 +14,7 @@ use kamu_messaging_outbox_postgres::PostgresOutboxMessageBridge;
 use kamu_messaging_outbox_repo_tests::OutboxAgentHarness;
 use kamu_wakeup_listener_postgres::PostgresNotificationHub;
 use sqlx::{PgPool, Postgres, Transaction};
+use tokio::task::JoinHandle;
 use tokio::time::{Duration, Instant};
 use wakeup_listener::WakeupListenerMetrics;
 
@@ -125,7 +126,7 @@ impl PostgresOutboxAgentHarness {
         transaction
     }
 
-    fn spawn_main_loop(&self) -> tokio::task::JoinHandle<()> {
+    fn spawn_main_loop(&self) -> JoinHandle<()> {
         let outbox_agent = self.outbox_agent();
         tokio::spawn(async move { outbox_agent.run(CancellationToken::new()).await.unwrap() })
     }

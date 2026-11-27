@@ -28,6 +28,8 @@ pub enum ScriptedBatch {
     Fails,
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 /// Runs its script, one entry per batch, then batches that find nothing due.
 /// Its deadline is whatever [`Self::set_next_due`] last set.
 pub struct ScriptedHousekeepingJob {

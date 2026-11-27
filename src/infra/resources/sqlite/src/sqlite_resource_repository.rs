@@ -46,6 +46,10 @@ use kamu_resources::{
     ResourceVisibility,
     TypeUri,
     UpdateResourceError,
+    resource_annotations_to_json,
+    resource_labels_to_json,
+    resource_owner_references_to_json,
+    resource_status_to_json,
 };
 use odf::metadata::AsStackString;
 use sqlx::AssertSqlSafe;
@@ -78,12 +82,10 @@ impl ResourceRepository for SqliteResourceRepository {
         let account_id_str = account_id_stack.as_str();
         let resource_snapshot_schema = resource_snapshot.schema.as_str();
         let name_str = resource_snapshot.headers.name.as_str();
-        let labels = kamu_resources::resource_labels_to_json(&resource_snapshot.headers.labels);
-        let annotations =
-            kamu_resources::resource_annotations_to_json(&resource_snapshot.headers.annotations);
-        let owner_references = kamu_resources::resource_owner_references_to_json(
-            resource_snapshot.headers.owner_references.as_ref(),
-        );
+        let labels = resource_labels_to_json(&resource_snapshot.headers.labels);
+        let annotations = resource_annotations_to_json(&resource_snapshot.headers.annotations);
+        let owner_references =
+            resource_owner_references_to_json(resource_snapshot.headers.owner_references.as_ref());
         let generation = i64::try_from(resource_snapshot.headers.generation).unwrap();
         let status_generation = i64::try_from(resource_snapshot.headers.status_generation).unwrap();
         let last_event_id = resource_snapshot.last_event_id.map(EventID::into_inner);
@@ -91,7 +93,7 @@ impl ResourceRepository for SqliteResourceRepository {
         let status = resource_snapshot
             .status
             .as_ref()
-            .map(kamu_resources::resource_status_to_json);
+            .map(resource_status_to_json);
 
         let insert_result = sqlx::query!(
             r#"
@@ -162,12 +164,10 @@ impl ResourceRepository for SqliteResourceRepository {
         let account_id_str = account_id_stack.as_str();
         let resource_snapshot_schema = resource_snapshot.schema.as_str();
         let name_str = resource_snapshot.headers.name.as_str();
-        let labels = kamu_resources::resource_labels_to_json(&resource_snapshot.headers.labels);
-        let annotations =
-            kamu_resources::resource_annotations_to_json(&resource_snapshot.headers.annotations);
-        let owner_references = kamu_resources::resource_owner_references_to_json(
-            resource_snapshot.headers.owner_references.as_ref(),
-        );
+        let labels = resource_labels_to_json(&resource_snapshot.headers.labels);
+        let annotations = resource_annotations_to_json(&resource_snapshot.headers.annotations);
+        let owner_references =
+            resource_owner_references_to_json(resource_snapshot.headers.owner_references.as_ref());
         let generation = i64::try_from(resource_snapshot.headers.generation).unwrap();
         let status_generation = i64::try_from(resource_snapshot.headers.status_generation).unwrap();
         let last_event_id = resource_snapshot.last_event_id.map(EventID::into_inner);
@@ -176,7 +176,7 @@ impl ResourceRepository for SqliteResourceRepository {
         let status = resource_snapshot
             .status
             .as_ref()
-            .map(kamu_resources::resource_status_to_json);
+            .map(resource_status_to_json);
 
         let update_result = sqlx::query!(
             r#"
@@ -314,7 +314,7 @@ impl ResourceRepository for SqliteResourceRepository {
 
         let mut query = sqlx::query_as::<_, ResourceHandleRow>(AssertSqlSafe(query_str))
             .bind(account_id_str)
-            .bind(kamu_resources::DELETED_ACCOUNT_NAME_SENTINEL);
+            .bind(DELETED_ACCOUNT_NAME_SENTINEL);
         for id in ids {
             query = query.bind(*id.as_ref());
         }
@@ -420,7 +420,7 @@ impl ResourceRepository for SqliteResourceRepository {
                 COALESCE(a.resource_id, X'00000000000000000000000000000000') as account_resource_id,
                 COALESCE(a.account_name, "#,
         );
-        query_builder.push_bind(kamu_resources::DELETED_ACCOUNT_NAME_SENTINEL);
+        query_builder.push_bind(DELETED_ACCOUNT_NAME_SENTINEL);
         query_builder.push(
             r#") as account_name,
                 r.deletion_requested_at as deletion_requested_at,
@@ -510,7 +510,7 @@ impl ResourceRepository for SqliteResourceRepository {
             "#,
             query_id,
             query_schema,
-            kamu_resources::DELETED_ACCOUNT_NAME_SENTINEL,
+            DELETED_ACCOUNT_NAME_SENTINEL,
         )
         .fetch_optional(connection_mut)
         .await
@@ -610,7 +610,7 @@ impl ResourceRepository for SqliteResourceRepository {
 
         let uids_placeholders =
             sqlite_generate_placeholders_list(ids.len(), NonZeroUsize::new(2).unwrap());
-        let deleted_account_sentinel = kamu_resources::DELETED_ACCOUNT_NAME_SENTINEL;
+        let deleted_account_sentinel = DELETED_ACCOUNT_NAME_SENTINEL;
 
         let query_str = format!(
             r#"
@@ -695,7 +695,7 @@ impl ResourceRepository for SqliteResourceRepository {
             WHERE r.resource_id = $1
             "#,
             resource_id,
-            kamu_resources::DELETED_ACCOUNT_NAME_SENTINEL,
+            DELETED_ACCOUNT_NAME_SENTINEL,
         )
         .fetch_optional(connection_mut)
         .await
@@ -720,7 +720,7 @@ impl ResourceRepository for SqliteResourceRepository {
         let account_id_str = account_id_stack.as_str();
         let uids_placeholders =
             sqlite_generate_placeholders_list(ids.len(), NonZeroUsize::new(2).unwrap());
-        let deleted_account_sentinel = kamu_resources::DELETED_ACCOUNT_NAME_SENTINEL;
+        let deleted_account_sentinel = DELETED_ACCOUNT_NAME_SENTINEL;
 
         let query_str = format!(
             r#"

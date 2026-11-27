@@ -39,9 +39,9 @@ pub fn register_test_resource_access_rules(catalog_builder: &mut dill::CatalogBu
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// Places a resource whose value has a `place:<account>` token in that account
-#[dill::component(pub)]
+#[dill::component]
 #[dill::interface(dyn ResourcePlacement<TestResource>)]
-pub struct TestResourcePlacement {
+struct TestResourcePlacement {
     account_service: Arc<dyn AccountService>,
 }
 
@@ -77,9 +77,9 @@ impl ResourcePlacement<TestResource> for TestResourcePlacement {
 /// | Read | A principal named by a `read:` or `delete:` token |
 /// | Delete | A principal named by a `delete:` token |
 /// | List | Anyone, with a name pattern |
-#[dill::component(pub)]
+#[dill::component]
 #[dill::interface(dyn ResourceOperationGuard<TestResource>)]
-pub struct TestResourceOperationGuard {
+struct TestResourceOperationGuard {
     default_guard: Arc<DefaultResourceOperationGuard>,
 }
 

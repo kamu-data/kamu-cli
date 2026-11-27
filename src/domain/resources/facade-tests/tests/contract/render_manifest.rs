@@ -10,6 +10,8 @@
 use kamu_resources::{
     ApplyManifestApplicationDecision,
     ApplyManifestPlanningDecision,
+    ApplyResourceOutcome,
+    ResourceID,
     ResourceRef,
     ResourceVisibility,
     TypeName,
@@ -21,6 +23,7 @@ use kamu_resources_facade::{
     SpecViewOpts,
 };
 use pretty_assertions::{assert_eq, assert_matches};
+use uuid::Uuid;
 
 use crate::contract_test;
 use crate::harness::{FacadeContractHarness, TestAccount};
@@ -151,7 +154,7 @@ pub async fn test_rendered_manifest_can_be_reapplied(h: &impl FacadeContractHarn
     assert_matches!(
     plan,
                 ApplyManifestPlanningDecision::Planned(ref p)
-                if p.outcome == kamu_resources::ApplyResourceOutcome::Untouched,
+                if p.outcome == ApplyResourceOutcome::Untouched,
     "re-planning rendered manifest must be Untouched, got: {plan:?}"
     );
 
@@ -166,7 +169,7 @@ pub async fn test_rendered_manifest_can_be_reapplied(h: &impl FacadeContractHarn
     assert_matches!(
     apply,
                 ApplyManifestApplicationDecision::Applied(ref r)
-                if r.outcome == kamu_resources::ApplyResourceOutcome::Untouched,
+                if r.outcome == ApplyResourceOutcome::Untouched,
     "re-applying rendered manifest must be Untouched, got: {apply:?}"
     );
 }
@@ -181,7 +184,7 @@ contract_test!(
 
 pub async fn test_render_missing_resource_returns_not_found(h: &impl FacadeContractHarness) {
     let facade = h.facade_for(TestAccount::Alice);
-    let absent_uid = kamu_resources::ResourceID::new(uuid::Uuid::new_v4());
+    let absent_uid = ResourceID::new(Uuid::new_v4());
 
     let by_name_result = facade
         .render_manifests(

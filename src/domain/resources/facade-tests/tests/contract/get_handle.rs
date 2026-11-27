@@ -8,9 +8,17 @@
 // by the Apache License, Version 2.0.
 
 use kamu_configuration::VariableSetResource;
-use kamu_resources::{ResourceRef, ResourceSchemaProvider, ResourceVisibility, TypeName};
+use kamu_resources::{
+    ResourceID,
+    ResourceRef,
+    ResourceSchemaProvider,
+    ResourceVisibility,
+    TypeName,
+    resource_type_name,
+};
 use kamu_resources_facade::{ResourceLookupProblem, ResourceSchemaMismatchError, SpecViewOpts};
 use pretty_assertions::{assert_eq, assert_matches};
+use uuid::Uuid;
 
 use crate::contract_test;
 use crate::harness::{FacadeContractHarness, TestAccount};
@@ -102,12 +110,7 @@ pub async fn test_get_handle_by_name(h: &impl FacadeContractHarness) {
         "ident-name-test",
         &id,
     );
-    assert_ne!(
-        kamu_resources::resource_type_name(&handle.r#type)
-            .unwrap()
-            .as_str(),
-        ""
-    );
+    assert_ne!(resource_type_name(&handle.r#type).unwrap().as_str(), "");
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -192,7 +195,7 @@ contract_test!(
 
 pub async fn test_get_missing_uid_returns_not_found(h: &impl FacadeContractHarness) {
     let facade = h.facade_for(TestAccount::Alice);
-    let absent_uid = kamu_resources::ResourceID::new(uuid::Uuid::new_v4());
+    let absent_uid = ResourceID::new(Uuid::new_v4());
 
     let get_result = facade
         .get(

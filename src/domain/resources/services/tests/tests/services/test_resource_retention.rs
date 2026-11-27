@@ -43,6 +43,7 @@ use kamu_resources::{
 use kamu_resources_services::ResourceRetentionJob;
 use kamu_resources_services::testing::{BaseResourceServiceHarnessOpts, TestResource};
 use messaging_outbox::OutboxProvider;
+use pretty_assertions::assert_eq;
 
 use crate::tests::utils::{ServiceLayerTestHarness, ServiceLayerTestHarnessOpts};
 
@@ -70,13 +71,15 @@ async fn test_completed_deletion_is_purged_after_the_type_retention() {
         harness.complete_deletion(harness.catalog(), id).await;
 
         let deleted_at = harness.deleted_at(&id).await;
-        pretty_assertions::assert_eq!(
+        assert_eq!(
             harness.purge_at(&id).await,
             retention.map(|retention| deleted_at + retention),
             "default={default:?}, override={override_of_type:?}"
         );
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
 async fn test_resource_being_deleted_has_no_purge_deadline() {
@@ -88,8 +91,10 @@ async fn test_resource_being_deleted_has_no_purge_deadline() {
 
     let id = harness.apply_and_request_deletion("res").await;
 
-    pretty_assertions::assert_eq!(harness.purge_at(&id).await, None);
+    assert_eq!(harness.purge_at(&id).await, None);
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
 async fn test_policy_change_applies_to_later_deletions_only() {
@@ -107,11 +112,11 @@ async fn test_policy_change_applies_to_later_deletions_only() {
     let later = harness.apply_and_request_deletion_in(&after, "later").await;
     harness.complete_deletion(&after, later).await;
 
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         harness.purge_at(&earlier).await,
         Some(harness.deleted_at(&earlier).await + TimeDelta::days(7))
     );
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         harness.purge_at(&later).await,
         Some(harness.deleted_at(&later).await + TimeDelta::days(1))
     );
@@ -136,15 +141,17 @@ async fn test_due_resource_is_purged_and_one_not_yet_due_kept() {
         .await
         .unwrap();
 
-    pretty_assertions::assert_eq!(report.removed_by_kind, removed_test_resources(1));
-    pretty_assertions::assert_eq!(report.backlog, 0);
+    assert_eq!(report.removed_by_kind, removed_test_resources(1));
+    assert_eq!(report.backlog, 0);
     assert!(harness.is_purged(&due).await);
     assert!(!harness.is_purged(&not_yet_due).await);
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         harness.next_due().await,
         harness.purge_at(&not_yet_due).await
     );
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
 async fn test_purge_batches_stay_bounded() {
@@ -158,7 +165,7 @@ async fn test_purge_batches_stay_bounded() {
     let second = harness.run_purge_batch(harness.catalog(), 2).await.unwrap();
     let third = harness.run_purge_batch(harness.catalog(), 2).await.unwrap();
 
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         [first, second, third].map(|report| (report.removed(), report.backlog)),
         [(2, 1), (1, 0), (0, 0)]
     );
@@ -166,6 +173,8 @@ async fn test_purge_batches_stay_bounded() {
         assert!(harness.is_purged(id).await);
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
 async fn test_failed_purge_batch_leaves_everything_for_the_next_one() {
@@ -175,12 +184,14 @@ async fn test_failed_purge_batch_leaves_everything_for_the_next_one() {
 
     harness.run_purge_batch(&catalog, 10).await.unwrap_err();
     assert!(!harness.is_purged(&id).await);
-    pretty_assertions::assert_eq!(harness.purged_ids().await, []);
+    assert_eq!(harness.purged_ids().await, []);
 
     let report = harness.run_purge_batch(&catalog, 10).await.unwrap();
-    pretty_assertions::assert_eq!(report.removed(), 1);
+    assert_eq!(report.removed(), 1);
     assert!(harness.is_purged(&id).await);
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
 async fn test_concurrent_purgers_purge_each_resource_once() {
@@ -201,12 +212,14 @@ async fn test_concurrent_purgers_purge_each_resource_once() {
         .map(|report| report.removed())
         .sum();
 
-    pretty_assertions::assert_eq!(removed, 3);
+    assert_eq!(removed, 3);
     let mut purged_ids = harness.purged_ids().await;
     purged_ids.sort();
     ids.sort();
-    pretty_assertions::assert_eq!(purged_ids, ids);
+    assert_eq!(purged_ids, ids);
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
 async fn test_purge_keeps_the_pending_messages_of_purged_resources() {
@@ -227,8 +240,8 @@ async fn test_purge_keeps_the_pending_messages_of_purged_resources() {
         .unwrap();
 
     let messages = harness.lifecycle_messages().await;
-    pretty_assertions::assert_eq!(messages[..pending.len()], pending[..]);
-    pretty_assertions::assert_eq!(
+    assert_eq!(messages[..pending.len()], pending[..]);
+    assert_eq!(
         messages[pending.len()..],
         [ResourceLifecycleMessage::purged(
             harness.time_source().now(),
@@ -239,6 +252,8 @@ async fn test_purge_keeps_the_pending_messages_of_purged_resources() {
     // Consumers still get the messages of the purged resource
     harness.settle().await;
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
 async fn test_cli_finalization_purges_one_batch() {
@@ -269,6 +284,8 @@ fn retention_config(
             .collect(),
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 fn removed_test_resources(count: u64) -> BTreeMap<String, u64> {
     BTreeMap::from([(

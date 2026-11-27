@@ -3,7 +3,7 @@ import subprocess
 import unittest
 
 from scripts.agents.common import ROOT
-from scripts.agents.post_edit import LICENSE_HEADER, added_lines, check_edit, check_rust_lines, nudges
+from scripts.agents.post_edit import LICENSE_HEADER, added_lines, check_edit, check_rust_lines, inline_paths, nudges
 
 
 def rustfmt_runs():
@@ -41,6 +41,23 @@ class AddedTextTest(unittest.TestCase):
                      "let plan = Plan::new(7);"]:
             with self.subTest(line=line):
                 self.assertFalse(flagged(line))
+
+    def test_inline_crate_paths_are_nudged(self):
+        for line in ["    owner: Option<kamu_resources::ResourceRef>,", "let s = std::sync::LazyLock::new(f);",
+                     "b.add::<kamu_resources_inmem::InMemoryResourceRepository>();", "x.map(crate::make_test_snapshot)"]:
+            with self.subTest(line=line):
+                self.assertTrue(inline_paths("src/domain/x/src/a.rs", [line]))
+        self.assertIn("kamu-rust-style", nudges("src/domain/x/src/a.rs", ["let r: kamu_resources::ResourceRef;"])[0])
+
+    def test_imports_and_legitimate_paths_are_not_nudged(self):
+        for line in ["use kamu_resources::ResourceRef;", "pub use crate::make_test_snapshot;", "let id = odf::DatasetID::new();",
+                     "tracing::info!(id, \"x\");", "$crate::ResourceID::new()", "fmt::Display::fmt(&self.0, f)",
+                     '#[graphql(remote = "kamu_resources::ResourceVisibility")]', 'let s = "kamu_resources::X";',
+                     "let a = 1; // kamu_resources::ResourceRef", "Self::Foo::bar()", "super::test_fn",
+                     "    fixture = kamu_cli_e2e_repo_tests::commands::test_delete,"]:
+            with self.subTest(line=line):
+                self.assertEqual(inline_paths("src/domain/x/src/a.rs", [line]), [])
+        self.assertEqual(inline_paths("src/app/cli/src/app.rs", ["b.add::<kamu_resources::X>();"]), [])
 
     def test_nudges_name_the_follow_up_command(self):
         self.assertIn("sqlx-prepare", nudges("migrations/postgres/x.sql", ["CREATE TABLE x ();"])[0])

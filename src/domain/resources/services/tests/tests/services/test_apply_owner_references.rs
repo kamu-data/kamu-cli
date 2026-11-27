@@ -502,6 +502,8 @@ fn by_id(id: ResourceID) -> ResourceRef {
     }
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 fn by_name(name: &str) -> ResourceRef {
     ResourceRef {
         r#type: Some(TestResource::type_uri().cheap_clone().into()),
@@ -509,6 +511,8 @@ fn by_name(name: &str) -> ResourceRef {
         ..ResourceRef::default()
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 fn make_handle(owner: &ResourceHeaders) -> ResourceHandle {
     ResourceHandle {
@@ -519,6 +523,8 @@ fn make_handle(owner: &ResourceHeaders) -> ResourceHandle {
         name: owner.name.clone(),
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 fn sorted<const N: usize>(mut ids: [ResourceID; N]) -> [ResourceID; N] {
     ids.sort();

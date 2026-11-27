@@ -32,6 +32,7 @@ use kamu_resources_facade::{
     SpecViewOpts,
 };
 use pretty_assertions::{assert_eq, assert_matches};
+use uuid::Uuid;
 
 use crate::contract_test;
 use crate::harness::{FacadeContractHarness, TestAccount};
@@ -194,7 +195,7 @@ contract_test!(
 
 pub async fn test_delete_missing_uid_returns_not_found(h: &impl FacadeContractHarness) {
     let facade = h.facade_for(TestAccount::Alice);
-    let absent_uid = kamu_resources::ResourceID::new(uuid::Uuid::new_v4());
+    let absent_uid = ResourceID::new(Uuid::new_v4());
 
     let result = facade
         .delete(vec![variable_set_ref_by_id(absent_uid)])

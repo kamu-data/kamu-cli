@@ -19,8 +19,12 @@
 
 use kamu_configuration::VariableSetResource;
 use kamu_resources::{
+    ApplyManifestApplicationDecision,
     ApplyManifestPlanningDecision,
+    ApplyManifestRejection,
     ApplyResourceOutcome,
+    ApplyResourceRejectionCategory,
+    ResourceID,
     ResourceRef,
     ResourceSchemaProvider,
     ResourceVisibility,
@@ -33,6 +37,7 @@ use kamu_resources_facade::{
     SpecViewOpts,
 };
 use pretty_assertions::{assert_eq, assert_matches};
+use uuid::Uuid;
 
 use crate::contract_test;
 use crate::harness::{FacadeContractHarness, TestAccount};
@@ -271,7 +276,7 @@ pub async fn test_batch_equivalence(h: &impl FacadeContractHarness) {
             .headers
             .id
     };
-    let absent_uid = kamu_resources::ResourceID::new(uuid::Uuid::new_v4());
+    let absent_uid = ResourceID::new(Uuid::new_v4());
 
     let batch_selector = vec![
         ResourceRef {
@@ -531,9 +536,9 @@ pub async fn test_apply_equivalence(h: &impl FacadeContractHarness) {
         .await;
     assert_matches!(
         local_reject,
-        Ok(kamu_resources::ApplyManifestApplicationDecision::Rejected(
-            kamu_resources::ApplyManifestRejection {
-                category: kamu_resources::ApplyResourceRejectionCategory::BusinessValidationFailed,
+        Ok(ApplyManifestApplicationDecision::Rejected(
+            ApplyManifestRejection {
+                category: ApplyResourceRejectionCategory::BusinessValidationFailed,
                 ..
             }
         )),
@@ -541,9 +546,9 @@ pub async fn test_apply_equivalence(h: &impl FacadeContractHarness) {
     );
     assert_matches!(
         remote_reject,
-        Ok(kamu_resources::ApplyManifestApplicationDecision::Rejected(
-            kamu_resources::ApplyManifestRejection {
-                category: kamu_resources::ApplyResourceRejectionCategory::BusinessValidationFailed,
+        Ok(ApplyManifestApplicationDecision::Rejected(
+            ApplyManifestRejection {
+                category: ApplyResourceRejectionCategory::BusinessValidationFailed,
                 ..
             }
         )),
@@ -564,9 +569,9 @@ pub async fn test_apply_equivalence(h: &impl FacadeContractHarness) {
         .await;
     assert_matches!(
         local_plan_reject,
-        Ok(kamu_resources::ApplyManifestPlanningDecision::Rejected(
-            kamu_resources::ApplyManifestRejection {
-                category: kamu_resources::ApplyResourceRejectionCategory::BusinessValidationFailed,
+        Ok(ApplyManifestPlanningDecision::Rejected(
+            ApplyManifestRejection {
+                category: ApplyResourceRejectionCategory::BusinessValidationFailed,
                 ..
             }
         )),
@@ -574,9 +579,9 @@ pub async fn test_apply_equivalence(h: &impl FacadeContractHarness) {
     );
     assert_matches!(
         remote_plan_reject,
-        Ok(kamu_resources::ApplyManifestPlanningDecision::Rejected(
-            kamu_resources::ApplyManifestRejection {
-                category: kamu_resources::ApplyResourceRejectionCategory::BusinessValidationFailed,
+        Ok(ApplyManifestPlanningDecision::Rejected(
+            ApplyManifestRejection {
+                category: ApplyResourceRejectionCategory::BusinessValidationFailed,
                 ..
             }
         )),

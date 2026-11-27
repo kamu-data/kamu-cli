@@ -190,11 +190,7 @@ async fn test_lost_create_race_of_an_immutable_spec() {
             let harness = ApplyResourceRunnerHarness::<ImmutableTestResource>::new(
                 register_immutable_test_resource,
             );
-            let pre_apply = harness
-                .base
-                .catalog()
-                .get_one::<dyn ResourceSpecPreApply<ImmutableTestResource>>()
-                .unwrap();
+            let pre_apply = harness.registered_pre_apply();
             harness
                 .apply_losing_at(
                     moment,
@@ -297,6 +293,11 @@ where
         }
     }
 
+    /// The type's own [`ResourceSpecPreApply`], as the catalog registers it
+    fn registered_pre_apply(&self) -> Arc<dyn ResourceSpecPreApply<R>> {
+        self.base.catalog().get_one().unwrap()
+    }
+
     fn make_resource(&self, spec: R::SpecInput) -> R {
         <R as ManagedResource>::try_create(
             Utc::now(),
@@ -389,9 +390,13 @@ where
     }
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 fn account_handle() -> odf::ResourceOwnerHandle {
     odf::ResourceOwnerHandle::new_test("test")
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 fn spec(value: &str) -> TestResourceSpec {
     TestResourceSpec {

@@ -22,12 +22,14 @@ use datafusion::arrow::datatypes::{DataType, Field, Schema, TimeUnit};
 use datafusion::arrow::record_batch::RecordBatch;
 use internal_error::InternalError;
 use kamu_resources::{
+    ResourceLabelFilterInput,
     ResourceListColumnDataType,
     ResourceListColumnDescriptor,
     ResourceListColumnValue,
     ResourceListColumnVisibility,
     ResourcePhase,
     ResourceQuery,
+    ResourceRef,
     ResourceSummaryView,
     ResourceTypeDescriptor,
     ResourceVisibility,
@@ -56,8 +58,8 @@ pub struct ListResourcesCommand {
     output_config: Arc<OutputConfig>,
     detail_level: u8,
     max_results: Option<NonZeroUsize>,
-    label_filter: Option<kamu_resources::ResourceLabelFilterInput>,
-    owner: Option<kamu_resources::ResourceRef>,
+    label_filter: Option<ResourceLabelFilterInput>,
+    owner: Option<ResourceRef>,
     visibility: ResourceVisibility,
 }
 
@@ -73,8 +75,8 @@ impl ListResourcesCommand {
         output_config: Arc<OutputConfig>,
         detail_level: u8,
         max_results: Option<NonZeroUsize>,
-        label_filter: Option<kamu_resources::ResourceLabelFilterInput>,
-        owner: Option<kamu_resources::ResourceRef>,
+        label_filter: Option<ResourceLabelFilterInput>,
+        owner: Option<ResourceRef>,
         visibility: ResourceVisibility,
     ) -> Self {
         let visibility = scope.effective_visibility(visibility);
@@ -678,7 +680,7 @@ enum ResourceGenericColumn {
 fn selectors_for_type(
     schema: &kamu_resources::TypeUri,
     query: Option<&kamu_resources::ResourceQuery>,
-    label_filter: Option<&kamu_resources::ResourceLabelFilterInput>,
+    label_filter: Option<&ResourceLabelFilterInput>,
 ) -> Vec<kamu_resources::ResourceSelector> {
     selectors_for_query(Some(schema), query, label_filter)
 }
@@ -686,7 +688,7 @@ fn selectors_for_type(
 /// The same, spanning every type.
 fn any_type_selectors(
     query: Option<&kamu_resources::ResourceQuery>,
-    label_filter: Option<&kamu_resources::ResourceLabelFilterInput>,
+    label_filter: Option<&ResourceLabelFilterInput>,
 ) -> Vec<kamu_resources::ResourceSelector> {
     selectors_for_query(None, query, label_filter)
 }
@@ -700,7 +702,7 @@ fn any_type_selectors(
 fn selectors_for_query(
     schema: Option<&kamu_resources::TypeUri>,
     query: Option<&kamu_resources::ResourceQuery>,
-    label_filter: Option<&kamu_resources::ResourceLabelFilterInput>,
+    label_filter: Option<&ResourceLabelFilterInput>,
 ) -> Vec<kamu_resources::ResourceSelector> {
     // `-l` narrows the whole invocation, which the facade expresses as the same
     // filter on every selector. See `with_labels` in the selection-resolution

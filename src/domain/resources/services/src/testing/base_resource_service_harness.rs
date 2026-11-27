@@ -115,7 +115,7 @@ impl BaseResourceServiceHarness {
         )
     }
 
-    pub fn new_with_opts_and_additional_dependencies(
+    fn new_with_opts_and_additional_dependencies(
         opts: BaseResourceServiceHarnessOpts,
         register_additional_dependencies: impl FnOnce(&mut CatalogBuilder),
     ) -> Self {
@@ -238,7 +238,7 @@ impl BaseResourceServiceHarness {
     /// (e.g. `InMemoryResourceRepository`'s per-read account-name resolution)
     /// find a match instead of falling back to the deleted-account sentinel.
     /// Idempotent: registering the same handle twice is a no-op.
-    pub async fn register_test_account(&self, account: &odf::ResourceOwnerHandle) {
+    async fn register_test_account(&self, account: &odf::ResourceOwnerHandle) {
         let account_repository = self.catalog.get_one::<dyn AccountRepository>().unwrap();
 
         if account_repository
@@ -320,7 +320,7 @@ impl BaseResourceServiceHarness {
 
     /// Like [`Self::make_headers_input`], with the name left to the resource
     /// type
-    pub fn make_nameless_headers(account: odf::ResourceOwnerHandle) -> ApplyResourceHeaders {
+    fn make_nameless_headers(account: odf::ResourceOwnerHandle) -> ApplyResourceHeaders {
         ApplyResourceHeaders::try_new(Some(account.into()), None, vec![], vec![]).unwrap()
     }
 

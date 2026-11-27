@@ -9,7 +9,6 @@
 
 use std::collections::BTreeSet;
 
-use odf::metadata::auth::ResourceOwnerHandle;
 use odf::metadata::serde::yaml::IntoDto;
 
 use crate::{ResourceHandle, ResourceID, ResourceRef, TypeRef};
@@ -83,7 +82,7 @@ pub fn validate_owner_reference(
 /// the one in a reference, whose name may be out of date.
 pub(crate) fn owner_handles_from_input(
     input: Option<Vec<ResourceRef>>,
-    account: &ResourceOwnerHandle,
+    account: &odf::ResourceOwnerHandle,
 ) -> Option<Vec<ResourceHandle>> {
     let handles = input
         .unwrap_or_default()
@@ -96,7 +95,7 @@ pub(crate) fn owner_handles_from_input(
 
 fn owner_handle_from_resolved_ref(
     owner_reference: ResourceRef,
-    account: &ResourceOwnerHandle,
+    account: &odf::ResourceOwnerHandle,
 ) -> ResourceHandle {
     match owner_reference {
         ResourceRef {
@@ -166,9 +165,9 @@ pub fn resource_owner_references_to_json(
 }
 
 /// Takes `account` as [`owner_handles_from_input`] does
-pub fn resource_owner_references_from_json(
+pub(crate) fn resource_owner_references_from_json(
     value: Option<serde_json::Value>,
-    account: &ResourceOwnerHandle,
+    account: &odf::ResourceOwnerHandle,
 ) -> Option<Vec<ResourceHandle>> {
     value.map(|value| {
         let proxies: Vec<odf::metadata::serde::yaml::resources::ResourceHandle> =

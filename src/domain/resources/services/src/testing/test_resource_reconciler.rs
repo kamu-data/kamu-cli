@@ -47,9 +47,9 @@ impl SimpleResourceReconciler<TestResource> for TestResourceReconciler {
 // TestResourceFailingReconciler
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[dill::component(pub)]
+#[dill::component]
 #[dill::interface(dyn SimpleResourceReconciler<TestResource>)]
-pub struct TestResourceFailingReconciler;
+struct TestResourceFailingReconciler;
 
 #[async_trait::async_trait]
 impl SimpleResourceReconciler<TestResource> for TestResourceFailingReconciler {
@@ -72,8 +72,8 @@ impl SimpleResourceReconciler<TestResource> for TestResourceFailingReconciler {
 
 // Not a #[dill::component] — always registered via add_value() so that the
 // Arc<AtomicU32> owned by the test is shared across all catalog resolutions.
-pub struct TestResourceCountingReconciler {
-    pub call_count: Arc<AtomicU32>,
+struct TestResourceCountingReconciler {
+    call_count: Arc<AtomicU32>,
 }
 
 #[async_trait::async_trait]
@@ -93,8 +93,8 @@ impl SimpleResourceReconciler<TestResource> for TestResourceCountingReconciler {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// Fails the cleanup of the resource named `failing_name` only.
-pub struct TestResourceSelectiveCleanupReconciler {
-    pub failing_name: &'static str,
+struct TestResourceSelectiveCleanupReconciler {
+    failing_name: &'static str,
 }
 
 #[async_trait::async_trait]
@@ -119,14 +119,14 @@ impl SimpleResourceReconciler<TestResource> for TestResourceSelectiveCleanupReco
 
 /// During its first cleanup, plays another writer that updates the status of
 /// the resource being cleaned up, then fails that cleanup if asked to.
-#[dill::component(pub)]
+#[dill::component]
 #[dill::interface(dyn SimpleResourceReconciler<TestResource>)]
-pub struct TestResourceInterferingCleanupReconciler {
+struct TestResourceInterferingCleanupReconciler {
     catalog: dill::Catalog,
     interference: Arc<TestCleanupInterference>,
 }
 
-pub struct TestCleanupInterference {
+struct TestCleanupInterference {
     done: AtomicBool,
     then_fails: bool,
 }
@@ -163,9 +163,9 @@ impl SimpleResourceReconciler<TestResource> for TestResourceInterferingCleanupRe
 
 /// During its cleanup, plays another writer that completes the deletion of the
 /// resource being cleaned up
-#[dill::component(pub)]
+#[dill::component]
 #[dill::interface(dyn SimpleResourceReconciler<TestResource>)]
-pub struct TestResourceCompletingCleanupReconciler {
+struct TestResourceCompletingCleanupReconciler {
     lifecycle_primitives: Arc<dyn ResourceLifecyclePrimitives<TestResource>>,
 }
 
@@ -194,14 +194,14 @@ impl SimpleResourceReconciler<TestResource> for TestResourceCompletingCleanupRec
 /// Writes to the status of the resource it reconciles, as another writer
 /// would, so the outcome recorded after it fails with a status conflict. Then
 /// fails the reconciliation, if asked to, with an error that is not transient.
-#[dill::component(pub)]
+#[dill::component]
 #[dill::interface(dyn SimpleResourceReconciler<TestResource>)]
-pub struct TestResourceInterferingReconciler {
+struct TestResourceInterferingReconciler {
     catalog: dill::Catalog,
     interference: Arc<TestReconcileInterference>,
 }
 
-pub struct TestReconcileInterference {
+struct TestReconcileInterference {
     then_fails: bool,
 }
 
@@ -232,14 +232,14 @@ impl SimpleResourceReconciler<TestResource> for TestResourceInterferingReconcile
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// Fails its first cleanup and succeeds on every later one.
-#[dill::component(pub)]
+#[dill::component]
 #[dill::interface(dyn SimpleResourceReconciler<TestResource>)]
-pub struct TestResourceFailingCleanupOnceReconciler {
+struct TestResourceFailingCleanupOnceReconciler {
     failure: Arc<TestCleanupFailureOnce>,
 }
 
 #[derive(Default)]
-pub struct TestCleanupFailureOnce {
+struct TestCleanupFailureOnce {
     done: AtomicBool,
 }
 
@@ -265,9 +265,9 @@ impl SimpleResourceReconciler<TestResource> for TestResourceFailingCleanupOnceRe
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// Fails every reconciliation with an error that is not transient
-#[dill::component(pub)]
+#[dill::component]
 #[dill::interface(dyn SimpleResourceReconciler<TestResource>)]
-pub struct TestResourceRejectingReconciler;
+struct TestResourceRejectingReconciler;
 
 #[async_trait::async_trait]
 impl SimpleResourceReconciler<TestResource> for TestResourceRejectingReconciler {
@@ -288,14 +288,14 @@ impl SimpleResourceReconciler<TestResource> for TestResourceRejectingReconciler 
 
 /// Fails its first reconciliation with a transient error and succeeds on
 /// every later one
-#[dill::component(pub)]
+#[dill::component]
 #[dill::interface(dyn SimpleResourceReconciler<TestResource>)]
-pub struct TestResourceFailingReconcileOnceReconciler {
+struct TestResourceFailingReconcileOnceReconciler {
     failure: Arc<TestReconcileFailureOnce>,
 }
 
 #[derive(Default)]
-pub struct TestReconcileFailureOnce {
+struct TestReconcileFailureOnce {
     done: AtomicBool,
 }
 

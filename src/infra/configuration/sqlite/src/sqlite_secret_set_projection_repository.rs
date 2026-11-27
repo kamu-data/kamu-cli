@@ -19,6 +19,8 @@ use kamu_configuration::{
 use kamu_resources::ResourceID;
 use uuid::Uuid;
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[component]
 #[interface(dyn SecretSetProjectionRepository)]
 pub struct SqliteSecretSetProjectionRepository {

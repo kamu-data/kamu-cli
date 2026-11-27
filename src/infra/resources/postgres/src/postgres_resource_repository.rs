@@ -18,6 +18,7 @@ use futures::TryStreamExt;
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_resources::{
     CreateResourceError,
+    DELETED_ACCOUNT_NAME_SENTINEL,
     ResourceDueForPurge,
     ResourceDuplicateError,
     ResourceHandleRow,
@@ -39,6 +40,10 @@ use kamu_resources::{
     ResourceVisibility,
     TypeUri,
     UpdateResourceError,
+    resource_annotations_to_json,
+    resource_labels_to_json,
+    resource_owner_references_to_json,
+    resource_status_to_json,
 };
 use odf::metadata::AsStackString;
 
@@ -166,7 +171,7 @@ macro_rules! search_resources_query {
             $flat.label_keys(),
             $flat.label_values(),
             $limit,
-            kamu_resources::DELETED_ACCOUNT_NAME_SENTINEL,
+            DELETED_ACCOUNT_NAME_SENTINEL,
             $offset,
             $visibility.includes_live(),
             $visibility.includes_deleting(),
@@ -195,12 +200,10 @@ impl ResourceRepository for PostgresResourceRepository {
 
         let account_id_stack = resource_snapshot.headers.account.did.as_stack_string();
         let account_id_str = account_id_stack.as_str();
-        let labels = kamu_resources::resource_labels_to_json(&resource_snapshot.headers.labels);
-        let annotations =
-            kamu_resources::resource_annotations_to_json(&resource_snapshot.headers.annotations);
-        let owner_references = kamu_resources::resource_owner_references_to_json(
-            resource_snapshot.headers.owner_references.as_ref(),
-        );
+        let labels = resource_labels_to_json(&resource_snapshot.headers.labels);
+        let annotations = resource_annotations_to_json(&resource_snapshot.headers.annotations);
+        let owner_references =
+            resource_owner_references_to_json(resource_snapshot.headers.owner_references.as_ref());
         let generation = i64::try_from(resource_snapshot.headers.generation).unwrap();
         let status_generation = i64::try_from(resource_snapshot.headers.status_generation).unwrap();
         let last_event_id = resource_snapshot.last_event_id.map(EventID::into_inner);
@@ -208,7 +211,7 @@ impl ResourceRepository for PostgresResourceRepository {
         let status = resource_snapshot
             .status
             .as_ref()
-            .map(kamu_resources::resource_status_to_json);
+            .map(resource_status_to_json);
 
         // A taken name must not fail the statement: a failed statement aborts the
         // whole Postgres transaction, and the caller retries in the same one
@@ -331,13 +334,11 @@ impl ResourceRepository for PostgresResourceRepository {
                 )
                 .push_bind(resource_snapshot.schema.to_string())
                 .push_bind(resource_snapshot.headers.name.to_string())
-                .push_bind(kamu_resources::resource_labels_to_json(
-                    &resource_snapshot.headers.labels,
-                ))
-                .push_bind(kamu_resources::resource_annotations_to_json(
+                .push_bind(resource_labels_to_json(&resource_snapshot.headers.labels))
+                .push_bind(resource_annotations_to_json(
                     &resource_snapshot.headers.annotations,
                 ))
-                .push_bind(kamu_resources::resource_owner_references_to_json(
+                .push_bind(resource_owner_references_to_json(
                     resource_snapshot.headers.owner_references.as_ref(),
                 ))
                 .push_bind(resource_snapshot.spec.clone())
@@ -345,7 +346,7 @@ impl ResourceRepository for PostgresResourceRepository {
                     resource_snapshot
                         .status
                         .as_ref()
-                        .map(kamu_resources::resource_status_to_json),
+                        .map(resource_status_to_json),
                 )
                 .push_bind(i64::try_from(resource_snapshot.headers.generation).unwrap())
                 .push_bind(i64::try_from(resource_snapshot.headers.status_generation).unwrap())
@@ -500,7 +501,7 @@ impl ResourceRepository for PostgresResourceRepository {
             "#,
             account_id_stack.as_str(),
             &ids,
-            kamu_resources::DELETED_ACCOUNT_NAME_SENTINEL,
+            DELETED_ACCOUNT_NAME_SENTINEL,
         )
         .fetch_all(connection_mut)
         .await
@@ -784,7 +785,7 @@ impl ResourceRepository for PostgresResourceRepository {
             "#,
             query_id,
             query_schema,
-            kamu_resources::DELETED_ACCOUNT_NAME_SENTINEL,
+            DELETED_ACCOUNT_NAME_SENTINEL,
         )
         .fetch_optional(connection_mut)
         .await
@@ -911,7 +912,7 @@ impl ResourceRepository for PostgresResourceRepository {
         )
         .bind(schema.as_str())
         .bind(&ids)
-        .bind(kamu_resources::DELETED_ACCOUNT_NAME_SENTINEL)
+        .bind(DELETED_ACCOUNT_NAME_SENTINEL)
         .fetch_all(connection_mut)
         .await
         .int_err()?;
@@ -966,7 +967,7 @@ impl ResourceRepository for PostgresResourceRepository {
             WHERE r.resource_id = $1
             "#,
             resource_id,
-            kamu_resources::DELETED_ACCOUNT_NAME_SENTINEL,
+            DELETED_ACCOUNT_NAME_SENTINEL,
         )
         .fetch_optional(connection_mut)
         .await
@@ -1025,7 +1026,7 @@ impl ResourceRepository for PostgresResourceRepository {
             "#,
             account_id_stack.as_str(),
             &ids,
-            kamu_resources::DELETED_ACCOUNT_NAME_SENTINEL,
+            DELETED_ACCOUNT_NAME_SENTINEL,
         )
         .fetch_all(connection_mut)
         .await

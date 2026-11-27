@@ -127,7 +127,7 @@ impl From<AnonymousPrincipalError> for ResolveManifestAccountError {
 
 impl ResolveManifestAccountError {
     /// A denial of a guard deciding on the account alone
-    pub fn from_operation_error(err: ResourceOperationError) -> Self {
+    pub(crate) fn from_operation_error(err: ResourceOperationError) -> Self {
         match err {
             ResourceOperationError::Access(err) => ResourceAccountAccessError::Access(err).into(),
             ResourceOperationError::NotFound(err) => Self::Internal(

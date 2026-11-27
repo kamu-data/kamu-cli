@@ -289,6 +289,8 @@ enum ScriptedRun {
     IgnoreShutdown,
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 /// Runs its script, one entry per run, then runs until a shutdown
 struct ScriptedAgent {
     name: &'static str,
@@ -394,6 +396,8 @@ impl BackgroundAgent for ScriptedAgent {
         self.fatal
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// Marks the agent aborted when its run is dropped before returning
 struct AbortGuard(Arc<AtomicBool>);

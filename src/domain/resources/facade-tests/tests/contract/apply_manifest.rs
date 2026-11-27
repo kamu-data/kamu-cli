@@ -10,10 +10,12 @@
 use kamu_configuration::VariableSetResource;
 use kamu_resources::{
     ApplyManifestApplicationDecision,
+    ApplyManifestDocuments,
     ApplyManifestPlanningDecision,
     ApplyResourceOutcome,
     RESOURCE_ANNOTATION_DESCRIPTION_SCHEMA_URI,
     RESOURCE_LABEL_ENVIRONMENT_SCHEMA_URI,
+    ResourceID,
     ResourceRef,
     ResourceSchemaProvider,
     ResourceVisibility,
@@ -315,6 +317,8 @@ pub async fn test_plan_rejects_malformed_manifest(h: &impl FacadeContractHarness
     );
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 // RF-015
 contract_test!(
     plan_rejects_schema_invalid_manifest,
@@ -605,7 +609,7 @@ pub async fn test_apply_idempotent(h: &impl FacadeContractHarness) {
         .await
         .unwrap();
     let first = assert_applied_outcome(&first_decision, ApplyResourceOutcome::Created);
-    let id: kamu_resources::ResourceID = first.headers.id;
+    let id: ResourceID = first.headers.id;
     let generation = first.headers.generation;
 
     let second_decision = facade
@@ -1163,16 +1167,11 @@ pub async fn test_apply_invalid_spec_carries_schema(h: &impl FacadeContractHarne
         })
         .await;
 
-    match result {
-        Err(ApplyManifestError::InvalidSpec(e)) => {
-            assert_eq!(
-                e.schema.as_str(),
-                VARIABLE_SET_SCHEMA_STR,
-                "InvalidSpec must carry the correct schema"
-            );
-        }
-        other => panic!("expected Err(InvalidSpec), got: {other:?}"),
-    }
+    assert_matches!(
+        result,
+        Err(ApplyManifestError::InvalidSpec(e)) if e.schema.as_str() == VARIABLE_SET_SCHEMA_STR,
+        "InvalidSpec must carry the correct schema"
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1241,11 +1240,7 @@ pub async fn test_apply_documents_never_expose_secret_plaintext(h: &impl FacadeC
     assert_documents_free_of(&plan.documents().unwrap(), SENTINEL, "plan of an update");
 }
 
-fn assert_documents_free_of(
-    documents: &kamu_resources::ApplyManifestDocuments,
-    sentinel: &str,
-    context: &str,
-) {
+fn assert_documents_free_of(documents: &ApplyManifestDocuments, sentinel: &str, context: &str) {
     if let Some(before) = &documents.before {
         let before = serde_json::to_string(before).unwrap();
         assert!(

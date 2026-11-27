@@ -17,7 +17,7 @@ mod test_resource_reconciler;
 
 pub use base_resource_service_harness::*;
 pub use immutable_test_resource::*;
-pub use own_account_resource_access::*;
+pub(crate) use own_account_resource_access::*;
 pub use test_conditions::*;
 pub use test_resource::*;
 pub use test_resource_access::*;

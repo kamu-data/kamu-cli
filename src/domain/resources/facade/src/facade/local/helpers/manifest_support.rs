@@ -13,6 +13,7 @@ use kamu_resources::{
     ResourceManifest,
     ResourceRef,
     ResourceWarning,
+    TypeRef,
     description_annotation_type_ref,
     resource_label_not_indexed_warning,
     resource_missing_description_warning,
@@ -45,8 +46,8 @@ pub(crate) fn parse_manifest(
 pub(crate) fn make_apply_headers(
     name: Option<&str>,
     target_account: &odf::ResourceOwnerHandle,
-    labels: Vec<(kamu_resources::TypeRef, serde_json::Value)>,
-    annotations: Vec<(kamu_resources::TypeRef, serde_json::Value)>,
+    labels: Vec<(TypeRef, serde_json::Value)>,
+    annotations: Vec<(TypeRef, serde_json::Value)>,
     owner_references: Vec<ResourceRef>,
 ) -> Result<ApplyResourceHeaders, ApplyManifestError> {
     ApplyResourceHeaders::try_new(
@@ -62,7 +63,7 @@ pub(crate) fn make_apply_headers(
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub(crate) fn collect_manifest_header_warnings(
-    annotations: &[(kamu_resources::TypeRef, serde_json::Value)],
+    annotations: &[(TypeRef, serde_json::Value)],
 ) -> Vec<ResourceWarning> {
     let mut warnings = Vec::new();
 
@@ -81,7 +82,7 @@ pub(crate) fn collect_manifest_header_warnings(
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub(crate) fn collect_non_indexable_label_warnings(
-    labels: &[(kamu_resources::TypeRef, serde_json::Value)],
+    labels: &[(TypeRef, serde_json::Value)],
 ) -> Vec<ResourceWarning> {
     labels
         .iter()
