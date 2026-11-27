@@ -302,8 +302,8 @@ impl ResourceLifecycleHarness {
         self.resource.try_complete_deletion(now)
     }
 
-    /// Applies a deletion as stored before it was preceded by a request, with
-    /// the `tombstone_name` events no longer carry.
+    /// Applies a stored legacy `Deleted` event, one that no deletion request
+    /// preceded and that carries a `tombstone_name`
     pub fn apply_stored_deletion(&mut self) {
         let id = *self.resource.id();
         let event = serde_json::json!({

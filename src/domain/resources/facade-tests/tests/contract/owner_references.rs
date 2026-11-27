@@ -316,7 +316,7 @@ pub async fn test_owner_is_kept_after_its_deletion(h: &impl FacadeContractHarnes
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// RF-195
+// RF-197
 contract_test!(
     owners_follow_the_renamed_account,
     super::test_owners_follow_the_renamed_account
@@ -370,6 +370,7 @@ pub async fn test_owners_follow_the_renamed_account(h: &impl FacadeContractHarne
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+// RF-195
 contract_test!(search_by_owner, super::test_search_by_owner);
 
 pub async fn test_search_by_owner(h: &impl FacadeContractHarness) {

@@ -91,9 +91,9 @@ impl ApplyResourceHeaders {
         Ok(name)
     }
 
-    /// For headers given to an
-    /// [`ApplyResourceUseCase`](crate::ApplyResourceUseCase), which takes them
-    /// with the account resolved
+    /// The DID of `account`. Panics if it has none, which the headers an
+    /// [`ApplyResourceUseCase`](crate::ApplyResourceUseCase) takes never lack:
+    /// their account is resolved
     pub fn resolved_account_id(&self) -> &odf::AccountID {
         self.resolved_account()
             .did
@@ -101,14 +101,17 @@ impl ApplyResourceHeaders {
             .expect("resource headers must carry a resolved account by apply time")
     }
 
-    /// See [`Self::resolved_account_id`]
+    /// `account`. Panics if it is absent, which it never is in the headers of
+    /// an apply (see [`Self::resolved_account_id`])
     pub fn resolved_account(&self) -> &odf::metadata::auth::ResourceOwnerRef {
         self.account
             .as_ref()
             .expect("resource headers must carry a resolved account by apply time")
     }
 
-    /// See [`Self::resolved_account_id`]
+    /// `account` as a handle. Panics unless it is fully resolved: a type URI,
+    /// ID, DID and name, as in the headers of an apply (see
+    /// [`Self::resolved_account_id`])
     pub fn resolved_account_handle(&self) -> odf::ResourceOwnerHandle {
         crate::account_handle_from_input(self.account.as_ref())
     }

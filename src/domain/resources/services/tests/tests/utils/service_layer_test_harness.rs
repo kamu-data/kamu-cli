@@ -214,7 +214,8 @@ impl ServiceLayerTestHarness {
             .unwrap();
     }
 
-    /// See [`background_agent_host::BackgroundWorkFinalizer`]
+    /// Completes the background work the test left behind, housekeeping aside
+    /// ([`background_agent_host::BackgroundWorkFinalizer`])
     pub async fn settle(&self) {
         self.base
             .background_work_finalizer()

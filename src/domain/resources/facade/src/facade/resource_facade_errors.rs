@@ -278,7 +278,7 @@ pub enum ResourceLookupProblem {
     )]
     UntypedName,
 
-    /// The resource was found, but the caller asked to reveal its spec
+    /// The caller asked to reveal the spec of a deleted resource
     #[error(transparent)]
     DeletedNotRevealed(#[from] ResourceDeletedNotRevealedError),
 

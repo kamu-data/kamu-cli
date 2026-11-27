@@ -104,7 +104,7 @@ impl ContentEncoding {
 
 /// Methods on the RFC-generated [`Secret`] DTO. A bare `type` alias can't
 /// carry inherent impls, so these attach via an extension trait — see
-/// [`Variable`](super::Variable)'s alias for the leaf type that needed none.
+/// [`Variable`](crate::Variable)'s alias for the leaf type that needed none.
 pub trait SecretExt {
     /// The plaintext string for a non-encrypted secret.
     ///

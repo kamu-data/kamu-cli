@@ -34,11 +34,8 @@ use crate::tests::utils::{ServiceLayerTestHarness, ServiceLayerTestHarnessOpts, 
 // Tests
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// The planner and executor are each tested in isolation in their own test
-// modules. Here we only test behaviour that is exclusive to the use-case layer:
-// a basic end-to-end wiring smoke test, spec pre-apply integration (all code-paths),
-// the boundary where a pre-apply hook produces an invalid spec, and preconditions,
-// which span both.
+// Only what an apply through the use case adds to the runner, planner and
+// executor, which have suites of their own
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

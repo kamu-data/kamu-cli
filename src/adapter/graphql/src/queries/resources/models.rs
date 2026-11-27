@@ -548,7 +548,7 @@ pub struct ResourceUntypedNameProblem {
     pub message: String,
 }
 
-/// The referenced resource is deleted, so its spec cannot be revealed
+/// A reveal of the spec was requested, but the resource is deleted
 #[derive(SimpleObject, Debug, Clone)]
 pub struct ResourceDeletedNotRevealedProblem {
     /// ID of the deleted resource

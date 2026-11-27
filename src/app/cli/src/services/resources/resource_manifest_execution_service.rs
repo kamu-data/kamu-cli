@@ -98,7 +98,7 @@ impl TryFrom<ApplyManifestApplicationDecision> for ExecuteResourceManifestOutcom
 pub struct ExecutedResourceManifestResult {
     pub outcome: ApplyResourceOutcome,
     pub resource: Resource,
-    /// See [`kamu_resources::ApplyManifestPlan::name_pending`]
+    /// The name in `resource` is a placeholder: the apply generates the real one
     pub name_pending: bool,
     pub warnings: Vec<ResourceWarning>,
     pub documents: ApplyManifestDocuments,

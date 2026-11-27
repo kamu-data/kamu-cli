@@ -71,7 +71,8 @@ impl BaseGQLResourceHarness {
         Self::new(base_gql_harness, catalog_base)
     }
 
-    /// See [`BackgroundWorkFinalizer`]
+    /// Completes the background work the test's writes left behind, such as
+    /// Outbox deliveries
     pub async fn settle(&self) {
         BackgroundWorkFinalizer::settle_only()
             .finalize(&self.catalog_base)

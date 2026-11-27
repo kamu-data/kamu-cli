@@ -178,9 +178,8 @@ Before committing the migration run `make resources-db-schema` to update the fin
 as: resource id columns are declared `CHAR(36)`, and text affinity never converts a blob. A SQLite
 migration that writes UUIDs therefore writes blobs: `randomblob(16)` for new ids, `unhex(id, '-')`
 for text ones. A text UUID compiles and passes every test on a fresh database, then fails to decode
-or match on existing workspaces: v0.267.0 broke CLI startup this way, repaired by
-`migrations/sqlite/20261008120000_resource_ids_text_to_blob.sql`. Check a backfill on a scratch
-database that has rows (`typeof(column) = 'blob'`, `length(column) = 16`).
+or match on existing workspaces. Check a backfill on a scratch database that has rows
+(`typeof(column) = 'blob'`, `length(column) = 16`).
 
 ## Validation
 

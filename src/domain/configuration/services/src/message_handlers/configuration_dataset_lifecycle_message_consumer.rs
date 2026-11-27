@@ -186,7 +186,8 @@ impl ConfigurationDatasetLifecycleMessageConsumer {
             RESOURCE_LABEL_LEGACY_CONFIG_TARGET_DATASET_SCHEMA_URI,
         ));
 
-        // Only edits resources that exist, so it is never recorded
+        // Only a create records its provenance, and this edits existing
+        // resources only
         let provenance = request_creation_provenance(
             &Principal::Node,
             &RequestOrigin::Internal {

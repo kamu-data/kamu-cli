@@ -68,7 +68,7 @@ whose crate's code it changed, check:
 | A crate that depends on another layer's crate only for one type or helper | Report it: the type may belong lower, the call may belong in a caller |
 
 After the fixes, `make clippy` and the tests of the touched crates show that nothing needed was
-dropped. A feature the crate needs but no longer names can still build here, enabled by another
+dropped. A feature the crate needs but does not name can still build here, enabled by another
 crate of the workspace build (AGENTS.md, "Build scope"); check that the crate's code reaches only
 the features it lists.
 

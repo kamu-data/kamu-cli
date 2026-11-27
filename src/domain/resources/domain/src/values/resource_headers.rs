@@ -207,12 +207,9 @@ impl ResourceHeadersExt for ResourceHeaders {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Account resolution (id + did + name lookup) happens upstream, as part of
-/// the apply process (see `ResourceAccountResolver`), before a
-/// [`ResourceHeadersInput`] is ever constructed — every production caller
-/// populates `account` with a fully-resolved [`odf::metadata::auth::ResourceOwnerRef`]. Panics if
-/// handed a partially-resolved reference, which would indicate a caller
-/// bypassed account resolution.
+/// Panics unless `input` is fully resolved: a type URI, ID, DID and name. The
+/// apply process resolves the account (`ResourceAccountResolver`) before it
+/// builds headers, so a partial one means a caller bypassed that.
 pub(crate) fn account_handle_from_input(
     input: Option<&odf::metadata::auth::ResourceOwnerRef>,
 ) -> odf::ResourceOwnerHandle {

@@ -449,12 +449,8 @@ where
         }))
     }
 
-    /// `headers.account` must already be resolved by the time it gets here —
-    /// resolving an id/name selector is the caller's responsibility (via the
-    /// facade's `ResourceAccountResolver`, or by threading an already-known
-    /// handle). This is enforced here rather than silently trusted, since the
-    /// event-sourced projector downstream is pure/sync and cannot resolve
-    /// accounts itself.
+    /// Fails unless `headers.account` is a resolved handle: callers resolve
+    /// selectors (the facade's `ResourceAccountResolver`), the projection cannot
     fn ensure_account_resolved(params: &ApplyResourceParams<R>) -> Result<(), InternalError> {
         match &params.headers.account {
             Some(odf::metadata::auth::ResourceOwnerRef {

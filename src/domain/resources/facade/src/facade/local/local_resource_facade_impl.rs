@@ -1048,8 +1048,8 @@ impl LocalResourceFacadeImpl {
         }
 
         // Resolved in one batch, deduplicated by spelling. Access is checked
-        // per selector below, by the type's guard; any denial fails the whole
-        // call.
+        // per selector afterwards, by the type's guard; any denial fails the
+        // whole call.
         //
         // `None` stays `None` rather than resolving to the principal's own
         // account: the repository takes that account as the

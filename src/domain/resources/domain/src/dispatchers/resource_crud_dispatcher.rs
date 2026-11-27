@@ -65,8 +65,8 @@ pub trait ResourceCrudDispatcher: Send + Sync {
         request: ResourceCrudDispatcherDeletionRequest,
     ) -> Result<(), RequestResourcesDeletionCrudDispatcherError>;
 
-    /// See [`crate::ResourceOperationGuard::check_account`]; the type's guard,
-    /// or the default rule
+    /// Decides on `account` before any resource is loaded, by the type's
+    /// [`crate::ResourceOperationGuard::check_account`] or the default rule
     async fn check_account_access(
         &self,
         principal: &odf::metadata::auth::PrincipalHandle,

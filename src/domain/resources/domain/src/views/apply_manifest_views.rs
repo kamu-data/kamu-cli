@@ -40,8 +40,8 @@ impl ApplyManifestDocuments {
     /// Canonicalizes both sides of an apply.
     ///
     /// `previous_resource` is `None` exactly when the resource is being
-    /// created. See [`ApplyManifestPlan::set_documents`] for the ordering
-    /// requirement around `headers.account`.
+    /// created. Call it once `headers.account` is final: the account is part
+    /// of the canonical manifest.
     pub fn build(
         previous_resource: Option<&Resource>,
         resource: &Resource,
