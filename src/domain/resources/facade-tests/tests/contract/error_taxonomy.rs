@@ -65,6 +65,8 @@ fn batch_by_name_for_account(name: &str, account: ResourceOwnerRef) -> Vec<Resou
     }]
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 fn batch_by_id(id: ResourceID) -> Vec<ResourceRef> {
     vec![variable_set_ref_by_id(id)]
 }

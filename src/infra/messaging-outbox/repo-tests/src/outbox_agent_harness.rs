@@ -91,6 +91,14 @@ impl OutboxAgentHarness {
         self.outbox_agent.run_while_has_tasks().await.unwrap();
     }
 
+    /// Drains, failing the test if the drain waits for an open transaction
+    pub async fn drain_without_waiting(&self) {
+        tokio::time::timeout(Duration::from_secs(2), self.spawn_drain())
+            .await
+            .expect("drain must not wait for the older transaction")
+            .unwrap();
+    }
+
     pub fn spawn_drain(&self) -> JoinHandle<()> {
         let outbox_agent = self.outbox_agent.clone();
         tokio::spawn(async move {

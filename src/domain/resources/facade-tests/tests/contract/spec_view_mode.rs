@@ -479,6 +479,8 @@ pub async fn test_deleted_spec_is_not_revealed(h: &impl FacadeContractHarness) {
     );
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[track_caller]
 fn assert_deleted_not_revealed(
     problems: &[BatchResourceProblem<ResourceLookupProblem>],

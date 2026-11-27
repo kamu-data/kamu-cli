@@ -54,6 +54,8 @@ async fn apply(facade: &dyn ResourceFacade, value: &str) {
     apply_variable_set(facade, RESOURCE_NAME, &[("A", value)]).await;
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 async fn provenance(facade: &dyn ResourceFacade) -> Option<CreationProvenance> {
     let resource = get_resource(facade, variable_set_ref_by_name(RESOURCE_NAME)).await;
 

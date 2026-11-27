@@ -1240,6 +1240,8 @@ pub async fn test_apply_documents_never_expose_secret_plaintext(h: &impl FacadeC
     assert_documents_free_of(&plan.documents().unwrap(), SENTINEL, "plan of an update");
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 fn assert_documents_free_of(documents: &ApplyManifestDocuments, sentinel: &str, context: &str) {
     if let Some(before) = &documents.before {
         let before = serde_json::to_string(before).unwrap();

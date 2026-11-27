@@ -678,6 +678,8 @@ async fn test_resolve_dataset_handles_by_refs(tenancy_config: TenancyConfig) {
     }
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 async fn test_resolve_dataset_handle(tenancy_config: TenancyConfig) {
     let harness =
         DatasetEntryServiceHarness::new(TestDatasetEntryRepository::InMemory, tenancy_config);
@@ -848,42 +850,32 @@ async fn test_resolve_dataset_handle_not_found(tenancy_config: TenancyConfig) {
         (
             "resource ID with another name",
             DatasetRef {
+                id: Some(foo.id),
                 name: Some(bar.name.clone()),
-                ..odf::metadata::datasets::DatasetRef {
-                    id: Some(foo.id),
-                    ..Default::default()
-                }
+                ..Default::default()
             },
         ),
         (
             "DID with another account",
             DatasetRef {
-                account: odf::metadata::datasets::DatasetRef {
-                    account: Some(odf::metadata::auth::ResourceOwnerRef {
-                        name: Some(bar.account.name.clone()),
-                        ..Default::default()
-                    }),
+                account: Some(ResourceOwnerRef {
+                    name: Some(bar.account.name.clone()),
                     ..Default::default()
-                }
-                .account,
-                ..odf::metadata::datasets::DatasetRef {
-                    did: Some(foo.did.clone()),
-                    ..Default::default()
-                }
+                }),
+                did: Some(foo.did.clone()),
+                ..Default::default()
             },
         ),
         (
             "name with another DID",
             DatasetRef {
-                did: Some(bar.did.clone()),
-                ..odf::metadata::datasets::DatasetRef {
-                    account: Some(odf::metadata::auth::ResourceOwnerRef {
-                        name: Some(foo.account.name.clone()),
-                        ..Default::default()
-                    }),
-                    name: Some(foo.name.clone()),
+                account: Some(ResourceOwnerRef {
+                    name: Some(foo.account.name.clone()),
                     ..Default::default()
-                }
+                }),
+                did: Some(bar.did.clone()),
+                name: Some(foo.name.clone()),
+                ..Default::default()
             },
         ),
         (
@@ -906,10 +898,8 @@ async fn test_resolve_dataset_handle_not_found(tenancy_config: TenancyConfig) {
                     id: Some(bar.account.id),
                     ..Default::default()
                 }),
-                ..odf::metadata::datasets::DatasetRef {
-                    did: Some(foo.did.clone()),
-                    ..Default::default()
-                }
+                did: Some(foo.did.clone()),
+                ..Default::default()
             },
         ),
     ];
@@ -930,7 +920,7 @@ async fn test_resolve_dataset_handle_not_found(tenancy_config: TenancyConfig) {
     harness.delete_account(&orphan.account.did).await;
     assert_eq!(
         harness
-            .resolve_dataset_handle(&odf::metadata::datasets::DatasetRef::from(orphan), None)
+            .resolve_dataset_handle(&DatasetRef::from(orphan), None)
             .await
             .unwrap(),
         None
@@ -952,7 +942,7 @@ async fn test_resolve_dataset_handle_invalid_ref(tenancy_config: TenancyConfig) 
         ("empty", DatasetRef::default(), Some(&foo.account.name)),
         (
             "bare name, no account given",
-            odf::metadata::datasets::DatasetRef {
+            DatasetRef {
                 name: Some(foo.name.clone()),
                 ..Default::default()
             },

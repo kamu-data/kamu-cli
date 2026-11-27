@@ -83,6 +83,8 @@ pub struct UnknownRetentionTypesError {
     pub registered: Vec<TypeName>,
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 fn join(type_names: &[TypeName]) -> String {
     type_names
         .iter()

@@ -86,6 +86,8 @@ pub fn make_test_snapshot(
     }
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 fn status_with_phase(phase: ResourcePhase) -> ResourceStatus {
     let mut status = new_pending_resource_status();
     status.phase = phase;
@@ -3373,6 +3375,8 @@ async fn create_test_resource(
     create_test_resource_of(repo, account_handle, &TEST_KIND, name).await
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 async fn create_test_resource_of(
     repo: &dyn ResourceRepository,
     account_handle: &odf::ResourceOwnerHandle,
@@ -3386,6 +3390,8 @@ async fn create_test_resource_of(
     repo.create_resource(&snapshot).await.unwrap();
     snapshot
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 async fn create_labelled_test_resource(
     repo: &dyn ResourceRepository,
@@ -3429,6 +3435,8 @@ async fn request_test_resource_deletion(
     .await
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 /// Writes `snapshot` as it is once its deletion was requested, then completed.
 async fn delete_test_resource(
     repo: &dyn ResourceRepository,
@@ -3444,6 +3452,8 @@ async fn delete_test_resource(
     })
     .await
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// Writes `snapshot` with `change` applied, as the event after its last one.
 async fn update_test_resource(
@@ -3544,6 +3554,8 @@ impl ListingReads {
         self.listed.iter().map(|snapshot| snapshot.id).collect()
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// Runs one query through `search_resource_handles`,
 /// `count_search_resource_handles` and `list_resource_snapshots`

@@ -330,6 +330,8 @@ pub fn register_test_resource_crud_dispatcher(catalog_builder: &mut dill::Catalo
     catalog_builder.add::<TestResourceCrudDispatcher>();
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 /// Everything the type needs to be served beside the real ones, reconciled by
 /// a stub
 pub fn register_test_resource(catalog_builder: &mut dill::CatalogBuilder) {

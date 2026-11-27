@@ -11,6 +11,7 @@ use kamu_configuration::{
     CONTENT_ENCODING_AES256GCM,
     CONTENT_ENCODING_JWE,
     SecretExt,
+    SecretSetResource,
     SecretSetSpec,
     SecretSetSpecInput,
 };
@@ -21,6 +22,7 @@ use kamu_resources::{
     ApplyResourceOutcome,
     ApplyResourceParams,
     ApplyResourceRejectionCategory,
+    ResourceID,
     ResourceSpecFromInput,
 };
 use kamu_resources_services::testing::BaseResourceServiceHarness;
@@ -33,6 +35,8 @@ fn plaintext_secret(value: &str) -> odf::metadata::config::Secret {
         content_encoding: None,
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// Encrypt with the legacy AES-GCM scheme and pack as `hex(nonce ‖
 /// ciphertext)` — the exact wire form the env-var backfill migrations emit.
@@ -50,6 +54,8 @@ fn legacy_aes256gcm_secret(plaintext: &[u8]) -> odf::metadata::config::Secret {
     }
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 fn make_spec_input(
     entries: impl IntoIterator<Item = (impl Into<String>, odf::metadata::config::Secret)>,
 ) -> SecretSetSpecInput {
@@ -64,41 +70,16 @@ fn make_spec_input(
 
 #[test_log::test(tokio::test)]
 async fn test_apply_secret_set_encrypts_literal_values() {
-    let harness = BaseConfigurationServiceHarness::new();
-    let account_handle = odf::ResourceOwnerHandle::new_test("test-owner");
+    let harness = SecretSetPreApplyHarness::new();
 
-    let spec = make_spec_input([
-        ("API_TOKEN", plaintext_secret("my-secret-token")),
-        ("DB_PASSWORD", plaintext_secret("my-db-password")),
-    ]);
+    let id = harness
+        .apply_new(make_spec_input([
+            ("API_TOKEN", plaintext_secret("my-secret-token")),
+            ("DB_PASSWORD", plaintext_secret("my-db-password")),
+        ]))
+        .await;
 
-    let decision = harness
-        .apply_secret_use_case()
-        .apply(BaseResourceServiceHarness::make_apply_params(
-            account_handle,
-            Some("test-secrets"),
-            spec,
-        ))
-        .await
-        .unwrap();
-
-    let applied_id = match decision {
-        ApplyResourceApplicationDecision::Applied(result) => result.id,
-        ApplyResourceApplicationDecision::Rejected(r) => {
-            panic!("apply was rejected: {}", r.message)
-        }
-    };
-
-    // Load the stored snapshot and deserialize the spec
-    let snapshot = harness
-        .generic_query_svc()
-        .get_snapshot_by_id(&applied_id)
-        .await
-        .unwrap()
-        .expect("snapshot must exist after apply");
-
-    let stored_spec: SecretSetSpec =
-        serde_json::from_value(snapshot.spec.clone()).expect("spec must deserialize");
+    let (stored_spec, spec_json) = harness.stored_spec(&id).await;
 
     // All values must be encrypted — no plaintext secrets in stored form
     for (name, secret) in &stored_spec.secrets.entries {
@@ -107,9 +88,6 @@ async fn test_apply_secret_set_encrypts_literal_values() {
             "secret '{name}' must be encrypted in stored spec, got: {secret:?}"
         );
     }
-
-    // Plaintext values must not appear anywhere in the serialized spec JSON
-    let spec_json = snapshot.spec.to_string();
     assert!(
         !spec_json.contains("my-secret-token"),
         "plaintext 'my-secret-token' must not appear in stored spec"
@@ -124,90 +102,35 @@ async fn test_apply_secret_set_encrypts_literal_values() {
 
 #[test_log::test(tokio::test)]
 async fn test_apply_secret_set_already_encrypted_passes_through_idempotently() {
-    let harness = BaseConfigurationServiceHarness::new();
-    let account_handle = odf::ResourceOwnerHandle::new_test("test-owner");
+    let harness = SecretSetPreApplyHarness::new();
 
-    // First apply with a plaintext value to produce an encrypted snapshot
-    let spec = make_spec_input([("API_TOKEN", plaintext_secret("original-value"))]);
-
-    let decision = harness
-        .apply_secret_use_case()
-        .apply(BaseResourceServiceHarness::make_apply_params(
-            account_handle.clone(),
-            Some("test-secrets"),
-            spec,
-        ))
-        .await
-        .unwrap();
-
-    let id = match decision {
-        ApplyResourceApplicationDecision::Applied(result) => result.id,
-        ApplyResourceApplicationDecision::Rejected(r) => {
-            panic!("first apply was rejected: {}", r.message)
-        }
-    };
-
-    // Load the stored spec (already encrypted) and re-apply it as-is
-    let snapshot = harness
-        .generic_query_svc()
-        .get_snapshot_by_id(&id)
-        .await
-        .unwrap()
-        .unwrap();
-
-    let encrypted_spec: SecretSetSpec =
-        serde_json::from_value(snapshot.spec).expect("spec must deserialize");
-
-    // Confirm the first apply produced an encrypted secret
+    let id = harness
+        .apply_new(make_spec_input([(
+            "API_TOKEN",
+            plaintext_secret("original-value"),
+        )]))
+        .await;
+    let (encrypted_spec, _) = harness.stored_spec(&id).await;
     assert!(
         encrypted_spec.secrets.entries["API_TOKEN"].is_encrypted(),
         "first apply must produce an encrypted secret"
     );
 
-    // Re-apply the already-encrypted spec — the hook must pass it through
-    // unchanged
-    let decision2 = harness
-        .apply_secret_use_case()
-        .apply(ApplyResourceParams {
-            id: Some(id),
-            ..BaseResourceServiceHarness::make_apply_params(
-                account_handle,
-                Some("test-secrets"),
-                encrypted_spec.clone().into_input(),
-            )
-        })
-        .await
-        .unwrap();
-
-    match &decision2 {
-        ApplyResourceApplicationDecision::Applied(result) => {
-            assert_eq!(result.outcome, ApplyResourceOutcome::Untouched);
-        }
-        ApplyResourceApplicationDecision::Rejected(r) => {
-            panic!("second apply was rejected unexpectedly: {}", r.message)
-        }
-    }
-
-    let snapshot2 = harness
-        .generic_query_svc()
-        .get_snapshot_by_id(&id)
-        .await
-        .unwrap()
-        .unwrap();
-
-    let stored_spec2: SecretSetSpec =
-        serde_json::from_value(snapshot2.spec).expect("spec must deserialize");
-
-    // After re-apply the value must still be encrypted (not double-wrapped)
-    assert!(
-        stored_spec2.secrets.entries["API_TOKEN"].is_encrypted(),
-        "secret must remain encrypted after idempotent re-apply"
+    // Re-applying the already-encrypted spec must pass it through unchanged
+    assert_eq!(
+        harness
+            .reapply(id, encrypted_spec.clone().into_input())
+            .await,
+        ApplyResourceOutcome::Untouched
     );
 
-    // The ciphertext must equal the original — the hook is a no-op on
-    // already-encrypted specs
+    let (stored_spec, _) = harness.stored_spec(&id).await;
+    assert!(
+        stored_spec.secrets.entries["API_TOKEN"].is_encrypted(),
+        "secret must remain encrypted after idempotent re-apply"
+    );
     assert_eq!(
-        stored_spec2.secrets.entries["API_TOKEN"].as_encrypted(),
+        stored_spec.secrets.entries["API_TOKEN"].as_encrypted(),
         encrypted_spec.secrets.entries["API_TOKEN"].as_encrypted(),
         "ciphertext must be unchanged after idempotent re-apply"
     );
@@ -217,71 +140,17 @@ async fn test_apply_secret_set_already_encrypted_passes_through_idempotently() {
 
 #[test_log::test(tokio::test)]
 async fn test_apply_secret_set_same_plaintext_is_untouched() {
-    let harness = BaseConfigurationServiceHarness::new();
-    let account_handle = odf::ResourceOwnerHandle::new_test("test-owner");
-
+    let harness = SecretSetPreApplyHarness::new();
     let spec = make_spec_input([("API_TOKEN", plaintext_secret("original-value"))]);
 
-    let decision = harness
-        .apply_secret_use_case()
-        .apply(BaseResourceServiceHarness::make_apply_params(
-            account_handle.clone(),
-            Some("test-secrets"),
-            spec.clone(),
-        ))
-        .await
-        .unwrap();
+    let id = harness.apply_new(spec.clone()).await;
+    let (stored_spec, _) = harness.stored_spec(&id).await;
 
-    let id = match decision {
-        ApplyResourceApplicationDecision::Applied(result) => result.id,
-        ApplyResourceApplicationDecision::Rejected(r) => {
-            panic!("first apply was rejected: {}", r.message)
-        }
-    };
-
-    let snapshot = harness
-        .generic_query_svc()
-        .get_snapshot_by_id(&id)
-        .await
-        .unwrap()
-        .unwrap();
-
-    let stored_spec: SecretSetSpec =
-        serde_json::from_value(snapshot.spec).expect("spec must deserialize");
-
-    let decision2 = harness
-        .apply_secret_use_case()
-        .apply(ApplyResourceParams {
-            id: Some(id),
-            ..BaseResourceServiceHarness::make_apply_params(
-                account_handle,
-                Some("test-secrets"),
-                spec,
-            )
-        })
-        .await
-        .unwrap();
-
-    match decision2 {
-        ApplyResourceApplicationDecision::Applied(result) => {
-            assert_eq!(result.outcome, ApplyResourceOutcome::Untouched);
-        }
-        ApplyResourceApplicationDecision::Rejected(r) => {
-            panic!("second apply was rejected unexpectedly: {}", r.message)
-        }
-    }
-
-    let snapshot2 = harness
-        .generic_query_svc()
-        .get_snapshot_by_id(&id)
-        .await
-        .unwrap()
-        .unwrap();
-
-    let stored_spec2: SecretSetSpec =
-        serde_json::from_value(snapshot2.spec).expect("spec must deserialize");
-
-    assert_eq!(stored_spec2, stored_spec);
+    assert_eq!(
+        harness.reapply(id, spec).await,
+        ApplyResourceOutcome::Untouched
+    );
+    assert_eq!(harness.stored_spec(&id).await.0, stored_spec);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -293,44 +162,27 @@ async fn test_apply_secret_set_rejects_jwe_that_does_not_decrypt_under_current_k
     // persisted only to fail later in reconciliation or reveal.
     use crypto_utils::SecretCryptor;
 
-    let harness = BaseConfigurationServiceHarness::new();
-    let account_handle = odf::ResourceOwnerHandle::new_test("test-owner");
+    let harness = SecretSetPreApplyHarness::new();
 
-    let wrong_key = "ffffffffffffffffffffffffffffffff";
-    let wrong_key_cryptor = SecretCryptor::try_new(wrong_key).unwrap();
+    let wrong_key_cryptor = SecretCryptor::try_new("ffffffffffffffffffffffffffffffff").unwrap();
     let bad_token = wrong_key_cryptor
         .encrypt_to_jwe(b"encrypted-under-the-wrong-key")
         .unwrap();
 
-    let spec = make_spec_input([(
-        "API_TOKEN",
-        odf::metadata::config::Secret {
-            value: bad_token,
-            content_encoding: Some(CONTENT_ENCODING_JWE.to_string()),
-        },
-    )]);
+    let category = harness
+        .apply_new_rejected(make_spec_input([(
+            "API_TOKEN",
+            odf::metadata::config::Secret {
+                value: bad_token,
+                content_encoding: Some(CONTENT_ENCODING_JWE.to_string()),
+            },
+        )]))
+        .await;
 
-    let decision = harness
-        .apply_secret_use_case()
-        .apply(BaseResourceServiceHarness::make_apply_params(
-            account_handle,
-            Some("test-secrets"),
-            spec,
-        ))
-        .await
-        .unwrap();
-
-    match decision {
-        ApplyResourceApplicationDecision::Applied(result) => {
-            panic!("apply must be rejected, not applied: {result:?}")
-        }
-        ApplyResourceApplicationDecision::Rejected(rejection) => {
-            assert_eq!(
-                rejection.category,
-                ApplyResourceRejectionCategory::BusinessValidationFailed
-            );
-        }
-    }
+    assert_eq!(
+        category,
+        ApplyResourceRejectionCategory::BusinessValidationFailed
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -340,42 +192,16 @@ async fn test_apply_secret_set_upgrades_legacy_aes256gcm_to_jwe() {
     // A legacy `aes256gcm` secret (as the env-var backfill migrations produce) is
     // not the canonical write-path encoding, so applying the resource as-is must
     // decrypt and re-encrypt it into `jwe` rather than leaving it untouched.
-    let harness = BaseConfigurationServiceHarness::new();
-    let account_handle = odf::ResourceOwnerHandle::new_test("test-owner");
+    let harness = SecretSetPreApplyHarness::new();
 
-    let legacy_spec = make_spec_input([(
-        "API_TOKEN",
-        legacy_aes256gcm_secret(b"legacy-plaintext-token"),
-    )]);
+    let id = harness
+        .apply_new(make_spec_input([(
+            "API_TOKEN",
+            legacy_aes256gcm_secret(b"legacy-plaintext-token"),
+        )]))
+        .await;
 
-    let decision = harness
-        .apply_secret_use_case()
-        .apply(BaseResourceServiceHarness::make_apply_params(
-            account_handle,
-            Some("test-secrets"),
-            legacy_spec,
-        ))
-        .await
-        .unwrap();
-
-    let applied_id = match decision {
-        ApplyResourceApplicationDecision::Applied(result) => result.id,
-        ApplyResourceApplicationDecision::Rejected(r) => {
-            panic!("apply was rejected: {}", r.message)
-        }
-    };
-
-    let snapshot = harness
-        .generic_query_svc()
-        .get_snapshot_by_id(&applied_id)
-        .await
-        .unwrap()
-        .expect("snapshot must exist after apply");
-
-    let spec_json = snapshot.spec.to_string();
-    let stored_spec: SecretSetSpec =
-        serde_json::from_value(snapshot.spec).expect("spec must deserialize");
-
+    let (stored_spec, spec_json) = harness.stored_spec(&id).await;
     let stored_secret = &stored_spec.secrets.entries["API_TOKEN"];
     assert_eq!(
         stored_secret.content_encoding.as_deref(),
@@ -389,6 +215,88 @@ async fn test_apply_secret_set_upgrades_legacy_aes256gcm_to_jwe() {
         !spec_json.contains("legacy-plaintext-token"),
         "plaintext must not appear in stored spec after upgrading from aes256gcm"
     );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Harness
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+struct SecretSetPreApplyHarness {
+    base: BaseConfigurationServiceHarness,
+    account: odf::ResourceOwnerHandle,
+}
+
+impl SecretSetPreApplyHarness {
+    const NAME: &str = "test-secrets";
+
+    fn new() -> Self {
+        Self {
+            base: BaseConfigurationServiceHarness::new(),
+            account: odf::ResourceOwnerHandle::new_test("test-owner"),
+        }
+    }
+
+    async fn apply(
+        &self,
+        params: ApplyResourceParams<SecretSetResource>,
+    ) -> ApplyResourceApplicationDecision<SecretSetResource> {
+        self.base
+            .apply_secret_use_case()
+            .apply(params)
+            .await
+            .unwrap()
+    }
+
+    fn params(&self, spec: SecretSetSpecInput) -> ApplyResourceParams<SecretSetResource> {
+        BaseResourceServiceHarness::make_apply_params(self.account.clone(), Some(Self::NAME), spec)
+    }
+
+    /// Applies a new secret set and returns its ID, failing the test on a rejection
+    async fn apply_new(&self, spec: SecretSetSpecInput) -> ResourceID {
+        match self.apply(self.params(spec)).await {
+            ApplyResourceApplicationDecision::Applied(result) => result.id,
+            ApplyResourceApplicationDecision::Rejected(r) => {
+                panic!("apply was rejected: {}", r.message)
+            }
+        }
+    }
+
+    /// Applies a new secret set that must be rejected, and returns why
+    async fn apply_new_rejected(&self, spec: SecretSetSpecInput) -> ApplyResourceRejectionCategory {
+        match self.apply(self.params(spec)).await {
+            ApplyResourceApplicationDecision::Applied(result) => {
+                panic!("apply must be rejected, not applied: {result:?}")
+            }
+            ApplyResourceApplicationDecision::Rejected(r) => r.category,
+        }
+    }
+
+    /// Applies the spec to an existing secret set, failing the test on a rejection
+    async fn reapply(&self, id: ResourceID, spec: SecretSetSpecInput) -> ApplyResourceOutcome {
+        let params = ApplyResourceParams {
+            id: Some(id),
+            ..self.params(spec)
+        };
+        match self.apply(params).await {
+            ApplyResourceApplicationDecision::Applied(result) => result.outcome,
+            ApplyResourceApplicationDecision::Rejected(r) => {
+                panic!("re-apply was rejected: {}", r.message)
+            }
+        }
+    }
+
+    /// The stored spec, and its JSON as persisted
+    async fn stored_spec(&self, id: &ResourceID) -> (SecretSetSpec, String) {
+        let snapshot = self
+            .base
+            .generic_query_svc()
+            .get_snapshot_by_id(id)
+            .await
+            .unwrap()
+            .expect("snapshot must exist after apply");
+        let json = snapshot.spec.to_string();
+        (serde_json::from_value(snapshot.spec).unwrap(), json)
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

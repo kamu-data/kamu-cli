@@ -84,6 +84,8 @@ fn manifest(target_name: &str, mode: &str) -> ApplyManifestRequest {
     }
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 async fn apply(facade: &dyn ResourceFacade, request: ApplyManifestRequest) -> ApplyResourceOutcome {
     facade
         .apply_manifest(request)

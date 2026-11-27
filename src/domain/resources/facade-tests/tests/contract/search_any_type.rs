@@ -37,6 +37,8 @@ fn summary_keys(mut items: Vec<ResourceSummaryView>) -> Vec<(String, String)> {
         .collect()
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 fn handle_keys(mut items: Vec<ResourceHandle>) -> Vec<(String, String)> {
     normalize_handles(&mut items);
     items

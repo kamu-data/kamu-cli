@@ -73,6 +73,8 @@ pub(crate) fn validate_name(name: &ResourceName) -> Result<(), ResourceHeadersVa
     Ok(())
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 pub(crate) fn validate_entry_counts(
     labels: Option<&ResourceLabels>,
     annotations: Option<&ResourceAnnotations>,
@@ -97,6 +99,8 @@ pub(crate) fn validate_entry_counts(
 
     Ok(())
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub(crate) fn validate_owner_references(
     owner_references: &[ResourceRef],

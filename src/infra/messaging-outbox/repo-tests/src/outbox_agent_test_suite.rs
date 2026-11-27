@@ -54,10 +54,7 @@ pub async fn test_drain_ignores_held_back_messages_nobody_consumes(catalog: &Cat
     harness.push_unconsumed_message(&newer_tx).await;
     harness.commit(newer_tx).await;
 
-    tokio::time::timeout(Duration::from_secs(2), harness.spawn_drain())
-        .await
-        .expect("drain must not wait for the older transaction")
-        .unwrap();
+    harness.drain_without_waiting().await;
 
     harness.commit(older_tx).await;
 }
@@ -80,10 +77,7 @@ pub async fn test_drain_ignores_held_back_messages_of_failed_consumers(catalog: 
     harness.push_failing_message(&newer_tx).await;
     harness.commit(newer_tx).await;
 
-    tokio::time::timeout(Duration::from_secs(2), harness.spawn_drain())
-        .await
-        .expect("drain must not wait for the older transaction")
-        .unwrap();
+    harness.drain_without_waiting().await;
 
     harness.commit(older_tx).await;
 }

@@ -169,6 +169,8 @@ fn request(manifest: &serde_json::Value) -> ApplyManifestRequest {
     }
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 fn nameless_manifest(id: Option<ResourceID>, value: &str) -> ApplyManifestRequest {
     request(&serde_json::json!({
         "$schema": TestResource::SCHEMA_STR,
@@ -176,6 +178,8 @@ fn nameless_manifest(id: Option<ResourceID>, value: &str) -> ApplyManifestReques
         "spec": { "value": value },
     }))
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 fn named_manifest(name: &str, value: &str) -> ApplyManifestRequest {
     request(&serde_json::json!({
@@ -185,6 +189,8 @@ fn named_manifest(name: &str, value: &str) -> ApplyManifestRequest {
     }))
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 async fn plan(facade: &dyn ResourceFacade, request: ApplyManifestRequest) -> ApplyManifestPlan {
     facade
         .plan_apply_manifest(request)
@@ -193,6 +199,8 @@ async fn plan(facade: &dyn ResourceFacade, request: ApplyManifestRequest) -> App
         .expect_planned()
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 async fn apply(facade: &dyn ResourceFacade, request: ApplyManifestRequest) -> ApplyManifestResult {
     facade
         .apply_manifest(request)
@@ -200,6 +208,8 @@ async fn apply(facade: &dyn ResourceFacade, request: ApplyManifestRequest) -> Ap
         .unwrap()
         .expect_applied()
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 async fn stored_name(facade: &dyn ResourceFacade, id: ResourceID) -> String {
     let response = facade
@@ -221,6 +231,8 @@ async fn stored_name(facade: &dyn ResourceFacade, id: ResourceID) -> String {
         .name
         .to_string()
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 fn assert_missing_name(result: Result<impl std::fmt::Debug, ApplyManifestError>) {
     assert_matches!(

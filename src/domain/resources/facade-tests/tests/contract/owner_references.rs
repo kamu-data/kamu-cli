@@ -516,6 +516,8 @@ fn request(manifest: String) -> ApplyManifestRequest {
     }
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 fn owned_manifest(name: &str, owner_references: &serde_json::Value) -> String {
     serde_json::json!({
         "$schema": VARIABLE_SET_SCHEMA_STR,
@@ -524,6 +526,8 @@ fn owned_manifest(name: &str, owner_references: &serde_json::Value) -> String {
     })
     .to_string()
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 async fn create_owned(
     h: &impl FacadeContractHarness,
@@ -538,6 +542,8 @@ async fn create_owned(
     .await
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 fn assert_owners_account_name(resource: &Resource, expected: &odf::AccountName) {
     let names = resource
         .headers
@@ -549,6 +555,8 @@ fn assert_owners_account_name(resource: &Resource, expected: &odf::AccountName) 
     assert_eq!(names, [expected]);
     assert_eq!(resource.headers.account.name, *expected);
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 async fn rendered_manifest(facade: &dyn ResourceFacade, id: ResourceID) -> String {
     let response = facade
@@ -563,6 +571,8 @@ async fn rendered_manifest(facade: &dyn ResourceFacade, id: ResourceID) -> Strin
     assert_single_batch_success(response).manifest
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 async fn reapply(facade: &dyn ResourceFacade, manifest: String) -> ApplyResourceOutcome {
     facade
         .apply_manifest(request(manifest))
@@ -571,6 +581,8 @@ async fn reapply(facade: &dyn ResourceFacade, manifest: String) -> ApplyResource
         .expect_applied()
         .outcome
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 fn search_request(owner: ResourceRef, visibility: ResourceVisibility) -> SearchResourcesRequest {
     SearchResourcesRequest {
@@ -586,6 +598,8 @@ fn search_request(owner: ResourceRef, visibility: ResourceVisibility) -> SearchR
     }
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 async fn search_owned(
     facade: &dyn ResourceFacade,
     owner: ResourceRef,
@@ -593,6 +607,8 @@ async fn search_owned(
 ) -> Result<BTreeSet<String>, ListResourcesError> {
     search(facade, search_request(owner, visibility)).await
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// Names found by both kinds of search, which must agree
 async fn search(

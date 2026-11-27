@@ -192,6 +192,8 @@ where
     resource.apply_event(event)
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 /// Compares what would be stored, so an equivalent input counts as the same
 /// even if its written form differs
 fn is_same_spec<R>(resource: &R, new_spec: &R::SpecInput) -> bool

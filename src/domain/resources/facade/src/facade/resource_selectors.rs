@@ -107,6 +107,8 @@ pub fn validate_selector(value: &ResourceSelector) -> Result<(), UnsupportedSele
     Ok(())
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 /// Rejects a search whose selectors or owner carry a field the facade cannot
 /// resolve, by [`validate_selector`] and [`validate_ref`].
 pub fn validate_search_request(

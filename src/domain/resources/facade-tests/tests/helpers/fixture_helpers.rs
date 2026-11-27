@@ -129,6 +129,8 @@ pub fn sorted_handle_names(mut items: Vec<ResourceHandle>) -> Vec<String> {
         .collect()
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 pub fn sorted_summary_names(mut items: Vec<ResourceSummaryView>) -> Vec<String> {
     crate::helpers::normalize_summary_views(&mut items);
     items
@@ -136,6 +138,8 @@ pub fn sorted_summary_names(mut items: Vec<ResourceSummaryView>) -> Vec<String> 
         .map(|item| item.name.to_string())
         .collect()
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub fn total_schema_count(summary: ResourcesSummary, schema: &TypeUri) -> u64 {
     summary
@@ -164,6 +168,8 @@ pub fn variable_set_ref_by_name(name: &str) -> ResourceRef {
     }
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 /// A ref to the `VariableSet` of this id.
 pub fn variable_set_ref_by_id(id: ResourceID) -> ResourceRef {
     ResourceRef {
@@ -172,6 +178,8 @@ pub fn variable_set_ref_by_id(id: ResourceID) -> ResourceRef {
         ..ResourceRef::default()
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// A ref to the resource of this id, whatever its type.
 pub fn ref_by_id(id: ResourceID) -> ResourceRef {

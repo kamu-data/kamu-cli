@@ -55,6 +55,8 @@ pub enum UnresolvableResourceRefError {
     UntypedName,
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 pub fn validate_owner_reference(
     owner_reference: &ResourceRef,
 ) -> Result<(), UnresolvableResourceRefError> {
@@ -92,6 +94,8 @@ pub(crate) fn owner_handles_from_input(
 
     (!handles.is_empty()).then_some(handles)
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 fn owner_handle_from_resolved_ref(
     owner_reference: ResourceRef,
@@ -140,6 +144,8 @@ pub(crate) fn have_same_owners(
     current == new
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 /// IDs of the owners, as indexed for queries by owner
 pub fn owner_ids(owner_references: Option<&Vec<ResourceHandle>>) -> Vec<ResourceID> {
     owner_references
@@ -163,6 +169,8 @@ pub fn resource_owner_references_to_json(
         serde_json::to_value(proxies).unwrap()
     })
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// Takes `account` as [`owner_handles_from_input`] does
 pub(crate) fn resource_owner_references_from_json(

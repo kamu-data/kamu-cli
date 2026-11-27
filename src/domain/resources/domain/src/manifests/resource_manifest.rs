@@ -162,6 +162,8 @@ where
     )
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 /// Accepts the short `Type:name` form as well
 fn deserialize_owner_references<'de, D>(deserializer: D) -> Result<Vec<ResourceRef>, D::Error>
 where
@@ -181,6 +183,8 @@ where
         .map(|proxy| ResourceRef::try_from(proxy).map_err(serde::de::Error::custom))
         .collect()
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// The owner as a manifest names it: without the account, which is that of the
 /// resource

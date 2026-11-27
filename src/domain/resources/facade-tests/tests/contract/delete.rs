@@ -820,6 +820,8 @@ pub async fn test_deleted_only_hides_live_resources(h: &impl FacadeContractHarne
     }
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[track_caller]
 fn assert_not_found(problem: &ResourceLookupProblem) {
     assert_matches!(
@@ -906,6 +908,8 @@ async fn create_variable_set_with_replacement_warnings(
 
     (id, replacement_warnings)
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// `(request_index, id)` of the resources a name resolves to
 async fn found_by_name(

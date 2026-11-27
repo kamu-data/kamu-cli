@@ -132,6 +132,8 @@ fn owned_manifest(name: &str, owner_reference: &str) -> String {
     )
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 async fn apply_owned(ctx: &ResourceCtx, name: &str, owner_reference: &str) {
     ctx.assert_success_with_stdin(
         ["apply", "--stdin"],
