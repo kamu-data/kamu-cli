@@ -157,6 +157,33 @@ pub async fn test_guard_decides_create_in_another_account(h: &impl FacadeContrac
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+// RF-212
+contract_test!(
+    guard_hiding_a_create_denies_it_as_another_account,
+    super::test_guard_hiding_a_create_denies_it_as_another_account,
+    opts = super::LocalFacadeHarnessOpts::with_guarded_test_resources()
+);
+
+pub async fn test_guard_hiding_a_create_denies_it_as_another_account(
+    h: &impl FacadeContractHarness,
+) {
+    let bob = h.account_name(TestAccount::Bob);
+    let request = manifest_request(
+        Some(&bob),
+        "hidden",
+        &format!("hide:{bob}"),
+        serde_json::json!({}),
+    );
+    let facade = h.facade_for(TestAccount::Alice);
+
+    let planned = facade.plan_apply_manifest(request.clone()).await;
+    assert_apply_access_denied(&planned.unwrap_err());
+    let applied = facade.apply_manifest(request).await;
+    assert_apply_access_denied(&applied.unwrap_err());
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 // RF-209
 contract_test!(
     guard_decides_update_by_the_current_resource,

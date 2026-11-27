@@ -7,6 +7,10 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::assert_matches;
+
+use crypto_utils::SecretCryptor;
+use internal_error::InternalError;
 use kamu_configuration::{
     CONTENT_ENCODING_AES256GCM,
     CONTENT_ENCODING_JWE,
@@ -24,6 +28,9 @@ use kamu_resources::{
     ApplyResourceRejectionCategory,
     ResourceID,
     ResourceSpecFromInput,
+    ResourceSpecPreApply,
+    ResourceSpecPreApplyContext,
+    ResourceSpecPreApplyOutcome,
 };
 use kamu_resources_services::testing::BaseResourceServiceHarness;
 
@@ -51,6 +58,18 @@ fn legacy_aes256gcm_secret(plaintext: &[u8]) -> odf::metadata::config::Secret {
     odf::metadata::config::Secret {
         value: hex::encode(combined),
         content_encoding: Some(CONTENT_ENCODING_AES256GCM.to_string()),
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// A well-formed JWE secret encrypted under a key other than the current one
+fn wrong_key_jwe_secret(plaintext: &[u8]) -> odf::metadata::config::Secret {
+    let wrong_key_cryptor = SecretCryptor::try_new("ffffffffffffffffffffffffffffffff").unwrap();
+
+    odf::metadata::config::Secret {
+        value: wrong_key_cryptor.encrypt_to_jwe(plaintext).unwrap(),
+        content_encoding: Some(CONTENT_ENCODING_JWE.to_string()),
     }
 }
 
@@ -160,22 +179,12 @@ async fn test_apply_secret_set_rejects_jwe_that_does_not_decrypt_under_current_k
     // A `contentEncoding: jwe` secret that is well-formed but was encrypted under a
     // different key (or tampered) must be rejected as bad business input, not
     // persisted only to fail later in reconciliation or reveal.
-    use crypto_utils::SecretCryptor;
-
     let harness = SecretSetPreApplyHarness::new();
-
-    let wrong_key_cryptor = SecretCryptor::try_new("ffffffffffffffffffffffffffffffff").unwrap();
-    let bad_token = wrong_key_cryptor
-        .encrypt_to_jwe(b"encrypted-under-the-wrong-key")
-        .unwrap();
 
     let category = harness
         .apply_new_rejected(make_spec_input([(
             "API_TOKEN",
-            odf::metadata::config::Secret {
-                value: bad_token,
-                content_encoding: Some(CONTENT_ENCODING_JWE.to_string()),
-            },
+            wrong_key_jwe_secret(b"encrypted-under-the-wrong-key"),
         )]))
         .await;
 
@@ -214,6 +223,46 @@ async fn test_apply_secret_set_upgrades_legacy_aes256gcm_to_jwe() {
     assert!(
         !spec_json.contains("legacy-plaintext-token"),
         "plaintext must not appear in stored spec after upgrading from aes256gcm"
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+#[test_log::test(tokio::test)]
+async fn test_apply_secret_set_current_secret_that_does_not_decrypt_is_internal_error() {
+    // The current secret was accepted once, so a failure to decrypt it is a
+    // technical fault, such as a changed key, and not bad input
+    let harness = SecretSetPreApplyHarness::new();
+
+    let result = harness
+        .pre_apply_over(
+            make_spec_input([("API_TOKEN", wrong_key_jwe_secret(b"current-value"))]),
+            make_spec_input([("API_TOKEN", plaintext_secret("current-value"))]),
+        )
+        .await;
+
+    assert_matches!(result, Err(_));
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_apply_secret_set_same_plaintext_over_legacy_secret_is_reencrypted() {
+    let harness = SecretSetPreApplyHarness::new();
+    let current_secret = legacy_aes256gcm_secret(b"current-value");
+
+    let prepared = harness
+        .pre_apply_over(
+            make_spec_input([("API_TOKEN", current_secret.clone())]),
+            make_spec_input([("API_TOKEN", plaintext_secret("current-value"))]),
+        )
+        .await
+        .unwrap();
+
+    let prepared_secret = &prepared.secrets.entries["API_TOKEN"];
+    assert_ne!(prepared_secret.value, current_secret.value);
+    assert_eq!(
+        prepared_secret.content_encoding.as_deref(),
+        Some(CONTENT_ENCODING_JWE)
     );
 }
 
@@ -281,6 +330,36 @@ impl SecretSetPreApplyHarness {
             ApplyResourceApplicationDecision::Applied(result) => result.outcome,
             ApplyResourceApplicationDecision::Rejected(r) => {
                 panic!("re-apply was rejected: {}", r.message)
+            }
+        }
+    }
+
+    /// Prepares `new_spec` over a stored `current_spec` that the apply path
+    /// does not write: a legacy or undecryptable one. Fails the test on a
+    /// rejection
+    async fn pre_apply_over(
+        &self,
+        current_spec: SecretSetSpecInput,
+        new_spec: SecretSetSpecInput,
+    ) -> Result<SecretSetSpecInput, InternalError> {
+        let current_spec = SecretSetSpec::from_input(current_spec);
+        let outcome = self
+            .base
+            .catalog()
+            .get_one::<dyn ResourceSpecPreApply<SecretSetResource>>()
+            .unwrap()
+            .pre_apply(
+                new_spec,
+                ResourceSpecPreApplyContext {
+                    account_id: &self.account.did,
+                    maybe_current_spec: Some(&current_spec),
+                },
+            )
+            .await?;
+        match outcome {
+            ResourceSpecPreApplyOutcome::Prepared(spec) => Ok(spec),
+            ResourceSpecPreApplyOutcome::Rejected(r) => {
+                panic!("pre-apply was rejected: {}", r.message)
             }
         }
     }

@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use chrono::{DateTime, Duration, TimeZone, Utc};
-use event_sourcing::Aggregate;
+use event_sourcing::{Aggregate, EventID};
 use internal_error::InternalError;
 use kamu_resources::{
     DeclarativeResource,
@@ -107,6 +107,20 @@ impl ResourceLifecycleHarness {
         harness.mark_started();
         harness.mark_succeeded();
         harness
+    }
+
+    /// The resource as loaded back from its store, with no events pending
+    pub fn saved(self) -> Self {
+        let id = *self.resource.id();
+        let state = self.resource.0.into_state();
+        Self {
+            resource: TestResource::from_aggregate(Aggregate::from_stored_snapshot(
+                id,
+                EventID::new(1),
+                state,
+            )),
+            now: self.now,
+        }
     }
 
     pub fn headers_input(env_label: Option<&str>) -> ResourceHeadersInput {
@@ -329,6 +343,10 @@ impl ResourceLifecycleHarness {
 
     pub fn updated_at(&self) -> DateTime<Utc> {
         self.resource.headers().updated_at
+    }
+
+    pub fn has_pending_events(&self) -> bool {
+        self.resource.0.has_updates()
     }
 
     pub fn needs_reconciliation(&self) -> bool {

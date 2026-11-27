@@ -45,3 +45,58 @@ pub fn request_creation_provenance(
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[cfg(test)]
+mod tests {
+    use pretty_assertions::assert_eq;
+
+    use super::*;
+
+    #[test]
+    fn test_each_request_origin_maps_to_its_creation_origin() {
+        let internal = |detail: Option<&str>| {
+            (
+                RequestOrigin::Internal {
+                    producer: "dev.kamu.test.Producer".to_string(),
+                    detail: detail.map(str::to_string),
+                },
+                CreationOrigin::Internal {
+                    producer: "dev.kamu.test.Producer".to_string(),
+                    detail: detail.map(str::to_string),
+                },
+            )
+        };
+        let api = |request_api, creation_api| {
+            (
+                RequestOrigin::Api(request_api),
+                CreationOrigin::Api { api: creation_api },
+            )
+        };
+        let cases = [
+            api(ApiKind::GraphQl, CreationOriginApi::GraphQl),
+            api(ApiKind::Rest, CreationOriginApi::Rest),
+            api(ApiKind::FlightSql, CreationOriginApi::FlightSql),
+            (RequestOrigin::Cli, CreationOrigin::Cli),
+            internal(None),
+            internal(Some("flow-1")),
+        ];
+
+        for (request_origin, expected_origin) in cases {
+            assert_eq!(
+                request_creation_provenance(&Principal::Node, &request_origin).unwrap(),
+                CreationProvenance {
+                    principal: Principal::Node.handle().unwrap(),
+                    origin: expected_origin,
+                },
+                "{request_origin:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_anonymous_principal_has_no_creation_provenance() {
+        assert!(request_creation_provenance(&Principal::Anonymous, &RequestOrigin::Cli).is_err());
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -129,6 +129,22 @@ database_concurrent_transactions_test!(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+database_concurrent_transactions_test!(
+    storage = postgres,
+    fixture = variable_set_repo::test_rolled_back_replace_entries_leaves_generation_free,
+    harness = PostgresVariableSetProjectionRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_concurrent_transactions_test!(
+    storage = postgres,
+    fixture = variable_set_repo::test_rolled_back_cleanup_keeps_older_generations,
+    harness = PostgresVariableSetProjectionRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 struct PostgresVariableSetProjectionRepositoryHarness {
     catalog: Catalog,
 }

@@ -129,6 +129,22 @@ database_concurrent_transactions_test!(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+database_concurrent_transactions_test!(
+    storage = sqlite,
+    fixture = variable_set_repo::test_rolled_back_replace_entries_leaves_generation_free,
+    harness = SqliteVariableSetProjectionRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_concurrent_transactions_test!(
+    storage = sqlite,
+    fixture = variable_set_repo::test_rolled_back_cleanup_keeps_older_generations,
+    harness = SqliteVariableSetProjectionRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 struct SqliteVariableSetProjectionRepositoryHarness {
     catalog: Catalog,
 }

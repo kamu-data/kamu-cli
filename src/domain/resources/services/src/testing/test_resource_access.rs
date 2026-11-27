@@ -17,6 +17,7 @@ use kamu_resources::{
     DeclarativeResource,
     ResourceAccountAccess,
     ResourceAccountOperation,
+    ResourceID,
     ResourceIDNotFoundError,
     ResourceOperation,
     ResourceOperationError,
@@ -25,6 +26,7 @@ use kamu_resources::{
     ResourcePlacement,
     ResourcePlacementOutcome,
 };
+use uuid::Uuid;
 
 use crate::DefaultResourceOperationGuard;
 use crate::testing::{TestResource, TestResourceSpec};
@@ -85,7 +87,7 @@ impl ResourcePlacement<TestResource> for TestResourcePlacement {
 ///
 /// | Operation | Also allowed for |
 /// | --- | --- |
-/// | Create | Anyone, in the account the spec places the resource in |
+/// | Create | Anyone, in the account the spec places the resource in. Not found, for a `hide:` token naming the account |
 /// | Update | Anyone, in the account both the current and the new spec place the resource in |
 /// | Read | A principal named by a `read:` or `delete:` token; anyone, for a `public-` name |
 /// | Delete | A principal named by a `delete:` token |
@@ -166,7 +168,11 @@ impl ResourceOperationGuard<TestResource> for TestResourceOperationGuard {
 
         match &request.operation {
             ResourceOperation::Create { spec } => {
-                if places_in_account(spec) {
+                if token_values(spec, "hide").any(|name| name == request.account.name.as_str()) {
+                    Err(ResourceOperationError::NotFound(ResourceIDNotFoundError(
+                        ResourceID::new(Uuid::nil()),
+                    )))
+                } else if places_in_account(spec) {
                     Ok(())
                 } else {
                     Err(denial)

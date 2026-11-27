@@ -186,3 +186,4 @@ Each `RF-*` contract scenario is listed with its status. Test code and comments 
 | RF-209 | operation_guard.rs | Active | A type's guard decides an update by the current resource | On `TestResource`: an update the new spec alone would allow is `AccountAccess` when the current spec does not place the resource in the account |
 | RF-210 | operation_guard.rs | Active | A placement rejecting the spec rejects plan and apply | On `TestResource`: a `place:` token naming a missing account is `ReferencedObjectMissing`, and nothing is created |
 | RF-211 | owner_references.rs | Active | Owners named alike in several types resolve to their own types | `VariableSet:x` and `SecretSet:x` in one manifest are stored with their own ids and types |
+| RF-212 | operation_guard.rs | Active | A guard that finds a create's object hidden denies it as an apply in an account the caller may not use | On `TestResource`, a `hide:` token: `AccountAccess` from plan and apply, as RF-201 |

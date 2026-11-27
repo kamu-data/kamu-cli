@@ -214,6 +214,23 @@ fn test_unchanged_status_is_not_an_update() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test]
+fn test_status_differing_only_in_phase_is_not_an_update() {
+    // The phase is derived, so the one a status carries is replaced
+    let mut harness = ResourceLifecycleHarness::reconciled().saved();
+    let status_before = harness.status();
+    let mut new_status = harness.status();
+    new_status.phase = ResourcePhase::Failed;
+
+    harness.update_status(3, new_status).unwrap();
+
+    assert_eq!(harness.generations(), (1, 3));
+    assert_eq!(harness.status(), status_before);
+    assert!(!harness.has_pending_events());
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test]
 fn test_failed_then_retried_then_degraded() {
     let mut harness = ResourceLifecycleHarness::new();
 

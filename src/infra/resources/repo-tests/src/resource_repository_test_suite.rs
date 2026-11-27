@@ -3541,7 +3541,8 @@ pub async fn test_purging_an_owner_keeps_owner_rows_of_owned_resources(catalog: 
         &TEST_KIND,
         "owned",
         &[&owner_handle],
-        false,
+        Utc::now(),
+        OwnedResourceDeletion::None,
     )
     .await;
 
@@ -4724,39 +4725,74 @@ pub async fn test_search_by_owner(catalog: &Catalog) {
     let repo = catalog.get_one::<dyn ResourceRepository>().unwrap();
     let account = odf::ResourceOwnerHandle::new_test("test-account");
     let other_account = odf::ResourceOwnerHandle::new_test("other-account");
+    let at = |hour| Utc.with_ymd_and_hms(2026, 1, 1, hour, 0, 0).unwrap();
 
     let first = make_owner_handle(&account, "first");
     let second = make_owner_handle(&account, "second");
 
-    for (account, schema, name, owners, deleted) in [
-        (&account, &*TEST_KIND, "of-first", vec![&first], false),
+    // Deletion runs opposite to the last update, so that the order of
+    // resources being deleted shows which of the two the listing sorts by
+    use OwnedResourceDeletion as D;
+    for (account, schema, name, owners, updated_at, deletion) in [
+        (
+            &account,
+            &*TEST_KIND,
+            "of-first",
+            vec![&first],
+            at(1),
+            D::None,
+        ),
         (
             &account,
             &*OTHER_KIND,
             "of-both",
             vec![&first, &second],
-            false,
+            at(3),
+            D::None,
         ),
-        (&account, &*TEST_KIND, "of-second", vec![&second], false),
-        (&account, &*TEST_KIND, "of-none", vec![], false),
+        (
+            &account,
+            &*TEST_KIND,
+            "of-second",
+            vec![&second],
+            at(2),
+            D::None,
+        ),
+        (&account, &*TEST_KIND, "of-none", vec![], at(4), D::None),
+        (
+            &account,
+            &*TEST_KIND,
+            "deleting-of-first",
+            vec![&first],
+            at(2),
+            D::Requested(at(8)),
+        ),
         (
             &account,
             &*TEST_KIND,
             "deleted-of-first",
             vec![&first],
-            true,
+            at(5),
+            D::Completed(at(7)),
         ),
         (
             &other_account,
             &*TEST_KIND,
             "of-other-account",
             vec![&first],
-            false,
+            at(1),
+            D::None,
         ),
     ] {
-        create_owned_resource(catalog, account, schema, name, &owners, deleted).await;
+        create_owned_resource(
+            catalog, account, schema, name, &owners, updated_at, deletion,
+        )
+        .await;
     }
 
+    // In the order of `list_resource_snapshots`: by last update, newest first.
+    // Only when deleted resources are visible do the ones whose deletion was
+    // requested follow the live ones, by deletion time
     use ResourceVisibility as V;
     let any_type = ResourceScope::any_type();
     let one_type = ResourceScope::one_type(TEST_KIND.clone(), None);
@@ -4767,14 +4803,20 @@ pub async fn test_search_by_owner(catalog: &Catalog) {
         (
             first.id,
             &one_type,
+            V::IncludeDeleting,
+            vec!["deleting-of-first", "of-first"],
+        ),
+        (
+            first.id,
+            &one_type,
             V::IncludeDeleted,
-            vec!["deleted-of-first", "of-first"],
+            vec!["of-first", "deleting-of-first", "deleted-of-first"],
         ),
         (
             first.id,
             &any_type,
             V::DeletedOnly,
-            vec!["deleted-of-first"],
+            vec!["deleting-of-first", "deleted-of-first"],
         ),
         (
             second.id,
@@ -4794,24 +4836,32 @@ pub async fn test_search_by_owner(catalog: &Catalog) {
         )
         .await;
 
-        let mut handles = reads
+        let searched = reads
             .searched
             .into_iter()
             .map(|row| row.name)
             .collect::<Vec<_>>();
-        handles.sort();
-        assert_eq!(handles, expected);
+        assert_eq!(searched, expected, "{visibility:?}");
 
-        let mut listed = reads
+        let listed = reads
             .listed
             .into_iter()
             .map(|snapshot| snapshot.headers.name.to_string())
             .collect::<Vec<_>>();
-        listed.sort();
-        assert_eq!(listed, expected);
+        assert_eq!(listed, expected, "{visibility:?}");
 
-        assert_eq!(reads.count, expected.len());
+        assert_eq!(reads.count, expected.len(), "{visibility:?}");
     }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// How far the deletion of a resource made by [`create_owned_resource`] went
+#[derive(Debug, Clone, Copy)]
+enum OwnedResourceDeletion {
+    None,
+    Requested(DateTime<Utc>),
+    Completed(DateTime<Utc>),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -4822,15 +4872,23 @@ async fn create_owned_resource(
     schema: &TypeUri,
     name: &str,
     owners: &[&ResourceHandle],
-    deleted: bool,
+    updated_at: DateTime<Utc>,
+    deletion: OwnedResourceDeletion,
 ) -> ResourceSnapshot {
     let mut snapshot = make_test_snapshot(account, schema, name);
     let headers = &mut snapshot.headers;
     headers.owner_references =
         (!owners.is_empty()).then(|| owners.iter().copied().cloned().collect());
-    if deleted {
-        headers.deletion_requested_at = Some(Utc::now());
-        headers.deleted_at = Some(Utc::now());
+    headers.updated_at = updated_at;
+    match deletion {
+        OwnedResourceDeletion::None => {}
+        OwnedResourceDeletion::Requested(requested_at) => {
+            headers.deletion_requested_at = Some(requested_at);
+        }
+        OwnedResourceDeletion::Completed(deleted_at) => {
+            headers.deletion_requested_at = Some(deleted_at);
+            headers.deleted_at = Some(deleted_at);
+        }
     }
 
     catalog

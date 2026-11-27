@@ -104,6 +104,25 @@ async fn purge_resources(catalog: &Catalog, ids: &[ResourceID]) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// The entries of a generation, read in a transaction of their own
+async fn committed_entries(
+    catalog: &Catalog,
+    resource_id: ResourceID,
+    resource_generation: u64,
+) -> Vec<SecretSetEntry> {
+    in_committed_transaction(catalog, |catalog| async move {
+        catalog
+            .get_one::<dyn SecretSetProjectionRepository>()
+            .unwrap()
+            .get_entries(&resource_id, resource_generation)
+            .await
+            .unwrap()
+    })
+    .await
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 pub async fn test_entries_empty_initially(catalog: &Catalog) {
     let repo = catalog
         .get_one::<dyn SecretSetProjectionRepository>()
@@ -512,17 +531,78 @@ pub async fn test_rolled_back_delete_all_entries_keeps_entries(catalog: &Catalog
     })
     .await;
 
-    let entries = in_committed_transaction(catalog, |catalog| async move {
+    let entries = committed_entries(catalog, resource_id, 1).await;
+    assert_eq!(1, entries.len());
+    assert_eq!(entries[0].value, b"gen1");
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_rolled_back_replace_entries_leaves_generation_free(catalog: &Catalog) {
+    let resource_id = in_committed_transaction(catalog, |catalog| async move {
+        make_secret_set_resource(&catalog).await
+    })
+    .await;
+
+    in_rolled_back_transaction(catalog, |catalog| async move {
         catalog
             .get_one::<dyn SecretSetProjectionRepository>()
             .unwrap()
-            .get_entries(&resource_id, 1)
+            .replace_entries(&resource_id, 1, &[make_entry("K1", b"rolled-back")])
             .await
-            .unwrap()
+            .unwrap();
     })
     .await;
+
+    assert_eq!(committed_entries(catalog, resource_id, 1).await, []);
+
+    in_committed_transaction(catalog, |catalog| async move {
+        catalog
+            .get_one::<dyn SecretSetProjectionRepository>()
+            .unwrap()
+            .replace_entries(&resource_id, 1, &[make_entry("K1", b"committed")])
+            .await
+            .unwrap();
+    })
+    .await;
+
+    let entries = committed_entries(catalog, resource_id, 1).await;
     assert_eq!(1, entries.len());
-    assert_eq!(entries[0].value, b"gen1");
+    assert_eq!(entries[0].value, b"committed");
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_rolled_back_cleanup_keeps_older_generations(catalog: &Catalog) {
+    let resource_id = in_committed_transaction(catalog, |catalog| async move {
+        let resource_id = make_secret_set_resource(&catalog).await;
+        let repo = catalog
+            .get_one::<dyn SecretSetProjectionRepository>()
+            .unwrap();
+        for (generation, value) in [(1, b"gen1"), (2, b"gen2"), (3, b"gen3")] {
+            repo.replace_entries(&resource_id, generation, &[make_entry("K1", value)])
+                .await
+                .unwrap();
+        }
+        resource_id
+    })
+    .await;
+
+    in_rolled_back_transaction(catalog, |catalog| async move {
+        catalog
+            .get_one::<dyn SecretSetProjectionRepository>()
+            .unwrap()
+            .cleanup_entries_before_generation(&resource_id, 3)
+            .await
+            .unwrap();
+    })
+    .await;
+
+    for (generation, value) in [(1, b"gen1"), (2, b"gen2"), (3, b"gen3")] {
+        let entries = committed_entries(catalog, resource_id, generation).await;
+        assert_eq!(1, entries.len(), "generation {generation}");
+        assert_eq!(entries[0].value, value, "generation {generation}");
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
