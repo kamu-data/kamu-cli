@@ -13,7 +13,7 @@ use std::sync::Arc;
 use chrono::Utc;
 use crypto_utils::{AesGcmEncryptor, Encryptor};
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
-use kamu_accounts::{AccountService, Principal};
+use kamu_accounts::{AccountService, Principal, RequestOrigin};
 use kamu_configuration::{
     RESOURCE_LABEL_LEGACY_CONFIG_TARGET_DATASET_SCHEMA_URI,
     Secret,
@@ -26,7 +26,6 @@ use kamu_configuration::{
     VariableSetSpec,
     VariableSetSpecInput,
 };
-use kamu_core::RequestOrigin;
 use kamu_datasets::{
     CreateDatasetEnvVarError,
     DatasetEntry,

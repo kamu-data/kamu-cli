@@ -12,10 +12,9 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 
 use axum::Extension;
-use kamu_accounts::{Account, CurrentAccountSubject};
+use kamu_accounts::{Account, ApiKind, CurrentAccountSubject, RequestOrigin};
 use kamu_adapter_graphql::data_loader::{account_entity_data_loader, dataset_handle_data_loader};
 use kamu_adapter_resources_facade_graphql::RemoteGraphqlResourceFacadeImpl;
-use kamu_core::{ApiKind, RequestOrigin};
 use kamu_resources::{CreationOrigin, CreationOriginApi};
 use kamu_resources_facade::ResourceFacade;
 use strum::IntoEnumIterator;

@@ -62,7 +62,7 @@ Register the caller through `CurrentAccountSubject::register`, never with a bare
 `add_value(subject)`, so the two cannot disagree.
 
 Beside the principal, each boundary that serves requests registers the `RequestOrigin` it is
-(`kamu_core`): the HTTP authentication layer `Api(GraphQl)` for the `/graphql` endpoint and `Api(Rest)` for
+(`kamu_accounts`, beside `Principal`): the HTTP authentication layer `Api(GraphQl)` for the `/graphql` endpoint and `Api(Rest)` for
 any other route, the Flight SQL auth layer `Api(FlightSql)`, and the CLI catalog `Cli`. The
 background catalogs register none: background work that records an origin states its own
 `Internal` one. Resource apply records both as the creator of a resource

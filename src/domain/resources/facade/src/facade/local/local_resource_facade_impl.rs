@@ -12,8 +12,7 @@ use std::sync::Arc;
 
 use database_common::PaginationOpts;
 use internal_error::{InternalError, ResultIntoInternal};
-use kamu_accounts::Principal;
-use kamu_core::RequestOrigin;
+use kamu_accounts::{Principal, RequestOrigin};
 use kamu_resources::*;
 use kamu_resources_services::{
     ResourceDispatcherFactory,

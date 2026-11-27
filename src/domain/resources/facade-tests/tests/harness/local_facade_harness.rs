@@ -23,6 +23,7 @@ use kamu_accounts::{
     JOB_KAMU_ACCOUNTS_PREDEFINED_ACCOUNTS_REGISTRATOR,
     PredefinedAccountsConfig,
     Principal,
+    RequestOrigin,
 };
 use kamu_accounts_inmem::{
     InMemoryAccountQuotaEventStore,
@@ -46,7 +47,6 @@ use kamu_auth_rebac_services::{
     RebacServiceImpl,
     SetDatasetRebacPropertiesUseCaseImpl,
 };
-use kamu_core::RequestOrigin;
 use kamu_datasets::SecretsEncryptionConfig;
 use kamu_resources::{
     CreationOrigin,

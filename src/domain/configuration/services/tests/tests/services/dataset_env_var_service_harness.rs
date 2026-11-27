@@ -14,7 +14,7 @@ use chrono::Utc;
 use dill::CatalogBuilder;
 use event_sourcing::Aggregate;
 use internal_error::InternalError;
-use kamu_accounts::Principal;
+use kamu_accounts::{ApiKind, Principal, RequestOrigin};
 use kamu_accounts_services::AccountServiceImpl;
 use kamu_configuration::{
     Secret,
@@ -26,7 +26,6 @@ use kamu_configuration::{
 };
 use kamu_configuration_services::DatasetEnvVarMutationAdapterImpl;
 pub use kamu_configuration_services::testing::BaseConfigurationServiceHarness;
-use kamu_core::{ApiKind, RequestOrigin};
 use kamu_datasets::{
     CreateDatasetEnvVarError,
     DatasetEnvVar,

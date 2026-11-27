@@ -9,8 +9,7 @@
 
 use std::sync::Arc;
 
-use kamu_accounts::Principal;
-use kamu_core::{ApiKind, RequestOrigin};
+use kamu_accounts::{ApiKind, Principal, RequestOrigin};
 use kamu_resources::{
     ApplyResourceOutcome,
     ApplyResourceUseCase,

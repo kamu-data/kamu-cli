@@ -16,11 +16,12 @@ use futures::Future;
 use kamu_accounts::{
     Account,
     AnonymousAccountReason,
+    ApiKind,
     AuthenticationService,
     CurrentAccountSubject,
     GetAccountInfoError,
+    RequestOrigin,
 };
-use kamu_core::{ApiKind, RequestOrigin};
 use tonic::Status;
 use tower::{Layer, Service};
 

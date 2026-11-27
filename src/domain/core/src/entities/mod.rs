@@ -8,10 +8,8 @@
 // by the Apache License, Version 2.0.
 
 pub mod engine;
-mod request_origin;
 mod writer_metadata_state;
 mod writer_source_visitor;
 
-pub use request_origin::*;
 pub use writer_metadata_state::*;
 pub use writer_source_visitor::*;

@@ -38,7 +38,6 @@ kamu-auth-rebac-services = { workspace = true }
 kamu-configuration = { workspace = true }
 kamu-configuration-inmem = { workspace = true }
 kamu-configuration-services = { workspace = true }
-kamu-core = { workspace = true }
 kamu-datasets = { workspace = true }
 kamu-messaging-outbox-inmem = { workspace = true }
 kamu-resources = { workspace = true }

@@ -20,7 +20,6 @@ use kamu_accounts_services::{
 use kamu_adapter_graphql::ANONYMOUS_ACCESS_FORBIDDEN_MESSAGE;
 use kamu_auth_rebac_inmem::InMemoryRebacRepository;
 use kamu_auth_rebac_services::*;
-use kamu_core::{ApiKind, RequestOrigin};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

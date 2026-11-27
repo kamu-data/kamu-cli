@@ -14,9 +14,8 @@ use background_agent_host::BackgroundWorkFinalizer;
 use chrono::Utc;
 use database_common::{InMemoryTransactionManager, NoOpDatabasePlugin};
 use dill::CatalogBuilder;
-use kamu_accounts::{Account, AccountRepository, AccountType, Principal};
+use kamu_accounts::{Account, AccountRepository, AccountType, Principal, RequestOrigin};
 use kamu_accounts_inmem::InMemoryAccountRepository;
-use kamu_core::RequestOrigin;
 use kamu_resources::{
     ApplyResourceAccessCheck,
     ApplyResourceAccountSource,

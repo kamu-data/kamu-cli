@@ -12,13 +12,12 @@ use std::sync::Arc;
 
 use dill::{Catalog, component, interface, meta};
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
-use kamu_accounts::Principal;
+use kamu_accounts::{Principal, RequestOrigin};
 use kamu_configuration::{
     RESOURCE_LABEL_LEGACY_CONFIG_TARGET_DATASET_SCHEMA_URI,
     SecretSetResource,
     VariableSetResource,
 };
-use kamu_core::RequestOrigin;
 use kamu_datasets::{DatasetLifecycleMessage, MESSAGE_PRODUCER_KAMU_DATASET_SERVICE};
 use kamu_resources::{
     ApplyManifestApplicationDecision,

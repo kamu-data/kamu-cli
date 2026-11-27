@@ -8,8 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use internal_error::InternalError;
-use kamu_accounts::Principal;
-use kamu_core::{ApiKind, RequestOrigin};
+use kamu_accounts::{ApiKind, Principal, RequestOrigin};
 
 use crate::domain::{CreationOrigin, CreationOriginApi, CreationProvenance};
 

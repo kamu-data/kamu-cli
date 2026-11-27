@@ -14,8 +14,7 @@ use std::sync::{Arc, Mutex};
 use chrono::Utc;
 use dill::CatalogBuilder;
 use internal_error::{InternalError, ResultIntoInternal};
-use kamu_accounts::Principal;
-use kamu_core::RequestOrigin;
+use kamu_accounts::{Principal, RequestOrigin};
 use kamu_resources::{
     ApplyResourceApplicationDecision,
     ApplyResourceOutcome,

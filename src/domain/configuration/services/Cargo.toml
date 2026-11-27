@@ -43,7 +43,6 @@ kamu-configuration = { workspace = true }
 # Used only by `src/testing/`, which is a library module gated behind the
 # `testing` feature -- so these cannot be dev-dependencies.
 kamu-configuration-inmem = { workspace = true, optional = true }
-kamu-core = { workspace = true }
 kamu-datasets = { workspace = true }
 kamu-datasets-inmem = { workspace = true, optional = true }
 kamu-resources = { workspace = true }
