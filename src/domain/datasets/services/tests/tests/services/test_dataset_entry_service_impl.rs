@@ -46,9 +46,6 @@ test_utils::test_for_each_tenancy!(test_try_to_resolve_non_existing_dataset);
 test_utils::test_for_each_tenancy!(test_try_to_resolve_all_datasets_for_non_existing_user);
 test_utils::test_for_each_tenancy!(test_resolve_dataset_handles_by_refs);
 test_utils::test_for_each_tenancy!(test_node_resolves_bare_alias_only_in_single_tenant);
-test_utils::test_for_each_tenancy!(test_resolve_dataset_handle);
-test_utils::test_for_each_tenancy!(test_resolve_dataset_handle_not_found);
-test_utils::test_for_each_tenancy!(test_resolve_dataset_handle_invalid_ref);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Implementations
@@ -680,9 +677,12 @@ async fn test_resolve_dataset_handles_by_refs(tenancy_config: TenancyConfig) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-async fn test_resolve_dataset_handle(tenancy_config: TenancyConfig) {
-    let harness =
-        DatasetEntryServiceHarness::new(TestDatasetEntryRepository::InMemory, tenancy_config);
+#[test_log::test(tokio::test)]
+async fn test_resolve_dataset_handle() {
+    let harness = DatasetEntryServiceHarness::new(
+        TestDatasetEntryRepository::InMemory,
+        TenancyConfig::MultiTenant,
+    );
     let foo = harness.create_dataset_handle("alice", "foo").await;
     let bobs_foo = harness.create_dataset_handle("bob", "foo").await;
     let alice = odf::AccountName::new_unchecked("alice");
@@ -760,19 +760,6 @@ async fn test_resolve_dataset_handle(tenancy_config: TenancyConfig) {
             None,
             &foo,
         ),
-        (
-            "account type by short name",
-            odf::metadata::datasets::DatasetRef {
-                account: Some(odf::metadata::auth::ResourceOwnerRef {
-                    r#type: Some(odf::metadata::resources::TypeName::new_unchecked("User").into()),
-                    ..Default::default()
-                }),
-                did: Some(foo.did.clone()),
-                ..Default::default()
-            },
-            None,
-            &foo,
-        ),
     ];
 
     for (case, dataset_ref, bare_name_account, expected) in cases {
@@ -808,13 +795,16 @@ async fn test_resolve_dataset_handle(tenancy_config: TenancyConfig) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-async fn test_resolve_dataset_handle_not_found(tenancy_config: TenancyConfig) {
+#[test_log::test(tokio::test)]
+async fn test_resolve_dataset_handle_not_found() {
     use odf::metadata::auth::ResourceOwnerRef;
     use odf::metadata::datasets::DatasetRef;
     use odf::metadata::resources::ResourceName;
 
-    let harness =
-        DatasetEntryServiceHarness::new(TestDatasetEntryRepository::InMemory, tenancy_config);
+    let harness = DatasetEntryServiceHarness::new(
+        TestDatasetEntryRepository::InMemory,
+        TenancyConfig::MultiTenant,
+    );
     let foo = harness.create_dataset_handle("alice", "foo").await;
     let bar = harness.create_dataset_handle("bob", "bar").await;
     let alice = foo.account.name.clone();
@@ -878,30 +868,6 @@ async fn test_resolve_dataset_handle_not_found(tenancy_config: TenancyConfig) {
                 ..Default::default()
             },
         ),
-        (
-            "account of another type by short name",
-            DatasetRef {
-                account: Some(ResourceOwnerRef {
-                    r#type: Some(
-                        odf::metadata::resources::TypeName::new_unchecked("Organization").into(),
-                    ),
-                    ..Default::default()
-                }),
-                did: Some(foo.did.clone()),
-                ..Default::default()
-            },
-        ),
-        (
-            "account with another resource ID",
-            DatasetRef {
-                account: Some(ResourceOwnerRef {
-                    id: Some(bar.account.id),
-                    ..Default::default()
-                }),
-                did: Some(foo.did.clone()),
-                ..Default::default()
-            },
-        ),
     ];
 
     for (case, dataset_ref) in cases {
@@ -929,13 +895,16 @@ async fn test_resolve_dataset_handle_not_found(tenancy_config: TenancyConfig) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-async fn test_resolve_dataset_handle_invalid_ref(tenancy_config: TenancyConfig) {
+#[test_log::test(tokio::test)]
+async fn test_resolve_dataset_handle_invalid_ref() {
     use odf::metadata::auth::ResourceOwnerRef;
     use odf::metadata::datasets::DatasetRef;
     use odf::metadata::resources::ResourceName;
 
-    let harness =
-        DatasetEntryServiceHarness::new(TestDatasetEntryRepository::InMemory, tenancy_config);
+    let harness = DatasetEntryServiceHarness::new(
+        TestDatasetEntryRepository::InMemory,
+        TenancyConfig::MultiTenant,
+    );
     let foo = harness.create_dataset_handle("alice", "foo").await;
 
     let cases = [

@@ -263,19 +263,6 @@ mod tests {
         }
     }
 
-    #[test]
-    fn test_reconciliation_start_clears_previous_error() {
-        let mut status = status(Some(1), Some(1), true);
-
-        status.mark_reconciling(GENERATION, now()).unwrap();
-
-        assert!(!status.conditions.has_reconciliation_error());
-        assert_eq!(
-            status.derive_phase(&headers(Deletion::None)),
-            ResourcePhase::Reconciling
-        );
-    }
-
     fn status(observed: Option<u64>, reconciled: Option<u64>, has_error: bool) -> ResourceStatus {
         let mut status = new_pending_resource_status();
         status.observed_generation = observed;

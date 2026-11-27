@@ -20,32 +20,14 @@ use kamu_cli::{
     configure_in_memory_components,
     register_config_in_catalog,
 };
-use kamu_resources::TypeName;
-use kamu_resources_services::ResourceDispatcherFactory;
 use tempfile::TempDir;
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[test_log::test(tokio::test)]
-async fn test_cli_registers_the_configuration_resource_types() {
-    let harness = RetentionTypesHarness::new(&[]);
-
-    let registered = harness.registered_type_names();
-
-    for type_name in ["VariableSet", "SecretSet"] {
-        assert!(
-            registered.contains(&type_name.parse().unwrap()),
-            "{type_name} in {registered:?}"
-        );
-    }
-}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
 async fn test_cli_refuses_retention_of_unknown_resource_types() {
     for (types, expected_error) in [
-        (&["VariableSet"][..], None),
+        (&["VariableSet", "SecretSet"][..], None),
         (
             &["VariableSet", "Nope"][..],
             Some("Retention configured for unknown resource types: Nope;"),
@@ -114,10 +96,6 @@ impl RetentionTypesHarness {
             base_catalog: b.build(),
             _temp_dir: temp_dir,
         }
-    }
-
-    fn registered_type_names(&self) -> Vec<TypeName> {
-        ResourceDispatcherFactory::registered_type_names_in(&self.base_catalog).unwrap()
     }
 
     fn check_retention_types(&self) -> Result<(), CLIError> {

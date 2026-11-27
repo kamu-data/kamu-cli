@@ -175,23 +175,6 @@ pub async fn test_resources_apply_input_modes(ctx: ResourceCtx) {
         ctx.assert_resource_present("vs", top_name).await;
         ctx.assert_resource_present("vs", nested_name).await;
     }
-
-    // ── 7. Manifest without a name ────────────────────────────────────────────
-    {
-        let rel = "manifests/nameless.yaml";
-        let manifest = fixtures::variable_set_manifest_yaml("nameless-vars", "nameless")
-            .replace("name: nameless-vars", "name: null");
-        ctx.write_manifest(rel, &manifest);
-
-        for args in [vec!["apply", rel], vec!["apply", rel, "--dry-run"]] {
-            ctx.assert_failure(
-                args,
-                Some(&[r#"resource name is required: resources of type '.*VariableSet'"#]),
-            )
-            .await;
-        }
-        ctx.assert_resource_absent("vs", "nameless-vars").await;
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -7,6 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::collections::HashSet;
+
 use kamu_resources::{
     ApplyManifestPlan,
     ApplyManifestResult,
@@ -27,7 +29,7 @@ use kamu_resources_facade::{
     SpecViewOpts,
 };
 use kamu_resources_services::testing::TestResource;
-use pretty_assertions::{assert_eq, assert_matches, assert_ne};
+use pretty_assertions::{assert_eq, assert_matches};
 
 use crate::contract_test;
 use crate::harness::{FacadeContractHarness, LocalFacadeHarnessOpts, TestAccount};
@@ -45,10 +47,23 @@ contract_test!(
 pub async fn test_apply_without_name_creates_each_time(h: &impl FacadeContractHarness) {
     let facade = h.facade_for(TestAccount::Alice);
 
-    let first = apply(facade.as_ref(), nameless_manifest(None, "same")).await;
-    let second = apply(facade.as_ref(), nameless_manifest(None, "same")).await;
+    let mut results = vec![
+        apply(facade.as_ref(), nameless_manifest(None, "same")).await,
+        apply(facade.as_ref(), nameless_manifest(None, "same")).await,
+    ];
+    results.extend(
+        apply_batch(
+            facade.as_ref(),
+            vec![
+                nameless_manifest(None, "same"),
+                nameless_manifest(None, "same"),
+            ],
+        )
+        .await,
+    );
+    assert_eq!(results.len(), 4);
 
-    for result in [&first, &second] {
+    for result in &results {
         assert_eq!(result.outcome, ApplyResourceOutcome::Created);
         let name = &result.resource.headers.name;
         assert!(name.as_str().starts_with("plain-"), "{name}");
@@ -61,8 +76,13 @@ pub async fn test_apply_without_name_creates_each_time(h: &impl FacadeContractHa
             name.as_str()
         );
     }
-    assert_ne!(first.resource.headers.id, second.resource.headers.id);
-    assert_ne!(first.resource.headers.name, second.resource.headers.name);
+    let ids: HashSet<_> = results.iter().map(|r| r.resource.headers.id).collect();
+    assert_eq!(ids.len(), results.len());
+    let names: HashSet<_> = results
+        .iter()
+        .map(|r| r.resource.headers.name.to_string())
+        .collect();
+    assert_eq!(names.len(), results.len());
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -207,6 +227,24 @@ async fn apply(facade: &dyn ResourceFacade, request: ApplyManifestRequest) -> Ap
         .await
         .unwrap()
         .expect_applied()
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+async fn apply_batch(
+    facade: &dyn ResourceFacade,
+    items: Vec<ApplyManifestRequest>,
+) -> Vec<ApplyManifestResult> {
+    let response = facade
+        .apply_manifests(ApplyManifestBatchRequest { items })
+        .await
+        .unwrap();
+    assert_eq!(response.rolled_back_successes, Vec::<usize>::new());
+    response
+        .items
+        .into_iter()
+        .map(|item| item.outcome.unwrap().expect_applied())
+        .collect()
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

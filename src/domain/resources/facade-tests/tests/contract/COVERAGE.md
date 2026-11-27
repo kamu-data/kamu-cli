@@ -113,14 +113,13 @@ Each `RF-*` contract scenario is listed with its status. Test code and comments 
 | RF-124 | account_scoping.rs | Active | Unknown account name/id is rejected |  |
 | RF-125 | account_scoping.rs | Active | Account isolation across all read APIs |  |
 | RF-126 | account_scoping.rs | Active | Explicit empty account selector `{}` is rejected | Distinct from omitting `account` entirely (RF-120); rejected by account resolution, not parsing |
-| RF-130 | delete.rs | Active | Delete by name removes resource | Reports `Deleting`: the controllers clean up after the request. Then hidden from names and listings, and found by id as `Deleted` |
 | RF-131 | delete.rs | Active | Delete by UID removes resource |  |
 | RF-132 | delete.rs | Active | Delete missing name returns lookup problem |  |
 | RF-133 | delete.rs | Active | Delete missing UID returns lookup problem |  |
 | RF-134 | delete.rs | Active | Delete wrong schema returns mismatch problem |  |
 | RF-135 | delete.rs | Active | Delete is account-scoped |  |
 | RF-136 | delete.rs | Active | Repeated delete of a deleted resource returns not found |  |
-| RF-137 | delete.rs | Active | Delete reports `Deleting` until controllers clean up | While deleting: found by id, hidden from names and from both `search` and `search_handles` unless `IncludeDeleting` (a `search` summary then reports `Deleting`); once cleaned up: still found by id, hidden from the others unless `IncludeDeleted` or `DeletedOnly` |
+| RF-137 | delete.rs | Active | Delete by name reports `Deleting` until controllers clean up | While deleting: found by id, hidden from names and from both `search` and `search_handles` unless `IncludeDeleting` (a `search` summary then reports `Deleting`); once cleaned up: still found by id, hidden from the others unless `IncludeDeleted` or `DeletedOnly` |
 | RF-138 | delete.rs | Active | A resource being deleted gives up its name | Re-apply creates a new resource with a `replaces_resource_being_deleted` warning; with `IncludeDeleting`, `get_handles`, `get` and `render_manifests` by name return both under one request index, live first; re-apply over a deleted resource creates one without the warning; with `IncludeDeleted` the name finds the live resource and then the deleted ones, newest deletion first |
 | RF-139 | delete.rs | Active | Repeated delete of a resource being deleted reports `Deleting` | By id only: `delete` resolves names to live resources; the controller runtime completes the deletion |
 | RF-140 | error_taxonomy.rs | Active | One-element-batch lookup taxonomy is consistent across get/get_handles/render_manifests/delete | Full 3x4 matrix (NameNotFound/IDNotFound/SchemaMismatch x 4 methods); RF-141 covers only a subset, so this was converted to batch form rather than retired |
@@ -160,7 +159,7 @@ Each `RF-*` contract scenario is listed with its status. Test code and comments 
 | RF-184 | delete.rs | Active | `DeletedOnly` hides live resources, even from their ids | Also pins the listing order: newest deletion first, and with `IncludeDeleted` the live ones before it |
 | RF-185 | delete.rs | Active | Label selectors find deleted resources | Deleted resources keep their label projection |
 | RF-186 | spec_view_mode.rs | Active | The spec of a deleted resource is not revealed | A per-item problem from `get` and `render_manifests`; a live resource sharing the name is revealed beside it |
-| RF-187 | generated_names.rs | Active | Applying a manifest without a name creates a resource each time and returns its generated name | On `TestResource`, the type that generates names |
+| RF-187 | generated_names.rs | Active | Applying a manifest without a name creates a resource each time and returns its generated name | On `TestResource`, the type that generates names; through `apply_manifest` and through an `apply_manifests` batch of two nameless manifests |
 | RF-188 | generated_names.rs | Active | Planning a manifest without a name reports the name as pending | A placeholder in `resource`, no name in the `after` document |
 | RF-189 | generated_names.rs | Active | A manifest with an `id` and without a name keeps the name of the resource | Plan and apply alike |
 | RF-190 | generated_names.rs | Active | A manifest without a name is refused for a type that does not generate names | Omitted, `null`, and with an `id`; `InvalidHeaders` from plan, apply and batch apply |

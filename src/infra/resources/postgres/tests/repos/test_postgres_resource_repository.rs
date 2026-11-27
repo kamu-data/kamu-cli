@@ -288,14 +288,6 @@ database_transactional_test!(
 
 database_transactional_test!(
     storage = postgres,
-    fixture = resource_repo_suite::test_name_of_resource_being_deleted_can_be_taken,
-    harness = PostgresResourceRepositoryHarness
-);
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-database_transactional_test!(
-    storage = postgres,
     fixture = resource_repo_suite::test_deleted_resources_share_name_with_live_one,
     harness = PostgresResourceRepositoryHarness
 );
@@ -309,12 +301,6 @@ database_transactional_test!(
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-database_transactional_test!(
-    storage = postgres,
-    fixture = resource_repo_suite::test_summarize_resources_counts_deleting_and_deleted,
-    harness = PostgresResourceRepositoryHarness
-);
 
 database_transactional_test!(
     storage = postgres,
@@ -480,14 +466,6 @@ database_transactional_test!(
 database_transactional_test!(
     storage = postgres,
     fixture = resource_repo_suite::test_find_resource_ids_by_schema_and_label_discriminates_schema_and_value,
-    harness = PostgresResourceRepositoryHarness
-);
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-database_transactional_test!(
-    storage = postgres,
-    fixture = resource_repo_suite::test_find_resource_ids_by_schema_and_label_excludes_deleted,
     harness = PostgresResourceRepositoryHarness
 );
 

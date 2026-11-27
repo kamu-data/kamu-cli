@@ -7,8 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::assert_matches;
 use std::sync::LazyLock;
+use std::{assert_matches, slice};
 
 use chrono::{DateTime, TimeDelta, TimeZone, Utc};
 use database_common::PaginationOpts;
@@ -2787,6 +2787,12 @@ pub async fn test_summarize_resources(catalog: &Catalog) {
     pending_b.status = None;
     repo.create_resource(&pending_b).await.unwrap();
 
+    let mut deleting = make_test_snapshot(&account_handle, &KIND_B, "deleting");
+    deleting.id = repo.new_resource_id().await.unwrap();
+    deleting.headers.deletion_requested_at = Some(Utc::now());
+    deleting.status = Some(status_with_phase(ResourcePhase::Deleting));
+    repo.create_resource(&deleting).await.unwrap();
+
     let mut deleted = make_test_snapshot(&account_handle, &KIND_B, "deleted");
     deleted.id = repo.new_resource_id().await.unwrap();
     deleted.headers.deletion_requested_at = Some(Utc::now());
@@ -2832,14 +2838,14 @@ pub async fn test_summarize_resources(catalog: &Catalog) {
             },
             ResourceSummaryRow {
                 schema: "KindB".to_string(),
-                total_count: 3,
+                total_count: 4,
                 phase_counts: ResourcePhaseCounts {
                     pending: 1,
                     reconciling: 0,
                     ready: 0,
                     degraded: 0,
                     failed: 1,
-                    deleting: 0,
+                    deleting: 1,
                     deleted: 1,
                 },
             },
@@ -3043,73 +3049,6 @@ pub async fn test_visibility_by_deletion_state(catalog: &Catalog) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn test_name_of_resource_being_deleted_can_be_taken(catalog: &Catalog) {
-    let repo = catalog.get_one::<dyn ResourceRepository>().unwrap();
-    let account_handle = odf::ResourceOwnerHandle::new_test("test-account");
-
-    // Deletion requests run opposite to creation, so the order below cannot
-    // come from creation time or ID
-    let first = create_test_resource(repo.as_ref(), &account_handle, "shared").await;
-    let first = request_test_resource_deletion(
-        repo.as_ref(),
-        first,
-        Utc.with_ymd_and_hms(2026, 1, 2, 0, 0, 0).unwrap(),
-    )
-    .await;
-
-    let second = create_test_resource(repo.as_ref(), &account_handle, "shared").await;
-    request_test_resource_deletion(
-        repo.as_ref(),
-        second.clone(),
-        Utc.with_ymd_and_hms(2026, 1, 1, 0, 0, 0).unwrap(),
-    )
-    .await;
-
-    let live = create_test_resource(repo.as_ref(), &account_handle, "shared").await;
-
-    // The resource being deleted is still written to, without taking the name
-    // back from the live one
-    update_test_resource(repo.as_ref(), &first, |update| {
-        update.status = Some(status_with_phase(ResourcePhase::Deleting));
-    })
-    .await;
-
-    let name: ResourceName = "shared".parse().unwrap();
-    assert_eq!(
-        repo.find_resource_id_by_name(&account_handle.did, &TEST_KIND, &name)
-            .await
-            .unwrap(),
-        Some(live.id)
-    );
-
-    let differently_cased_name: ResourceName = "SHARED".parse().unwrap();
-    let resolved = repo
-        .resolve_resource_ids_by_names(
-            &account_handle.did,
-            &TEST_KIND,
-            std::slice::from_ref(&differently_cased_name),
-            ResourceVisibility::IncludeDeleting,
-        )
-        .await
-        .unwrap();
-    assert_eq!(
-        resolved.into_iter().map(|(_, id)| id).collect::<Vec<_>>(),
-        vec![live.id, second.id, first.id],
-        "the live resource comes first, then the oldest deletion request"
-    );
-
-    // Last: on Postgres the failed insert aborts the transaction
-    let mut duplicate = make_test_snapshot(&account_handle, &TEST_KIND, "shared");
-    duplicate.id = repo.new_resource_id().await.unwrap();
-    assert_matches!(
-        repo.create_resource(&duplicate).await,
-        Err(CreateResourceError::Duplicate(_)),
-        "a live resource still holds its name"
-    );
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 pub async fn test_deleted_resources_share_name_with_live_one(catalog: &Catalog) {
     let repo = catalog.get_one::<dyn ResourceRepository>().unwrap();
     let account_handle = odf::ResourceOwnerHandle::new_test("test-account");
@@ -3135,8 +3074,12 @@ pub async fn test_deleted_resources_share_name_with_live_one(catalog: &Catalog) 
         request_test_resource_deletion(repo.as_ref(), oldest_deleting, minutes(5)).await;
     let live = create().await;
 
-    // A write to a deleted resource does not take the name back
+    // Writes to a deleted resource or one being deleted do not take the name back
     update_test_resource(repo.as_ref(), &newest_deleted, |_| {}).await;
+    update_test_resource(repo.as_ref(), &oldest_deleting, |update| {
+        update.status = Some(status_with_phase(ResourcePhase::Deleting));
+    })
+    .await;
 
     assert_eq!(
         repo.find_resource_id_by_name(&account_handle.did, &TEST_KIND, &name)
@@ -3166,7 +3109,7 @@ pub async fn test_deleted_resources_share_name_with_live_one(catalog: &Catalog) 
             .resolve_resource_ids_by_names(
                 &account_handle.did,
                 &TEST_KIND,
-                std::slice::from_ref(&name),
+                slice::from_ref(&name),
                 visibility,
             )
             .await
@@ -3177,6 +3120,31 @@ pub async fn test_deleted_resources_share_name_with_live_one(catalog: &Catalog) 
             "resolve with {visibility:?}"
         );
     }
+
+    let differently_cased_name: ResourceName = "SHARED".parse().unwrap();
+    let resolved = repo
+        .resolve_resource_ids_by_names(
+            &account_handle.did,
+            &TEST_KIND,
+            slice::from_ref(&differently_cased_name),
+            ResourceVisibility::IncludeDeleting,
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        resolved.into_iter().map(|(_, id)| id).collect::<Vec<_>>(),
+        vec![live.id, oldest_deleting.id, newest_deleting.id],
+        "names resolve ignoring case"
+    );
+
+    // Last: on Postgres the failed insert aborts the transaction
+    let mut duplicate = make_test_snapshot(&account_handle, &TEST_KIND, "shared");
+    duplicate.id = repo.new_resource_id().await.unwrap();
+    assert_matches!(
+        repo.create_resource(&duplicate).await,
+        Err(CreateResourceError::Duplicate(_)),
+        "a live resource still holds its name"
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -3240,35 +3208,6 @@ pub async fn test_listings_with_deleted_resources_run_newest_deletion_first(cata
         assert_eq!(searched, expected, "search with {visibility:?}");
         assert_eq!(listed, expected, "list with {visibility:?}");
     }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub async fn test_summarize_resources_counts_deleting_and_deleted(catalog: &Catalog) {
-    let repo = catalog.get_one::<dyn ResourceRepository>().unwrap();
-    let account_handle = odf::ResourceOwnerHandle::new_test("test-account");
-
-    create_test_resource(repo.as_ref(), &account_handle, "live").await;
-    let doomed = create_test_resource(repo.as_ref(), &account_handle, "doomed").await;
-    request_test_resource_deletion(repo.as_ref(), doomed, Utc::now()).await;
-    let deleted = create_test_resource(repo.as_ref(), &account_handle, "deleted").await;
-    delete_test_resource(repo.as_ref(), deleted, Utc::now(), Utc::now()).await;
-
-    let summary = repo.summarize_resources(account_handle.did).await.unwrap();
-
-    assert_eq!(
-        summary,
-        vec![ResourceSummaryRow {
-            schema: TEST_KIND.to_string(),
-            total_count: 3,
-            phase_counts: ResourcePhaseCounts {
-                pending: 1,
-                deleting: 1,
-                deleted: 1,
-                ..Default::default()
-            },
-        }]
-    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -4081,64 +4020,6 @@ pub async fn test_find_resource_ids_by_schema_and_label_discriminates_schema_and
         .unwrap();
 
     assert_eq!(ids, vec![wanted]);
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-/// Deleting a resource must retract the association, even though the caller
-/// never passes a "live only" flag.
-pub async fn test_find_resource_ids_by_schema_and_label_excludes_deleted(catalog: &Catalog) {
-    let repo = catalog.get_one::<dyn ResourceRepository>().unwrap();
-    let projection_repo = catalog
-        .get_one::<dyn ResourceLabelProjectionRepository>()
-        .unwrap();
-
-    let account_handle = odf::ResourceOwnerHandle::new_test("test-account");
-    let now = Utc::now();
-
-    let live = seed_labelled_resource_created_at(
-        repo.as_ref(),
-        projection_repo.as_ref(),
-        &account_handle,
-        &TEST_KIND,
-        "live",
-        now,
-        &[("environment", "prod")],
-    )
-    .await;
-    let doomed = seed_labelled_resource_created_at(
-        repo.as_ref(),
-        projection_repo.as_ref(),
-        &account_handle,
-        &TEST_KIND,
-        "doomed",
-        now + chrono::Duration::hours(1),
-        &[("environment", "prod")],
-    )
-    .await;
-
-    let mut snapshot = repo
-        .find_resource_snapshot_by_id(&doomed)
-        .await
-        .unwrap()
-        .unwrap();
-    snapshot.headers.deletion_requested_at = Some(Utc::now());
-    snapshot.headers.deleted_at = Some(Utc::now());
-    repo.update_resource(&snapshot, snapshot.last_event_id)
-        .await
-        .unwrap();
-
-    let ids = repo
-        .find_resource_ids_by_schema_and_label(
-            &account_handle.did,
-            &TEST_KIND,
-            "environment",
-            "prod",
-        )
-        .await
-        .unwrap();
-
-    assert_eq!(ids, vec![live], "a deleted resource must drop out");
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

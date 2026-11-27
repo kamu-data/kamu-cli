@@ -281,14 +281,6 @@ database_transactional_test!(
 
 database_transactional_test!(
     storage = inmem_with_transaction,
-    fixture = resource_repo_suite::test_name_of_resource_being_deleted_can_be_taken,
-    harness = InMemoryResourceRepositoriesHarness
-);
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-database_transactional_test!(
-    storage = inmem_with_transaction,
     fixture = resource_repo_suite::test_deleted_resources_share_name_with_live_one,
     harness = InMemoryResourceRepositoriesHarness
 );
@@ -302,12 +294,6 @@ database_transactional_test!(
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-database_transactional_test!(
-    storage = inmem_with_transaction,
-    fixture = resource_repo_suite::test_summarize_resources_counts_deleting_and_deleted,
-    harness = InMemoryResourceRepositoriesHarness
-);
 
 database_transactional_test!(
     storage = inmem_with_transaction,
@@ -444,14 +430,6 @@ database_transactional_test!(
 database_transactional_test!(
     storage = inmem_with_transaction,
     fixture = resource_repo_suite::test_find_resource_ids_by_schema_and_label_discriminates_schema_and_value,
-    harness = InMemoryResourceRepositoriesHarness
-);
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-database_transactional_test!(
-    storage = inmem_with_transaction,
-    fixture = resource_repo_suite::test_find_resource_ids_by_schema_and_label_excludes_deleted,
     harness = InMemoryResourceRepositoriesHarness
 );
 

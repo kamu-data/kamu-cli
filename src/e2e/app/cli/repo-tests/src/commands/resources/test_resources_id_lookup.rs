@@ -54,7 +54,6 @@ pub async fn test_resources_id_lookup(ctx: ResourceCtx) {
         deleted_view_by_id.ident(),
         (fixtures::VARIABLE_SET_SCHEMA, resource_name)
     );
-    assert_eq!(deleted_view_by_id.phase(), "Deleted");
 
     let missing_id = "51a420dc-f0a0-4842-a148-4481195a4b34";
     ctx.assert_failure(

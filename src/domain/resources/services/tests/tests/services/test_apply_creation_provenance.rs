@@ -40,11 +40,6 @@ async fn test_create_records_provenance_in_created_event() {
             },
         ),
         (
-            Principal::new_test_with(&"alice"),
-            RequestOrigin::Cli,
-            CreationOrigin::Cli,
-        ),
-        (
             Principal::Node,
             RequestOrigin::Internal {
                 producer: "dev.kamu.test.Producer".to_string(),

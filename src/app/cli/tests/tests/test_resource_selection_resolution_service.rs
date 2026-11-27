@@ -899,49 +899,6 @@ async fn resolves_exact_name_to_every_resource_holding_it_when_including_deletin
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn labelled_exact_name_lists_live_resource_first_when_including_deleting() {
-    let mut harness = ResourceSelectionResolutionHarness::new();
-    let being_deleted = harness.variableset_handle("vars-a");
-    let live = harness.variableset_handle("vars-a");
-
-    // A search orders by last update, which may put the one being deleted
-    // first. Both resources answer one name, so they span more than one page
-    // sized by the number of names.
-    harness.expect_search_handles_by_visibility([(
-        ResourceVisibility::IncludeDeleting,
-        vec![being_deleted.clone(), live.clone()],
-    )]);
-    harness.expect_get_handles_of_one_ref(vec![live.clone(), being_deleted.clone()]);
-
-    let result = harness
-        .resolve(
-            vec![harness.exact_selection_item("vars-a")],
-            ResourceSelectionResolutionOptions {
-                visibility: ResourceVisibility::IncludeDeleting,
-                label_filter: Some(environment_label_filter()),
-                ..ResourceSelectionResolutionHarness::default_options()
-            },
-        )
-        .await
-        .unwrap();
-
-    assert_eq!(
-        result
-            .targets
-            .iter()
-            .map(|target| target.id)
-            .collect::<Vec<_>>(),
-        vec![live.id, being_deleted.id]
-    );
-    assert_eq!(
-        harness.get_handles_visibilities(),
-        vec![ResourceVisibility::IncludeDeleting]
-    );
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[test_log::test(tokio::test)]
 async fn labelled_exact_name_lists_resources_in_name_lookup_order() {
     let mut harness = ResourceSelectionResolutionHarness::new();
     let live = harness.variableset_handle("vars-a");

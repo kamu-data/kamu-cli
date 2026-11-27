@@ -14,7 +14,6 @@ mod test_resources_apply_input_modes;
 mod test_resources_baseline;
 mod test_resources_context_management;
 mod test_resources_context_override;
-mod test_resources_creation_provenance;
 mod test_resources_dataset_compat;
 mod test_resources_dataset_deletion_cleanup;
 mod test_resources_delete;

@@ -15,7 +15,9 @@ use kamu_cli_e2e_common::prelude::*;
 
 kamu_cli_resource_e2e_test!(
     storage = sqlite,
-    fixture = kamu_cli_e2e_repo_tests::commands::test_resources_creation_provenance
+    fixture = kamu_cli_e2e_repo_tests::commands::test_resources_creation_provenance,
+    sqlite_only = "checks how the CLI and the server set the request origin; the repository type \
+                   cannot change it"
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
