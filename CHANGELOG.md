@@ -15,6 +15,40 @@ Recommendation: for ease of reading, use the following format:
 
 ## [Unreleased]
 ### Added
+- Deleted resources can be queried: `kamu list` and `kamu get` take `--include-deleted` and
+  `--deleted`, and `kamu summary` shows a `Deleted` column
+- Resource manifests may carry `ownerReferences`, which `kamu get` shows in every manifest form.
+  `kamu list` and `kamu get` take `--owner` to select the resources of one owner, and GraphQL
+  `SearchResourcesInput` takes `owner`
+- Newly created resources show a `CreationProvenance` condition in `kamu get` and GraphQL: who
+  created the resource, and through which API
+- Config: `resources.retention` sets how long deleted resources are kept, by `default` (7 days)
+  and per type in `types.<Type>`; `backgroundAgents.housekeeping.resourceRetention` (`enabled`,
+  `batchSize`, `interval`, `pauseBetweenBatches`) runs the purge
+- Prometheus metrics of housekeeping: `housekeeping_items_removed_total`, `housekeeping_backlog`
+  and `housekeeping_last_pass_timestamp_seconds`, by job
+### Changed
+- Deleted `VariableSet`, `SecretSet` and `Storage` resources are purged once their retention
+  period ends (7 days by default), including those deleted before the upgrade. Before, they were
+  kept forever
+- A deleted resource keeps its name instead of being renamed to `deleted-<id>`, also for
+  deletions completed before the upgrade
+- `kamu get` by ID and `kamu list <type>/<id>` show a deleted resource, with phase `Deleted`,
+  without `--include-deleted`. `Total` in `kamu summary` (GraphQL `totalCount`) includes deleted
+  resources
+- Breaking: the GraphQL resource queries take `visibility: ResourceVisibility` (`ACTIVE` by
+  default) instead of `includeDeleting`. The CLI and the server of its remote context must both
+  be on this version, or both before it
+- A resource manifest without a name is refused as `InvalidHeaders` with the code `MISSING_NAME`,
+  instead of as a parse error
+- While a resource is being reconciled, its previous `ReconciliationError` is no longer shown; a
+  new failure shows it again
+### Fixed
+- On Postgres, creating a resource whose name another apply took at the same time failed with
+  "current transaction is aborted". It is now applied as an update
+- `SecretSet`: an update or deletion by another writer while a spec was being prepared was
+  overwritten; the apply now fails as a concurrent modification
+### Added
 - Prometheus metrics of `kamu system api-server`'s background work: per agent
   `background_agent_running`, `background_agent_restarts_total` by reason and
   `background_agent_last_failure_timestamp_seconds`; per resource controller
