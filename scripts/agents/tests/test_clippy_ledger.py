@@ -38,6 +38,12 @@ class StopReminderTest(unittest.TestCase):
         self.fp = None
         self.assertIsNone(clippy_ledger.stop_reminder("s"))
 
+    def test_a_turn_counts_as_editing_only_until_the_next_stop(self):
+        self.assertFalse(clippy_ledger.take_turn_edit("s"))
+        clippy_ledger.note_rust_edit("s")
+        self.assertTrue(clippy_ledger.take_turn_edit("s"))
+        self.assertFalse(clippy_ledger.take_turn_edit("s"))
+
     def test_only_a_bare_make_clippy_counts_as_green(self):
         self.assertTrue(clippy_ledger.is_whole_clippy_run("make clippy"))
         self.assertTrue(clippy_ledger.is_whole_clippy_run("make lint"))
