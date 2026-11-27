@@ -812,8 +812,9 @@ resolves account selectors; who may act on a resolved account is decided per typ
   (`CurrentAccountSubject`) and checks access for the `Principal` the CLI catalog registers beside
   it ([identity](identity.md#who-registers-it)); the same rules apply for cross-account targeting.
   Background work runs as `Principal::Node`, which the default rule lets target any account.
-- **UID belonging to a different account.** Lookups are account-scoped: `find_account_snapshot`
-  treats a snapshot owned by another account as absent. A UID that exists but belongs to another account is reported as
+- **UID belonging to a different account.** A lookup by UID finds the resource in any account,
+  then the operation guard decides whether the principal may read it there
+  ([§7](#7-account-resolution--authorization)). A UID the principal may not read is reported as
   **not-found** (`ResourceIDNotFoundError`), not "forbidden" — so existence is not leaked across
   accounts. A UID of the wrong schema yields `ResourceTypeMismatchError` in the domain and
   `ResourceLookupProblem::SchemaMismatch` at the facade boundary.

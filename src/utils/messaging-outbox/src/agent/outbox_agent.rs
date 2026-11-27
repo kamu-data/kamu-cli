@@ -19,8 +19,7 @@ pub const OUTBOX_AGENT_NAME: &str = "dev.kamu.utils.messaging.OutboxAgent";
 pub trait OutboxAgent: BackgroundAgent + InitOnStartup {
     /// Delivers until no committed message is left, including messages held
     /// back while an older transaction runs: waits for that transaction to end.
-    /// Returns how many consumer deliveries it made.
-    async fn run_while_has_tasks(&self) -> Result<usize, InternalError>;
+    async fn run_while_has_tasks(&self) -> Result<(), InternalError>;
 
     // To be used by tests only!
     async fn run_single_iteration_only(&self) -> Result<(), InternalError>;

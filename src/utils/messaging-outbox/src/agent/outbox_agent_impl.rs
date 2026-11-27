@@ -180,20 +180,17 @@ impl OutboxAgentImpl {
 
     /// Given the agent's listener, keeps its heartbeat going between batches.
     /// Given a shutdown token, stops between batches once it is cancelled, so
-    /// that messages arriving during a shutdown do not keep it going. Returns
-    /// how many consumer deliveries it made
+    /// that messages arriving during a shutdown do not keep it going
     async fn run_until_end_of_queue(
         &self,
         wakeup_listener: Option<&dyn WakeupListener>,
         shutdown: Option<&CancellationToken>,
-    ) -> Result<ProcessedConsumerTasksCount, InternalError> {
-        let mut total_processed_count = 0;
+    ) -> Result<(), InternalError> {
         loop {
             let processed_consumer_tasks_count = self
                 .run_consumption_iteration()
                 .instrument(tracing::debug_span!("OutboxAgent::tick"))
                 .await?;
-            total_processed_count += processed_consumer_tasks_count;
 
             if let Some(wakeup_listener) = wakeup_listener {
                 wakeup_listener.heartbeat();
@@ -206,7 +203,7 @@ impl OutboxAgentImpl {
             }
         }
 
-        Ok(total_processed_count)
+        Ok(())
     }
 
     fn debug_outbox_routes(&self) {
@@ -491,17 +488,16 @@ impl BackgroundWorkDrainSession for OutboxDrainSession<'_> {
 #[async_trait::async_trait]
 impl OutboxAgent for OutboxAgentImpl {
     #[tracing::instrument(level = "debug", skip_all)]
-    async fn run_while_has_tasks(&self) -> Result<usize, InternalError> {
-        let mut total_processed_count = 0;
+    async fn run_while_has_tasks(&self) -> Result<(), InternalError> {
         loop {
             // Checked before processing, as in the main loop: checked after, it
             // would miss a release landing in between and leave its messages
             let has_held_back_messages = self.has_held_back_messages().await?;
 
-            total_processed_count += self.run_until_end_of_queue(None, None).await?;
+            self.run_until_end_of_queue(None, None).await?;
 
             if !has_held_back_messages {
-                return Ok(total_processed_count);
+                return Ok(());
             }
 
             tracing::debug!("Committed messages wait for an older transaction to end");

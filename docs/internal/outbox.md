@@ -288,7 +288,7 @@ run_while_has_tasks(): loop { held = has_held_back_messages(); drain; if !held b
 ```
 
 Waking is described in [wakeup-listeners.md](wakeup-listeners.md) (channel `outbox_messages_ready`).
-The same drain is callable as `run_while_has_tasks()`, which returns the deliveries it made. The
+The same drain is callable as `run_while_has_tasks()`. The
 agent is a `BackgroundWorkDrain` through it: a drain is idle when no run of the agent, the drain
 or the main loop, delivered anything since the session's previous drain (a counter of deliveries
 across runs, raised under the `run_lock`). With a

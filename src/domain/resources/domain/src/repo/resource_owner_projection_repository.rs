@@ -24,7 +24,8 @@ pub trait ResourceOwnerProjectionRepository: Send + Sync {
         owner_ids: &[ResourceID],
     ) -> Result<(), InternalError>;
 
-    /// Returns the IDs of the recorded owners in order.
+    /// Returns the IDs of the recorded owners in order. Read by the repository
+    /// tests, as the only view of the index that shows its cascade on a purge.
     async fn find_owners(&self, resource_id: &ResourceID)
     -> Result<Vec<ResourceID>, InternalError>;
 }

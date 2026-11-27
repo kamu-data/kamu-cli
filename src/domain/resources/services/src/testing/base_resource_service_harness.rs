@@ -409,10 +409,6 @@ impl BaseResourceServiceHarness {
             .returning(|_, _, _| Ok(()));
     }
 
-    pub fn expect_deleted_message(mock_outbox: &mut MockOutbox, expected_resource_count: usize) {
-        Self::expect_deleted_messages(mock_outbox, 1, expected_resource_count);
-    }
-
     /// Expects `n` `Deleted` messages, each of `expected_resource_count`
     /// resources
     pub fn expect_deleted_messages(

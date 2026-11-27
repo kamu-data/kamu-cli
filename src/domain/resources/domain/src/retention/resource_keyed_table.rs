@@ -22,11 +22,6 @@ pub struct ResourceKeyedTable {
 pub enum ResourceKeyedTablePurge {
     /// The purge deletes the rows itself, before the resource's row
     ByFramework,
-    /// A registered [`crate::ResourceRemovalListener`] deletes them in the
-    /// purge transaction
-    ByRemovalListener,
-    /// A consumer of the `Purged` lifecycle message deletes them
-    ByPurgedConsumer,
     /// The rows are not a projection of a resource and stay, for the reason
     /// given
     Outlives(&'static str),
