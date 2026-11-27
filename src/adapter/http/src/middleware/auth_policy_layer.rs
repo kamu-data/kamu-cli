@@ -19,6 +19,8 @@ use kamu_accounts::CurrentAccountSubject;
 use serde_json::Value;
 use tower::{Layer, Service};
 
+use crate::GRAPHQL_PATH;
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 const WHITELISTED_QUERY_NAMES: [&str; 2] = ["auth", "__schema"];
@@ -144,7 +146,7 @@ where
         Box::pin(async move {
             let path = request.uri().path();
 
-            let (request, skip_auth_policy) = if path == "/graphql" {
+            let (request, skip_auth_policy) = if path == GRAPHQL_PATH {
                 Self::is_whitelisted_graphql_operation_request(request).await
             } else {
                 (request, false)

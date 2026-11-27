@@ -11,8 +11,11 @@ use event_sourcing::ConcurrentModificationError;
 use internal_error::{ErrorIntoInternal, InternalError};
 
 use crate::{
+    ApplyResourceHeaders,
+    CreationProvenance,
     DeclarativeResource,
     EventSourcedResource,
+    ResourceHeadersValidationError,
     ResourceID,
     ResourceIDNotFoundError,
     ResourceLoadError,
@@ -70,19 +73,57 @@ pub enum ApplyResourcePrecondition {
 pub struct ApplyResourceParams<R: DeclarativeResource> {
     pub id: Option<ResourceID>,
     /// `headers.account` must be a fully resolved `ResourceOwnerRef` — see
-    /// [`ApplyResourceUseCase`].
-    pub headers: crate::ResourceHeadersInput,
+    /// [`ApplyResourceUseCase`]. `headers.name` may be omitted if the type has
+    /// a [`DeclarativeResource::GENERATED_NAME_PREFIX`].
+    pub headers: ApplyResourceHeaders,
+    pub account_source: ApplyResourceAccountSource,
+    pub access_check: ApplyResourceAccessCheck,
     pub spec: R::SpecInput,
+    /// Recorded when the apply creates the resource; ignored by an update.
+    /// Its principal is the one whose access the apply is checked for
+    pub provenance: CreationProvenance,
+}
+
+impl<R: DeclarativeResource> Clone for ApplyResourceParams<R>
+where
+    R::SpecInput: Clone,
+{
+    fn clone(&self) -> Self {
+        Self {
+            id: self.id,
+            headers: self.headers.clone(),
+            account_source: self.account_source,
+            access_check: self.access_check,
+            spec: self.spec.clone(),
+            provenance: self.provenance.clone(),
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Outcome of running a resource's sanitizer over `ApplyResourceParams`
-/// (before planning). Named rather than a nested `Result` so both `plan` and
-/// `apply` can match on it directly.
-pub enum SanitizeParamsOutcome<R: DeclarativeResource> {
-    Sanitized(ApplyResourceParams<R>),
-    Rejected(ApplyResourceRejection),
+/// Who decides whether the principal may apply the resource
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ApplyResourceAccessCheck {
+    /// The type's `ResourceOperationGuard`, or the default rule
+    ByGuard,
+    /// The caller, by rules of its own, such as the dataset permission a
+    /// compatibility API checks before it writes a dataset's resources. Never
+    /// for an apply on behalf of a manifest
+    CheckedByCaller,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Where `headers.account` of an apply comes from, which decides what a
+/// [`ResourcePlacement`](crate::ResourcePlacement) elsewhere does
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ApplyResourceAccountSource {
+    /// The manifest names it; a placement elsewhere rejects the manifest
+    Manifest,
+    /// The principal's own, as the manifest names none; a placement elsewhere
+    /// applies the resource there
+    PrincipalDefault,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -127,6 +168,9 @@ pub struct ApplyResourcePlan<R: DeclarativeResource> {
     /// documents. `None` for a create. Captured from the aggregate the planner
     /// already loaded, so it costs no additional read.
     pub previous_state: Option<R::ResourceState>,
+
+    /// The name in `state` is a placeholder: the apply generates the real one
+    pub name_pending: bool,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -245,6 +289,9 @@ pub trait IntoApplyResourceRejection {
 #[derive(thiserror::Error, Debug)]
 pub enum ApplyResourceUseCaseError<R: EventSourcedResource> {
     #[error(transparent)]
+    InvalidHeaders(#[from] ResourceHeadersValidationError),
+
+    #[error(transparent)]
     LoadFailed(#[from] ResourceLoadError<R::ResourceState>),
 
     #[error(transparent)]
@@ -255,6 +302,10 @@ pub enum ApplyResourceUseCaseError<R: EventSourcedResource> {
 
     #[error(transparent)]
     ConcurrentModification(ConcurrentModificationError),
+
+    /// The principal may not apply the resource in its account
+    #[error(transparent)]
+    Access(#[from] odf::AccessError),
 
     #[error(transparent)]
     Internal(#[from] InternalError),

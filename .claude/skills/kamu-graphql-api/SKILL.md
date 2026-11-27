@@ -157,6 +157,14 @@ Add new scalar mappings here **only** when a facade operation references a scala
 
 All Cynic-derived types live inside `cynic_api/` and must **not** appear on the `ResourceFacade` trait API surface. Expose only domain types through the trait.
 
+## Rejected approaches
+
+Do not re-propose these without new evidence.
+
+| Approach | Why it was rejected |
+|---|---|
+| A domain-specific GraphQL enum or field for the kind of an `odf::AccessError` (read-only, unauthenticated, unauthorized) | The error is shared by every domain and already reaches the API one way: `GqlError::Access`, a GraphQL error with a `code` extension (`READ_ONLY`, `UNAUTHENTICATED`, `UNAUTHORIZED`, in `src/adapter/graphql/src/utils.rs`). A second encoding per domain drifts from it |
+
 ## What lives elsewhere
 
 - Domain errors the resolvers map from: `kamu-domain-design`.

@@ -10,6 +10,7 @@
 use event_sourcing::ConcurrentModificationError;
 use graphql_http::GraphqlHttpRequestError;
 use internal_error::{ErrorIntoInternal, InternalError};
+use kamu_accounts::AnonymousPrincipalError;
 use kamu_resources::{
     ApplyResourceCrudDispatcherError,
     RequestResourcesDeletionCrudDispatcherError,
@@ -34,6 +35,7 @@ use crate::UnsupportedSelectorFieldError;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum ResourceHeadersValidationProblemCode {
+    MissingName,
     EmptyName,
     NameTooLong,
     InvalidName,
@@ -41,6 +43,8 @@ pub enum ResourceHeadersValidationProblemCode {
     DuplicateLabelKey,
     TooManyAnnotations,
     DuplicateAnnotationKey,
+    TooManyOwnerReferences,
+    InvalidOwnerReference,
     ResourceExtensionSchema,
 }
 
@@ -56,6 +60,7 @@ impl From<ResourceHeadersValidationError> for ResourceInvalidHeadersError {
         use ResourceHeadersValidationError as E;
         use ResourceHeadersValidationProblemCode as C;
         let code = match &err {
+            E::MissingName { .. } => C::MissingName,
             E::EmptyName => C::EmptyName,
             E::NameTooLong { .. } => C::NameTooLong,
             E::InvalidName { .. } => C::InvalidName,
@@ -63,6 +68,8 @@ impl From<ResourceHeadersValidationError> for ResourceInvalidHeadersError {
             E::DuplicateLabelKey { .. } => C::DuplicateLabelKey,
             E::TooManyAnnotations { .. } => C::TooManyAnnotations,
             E::DuplicateAnnotationKey { .. } => C::DuplicateAnnotationKey,
+            E::TooManyOwnerReferences { .. } => C::TooManyOwnerReferences,
+            E::InvalidOwnerReference(_) => C::InvalidOwnerReference,
         };
         Self {
             code,
@@ -270,6 +277,14 @@ pub enum ResourceLookupProblem {
          across resource types"
     )]
     UntypedName,
+
+    /// The caller asked to reveal the spec of a deleted resource
+    #[error(transparent)]
+    DeletedNotRevealed(#[from] ResourceDeletedNotRevealedError),
+
+    /// The caller may see the resource, but not run the operation on it
+    #[error(transparent)]
+    Access(#[from] odf::AccessError),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -298,6 +313,12 @@ pub enum BatchResourceError {
     Internal(#[from] InternalError),
 }
 
+impl From<AnonymousPrincipalError> for BatchResourceError {
+    fn from(err: AnonymousPrincipalError) -> Self {
+        Self::AccountAccess(err.into())
+    }
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Error)]
@@ -319,6 +340,10 @@ pub enum ListResourcesError {
 
     #[error(transparent)]
     UnrepresentableScope(#[from] UnrepresentableScopeError),
+
+    /// The owner to search by does not resolve to a resource
+    #[error("Cannot search by owner: {0}")]
+    OwnerLookup(#[source] ResourceLookupProblem),
 
     /// A selector set an ODF field the facade cannot honour. Rejected rather
     /// than ignored: a dropped narrowing constraint widens the result set
@@ -351,6 +376,22 @@ pub enum ResourcesSummaryError {
 
     #[error(transparent)]
     Internal(#[from] InternalError),
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl From<BatchResourceError> for ListResourcesError {
+    fn from(err: BatchResourceError) -> Self {
+        use BatchResourceError as E;
+        match err {
+            E::UnsupportedSelector(err) => Self::UnsupportedSelector(err),
+            E::AccountResolution(err) => Self::AccountResolution(err),
+            E::AccountAccess(err) => Self::AccountAccess(err),
+            E::InvalidLabelFilter(err) => Self::InvalidLabelFilter(err),
+            E::RemoteRequest(err) => Self::RemoteRequest(err),
+            E::Internal(err) => Self::Internal(err),
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -433,10 +474,12 @@ impl From<ApplyResourceCrudDispatcherError> for ApplyManifestError {
     fn from(err: ApplyResourceCrudDispatcherError) -> Self {
         use ApplyResourceCrudDispatcherError as E;
         match err {
+            E::InvalidHeaders(err) => Self::InvalidHeaders(err.into()),
             E::Internal(err) => Self::Internal(err),
             E::NotFound(err) => Self::IDNotFound(err),
             E::TypeMismatch(err) => Self::TypeMismatch(err),
             E::ConcurrentModification(err) => Self::ConcurrentModification(err),
+            E::Access(err) => Self::AccountAccess(ResourceAccountAccessError::Access(err)),
             E::InvalidSpec { schema, message } => {
                 Self::InvalidSpec(ResourceInvalidSpecError { schema, message })
             }
@@ -468,6 +511,14 @@ pub struct ResourceNameMismatchError {
     pub id: ResourceID,
     pub expected_name: ResourceName,
     pub actual_name: ResourceName,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Error)]
+#[error("Resource {id} is deleted, its spec cannot be revealed")]
+pub struct ResourceDeletedNotRevealedError {
+    pub id: ResourceID,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

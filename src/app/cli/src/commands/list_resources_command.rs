@@ -22,11 +22,14 @@ use datafusion::arrow::datatypes::{DataType, Field, Schema, TimeUnit};
 use datafusion::arrow::record_batch::RecordBatch;
 use internal_error::InternalError;
 use kamu_resources::{
+    ResourceLabelFilterInput,
     ResourceListColumnDataType,
     ResourceListColumnDescriptor,
     ResourceListColumnValue,
     ResourceListColumnVisibility,
+    ResourcePhase,
     ResourceQuery,
+    ResourceRef,
     ResourceSummaryView,
     ResourceTypeDescriptor,
     ResourceVisibility,
@@ -55,7 +58,8 @@ pub struct ListResourcesCommand {
     output_config: Arc<OutputConfig>,
     detail_level: u8,
     max_results: Option<NonZeroUsize>,
-    label_filter: Option<kamu_resources::ResourceLabelFilterInput>,
+    label_filter: Option<ResourceLabelFilterInput>,
+    owner: Option<ResourceRef>,
     visibility: ResourceVisibility,
 }
 
@@ -71,7 +75,8 @@ impl ListResourcesCommand {
         output_config: Arc<OutputConfig>,
         detail_level: u8,
         max_results: Option<NonZeroUsize>,
-        label_filter: Option<kamu_resources::ResourceLabelFilterInput>,
+        label_filter: Option<ResourceLabelFilterInput>,
+        owner: Option<ResourceRef>,
         visibility: ResourceVisibility,
     ) -> Self {
         let visibility = scope.effective_visibility(visibility);
@@ -85,6 +90,7 @@ impl ListResourcesCommand {
             detail_level,
             max_results,
             label_filter,
+            owner,
             visibility,
         }
     }
@@ -298,6 +304,7 @@ impl ListResourcesCommand {
                 .resource_facade
                 .search(kamu_resources_facade::SearchResourcesRequest {
                     selectors: selectors.to_vec(),
+                    owner: self.owner.clone(),
                     visibility: self.visibility,
                     pagination: PaginationOpts::from_max_results(max_results.get()),
                 })
@@ -309,6 +316,7 @@ impl ListResourcesCommand {
                     .resource_facade
                     .search(kamu_resources_facade::SearchResourcesRequest {
                         selectors: selectors.to_vec(),
+                        owner: self.owner.clone(),
                         visibility: self.visibility,
                         pagination,
                     })
@@ -339,16 +347,41 @@ impl ListResourcesCommand {
 
         let mut resources = self.search_resources(&selectors).await?;
 
+        // A listing of deleted resources runs newest deletion first, so only
+        // the live ones, which precede them, are sorted by name.
+        let sorted_count = if self.visibility.includes_deleted() {
+            resources
+                .iter()
+                .take_while(|resource| !Self::is_being_deleted_or_deleted(resource))
+                .count()
+        } else {
+            resources.len()
+        };
+
         // A single-type listing has one schema throughout, so the extra keys are
         // inert there and the ordering matches what `list` produced before the
         // merge.
-        resources.sort_by(|lhs, rhs| {
+        resources[..sorted_count].sort_by(|lhs, rhs| {
             lhs.name
                 .cmp(&rhs.name)
                 .then_with(|| lhs.schema.cmp(&rhs.schema))
                 .then_with(|| lhs.id.to_string().cmp(&rhs.id.to_string()))
         });
         Ok(resources)
+    }
+
+    fn is_being_deleted_or_deleted(resource: &ResourceSummaryView) -> bool {
+        match resource.status.as_ref().and_then(|status| status.phase) {
+            Some(ResourcePhase::Deleting | ResourcePhase::Deleted) => true,
+            Some(
+                ResourcePhase::Pending
+                | ResourcePhase::Reconciling
+                | ResourcePhase::Ready
+                | ResourcePhase::Degraded
+                | ResourcePhase::Failed,
+            )
+            | None => false,
+        }
     }
 
     fn make_writer(
@@ -593,8 +626,8 @@ impl ListResourcesScope {
         !matches!(self, Self::ByType(..))
     }
 
-    /// Ids always find resources being deleted, so a scope of ids alone
-    /// includes them; any other scope follows the requested visibility.
+    /// Ids find resources in any state, so a scope of ids alone includes
+    /// deleted ones; any other scope follows the requested visibility.
     pub(crate) fn effective_visibility(&self, requested: ResourceVisibility) -> ResourceVisibility {
         let only_ids = match self {
             Self::ByType(_, query) | Self::All(query) => Self::is_id_query(query.as_ref()),
@@ -604,7 +637,7 @@ impl ListResourcesScope {
         };
 
         if only_ids {
-            ResourceVisibility::IncludeDeleting
+            requested.of_ids()
         } else {
             requested
         }
@@ -647,7 +680,7 @@ enum ResourceGenericColumn {
 fn selectors_for_type(
     schema: &kamu_resources::TypeUri,
     query: Option<&kamu_resources::ResourceQuery>,
-    label_filter: Option<&kamu_resources::ResourceLabelFilterInput>,
+    label_filter: Option<&ResourceLabelFilterInput>,
 ) -> Vec<kamu_resources::ResourceSelector> {
     selectors_for_query(Some(schema), query, label_filter)
 }
@@ -655,7 +688,7 @@ fn selectors_for_type(
 /// The same, spanning every type.
 fn any_type_selectors(
     query: Option<&kamu_resources::ResourceQuery>,
-    label_filter: Option<&kamu_resources::ResourceLabelFilterInput>,
+    label_filter: Option<&ResourceLabelFilterInput>,
 ) -> Vec<kamu_resources::ResourceSelector> {
     selectors_for_query(None, query, label_filter)
 }
@@ -669,7 +702,7 @@ fn any_type_selectors(
 fn selectors_for_query(
     schema: Option<&kamu_resources::TypeUri>,
     query: Option<&kamu_resources::ResourceQuery>,
-    label_filter: Option<&kamu_resources::ResourceLabelFilterInput>,
+    label_filter: Option<&ResourceLabelFilterInput>,
 ) -> Vec<kamu_resources::ResourceSelector> {
     // `-l` narrows the whole invocation, which the facade expresses as the same
     // filter on every selector. See `with_labels` in the selection-resolution

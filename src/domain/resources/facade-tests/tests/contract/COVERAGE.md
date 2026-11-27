@@ -18,7 +18,7 @@ Each `RF-*` contract scenario is listed with its status. Test code and comments 
 | RF-021 | apply_manifest.rs | Active | Apply create from YAML manifest |  |
 | RF-022 | apply_manifest.rs | Active | Apply update changes headers/spec |  |
 | RF-023 | apply_manifest.rs | Active | Apply unchanged manifest is idempotent |  |
-| RF-024 | apply_manifest.rs | Deferred | Apply rejects immutable field change | Requires a resource type with an immutable field |
+| RF-024 | immutable_specs.rs | Active | Plan and apply reject a changed immutable spec | On `ImmutableTestResource`; an unchanged manifest stays a no-op |
 | RF-025 | apply_manifest.rs | Active | Apply rejects invalid spec | Combined with RF-016 in one test |
 | RF-026 | apply_manifest.rs | Active | Apply preserves duplicate header-key validation |  |
 | RF-026A | apply_manifest.rs | Active | Apply rejects invalid label/annotation header keys at parse time | Extension beyond original plan |
@@ -27,7 +27,7 @@ Each `RF-*` contract scenario is listed with its status. Test code and comments 
 | RF-026D | apply_manifest.rs | Active | Extension header canonicalization precedes diffing | Short-name after URI reapply reports `Untouched` |
 | RF-026E | apply_manifest.rs | Active | Plan/apply reject invalid registered extension values as headers | Surfaces as `InvalidHeaders` locally and remotely |
 | RF-026F | apply_manifest.rs | Active | Plan/apply reject over-long description via annotation schema | Uses `ResourceExtensionSchema`, not legacy `DescriptionTooLong` |
-| RF-027 | apply_manifest.rs | Active | Apply documents never expose SecretSet plaintext | Sanitizer runs before planning, so `before`/`after` carry ciphertext |
+| RF-027 | apply_manifest.rs | Active | Apply documents never expose SecretSet plaintext | The pre-apply hook runs before planning, so `before`/`after` carry ciphertext |
 | RF-028 | apply_manifest.rs | Active | Apply documents match the rendered manifest | Shared canonicalization with `render_manifests` |
 | RF-029 | apply_manifest.rs | Active | Apply document `before` is absent only for creates | Unchanged apply still carries `before`; guards placeholder regressions |
 | RF-030 | get_handle.rs | Active | Get by name returns full resource view |  |
@@ -104,7 +104,7 @@ Each `RF-*` contract scenario is listed with its status. Test code and comments 
 | RF-111 | summary.rs | Active | Summary counts resources by type |  |
 | RF-112 | summary.rs | Active | Summary phase counts (pending → ready transition) | Reconciling is an internal transient not observable at facade granularity |
 | RF-113 | summary.rs | Active | Summary account scoping |  |
-| RF-114 | summary.rs | Active | Summary counts resources being deleted | `Deleting` until the controllers clean up, then not counted at all |
+| RF-114 | summary.rs | Active | Summary counts resources whose deletion was requested | `Deleting` until the controllers clean up, then `Deleted`; the total includes both |
 | RF-120 | account_scoping.rs | Active | Default account selector resolves to current account |  |
 | RF-121 | account_scoping.rs | Active | Account by name resolves correctly |  |
 | RF-122 | account_scoping.rs | Active | Account by id resolves correctly |  |
@@ -113,20 +113,19 @@ Each `RF-*` contract scenario is listed with its status. Test code and comments 
 | RF-124 | account_scoping.rs | Active | Unknown account name/id is rejected |  |
 | RF-125 | account_scoping.rs | Active | Account isolation across all read APIs |  |
 | RF-126 | account_scoping.rs | Active | Explicit empty account selector `{}` is rejected | Distinct from omitting `account` entirely (RF-120); rejected by account resolution, not parsing |
-| RF-130 | delete.rs | Active | Delete by name removes resource | Reports `Deleting`: the controllers clean up after the request |
 | RF-131 | delete.rs | Active | Delete by UID removes resource |  |
 | RF-132 | delete.rs | Active | Delete missing name returns lookup problem |  |
 | RF-133 | delete.rs | Active | Delete missing UID returns lookup problem |  |
 | RF-134 | delete.rs | Active | Delete wrong schema returns mismatch problem |  |
 | RF-135 | delete.rs | Active | Delete is account-scoped |  |
 | RF-136 | delete.rs | Active | Repeated delete of a deleted resource returns not found |  |
-| RF-137 | delete.rs | Active | Delete reports `Deleting` until controllers clean up | While deleting: found by id, hidden from names and from both `search` and `search_handles` unless `IncludeDeleting` (a `search` summary then reports `Deleting`); once cleaned up: not found even with it |
-| RF-138 | delete.rs | Active | A resource being deleted gives up its name | Re-apply creates a new resource with a `replaces_resource_being_deleted` warning; with `IncludeDeleting`, `get_handles`, `get` and `render_manifests` by name return both under one request index, live first |
+| RF-137 | delete.rs | Active | Delete by name reports `Deleting` until controllers clean up | While deleting: found by id, hidden from names and from both `search` and `search_handles` unless `IncludeDeleting` (a `search` summary then reports `Deleting`); once cleaned up: still found by id, hidden from the others unless `IncludeDeleted` or `DeletedOnly` |
+| RF-138 | delete.rs | Active | A resource being deleted gives up its name | Re-apply creates a new resource with a `replaces_resource_being_deleted` warning; with `IncludeDeleting`, `get_handles`, `get` and `render_manifests` by name return both under one request index, live first; re-apply over a deleted resource creates one without the warning; with `IncludeDeleted` the name finds the live resource and then the deleted ones, newest deletion first |
 | RF-139 | delete.rs | Active | Repeated delete of a resource being deleted reports `Deleting` | By id only: `delete` resolves names to live resources; the controller runtime completes the deletion |
 | RF-140 | error_taxonomy.rs | Active | One-element-batch lookup taxonomy is consistent across get/get_handles/render_manifests/delete | Full 3x4 matrix (NameNotFound/IDNotFound/SchemaMismatch x 4 methods); RF-141 covers only a subset, so this was converted to batch form rather than retired |
 | RF-141 | error_taxonomy.rs | Active | Multi-ref batch lookup problem taxonomy mirrors the one-element case |  |
 | RF-142 | error_taxonomy.rs | Active | Batch-level error taxonomy (unsupported type, bad account) |  |
-| RF-143 | error_taxonomy.rs | Active | Apply rejection taxonomy (InvalidHeaders, InvalidSpec, Rejected) | Also split into apply_manifest.rs for apply-specific rejection cases |
+| RF-143 | error_taxonomy.rs | Active | Apply rejection taxonomy (InvalidHeaders, InvalidSpec, Rejected) | Also split into apply_manifest.rs for apply-specific rejection cases, and immutable_specs.rs for `ImmutableFieldChanged` and `ReferencedObjectMissing` |
 | RF-150 | cross_impl.rs | Active | Local and remote expose same supported type descriptors | Verified via `contract_test!` macro, not side-by-side comparison |
 | RF-151 | cross_impl.rs | Active | Local-created resource is readable remotely | True cross-facade test |
 | RF-152 | cross_impl.rs | Active | Remote-created resource is readable locally | True cross-facade test |
@@ -156,3 +155,34 @@ Each `RF-*` contract scenario is listed with its status. Test code and comments 
 | RF-180 | list_search.rs | Active | A type-less selector may name an account, spanning every type under it | The only spelling for an all-types listing scoped to one account, there being no call-level `account`. RF-105 covers a typed selector's account |
 | RF-181 | generations.rs | Active | `generation` counts header and spec changes, `statusGeneration` counts status updates | Walks apply → reconcile → spec update → labels-only update → unchanged re-apply. Between an update and its reconciliation the phase is derived as `Pending` without a status update |
 | RF-182 | delete.rs | Active | Applying a manifest whose `headers.id` names a resource being deleted is rejected | Plan and apply both reject with `LifecycleRuleConflict`; the resource stays `Deleting` with its spec unchanged |
+| RF-183 | delete.rs | Active | Applying a manifest whose `headers.id` names a deleted resource is not found | Plan and apply alike |
+| RF-184 | delete.rs | Active | `DeletedOnly` hides live resources, even from their ids | Also pins the listing order: newest deletion first, and with `IncludeDeleted` the live ones before it |
+| RF-185 | delete.rs | Active | Label selectors find deleted resources | Deleted resources keep their label projection |
+| RF-186 | spec_view_mode.rs | Active | The spec of a deleted resource is not revealed | A per-item problem from `get` and `render_manifests`; a live resource sharing the name is revealed beside it |
+| RF-187 | generated_names.rs | Active | Applying a manifest without a name creates a resource each time and returns its generated name | On `TestResource`, the type that generates names; through `apply_manifest` and through an `apply_manifests` batch of two nameless manifests |
+| RF-188 | generated_names.rs | Active | Planning a manifest without a name reports the name as pending | A placeholder in `resource`, no name in the `after` document |
+| RF-189 | generated_names.rs | Active | A manifest with an `id` and without a name keeps the name of the resource | Plan and apply alike |
+| RF-190 | generated_names.rs | Active | A manifest without a name is refused for a type that does not generate names | Omitted, `null`, and with an `id`; `InvalidHeaders` from plan, apply and batch apply |
+| RF-191 | owner_references.rs | Active | Owners are stored as handles and rendered in the manifest | Short form and id; the rendered manifest re-applies as `Untouched` |
+| RF-192 | owner_references.rs | Active | Plan and apply reject a reference that does not name an owner | Missing, in another account, being deleted, mismatching type or name, repeated, the resource itself |
+| RF-193 | owner_references.rs | Active | Owner references without a resolvable form are `InvalidHeaders` | Also too many of them |
+| RF-194 | owner_references.rs | Active | A resource keeps the reference to its deleted owner through updates | Omitting `ownerReferences` drops it |
+| RF-195 | owner_references.rs | Active | Search by owner narrows the selectors, with any visibility | By id, by name, and by both; `search` and `search_handles` agree, account-scoped |
+| RF-196 | owner_references.rs | Active | The owner to search by is found by id even when gone, by name only when live | Lookup problems and unresolvable forms are typed errors; an unresolvable selector fails before the owner is looked up |
+| RF-197 | owner_references.rs | Active | Owners carry the current name of a renamed account | In plan, apply and get |
+| RF-198 | creation_provenance.rs | Active | A created resource records its creator's principal and origin in a `CreationProvenance` condition | Local records `Cli`, remote `Api` (`GraphQl`); an update keeps it |
+| RF-199 | operation_guard.rs | Active | A type's placement puts a resource applied by a non-owner in the placed account | On `TestResource` with its access rules; without an account and naming the placed one. Applied again, the manifest finds the resource there: `Untouched`, then `Updated` with a changed value |
+| RF-200 | operation_guard.rs | Active | A manifest naming another account than the placement is rejected | `BusinessValidationFailed` |
+| RF-201 | operation_guard.rs | Active | A type's guard decides a create in another account | Without a grant it is `AccountAccess`, as under the default rule. A `headers.id` naming nothing, or a resource of another type, gets the same denial from plan and apply: the guard decides before the lookup |
+| RF-202 | operation_guard.rs | Active | Get in another account is decided per resource | A resource the caller may not read is a not-found problem beside the one it may; one resource named twice is checked once and answered for both refs. A hidden ID, and an ID of another type, are `IDNotFound` with the text of a missing ID. A type-less ref keeps the default rule: the whole call is `AccountAccess` |
+| RF-203 | operation_guard.rs | Active | Delete in another account is decided per resource | A readable resource the caller may not delete is an `Access` problem, an unreadable one not found; the permitted one is deleted. A resource named twice gets the same problem for both refs. The denial keeps its kind and detail remotely. Deleting again a deleted resource the caller may read is `IDNotFound`, not `Access` |
+| RF-204 | operation_guard.rs | Active | Listing another account needs the filter the type's guard asks for | A selector without a type keeps the default rule; a pattern that may match what the caller may not read is refused |
+| RF-205 | operation_guard.rs | Active | A name matching resources the caller may read and ones it may not answers with the readable ones only | Under `IncludeDeleting`, by `get` and `get_handles`; a name matching only hidden resources is one `NameNotFound` |
+| RF-206 | operation_guard.rs | Active | An owner the caller may not read is rejected as a missing one | By id or name, with a mismatching name or type, deleted, or repeated; plan and apply agree. A readable owner is accepted and checked against the reference. An owner of a type whose guard refuses the whole account (`VariableSet`) is rejected the same way |
+| RF-207 | account_scoping.rs | Active | An apply addressing a resource by `headers.id` finds it in the apply's own account only | Another account's ID is `IDNotFound` from plan and apply; the resource there keeps its spec |
+| RF-208 | account_scoping.rs | Active | Under the default rule, batch refs naming another account fail the whole call | `get`, `get_handles`, `render_manifests` and `delete`, beside a ref the caller may use; `AccountAccess`, naming none of the resources. RF-105 covers search |
+| RF-208B | account_scoping.rs | Active | An admin may use batch refs naming another account | Local only: the admin is a predefined account outside `TestAccount` |
+| RF-209 | operation_guard.rs | Active | A type's guard decides an update by the current resource | On `TestResource`: an update the new spec alone would allow is `AccountAccess` when the current spec does not place the resource in the account |
+| RF-210 | operation_guard.rs | Active | A placement rejecting the spec rejects plan and apply | On `TestResource`: a `place:` token naming a missing account is `ReferencedObjectMissing`, and nothing is created |
+| RF-211 | owner_references.rs | Active | Owners named alike in several types resolve to their own types | `VariableSet:x` and `SecretSet:x` in one manifest are stored with their own ids and types |
+| RF-212 | operation_guard.rs | Active | A guard that finds a create's object hidden denies it as an apply in an account the caller may not use | On `TestResource`, a `hide:` token: `AccountAccess` from plan and apply, as RF-201 |

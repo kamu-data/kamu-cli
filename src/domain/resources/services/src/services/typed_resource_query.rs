@@ -14,6 +14,7 @@ use tokio_stream::StreamExt;
 use crate::domain::{
     DeclarativeResource,
     ResolvedResourceLabelFilter,
+    ResourceHeadersExt,
     ResourceID,
     ResourceIDNotFoundError,
     ResourceLabelFilterPredicate,
@@ -50,7 +51,7 @@ where
         }
     }
 
-    pub async fn load_snapshot_by_id(
+    pub async fn load_undeleted_snapshot_by_id(
         &self,
         id: &ResourceID,
     ) -> Result<ResourceSnapshot, TypedResourceQueryError> {
@@ -58,6 +59,7 @@ where
             .resource_repository
             .find_resource_snapshot_by_id(id)
             .await?
+            .filter(|snapshot| !snapshot.headers.is_deleted())
             .ok_or(ResourceIDNotFoundError(*id))?;
 
         if snapshot.schema != *R::type_uri() {
@@ -137,6 +139,7 @@ where
             &account_id,
             &scope,
             ResourceVisibility::Active,
+            None,
             pagination,
         );
 
@@ -188,7 +191,7 @@ macro_rules! declare_typed_resource_query_service {
                     self.resource_repository.as_ref(),
                 );
 
-                helper.load_snapshot_by_id(id).await.map(|_| ())
+                helper.load_undeleted_snapshot_by_id(id).await.map(|_| ())
             }
 
             async fn get_state_by_id(

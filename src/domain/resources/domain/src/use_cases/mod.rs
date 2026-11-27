@@ -10,9 +10,9 @@
 mod apply_resource_use_case;
 mod request_account_resources_deletion_use_case;
 mod request_resources_deletion_use_case;
-mod resource_spec_sanitizer;
+mod resource_spec_pre_apply;
 
 pub use apply_resource_use_case::*;
 pub use request_account_resources_deletion_use_case::*;
 pub use request_resources_deletion_use_case::*;
-pub use resource_spec_sanitizer::*;
+pub use resource_spec_pre_apply::*;

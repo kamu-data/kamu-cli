@@ -1,0 +1,111 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n                SELECT\n                    dataset_id   as \"id: _\",\n                    resource_id  as \"resource_id: _\",\n                    owner_id     as \"owner_id: _\",\n                    owner_name   as owner_name,\n                    dataset_name as name,\n                    created_at   as \"created_at: _\",\n                    kind         as \"kind: _\"\n                FROM dataset_entries\n                ORDER BY owner_name, dataset_name\n                LIMIT $1 OFFSET $2\n                ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id: _",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "dataset_entries",
+            "name": "dataset_id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "resource_id: _",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "dataset_entries",
+            "name": "resource_id"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "owner_id: _",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "dataset_entries",
+            "name": "owner_id"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "owner_name",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "dataset_entries",
+            "name": "owner_name"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "name",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "dataset_entries",
+            "name": "dataset_name"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "created_at: _",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "dataset_entries",
+            "name": "created_at"
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "kind: _",
+        "type_info": {
+          "Custom": {
+            "name": "dataset_kind",
+            "kind": {
+              "Enum": [
+                "root",
+                "derivative"
+              ]
+            }
+          }
+        },
+        "origin": {
+          "Table": {
+            "table": "dataset_entries",
+            "name": "kind"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int8",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "f905d949f724777c647617802a57ebd7feddbb9b413bebdcf0a57929758a32f3"
+}

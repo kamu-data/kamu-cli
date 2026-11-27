@@ -14,12 +14,13 @@ use dill::*;
 use internal_error::InternalError;
 use kamu_datasets::*;
 
-use super::InMemoryDatasetKeyBlockState;
+use super::{InMemoryDatasetEntryState, InMemoryDatasetKeyBlockState};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub(crate) struct InMemoryDatasetKeyBlockRepository {
     state: Arc<InMemoryDatasetKeyBlockState>,
+    entries: Arc<InMemoryDatasetEntryState>,
     transaction_id: Option<TransactionId>,
 }
 
@@ -29,10 +30,12 @@ pub(crate) struct InMemoryDatasetKeyBlockRepository {
 impl InMemoryDatasetKeyBlockRepository {
     pub fn new(
         state: Arc<InMemoryDatasetKeyBlockState>,
+        entries: Arc<InMemoryDatasetEntryState>,
         transaction_ref: Option<TransactionRef>,
     ) -> Self {
         Self {
             state,
+            entries,
             transaction_id: transaction_ref.map(|transaction_ref| transaction_ref.id()),
         }
     }
@@ -45,8 +48,21 @@ impl DatasetKeyBlockRepository for InMemoryDatasetKeyBlockRepository {
     async fn list_unindexed_dataset_branches(
         &self,
     ) -> Result<Vec<(odf::DatasetID, odf::BlockRef)>, InternalError> {
-        // Not implemented, however, not really required for usage in tests
-        Ok(vec![])
+        let dataset_ids = self.entries.rows.read(self.transaction_id, |rows| {
+            rows.iter().map(|(id, _)| id.clone()).collect::<Vec<_>>()
+        });
+
+        Ok(dataset_ids
+            .into_iter()
+            .filter(|id| {
+                !self.state.key_blocks.has_blocks_for_ref(
+                    self.transaction_id,
+                    id,
+                    &odf::BlockRef::Head,
+                )
+            })
+            .map(|id| (id, odf::BlockRef::Head))
+            .collect())
     }
 
     async fn has_key_blocks_for_ref(

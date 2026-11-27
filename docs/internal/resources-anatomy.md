@@ -22,15 +22,16 @@ pub struct ResourceManifestHeaders {
     pub id: Option<ResourceID>,              // optional — NOT assignable; an exact pointer to an
                                              // existing resource for updates (e.g. when renaming)
     pub account: Option<ResourceOwnerRef>, // optional — id/did/name selector; defaults to caller
-    pub name: ResourceName,                  // required
+    pub name: Option<String>,                // required, unless the type generates names
     pub labels: Vec<(TypeRef, serde_json::Value)>,
     pub annotations: Vec<(TypeRef, serde_json::Value)>,
+    pub owner_references: Vec<ResourceRef>,
 }
 ```
 
-A user may write **only**: `$schema`, `headers.{id?, account?, name, labels, annotations}`, and
-`spec`. `deny_unknown_fields` means a manifest **cannot** carry `status`, timestamps, or
-`generation` — those are server-owned.
+A user may write **only**: `$schema`, `headers.{id?, account?, name?, labels, annotations,
+ownerReferences}`, and `spec`. `deny_unknown_fields` means a manifest **cannot** carry `status`,
+timestamps, or `generation` — those are server-owned.
 
 > **Well-known annotations.** `description` is not a dedicated header field — it is the *first*
 > well-known entry in `headers.annotations`, establishing the pattern future well-known annotations
@@ -68,7 +69,8 @@ A user may write **only**: `$schema`, `headers.{id?, account?, name, labels, ann
 The `id` is **not** something the user assigns — a new resource's UID is always allocated by the
 server. It may only be *supplied* on a manifest to point at an already-existing resource for an
 update; this is what lets a resource be renamed (the `id` keeps the identity stable while `name`
-changes). Omit it for normal create/update-by-name.
+changes). Omit it for normal create/update-by-name. When the `name` may be omitted is in
+[Generated names](resources-framework.md#generated-names).
 
 **(2) Framework-generated — the rest of headers + all of status.**
 `ResourceHeaders` ([`values/resource_headers.rs`](/src/domain/resources/domain/src/values/resource_headers.rs))
@@ -81,21 +83,23 @@ pub struct ResourceHeaders {
     pub name: ResourceName,                  // (authored)
     pub labels: ResourceLabels,              // (authored) BTreeMap<TypeRef, serde_json::Value>
     pub annotations: ResourceAnnotations,    // (authored) BTreeMap<TypeRef, serde_json::Value>
+    pub owner_references: Option<Vec<ResourceHandle>>, // (authored) resolved owners
     pub generation: u64,                     // generated — bumps once per apply that changes headers or spec
     pub status_generation: u64,              // generated — bumps on every status update, deletion request and deletion
     pub created_at: DateTime<Utc>,           // generated
     pub updated_at: DateTime<Utc>,           // generated
     pub deletion_requested_at: Option<DateTime<Utc>>, // generated — deletion requested
-    pub deleted_at: Option<DateTime<Utc>>,   // generated — deletion completed (tombstone)
+    pub deleted_at: Option<DateTime<Utc>>,   // generated — deletion completed
 }
 
 pub struct ResourceStatus {                  // ODF-generated; written only by controllers
-    pub phase: ResourcePhase,                // Pending|Reconciling|Ready|Degraded|Failed|Deleting|Deleted
+    pub phase: ResourcePhase,                // derived from the rest (`align_phase`), never set by a writer
+                                             // Pending|Reconciling|Ready|Degraded|Failed|Deleting|Deleted
     pub observed_generation: Option<u64>,    // generation the controller last started reconciling
     pub observed_at: Option<DateTime<Utc>>,
     pub reconciled_generation: Option<u64>,  // generation the controller last reconciled successfully
     pub reconciled_at: Option<DateTime<Utc>>,
-    pub conditions: ResourceConditions,      // empty for a new resource
+    pub conditions: ResourceConditions,      // a new resource: its provenance and the type's initial ones
 }
 ```
 
@@ -167,23 +171,32 @@ The behaviorally-significant consequences of adopting these shapes:
   a resource yet; `resource_id` is an artificial, stable id assigned per account
   (`kamu_accounts::Account::resource_id`) in preparation for `Account` eventually becoming a
   projection of an account resource — no account-resource events/history exist today.
+- **Datasets have resource ids too, without being resources.** `DatasetEntry::resource_id` is a
+  random UUID created with the entry (`DatasetEntry::generate_resource_id`) and stored on
+  `dataset_entries.resource_id` (unique). Renames and owner renames keep it; it is the id datasets
+  keep when they become resources, because immutable specs refer to it.
+  `DatasetEntryService::resolve_dataset_handle` turns an ODF `datasets::DatasetRef` into the
+  `datasets::DatasetHandle` such specs store. It reads no caller identity (a bare name is looked up
+  in an account the caller passes), checks no access, and returns `None` when no dataset matches.
 - **Account is a precondition, not resolved, at the use-case boundary.**
-  `ResourceHeadersInput.account` is an `Option<auth::ResourceOwnerRef>` selector — `{id, did, name}`, all
-  optional — but by the time headers reach `ApplyResourceUseCase::plan`/`apply` it must already be a
-  fully-resolved `ResourceOwnerRef` (all three fields `Some`); `ResourceHeaders::from_input` panics
-  otherwise. Resolution is the caller's job — via the facade's `ResourceAccountResolver` (which also
+  `ApplyResourceHeaders.account` is an `Option<auth::ResourceOwnerRef>` selector — `{type, id, did,
+  name}`, all optional — but by the time headers reach `ApplyResourceUseCase::plan`/`apply` it must
+  already be a fully-resolved `ResourceOwnerRef` (all four fields `Some`); building
+  `ResourceHeaders` from it panics otherwise. Resolution is the caller's job — via the facade's `ResourceAccountResolver` (which also
   authorizes), or by resolving the account directly when only a DID/name is in hand (e.g.
   `DatasetEnvVarMutationAdapterImpl` looks up the resource id via `AccountService` from
   `DatasetEntry.owner_id`/`owner_name` before building headers). The use case enforces this
   defensively because the downstream event-sourced projector is pure/sync and cannot resolve
   accounts.
-- **The only built-in condition is ODF `ReconciliationError`**
+- **Two built-in conditions.** Kamu's `CreationProvenance` records the creator of every new
+  resource ([creation provenance](resources-framework.md#creation-provenance)). ODF
+  `ReconciliationError`
   (`https://opendatafabric.org/schemas/resources/v1alpha1/ReconciliationError`, with `code` and
-  `message`). It is present while the latest reconciliation or cleanup of the resource has failed;
-  the phase carries everything else, so Kamu defines no conditions of its own. Codes are
+  `message`) is present while the latest reconciliation or cleanup of the resource has failed;
+  the phase carries everything else. Codes are
   kebab-case: the shared ones are `RECONCILIATION_ERROR_CODE_*` constants, and each resource type
   adds its own through `ResourceReconcileError::code`.
-  New resources have no conditions; only a status update replaces them
+  A new resource starts without it; only a status update sets it
   ([state machine](resources-framework.md#lifecycle-state-machine)). Its DI-registered extension
   dispatcher carries no schema document, since ODF owns the schema; value validation is strict
   serde over the generated ODF proxy (unknown fields are rejected).
@@ -195,7 +208,7 @@ The behaviorally-significant consequences of adopting these shapes:
   unreachable; only entry *counts* (`MAX_LABELS`/`MAX_ANNOTATIONS`) are enforced.
 - **Registered label/annotation keys are canonicalized before diffing.** Facade apply preparation
   resolves `headers.labels` and `headers.annotations` with `ResourceExtensionSchemaResolver` before
-  constructing `ResourceHeadersInput`. Short names and aliases that resolve to a registered extension
+  constructing `ApplyResourceHeaders`. Short names and aliases that resolve to a registered extension
   are rewritten to the canonical schema URI, so re-applying `description` after a stored URI form (or
   vice versa) is `Untouched` rather than a headers update. Duplicate keys that only become duplicates
   after canonicalization are rejected as `InvalidHeaders`. Unknown short names remain free-form and
@@ -243,7 +256,7 @@ pub struct ResourceSnapshot {
 
 ```mermaid
 flowchart LR
-    M["Manifest (authored)<br/>$schema<br/>headers: name, account?, id?,<br/>labels, annotations<br/>spec"]
+    M["Manifest (authored)<br/>$schema<br/>headers: name?, account?, id?,<br/>labels, annotations<br/>spec"]
     A["apply use case<br/>(resolve account, allocate id,<br/>bump generation, set timestamps)"]
     S["Snapshot / State<br/>= authored fields<br/>+ <b>generated</b>: account(ID), id,<br/>generation, statusGeneration, created/updated/<br/>deletionRequested/deleted_at,<br/>status{phase, observed/reconciled generation and time, conditions}"]
     M --> A --> S

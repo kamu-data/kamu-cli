@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use database_common::PaginationOpts;
-use kamu_resources::{ResourceSelector, ResourceVisibility};
+use kamu_resources::{ResourceHandle, ResourceSelector, ResourceSummaryView};
 use kamu_resources_facade::SearchResourcesRequest;
 use pretty_assertions::assert_eq;
 
@@ -22,13 +22,14 @@ use crate::helpers::{
     apply_manifest_and_get_id,
     normalize_handles,
     normalize_summary_views,
+    search_request,
     secret_set_manifest_json,
     variable_set_manifest_json,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-fn summary_keys(mut items: Vec<kamu_resources::ResourceSummaryView>) -> Vec<(String, String)> {
+fn summary_keys(mut items: Vec<ResourceSummaryView>) -> Vec<(String, String)> {
     normalize_summary_views(&mut items);
     items
         .into_iter()
@@ -36,7 +37,9 @@ fn summary_keys(mut items: Vec<kamu_resources::ResourceSummaryView>) -> Vec<(Str
         .collect()
 }
 
-fn handle_keys(mut items: Vec<kamu_resources::ResourceHandle>) -> Vec<(String, String)> {
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+fn handle_keys(mut items: Vec<ResourceHandle>) -> Vec<(String, String)> {
     normalize_handles(&mut items);
     items
         .into_iter()
@@ -74,11 +77,7 @@ pub async fn search_summaries_across_supported_resource_types(h: &impl FacadeCon
 
     let summaries = h
         .facade_for(TestAccount::Alice)
-        .search(SearchResourcesRequest {
-            visibility: ResourceVisibility::Active,
-            pagination: PaginationOpts::from_max_results(1000),
-            selectors: vec![ResourceSelector::default()],
-        })
+        .search(search_request(vec![ResourceSelector::default()]))
         .await
         .unwrap()
         .items;
@@ -127,11 +126,7 @@ pub async fn search_narrowed_by_selectors(h: &impl FacadeContractHarness) {
 
     let search = async |selectors: Vec<ResourceSelector>| {
         h.facade_for(TestAccount::Alice)
-            .search(SearchResourcesRequest {
-                visibility: ResourceVisibility::Active,
-                pagination: PaginationOpts::from_max_results(1000),
-                selectors,
-            })
+            .search(search_request(selectors))
             .await
             .unwrap()
             .items
@@ -238,12 +233,10 @@ pub async fn test_search_handles_across_supported_resource_types(h: &impl Facade
 
     let handles = h
         .facade_for(TestAccount::Alice)
-        .search_handles(SearchResourcesRequest {
-            visibility: ResourceVisibility::Active,
+        .search_handles(search_request(
             // Spans every type.
-            selectors: vec![ResourceSelector::default()],
-            pagination: PaginationOpts::from_max_results(1000),
-        })
+            vec![ResourceSelector::default()],
+        ))
         .await
         .unwrap()
         .items;
@@ -293,30 +286,27 @@ pub async fn test_search_supports_pagination(h: &impl FacadeContractHarness) {
 
     let facade = h.facade_for(TestAccount::Alice);
     let first_page = facade
-        .search(SearchResourcesRequest {
-            visibility: ResourceVisibility::Active,
-            pagination: PaginationOpts::from_page(0, 2),
-            selectors: vec![ResourceSelector::default()],
-        })
+        .search(SearchResourcesRequest::new(
+            vec![ResourceSelector::default()],
+            PaginationOpts::from_page(0, 2),
+        ))
         .await
         .unwrap()
         .items;
     let second_page = facade
-        .search(SearchResourcesRequest {
-            visibility: ResourceVisibility::Active,
-            pagination: PaginationOpts::from_page(1, 2),
-            selectors: vec![ResourceSelector::default()],
-        })
+        .search(SearchResourcesRequest::new(
+            vec![ResourceSelector::default()],
+            PaginationOpts::from_page(1, 2),
+        ))
         .await
         .unwrap()
         .items;
     let handle_second_page = facade
-        .search_handles(SearchResourcesRequest {
-            visibility: ResourceVisibility::Active,
+        .search_handles(SearchResourcesRequest::new(
             // Spans every type.
-            selectors: vec![ResourceSelector::default()],
-            pagination: PaginationOpts::from_page(1, 2),
-        })
+            vec![ResourceSelector::default()],
+            PaginationOpts::from_page(1, 2),
+        ))
         .await
         .unwrap()
         .items;
@@ -353,21 +343,15 @@ pub async fn test_search_empty_account_returns_empty(h: &impl FacadeContractHarn
 
     let facade = h.facade_for(TestAccount::Bob);
     let summaries = facade
-        .search(SearchResourcesRequest {
-            visibility: ResourceVisibility::Active,
-            pagination: PaginationOpts::from_max_results(1000),
-            selectors: vec![ResourceSelector::default()],
-        })
+        .search(search_request(vec![ResourceSelector::default()]))
         .await
         .unwrap()
         .items;
     let handles = facade
-        .search_handles(SearchResourcesRequest {
-            visibility: ResourceVisibility::Active,
+        .search_handles(search_request(
             // Spans every type.
-            selectors: vec![ResourceSelector::default()],
-            pagination: PaginationOpts::from_max_results(1000),
-        })
+            vec![ResourceSelector::default()],
+        ))
         .await
         .unwrap()
         .items;

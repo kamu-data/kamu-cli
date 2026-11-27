@@ -34,6 +34,7 @@ pub enum ResourceLifecycleMessage {
     DeletionRequested(ResourceLifecycleMessageDeletionRequested),
     Deleted(ResourceLifecycleMessageDeleted),
     StatusUpdated(ResourceLifecycleMessageStatusUpdated),
+    Purged(ResourceLifecycleMessagePurged),
 }
 
 impl ResourceLifecycleMessage {
@@ -80,6 +81,19 @@ impl ResourceLifecycleMessage {
         Self::Deleted(ResourceLifecycleMessageDeleted {
             event_time,
             resources,
+        })
+    }
+
+    pub fn purged(event_time: DateTime<Utc>, schema: TypeUri, ids: Vec<ResourceID>) -> Self {
+        debug_assert!(
+            !ids.is_empty(),
+            "purged message must contain at least one resource"
+        );
+
+        Self::Purged(ResourceLifecycleMessagePurged {
+            event_time,
+            schema,
+            ids,
         })
     }
 
@@ -142,6 +156,18 @@ pub struct ResourceLifecycleMessageDeleted {
     pub event_time: DateTime<Utc>,
     // all resources share the same `schema`
     pub resources: Vec<ResourceSnapshot>,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// The deleted resources were purged once their retention ended: their
+/// snapshots, events and everything keyed by them are gone, and they can no
+/// longer be read
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ResourceLifecycleMessagePurged {
+    pub event_time: DateTime<Utc>,
+    pub schema: TypeUri,
+    pub ids: Vec<ResourceID>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -7,13 +7,14 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, RwLock};
 
 use chrono::{DateTime, TimeZone, Utc};
 use init_on_startup::InitOnStartup;
 use kamu_accounts::{
     Account,
+    AccountHandle,
     AccountRepository,
     CurrentAccountSubject,
     DidSecretEncryptionConfig,
@@ -25,10 +26,12 @@ use kamu_core::TenancyConfig;
 use kamu_datasets::{
     DatasetEntry,
     DatasetEntryRepository,
+    DatasetEntryService,
     DatasetLifecycleMessage,
     DatasetRegistry,
     MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
     MockDatasetEntryRepository,
+    ResolveDatasetHandleError,
 };
 use kamu_datasets_services::{DatasetEntryIndexer, DatasetEntryServiceImpl};
 use messaging_outbox::{Outbox, OutboxImmediateImpl, register_message_dispatcher};
@@ -160,10 +163,15 @@ async fn test_indexes_datasets_correctly(tenancy_config: TenancyConfig) {
 
     dataset_entries.sort_by(|l, r| l.name.cmp(&r.name));
 
+    // Each indexed entry gets a resource ID of its own
+    let resource_ids: Vec<_> = dataset_entries.iter().map(|e| e.resource_id).collect();
+    assert_eq!(resource_ids.iter().collect::<HashSet<_>>().len(), 3);
+
     assert_eq!(
         [
             DatasetEntry {
                 id: dataset_id_1,
+                resource_id: resource_ids[0],
                 owner_id: owner_account_id_1.clone(),
                 owner_name: odf::AccountName::new_unchecked("user1"),
                 name: odf::DatasetName::new_unchecked(dataset_name_1),
@@ -172,6 +180,7 @@ async fn test_indexes_datasets_correctly(tenancy_config: TenancyConfig) {
             },
             DatasetEntry {
                 id: dataset_id_2,
+                resource_id: resource_ids[1],
                 owner_id: owner_account_id_1,
                 owner_name: odf::AccountName::new_unchecked("user1"),
                 name: odf::DatasetName::new_unchecked(dataset_name_2),
@@ -180,6 +189,7 @@ async fn test_indexes_datasets_correctly(tenancy_config: TenancyConfig) {
             },
             DatasetEntry {
                 id: dataset_id_3,
+                resource_id: resource_ids[2],
                 owner_id: owner_account_id_2,
                 owner_name: odf::AccountName::new_unchecked("user2"),
                 name: odf::DatasetName::new_unchecked(dataset_name_3),
@@ -666,6 +676,273 @@ async fn test_resolve_dataset_handles_by_refs(tenancy_config: TenancyConfig) {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_resolve_dataset_handle() {
+    let harness = DatasetEntryServiceHarness::new(
+        TestDatasetEntryRepository::InMemory,
+        TenancyConfig::MultiTenant,
+    );
+    let foo = harness.create_dataset_handle("alice", "foo").await;
+    let bobs_foo = harness.create_dataset_handle("bob", "foo").await;
+    let alice = odf::AccountName::new_unchecked("alice");
+
+    let cases = [
+        (
+            "resource ID",
+            odf::metadata::datasets::DatasetRef {
+                id: Some(foo.id),
+                ..Default::default()
+            },
+            None,
+            &foo,
+        ),
+        (
+            "DID",
+            odf::metadata::datasets::DatasetRef {
+                did: Some(foo.did.clone()),
+                ..Default::default()
+            },
+            None,
+            &foo,
+        ),
+        (
+            "account name and name",
+            odf::metadata::datasets::DatasetRef {
+                account: Some(odf::metadata::auth::ResourceOwnerRef {
+                    name: Some(foo.account.name.clone()),
+                    ..Default::default()
+                }),
+                name: Some(foo.name.clone()),
+                ..Default::default()
+            },
+            None,
+            &foo,
+        ),
+        (
+            "account DID and name",
+            odf::metadata::datasets::DatasetRef {
+                account: Some(odf::metadata::auth::ResourceOwnerRef {
+                    did: Some(foo.account.did.clone()),
+                    ..Default::default()
+                }),
+                name: Some(foo.name.clone()),
+                ..Default::default()
+            },
+            None,
+            &foo,
+        ),
+        (
+            "bare name in the given account",
+            odf::metadata::datasets::DatasetRef {
+                name: Some(bobs_foo.name.clone()),
+                ..Default::default()
+            },
+            Some(&bobs_foo.account.name),
+            &bobs_foo,
+        ),
+        (
+            "the account of the ref over the given one",
+            odf::metadata::datasets::DatasetRef {
+                account: Some(odf::metadata::auth::ResourceOwnerRef {
+                    name: Some(bobs_foo.account.name.clone()),
+                    ..Default::default()
+                }),
+                name: Some(bobs_foo.name.clone()),
+                ..Default::default()
+            },
+            Some(&alice),
+            &bobs_foo,
+        ),
+        (
+            "every field",
+            odf::metadata::datasets::DatasetRef::from(foo.clone()),
+            None,
+            &foo,
+        ),
+    ];
+
+    for (case, dataset_ref, bare_name_account, expected) in cases {
+        assert_eq!(
+            harness
+                .resolve_dataset_handle(&dataset_ref, bare_name_account)
+                .await
+                .unwrap()
+                .as_ref(),
+            Some(expected),
+            "{case}"
+        );
+    }
+
+    let differently_cased = odf::metadata::datasets::DatasetRef {
+        name: Some(odf::metadata::resources::ResourceName::new_unchecked("FOO")),
+        ..odf::metadata::datasets::DatasetRef {
+            account: Some(odf::metadata::auth::ResourceOwnerRef {
+                name: Some(foo.account.name.clone()),
+                ..Default::default()
+            }),
+            ..Default::default()
+        }
+    };
+    assert_eq!(
+        harness
+            .resolve_dataset_handle(&differently_cased, None)
+            .await
+            .unwrap(),
+        Some(foo)
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_resolve_dataset_handle_not_found() {
+    use odf::metadata::auth::ResourceOwnerRef;
+    use odf::metadata::datasets::DatasetRef;
+    use odf::metadata::resources::ResourceName;
+
+    let harness = DatasetEntryServiceHarness::new(
+        TestDatasetEntryRepository::InMemory,
+        TenancyConfig::MultiTenant,
+    );
+    let foo = harness.create_dataset_handle("alice", "foo").await;
+    let bar = harness.create_dataset_handle("bob", "bar").await;
+    let alice = foo.account.name.clone();
+
+    let named = |account: &str, name: &str| DatasetRef {
+        account: Some(ResourceOwnerRef {
+            name: Some(odf::AccountName::new_unchecked(account)),
+            ..Default::default()
+        }),
+        name: Some(ResourceName::new_unchecked(name)),
+        ..Default::default()
+    };
+
+    let cases = [
+        (
+            "unknown resource ID",
+            DatasetRef {
+                id: Some(DatasetEntry::generate_resource_id()),
+                ..Default::default()
+            },
+        ),
+        (
+            "unknown DID",
+            DatasetRef {
+                did: Some(odf::DatasetID::new_generated_ed25519().1),
+                ..Default::default()
+            },
+        ),
+        ("unknown name", named("alice", "baz")),
+        ("unknown account", named("carol", "foo")),
+        ("dataset of another account", named("alice", "bar")),
+        ("not a dataset name", named("alice", "foo.bar~")),
+        (
+            "resource ID with another name",
+            DatasetRef {
+                id: Some(foo.id),
+                name: Some(bar.name.clone()),
+                ..Default::default()
+            },
+        ),
+        (
+            "DID with another account",
+            DatasetRef {
+                account: Some(ResourceOwnerRef {
+                    name: Some(bar.account.name.clone()),
+                    ..Default::default()
+                }),
+                did: Some(foo.did.clone()),
+                ..Default::default()
+            },
+        ),
+        (
+            "name with another DID",
+            DatasetRef {
+                account: Some(ResourceOwnerRef {
+                    name: Some(foo.account.name.clone()),
+                    ..Default::default()
+                }),
+                did: Some(bar.did.clone()),
+                name: Some(foo.name.clone()),
+                ..Default::default()
+            },
+        ),
+    ];
+
+    for (case, dataset_ref) in cases {
+        assert_eq!(
+            harness
+                .resolve_dataset_handle(&dataset_ref, Some(&alice))
+                .await
+                .unwrap(),
+            None,
+            "{case}"
+        );
+    }
+
+    // An entry can outlive its owner until the account's datasets are cleaned up
+    let orphan = harness.create_dataset_handle("carol", "baz").await;
+    harness.delete_account(&orphan.account.did).await;
+    assert_eq!(
+        harness
+            .resolve_dataset_handle(&DatasetRef::from(orphan), None)
+            .await
+            .unwrap(),
+        None
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_resolve_dataset_handle_invalid_ref() {
+    use odf::metadata::auth::ResourceOwnerRef;
+    use odf::metadata::datasets::DatasetRef;
+    use odf::metadata::resources::ResourceName;
+
+    let harness = DatasetEntryServiceHarness::new(
+        TestDatasetEntryRepository::InMemory,
+        TenancyConfig::MultiTenant,
+    );
+    let foo = harness.create_dataset_handle("alice", "foo").await;
+
+    let cases = [
+        ("empty", DatasetRef::default(), Some(&foo.account.name)),
+        (
+            "bare name, no account given",
+            DatasetRef {
+                name: Some(foo.name.clone()),
+                ..Default::default()
+            },
+            None,
+        ),
+        (
+            "account by resource ID only",
+            DatasetRef {
+                account: Some(ResourceOwnerRef {
+                    id: Some(foo.account.id),
+                    ..Default::default()
+                }),
+                name: Some(ResourceName::new_unchecked("foo")),
+                ..Default::default()
+            },
+            None,
+        ),
+    ];
+
+    for (case, dataset_ref, bare_name_account) in cases {
+        assert_matches!(
+            harness
+                .resolve_dataset_handle(&dataset_ref, bare_name_account)
+                .await,
+            Err(ResolveDatasetHandleError::InvalidRef(_)),
+            "{case}"
+        );
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Harness
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -687,6 +964,7 @@ struct DatasetEntryServiceHarness {
     dataset_registry: Arc<dyn DatasetRegistry>,
     dataset_storage_unit_writer: Arc<dyn odf::DatasetStorageUnitWriter>,
     dataset_entry_writer: Arc<dyn kamu_datasets_services::DatasetEntryWriter>,
+    dataset_entry_svc: Arc<dyn DatasetEntryService>,
     tenancy_config: TenancyConfig,
 }
 
@@ -771,6 +1049,7 @@ impl DatasetEntryServiceHarness {
             dataset_registry: catalog.get_one().unwrap(),
             dataset_storage_unit_writer: catalog.get_one().unwrap(),
             dataset_entry_writer: catalog.get_one().unwrap(),
+            dataset_entry_svc: catalog.get_one().unwrap(),
             tenancy_config,
         }
     }
@@ -782,6 +1061,40 @@ impl DatasetEntryServiceHarness {
         self.dataset_registry
             .resolve_dataset_handle_by_ref(dataset_ref)
             .await
+    }
+
+    async fn resolve_dataset_handle(
+        &self,
+        dataset_ref: &odf::metadata::datasets::DatasetRef,
+        bare_name_account: Option<&odf::AccountName>,
+    ) -> Result<Option<odf::metadata::datasets::DatasetHandle>, ResolveDatasetHandleError> {
+        self.dataset_entry_svc
+            .resolve_dataset_handle(dataset_ref, bare_name_account)
+            .await
+    }
+
+    async fn delete_account(&self, account_id: &odf::AccountID) {
+        self.account_repo
+            .delete_account_by_id(account_id)
+            .await
+            .unwrap();
+    }
+
+    /// Creates a dataset and returns the ODF handle it resolves to
+    async fn create_dataset_handle(
+        &self,
+        account_name: &str,
+        dataset_name: &str,
+    ) -> odf::metadata::datasets::DatasetHandle {
+        let dataset = self.create_dataset(account_name, dataset_name).await;
+        let entry = self.dataset_entry_svc.get_entry(&dataset.id).await.unwrap();
+        let owner = self
+            .account_repo
+            .get_account_by_id(&entry.owner_id)
+            .await
+            .unwrap();
+
+        entry.to_odf_handle(AccountHandle::from(&owner).into())
     }
 
     async fn create_dataset(&self, account_name: &str, dataset_name: &str) -> odf::DatasetHandle {

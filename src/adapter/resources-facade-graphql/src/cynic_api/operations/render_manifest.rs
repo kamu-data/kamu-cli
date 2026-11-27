@@ -18,7 +18,12 @@ use crate::cynic_api::fragments::{
     ResourceRenderManifestResult,
     ResourceUnsupportedSelectorProblem,
 };
-use crate::cynic_api::inputs::{ResourceRefInput, SpecViewOptsInput, resource_ref_inputs};
+use crate::cynic_api::inputs::{
+    ResourceRefInput,
+    ResourceVisibilityInput,
+    SpecViewOptsInput,
+    resource_ref_inputs,
+};
 use crate::cynic_api::schema;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -39,7 +44,7 @@ pub(crate) struct RenderManifestsResources {
         resourceRefs: $resource_refs,
         format: $format,
         opts: $opts,
-        includeDeleting: $include_deleting
+        visibility: $visibility
     )]
     pub render_manifests: BatchResourceManifestsOutcome,
 }
@@ -72,7 +77,7 @@ pub(crate) struct RenderResourceManifestsVariables {
     pub resource_refs: Vec<ResourceRefInput>,
     pub format: ResourceManifestFormat,
     pub opts: SpecViewOptsInput,
-    pub include_deleting: bool,
+    pub visibility: ResourceVisibilityInput,
 }
 
 impl RenderResourceManifestsVariables {
@@ -86,7 +91,7 @@ impl RenderResourceManifestsVariables {
             resource_refs: resource_ref_inputs(resource_refs),
             format: format.into(),
             opts: spec_view.into(),
-            include_deleting: visibility.includes_deleting(),
+            visibility: visibility.into(),
         }
     }
 }

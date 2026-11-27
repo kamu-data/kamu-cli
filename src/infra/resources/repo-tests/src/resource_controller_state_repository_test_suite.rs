@@ -319,7 +319,7 @@ pub async fn test_count_failing_resources(catalog: &Catalog) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn test_delete_states_for_resource(catalog: &Catalog) {
+pub async fn test_delete_states_for_resources(catalog: &Catalog) {
     let ctx = ControllerStateTestContext::new(catalog);
     let removed = ctx.create_resource("removed").await;
     let kept = ctx.create_resource("kept").await;
@@ -360,12 +360,17 @@ pub async fn test_upsert_state_with_nul_in_error(catalog: &Catalog) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn test_upsert_state_of_unknown_resource_fails(catalog: &Catalog) {
+pub async fn test_upsert_state_of_absent_resource_writes_nothing(catalog: &Catalog) {
     let ctx = ControllerStateTestContext::new(catalog);
     let unknown = ctx.unsaved_resource("unknown").await;
+    let purged = ctx.create_resource("purged").await;
+    ctx.resources.purge_resources(&[purged.id]).await.unwrap();
 
-    let state = ctx.done_state(&CONTROLLER, &unknown, REVISION);
-    assert!(ctx.states.upsert_state(&state).await.is_err());
+    for resource in [&unknown, &purged] {
+        ctx.upsert(&ctx.done_state(&CONTROLLER, resource, REVISION))
+            .await;
+        assert_eq!(ctx.get_state(&CONTROLLER, resource).await, None);
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -504,7 +509,7 @@ impl ControllerStateTestContext {
 
     async fn delete_states(&self, snapshot: &ResourceSnapshot) {
         self.states
-            .delete_states_for_resource(&snapshot.id)
+            .delete_states_for_resources(std::slice::from_ref(&snapshot.id))
             .await
             .unwrap();
     }

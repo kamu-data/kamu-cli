@@ -9,12 +9,14 @@
 
 #![feature(error_generic_member_access)]
 
+mod access;
 mod core;
 mod dispatchers;
 mod errors;
 mod manifests;
 mod messages;
 mod repo;
+mod retention;
 mod services;
 mod state;
 mod use_cases;
@@ -24,11 +26,13 @@ mod views;
 
 pub use core::*;
 
+pub use access::*;
 pub use dispatchers::*;
 pub use errors::*;
 pub use manifests::*;
 pub use messages::*;
 pub use repo::*;
+pub use retention::*;
 pub use services::*;
 pub use state::*;
 pub use use_cases::*;

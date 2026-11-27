@@ -19,7 +19,7 @@ mod reconcilers;
 mod resource_crud_dispatchers;
 mod resource_extension_schemas;
 mod resources;
-pub mod sanitizers;
+mod spec_pre_apply;
 
 pub use dataset_env_var_mutation_adapter::*;
 pub use dataset_env_var_resolver::*;
@@ -30,4 +30,4 @@ pub use reconcilers::*;
 pub use resource_crud_dispatchers::*;
 pub use resource_extension_schemas::*;
 pub use resources::*;
-pub use sanitizers::*;
+pub use spec_pre_apply::*;

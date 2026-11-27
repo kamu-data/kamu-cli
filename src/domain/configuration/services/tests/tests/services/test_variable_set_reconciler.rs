@@ -45,11 +45,11 @@ async fn test_reconcile_variable_set_populates_projection_entries() {
 
     let decision = harness
         .apply_variable_use_case()
-        .apply(ApplyResourceParams {
-            id: None,
-            headers: BaseResourceServiceHarness::make_headers_input(account_handle, "test-vars"),
+        .apply(BaseResourceServiceHarness::make_apply_params(
+            account_handle,
+            Some("test-vars"),
             spec,
-        })
+        ))
         .await
         .unwrap();
     harness.settle().await;
@@ -89,14 +89,11 @@ async fn test_reconcile_variable_set_preserves_entry_id_across_reconciliations()
     // First apply — generation 0 → 1
     let decision = harness
         .apply_variable_use_case()
-        .apply(ApplyResourceParams {
-            id: None,
-            headers: BaseResourceServiceHarness::make_headers_input(
-                account_handle.clone(),
-                "test-vars",
-            ),
+        .apply(BaseResourceServiceHarness::make_apply_params(
+            account_handle.clone(),
+            Some("test-vars"),
             spec,
-        })
+        ))
         .await
         .unwrap();
     harness.settle().await;
@@ -122,11 +119,11 @@ async fn test_reconcile_variable_set_preserves_entry_id_across_reconciliations()
         .apply_variable_use_case()
         .apply(ApplyResourceParams {
             id: Some(id),
-            headers: BaseResourceServiceHarness::make_headers_input(
+            ..BaseResourceServiceHarness::make_apply_params(
                 account_handle.clone(),
-                "test-vars",
-            ),
-            spec: spec2,
+                Some("test-vars"),
+                spec2,
+            )
         })
         .await
         .unwrap();
@@ -219,7 +216,7 @@ async fn test_requested_deletion_of_variable_set_removes_its_projection_entries(
         harness.variable_set_phase(&id_deleted).await,
         ResourcePhase::Deleted
     );
-    assert!(harness.get_snapshot_by_id(&id_deleted).await.is_none());
+    assert!(harness.is_deleted(&id_deleted).await);
     assert_eq!(
         harness
             .variable_set_projection_entry_count(&id_deleted)

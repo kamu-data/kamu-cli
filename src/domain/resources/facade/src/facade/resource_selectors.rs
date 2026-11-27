@@ -35,7 +35,11 @@ use kamu_resources::{
     ResourceSelector,
     ResourceTypeQuery,
     TypeUri,
+    UnresolvableResourceRefError,
+    validate_owner_reference,
 };
+
+use crate::SearchResourcesRequest;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -61,6 +65,16 @@ pub enum UnsupportedSelectorFieldError {
     UntypedName,
 }
 
+impl From<UnresolvableResourceRefError> for UnsupportedSelectorFieldError {
+    fn from(value: UnresolvableResourceRefError) -> Self {
+        match value {
+            UnresolvableResourceRefError::Did => Self::Did,
+            UnresolvableResourceRefError::Empty => Self::EmptyRef,
+            UnresolvableResourceRefError::UntypedName => Self::UntypedName,
+        }
+    }
+}
+
 /// Rejects a ref the facade cannot resolve: one carrying a `did`, one naming
 /// nothing at all, or one naming a resource without saying of which type.
 ///
@@ -73,16 +87,7 @@ pub enum UnsupportedSelectorFieldError {
 /// type-less *`ResourceSelector`*, which stays legal: a selector asks which
 /// resources match and may span every type, while a ref names exactly one.
 pub fn validate_ref(value: &ResourceRef) -> Result<(), UnsupportedSelectorFieldError> {
-    if value.did.is_some() {
-        return Err(UnsupportedSelectorFieldError::Did);
-    }
-    if value.id.is_none() && value.name.is_none() {
-        return Err(UnsupportedSelectorFieldError::EmptyRef);
-    }
-    if value.id.is_none() && value.r#type.is_none() {
-        return Err(UnsupportedSelectorFieldError::UntypedName);
-    }
-    Ok(())
+    validate_owner_reference(value).map_err(Into::into)
 }
 
 /// Rejects a selector carrying a field the facade cannot resolve — today only
@@ -98,6 +103,22 @@ pub fn validate_ref(value: &ResourceRef) -> Result<(), UnsupportedSelectorFieldE
 pub fn validate_selector(value: &ResourceSelector) -> Result<(), UnsupportedSelectorFieldError> {
     if value.did.is_some() {
         return Err(UnsupportedSelectorFieldError::Did);
+    }
+    Ok(())
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Rejects a search whose selectors or owner carry a field the facade cannot
+/// resolve, by [`validate_selector`] and [`validate_ref`].
+pub fn validate_search_request(
+    request: &SearchResourcesRequest,
+) -> Result<(), UnsupportedSelectorFieldError> {
+    for selector in &request.selectors {
+        validate_selector(selector)?;
+    }
+    if let Some(owner) = &request.owner {
+        validate_ref(owner)?;
     }
     Ok(())
 }

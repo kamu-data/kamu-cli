@@ -464,7 +464,7 @@ The startup checks are in `src/app/cli/src/app.rs`; the full reference is genera
 | --- | --- |
 | Use cases, with a shared harness | `src/domain/webhooks/services/tests/tests/use_cases/` (`webhook_subscription_use_case_harness.rs`) |
 | Delivery worker (mocked sender, watermark on 2xx), signer test vector, dataset removal handler | `src/domain/webhooks/services/tests/tests/services/` |
-| Event store, delivery and watermark repository suites, run against every backend; the watermarks backfill migration on Postgres and SQLite | `src/infra/webhooks/repo-tests/src/`, invoked from `src/infra/webhooks/{inmem,postgres,sqlite}/tests/` |
+| Event store, delivery and watermark repository suites, run against every backend | `src/infra/webhooks/repo-tests/src/`, invoked from `src/infra/webhooks/{inmem,postgres,sqlite}/tests/` |
 | Sensor (including catch-up), dataset watermark provider, deliver controller (payload shape), event bridge, recovery job | `src/adapter/flow-webhook/tests/tests/` |
 | Flow agent running delivery flows: activation by push and by an upstream ingest flow, batching, retries, stop policy, breaking changes, catch-up at startup and on resume | `src/domain/flow-system/services/tests/tests/test_flow_agent/test_webhook_delivery.rs` |
 | GraphQL subscription management | `src/adapter/graphql/tests/tests/test_gql_webhook_subscriptions.rs` |

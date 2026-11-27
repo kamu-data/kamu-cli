@@ -10,16 +10,20 @@
 use std::collections::HashSet;
 use std::sync::Arc;
 
+use background_agent_host::BackgroundWorkFinalizer;
 use database_common::{NoOpDatabasePlugin, PaginationOpts};
 use dill::CatalogBuilder;
 use kamu_accounts::{
+    Account,
     AccountConfig,
     AccountPropertyName,
+    AccountRepository,
     CurrentAccountSubject,
     DidSecretEncryptionConfig,
     JOB_KAMU_ACCOUNTS_PREDEFINED_ACCOUNTS_REGISTRATOR,
     PredefinedAccountsConfig,
     Principal,
+    RequestOrigin,
 };
 use kamu_accounts_inmem::{
     InMemoryAccountQuotaEventStore,
@@ -32,6 +36,7 @@ use kamu_accounts_services::{
     CreateAccountUseCaseImpl,
     LoginPasswordAuthProvider,
     PredefinedAccountsRegistrator,
+    ResourceAccountAccessAdapter,
     UpdateAccountUseCaseImpl,
 };
 use kamu_auth_rebac_inmem::InMemoryRebacRepository;
@@ -42,21 +47,23 @@ use kamu_auth_rebac_services::{
     RebacServiceImpl,
     SetDatasetRebacPropertiesUseCaseImpl,
 };
-use kamu_configuration_inmem::{
-    InMemorySecretSetProjectionRepository,
-    InMemoryVariableSetProjectionRepository,
-};
 use kamu_datasets::SecretsEncryptionConfig;
 use kamu_resources::{
+    CreationOrigin,
     MESSAGE_PRODUCER_KAMU_RESOURCE_SERVICE,
     ResourceControllerRuntimeConfig,
     ResourceLifecycleMessage,
     ResourceOwnerRef,
+    ResourceRetentionConfig,
     ResourceSelector,
-    ResourceVisibility,
 };
 use kamu_resources_facade::{ListResourcesError, ResourceFacade, SearchResourcesRequest};
-use kamu_resources_services::{BackgroundWorkFinalizer, ResourceControllerRuntimeImpl};
+use kamu_resources_services::ResourceControllerRuntimeImpl;
+use kamu_resources_services::testing::{
+    register_immutable_test_resource,
+    register_test_resource,
+    register_test_resource_access_rules,
+};
 use messaging_outbox::{OutboxAgent, OutboxProvider, register_message_dispatcher};
 use strum::IntoEnumIterator;
 use time_source::SystemTimeSourceProvider;
@@ -71,10 +78,37 @@ use crate::helpers::{VARIABLE_SET_CANONICAL_SELECTOR, sorted_handle_names};
 /// the contract suite's fixture accounts stay non-admin
 const ADMIN_ACCOUNT_NAME: &str = "admin";
 
+/// The producer that [`LocalFacadeHarness::facade_for_node`] applies as
+pub const NODE_TEST_PRODUCER: &str = "dev.kamu.test.NodeFacade";
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct LocalFacadeHarnessOpts {
     pub outbox_provider: OutboxProvider,
+    /// Serves [`TestResource`](kamu_resources_services::testing::TestResource)
+    /// and
+    /// [`ImmutableTestResource`](kamu_resources_services::testing::ImmutableTestResource)
+    /// beside the real types
+    pub test_resources: bool,
+    /// Gives `TestResource` the placement and the operation guard of
+    /// [`register_test_resource_access_rules`]
+    pub test_resource_access_rules: bool,
+}
+
+impl LocalFacadeHarnessOpts {
+    pub fn with_test_resources() -> Self {
+        Self {
+            test_resources: true,
+            ..Default::default()
+        }
+    }
+
+    pub fn with_guarded_test_resources() -> Self {
+        Self {
+            test_resource_access_rules: true,
+            ..Self::with_test_resources()
+        }
+    }
 }
 
 impl Default for LocalFacadeHarnessOpts {
@@ -83,6 +117,8 @@ impl Default for LocalFacadeHarnessOpts {
             outbox_provider: OutboxProvider::Immediate {
                 force_immediate: true,
             },
+            test_resources: false,
+            test_resource_access_rules: false,
         }
     }
 }
@@ -91,7 +127,6 @@ impl Default for LocalFacadeHarnessOpts {
 
 pub struct LocalFacadeHarness {
     base_catalog: dill::Catalog,
-    dispatching_outbox: bool,
     alice_account_id: odf::AccountID,
     bob_account_id: odf::AccountID,
 }
@@ -125,7 +160,7 @@ impl LocalFacadeHarness {
             .clone();
 
         let is_dispatching = matches!(opts.outbox_provider, OutboxProvider::Dispatching);
-        let base_catalog = Self::build_base_catalog(&subjects, opts.outbox_provider).await;
+        let base_catalog = Self::build_base_catalog(&subjects, opts).await;
 
         if is_dispatching {
             base_catalog
@@ -140,13 +175,12 @@ impl LocalFacadeHarness {
             base_catalog,
             alice_account_id,
             bob_account_id,
-            dispatching_outbox: is_dispatching,
         }
     }
 
     async fn build_base_catalog(
         subjects: &[(TestAccount, CurrentAccountSubject)],
-        outbox_provider: OutboxProvider,
+        opts: LocalFacadeHarnessOpts,
     ) -> dill::Catalog {
         let mut predefined_accounts_config = PredefinedAccountsConfig::new();
         for (_, subject) in subjects {
@@ -174,8 +208,8 @@ impl LocalFacadeHarness {
         NoOpDatabasePlugin::init_database_components(&mut b);
 
         // Outbox
-        let needs_bridge = matches!(outbox_provider, OutboxProvider::Dispatching);
-        outbox_provider.embed_into_catalog(&mut b);
+        let needs_bridge = matches!(opts.outbox_provider, OutboxProvider::Dispatching);
+        opts.outbox_provider.embed_into_catalog(&mut b);
         // The controller hint hub needs it with any outbox
         b.add::<WakeupListenerMetrics>();
         if needs_bridge {
@@ -189,7 +223,8 @@ impl LocalFacadeHarness {
 
         // Resource controllers
         b.add::<ResourceControllerRuntimeImpl>()
-            .add_value(ResourceControllerRuntimeConfig::default());
+            .add_value(ResourceControllerRuntimeConfig::default())
+            .add_value(ResourceRetentionConfig::default());
 
         // Accounts
         b.add::<InMemoryAccountRepository>()
@@ -201,6 +236,7 @@ impl LocalFacadeHarness {
             .add::<AccountQuotaServiceImpl>()
             .add::<CreateAccountUseCaseImpl>()
             .add::<UpdateAccountUseCaseImpl>()
+            .add::<ResourceAccountAccessAdapter>()
             .add_value(DidSecretEncryptionConfig::sample())
             .add_value(predefined_accounts_config);
 
@@ -216,12 +252,18 @@ impl LocalFacadeHarness {
         kamu_resources_inmem::register_dependencies(&mut b);
 
         // Configuration
-        b.add::<InMemoryVariableSetProjectionRepository>()
-            .add::<InMemorySecretSetProjectionRepository>()
-            .add_value(SecretsEncryptionConfig::sample());
+        kamu_configuration_inmem::register_dependencies(&mut b);
+        b.add_value(SecretsEncryptionConfig::sample());
 
         kamu_resources_services::register_dependencies(&mut b);
         kamu_configuration_services::register_dependencies(&mut b);
+        if opts.test_resources {
+            register_test_resource(&mut b);
+            register_immutable_test_resource(&mut b);
+        }
+        if opts.test_resource_access_rules {
+            register_test_resource_access_rules(&mut b);
+        }
 
         register_message_dispatcher::<ResourceLifecycleMessage>(
             &mut b,
@@ -251,27 +293,25 @@ impl LocalFacadeHarness {
 
     /// See [`FacadeContractHarness::settle`]
     pub async fn settle(&self) {
-        let finalizer = if self.dispatching_outbox {
-            BackgroundWorkFinalizer::for_dispatching_outbox()
-        } else {
-            BackgroundWorkFinalizer::for_immediate_outbox()
-        };
-        finalizer.finalize(&self.base_catalog).await.unwrap();
+        BackgroundWorkFinalizer::settle_only()
+            .finalize(&self.base_catalog)
+            .await
+            .unwrap();
     }
 
     /// A facade acting as the admin account
     pub fn facade_for_admin(&self) -> Arc<dyn ResourceFacade> {
-        let subject = Self::admin_subject();
-        let mut b = dill::CatalogBuilder::new_chained(&self.base_catalog);
-        subject.register(&mut b);
-        let catalog = b.build();
-        Self::facade_in(&catalog)
+        Self::facade_in(&self.subject_catalog(Self::admin_subject()))
     }
 
     /// A facade of background work: [`Principal::Node`] acting, with no caller
     pub fn facade_for_node(&self) -> Arc<dyn ResourceFacade> {
-        let catalog = dill::CatalogBuilder::new_chained(&self.base_catalog)
+        let catalog = CatalogBuilder::new_chained(&self.base_catalog)
             .add_value(Principal::Node)
+            .add_value(RequestOrigin::Internal {
+                producer: NODE_TEST_PRODUCER.to_string(),
+                detail: None,
+            })
             .build();
         Self::facade_in(&catalog)
     }
@@ -284,9 +324,8 @@ impl LocalFacadeHarness {
         account: Option<TestAccount>,
     ) -> Result<Vec<String>, ListResourcesError> {
         let response = facade
-            .search_handles(SearchResourcesRequest {
-                visibility: ResourceVisibility::Active,
-                selectors: vec![ResourceSelector {
+            .search_handles(SearchResourcesRequest::new(
+                vec![ResourceSelector {
                     account: account.map(|account| ResourceOwnerRef {
                         r#type: None,
                         id: None,
@@ -295,8 +334,8 @@ impl LocalFacadeHarness {
                     }),
                     ..ResourceSelector::of_type(VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap())
                 }],
-                pagination: PaginationOpts::from_max_results(1000),
-            })
+                PaginationOpts::from_max_results(1000),
+            ))
             .await?;
         Ok(sorted_handle_names(response.items))
     }
@@ -306,7 +345,7 @@ impl LocalFacadeHarness {
     }
 
     fn facade_in(catalog: &dill::Catalog) -> Arc<dyn ResourceFacade> {
-        let mut b = dill::CatalogBuilder::new_chained(catalog);
+        let mut b = CatalogBuilder::new_chained(catalog);
         kamu_resources_facade::register_dependencies(&mut b);
         b.build().get_one::<dyn ResourceFacade>().unwrap()
     }
@@ -314,13 +353,19 @@ impl LocalFacadeHarness {
     fn catalog_for_account(&self, account: TestAccount) -> dill::Catalog {
         let account_id = self.account_id(account);
         let subject = CurrentAccountSubject::logged(
-            kamu_accounts::Account::seed_resource_id_from_name(account.name()),
+            Account::seed_resource_id_from_name(account.name()),
             account_id,
             odf::AccountName::new_unchecked(account.name()),
         );
 
-        let mut b = dill::CatalogBuilder::new_chained(&self.base_catalog);
+        self.subject_catalog(subject)
+    }
+
+    /// The catalog of a CLI command `subject` runs
+    fn subject_catalog(&self, subject: CurrentAccountSubject) -> dill::Catalog {
+        let mut b = CatalogBuilder::new_chained(&self.base_catalog);
         subject.register(&mut b);
+        b.add_value(RequestOrigin::Cli);
         b.build()
     }
 }
@@ -342,6 +387,21 @@ impl FacadeContractHarness for LocalFacadeHarness {
 
     fn account_name(&self, account: TestAccount) -> odf::AccountName {
         odf::AccountName::new_unchecked(account.name())
+    }
+
+    async fn rename_account(&self, account: TestAccount, new_name: &odf::AccountName) {
+        let account_repo: Arc<dyn AccountRepository> = self.base_catalog.get_one().unwrap();
+
+        let mut account = account_repo
+            .get_account_by_id(&self.account_id(account))
+            .await
+            .unwrap();
+        account.account_name = new_name.clone();
+        account_repo.update_account(&account).await.unwrap();
+    }
+
+    fn creation_origin(&self) -> CreationOrigin {
+        CreationOrigin::Cli
     }
 
     async fn settle(&self) {

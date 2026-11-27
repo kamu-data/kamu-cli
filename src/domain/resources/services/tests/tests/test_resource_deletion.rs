@@ -15,9 +15,10 @@ use kamu_resources::{
     ResourceDeletionInProgressError,
     ResourcePhase,
 };
+use kamu_resources_services::testing::TestResourceLifecycleError;
 use pretty_assertions::assert_eq;
 
-use crate::tests::utils::{ResourceLifecycleHarness, TestResourceLifecycleError};
+use crate::tests::utils::ResourceLifecycleHarness;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -75,18 +76,16 @@ fn test_deletion_takes_precedence_over_pending_generation() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test]
-fn test_completed_deletion_renames_to_tombstone() {
+fn test_completed_deletion_keeps_name() {
     let mut harness = ResourceLifecycleHarness::reconciled();
+    let name = harness.resource.headers().name.clone();
     harness.request_deletion();
     let requested_at = harness.now;
 
     harness.complete_deletion();
 
     let headers = harness.resource.headers();
-    assert_eq!(
-        headers.name.as_str(),
-        format!("deleted-{}", harness.resource.id())
-    );
+    assert_eq!(headers.name, name);
     assert_eq!(headers.deletion_requested_at, Some(requested_at));
     assert_eq!(headers.deleted_at, Some(harness.now));
     assert_eq!(harness.phase(), ResourcePhase::Deleted);
@@ -115,14 +114,12 @@ fn test_completing_unrequested_deletion_is_an_invariant_violation() {
 #[test]
 fn test_stored_deletion_without_request_replays_as_deleted() {
     let mut harness = ResourceLifecycleHarness::reconciled();
+    let name = harness.resource.headers().name.clone();
 
     harness.apply_stored_deletion();
 
     let headers = harness.resource.headers();
-    assert_eq!(
-        headers.name.as_str(),
-        format!("deleted-{}", harness.resource.id())
-    );
+    assert_eq!(headers.name, name);
     assert_eq!(headers.deletion_requested_at, Some(harness.now));
     assert_eq!(headers.deleted_at, Some(harness.now));
     assert_eq!(harness.phase(), ResourcePhase::Deleted);

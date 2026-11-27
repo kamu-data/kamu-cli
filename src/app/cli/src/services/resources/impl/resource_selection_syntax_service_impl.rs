@@ -10,7 +10,7 @@
 use std::future::Future;
 use std::sync::Arc;
 
-use kamu_resources::ResourceTypeDescriptor;
+use kamu_resources::{ResourceRef, ResourceTypeDescriptor};
 
 use super::resource_selection_scanner::ANY_SELECTOR;
 use super::resource_selection_syntax_parser::{ParsedSyntax, ResourceSelectionSyntaxParser};
@@ -85,11 +85,63 @@ impl ResourceSelectionSyntaxService for ResourceSelectionSyntaxServiceImpl {
         )
         .await
     }
+
+    async fn parse_owner(
+        &self,
+        explicit_context_name: Option<&str>,
+        owner: Option<&str>,
+    ) -> Result<Option<ResourceRef>, CLIError> {
+        let Some(owner) = owner else {
+            return Ok(None);
+        };
+        let args = [owner.to_owned()];
+
+        let (type_str, selector_input) = match ResourceSelectionSyntaxParser::parse(&args)? {
+            ParsedSyntax::ById { input } => (None, input),
+            ParsedSyntax::RefForm { pairs } => match pairs.as_slice() {
+                [(type_str, selector_input)]
+                    if !Self::is_name_pattern(type_str)
+                        && !Self::is_name_pattern(selector_input) =>
+                {
+                    (Some(*type_str), *selector_input)
+                }
+                _ => return Err(Self::not_an_owner_error(owner)),
+            },
+            ParsedSyntax::SameType { .. } => return Err(Self::not_an_owner_error(owner)),
+        };
+
+        let schema = match type_str {
+            Some(type_str) => Some(
+                self.resource_type_lookup_service
+                    .resolve_type_descriptor(
+                        explicit_context_name,
+                        type_str,
+                        ResourceTypeLookupErrorOptions::new("Unsupported owner type"),
+                    )
+                    .await?
+                    .schema,
+            ),
+            None => None,
+        };
+
+        let resolved = self
+            .resource_selector_resolution_service
+            .resolve_single_selector(selector_input)
+            .await?;
+
+        Ok(Some(resolved.resource_ref.into_resource_ref(schema)))
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl ResourceSelectionSyntaxServiceImpl {
+    fn not_an_owner_error(owner: &str) -> CLIError {
+        CLIError::usage_error(format!(
+            "--owner must name one resource, as `type/name`, `type/<id>` or `<id>`, got: {owner}"
+        ))
+    }
+
     async fn interpret_parsed_syntax_with<F, Fut>(
         supported_resource_types: &[ResourceTypeDescriptor],
         parsed: ParsedSyntax<'_>,

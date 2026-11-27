@@ -38,6 +38,7 @@ chrono = { version = "0.4", default-features = false, features = [
     "clock",
 ] }
 database-common = { workspace = true }
+database-common-macros = { workspace = true }
 dill = { version = "0.17", default-features = false }
 email-utils = { workspace = true }
 enum-variants = { workspace = true }
@@ -56,6 +57,7 @@ observability = { workspace = true, features = [
 odf = { workspace = true }
 paste = { version = "1", default-features = false }
 prometheus = { version = "0.14", default-features = false }
+random-strings = { workspace = true }
 retry-backoff = { workspace = true }
 serde = { version = "1.0", features = [
     "derive",
@@ -83,6 +85,10 @@ database-common = { workspace = true, features = [
 ] }
 email-utils = { workspace = true }
 event-sourcing = { workspace = true }
+futures = "0.3"
+kamu-accounts = { workspace = true, features = [
+    "testing",
+] }
 kamu-accounts-inmem = { workspace = true }
 kamu-messaging-outbox-inmem = { workspace = true }
 kamu-resources = { workspace = true, features = [

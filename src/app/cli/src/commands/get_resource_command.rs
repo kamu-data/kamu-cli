@@ -71,7 +71,10 @@ pub struct GetResourceCommand {
     label_selectors: Vec<String>,
 
     #[dill::component(explicit)]
-    include_deleting: bool,
+    owner: Option<String>,
+
+    #[dill::component(explicit)]
+    visibility: ResourceVisibility,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -79,7 +82,12 @@ pub struct GetResourceCommand {
 impl GetResourceCommand {
     const MATERIALIZATION_BATCH_SIZE: usize = 100;
 
-    fn resolution_options(&self) -> Result<ResourceSelectionResolutionOptions, CLIError> {
+    async fn resolution_options(&self) -> Result<ResourceSelectionResolutionOptions, CLIError> {
+        let owner = self
+            .resource_selection_syntax_service
+            .parse_owner(self.explicit_context_name.as_deref(), self.owner.as_deref())
+            .await?;
+
         Ok(ResourceSelectionResolutionOptions {
             ignore_not_found: self.ignore_not_found,
             max_expanded_results: if self.unbounded {
@@ -88,12 +96,10 @@ impl GetResourceCommand {
                 Some(self.max_results.get())
             },
             label_filter: ResourceLabelSelectorParser::parse(&self.label_selectors)?,
-            visibility: self.visibility(),
+            owner,
+            visibility: self.visibility,
+            id_visibility: self.visibility.of_ids(),
         })
-    }
-
-    fn visibility(&self) -> ResourceVisibility {
-        ResourceVisibility::with_deleting(self.include_deleting)
     }
 
     fn spec_view(&self) -> kamu_resources_facade::SpecViewOpts {
@@ -161,7 +167,7 @@ impl GetResourceCommand {
                         Self::chunk_resource_refs(chunk),
                         format,
                         self.spec_view(),
-                        self.visibility(),
+                        self.visibility,
                     )
                     .await?;
 
@@ -191,7 +197,7 @@ impl GetResourceCommand {
                     .get(
                         Self::chunk_resource_refs(chunk),
                         self.spec_view(),
-                        self.visibility(),
+                        self.visibility,
                     )
                     .await?;
 
@@ -256,7 +262,9 @@ impl GetResourceCommand {
                 | ResourceLookupProblem::SchemaMismatch(_)
                 | ResourceLookupProblem::NameMismatch(_)
                 | ResourceLookupProblem::EmptyRef
-                | ResourceLookupProblem::UntypedName) => {
+                | ResourceLookupProblem::UntypedName
+                | ResourceLookupProblem::DeletedNotRevealed(_)
+                | ResourceLookupProblem::Access(_)) => {
                     return Err(GetResourceError::LookupProblem(error).into());
                 }
             }
@@ -345,7 +353,7 @@ impl Command for GetResourceCommand {
             .resolve(
                 syntax,
                 resource_facade.as_ref(),
-                &self.resolution_options()?,
+                &self.resolution_options().await?,
             )
             .await?;
 

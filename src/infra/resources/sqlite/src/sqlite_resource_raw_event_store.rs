@@ -10,7 +10,7 @@
 use std::collections::HashMap;
 
 use chrono::{DateTime, Utc};
-use database_common::TransactionRefT;
+use database_common::{TransactionRefT, sqlite_push_bind_list};
 use dill::{component, interface};
 use event_sourcing::{
     EventID,
@@ -527,6 +527,28 @@ impl ResourceRawEventStore for SqliteResourceRawEventStore {
         .int_err()?;
 
         Ok(usize::try_from(events_count).unwrap())
+    }
+
+    async fn delete_events_of_resources(&self, ids: &[ResourceID]) -> Result<(), InternalError> {
+        if ids.is_empty() {
+            return Ok(());
+        }
+
+        let mut tr = self.transaction.lock().await;
+        let connection_mut = tr.connection_mut().await?;
+
+        let mut query_builder = sqlx::QueryBuilder::<sqlx::Sqlite>::new(
+            "DELETE FROM resource_events WHERE resource_id IN ",
+        );
+        sqlite_push_bind_list(&mut query_builder, ids.iter().map(|id| *id.as_ref()));
+
+        query_builder
+            .build()
+            .execute(connection_mut)
+            .await
+            .int_err()?;
+
+        Ok(())
     }
 
     fn get_all_events_by_schema(

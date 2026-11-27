@@ -18,6 +18,9 @@ pub const SECRET_SET_SCHEMA: &str = odf::metadata::config::SecretSet::type_uri_s
 pub const VARIABLE_SET_SHORT_NAME: &str = "VariableSet";
 pub const DESCRIPTION_ANNOTATION_SCHEMA: &str =
     "https://kamu.dev/schemas/resource/v1alpha1/annotations/Description";
+/// Schema URI of the condition recording the creator of a resource.
+pub const CREATION_PROVENANCE_CONDITION_SCHEMA: &str =
+    "https://kamu.dev/schemas/resource/v1alpha1/conditions/CreationProvenance";
 /// Canonical schema URI for the built-in `environment` label.
 pub const ENVIRONMENT_LABEL_SCHEMA: &str =
     "https://kamu.dev/schemas/resource/v1alpha1/labels/Environment";
@@ -38,6 +41,18 @@ pub const SECRETS_ENCRYPTION_KAMU_CONFIG: &str = indoc::indoc!(
       secretsEncryption:
         enabled: true
         encryptionKey: QfnEDcnUtGSW2pwVXaFPvZOwxyFm2BOC
+    "#
+);
+
+/// Deleted resources are kept for a day
+pub const RETENTION_ONE_DAY_KAMU_CONFIG: &str = indoc::indoc!(
+    r#"
+    kind: CLIConfig
+    version: 1
+    content:
+      resources:
+        retention:
+          default: 1d
     "#
 );
 

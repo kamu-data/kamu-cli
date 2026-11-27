@@ -1,0 +1,26 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            SELECT purge_at AS \"purge_at!: DateTime<Utc>\"\n            FROM resources\n            WHERE purge_at IS NOT NULL AND purge_at > $1\n            ORDER BY purge_at ASC\n            LIMIT 1\n            ",
+  "describe": {
+    "columns": [
+      {
+        "name": "purge_at!: DateTime<Utc>",
+        "ordinal": 0,
+        "type_info": "Null",
+        "origin": {
+          "Table": {
+            "table": "resources",
+            "name": "purge_at"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      true
+    ]
+  },
+  "hash": "0a5b999916152b67b5fdca887835f90f4ad661705674cba0f6be301f08e60089"
+}

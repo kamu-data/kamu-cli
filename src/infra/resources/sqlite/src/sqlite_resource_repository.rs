@@ -9,6 +9,7 @@
 
 use std::collections::HashMap;
 use std::num::NonZeroUsize;
+use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
 use database_common::{
@@ -16,6 +17,7 @@ use database_common::{
     TransactionRefT,
     sql_like_escape_pattern,
     sqlite_generate_placeholders_list,
+    sqlite_push_bind_list,
 };
 use dill::{component, interface};
 use event_sourcing::EventID;
@@ -24,15 +26,17 @@ use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_resources::{
     CreateResourceError,
     DELETED_ACCOUNT_NAME_SENTINEL,
+    ResourceDueForPurge,
     ResourceDuplicateError,
     ResourceHandleRow,
-    ResourceHeaders,
     ResourceID,
     ResourceLabelPair,
     ResourceName,
     ResourcePhaseCounts,
+    ResourcePurgeDeadline,
     ResourceQuery,
     ResourceRawEventQuery,
+    ResourceRemovalListener,
     ResourceRepository,
     ResourceScope,
     ResourceSnapshot,
@@ -42,6 +46,10 @@ use kamu_resources::{
     ResourceVisibility,
     TypeUri,
     UpdateResourceError,
+    resource_annotations_to_json,
+    resource_labels_to_json,
+    resource_owner_references_to_json,
+    resource_status_to_json,
 };
 use odf::metadata::AsStackString;
 use sqlx::AssertSqlSafe;
@@ -52,6 +60,7 @@ use sqlx::AssertSqlSafe;
 #[interface(dyn ResourceRepository)]
 pub struct SqliteResourceRepository {
     transaction: TransactionRefT<sqlx::Sqlite>,
+    removal_listeners: Vec<Arc<dyn ResourceRemovalListener>>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -73,9 +82,10 @@ impl ResourceRepository for SqliteResourceRepository {
         let account_id_str = account_id_stack.as_str();
         let resource_snapshot_schema = resource_snapshot.schema.as_str();
         let name_str = resource_snapshot.headers.name.as_str();
-        let labels = kamu_resources::resource_labels_to_json(&resource_snapshot.headers.labels);
-        let annotations =
-            kamu_resources::resource_annotations_to_json(&resource_snapshot.headers.annotations);
+        let labels = resource_labels_to_json(&resource_snapshot.headers.labels);
+        let annotations = resource_annotations_to_json(&resource_snapshot.headers.annotations);
+        let owner_references =
+            resource_owner_references_to_json(resource_snapshot.headers.owner_references.as_ref());
         let generation = i64::try_from(resource_snapshot.headers.generation).unwrap();
         let status_generation = i64::try_from(resource_snapshot.headers.status_generation).unwrap();
         let last_event_id = resource_snapshot.last_event_id.map(EventID::into_inner);
@@ -83,9 +93,9 @@ impl ResourceRepository for SqliteResourceRepository {
         let status = resource_snapshot
             .status
             .as_ref()
-            .map(kamu_resources::resource_status_to_json);
+            .map(resource_status_to_json);
 
-        sqlx::query!(
+        let insert_result = sqlx::query!(
             r#"
             INSERT INTO resources (
                 resource_id,
@@ -102,9 +112,13 @@ impl ResourceRepository for SqliteResourceRepository {
                 deleted_at,
                 last_event_id,
                 status_generation,
-                deletion_requested_at
+                deletion_requested_at,
+                owner_references
             )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+            ON CONFLICT (account_id, resource_schema, resource_name)
+                WHERE deletion_requested_at IS NULL
+                DO NOTHING
             "#,
             resource_id,
             account_id_str,
@@ -121,22 +135,19 @@ impl ResourceRepository for SqliteResourceRepository {
             last_event_id,
             status_generation,
             resource_snapshot.headers.deletion_requested_at,
+            owner_references,
         )
         .execute(connection_mut)
         .await
-        .map_err(|e: sqlx::Error| {
-            if let Some(db_err) = e.as_database_error()
-                && db_err.is_unique_violation()
-            {
-                CreateResourceError::Duplicate(ResourceDuplicateError {
-                    account_id: resource_snapshot.headers.account.did.clone(),
-                    schema: resource_snapshot.schema.clone(),
-                    name: resource_snapshot.headers.name.clone(),
-                })
-            } else {
-                CreateResourceError::Internal(e.int_err())
-            }
-        })?;
+        .int_err()?;
+
+        if insert_result.rows_affected() == 0 {
+            return Err(CreateResourceError::Duplicate(ResourceDuplicateError {
+                account_id: resource_snapshot.headers.account.did.clone(),
+                schema: resource_snapshot.schema.clone(),
+                name: resource_snapshot.headers.name.clone(),
+            }));
+        }
 
         Ok(())
     }
@@ -153,9 +164,10 @@ impl ResourceRepository for SqliteResourceRepository {
         let account_id_str = account_id_stack.as_str();
         let resource_snapshot_schema = resource_snapshot.schema.as_str();
         let name_str = resource_snapshot.headers.name.as_str();
-        let labels = kamu_resources::resource_labels_to_json(&resource_snapshot.headers.labels);
-        let annotations =
-            kamu_resources::resource_annotations_to_json(&resource_snapshot.headers.annotations);
+        let labels = resource_labels_to_json(&resource_snapshot.headers.labels);
+        let annotations = resource_annotations_to_json(&resource_snapshot.headers.annotations);
+        let owner_references =
+            resource_owner_references_to_json(resource_snapshot.headers.owner_references.as_ref());
         let generation = i64::try_from(resource_snapshot.headers.generation).unwrap();
         let status_generation = i64::try_from(resource_snapshot.headers.status_generation).unwrap();
         let last_event_id = resource_snapshot.last_event_id.map(EventID::into_inner);
@@ -164,7 +176,7 @@ impl ResourceRepository for SqliteResourceRepository {
         let status = resource_snapshot
             .status
             .as_ref()
-            .map(kamu_resources::resource_status_to_json);
+            .map(resource_status_to_json);
 
         let update_result = sqlx::query!(
             r#"
@@ -182,7 +194,8 @@ impl ResourceRepository for SqliteResourceRepository {
                 deleted_at = $11,
                 last_event_id = $12,
                 status_generation = $14,
-                deletion_requested_at = $15
+                deletion_requested_at = $15,
+                owner_references = $16
             WHERE resource_id = $1
               AND (
                     last_event_id IS NULL AND CAST($13 as INT8) IS NULL OR
@@ -204,6 +217,7 @@ impl ResourceRepository for SqliteResourceRepository {
             expected_last_event_id,
             status_generation,
             resource_snapshot.headers.deletion_requested_at,
+            owner_references,
         )
         .execute(connection_mut)
         .await
@@ -288,18 +302,19 @@ impl ResourceRepository for SqliteResourceRepository {
                 r.resource_name as name,
                 r.account_id as account_id,
                 COALESCE(a.resource_id, X'00000000000000000000000000000000') as account_resource_id,
-                COALESCE(a.account_name, $2) as account_name
+                COALESCE(a.account_name, $2) as account_name,
+                r.deletion_requested_at as deletion_requested_at,
+                r.deleted_at as deleted_at
             FROM resources r
             LEFT JOIN accounts a ON a.id = r.account_id
             WHERE r.account_id = $1
               AND r.resource_id IN ({uids_placeholders})
-              AND r.deleted_at IS NULL
             "#,
         );
 
         let mut query = sqlx::query_as::<_, ResourceHandleRow>(AssertSqlSafe(query_str))
             .bind(account_id_str)
-            .bind(kamu_resources::DELETED_ACCOUNT_NAME_SENTINEL);
+            .bind(DELETED_ACCOUNT_NAME_SENTINEL);
         for id in ids {
             query = query.bind(*id.as_ref());
         }
@@ -308,6 +323,49 @@ impl ResourceRepository for SqliteResourceRepository {
         sort_into_requested_order(&mut rows, ids.iter().map(|id| *id.as_ref()), |row| row.id);
 
         Ok(rows)
+    }
+
+    async fn touch_live_resources(
+        &self,
+        account_id: &odf::AccountID,
+        ids: &[ResourceID],
+    ) -> Result<Vec<ResourceID>, InternalError> {
+        if ids.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        let mut tr = self.transaction.lock().await;
+        let connection_mut = tr.connection_mut().await?;
+
+        let account_id_stack = account_id.as_stack_string();
+        let account_id_str = account_id_stack.as_str();
+
+        let uids_placeholders =
+            sqlite_generate_placeholders_list(ids.len(), NonZeroUsize::new(2).unwrap());
+
+        // Assigning a column its own value changes nothing, but the write takes
+        // the database's single write lock, so a concurrent deletion request
+        // runs either before this statement or after the transaction
+        let query_str = format!(
+            r#"
+            UPDATE resources
+            SET deletion_requested_at = deletion_requested_at
+            WHERE account_id = $1
+              AND resource_id IN ({uids_placeholders})
+              AND deletion_requested_at IS NULL
+            RETURNING resource_id
+            "#,
+        );
+
+        let mut query =
+            sqlx::query_scalar::<_, uuid::Uuid>(AssertSqlSafe(query_str)).bind(account_id_str);
+        for id in ids {
+            query = query.bind(*id.as_ref());
+        }
+
+        let touched_ids = query.fetch_all(connection_mut).await.int_err()?;
+
+        Ok(touched_ids.into_iter().map(ResourceID::new).collect())
     }
 
     async fn resolve_resource_ids_by_names(
@@ -332,13 +390,11 @@ impl ResourceRepository for SqliteResourceRepository {
 
         // Spelled out rather than bound, so that for live resources the
         // planner can use the partial unique index on names
-        let visibility_predicate = match visibility {
-            ResourceVisibility::Active => "AND r.deletion_requested_at IS NULL",
-            ResourceVisibility::IncludeDeleting => "",
-        };
+        let visibility_predicate = visibility_predicate(visibility);
 
         // Within a name the live resource comes first, then those being
-        // deleted, oldest first; the stable sort below keeps that order.
+        // deleted, oldest first, then the deleted ones, newest first; the
+        // stable sort below keeps that order.
         let query_str = format!(
             r#"
             SELECT
@@ -347,12 +403,11 @@ impl ResourceRepository for SqliteResourceRepository {
             FROM resources r
             WHERE r.account_id = $1
               AND r.resource_schema = $2
-              {visibility_predicate}
+              AND {visibility_predicate}
               AND r.resource_name COLLATE NOCASE IN ({names_placeholders})
-              AND r.deleted_at IS NULL
             ORDER BY
-                r.deletion_requested_at IS NOT NULL,
-                r.deletion_requested_at,
+                r.deleted_at DESC NULLS FIRST,
+                r.deletion_requested_at NULLS FIRST,
                 r.resource_id
             "#,
         );
@@ -385,6 +440,7 @@ impl ResourceRepository for SqliteResourceRepository {
         account_id: &odf::AccountID,
         scope: &ResourceScope,
         visibility: ResourceVisibility,
+        owner_id: Option<ResourceID>,
         pagination: PaginationOpts,
     ) -> Result<Vec<ResourceHandleRow>, InternalError> {
         if scope.is_vacuous() {
@@ -407,22 +463,18 @@ impl ResourceRepository for SqliteResourceRepository {
                 COALESCE(a.resource_id, X'00000000000000000000000000000000') as account_resource_id,
                 COALESCE(a.account_name, "#,
         );
-        query_builder.push_bind(kamu_resources::DELETED_ACCOUNT_NAME_SENTINEL);
+        query_builder.push_bind(DELETED_ACCOUNT_NAME_SENTINEL);
         query_builder.push(
-            r#") as account_name
+            r#") as account_name,
+                r.deletion_requested_at as deletion_requested_at,
+                r.deleted_at as deleted_at
             FROM resources r
             LEFT JOIN accounts a ON a.id = r.account_id
-            WHERE r.deleted_at IS NULL"#,
+            WHERE "#,
         );
 
-        push_visibility_predicate(&mut query_builder, visibility);
-        push_scope_predicate(&mut query_builder, scope, account_id);
-
-        query_builder
-            .push(" ORDER BY r.updated_at DESC, r.resource_id DESC LIMIT ")
-            .push_bind(limit)
-            .push(" OFFSET ")
-            .push_bind(offset);
+        push_scoped_filter(&mut query_builder, scope, account_id, visibility, owner_id);
+        push_listing_page(&mut query_builder, visibility, limit, offset);
 
         query_builder
             .build_query_as::<ResourceHandleRow>()
@@ -436,6 +488,7 @@ impl ResourceRepository for SqliteResourceRepository {
         account_id: &odf::AccountID,
         scope: &ResourceScope,
         visibility: ResourceVisibility,
+        owner_id: Option<ResourceID>,
     ) -> Result<usize, InternalError> {
         if scope.is_vacuous() {
             return Ok(0);
@@ -448,11 +501,10 @@ impl ResourceRepository for SqliteResourceRepository {
             r#"
             SELECT COUNT(*) as count
             FROM resources r
-            WHERE r.deleted_at IS NULL"#,
+            WHERE "#,
         );
 
-        push_visibility_predicate(&mut query_builder, visibility);
-        push_scope_predicate(&mut query_builder, scope, account_id);
+        push_scoped_filter(&mut query_builder, scope, account_id, visibility, owner_id);
 
         let row = query_builder
             .build_query_scalar::<i64>()
@@ -472,7 +524,8 @@ impl ResourceRepository for SqliteResourceRepository {
 
         let query_id: &uuid::Uuid = query.id.as_ref();
         let query_schema = query.schema.as_str();
-        let maybe_row = sqlx::query!(
+        let maybe_row = sqlx::query_as!(
+            ResourceSnapshotRow,
             r#"
             SELECT
                 r.resource_id as "id: uuid::Uuid",
@@ -483,6 +536,7 @@ impl ResourceRepository for SqliteResourceRepository {
                 r.resource_name,
                 r.labels as "labels: serde_json::Value",
                 r.annotations as "annotations: serde_json::Value",
+                r.owner_references as "owner_references: serde_json::Value",
                 r.spec as "spec: serde_json::Value",
                 r.status as "status: serde_json::Value",
                 r.generation,
@@ -496,46 +550,16 @@ impl ResourceRepository for SqliteResourceRepository {
             LEFT JOIN accounts a ON a.id = r.account_id
             WHERE r.resource_id = $1
               AND r.resource_schema = $2
-              AND r.deleted_at IS NULL
             "#,
             query_id,
             query_schema,
-            kamu_resources::DELETED_ACCOUNT_NAME_SENTINEL,
+            DELETED_ACCOUNT_NAME_SENTINEL,
         )
         .fetch_optional(connection_mut)
         .await
         .int_err()?;
 
-        Ok(maybe_row.map(|row| ResourceSnapshot {
-            id: ResourceID::new(row.id),
-            schema: TypeUri::new_unchecked(&row.resource_schema),
-            headers: ResourceHeaders {
-                id: ResourceID::new(row.id),
-                account: odf::ResourceOwnerHandle {
-                    // TODO: Support Org accounts
-                    r#type: odf::metadata::auth::User::type_uri().cheap_clone(),
-                    id: ResourceID::new(row.account_resource_id),
-                    did: row.account_id,
-                    name: odf::AccountName::new_unchecked(&row.account_name),
-                },
-                name: kamu_resources::ResourceName::new_unchecked(&row.resource_name),
-                labels: kamu_resources::resource_labels_from_json(row.labels),
-                annotations: kamu_resources::resource_annotations_from_json(row.annotations),
-                owner_references: None, // TODO
-                generation: u64::try_from(row.generation).unwrap(),
-                status_generation: u64::try_from(row.status_generation).unwrap(),
-                created_at: row.created_at,
-                updated_at: row.updated_at,
-                deletion_requested_at: row.deletion_requested_at,
-                deleted_at: row.deleted_at,
-            },
-            spec: row.spec,
-            status: row
-                .status
-                .as_ref()
-                .and_then(ResourceSnapshot::basic_status_from_json),
-            last_event_id: row.last_event_id.map(EventID::new),
-        }))
+        Ok(maybe_row.map(ResourceSnapshotRow::into_snapshot))
     }
 
     async fn find_resource_ids_by_schema_and_label(
@@ -629,7 +653,7 @@ impl ResourceRepository for SqliteResourceRepository {
 
         let uids_placeholders =
             sqlite_generate_placeholders_list(ids.len(), NonZeroUsize::new(2).unwrap());
-        let deleted_account_sentinel = kamu_resources::DELETED_ACCOUNT_NAME_SENTINEL;
+        let deleted_account_sentinel = DELETED_ACCOUNT_NAME_SENTINEL;
 
         let query_str = format!(
             r#"
@@ -642,6 +666,7 @@ impl ResourceRepository for SqliteResourceRepository {
                 r.resource_name,
                 r.labels,
                 r.annotations,
+                r.owner_references,
                 r.spec,
                 r.status,
                 r.generation,
@@ -655,7 +680,6 @@ impl ResourceRepository for SqliteResourceRepository {
             LEFT JOIN accounts a ON a.id = r.account_id
             WHERE r.resource_schema = $1
               AND r.resource_id IN ({uids_placeholders})
-              AND r.deleted_at IS NULL
             "#,
         );
 
@@ -687,7 +711,8 @@ impl ResourceRepository for SqliteResourceRepository {
         let connection_mut = tr.connection_mut().await?;
 
         let resource_id: &uuid::Uuid = id.as_ref();
-        let maybe_row = sqlx::query!(
+        let maybe_row = sqlx::query_as!(
+            ResourceSnapshotRow,
             r#"
             SELECT
                 r.resource_id as "id: uuid::Uuid",
@@ -698,6 +723,7 @@ impl ResourceRepository for SqliteResourceRepository {
                 r.resource_name,
                 r.labels as "labels: serde_json::Value",
                 r.annotations as "annotations: serde_json::Value",
+                r.owner_references as "owner_references: serde_json::Value",
                 r.spec as "spec: serde_json::Value",
                 r.status as "status: serde_json::Value",
                 r.generation,
@@ -710,45 +736,15 @@ impl ResourceRepository for SqliteResourceRepository {
             FROM resources r
             LEFT JOIN accounts a ON a.id = r.account_id
             WHERE r.resource_id = $1
-              AND r.deleted_at IS NULL
             "#,
             resource_id,
-            kamu_resources::DELETED_ACCOUNT_NAME_SENTINEL,
+            DELETED_ACCOUNT_NAME_SENTINEL,
         )
         .fetch_optional(connection_mut)
         .await
         .int_err()?;
 
-        Ok(maybe_row.map(|row| ResourceSnapshot {
-            id: ResourceID::new(row.id),
-            schema: TypeUri::new_unchecked(&row.resource_schema),
-            headers: ResourceHeaders {
-                id: ResourceID::new(row.id),
-                account: odf::ResourceOwnerHandle {
-                    // TODO: Support Org accounts
-                    r#type: odf::metadata::auth::User::type_uri().cheap_clone(),
-                    id: ResourceID::new(row.account_resource_id),
-                    did: row.account_id,
-                    name: odf::AccountName::new_unchecked(&row.account_name),
-                },
-                name: kamu_resources::ResourceName::new_unchecked(&row.resource_name),
-                labels: kamu_resources::resource_labels_from_json(row.labels),
-                annotations: kamu_resources::resource_annotations_from_json(row.annotations),
-                owner_references: None, // TODO
-                generation: u64::try_from(row.generation).unwrap(),
-                status_generation: u64::try_from(row.status_generation).unwrap(),
-                created_at: row.created_at,
-                updated_at: row.updated_at,
-                deletion_requested_at: row.deletion_requested_at,
-                deleted_at: row.deleted_at,
-            },
-            spec: row.spec,
-            status: row
-                .status
-                .as_ref()
-                .and_then(ResourceSnapshot::basic_status_from_json),
-            last_event_id: row.last_event_id.map(EventID::new),
-        }))
+        Ok(maybe_row.map(ResourceSnapshotRow::into_snapshot))
     }
 
     async fn find_resource_snapshots_by_ids(
@@ -767,7 +763,7 @@ impl ResourceRepository for SqliteResourceRepository {
         let account_id_str = account_id_stack.as_str();
         let uids_placeholders =
             sqlite_generate_placeholders_list(ids.len(), NonZeroUsize::new(2).unwrap());
-        let deleted_account_sentinel = kamu_resources::DELETED_ACCOUNT_NAME_SENTINEL;
+        let deleted_account_sentinel = DELETED_ACCOUNT_NAME_SENTINEL;
 
         let query_str = format!(
             r#"
@@ -780,6 +776,7 @@ impl ResourceRepository for SqliteResourceRepository {
                 r.resource_name,
                 r.labels,
                 r.annotations,
+                r.owner_references,
                 r.spec,
                 r.status,
                 r.generation,
@@ -793,7 +790,6 @@ impl ResourceRepository for SqliteResourceRepository {
             LEFT JOIN accounts a ON a.id = r.account_id
             WHERE r.account_id = $1
               AND r.resource_id IN ({uids_placeholders})
-              AND r.deleted_at IS NULL
             "#,
         );
 
@@ -817,6 +813,7 @@ impl ResourceRepository for SqliteResourceRepository {
         account_id: &odf::AccountID,
         scope: &ResourceScope,
         visibility: ResourceVisibility,
+        owner_id: Option<ResourceID>,
         pagination: PaginationOpts,
     ) -> ResourceSnapshotStream<'_> {
         let account_id = account_id.clone();
@@ -844,6 +841,7 @@ impl ResourceRepository for SqliteResourceRepository {
                     r.resource_name,
                     r.labels,
                     r.annotations,
+                    r.owner_references,
                     r.spec,
                     r.status,
                     r.generation,
@@ -855,17 +853,11 @@ impl ResourceRepository for SqliteResourceRepository {
                     r.last_event_id
                 FROM resources r
                 LEFT JOIN accounts a ON a.id = r.account_id
-                WHERE r.deleted_at IS NULL"#,
+                WHERE "#,
             );
 
-            push_visibility_predicate(&mut query_builder, visibility);
-            push_scope_predicate(&mut query_builder, &scope, &account_id);
-
-            query_builder
-                .push(" ORDER BY r.updated_at DESC, r.resource_id DESC LIMIT ")
-                .push_bind(limit)
-                .push(" OFFSET ")
-                .push_bind(offset);
+            push_scoped_filter(&mut query_builder, &scope, &account_id, visibility, owner_id);
+            push_listing_page(&mut query_builder, visibility, limit, offset);
 
             let mut query_stream = query_builder
                 .build_query_as::<ResourceSnapshotRow>()
@@ -909,6 +901,9 @@ impl ResourceRepository for SqliteResourceRepository {
                     CASE WHEN json_extract(status, '$.phase') = 'Deleting' THEN 1 ELSE 0 END
                 ) as "deleting_count!: i64",
                 SUM(
+                    CASE WHEN json_extract(status, '$.phase') = 'Deleted' THEN 1 ELSE 0 END
+                ) as "deleted_count!: i64",
+                SUM(
                     CASE
                         WHEN COALESCE(json_extract(status, '$.phase'), 'Pending') = 'Pending'
                         THEN 1
@@ -917,7 +912,6 @@ impl ResourceRepository for SqliteResourceRepository {
                 ) as "pending_count!: i64"
             FROM resources
             WHERE account_id = $1
-              AND deleted_at IS NULL
             GROUP BY resource_schema
             ORDER BY resource_schema ASC
             "#,
@@ -939,9 +933,183 @@ impl ResourceRepository for SqliteResourceRepository {
                     degraded: u64::try_from(row.degraded_count).unwrap(),
                     failed: u64::try_from(row.failed_count).unwrap(),
                     deleting: u64::try_from(row.deleting_count).unwrap(),
+                    deleted: u64::try_from(row.deleted_count).unwrap(),
                 },
             })
             .collect())
+    }
+
+    async fn set_purge_deadlines(
+        &self,
+        deadlines: &[ResourcePurgeDeadline],
+    ) -> Result<(), InternalError> {
+        if deadlines.is_empty() {
+            return Ok(());
+        }
+
+        let mut tr = self.transaction.lock().await;
+        let connection_mut = tr.connection_mut().await?;
+
+        // UUIDs bind as blobs, so the rows go in as bound values, not JSON
+        let mut query_builder = sqlx::QueryBuilder::<sqlx::Sqlite>::new(
+            "WITH deadlines (resource_id, purge_at) AS (VALUES ",
+        );
+        let mut rows = query_builder.separated(", ");
+        for deadline in deadlines {
+            rows.push("(")
+                .push_bind_unseparated(*deadline.id.as_ref())
+                .push_unseparated(", ")
+                .push_bind_unseparated(deadline.purge_at)
+                .push_unseparated(")");
+        }
+        query_builder.push(
+            ") UPDATE resources SET purge_at = deadlines.purge_at FROM deadlines WHERE \
+             resources.resource_id = deadlines.resource_id",
+        );
+
+        query_builder
+            .build()
+            .execute(connection_mut)
+            .await
+            .int_err()?;
+
+        Ok(())
+    }
+
+    async fn find_resources_due_for_purge(
+        &self,
+        now: DateTime<Utc>,
+        limit: usize,
+    ) -> Result<Vec<ResourceDueForPurge>, InternalError> {
+        let mut tr = self.transaction.lock().await;
+        let connection_mut = tr.connection_mut().await?;
+
+        let limit = i64::try_from(limit).unwrap_or(i64::MAX);
+        let rows = sqlx::query!(
+            r#"
+            SELECT
+                resource_id AS "id: uuid::Uuid",
+                resource_schema,
+                purge_at AS "purge_at!: DateTime<Utc>"
+            FROM resources
+            WHERE purge_at IS NOT NULL AND purge_at <= $1
+            ORDER BY purge_at ASC, resource_id ASC
+            LIMIT $2
+            "#,
+            now,
+            limit,
+        )
+        .fetch_all(connection_mut)
+        .await
+        .int_err()?;
+
+        Ok(rows
+            .into_iter()
+            .map(|row| ResourceDueForPurge {
+                id: ResourceID::new(row.id),
+                schema: TypeUri::new_unchecked(&row.resource_schema),
+                purge_at: row.purge_at,
+            })
+            .collect())
+    }
+
+    async fn count_resources_due_for_purge(
+        &self,
+        now: DateTime<Utc>,
+    ) -> Result<u64, InternalError> {
+        let mut tr = self.transaction.lock().await;
+        let connection_mut = tr.connection_mut().await?;
+
+        let count = sqlx::query_scalar!(
+            r#"
+            SELECT COUNT(*) AS "count!: i64"
+            FROM resources
+            WHERE purge_at IS NOT NULL AND purge_at <= $1
+            "#,
+            now,
+        )
+        .fetch_one(connection_mut)
+        .await
+        .int_err()?;
+
+        u64::try_from(count).int_err()
+    }
+
+    async fn claim_resources_for_purge(
+        &self,
+        ids: &[ResourceID],
+        now: DateTime<Utc>,
+    ) -> Result<Vec<ResourceID>, InternalError> {
+        if ids.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        let mut tr = self.transaction.lock().await;
+        let connection_mut = tr.connection_mut().await?;
+
+        let mut query_builder = sqlx::QueryBuilder::<sqlx::Sqlite>::new(
+            "UPDATE resources SET purge_at = NULL WHERE resource_id IN ",
+        );
+        sqlite_push_bind_list(&mut query_builder, ids.iter().map(|id| *id.as_ref()));
+        query_builder
+            .push(" AND purge_at IS NOT NULL AND purge_at <= ")
+            .push_bind(now)
+            .push(" RETURNING resource_id");
+
+        let claimed_ids: Vec<uuid::Uuid> = query_builder
+            .build_query_scalar()
+            .fetch_all(connection_mut)
+            .await
+            .int_err()?;
+
+        Ok(claimed_ids.into_iter().map(ResourceID::new).collect())
+    }
+
+    async fn purge_resources(&self, ids: &[ResourceID]) -> Result<(), InternalError> {
+        if ids.is_empty() {
+            return Ok(());
+        }
+
+        for listener in &self.removal_listeners {
+            listener.on_resources_removed(ids).await?;
+        }
+
+        let mut tr = self.transaction.lock().await;
+        let connection_mut = tr.connection_mut().await?;
+
+        let mut query_builder =
+            sqlx::QueryBuilder::<sqlx::Sqlite>::new("DELETE FROM resources WHERE resource_id IN ");
+        sqlite_push_bind_list(&mut query_builder, ids.iter().map(|id| *id.as_ref()));
+
+        query_builder
+            .build()
+            .execute(connection_mut)
+            .await
+            .int_err()?;
+
+        Ok(())
+    }
+
+    async fn find_nearest_purge_at(
+        &self,
+        now: DateTime<Utc>,
+    ) -> Result<Option<DateTime<Utc>>, InternalError> {
+        let mut tr = self.transaction.lock().await;
+        let connection_mut = tr.connection_mut().await?;
+
+        sqlx::query_scalar!(
+            r#"
+            SELECT purge_at AS "purge_at!: DateTime<Utc>"
+            FROM resources
+            WHERE purge_at IS NOT NULL AND purge_at > $1
+            ORDER BY purge_at ASC
+            LIMIT 1
+            "#,
+            now,
+        )
+        .fetch_optional(connection_mut)
+        .await
+        .int_err()
     }
 }
 
@@ -974,18 +1142,61 @@ fn sort_into_requested_order<Row, Key: std::hash::Hash + Eq>(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Appends the condition excluding resources being deleted, unless
-/// `visibility` includes them.
-fn push_visibility_predicate(
+fn visibility_predicate(visibility: ResourceVisibility) -> &'static str {
+    match visibility {
+        ResourceVisibility::Active => "r.deletion_requested_at IS NULL",
+        ResourceVisibility::IncludeDeleting => "r.deleted_at IS NULL",
+        ResourceVisibility::IncludeDeleted => "1 = 1",
+        ResourceVisibility::DeletedOnly => "r.deletion_requested_at IS NOT NULL",
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// The order of listings and searches, see
+/// [`ResourceRepository::list_resource_snapshots`]. Repeats the expressions of
+/// the indexes in that order.
+fn listing_order(visibility: ResourceVisibility) -> &'static str {
+    if visibility.includes_deleted() {
+        "COALESCE(r.deleted_at, r.deletion_requested_at) DESC NULLS FIRST, r.updated_at DESC, \
+         r.resource_id DESC"
+    } else {
+        "r.updated_at DESC, r.resource_id DESC"
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Appends the `WHERE` body shared by searches, counts and listings: the
+/// visibility, the scope and the owner.
+fn push_scoped_filter(
+    query_builder: &mut sqlx::QueryBuilder<sqlx::Sqlite>,
+    scope: &ResourceScope,
+    account_id: &odf::AccountID,
+    visibility: ResourceVisibility,
+    owner_id: Option<ResourceID>,
+) {
+    query_builder.push(visibility_predicate(visibility));
+    push_scope_predicate(query_builder, scope, account_id);
+    push_owner_predicate(query_builder, owner_id);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Appends the listing order and the page.
+fn push_listing_page(
     query_builder: &mut sqlx::QueryBuilder<sqlx::Sqlite>,
     visibility: ResourceVisibility,
+    limit: i64,
+    offset: i64,
 ) {
-    match visibility {
-        ResourceVisibility::Active => {
-            query_builder.push(" AND r.deletion_requested_at IS NULL");
-        }
-        ResourceVisibility::IncludeDeleting => {}
-    }
+    query_builder
+        .push(" ORDER BY ")
+        .push(listing_order(visibility))
+        .push(" LIMIT ")
+        .push_bind(limit)
+        .push(" OFFSET ")
+        .push_bind(offset);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1006,12 +1217,8 @@ fn push_query_predicate(
             query_builder.push(")");
         }
         ResourceQuery::ExactIds(ids) => {
-            query_builder.push("r.resource_id IN (");
-            let mut separated = query_builder.separated(", ");
-            for id in ids {
-                separated.push_bind(*id.as_ref());
-            }
-            query_builder.push(")");
+            query_builder.push("r.resource_id IN ");
+            sqlite_push_bind_list(query_builder, ids.iter().map(|id| *id.as_ref()));
         }
         // An ID is matched exactly above; only a pattern is LIKE-escaped.
         ResourceQuery::NamePattern(pattern) => {
@@ -1110,6 +1317,24 @@ fn push_label_filter_predicates(
         query_builder.push_bind(value.clone());
         query_builder.push(")");
     }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+fn push_owner_predicate(
+    query_builder: &mut sqlx::QueryBuilder<sqlx::Sqlite>,
+    owner_id: Option<ResourceID>,
+) {
+    let Some(owner_id) = owner_id else {
+        return;
+    };
+
+    query_builder.push(
+        " AND EXISTS (SELECT 1 FROM resource_owners_projection ro WHERE ro.resource_id = \
+         r.resource_id AND ro.owner_id = ",
+    );
+    query_builder.push_bind(*owner_id.as_ref());
+    query_builder.push(")");
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -10,6 +10,8 @@
 use kamu_resources::{
     ApplyManifestApplicationDecision,
     ApplyManifestPlanningDecision,
+    ApplyResourceOutcome,
+    ResourceID,
     ResourceRef,
     ResourceVisibility,
     TypeName,
@@ -21,48 +23,20 @@ use kamu_resources_facade::{
     SpecViewOpts,
 };
 use pretty_assertions::{assert_eq, assert_matches};
+use uuid::Uuid;
 
 use crate::contract_test;
 use crate::harness::{FacadeContractHarness, TestAccount};
 use crate::helpers::{
-    VARIABLE_SET_CANONICAL_SELECTOR,
     VARIABLE_SET_SCHEMA_STR,
     assert_single_batch_problem,
     assert_single_batch_success,
     create_variable_set,
+    variable_set_ref_by_id,
+    variable_set_ref_by_name,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-fn by_name(name: &str) -> ResourceRef {
-    ResourceRef {
-        account: None,
-        r#type: Some(
-            VARIABLE_SET_CANONICAL_SELECTOR
-                .parse::<TypeName>()
-                .unwrap()
-                .into(),
-        ),
-        id: None,
-        did: None,
-        name: Some(name.parse().unwrap()),
-    }
-}
-
-fn by_id(id: &kamu_resources::ResourceID) -> ResourceRef {
-    ResourceRef {
-        account: None,
-        r#type: Some(
-            VARIABLE_SET_CANONICAL_SELECTOR
-                .parse::<TypeName>()
-                .unwrap()
-                .into(),
-        ),
-        id: Some(*id),
-        did: None,
-        name: None,
-    }
-}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -76,7 +50,7 @@ pub async fn test_render_json_by_name(h: &impl FacadeContractHarness) {
     let result = assert_single_batch_success(
         facade
             .render_manifests(
-                vec![by_name("render-json-name")],
+                vec![variable_set_ref_by_name("render-json-name")],
                 ResourceManifestFormat::Json,
                 SpecViewOpts::ENCRYPTED,
                 ResourceVisibility::Active,
@@ -120,7 +94,7 @@ pub async fn test_render_yaml_by_uid(h: &impl FacadeContractHarness) {
     let result = assert_single_batch_success(
         facade
             .render_manifests(
-                vec![by_id(&id)],
+                vec![variable_set_ref_by_id(id)],
                 ResourceManifestFormat::Yaml,
                 SpecViewOpts::ENCRYPTED,
                 ResourceVisibility::Active,
@@ -160,7 +134,7 @@ pub async fn test_rendered_manifest_can_be_reapplied(h: &impl FacadeContractHarn
     let rendered = assert_single_batch_success(
         facade
             .render_manifests(
-                vec![by_id(&id)],
+                vec![variable_set_ref_by_id(id)],
                 ResourceManifestFormat::Json,
                 SpecViewOpts::ENCRYPTED,
                 ResourceVisibility::Active,
@@ -180,7 +154,7 @@ pub async fn test_rendered_manifest_can_be_reapplied(h: &impl FacadeContractHarn
     assert_matches!(
     plan,
                 ApplyManifestPlanningDecision::Planned(ref p)
-                if p.outcome == kamu_resources::ApplyResourceOutcome::Untouched,
+                if p.outcome == ApplyResourceOutcome::Untouched,
     "re-planning rendered manifest must be Untouched, got: {plan:?}"
     );
 
@@ -195,7 +169,7 @@ pub async fn test_rendered_manifest_can_be_reapplied(h: &impl FacadeContractHarn
     assert_matches!(
     apply,
                 ApplyManifestApplicationDecision::Applied(ref r)
-                if r.outcome == kamu_resources::ApplyResourceOutcome::Untouched,
+                if r.outcome == ApplyResourceOutcome::Untouched,
     "re-applying rendered manifest must be Untouched, got: {apply:?}"
     );
 }
@@ -210,11 +184,11 @@ contract_test!(
 
 pub async fn test_render_missing_resource_returns_not_found(h: &impl FacadeContractHarness) {
     let facade = h.facade_for(TestAccount::Alice);
-    let absent_uid = kamu_resources::ResourceID::new(uuid::Uuid::new_v4());
+    let absent_uid = ResourceID::new(Uuid::new_v4());
 
     let by_name_result = facade
         .render_manifests(
-            vec![by_name("render-no-such")],
+            vec![variable_set_ref_by_name("render-no-such")],
             ResourceManifestFormat::Json,
             SpecViewOpts::ENCRYPTED,
             ResourceVisibility::Active,
@@ -229,7 +203,7 @@ pub async fn test_render_missing_resource_returns_not_found(h: &impl FacadeContr
 
     let by_uid_result = facade
         .render_manifests(
-            vec![by_id(&absent_uid)],
+            vec![variable_set_ref_by_id(absent_uid)],
             ResourceManifestFormat::Json,
             SpecViewOpts::ENCRYPTED,
             ResourceVisibility::Active,

@@ -13,7 +13,7 @@ use std::sync::Arc;
 use chrono::Utc;
 use crypto_utils::{AesGcmEncryptor, Encryptor};
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
-use kamu_accounts::AccountService;
+use kamu_accounts::{AccountService, Principal, RequestOrigin};
 use kamu_configuration::{
     RESOURCE_LABEL_LEGACY_CONFIG_TARGET_DATASET_SCHEMA_URI,
     Secret,
@@ -48,22 +48,27 @@ use kamu_datasets::{
 };
 use kamu_resources::{
     ApplyManifestApplicationDecision,
+    ApplyResourceAccessCheck,
+    ApplyResourceAccountSource,
     ApplyResourceCrudDispatcherError,
     ApplyResourcePrecondition,
+    CreationProvenance,
     GenericResourceQueryService,
     ResourceCrudDispatcher,
     ResourceCrudDispatcherApplyRequest,
     ResourceCrudDispatcherDeletionRequest,
+    ResourceHeaders,
     ResourceHeadersExt,
     ResourceHeadersInput,
     ResourceID,
     ResourceName,
+    ResourceRef,
     ResourceSchemaProvider,
     ResourceSnapshot,
     ResourceSpecFromInput,
     TypeUri,
 };
-use kamu_resources_services::ResourceDispatcherFactory;
+use kamu_resources_services::{ResourceDispatcherFactory, request_creation_provenance};
 use secrecy::ExposeSecret;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -75,6 +80,8 @@ pub struct DatasetEnvVarMutationAdapterImpl {
     generic_resource_query_service: Arc<dyn GenericResourceQueryService>,
     spec_resolver: Arc<dyn DatasetEnvVarSpecResolver>,
     secrets_encryption_config: Arc<SecretsEncryptionConfig>,
+    principal: Arc<Principal>,
+    request_origin: Arc<RequestOrigin>,
 }
 
 #[dill::component(pub)]
@@ -87,6 +94,8 @@ impl DatasetEnvVarMutationAdapterImpl {
         generic_resource_query_service: Arc<dyn GenericResourceQueryService>,
         spec_resolver: Arc<dyn DatasetEnvVarSpecResolver>,
         secrets_encryption_config: Arc<SecretsEncryptionConfig>,
+        principal: Arc<Principal>,
+        request_origin: Arc<RequestOrigin>,
     ) -> Self {
         Self {
             dispatcher_factory,
@@ -95,6 +104,8 @@ impl DatasetEnvVarMutationAdapterImpl {
             generic_resource_query_service,
             spec_resolver,
             secrets_encryption_config,
+            principal,
+            request_origin,
         }
     }
 }
@@ -199,6 +210,11 @@ impl DatasetEnvVarMutationAdapterImpl {
         ResourceName::new_unchecked(&format!("legacy-secrets-{}", dataset_id.as_multibase()))
     }
 
+    /// Variable and secret sets are created on behalf of the caller
+    fn creation_provenance(&self) -> Result<CreationProvenance, InternalError> {
+        request_creation_provenance(&self.principal, &self.request_origin)
+    }
+
     fn get_dispatcher(
         &self,
         schema: &str,
@@ -215,10 +231,21 @@ impl DatasetEnvVarMutationAdapterImpl {
     async fn apply_and_handle_rejection(
         &self,
         dispatcher: &Arc<dyn ResourceCrudDispatcher>,
-        request: ResourceCrudDispatcherApplyRequest,
+        id: Option<ResourceID>,
+        headers: ResourceHeadersInput,
+        spec: serde_json::Value,
         precondition: ApplyResourcePrecondition,
         resource_type_name: &str,
     ) -> Result<ResourceID, EnvVarSetWriteError> {
+        let request = ResourceCrudDispatcherApplyRequest {
+            account_source: ApplyResourceAccountSource::Manifest,
+            access_check: ApplyResourceAccessCheck::CheckedByCaller,
+            id,
+            headers: headers.into(),
+            spec,
+            provenance: self.creation_provenance()?,
+        };
+
         let apply_decision = match dispatcher
             .apply_with_precondition(request, precondition)
             .await
@@ -228,9 +255,11 @@ impl DatasetEnvVarMutationAdapterImpl {
                 return Err(EnvVarSetWriteError::ConcurrentModification);
             }
             Err(
-                err @ (ApplyResourceCrudDispatcherError::InvalidSpec { .. }
+                err @ (ApplyResourceCrudDispatcherError::InvalidHeaders(_)
+                | ApplyResourceCrudDispatcherError::InvalidSpec { .. }
                 | ApplyResourceCrudDispatcherError::NotFound(_)
                 | ApplyResourceCrudDispatcherError::TypeMismatch(_)
+                | ApplyResourceCrudDispatcherError::Access(_)
                 | ApplyResourceCrudDispatcherError::Internal(_)),
             ) => return Err(err.int_err().into()),
         };
@@ -293,6 +322,7 @@ impl DatasetEnvVarMutationAdapterImpl {
             id: existing_id,
             precondition,
             entries: mut variables,
+            owner_references,
         } = self.load_variable_set(account_did, &resource_name).await?;
 
         let exists_as_variable = variables.contains_key(key);
@@ -344,6 +374,7 @@ impl DatasetEnvVarMutationAdapterImpl {
                 account_name.clone(),
                 resource_name,
                 dataset_id,
+                owner_references,
             )
             .await?;
 
@@ -351,11 +382,9 @@ impl DatasetEnvVarMutationAdapterImpl {
 
         self.apply_and_handle_rejection(
             &dispatcher,
-            ResourceCrudDispatcherApplyRequest {
-                id: existing_id,
-                headers,
-                spec: new_spec,
-            },
+            existing_id,
+            headers,
+            new_spec,
             precondition,
             "VariableSet",
         )
@@ -394,6 +423,7 @@ impl DatasetEnvVarMutationAdapterImpl {
             id: existing_id,
             precondition,
             entries: mut secrets,
+            owner_references,
         } = self.load_secret_set(account_did, &resource_name).await?;
 
         let exists_as_secret = secrets.contains_key(key);
@@ -446,6 +476,7 @@ impl DatasetEnvVarMutationAdapterImpl {
                 account_name.clone(),
                 resource_name,
                 dataset_id,
+                owner_references,
             )
             .await?;
 
@@ -453,11 +484,9 @@ impl DatasetEnvVarMutationAdapterImpl {
 
         self.apply_and_handle_rejection(
             &dispatcher,
-            ResourceCrudDispatcherApplyRequest {
-                id: existing_id,
-                headers,
-                spec: new_spec,
-            },
+            existing_id,
+            headers,
+            new_spec,
             precondition,
             "SecretSet",
         )
@@ -520,11 +549,9 @@ impl DatasetEnvVarMutationAdapterImpl {
             let headers = snapshot.headers.into_input();
             self.apply_and_handle_rejection(
                 &dispatcher,
-                ResourceCrudDispatcherApplyRequest {
-                    id: Some(resource_id),
-                    headers,
-                    spec: serde_json::to_value(spec.into_input()).int_err()?,
-                },
+                Some(resource_id),
+                headers,
+                serde_json::to_value(spec.into_input()).int_err()?,
                 precondition,
                 "VariableSet",
             )
@@ -576,11 +603,9 @@ impl DatasetEnvVarMutationAdapterImpl {
             let headers = snapshot.headers.into_input();
             self.apply_and_handle_rejection(
                 &dispatcher,
-                ResourceCrudDispatcherApplyRequest {
-                    id: Some(resource_id),
-                    headers,
-                    spec: serde_json::to_value(new_spec).int_err()?,
-                },
+                Some(resource_id),
+                headers,
+                serde_json::to_value(new_spec).int_err()?,
                 precondition,
                 "SecretSet",
             )
@@ -718,12 +743,14 @@ impl DatasetEnvVarMutationAdapterImpl {
 
         let snapshot = self.load_snapshot(&id).await?;
         let generation = snapshot.headers.generation;
+        let owner_references = Self::make_owner_references(&snapshot.headers);
         let spec: VariableSetSpec = serde_json::from_value(snapshot.spec).int_err()?;
 
         Ok(LoadedEnvVarSet {
             id: Some(id),
             precondition: ApplyResourcePrecondition::Generation(generation),
             entries: spec.into_dto().variables.entries,
+            owner_references,
         })
     }
 
@@ -742,6 +769,7 @@ impl DatasetEnvVarMutationAdapterImpl {
 
         let snapshot = self.load_snapshot(&id).await?;
         let generation = snapshot.headers.generation;
+        let owner_references = Self::make_owner_references(&snapshot.headers);
         let spec: SecretSetSpec = serde_json::from_value(snapshot.spec).int_err()?;
 
         let entries = self
@@ -762,6 +790,7 @@ impl DatasetEnvVarMutationAdapterImpl {
             id: Some(id),
             precondition: ApplyResourcePrecondition::Generation(generation),
             entries,
+            owner_references,
         })
     }
 
@@ -777,6 +806,7 @@ impl DatasetEnvVarMutationAdapterImpl {
         self.generic_resource_query_service
             .get_snapshot_by_id(resource_id)
             .await?
+            .filter(|snapshot| !snapshot.headers.is_deleted())
             .ok_or_else(|| format!("Resource {resource_id} missing snapshot").int_err())
     }
 
@@ -814,6 +844,19 @@ impl DatasetEnvVarMutationAdapterImpl {
         Ok(decrypted)
     }
 
+    /// The owners by ID, which keeps the references as they are
+    fn make_owner_references(headers: &ResourceHeaders) -> Option<Vec<ResourceRef>> {
+        headers.owner_references.as_ref().map(|owners| {
+            owners
+                .iter()
+                .map(|owner| ResourceRef {
+                    id: Some(owner.id),
+                    ..ResourceRef::default()
+                })
+                .collect()
+        })
+    }
+
     /// Builds headers for an auto-managed legacy resource, stamped with the
     /// `legacy-config-target-dataset` label that associates it with its
     /// dataset. The label is what the resolver reads; without it the resource
@@ -824,6 +867,7 @@ impl DatasetEnvVarMutationAdapterImpl {
         account_name: odf::AccountName,
         resource_name: ResourceName,
         dataset_id: &odf::DatasetID,
+        owner_references: Option<Vec<ResourceRef>>,
     ) -> Result<ResourceHeadersInput, InternalError> {
         let account = self.account_service.get_account_by_id(&account_did).await;
         let account_resource_id = match account {
@@ -853,7 +897,7 @@ impl DatasetEnvVarMutationAdapterImpl {
             annotations: Some(kamu_resources::ResourceAnnotations {
                 entries: BTreeMap::new(),
             }),
-            owner_references: None,
+            owner_references,
         })
     }
 }
@@ -866,6 +910,8 @@ struct LoadedEnvVarSet<T> {
     id: Option<ResourceID>,
     precondition: ApplyResourcePrecondition,
     entries: BTreeMap<String, T>,
+    /// Carried over by a write, which rebuilds the headers
+    owner_references: Option<Vec<ResourceRef>>,
 }
 
 impl<T> LoadedEnvVarSet<T> {
@@ -874,6 +920,7 @@ impl<T> LoadedEnvVarSet<T> {
             id: None,
             precondition: ApplyResourcePrecondition::Absent,
             entries: BTreeMap::new(),
+            owner_references: None,
         }
     }
 }

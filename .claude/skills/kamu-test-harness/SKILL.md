@@ -38,6 +38,15 @@ base harnesses (`BaseRepoHarness`, `BaseUseCaseHarness`, the crate's `testing` m
 suite's sibling files. Extend a shared harness rather than copying its setup into a new suite.
 When cases differ only by data, write one table-driven test instead of near-identical copies.
 
+| You need | Look first in |
+|---|---|
+| A service-level catalog, accounts, mock outbox expectations | `BaseRepoHarness`, `BaseUseCaseHarness` (`kamu-core` `testing`); `BaseResourceServiceHarness` (`kamu-resources-services` `testing`), with its `make_*` builders of headers, provenance and params |
+| A resources service-layer suite | `ServiceLayerTestHarness` in the resources services tests, which the retention and lifecycle suites extend |
+| Racing or sequential transactions | `database_common::testing` (`race_transactions`, `in_committed_transaction`, `in_rolled_back_transaction`) |
+| A repository fixture | the helpers at the top of the domain's repo-tests suite, such as `make_test_snapshot` |
+| Facade contract fixtures and assertions | `facade-tests/tests/helpers/` (`fixture_helpers.rs`, `assert_helpers.rs`) |
+| An e2e resource command and its parsed output | `ResourceCtx` in the e2e repo-tests (`list_names_of`, `list_json`, the `wait_until_*` helpers) |
+
 ### What a well-written test looks like
 
 ```rust

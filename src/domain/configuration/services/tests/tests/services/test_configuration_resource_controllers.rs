@@ -20,7 +20,6 @@ use kamu_configuration::{
 use kamu_configuration_services::SECRET_SET_CONTROLLER_NAME;
 use kamu_configuration_services::testing::BaseConfigurationServiceHarness;
 use kamu_resources::{
-    ApplyResourceParams,
     EventSourcedResource,
     ResourceControllerName,
     ResourceControllerState,
@@ -132,11 +131,11 @@ impl ControllersHarness {
         });
 
         self.apply_variable_use_case()
-            .apply(ApplyResourceParams {
-                id: None,
-                headers: BaseResourceServiceHarness::make_headers_input(self.owner.clone(), name),
+            .apply(BaseResourceServiceHarness::make_apply_params(
+                self.owner.clone(),
+                Some(name),
                 spec,
-            })
+            ))
             .await
             .unwrap()
             .expect_applied()
@@ -156,7 +155,7 @@ impl ControllersHarness {
     }
 
     /// A `SecretSet` whose secret claims an encoding it does not have, written
-    /// past the sanitizer, so that every reconciliation of it fails
+    /// past the pre-apply hook, so that every reconciliation of it fails
     async fn create_secret_set_with_undecryptable_secret(&self) -> ResourceID {
         let spec = SecretSetSpecInput::new(odf::meta::config::SecretSetSpecInput {
             secrets: odf::meta::config::Secrets {
@@ -174,7 +173,13 @@ impl ControllersHarness {
         let id = self.resource_repo().new_resource_id().await.unwrap();
         let headers =
             BaseResourceServiceHarness::make_headers_input(self.owner.clone(), "undecryptable");
-        let event = SecretSetResource::make_created_event(Utc::now(), id, headers, spec);
+        let event = SecretSetResource::make_created_event(
+            Utc::now(),
+            id,
+            headers,
+            spec,
+            &BaseResourceServiceHarness::make_provenance(),
+        );
         let mut resource = SecretSetResource::from_aggregate(Aggregate::new(id, event).unwrap());
 
         let persistence_service: Arc<dyn ResourcePersistenceService<SecretSetResource>> =

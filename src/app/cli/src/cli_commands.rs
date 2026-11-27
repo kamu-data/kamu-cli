@@ -198,7 +198,8 @@ pub fn get_command(
                 c.max_results,
                 c.unbounded,
                 c.label_selectors,
-                c.include_deleting,
+                c.owner,
+                c.visibility.visibility(),
             )
             .cast(),
         ),
@@ -260,7 +261,8 @@ pub fn get_command(
                 c.max_results,
                 c.unbounded,
                 c.label_selectors,
-                c.include_deleting,
+                c.owner,
+                c.visibility.visibility(),
             )
             .cast(),
         ),
@@ -655,7 +657,7 @@ pub fn command_needs_transaction(args: &cli::Cli) -> bool {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub fn command_needs_outbox_processing(args: &cli::Cli) -> bool {
+pub fn command_needs_background_work(args: &cli::Cli) -> bool {
     match &args.command {
         cli::Command::System(c) => match &c.subcommand {
             cli::SystemSubCommand::Info(_)
@@ -665,7 +667,7 @@ pub fn command_needs_outbox_processing(args: &cli::Cli) -> bool {
             | cli::SystemSubCommand::GenerateToken(_)
             | cli::SystemSubCommand::Gc(_) => false,
             cli::SystemSubCommand::ApiServer(a) => match &a.subcommand {
-                // The server's agents process the outbox while it runs; after a shutdown,
+                // The server's agents do the background work while it runs; after a shutdown,
                 // what is left waits for the next start instead of outliving the shutdown bound
                 None | Some(cli::SystemApiServerSubCommand::GqlSchema(_)) => false,
                 Some(cli::SystemApiServerSubCommand::GqlQuery(_)) => true,

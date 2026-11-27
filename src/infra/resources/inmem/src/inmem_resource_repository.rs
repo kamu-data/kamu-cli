@@ -7,26 +7,32 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::collections::HashMap;
+use std::cmp::Reverse;
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
+use chrono::{DateTime, Utc};
 use database_common::{InMemoryMapWrite, PaginationOpts, TransactionId, TransactionRef};
 use dill::*;
 use event_sourcing::EventID;
 use futures::StreamExt;
-use internal_error::InternalError;
+use internal_error::{InternalError, ResultIntoInternal};
 use kamu_accounts::AccountRepository;
 use kamu_resources::{
     CreateResourceError,
+    ResourceDueForPurge,
     ResourceDuplicateError,
     ResourceHandleRow,
+    ResourceHeadersExt,
     ResourceID,
     ResourceLabelPair,
     ResourceName,
     ResourcePhase,
     ResourcePhaseCounts,
+    ResourcePurgeDeadline,
     ResourceQuery,
     ResourceRawEventQuery,
+    ResourceRemovalListener,
     ResourceRepository,
     ResourceScope,
     ResourceSnapshot,
@@ -38,6 +44,7 @@ use kamu_resources::{
     UpdateResourceError,
     deleted_account_name_sentinel,
     deleted_account_resource_id_sentinel,
+    owner_ids,
     string_label_entries,
 };
 
@@ -48,6 +55,9 @@ use crate::inmem_resource_state::{ResourceLookupKey, ResourceStateView};
 
 pub struct InMemoryResourceRepository {
     state: Arc<InMemoryResourceState>,
+    // The in-memory projections register as listeners in place of the cascade
+    // of the SQL backends
+    removal_listeners: Vec<Arc<dyn ResourceRemovalListener>>,
     transaction_id: Option<TransactionId>,
     // Resolved lazily per call rather than injected: `AccountRepository` may
     // be a transaction-scoped component (whenever it is paired with a
@@ -62,11 +72,13 @@ pub struct InMemoryResourceRepository {
 impl InMemoryResourceRepository {
     pub fn new(
         state: Arc<InMemoryResourceState>,
+        removal_listeners: Vec<Arc<dyn ResourceRemovalListener>>,
         transaction_ref: Option<TransactionRef>,
         catalog: CatalogWeakRef,
     ) -> Self {
         Self {
             state,
+            removal_listeners,
             transaction_id: transaction_ref.map(|transaction_ref| transaction_ref.id()),
             catalog,
         }
@@ -91,11 +103,10 @@ impl InMemoryResourceRepository {
     /// outbox-driven cleanup), so a missing account falls back to sentinels
     /// instead of failing the read.
     async fn resolve_snapshot(&self, mut snapshot: ResourceSnapshot) -> ResourceSnapshot {
-        let (resource_id, name) = self
+        let (id, name) = self
             .resolve_account_identity(&snapshot.headers.account.did)
             .await;
-        snapshot.headers.account.id = resource_id;
-        snapshot.headers.account.name = name;
+        set_account_identity(&mut snapshot, id, name);
         snapshot
     }
 
@@ -142,8 +153,7 @@ impl InMemoryResourceRepository {
                             deleted_account_name_sentinel(),
                         )
                     });
-                snapshot.headers.account.id = resource_id;
-                snapshot.headers.account.name = name;
+                set_account_identity(&mut snapshot, resource_id, name);
                 snapshot
             })
             .collect()
@@ -226,14 +236,19 @@ impl ResourceRepository for InMemoryResourceRepository {
 
         self.state
             .write(self.transaction_id, |snapshots_by_id, ids_by_lookup_key| {
-                if snapshots_by_id.view().contains_key(&resource_snapshot.id)
-                    || holds_name && name_is_taken(ids_by_lookup_key, &lookup_key, None)
-                {
+                if holds_name && name_is_taken(ids_by_lookup_key, &lookup_key, None) {
                     return Err(CreateResourceError::Duplicate(ResourceDuplicateError {
                         account_id: resource_snapshot.headers.account.did.clone(),
                         schema: resource_snapshot.schema.clone(),
                         name: resource_snapshot.headers.name.clone(),
                     }));
+                }
+
+                if snapshots_by_id.view().contains_key(&resource_snapshot.id) {
+                    return Err(CreateResourceError::Internal(InternalError::new(format!(
+                        "Resource {} already exists",
+                        resource_snapshot.id
+                    ))));
                 }
 
                 if holds_name {
@@ -354,20 +369,37 @@ impl ResourceRepository for InMemoryResourceRepository {
         Ok(self.state.read(self.transaction_id, |state| {
             ids.iter()
                 .filter_map(|id| state.snapshot(id))
-                .filter(|snapshot| {
-                    snapshot.headers.account.did == *account_id
-                        && snapshot.headers.deleted_at.is_none()
-                })
-                .map(|snapshot| ResourceHandleRow {
-                    id: *snapshot.id.as_ref(),
-                    schema: snapshot.schema.to_string(),
-                    name: snapshot.headers.name.to_string(),
-                    account_id: snapshot.headers.account.did.clone(),
-                    account_resource_id: *snapshot.headers.account.id.as_ref(),
-                    account_name: snapshot.headers.account.name.to_string(),
-                })
+                .filter(|snapshot| snapshot.headers.account.did == *account_id)
+                .map(ResourceHandleRow::from)
                 .collect()
         }))
+    }
+
+    async fn touch_live_resources(
+        &self,
+        account_id: &odf::AccountID,
+        ids: &[ResourceID],
+    ) -> Result<Vec<ResourceID>, InternalError> {
+        Ok(self
+            .state
+            .write(self.transaction_id, |snapshots_by_id, _| {
+                let live_ids = ids
+                    .iter()
+                    .copied()
+                    .filter(|id| {
+                        snapshots_by_id.view().get(id).is_some_and(|snapshot| {
+                            snapshot.headers.account.did == *account_id
+                                && snapshot.headers.deletion_requested_at.is_none()
+                        })
+                    })
+                    .collect::<HashSet<_>>();
+                for id in &live_ids {
+                    snapshots_by_id.touch(*id);
+                }
+                live_ids
+            })
+            .into_iter()
+            .collect())
     }
 
     async fn resolve_resource_ids_by_names(
@@ -380,34 +412,32 @@ impl ResourceRepository for InMemoryResourceRepository {
         Ok(self.state.read(self.transaction_id, |state| {
             let mut resolved = Vec::new();
             for name in names {
-                let live = state.live_snapshot_by_name(&ResourceLookupKey {
-                    account_id: account_id.clone(),
-                    schema: schema.clone(),
-                    name: name.clone(),
+                let mut matching = state
+                    .snapshots()
+                    .filter(|snapshot| {
+                        snapshot.headers.account.did == *account_id
+                            && snapshot.schema == *schema
+                            && snapshot.headers.name == *name
+                            && visibility.includes(
+                                snapshot.headers.deletion_requested_at,
+                                snapshot.headers.deleted_at,
+                            )
+                    })
+                    .collect::<Vec<_>>();
+                matching.sort_by_key(|snapshot| {
+                    let headers = &snapshot.headers;
+                    (
+                        headers.deleted_at.is_some(),
+                        Reverse(headers.deleted_at),
+                        headers.deletion_requested_at,
+                        snapshot.id,
+                    )
                 });
-                resolved.extend(live.map(|snapshot| (snapshot.headers.name.clone(), snapshot.id)));
-
-                if visibility.includes_deleting() {
-                    // Oldest deletion request first, as the SQL backends order them
-                    let mut deleting = state
-                        .snapshots()
-                        .filter(|snapshot| {
-                            snapshot.headers.account.did == *account_id
-                                && snapshot.schema == *schema
-                                && snapshot.headers.name == *name
-                                && snapshot.headers.deletion_requested_at.is_some()
-                                && snapshot.headers.deleted_at.is_none()
-                        })
-                        .collect::<Vec<_>>();
-                    deleting.sort_by_key(|snapshot| {
-                        (snapshot.headers.deletion_requested_at, snapshot.id)
-                    });
-                    resolved.extend(
-                        deleting
-                            .into_iter()
-                            .map(|snapshot| (snapshot.headers.name.clone(), snapshot.id)),
-                    );
-                }
+                resolved.extend(
+                    matching
+                        .into_iter()
+                        .map(|snapshot| (snapshot.headers.name.clone(), snapshot.id)),
+                );
             }
 
             resolved
@@ -419,6 +449,7 @@ impl ResourceRepository for InMemoryResourceRepository {
         account_id: &odf::AccountID,
         scope: &ResourceScope,
         visibility: ResourceVisibility,
+        owner_id: Option<ResourceID>,
         pagination: PaginationOpts,
     ) -> Result<Vec<ResourceHandleRow>, InternalError> {
         if scope.is_vacuous() {
@@ -427,29 +458,17 @@ impl ResourceRepository for InMemoryResourceRepository {
 
         let mut snapshots = {
             self.state.read(self.transaction_id, |state| {
-                filter_scoped_snapshots(state, account_id, scope, visibility)
+                filter_scoped_snapshots(state, account_id, scope, visibility, owner_id)
             })
         };
 
-        snapshots.sort_by(|lhs, rhs| {
-            rhs.headers
-                .updated_at
-                .cmp(&lhs.headers.updated_at)
-                .then_with(|| rhs.id.cmp(&lhs.id))
-        });
+        sort_snapshots(&mut snapshots, visibility);
 
         Ok(snapshots
             .into_iter()
             .skip(pagination.offset)
             .take(pagination.limit)
-            .map(|snapshot| ResourceHandleRow {
-                id: *snapshot.id.as_ref(),
-                schema: snapshot.schema.to_string(),
-                name: snapshot.headers.name.to_string(),
-                account_id: snapshot.headers.account.did.clone(),
-                account_resource_id: *snapshot.headers.account.id.as_ref(),
-                account_name: snapshot.headers.account.name.to_string(),
-            })
+            .map(|snapshot| ResourceHandleRow::from(&snapshot))
             .collect())
     }
 
@@ -458,13 +477,14 @@ impl ResourceRepository for InMemoryResourceRepository {
         account_id: &odf::AccountID,
         scope: &ResourceScope,
         visibility: ResourceVisibility,
+        owner_id: Option<ResourceID>,
     ) -> Result<usize, InternalError> {
         if scope.is_vacuous() {
             return Ok(0);
         }
 
         Ok(self.state.read(self.transaction_id, |state| {
-            filter_scoped_snapshots(state, account_id, scope, visibility).len()
+            filter_scoped_snapshots(state, account_id, scope, visibility, owner_id).len()
         }))
     }
 
@@ -477,7 +497,6 @@ impl ResourceRepository for InMemoryResourceRepository {
                 state
                     .snapshot(&query.id)
                     .filter(|snapshot| snapshot.schema == query.schema)
-                    .filter(|snapshot| snapshot.headers.deleted_at.is_none())
                     .cloned()
             })
         };
@@ -517,7 +536,6 @@ impl ResourceRepository for InMemoryResourceRepository {
                 ids.iter()
                     .filter_map(|id| state.snapshot(id))
                     .filter(|snapshot| snapshot.schema == *schema)
-                    .filter(|snapshot| snapshot.headers.deleted_at.is_none())
                     .cloned()
                     .collect::<Vec<_>>()
             })
@@ -531,12 +549,8 @@ impl ResourceRepository for InMemoryResourceRepository {
         id: &ResourceID,
     ) -> Result<Option<ResourceSnapshot>, InternalError> {
         let maybe_snapshot = {
-            self.state.read(self.transaction_id, |state| {
-                state
-                    .snapshot(id)
-                    .filter(|snapshot| snapshot.headers.deleted_at.is_none())
-                    .cloned()
-            })
+            self.state
+                .read(self.transaction_id, |state| state.snapshot(id).cloned())
         };
 
         match maybe_snapshot {
@@ -554,10 +568,7 @@ impl ResourceRepository for InMemoryResourceRepository {
             self.state.read(self.transaction_id, |state| {
                 ids.iter()
                     .filter_map(|id| state.snapshot(id))
-                    .filter(|snapshot| {
-                        snapshot.headers.account.did == *account_id
-                            && snapshot.headers.deleted_at.is_none()
-                    })
+                    .filter(|snapshot| snapshot.headers.account.did == *account_id)
                     .cloned()
                     .collect::<Vec<_>>()
             })
@@ -571,6 +582,7 @@ impl ResourceRepository for InMemoryResourceRepository {
         account_id: &odf::AccountID,
         scope: &ResourceScope,
         visibility: ResourceVisibility,
+        owner_id: Option<ResourceID>,
         pagination: PaginationOpts,
     ) -> ResourceSnapshotStream<'_> {
         let account_id = account_id.clone();
@@ -579,16 +591,11 @@ impl ResourceRepository for InMemoryResourceRepository {
         let stream = futures::stream::once(async move {
             let mut snapshots_page: Vec<_> = {
                 self.state.read(self.transaction_id, |state| {
-                    filter_scoped_snapshots(state, &account_id, &scope, visibility)
+                    filter_scoped_snapshots(state, &account_id, &scope, visibility, owner_id)
                 })
             };
 
-            snapshots_page.sort_by(|lhs, rhs| {
-                rhs.headers
-                    .updated_at
-                    .cmp(&lhs.headers.updated_at)
-                    .then_with(|| rhs.id.cmp(&lhs.id))
-            });
+            sort_snapshots(&mut snapshots_page, visibility);
 
             let snapshots_page: Vec<_> = snapshots_page
                 .into_iter()
@@ -615,10 +622,7 @@ impl ResourceRepository for InMemoryResourceRepository {
         let snapshots = self.state.read(self.transaction_id, |state| {
             state
                 .snapshots()
-                .filter(|snapshot| {
-                    snapshot.headers.account.did == account_id
-                        && snapshot.headers.deleted_at.is_none()
-                })
+                .filter(|snapshot| snapshot.headers.account.did == account_id)
                 .cloned()
                 .collect::<Vec<_>>()
         });
@@ -643,8 +647,7 @@ impl ResourceRepository for InMemoryResourceRepository {
                 Some(ResourcePhase::Degraded) => row.phase_counts.increment_degraded(),
                 Some(ResourcePhase::Failed) => row.phase_counts.increment_failed(),
                 Some(ResourcePhase::Deleting) => row.phase_counts.increment_deleting(),
-                // Excluded by the `deleted_at` filter
-                Some(ResourcePhase::Deleted) => {}
+                Some(ResourcePhase::Deleted) => row.phase_counts.increment_deleted(),
             }
         }
 
@@ -652,6 +655,117 @@ impl ResourceRepository for InMemoryResourceRepository {
         rows.sort_by(|lhs, rhs| lhs.schema.cmp(&rhs.schema));
 
         Ok(rows)
+    }
+
+    async fn set_purge_deadlines(
+        &self,
+        deadlines: &[ResourcePurgeDeadline],
+    ) -> Result<(), InternalError> {
+        let existing = self.state.read(self.transaction_id, |view| {
+            deadlines
+                .iter()
+                .filter(|deadline| view.snapshot(&deadline.id).is_some())
+                .copied()
+                .collect::<Vec<_>>()
+        });
+
+        self.state
+            .write_purge_deadlines(self.transaction_id, |purge_deadlines_by_id| {
+                for deadline in existing {
+                    purge_deadlines_by_id.overwrite(deadline.id, deadline.purge_at);
+                }
+            });
+
+        Ok(())
+    }
+
+    async fn find_resources_due_for_purge(
+        &self,
+        now: DateTime<Utc>,
+        limit: usize,
+    ) -> Result<Vec<ResourceDueForPurge>, InternalError> {
+        let mut due = self.state.read(self.transaction_id, |view| {
+            view.due_for_purge(now)
+                .into_iter()
+                .map(|(snapshot, purge_at)| ResourceDueForPurge {
+                    id: snapshot.id,
+                    schema: snapshot.schema.clone(),
+                    purge_at,
+                })
+                .collect::<Vec<_>>()
+        });
+
+        due.sort_by_key(|resource| (resource.purge_at, *resource.id.as_ref()));
+        due.truncate(limit);
+        Ok(due)
+    }
+
+    async fn count_resources_due_for_purge(
+        &self,
+        now: DateTime<Utc>,
+    ) -> Result<u64, InternalError> {
+        let count = self
+            .state
+            .read(self.transaction_id, |view| view.due_for_purge(now).len());
+        u64::try_from(count).int_err()
+    }
+
+    /// Claims by deleting the deadlines: a concurrent claim of the same
+    /// resources fails at commit, on the deleted keys
+    async fn claim_resources_for_purge(
+        &self,
+        ids: &[ResourceID],
+        now: DateTime<Utc>,
+    ) -> Result<Vec<ResourceID>, InternalError> {
+        let claimed_ids: Vec<ResourceID> = self.state.read(self.transaction_id, |view| {
+            view.due_for_purge(now)
+                .into_iter()
+                .filter(|(snapshot, _)| ids.contains(&snapshot.id))
+                .map(|(snapshot, _)| snapshot.id)
+                .collect()
+        });
+
+        self.state
+            .write_purge_deadlines(self.transaction_id, |purge_deadlines_by_id| {
+                for id in &claimed_ids {
+                    purge_deadlines_by_id.delete(*id);
+                }
+            });
+        Ok(claimed_ids)
+    }
+
+    async fn purge_resources(&self, ids: &[ResourceID]) -> Result<(), InternalError> {
+        for listener in &self.removal_listeners {
+            listener.on_resources_removed(ids).await?;
+        }
+
+        self.state
+            .write(self.transaction_id, |snapshots_by_id, ids_by_lookup_key| {
+                for id in ids {
+                    if let Some(snapshot) = snapshots_by_id.view().get(id).cloned() {
+                        let lookup_key = ResourceLookupKey::of(&snapshot);
+                        if ids_by_lookup_key.view().get(&lookup_key) == Some(id) {
+                            ids_by_lookup_key.delete(lookup_key);
+                        }
+                        snapshots_by_id.delete(*id);
+                    }
+                }
+            });
+
+        Ok(())
+    }
+
+    async fn find_nearest_purge_at(
+        &self,
+        now: DateTime<Utc>,
+    ) -> Result<Option<DateTime<Utc>>, InternalError> {
+        Ok(self.state.read(self.transaction_id, |view| {
+            view.purge_deadlines()
+                .into_iter()
+                .map(|(_, purge_at)| purge_at)
+                .filter(|purge_at| *purge_at > now)
+                .min()
+        }))
     }
 }
 
@@ -754,24 +868,66 @@ fn resource_name_matches_pattern(name: &str, pattern: &str) -> bool {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+fn set_account_identity(
+    snapshot: &mut ResourceSnapshot,
+    id: odf::ResourceID,
+    name: odf::AccountName,
+) {
+    let account = odf::ResourceOwnerHandle {
+        id,
+        name,
+        ..snapshot.headers.account.clone()
+    };
+    snapshot.headers.set_account(account);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 fn filter_scoped_snapshots(
     state: &ResourceStateView<'_, '_>,
     account_id: &odf::AccountID,
     scope: &ResourceScope,
     visibility: ResourceVisibility,
+    owner_id: Option<ResourceID>,
 ) -> Vec<ResourceSnapshot> {
     state
         .snapshots()
-        .filter(|snapshot| snapshot.headers.deleted_at.is_none())
         .filter(|snapshot| {
-            snapshot.headers.deletion_requested_at.is_none() || visibility.includes_deleting()
+            visibility.includes(
+                snapshot.headers.deletion_requested_at,
+                snapshot.headers.deleted_at,
+            )
         })
         // Account and labels are both matched inside the scope, not here: a row
         // may name its own account and carry its own label pairs, and
         // `account_id` is only the default for rows that do not.
         .filter(|snapshot| snapshot_matches_scope(snapshot, scope, account_id))
+        .filter(|snapshot| {
+            owner_id.is_none_or(|owner_id| {
+                owner_ids(snapshot.headers.owner_references.as_ref()).contains(&owner_id)
+            })
+        })
         .cloned()
         .collect()
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// The order of listings and searches, see
+/// [`ResourceRepository::list_resource_snapshots`]
+fn sort_snapshots(snapshots: &mut [ResourceSnapshot], visibility: ResourceVisibility) {
+    snapshots.sort_by_key(|snapshot| {
+        let headers = &snapshot.headers;
+        let deletion_time = if visibility.includes_deleted() {
+            headers.deleted_at.or(headers.deletion_requested_at)
+        } else {
+            None
+        };
+        (
+            deletion_time.is_some(),
+            Reverse((deletion_time, headers.updated_at, snapshot.id)),
+        )
+    });
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

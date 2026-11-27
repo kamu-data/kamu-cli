@@ -32,6 +32,7 @@ use kamu_datasets::{
 };
 use kamu_resources::{
     GenericResourceQueryService,
+    ResourceHeadersExt,
     ResourceID,
     ResourceRepository,
     ResourceSchemaProvider,
@@ -111,11 +112,14 @@ impl DatasetEnvVarSpecResolverImpl {
             .find_snapshots_by_ids(owner_id, ids)
             .await?;
 
-        let mut by_id: HashMap<ResourceID, ResourceSnapshot> =
-            snapshots.into_iter().map(|s| (s.id, s)).collect();
+        // A resource deleted between the two queries is skipped, matching what
+        // the projection resolver would do.
+        let mut by_id: HashMap<ResourceID, ResourceSnapshot> = snapshots
+            .into_iter()
+            .filter(|snapshot| !snapshot.headers.is_deleted())
+            .map(|snapshot| (snapshot.id, snapshot))
+            .collect();
 
-        // A missing snapshot means the resource was deleted between the two
-        // queries; skipping matches what the projection resolver would do.
         Ok(ids.iter().filter_map(|id| by_id.remove(id)).collect())
     }
 

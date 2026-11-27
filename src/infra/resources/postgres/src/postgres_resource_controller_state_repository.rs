@@ -100,7 +100,9 @@ impl ResourceControllerStateRepository for PostgresResourceControllerStateReposi
                 attempts,
                 last_error
             )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+            SELECT $1, r.resource_id, $3, $4, $5, $6, $7, $8
+            FROM resources r
+            WHERE r.resource_id = $2
             ON CONFLICT (controller, resource_id) DO UPDATE SET
                 controller_revision = EXCLUDED.controller_revision,
                 handled_generation = EXCLUDED.handled_generation,
@@ -129,18 +131,22 @@ impl ResourceControllerStateRepository for PostgresResourceControllerStateReposi
         Ok(())
     }
 
-    async fn delete_states_for_resource(
+    async fn delete_states_for_resources(
         &self,
-        resource_id: &ResourceID,
+        resource_ids: &[ResourceID],
     ) -> Result<(), InternalError> {
+        if resource_ids.is_empty() {
+            return Ok(());
+        }
+
         let mut tr = self.transaction.lock().await;
         let connection_mut = tr.connection_mut().await?;
 
-        let resource_id: &uuid::Uuid = resource_id.as_ref();
+        let resource_ids: Vec<uuid::Uuid> = resource_ids.iter().map(|id| *id.as_ref()).collect();
 
         sqlx::query!(
-            "DELETE FROM resource_controller_state WHERE resource_id = $1",
-            resource_id,
+            "DELETE FROM resource_controller_state WHERE resource_id = ANY($1)",
+            &resource_ids,
         )
         .execute(connection_mut)
         .await

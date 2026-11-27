@@ -57,6 +57,14 @@ database_transactional_test!(
 
 database_transactional_test!(
     storage = inmem_with_transaction,
+    fixture = resource_repo_suite::test_touch_live_resources,
+    harness = InMemoryResourceRepositoriesHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = inmem_with_transaction,
     fixture = resource_repo_suite::test_find_resource_snapshots_by_schema_and_ids,
     harness = InMemoryResourceRepositoriesHarness
 );
@@ -161,6 +169,14 @@ database_transactional_test!(
 
 database_transactional_test!(
     storage = inmem_with_transaction,
+    fixture = resource_repo_suite::test_create_resource_with_taken_id_fails,
+    harness = InMemoryResourceRepositoriesHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = inmem_with_transaction,
     fixture = resource_repo_suite::test_create_resource_duplicate_ignore_case_fails,
     harness = InMemoryResourceRepositoriesHarness
 );
@@ -249,7 +265,7 @@ database_transactional_test!(
 
 database_transactional_test!(
     storage = inmem_with_transaction,
-    fixture = resource_repo_suite::test_find_deleted_resource_not_returned,
+    fixture = resource_repo_suite::test_resource_in_deletion_round_trips,
     harness = InMemoryResourceRepositoriesHarness
 );
 
@@ -257,7 +273,7 @@ database_transactional_test!(
 
 database_transactional_test!(
     storage = inmem_with_transaction,
-    fixture = resource_repo_suite::test_resource_being_deleted_round_trips,
+    fixture = resource_repo_suite::test_visibility_by_deletion_state,
     harness = InMemoryResourceRepositoriesHarness
 );
 
@@ -265,7 +281,7 @@ database_transactional_test!(
 
 database_transactional_test!(
     storage = inmem_with_transaction,
-    fixture = resource_repo_suite::test_resource_being_deleted_is_hidden_unless_included,
+    fixture = resource_repo_suite::test_deleted_resources_share_name_with_live_one,
     harness = InMemoryResourceRepositoriesHarness
 );
 
@@ -273,7 +289,7 @@ database_transactional_test!(
 
 database_transactional_test!(
     storage = inmem_with_transaction,
-    fixture = resource_repo_suite::test_name_of_resource_being_deleted_can_be_taken,
+    fixture = resource_repo_suite::test_listings_with_deleted_resources_run_newest_deletion_first,
     harness = InMemoryResourceRepositoriesHarness
 );
 
@@ -281,7 +297,25 @@ database_transactional_test!(
 
 database_transactional_test!(
     storage = inmem_with_transaction,
-    fixture = resource_repo_suite::test_summarize_resources_counts_deleting,
+    fixture = resource_repo_suite::test_find_resources_due_for_purge,
+    harness = InMemoryResourceRepositoriesHarness
+);
+
+database_transactional_test!(
+    storage = inmem_with_transaction,
+    fixture = resource_repo_suite::test_purge_deadline_is_kept_apart_from_snapshot,
+    harness = InMemoryResourceRepositoriesHarness
+);
+
+database_transactional_test!(
+    storage = inmem_with_transaction,
+    fixture = resource_repo_suite::test_purge_resources,
+    harness = InMemoryResourceRepositoriesHarness
+);
+
+database_transactional_test!(
+    storage = inmem_with_transaction,
+    fixture = resource_repo_suite::test_purging_an_owner_keeps_owner_rows_of_owned_resources,
     harness = InMemoryResourceRepositoriesHarness
 );
 
@@ -322,6 +356,30 @@ database_transactional_test!(
 database_concurrent_transactions_test!(
     storage = inmem,
     fixture = resource_repo_suite::test_rolled_back_create_leaves_no_resource,
+    harness = InMemoryResourceRepositoriesHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_concurrent_transactions_test!(
+    storage = inmem,
+    fixture = resource_repo_suite::test_update_resource_in_concurrent_transactions,
+    harness = InMemoryResourceRepositoriesHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_concurrent_transactions_test!(
+    storage = inmem,
+    fixture = resource_repo_suite::test_touch_after_concurrent_deletion_request,
+    harness = InMemoryResourceRepositoriesHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_concurrent_transactions_test!(
+    storage = inmem,
+    fixture = resource_repo_suite::test_deletion_request_after_concurrent_touch,
     harness = InMemoryResourceRepositoriesHarness
 );
 
@@ -379,14 +437,6 @@ database_transactional_test!(
 
 database_transactional_test!(
     storage = inmem_with_transaction,
-    fixture = resource_repo_suite::test_find_resource_ids_by_schema_and_label_excludes_deleted,
-    harness = InMemoryResourceRepositoriesHarness
-);
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-database_transactional_test!(
-    storage = inmem_with_transaction,
     fixture =
         resource_repo_suite::test_find_resource_ids_by_schema_and_label_excludes_other_accounts,
     harness = InMemoryResourceRepositoriesHarness
@@ -407,6 +457,22 @@ database_transactional_test!(
     storage = inmem_with_transaction,
     fixture =
         resource_repo_suite::test_find_resource_ids_by_schema_and_label_any_account_discriminates,
+    harness = InMemoryResourceRepositoriesHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = inmem_with_transaction,
+    fixture = resource_repo_suite::test_owner_references_round_trip,
+    harness = InMemoryResourceRepositoriesHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = inmem_with_transaction,
+    fixture = resource_repo_suite::test_search_by_owner,
     harness = InMemoryResourceRepositoriesHarness
 );
 

@@ -14,6 +14,7 @@ use crate::{
     ResourceCleanupError,
     ResourceDeletionInProgressError,
     ResourceReconcileError,
+    ResourceSpecImmutableError,
     ResourceStatus,
     ResourceStatusRules,
     StatusConflictOf,
@@ -29,7 +30,9 @@ use crate::{
 /// stale.
 pub trait ManagedResource: DeclarativeResource + ResourceStatusRules {
     type ReconcileError: ResourceReconcileError;
-    type LifecycleError: StatusConflictOf + From<ResourceDeletionInProgressError>;
+    type LifecycleError: StatusConflictOf
+        + From<ResourceDeletionInProgressError>
+        + From<ResourceSpecImmutableError>;
 
     /// A resource being deleted never needs reconciliation.
     fn needs_reconciliation(&self) -> bool {
@@ -49,11 +52,14 @@ pub trait ManagedResource: DeclarativeResource + ResourceStatusRules {
         self.headers().deletion_requested_at.is_some() && self.headers().deleted_at.is_none()
     }
 
+    /// Records `provenance` in the conditions of the `Created` event, next to
+    /// the type's initial conditions
     fn try_create(
         now: DateTime<Utc>,
         id: crate::ResourceID,
         headers: crate::ResourceHeadersInput,
         spec: Self::SpecInput,
+        provenance: &crate::CreationProvenance,
     ) -> Result<Self, Self::LifecycleError>
     where
         Self: Sized;
@@ -75,14 +81,14 @@ pub trait ManagedResource: DeclarativeResource + ResourceStatusRules {
         new_generation: u64,
     ) -> Result<(), Self::LifecycleError>;
 
-    /// Starts the deletion; the resource keeps its name until it completes.
+    /// Starts the deletion; the resource keeps its name, which a new resource
+    /// may take.
     fn try_request_deletion(&mut self, now: DateTime<Utc>) -> Result<(), Self::LifecycleError>
     where
         Self: Sized;
 
-    /// Completes a requested deletion and renames the resource to
-    /// `deleted-<id>`. Fails with an invariant violation if the deletion was
-    /// not requested.
+    /// Completes a requested deletion; the resource keeps its name. Fails with
+    /// an invariant violation if the deletion was not requested.
     fn try_complete_deletion(&mut self, now: DateTime<Utc>) -> Result<(), Self::LifecycleError>
     where
         Self: Sized;

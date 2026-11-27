@@ -90,6 +90,8 @@ CREATE INDEX idx_dataset_entries_owner_id
 CREATE UNIQUE INDEX idx_dataset_entries_owner_id_dataset_name
     ON dataset_entries (owner_id, LOWER(dataset_name));
 
+CREATE UNIQUE INDEX idx_dataset_entries_resource_id ON dataset_entries (resource_id);
+
 CREATE UNIQUE INDEX idx_dataset_key_blocks_by_hash
     ON dataset_key_blocks (dataset_id, block_hash_bin);
 
@@ -198,6 +200,12 @@ CREATE INDEX idx_resource_events_schema_event_id
 CREATE INDEX idx_resource_labels_projection_key_value_resource_id
     ON resource_labels_projection (label_key, label_value, resource_id);
 
+CREATE INDEX idx_resource_owners_projection_owner_id
+    ON resource_owners_projection (owner_id, resource_id);
+
+CREATE INDEX idx_resources_account_schema_name_any_visibility
+    ON resources (account_id, resource_schema, resource_name);
+
 CREATE UNIQUE INDEX idx_resources_account_schema_name_ci
     ON resources (account_id, resource_schema, resource_name)
     WHERE deletion_requested_at IS NULL;
@@ -209,17 +217,30 @@ CREATE INDEX idx_resources_deletion_pending
     ON resources (resource_schema, resource_id)
     WHERE deletion_requested_at IS NOT NULL AND deleted_at IS NULL;
 
+CREATE INDEX idx_resources_deletion_time
+    ON resources (
+        account_id,
+        resource_schema,
+        COALESCE(deleted_at, deletion_requested_at) DESC,
+        updated_at DESC,
+        resource_id DESC
+    )
+    WHERE deletion_requested_at IS NOT NULL;
+
 CREATE INDEX idx_resources_not_reconciled
     ON resources (resource_schema, resource_id)
     WHERE deletion_requested_at IS NULL AND reconciled_generation < generation;
+
+CREATE INDEX idx_resources_purge_at
+    ON resources (purge_at)
+    WHERE purge_at IS NOT NULL;
 
 CREATE INDEX idx_resources_summary_projection
     ON resources (
         account_id,
         resource_schema,
         json_extract(status, '$.phase')
-    )
-    WHERE deleted_at IS NULL;
+    );
 
 CREATE INDEX idx_task_events_task_id ON task_events (task_id);
 
@@ -374,7 +395,7 @@ CREATE TABLE "dataset_entries"
     created_at   timestamptz  NOT NULL,
     kind         VARCHAR(15)  NOT NULL CHECK (kind IN ('root', 'derivative')),
     owner_name   VARCHAR(100) NOT NULL
-);
+, resource_id CHAR(36));
 
 CREATE TABLE dataset_key_blocks (
     dataset_id VARCHAR(100) NOT NULL REFERENCES dataset_entries(dataset_id) ON DELETE CASCADE,
@@ -592,6 +613,16 @@ CREATE TABLE resource_labels_projection (
         FOREIGN KEY (resource_id) REFERENCES resources(resource_id) ON DELETE CASCADE
 );
 
+CREATE TABLE resource_owners_projection (
+    resource_id             CHAR(36) NOT NULL,
+    owner_id                CHAR(36) NOT NULL,
+
+    PRIMARY KEY (resource_id, owner_id),
+
+    CONSTRAINT fk_resource_owners_projection_resource_id
+        FOREIGN KEY (resource_id) REFERENCES resources(resource_id) ON DELETE CASCADE
+);
+
 CREATE TABLE resources (
     resource_id            CHAR(36) PRIMARY KEY NOT NULL,
     account_id             VARCHAR(100) NOT NULL,
@@ -610,7 +641,7 @@ CREATE TABLE resources (
     deleted_at             TIMESTAMPTZ NULL,
     last_event_id          BIGINT NULL
 , status_generation BIGINT NOT NULL DEFAULT 1, deletion_requested_at TIMESTAMPTZ NULL, reconciled_generation INTEGER
-    GENERATED ALWAYS AS (COALESCE(json_extract(status, '$.reconciledGeneration'), 0)) VIRTUAL);
+    GENERATED ALWAYS AS (COALESCE(json_extract(status, '$.reconciledGeneration'), 0)) VIRTUAL, owner_references JSONB, purge_at TIMESTAMPTZ NULL);
 
 CREATE TABLE sqlite_sequence(name,seq);
 

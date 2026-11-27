@@ -18,6 +18,7 @@ pub fn register_dependencies(b: &mut CatalogBuilder) {
     b.add::<SqliteResourceRawEventStore>();
     b.add::<SqliteResourceRepository>();
     b.add::<SqliteResourceLabelProjectionRepository>();
+    b.add::<SqliteResourceOwnerProjectionRepository>();
     b.add::<SqliteResourceControllerStateRepository>();
 }
 

@@ -7,7 +7,9 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+#[macro_use]
 mod declare_resource_crud_dispatcher;
+#[macro_use]
 mod declare_resource_presentation_dispatcher;
 mod resource_crud_dispatcher_helpers;
 mod resource_dispatcher_factory;

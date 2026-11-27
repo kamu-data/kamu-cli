@@ -22,10 +22,10 @@ committed `.sqlx` cache and database-backed tests need the setup first
 - a post-edit pass on `.rs` files, whether an edit or a shell command wrote them (`rustfmt`, then
   checks on the added text), and on `Cargo.toml` files (`cargo sort`, then `taplo fmt`);
 - a session-start contract and a stop-time reminder when `.rs` files changed since the last green
-  `make clippy`.
+  `make clippy`, or when the uncommitted change adds the same Rust line in several places.
 
 A refusal names the rule and the fix. Load skills with the `Skill` tool; a subagent loads its own.
-How the harness is built and tested: [`DEVELOPER.md`](DEVELOPER.md#agent-harness).
+How the harness is built and tested: [`scripts/agents/README.md`](scripts/agents/README.md).
 
 ## Memory
 

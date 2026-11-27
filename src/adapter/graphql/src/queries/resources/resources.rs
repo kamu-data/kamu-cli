@@ -8,7 +8,6 @@
 // by the Apache License, Version 2.0.
 
 use database_common::PaginationOpts;
-use kamu_resources::ResourceVisibility;
 
 use crate::LoggedInGuard;
 use crate::prelude::*;
@@ -21,11 +20,13 @@ use crate::queries::{
     ResourceHandleConnection,
     ResourceInvalidLabelFilterProblem,
     ResourceManifestFormat,
+    ResourceOwnerLookupProblem,
     ResourceOwnerRefInput,
     ResourceRefInput,
     ResourceSummary,
     ResourceTypeDescriptor,
     ResourceUnsupportedSelectorProblem,
+    ResourceVisibility,
     ResourcesSummary,
     SearchResourcesInput,
     SpecViewOptsInput,
@@ -112,10 +113,11 @@ impl Resources {
         #[graphql(default)] opts: SpecViewOptsInput,
         #[graphql(
             default,
-            desc = "Also find resources whose deletion is in progress; a name may then match \
-                    several resources, the live one first"
+            desc = "Which resources to find. A name may match several: the live resource comes \
+                    first, then those being deleted, then the deleted ones. An ID finds a \
+                    resource in any state; only `DELETED_ONLY` hides live ones from it"
         )]
-        include_deleting: bool,
+        visibility: ResourceVisibility,
     ) -> Result<BatchResourcesOutcome> {
         let resource_facade = from_catalog_n!(ctx, dyn kamu_resources_facade::ResourceFacade);
 
@@ -123,7 +125,7 @@ impl Resources {
             .get(
                 into_resource_refs(resource_refs)?,
                 opts.into_spec_view_opts(),
-                ResourceVisibility::with_deleting(include_deleting),
+                visibility.into(),
             )
             .await
         {
@@ -147,18 +149,16 @@ impl Resources {
         resource_refs: Vec<ResourceRefInput>,
         #[graphql(
             default,
-            desc = "Also find resources whose deletion is in progress; a name may then match \
-                    several resources, the live one first"
+            desc = "Which resources to find. A name may match several: the live resource comes \
+                    first, then those being deleted, then the deleted ones. An ID finds a \
+                    resource in any state; only `DELETED_ONLY` hides live ones from it"
         )]
-        include_deleting: bool,
+        visibility: ResourceVisibility,
     ) -> Result<BatchResourceHandlesOutcome> {
         let resource_facade = from_catalog_n!(ctx, dyn kamu_resources_facade::ResourceFacade);
 
         match resource_facade
-            .get_handles(
-                into_resource_refs(resource_refs)?,
-                ResourceVisibility::with_deleting(include_deleting),
-            )
+            .get_handles(into_resource_refs(resource_refs)?, visibility.into())
             .await
         {
             Ok(response) => Ok(BatchResourceHandlesOutcome::Success(response.into())),
@@ -216,6 +216,9 @@ impl Resources {
             Err(kamu_resources_facade::ListResourcesError::InvalidLabelFilter(error)) => {
                 Ok(ResourceListOutcome::InvalidLabelFilter(error.into()))
             }
+            Err(kamu_resources_facade::ListResourcesError::OwnerLookup(problem)) => {
+                Ok(ResourceListOutcome::OwnerLookup(problem.into()))
+            }
             Err(error) => Err(map_list_resources_error(error)),
         }
     }
@@ -260,6 +263,9 @@ impl Resources {
             Err(kamu_resources_facade::ListResourcesError::InvalidLabelFilter(error)) => {
                 Ok(ResourceHandleListOutcome::InvalidLabelFilter(error.into()))
             }
+            Err(kamu_resources_facade::ListResourcesError::OwnerLookup(problem)) => {
+                Ok(ResourceHandleListOutcome::OwnerLookup(problem.into()))
+            }
             Err(error) => Err(map_list_resources_error(error)),
         }
     }
@@ -275,10 +281,11 @@ impl Resources {
         #[graphql(default)] opts: SpecViewOptsInput,
         #[graphql(
             default,
-            desc = "Also find resources whose deletion is in progress; a name may then match \
-                    several resources, the live one first"
+            desc = "Which resources to find. A name may match several: the live resource comes \
+                    first, then those being deleted, then the deleted ones. An ID finds a \
+                    resource in any state; only `DELETED_ONLY` hides live ones from it"
         )]
-        include_deleting: bool,
+        visibility: ResourceVisibility,
     ) -> Result<BatchResourceManifestsOutcome> {
         let resource_facade = from_catalog_n!(ctx, dyn kamu_resources_facade::ResourceFacade);
 
@@ -287,7 +294,7 @@ impl Resources {
                 into_resource_refs(resource_refs)?,
                 format.into(),
                 opts.into_spec_view_opts(),
-                ResourceVisibility::with_deleting(include_deleting),
+                visibility.into(),
             )
             .await
         {
@@ -323,6 +330,7 @@ pub enum ResourceListOutcome {
     UnsupportedSelector(ResourceUnsupportedSelectorProblem),
     AccountResolution(ResourceAccountResolutionProblem),
     InvalidLabelFilter(ResourceInvalidLabelFilterProblem),
+    OwnerLookup(ResourceOwnerLookupProblem),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -334,6 +342,7 @@ pub enum ResourceHandleListOutcome {
     UnsupportedSelector(ResourceUnsupportedSelectorProblem),
     AccountResolution(ResourceAccountResolutionProblem),
     InvalidLabelFilter(ResourceInvalidLabelFilterProblem),
+    OwnerLookup(ResourceOwnerLookupProblem),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -362,6 +371,7 @@ fn map_list_resources_error(error: kamu_resources_facade::ListResourcesError) ->
         E::AccountAccess(error) => map_account_access_error(error),
         E::InvalidLabelFilter(error) => GqlError::gql(error.to_string()),
         E::UnrepresentableScope(error) => GqlError::gql(error.to_string()),
+        error @ E::OwnerLookup(_) => GqlError::gql(error.to_string()),
         E::UnsupportedSelectorField(error) => GqlError::gql(error.to_string()),
         E::RemoteRequest(error) => error.int_err().into(),
         E::Internal(error) => error.into(),

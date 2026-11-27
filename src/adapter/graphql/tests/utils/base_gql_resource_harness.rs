@@ -7,17 +7,15 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_configuration_inmem::{
-    InMemorySecretSetProjectionRepository,
-    InMemoryVariableSetProjectionRepository,
-};
+use background_agent_host::BackgroundWorkFinalizer;
 use kamu_core::TenancyConfig;
 use kamu_resources::{
     MESSAGE_PRODUCER_KAMU_RESOURCE_SERVICE,
     ResourceControllerRuntimeConfig,
     ResourceLifecycleMessage,
+    ResourceRetentionConfig,
 };
-use kamu_resources_services::{BackgroundWorkFinalizer, ResourceControllerRuntimeImpl};
+use kamu_resources_services::ResourceControllerRuntimeImpl;
 use messaging_outbox::{OutboxProvider, register_message_dispatcher};
 use wakeup_listener::{WakeupListenerConfig, WakeupListenerMetrics};
 
@@ -43,8 +41,7 @@ impl BaseGQLResourceHarness {
         let mut b = dill::CatalogBuilder::new_chained(base_catalog);
 
         kamu_resources_inmem::register_dependencies(&mut b);
-        b.add::<InMemoryVariableSetProjectionRepository>()
-            .add::<InMemorySecretSetProjectionRepository>();
+        kamu_configuration_inmem::register_dependencies(&mut b);
 
         kamu_resources_services::register_dependencies(&mut b);
         // For the controller hint hub
@@ -52,6 +49,7 @@ impl BaseGQLResourceHarness {
         kamu_configuration_services::register_dependencies(&mut b);
         b.add::<ResourceControllerRuntimeImpl>()
             .add_value(ResourceControllerRuntimeConfig::default())
+            .add_value(ResourceRetentionConfig::default())
             .add_value(WakeupListenerConfig::local_default());
 
         register_message_dispatcher::<ResourceLifecycleMessage>(
@@ -73,10 +71,10 @@ impl BaseGQLResourceHarness {
         Self::new(base_gql_harness, catalog_base)
     }
 
-    /// See [`BackgroundWorkFinalizer`]. The outbox of this harness is
-    /// immediate, or drops the messages
+    /// Completes the background work the test's writes left behind, such as
+    /// Outbox deliveries
     pub async fn settle(&self) {
-        BackgroundWorkFinalizer::for_immediate_outbox()
+        BackgroundWorkFinalizer::settle_only()
             .finalize(&self.catalog_base)
             .await
             .unwrap();

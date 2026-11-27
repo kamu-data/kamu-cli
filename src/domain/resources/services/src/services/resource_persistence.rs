@@ -19,11 +19,13 @@ use crate::domain::{
     ResourceControllerStateRepository,
     ResourceID,
     ResourceLabelProjectionRepository,
+    ResourceOwnerProjectionRepository,
     ResourcePersistenceError,
     ResourceRepository,
     ResourceSchemaProvider,
     ResourceSnapshotUpdate,
     UpdateResourceError,
+    owner_ids,
     string_label_entries,
 };
 use crate::{
@@ -40,6 +42,7 @@ where
 {
     resource_repository: &'a dyn ResourceRepository,
     label_projection_repository: &'a dyn ResourceLabelProjectionRepository,
+    owner_projection_repository: &'a dyn ResourceOwnerProjectionRepository,
     controller_state_repository: &'a dyn ResourceControllerStateRepository,
     event_store: &'a R::Store,
     extension_schema_registry: &'a ResourceExtensionSchemaRegistry,
@@ -54,6 +57,7 @@ where
     pub fn new(
         resource_repository: &'a dyn ResourceRepository,
         label_projection_repository: &'a dyn ResourceLabelProjectionRepository,
+        owner_projection_repository: &'a dyn ResourceOwnerProjectionRepository,
         controller_state_repository: &'a dyn ResourceControllerStateRepository,
         event_store: &'a R::Store,
         extension_schema_registry: &'a ResourceExtensionSchemaRegistry,
@@ -61,6 +65,7 @@ where
         Self {
             resource_repository,
             label_projection_repository,
+            owner_projection_repository,
             controller_state_repository,
             event_store,
             extension_schema_registry,
@@ -70,6 +75,7 @@ where
     pub async fn create(&self, resource: &mut R) -> Result<(), ResourcePersistenceError> {
         self.validate(resource)?;
         let snapshot = resource.make_resource_snapshot()?;
+        let stored = StoredBeforeSave::of(resource);
 
         match self.resource_repository.create_resource(&snapshot).await {
             Ok(()) => {}
@@ -91,12 +97,12 @@ where
             }
         }
 
-        self.sync_snapshot(resource, None).await
+        self.sync_snapshot(resource, stored).await
     }
 
     pub async fn save(&self, resource: &mut R) -> Result<(), ResourcePersistenceError> {
-        let expected_last_event_id = resource.aggregate().last_stored_event_id();
         self.validate(resource)?;
+        let stored = StoredBeforeSave::of(resource);
         let outdates_controller_outcomes = Self::outdates_controller_outcomes(resource);
 
         match resource.aggregate_mut().save(self.event_store).await {
@@ -109,7 +115,7 @@ where
             }
         }
 
-        self.sync_snapshot(resource, expected_last_event_id).await?;
+        self.sync_snapshot(resource, stored).await?;
 
         if outdates_controller_outcomes {
             self.forget_controller_outcomes(resource.id()).await?;
@@ -127,9 +133,9 @@ where
             .map(|resource| *resource.id())
             .collect::<Vec<_>>();
 
-        let expected_last_event_ids = resources
+        let stored = resources
             .iter()
-            .map(|resource| resource.aggregate().last_stored_event_id())
+            .map(StoredBeforeSave::of)
             .collect::<Vec<_>>();
 
         match event_sourcing::Aggregate::save_multi(resources, self.event_store).await {
@@ -142,8 +148,7 @@ where
             }
         }
 
-        self.sync_snapshots(resources, expected_last_event_ids)
-            .await?;
+        self.sync_snapshots(resources, stored).await?;
 
         for id in &outdated_controller_outcomes {
             self.forget_controller_outcomes(id).await?;
@@ -172,7 +177,7 @@ where
         id: &ResourceID,
     ) -> Result<(), ResourcePersistenceError> {
         self.controller_state_repository
-            .delete_states_for_resource(id)
+            .delete_states_for_resources(std::slice::from_ref(id))
             .await
             .map_err(ResourcePersistenceError::Internal)
     }
@@ -201,24 +206,24 @@ where
     async fn sync_snapshot(
         &self,
         resource: &R,
-        expected_last_event_id: Option<EventID>,
+        stored: StoredBeforeSave,
     ) -> Result<(), ResourcePersistenceError> {
-        self.sync_snapshots(std::slice::from_ref(resource), vec![expected_last_event_id])
+        self.sync_snapshots(std::slice::from_ref(resource), vec![stored])
             .await
     }
 
     async fn sync_snapshots(
         &self,
         resources: &[R],
-        expected_last_event_ids: Vec<Option<EventID>>,
+        stored: Vec<StoredBeforeSave>,
     ) -> Result<(), ResourcePersistenceError> {
         let updates = resources
             .iter()
-            .zip(expected_last_event_ids)
-            .map(|(resource, expected_last_event_id)| {
+            .zip(&stored)
+            .map(|(resource, stored)| {
                 Ok(ResourceSnapshotUpdate {
                     snapshot: resource.make_resource_snapshot()?,
-                    expected_last_event_id,
+                    expected_last_event_id: stored.last_event_id,
                 })
             })
             .collect::<Result<Vec<_>, ResourcePersistenceError>>()?;
@@ -238,22 +243,49 @@ where
             Err(err) => return Err(ResourcePersistenceError::Internal(err.int_err())),
         }
 
-        for update in &updates {
-            // Tombstones keep no live projection rows. Keyed off the snapshot,
-            // not the call site, since every save shares this path.
-            let entries = if update.snapshot.headers.deleted_at.is_some() {
-                Vec::new()
-            } else {
-                string_label_entries(&update.snapshot.headers.labels)
-            };
-
+        for (update, stored) in updates.iter().zip(stored) {
             self.label_projection_repository
-                .replace_entries(&update.snapshot.id, &entries)
+                .replace_entries(
+                    &update.snapshot.id,
+                    &string_label_entries(&update.snapshot.headers.labels),
+                )
                 .await
                 .map_err(ResourcePersistenceError::Internal)?;
+
+            // Rarely change, unlike the statuses most saves are about
+            let owner_ids = owner_ids(update.snapshot.headers.owner_references.as_ref());
+            if owner_ids != stored.owner_ids {
+                self.owner_projection_repository
+                    .replace_owners(&update.snapshot.id, &owner_ids)
+                    .await
+                    .map_err(ResourcePersistenceError::Internal)?;
+            }
         }
 
         Ok(())
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// What is stored of a resource about to be saved, which makes the new state
+/// the stored one
+struct StoredBeforeSave {
+    last_event_id: Option<EventID>,
+    owner_ids: Vec<ResourceID>,
+}
+
+impl StoredBeforeSave {
+    fn of<R: EventSourcedResource>(resource: &R) -> Self {
+        let aggregate = resource.aggregate();
+        Self {
+            last_event_id: aggregate.last_stored_event_id(),
+            owner_ids: owner_ids(
+                aggregate
+                    .stored_state()
+                    .and_then(|stored| stored.headers().owner_references.as_ref()),
+            ),
+        }
     }
 }
 
@@ -272,10 +304,25 @@ macro_rules! declare_resource_persistence_service {
             resource_repository: std::sync::Arc<dyn kamu_resources::ResourceRepository>,
             label_projection_repository:
                 std::sync::Arc<dyn kamu_resources::ResourceLabelProjectionRepository>,
+            owner_projection_repository:
+                std::sync::Arc<dyn kamu_resources::ResourceOwnerProjectionRepository>,
             controller_state_repository:
                 std::sync::Arc<dyn kamu_resources::ResourceControllerStateRepository>,
             event_store: std::sync::Arc<dyn $store>,
             extension_schema_registry: std::sync::Arc<$crate::ResourceExtensionSchemaRegistry>,
+        }
+
+        impl $service {
+            fn helper(&self) -> $crate::ResourcePersistenceServiceHelper<'_, $resource> {
+                $crate::ResourcePersistenceServiceHelper::new(
+                    self.resource_repository.as_ref(),
+                    self.label_projection_repository.as_ref(),
+                    self.owner_projection_repository.as_ref(),
+                    self.controller_state_repository.as_ref(),
+                    self.event_store.as_ref(),
+                    self.extension_schema_registry.as_ref(),
+                )
+            }
         }
 
         #[async_trait::async_trait]
@@ -284,45 +331,21 @@ macro_rules! declare_resource_persistence_service {
                 &self,
                 resource: &mut $resource,
             ) -> Result<(), kamu_resources::ResourcePersistenceError> {
-                let helper = $crate::ResourcePersistenceServiceHelper::<$resource>::new(
-                    self.resource_repository.as_ref(),
-                    self.label_projection_repository.as_ref(),
-                    self.controller_state_repository.as_ref(),
-                    self.event_store.as_ref(),
-                    self.extension_schema_registry.as_ref(),
-                );
-
-                helper.create(resource).await
+                self.helper().create(resource).await
             }
 
             async fn save(
                 &self,
                 resource: &mut $resource,
             ) -> Result<(), kamu_resources::ResourcePersistenceError> {
-                let helper = $crate::ResourcePersistenceServiceHelper::<$resource>::new(
-                    self.resource_repository.as_ref(),
-                    self.label_projection_repository.as_ref(),
-                    self.controller_state_repository.as_ref(),
-                    self.event_store.as_ref(),
-                    self.extension_schema_registry.as_ref(),
-                );
-
-                helper.save(resource).await
+                self.helper().save(resource).await
             }
 
             async fn save_many(
                 &self,
                 resources: &mut [$resource],
             ) -> Result<(), kamu_resources::ResourcePersistenceError> {
-                let helper = $crate::ResourcePersistenceServiceHelper::<$resource>::new(
-                    self.resource_repository.as_ref(),
-                    self.label_projection_repository.as_ref(),
-                    self.controller_state_repository.as_ref(),
-                    self.event_store.as_ref(),
-                    self.extension_schema_registry.as_ref(),
-                );
-
-                helper.save_many(resources).await
+                self.helper().save_many(resources).await
             }
         }
     };

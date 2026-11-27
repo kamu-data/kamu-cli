@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_resources::{ResourceID, TypeUri};
+use kamu_resources::{ResourceID, ResourceRef, ResourceVisibility, TypeUri};
 
 use crate::{ResourceLookupProblem, ResourceSchemaMismatchError};
 
@@ -34,3 +34,20 @@ where
 
     Ok(())
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Which resources the ref may find. Checked on what was read, since a resource
+/// found by its name may have been deleted before the read.
+pub(crate) fn ref_visibility(
+    resource_ref: &ResourceRef,
+    visibility: ResourceVisibility,
+) -> ResourceVisibility {
+    if resource_ref.id.is_some() {
+        visibility.of_ids()
+    } else {
+        visibility
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

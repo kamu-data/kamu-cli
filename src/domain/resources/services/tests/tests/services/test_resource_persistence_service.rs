@@ -16,24 +16,27 @@ use kamu_resources::{
     DeclarativeResource,
     ManagedResource,
     ResourceAggregateLoader,
+    ResourceHeadersInput,
     ResourceID,
     ResourceLabelProjectionRepository,
+    ResourceLabels,
     ResourcePersistenceError,
     ResourcePersistenceService,
     ResourcePhase,
     ResourceRawEventQuery,
     ResourceSchemaProvider,
     ResourceSnapshot,
+    TypeRef,
 };
-use kamu_resources_services::testing::BaseResourceServiceHarness;
-
-use crate::tests::utils::{
+use kamu_resources_services::testing::{
+    BaseResourceServiceHarness,
     TestResource,
     TestResourceReconciler,
     TestResourceSpec,
-    make_fresh_aggregate,
     register_test_resource_resource_service_layer,
 };
+
+use crate::tests::utils::make_fresh_aggregate;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Tests
@@ -68,8 +71,7 @@ async fn test_create_resource_persists_snapshot_and_events() {
 async fn test_create_resource_populates_label_projection() {
     let harness = ResourcePersistenceServiceHarness::new();
 
-    let headers = kamu_resources::ResourceHeadersInputExt::try_new(
-        Some(harness.account_handle.clone().into()),
+    let headers = harness.make_labeled_headers(
         "res-a",
         vec![
             ("env".parse().unwrap(), serde_json::json!("prod")),
@@ -79,18 +81,17 @@ async fn test_create_resource_populates_label_projection() {
                 serde_json::json!({"lat": 1}),
             ),
         ],
-        vec![],
-    )
-    .unwrap();
+    );
 
     let id = kamu_resources::ResourceID::new(uuid::Uuid::new_v4());
-    let mut agg = crate::tests::utils::TestResource::try_create(
+    let mut agg = TestResource::try_create(
         Utc::now(),
         id,
         headers,
         TestResourceSpec {
             value: "res-a".to_string(),
         },
+        &BaseResourceServiceHarness::make_provenance(),
     )
     .unwrap();
 
@@ -113,13 +114,10 @@ async fn test_save_resource_resyncs_label_projection() {
     assert_eq!(harness.label_projection_entries(&id).await, vec![]);
 
     let mut loaded = harness.aggregate_loader().load(&id).await.unwrap();
-    let new_headers = kamu_resources::ResourceHeadersInputExt::try_new(
-        Some(harness.account_handle.clone().into()),
+    let new_headers = harness.make_labeled_headers(
         "res-a",
         vec![("env".parse().unwrap(), serde_json::json!("staging"))],
-        vec![],
-    )
-    .unwrap();
+    );
     let new_generation = loaded.headers().generation + 1;
     loaded
         .try_update_headers(Utc::now(), new_headers, new_generation)
@@ -135,21 +133,16 @@ async fn test_save_resource_resyncs_label_projection() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_completed_deletion_clears_label_projection() {
-    // Stale rows are only invisible today because every query filters
-    // `deleted_at IS NULL`; they would become wrong without that join.
+async fn test_deletion_keeps_label_projection() {
     let harness = ResourcePersistenceServiceHarness::new();
     let (id, mut agg) = make_fresh_aggregate(harness.account_handle.clone(), "res-a");
     harness.persistence_svc().create(&mut agg).await.unwrap();
 
     let mut loaded = harness.aggregate_loader().load(&id).await.unwrap();
-    let new_headers = kamu_resources::ResourceHeadersInputExt::try_new(
-        Some(harness.account_handle.clone().into()),
+    let new_headers = harness.make_labeled_headers(
         "res-a",
         vec![("env".parse().unwrap(), serde_json::json!("staging"))],
-        vec![],
-    )
-    .unwrap();
+    );
     let new_generation = loaded.headers().generation + 1;
     loaded
         .try_update_headers(Utc::now(), new_headers, new_generation)
@@ -179,8 +172,8 @@ async fn test_completed_deletion_clears_label_projection() {
 
     assert_eq!(
         harness.label_projection_entries(&id).await,
-        Vec::<(String, String)>::new(),
-        "completing the deletion must clear the projection rows"
+        vec![("env".to_string(), "staging".to_string())],
+        "a deleted resource keeps its projection rows"
     );
 }
 
@@ -255,7 +248,7 @@ async fn test_requested_deletion_keeps_resource_live() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_completed_deletion_hides_resource() {
+async fn test_completed_deletion_is_stored_in_snapshot() {
     let harness = ResourcePersistenceServiceHarness::new();
     let (id, mut agg) = make_fresh_aggregate(harness.account_handle.clone(), "res-a");
     harness.persistence_svc().create(&mut agg).await.unwrap();
@@ -269,11 +262,9 @@ async fn test_completed_deletion_hides_resource() {
     assert_eq!(reloaded.headers().deleted_at, Some(now));
     assert_eq!(reloaded.status().phase, ResourcePhase::Deleted);
 
-    // Deleted snapshots are hidden from live lookups — finding None is correct
-    assert!(
-        harness.snapshot_not_found(&id).await,
-        "deleted resource must not appear in live snapshot lookup"
-    );
+    let snapshot = harness.find_snapshot(&id).await;
+    assert_eq!(snapshot.headers.deleted_at, Some(now));
+    assert_eq!(snapshot.status.unwrap().phase, ResourcePhase::Deleted);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -394,6 +385,19 @@ impl ResourcePersistenceServiceHarness {
         }
     }
 
+    fn make_labeled_headers(
+        &self,
+        name: &str,
+        labels: Vec<(TypeRef, serde_json::Value)>,
+    ) -> ResourceHeadersInput {
+        let mut headers =
+            BaseResourceServiceHarness::make_headers_input(self.account_handle.clone(), name);
+        headers.labels = Some(ResourceLabels {
+            entries: labels.into_iter().collect(),
+        });
+        headers
+    }
+
     fn persistence_svc(&self) -> Arc<dyn ResourcePersistenceService<TestResource>> {
         self.catalog.get_one().unwrap()
     }
@@ -421,17 +425,6 @@ impl ResourcePersistenceServiceHarness {
             .await
             .unwrap()
             .expect("snapshot must exist")
-    }
-
-    async fn snapshot_not_found(&self, id: &ResourceID) -> bool {
-        self.resource_repo()
-            .find_resource_snapshot(&ResourceRawEventQuery {
-                schema: TestResource::type_uri().cheap_clone(),
-                id: *id,
-            })
-            .await
-            .unwrap()
-            .is_none()
     }
 
     async fn label_projection_entries(&self, id: &ResourceID) -> Vec<(String, String)> {

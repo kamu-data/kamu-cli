@@ -17,37 +17,32 @@ use kamu_resources::{
     ApplyResourcePlanningDecision,
     ApplyResourcePrecondition,
     ApplyResourceUseCaseError,
+    ResourceName,
     ResourcePhase,
 };
 use kamu_resources_services::testing::{
     BaseResourceServiceHarness,
     BaseResourceServiceHarnessOpts,
+    TestResource,
+    TestResourceSpec,
 };
 use messaging_outbox::OutboxProvider;
 
-use crate::tests::utils::{
-    SanitizerKind,
-    ServiceLayerTestHarness,
-    ServiceLayerTestHarnessOpts,
-    TestResourceSpec,
-};
+use crate::tests::utils::{ServiceLayerTestHarness, ServiceLayerTestHarnessOpts, SpecPreApplyKind};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Tests
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// The planner and executor are each tested in isolation in their own test
-// modules. Here we only test behaviour that is exclusive to the use-case layer:
-// a basic end-to-end wiring smoke test, sanitizer integration (all code-paths),
-// the boundary where a sanitizer produces an invalid spec, and preconditions,
-// which span both.
+// Only what an apply through the use case adds to the runner, planner and
+// executor, which have suites of their own
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
 async fn test_apply_end_to_end_create_and_retrieve() {
     // Smoke test: verifies planner → executor → persistence wiring is correct.
-    // No sanitizer; just confirms the resource is created and retrievable.
+    // No pre-apply hook; just confirms the resource is created and retrievable.
     let harness = ServiceLayerTestHarness::new();
     let account_handle = odf::ResourceOwnerHandle::new_test("test-owner");
 
@@ -79,9 +74,9 @@ async fn test_apply_end_to_end_create_and_retrieve() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_sanitizer_modifies_spec_on_create() {
+async fn test_spec_pre_apply_modifies_spec_on_create() {
     let harness = ServiceLayerTestHarness::new_with_opts(ServiceLayerTestHarnessOpts {
-        sanitizer: SanitizerKind::Appending,
+        spec_pre_apply: SpecPreApplyKind::Appending,
         ..Default::default()
     });
     let account_handle = odf::ResourceOwnerHandle::new_test("test-owner");
@@ -95,20 +90,20 @@ async fn test_sanitizer_modifies_spec_on_create() {
     let result = decision.expect_applied();
     assert_eq!(result.outcome, ApplyResourceOutcome::Created);
 
-    // The sanitizer appends "-sanitized"; the persisted spec must reflect that.
+    // The hook appends "-prepared"; the persisted spec must reflect that.
     let snapshot = harness.get_snapshot_by_id(&result.id).await.unwrap();
     pretty_assertions::assert_eq!(
         snapshot.spec,
-        serde_json::json!({ "value": "original-sanitized" })
+        serde_json::json!({ "value": "original-prepared" })
     );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_sanitizer_receives_current_spec_on_update() {
+async fn test_spec_pre_apply_modifies_spec_on_update() {
     let harness = ServiceLayerTestHarness::new_with_opts(ServiceLayerTestHarnessOpts {
-        sanitizer: SanitizerKind::Appending,
+        spec_pre_apply: SpecPreApplyKind::Appending,
         ..Default::default()
     });
     let account_handle = odf::ResourceOwnerHandle::new_test("test-owner");
@@ -116,10 +111,10 @@ async fn test_sanitizer_receives_current_spec_on_update() {
     let (id, initial_snapshot) = harness
         .apply_and_assert_snapshot(&account_handle, "res-a")
         .await;
-    // Sanitizer appends "-sanitized" even during initial apply
+    // The hook appends "-prepared" even during initial apply
     pretty_assertions::assert_eq!(
         initial_snapshot.spec,
-        serde_json::json!({ "value": "res-a-sanitized" })
+        serde_json::json!({ "value": "res-a-prepared" })
     );
 
     let params = ApplyResourceParams {
@@ -137,18 +132,18 @@ async fn test_sanitizer_receives_current_spec_on_update() {
     let snapshot = harness.get_snapshot_by_id(&id).await.unwrap();
     pretty_assertions::assert_eq!(
         snapshot.spec,
-        serde_json::json!({ "value": "updated-sanitized" })
+        serde_json::json!({ "value": "updated-prepared" })
     );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_sanitizer_modifies_spec_in_plan() {
-    // plan() must also run sanitize_params() — the returned plan's state must
-    // reflect the sanitized spec, not the raw input.
+async fn test_spec_pre_apply_modifies_spec_in_plan() {
+    // plan() must also run the hook — the returned plan's state must
+    // reflect the prepared spec, not the raw input.
     let harness = ServiceLayerTestHarness::new_with_opts(ServiceLayerTestHarnessOpts {
-        sanitizer: SanitizerKind::Appending,
+        spec_pre_apply: SpecPreApplyKind::Appending,
         ..Default::default()
     });
     let account_handle = odf::ResourceOwnerHandle::new_test("test-owner");
@@ -163,14 +158,14 @@ async fn test_sanitizer_modifies_spec_in_plan() {
         decision,
         ApplyResourcePlanningDecision::Planned(ref plan)
             if plan.action == ApplyResourceAction::Create
-            && plan.state.spec.value == "original-sanitized"
+            && plan.state.spec.value == "original-prepared"
     );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_no_sanitizer_passes_spec_unchanged() {
+async fn test_no_spec_pre_apply_passes_spec_unchanged() {
     let harness = ServiceLayerTestHarness::new();
     let account_handle = odf::ResourceOwnerHandle::new_test("test-owner");
 
@@ -189,11 +184,11 @@ async fn test_no_sanitizer_passes_spec_unchanged() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_apply_rejected_when_sanitized_spec_fails_validation() {
-    // A sanitizer that clears the value produces an empty string, which fails
+async fn test_apply_rejected_when_prepared_spec_fails_validation() {
+    // A hook that clears the value produces an empty string, which fails
     // TestResourceSpec validation → the use case must return Rejected, not panic.
     let harness = ServiceLayerTestHarness::new_with_opts(ServiceLayerTestHarnessOpts {
-        sanitizer: SanitizerKind::Clearing,
+        spec_pre_apply: SpecPreApplyKind::Clearing,
         ..Default::default()
     });
 
@@ -351,6 +346,37 @@ async fn test_apply_with_precondition() {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_apply_without_name_creates_a_resource_each_time() {
+    // With a pre-apply hook, for which the resource to update is looked for too
+    let harness = ServiceLayerTestHarness::new_with_opts(ServiceLayerTestHarnessOpts {
+        spec_pre_apply: SpecPreApplyKind::Appending,
+        ..Default::default()
+    });
+    let account_handle = odf::ResourceOwnerHandle::new_test("test-owner");
+
+    let mut applied = Vec::new();
+    for _ in 0..2 {
+        let result = harness
+            .apply_test_uc()
+            .apply(make_nameless_params(&account_handle, "same"))
+            .await
+            .unwrap()
+            .expect_applied();
+        assert_eq!(result.outcome, ApplyResourceOutcome::Created);
+        assert_generated_name(&result.state.headers.name, "plain-");
+
+        let snapshot = harness.get_snapshot_by_id(&result.id).await.unwrap();
+        assert_eq!(snapshot.headers.name, result.state.headers.name);
+        applied.push(result);
+    }
+
+    assert_ne!(applied[0].id, applied[1].id);
+    assert_ne!(applied[0].state.headers.name, applied[1].state.headers.name);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Helpers
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -358,14 +384,45 @@ fn make_params(
     account_handle: &odf::ResourceOwnerHandle,
     name: &str,
     value: &str,
-) -> ApplyResourceParams<crate::tests::utils::TestResource> {
-    ApplyResourceParams {
-        id: None,
-        headers: BaseResourceServiceHarness::make_headers_input(account_handle.clone(), name),
-        spec: TestResourceSpec {
+) -> ApplyResourceParams<TestResource> {
+    BaseResourceServiceHarness::make_apply_params(
+        account_handle.clone(),
+        Some(name),
+        TestResourceSpec {
             value: value.to_string(),
         },
-    }
+    )
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+fn make_nameless_params(
+    account_handle: &odf::ResourceOwnerHandle,
+    value: &str,
+) -> ApplyResourceParams<TestResource> {
+    BaseResourceServiceHarness::make_apply_params(
+        account_handle.clone(),
+        None,
+        TestResourceSpec {
+            value: value.to_string(),
+        },
+    )
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+fn assert_generated_name(name: &ResourceName, prefix: &str) {
+    let suffix = name
+        .as_str()
+        .strip_prefix(prefix)
+        .unwrap_or_else(|| panic!("'{name}' must start with '{prefix}'"));
+    assert_eq!(suffix.len(), 6, "{name}");
+    assert!(
+        suffix
+            .chars()
+            .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit()),
+        "{name}"
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -10,7 +10,13 @@
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
-use background_agent_host::{BackgroundAgent, CancellationToken};
+use background_agent_host::{
+    BackgroundAgent,
+    BackgroundWorkDrain,
+    BackgroundWorkDrainOutcome,
+    BackgroundWorkDrainSession,
+    CancellationToken,
+};
 use dill::{CatalogWeakRef, Singleton, component, interface, scope};
 use internal_error::{InternalError, ResultIntoInternal};
 use time_source::SystemTimeSource;
@@ -57,6 +63,7 @@ pub struct ResourceControllerRuntimeImpl {
 #[component(pub)]
 #[interface(dyn ResourceControllerRuntime)]
 #[interface(dyn BackgroundAgent)]
+#[interface(dyn BackgroundWorkDrain)]
 #[scope(Singleton)]
 impl ResourceControllerRuntimeImpl {
     pub fn new(
@@ -174,6 +181,31 @@ impl ResourceControllerRuntime for ResourceControllerRuntimeImpl {
         Ok(Box::new(ResourceControllerDrainSessionImpl::new(
             self.build_loops()?,
         )))
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl BackgroundWorkDrain for ResourceControllerRuntimeImpl {
+    fn new_drain_session(&self) -> Result<Box<dyn BackgroundWorkDrainSession + '_>, InternalError> {
+        Ok(Box::new(ControllerBackgroundWorkDrainSession(
+            ResourceControllerRuntime::new_drain_session(self)?,
+        )))
+    }
+}
+
+/// Drains every controller on each drain; idle while no drain of the
+/// controllers, here or in the agent, did any work
+struct ControllerBackgroundWorkDrainSession(Box<dyn ResourceControllerDrainSession>);
+
+#[async_trait::async_trait]
+impl BackgroundWorkDrainSession for ControllerBackgroundWorkDrainSession {
+    async fn drain(&mut self) -> Result<BackgroundWorkDrainOutcome, InternalError> {
+        Ok(if self.0.drain_due_resources().await?.is_idle() {
+            BackgroundWorkDrainOutcome::Idle
+        } else {
+            BackgroundWorkDrainOutcome::Worked
+        })
     }
 }
 

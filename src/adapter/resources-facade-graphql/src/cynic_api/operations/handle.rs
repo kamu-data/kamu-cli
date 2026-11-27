@@ -16,7 +16,7 @@ use crate::cynic_api::fragments::{
     ResourceHandle,
     ResourceUnsupportedSelectorProblem,
 };
-use crate::cynic_api::inputs::{ResourceRefInput, resource_ref_inputs};
+use crate::cynic_api::inputs::{ResourceRefInput, ResourceVisibilityInput, resource_ref_inputs};
 use crate::cynic_api::schema;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -30,7 +30,7 @@ pub(crate) struct GetResourceHandlesQuery {
 #[derive(cynic::QueryFragment, Debug, Clone)]
 #[cynic(graphql_type = "Resources", variables = "ResourceHandleRefsVariables")]
 pub(crate) struct ResourceHandlesResources {
-    #[arguments(resourceRefs: $resource_refs, includeDeleting: $include_deleting)]
+    #[arguments(resourceRefs: $resource_refs, visibility: $visibility)]
     pub handles_by_refs: BatchResourceHandlesOutcome,
 }
 
@@ -60,14 +60,14 @@ pub(crate) struct BatchResourceHandleSuccess {
 #[derive(cynic::QueryVariables, Debug, Clone)]
 pub(crate) struct ResourceHandleRefsVariables {
     pub resource_refs: Vec<ResourceRefInput>,
-    pub include_deleting: bool,
+    pub visibility: ResourceVisibilityInput,
 }
 
 impl ResourceHandleRefsVariables {
     pub(crate) fn new(resource_refs: &[ResourceRef], visibility: ResourceVisibility) -> Self {
         Self {
             resource_refs: resource_ref_inputs(resource_refs),
-            include_deleting: visibility.includes_deleting(),
+            visibility: visibility.into(),
         }
     }
 }

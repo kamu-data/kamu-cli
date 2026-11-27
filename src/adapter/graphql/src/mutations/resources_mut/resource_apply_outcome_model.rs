@@ -50,7 +50,10 @@ pub struct ResourceInvalidHeaderProblem {
 
 /// Kind of resource header validation failure
 #[derive(Enum, Debug, Clone, Copy, PartialEq, Eq)]
+#[graphql(remote = "kamu_resources_facade::ResourceHeadersValidationProblemCode")]
 pub enum ResourceHeaderValidationProblemCode {
+    /// Resource name is omitted, and the resource type does not generate names
+    MissingName,
     /// Resource name is empty
     EmptyName,
     /// Resource name exceeds the maximum length
@@ -65,6 +68,10 @@ pub enum ResourceHeaderValidationProblemCode {
     TooManyAnnotations,
     /// The same annotation key appears more than once
     DuplicateAnnotationKey,
+    /// Number of owner references exceeds the maximum
+    TooManyOwnerReferences,
+    /// An owner reference has an unsupported form or an unknown type
+    InvalidOwnerReference,
     /// A label or annotation key could not be resolved to a registered
     /// extension schema, or its value is invalid for it
     ResourceExtensionSchema,
@@ -78,23 +85,8 @@ impl From<kamu_resources::ResourceHeadersValidationError> for ResourceInvalidHea
 
 impl From<kamu_resources_facade::ResourceInvalidHeadersError> for ResourceInvalidHeaderProblem {
     fn from(value: kamu_resources_facade::ResourceInvalidHeadersError) -> Self {
-        use kamu_resources_facade::ResourceHeadersValidationProblemCode as C;
-        let code = match value.code {
-            C::EmptyName => ResourceHeaderValidationProblemCode::EmptyName,
-            C::NameTooLong => ResourceHeaderValidationProblemCode::NameTooLong,
-            C::InvalidName => ResourceHeaderValidationProblemCode::InvalidName,
-            C::TooManyLabels => ResourceHeaderValidationProblemCode::TooManyLabels,
-            C::DuplicateLabelKey => ResourceHeaderValidationProblemCode::DuplicateLabelKey,
-            C::TooManyAnnotations => ResourceHeaderValidationProblemCode::TooManyAnnotations,
-            C::DuplicateAnnotationKey => {
-                ResourceHeaderValidationProblemCode::DuplicateAnnotationKey
-            }
-            C::ResourceExtensionSchema => {
-                ResourceHeaderValidationProblemCode::ResourceExtensionSchema
-            }
-        };
         Self {
-            code,
+            code: value.code.into(),
             message: value.message,
         }
     }
@@ -133,6 +125,7 @@ impl TryFrom<kamu_resources::ApplyManifestPlanningDecision> for ResourceApplyOut
                 Self::Success(ResourceApplySuccess {
                     operation: plan.outcome.into(),
                     resource: plan.resource.into(),
+                    name_pending: plan.name_pending,
                     before: documents.before,
                     after: documents.after,
                     warnings: plan.warnings.into_iter().map(Into::into).collect(),
@@ -158,6 +151,7 @@ impl TryFrom<kamu_resources::ApplyManifestApplicationDecision> for ResourceApply
                 Self::Success(ResourceApplySuccess {
                     operation: result.outcome.into(),
                     resource: result.resource.into(),
+                    name_pending: false,
                     before: documents.before,
                     after: documents.after,
                     warnings: result.warnings.into_iter().map(Into::into).collect(),
@@ -180,13 +174,16 @@ pub struct ResourceApplySuccess {
     pub operation: ResourceApplyOperation,
     /// Resource as it is (or would be, on a dry run) after the apply
     pub resource: Resource,
+    /// Whether the name in `resource` is a placeholder, as on a dry run of a
+    /// manifest without a name: the apply generates it
+    pub name_pending: bool,
 
     /// Canonical manifest before the apply. Null **iff** the resource is being
     /// created.
     pub before: Option<serde_json::Value>,
 
     /// Canonical manifest the apply produced (or would produce). Always present
-    /// on an accepted apply.
+    /// on an accepted apply, without the name while `namePending`.
     pub after: serde_json::Value,
 
     /// Non-fatal issues found in the manifest

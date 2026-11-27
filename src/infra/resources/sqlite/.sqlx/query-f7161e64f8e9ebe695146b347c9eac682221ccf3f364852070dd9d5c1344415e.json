@@ -1,0 +1,50 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            SELECT\n                resource_id AS \"id: uuid::Uuid\",\n                resource_schema,\n                purge_at AS \"purge_at!: DateTime<Utc>\"\n            FROM resources\n            WHERE purge_at IS NOT NULL AND purge_at <= $1\n            ORDER BY purge_at ASC, resource_id ASC\n            LIMIT $2\n            ",
+  "describe": {
+    "columns": [
+      {
+        "name": "id: uuid::Uuid",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "resources",
+            "name": "resource_id"
+          }
+        }
+      },
+      {
+        "name": "resource_schema",
+        "ordinal": 1,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "resources",
+            "name": "resource_schema"
+          }
+        }
+      },
+      {
+        "name": "purge_at!: DateTime<Utc>",
+        "ordinal": 2,
+        "type_info": "Null",
+        "origin": {
+          "Table": {
+            "table": "resources",
+            "name": "purge_at"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false,
+      false,
+      true
+    ]
+  },
+  "hash": "f7161e64f8e9ebe695146b347c9eac682221ccf3f364852070dd9d5c1344415e"
+}

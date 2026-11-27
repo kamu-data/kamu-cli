@@ -15,12 +15,20 @@ use crate::{
     ApplyManifestApplicationDecision,
     ApplyManifestPlanningDecision,
     ApplyManifestRejection,
+    ApplyResourceAccessCheck,
+    ApplyResourceAccountSource,
+    ApplyResourceHeaders,
     ApplyResourcePrecondition,
     ApplyResourceUseCaseError,
+    CreationProvenance,
     RequestResourcesDeletionError,
-    ResourceHeadersInput,
+    ResourceAccountAccess,
+    ResourceAccountOperation,
+    ResourceHeadersValidationError,
     ResourceID,
     ResourceIDNotFoundError,
+    ResourceListScope,
+    ResourceOperationError,
     ResourceTypeMismatchError,
     ResourceTypeSelectorRaw,
     TypeUri,
@@ -56,6 +64,33 @@ pub trait ResourceCrudDispatcher: Send + Sync {
         &self,
         request: ResourceCrudDispatcherDeletionRequest,
     ) -> Result<(), RequestResourcesDeletionCrudDispatcherError>;
+
+    /// Decides on `account` before any resource is loaded, by the type's
+    /// [`crate::ResourceOperationGuard::check_account`] or the default rule
+    async fn check_account_access(
+        &self,
+        principal: &odf::metadata::auth::PrincipalHandle,
+        account: &odf::ResourceOwnerHandle,
+        operation: ResourceAccountOperation,
+    ) -> Result<ResourceAccountAccess, ResourceOperationError>;
+
+    /// Checks `operation` on each of the resources, all of the type and in
+    /// `account`, each named once. One result per ID, in order
+    async fn check_resource_operations(
+        &self,
+        principal: &odf::metadata::auth::PrincipalHandle,
+        account: &odf::ResourceOwnerHandle,
+        operation: ResourceAccountOperation,
+        ids: &[ResourceID],
+    ) -> Result<Vec<Result<(), ResourceOperationError>>, InternalError>;
+
+    /// Checks a search of `account` by one selector of the type
+    async fn check_list(
+        &self,
+        principal: &odf::metadata::auth::PrincipalHandle,
+        account: &odf::ResourceOwnerHandle,
+        scope: &ResourceListScope,
+    ) -> Result<(), ResourceOperationError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -63,8 +98,12 @@ pub trait ResourceCrudDispatcher: Send + Sync {
 #[derive(Debug, Clone)]
 pub struct ResourceCrudDispatcherApplyRequest {
     pub id: Option<ResourceID>,
-    pub headers: ResourceHeadersInput,
+    pub headers: ApplyResourceHeaders,
+    pub account_source: ApplyResourceAccountSource,
+    pub access_check: ApplyResourceAccessCheck,
     pub spec: serde_json::Value,
+    /// Recorded when the apply creates the resource; ignored by an update
+    pub provenance: CreationProvenance,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -79,6 +118,9 @@ pub struct ResourceCrudDispatcherDeletionRequest {
 
 #[derive(Debug, Error)]
 pub enum ApplyResourceCrudDispatcherError {
+    #[error(transparent)]
+    InvalidHeaders(#[from] ResourceHeadersValidationError),
+
     #[error("Invalid spec for resource {schema}: {message}")]
     InvalidSpec { schema: TypeUri, message: String },
 
@@ -90,6 +132,9 @@ pub enum ApplyResourceCrudDispatcherError {
 
     #[error(transparent)]
     ConcurrentModification(#[from] ConcurrentModificationError),
+
+    #[error(transparent)]
+    Access(#[from] odf::AccessError),
 
     #[error(transparent)]
     Internal(#[from] InternalError),
@@ -143,6 +188,7 @@ where
 {
     fn from(err: ApplyResourceUseCaseError<R>) -> Self {
         match err {
+            ApplyResourceUseCaseError::InvalidHeaders(err) => Self::InvalidHeaders(err),
             ApplyResourceUseCaseError::LoadFailed(err) => {
                 Self::Internal(format!("{err}").int_err())
             }
@@ -151,6 +197,7 @@ where
             ApplyResourceUseCaseError::ConcurrentModification(err) => {
                 Self::ConcurrentModification(err)
             }
+            ApplyResourceUseCaseError::Access(err) => Self::Access(err),
             ApplyResourceUseCaseError::Internal(err) => Self::Internal(err),
         }
     }

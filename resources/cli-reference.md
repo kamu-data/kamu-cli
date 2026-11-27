@@ -841,7 +841,10 @@ Returns manifest representation of a resource
   Default value: `100`
 * `--unbounded` — Disable the limit for expanding selectors
 * `-l`, `--label <LABEL_SELECTOR>` — Narrow the selection to resources carrying all of the given labels, as `key=value` pairs (repeatable, or comma-separated)
+* `--owner <OWNER>` — Narrow the selection to resources owned by the given one: `type/name`, `type/<id>` or `<id>`. A name must be that of a live resource; an ID also finds the resources of an owner that is gone
 * `--include-deleting` — Also include resources whose deletion is in progress
+* `--include-deleted` — Also include resources whose deletion is in progress or completed
+* `--deleted` — Include only resources whose deletion is in progress or completed
 
 Returns the current state of one or more resources as YAML or JSON.
 
@@ -1108,7 +1111,10 @@ List datasets or resources
 * `--max-results <N>` — Maximum number of results to list
 * `--unbounded` — Disable the result limit
 * `-l`, `--label <LABEL_SELECTOR>` — Narrow the listing to resources carrying all of the given labels, as `key=value` pairs (repeatable, or comma-separated)
+* `--owner <OWNER>` — Narrow the listing to resources owned by the given one: `type/name`, `type/<id>` or `<id>`. A name must be that of a live resource; an ID also finds the resources of an owner that is gone
 * `--include-deleting` — Also include resources whose deletion is in progress
+* `--include-deleted` — Also include resources whose deletion is in progress or completed
+* `--deleted` — Include only resources whose deletion is in progress or completed
 
 **Examples:**
 
@@ -1156,6 +1162,10 @@ To list only resources carrying a label:
 To require several labels at once:
 
     kamu list variablesets -l environment=production,tier=backend
+
+To list the resources of any type that a resource owns:
+
+    kamu list '%' --owner variablesets/app-config
 
 To get a machine-readable list of all resources:
 

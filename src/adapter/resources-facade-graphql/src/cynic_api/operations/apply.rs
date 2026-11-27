@@ -57,6 +57,7 @@ pub(crate) enum ResourceApplyOutcome {
 pub(crate) struct ResourceApplySuccess {
     pub operation: ResourceApplyOperation,
     pub resource: Resource,
+    pub name_pending: bool,
     pub before: Option<serde_json::Value>,
     pub after: serde_json::Value,
     pub warnings: Vec<ResourceApplyWarning>,
@@ -157,6 +158,7 @@ pub(crate) struct ResourceInvalidHeaderProblem {
 
 #[derive(cynic::Enum, Debug, Clone, Copy)]
 pub(crate) enum ResourceHeaderValidationProblemCode {
+    MissingName,
     EmptyName,
     NameTooLong,
     InvalidName,
@@ -164,6 +166,8 @@ pub(crate) enum ResourceHeaderValidationProblemCode {
     DuplicateLabelKey,
     TooManyAnnotations,
     DuplicateAnnotationKey,
+    TooManyOwnerReferences,
+    InvalidOwnerReference,
     ResourceExtensionSchema,
 }
 
@@ -173,6 +177,7 @@ impl From<ResourceHeaderValidationProblemCode>
     fn from(value: ResourceHeaderValidationProblemCode) -> Self {
         use ResourceHeaderValidationProblemCode as C;
         match value {
+            C::MissingName => Self::MissingName,
             C::EmptyName => Self::EmptyName,
             C::NameTooLong => Self::NameTooLong,
             C::InvalidName => Self::InvalidName,
@@ -180,6 +185,8 @@ impl From<ResourceHeaderValidationProblemCode>
             C::DuplicateLabelKey => Self::DuplicateLabelKey,
             C::TooManyAnnotations => Self::TooManyAnnotations,
             C::DuplicateAnnotationKey => Self::DuplicateAnnotationKey,
+            C::TooManyOwnerReferences => Self::TooManyOwnerReferences,
+            C::InvalidOwnerReference => Self::InvalidOwnerReference,
             C::ResourceExtensionSchema => Self::ResourceExtensionSchema,
         }
     }
@@ -236,6 +243,7 @@ impl ResourceApplyOutcome {
                     reconciliation_required: false,
                     executable: true,
                     warnings,
+                    name_pending: success.name_pending,
                     // The server already canonicalized; there is no resource
                     // pair on this side to rebuild the documents from.
                     documents: domain::ApplyManifestDocumentSource::Canonical(documents),

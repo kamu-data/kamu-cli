@@ -26,10 +26,22 @@ macro_rules! declare_resource_crud_dispatcher {
         pub struct $dispatcher {
             apply_resource_use_case:
                 std::sync::Arc<dyn kamu_resources::ApplyResourceUseCase<$resource>>,
-            generic_resource_query_service:
-                std::sync::Arc<dyn kamu_resources::GenericResourceQueryService>,
             request_resources_deletion_use_case:
                 std::sync::Arc<dyn kamu_resources::RequestResourcesDeletionUseCase<$resource>>,
+            resource_aggregate_loader:
+                std::sync::Arc<dyn kamu_resources::ResourceAggregateLoader<$resource>>,
+            maybe_resource_operation_guard:
+                Option<std::sync::Arc<dyn kamu_resources::ResourceOperationGuard<$resource>>>,
+            default_resource_operation_guard: std::sync::Arc<$crate::DefaultResourceOperationGuard>,
+        }
+
+        impl $dispatcher {
+            fn operation_guard(&self) -> &dyn kamu_resources::ResourceOperationGuard<$resource> {
+                $crate::DefaultResourceOperationGuard::or_default(
+                    self.maybe_resource_operation_guard.as_deref(),
+                    self.default_resource_operation_guard.as_ref(),
+                )
+            }
         }
 
         #[async_trait::async_trait]
@@ -55,16 +67,11 @@ macro_rules! declare_resource_crud_dispatcher {
                 kamu_resources::ApplyManifestPlanningDecision,
                 $crate::ApplyResourceCrudDispatcherError,
             > {
-                let schema = <$resource as kamu_resources::ResourceSchemaProvider>::type_uri();
-                let spec = $crate::decode_resource_spec::<$resource>(schema, request.spec)?;
+                let params = $crate::decode_apply_resource_params::<$resource>(request)?;
 
                 let plan = self
                     .apply_resource_use_case
-                    .plan(kamu_resources::ApplyResourceParams {
-                        id: request.id,
-                        headers: request.headers,
-                        spec,
-                    })
+                    .plan(params)
                     .await
                     .map_err(kamu_resources::ApplyResourceCrudDispatcherError::from)?;
 
@@ -80,19 +87,11 @@ macro_rules! declare_resource_crud_dispatcher {
                 kamu_resources::ApplyManifestApplicationDecision,
                 $crate::ApplyResourceCrudDispatcherError,
             > {
-                let schema = <$resource as kamu_resources::ResourceSchemaProvider>::type_uri();
-                let spec = $crate::decode_resource_spec::<$resource>(schema, request.spec)?;
+                let params = $crate::decode_apply_resource_params::<$resource>(request)?;
 
                 let result = self
                     .apply_resource_use_case
-                    .apply_with_precondition(
-                        kamu_resources::ApplyResourceParams {
-                            id: request.id,
-                            headers: request.headers,
-                            spec,
-                        },
-                        precondition,
-                    )
+                    .apply_with_precondition(params, precondition)
                     .await
                     .map_err(kamu_resources::ApplyResourceCrudDispatcherError::from)?;
 
@@ -108,6 +107,56 @@ macro_rules! declare_resource_crud_dispatcher {
                     .execute(request.account_id, request.ids)
                     .await
                     .map_err(kamu_resources::RequestResourcesDeletionCrudDispatcherError::from)
+            }
+
+            async fn check_account_access(
+                &self,
+                principal: &odf::metadata::auth::PrincipalHandle,
+                account: &odf::ResourceOwnerHandle,
+                operation: kamu_resources::ResourceAccountOperation,
+            ) -> Result<kamu_resources::ResourceAccountAccess, kamu_resources::ResourceOperationError>
+            {
+                self.operation_guard()
+                    .check_account(principal, account, operation)
+                    .await
+            }
+
+            async fn check_resource_operations(
+                &self,
+                principal: &odf::metadata::auth::PrincipalHandle,
+                account: &odf::ResourceOwnerHandle,
+                operation: kamu_resources::ResourceAccountOperation,
+                ids: &[kamu_resources::ResourceID],
+            ) -> Result<
+                Vec<Result<(), kamu_resources::ResourceOperationError>>,
+                internal_error::InternalError,
+            > {
+                $crate::check_resource_operations(
+                    self.resource_aggregate_loader.as_ref(),
+                    self.operation_guard(),
+                    principal,
+                    account,
+                    operation,
+                    ids,
+                )
+                .await
+            }
+
+            async fn check_list(
+                &self,
+                principal: &odf::metadata::auth::PrincipalHandle,
+                account: &odf::ResourceOwnerHandle,
+                scope: &kamu_resources::ResourceListScope,
+            ) -> Result<(), kamu_resources::ResourceOperationError> {
+                self.operation_guard()
+                    .check_operation(
+                        principal,
+                        &kamu_resources::ResourceOperationRequest {
+                            account,
+                            operation: kamu_resources::ResourceOperation::List { scope },
+                        },
+                    )
+                    .await
             }
         }
     };

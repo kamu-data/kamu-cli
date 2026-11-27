@@ -10,32 +10,44 @@
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
+use background_agent_host::BackgroundWorkFinalizer;
 use chrono::Utc;
 use database_common::{InMemoryTransactionManager, NoOpDatabasePlugin};
 use dill::CatalogBuilder;
-use kamu_accounts::{Account, AccountRepository, AccountType};
+use kamu_accounts::{Account, AccountRepository, AccountType, Principal, RequestOrigin};
 use kamu_accounts_inmem::InMemoryAccountRepository;
 use kamu_resources::{
+    ApplyResourceAccessCheck,
+    ApplyResourceAccountSource,
+    ApplyResourceHeaders,
+    ApplyResourceParams,
+    CreationProvenance,
+    DeclarativeResource,
     GenericResourceQueryService,
     MESSAGE_PRODUCER_KAMU_RESOURCE_SERVICE,
     ReconciliationError,
     ResourceControllerRuntimeConfig,
+    ResourceHeadersExt,
     ResourceHeadersInput,
     ResourceID,
     ResourceLifecycleMessage,
     ResourceLifecycleMessageOutcome,
     ResourcePhase,
     ResourceRepository,
+    ResourceRetentionConfig,
     ResourceSnapshot,
     ResourceStatus,
+    TypeRef,
     TypeUri,
+    creation_provenance_type_ref,
     reconciliation_error_type_ref,
 };
 use messaging_outbox::{MockOutbox, Outbox, OutboxProvider, register_message_dispatcher};
 use time_source::{FakeSystemTimeSource, SystemTimeSource, SystemTimeSourceStub};
 use wakeup_listener::{WakeupListenerConfig, WakeupListenerMetrics};
 
-use crate::{BackgroundWorkFinalizer, ResourceControllerRuntimeImpl};
+use crate::testing::OwnAccountResourceAccess;
+use crate::{ResourceControllerRuntimeImpl, request_creation_provenance};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -48,7 +60,6 @@ pub struct BaseResourceServiceHarness {
     resource_repo: Arc<dyn ResourceRepository>,
     outbox: Arc<dyn Outbox>,
     time_source: Arc<dyn SystemTimeSource>,
-    dispatching_outbox: bool,
 }
 
 pub struct BaseResourceServiceHarnessOpts {
@@ -67,6 +78,8 @@ pub struct BaseResourceServiceHarnessOpts {
     /// [`BaseResourceServiceHarness::register_controller_runtime`], and
     /// finalizes that catalog with [`BackgroundWorkFinalizer`]
     pub controller_runtime: bool,
+    /// `None` leaves the retention configuration to a chained catalog
+    pub retention: Option<ResourceRetentionConfig>,
 }
 
 impl Default for BaseResourceServiceHarnessOpts {
@@ -78,6 +91,7 @@ impl Default for BaseResourceServiceHarnessOpts {
             transactional: false,
             fake_time: false,
             controller_runtime: true,
+            retention: Some(ResourceRetentionConfig::default()),
         }
     }
 }
@@ -100,7 +114,7 @@ impl BaseResourceServiceHarness {
         )
     }
 
-    pub fn new_with_opts_and_additional_dependencies(
+    fn new_with_opts_and_additional_dependencies(
         opts: BaseResourceServiceHarnessOpts,
         register_additional_dependencies: impl FnOnce(&mut CatalogBuilder),
     ) -> Self {
@@ -135,6 +149,10 @@ impl BaseResourceServiceHarness {
 
         kamu_resources_inmem::register_dependencies(&mut b);
         b.add::<InMemoryAccountRepository>();
+        b.add::<OwnAccountResourceAccess>();
+        if let Some(retention) = opts.retention {
+            b.add_value(retention);
+        }
 
         if opts.transactional {
             assert!(
@@ -168,7 +186,6 @@ impl BaseResourceServiceHarness {
             resource_repo,
             outbox,
             time_source,
-            dispatching_outbox: needs_bridge,
         }
     }
 
@@ -185,13 +202,10 @@ impl BaseResourceServiceHarness {
             .unwrap();
     }
 
-    /// The finalizer for the outbox of this harness
+    /// The finalizer of this harness, which leaves housekeeping to the tests
+    /// that run it
     pub fn background_work_finalizer(&self) -> BackgroundWorkFinalizer {
-        if self.dispatching_outbox {
-            BackgroundWorkFinalizer::for_dispatching_outbox()
-        } else {
-            BackgroundWorkFinalizer::for_immediate_outbox()
-        }
+        BackgroundWorkFinalizer::settle_only()
     }
 
     pub fn catalog(&self) -> &dill::Catalog {
@@ -223,7 +237,7 @@ impl BaseResourceServiceHarness {
     /// (e.g. `InMemoryResourceRepository`'s per-read account-name resolution)
     /// find a match instead of falling back to the deleted-account sentinel.
     /// Idempotent: registering the same handle twice is a no-op.
-    pub async fn register_test_account(&self, account: &odf::ResourceOwnerHandle) {
+    async fn register_test_account(&self, account: &odf::ResourceOwnerHandle) {
         let account_repository = self.catalog.get_one::<dyn AccountRepository>().unwrap();
 
         if account_repository
@@ -282,8 +296,69 @@ impl BaseResourceServiceHarness {
         }
     }
 
+    /// Provenance of a resource created by the node in a test, for tests that
+    /// do not look at it
+    pub fn make_provenance() -> CreationProvenance {
+        request_creation_provenance(
+            &Principal::Node,
+            &RequestOrigin::Internal {
+                producer: "dev.kamu.test".to_string(),
+                detail: None,
+            },
+        )
+        .unwrap()
+    }
+
+    /// The condition entry [`Self::make_provenance`] is recorded as
+    pub fn make_provenance_entry() -> (TypeRef, serde_json::Value) {
+        (
+            creation_provenance_type_ref(),
+            serde_json::to_value(Self::make_provenance()).unwrap(),
+        )
+    }
+
+    /// Like [`Self::make_headers_input`], with the name left to the resource
+    /// type
+    fn make_nameless_headers(account: odf::ResourceOwnerHandle) -> ApplyResourceHeaders {
+        ApplyResourceHeaders::try_new(Some(account.into()), None, vec![], vec![]).unwrap()
+    }
+
+    /// Params of an apply in `account` that the guard checks, with
+    /// [`Self::make_provenance`]; a `None` name is left to the resource type
+    pub fn make_apply_params<R: DeclarativeResource>(
+        account: odf::ResourceOwnerHandle,
+        name: Option<&str>,
+        spec: R::SpecInput,
+    ) -> ApplyResourceParams<R> {
+        let headers = match name {
+            Some(name) => Self::make_headers_input(account, name).into(),
+            None => Self::make_nameless_headers(account),
+        };
+        Self::make_apply_params_with_headers(headers, spec)
+    }
+
+    /// [`Self::make_apply_params`] with the given headers
+    pub fn make_apply_params_with_headers<R: DeclarativeResource>(
+        headers: ApplyResourceHeaders,
+        spec: R::SpecInput,
+    ) -> ApplyResourceParams<R> {
+        ApplyResourceParams {
+            id: None,
+            headers,
+            account_source: ApplyResourceAccountSource::Manifest,
+            access_check: ApplyResourceAccessCheck::ByGuard,
+            spec,
+            provenance: Self::make_provenance(),
+        }
+    }
+
     pub async fn get_snapshot_by_id(&self, id: &ResourceID) -> Option<ResourceSnapshot> {
         self.generic_query_svc.get_snapshot_by_id(id).await.unwrap()
+    }
+
+    pub async fn is_deleted(&self, id: &ResourceID) -> bool {
+        let snapshot = self.get_snapshot_by_id(id).await.unwrap();
+        snapshot.headers.is_deleted()
     }
 
     pub async fn resource_id_by_name(
@@ -365,10 +440,6 @@ impl BaseResourceServiceHarness {
                     )
             })
             .returning(|_, _, _| Ok(()));
-    }
-
-    pub fn expect_deleted_message(mock_outbox: &mut MockOutbox, expected_resource_count: usize) {
-        Self::expect_deleted_messages(mock_outbox, 1, expected_resource_count);
     }
 
     /// Expects `n` `Deleted` messages, each of `expected_resource_count`

@@ -8,33 +8,54 @@
 // by the Apache License, Version 2.0.
 
 use internal_error::InternalError;
-use kamu_accounts::Principal;
-use kamu_resources::ResourceOwnerRef;
+use kamu_accounts::{AnonymousPrincipalError, Principal};
+use kamu_resources::{ResourceOperationError, ResourceOwnerRef};
 use thiserror::Error;
 
 use crate::{ResourceAccountResolutionError, ResourceAccountResolutionProblemCode};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Resolves the account selectors of facade calls, and checks the default
+/// rule on them (`ResourceAccountAccessPort`) where no type's
+/// `ResourceOperationGuard` decides instead.
 #[async_trait::async_trait]
 pub trait ResourceAccountResolver: Send + Sync {
-    async fn resolve_target_account(
+    /// Resolves `selector`, or the principal's own account without one,
+    /// without checking access. Rejects an anonymous principal
+    async fn resolve_account(
         &self,
         principal: &Principal,
         selector: Option<&ResourceOwnerRef>,
     ) -> Result<odf::ResourceOwnerHandle, ResolveManifestAccountError>;
 
+    /// Checks the default rule
+    async fn ensure_can_use_account(
+        &self,
+        principal: &Principal,
+        account: &odf::ResourceOwnerHandle,
+    ) -> Result<(), ResolveManifestAccountError>;
+
+    async fn resolve_target_account(
+        &self,
+        principal: &Principal,
+        selector: Option<&ResourceOwnerRef>,
+    ) -> Result<odf::ResourceOwnerHandle, ResolveManifestAccountError> {
+        let account = self.resolve_account(principal, selector).await?;
+        self.ensure_can_use_account(principal, &account).await?;
+        Ok(account)
+    }
+
     /// Resolves several account refs at once, for calls whose selectors each
-    /// name their own account.
+    /// name their own account, without checking access.
     ///
     /// Returns one handle per input, in order, so callers can zip the result
-    /// back onto their selectors. **Any denial fails the whole call** — a
-    /// partial result would silently narrow the caller's request.
+    /// back onto their selectors. Any failure fails the whole call.
     ///
     /// Deduplicated by spelling: the same account named twice resolves once.
     /// Two spellings of one account (by id and by name) still resolve twice,
     /// which costs a lookup but cannot produce a wrong answer.
-    async fn resolve_target_accounts(
+    async fn resolve_accounts(
         &self,
         principal: &Principal,
         selectors: &[Option<ResourceOwnerRef>],
@@ -48,9 +69,7 @@ pub trait ResourceAccountResolver: Send + Sync {
                 continue;
             }
 
-            let handle = self
-                .resolve_target_account(principal, selector.as_ref())
-                .await?;
+            let handle = self.resolve_account(principal, selector.as_ref()).await?;
             resolved.push((selector.clone(), handle.clone()));
             out.push(handle);
         }
@@ -94,7 +113,41 @@ pub enum ResourceAccountAccessError {
     Access(#[from] odf::AccessError),
 }
 
+impl From<AnonymousPrincipalError> for ResourceAccountAccessError {
+    fn from(_: AnonymousPrincipalError) -> Self {
+        Self::AnonymousSubject
+    }
+}
+
+impl From<AnonymousPrincipalError> for ResolveManifestAccountError {
+    fn from(err: AnonymousPrincipalError) -> Self {
+        ResourceAccountAccessError::from(err).into()
+    }
+}
+
 impl ResolveManifestAccountError {
+    /// A denial of a guard deciding on `account` alone. A resource hidden
+    /// from the principal there means they may not use the account
+    pub(crate) fn from_operation_error(
+        account: &odf::ResourceOwnerHandle,
+        err: ResourceOperationError,
+    ) -> Self {
+        match err {
+            ResourceOperationError::Access(err) => ResourceAccountAccessError::Access(err).into(),
+            ResourceOperationError::NotFound(_) => {
+                ResourceAccountAccessError::Access(odf::AccessError::Unauthorized(
+                    format!(
+                        "Current subject is not allowed to use resources of account '{}'",
+                        account.name
+                    )
+                    .into(),
+                ))
+                .into()
+            }
+            ResourceOperationError::Internal(err) => Self::Internal(err),
+        }
+    }
+
     pub fn empty_selector() -> Self {
         Self::Resolution(ResourceAccountResolutionError {
             code: ResourceAccountResolutionProblemCode::EmptySelector,
@@ -151,6 +204,41 @@ impl From<kamu_accounts::GetAccountByNameError> for ResolveManifestAccountError 
             }
             kamu_accounts::GetAccountByNameError::Internal(err) => Self::Internal(err),
         }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[cfg(test)]
+mod tests {
+    use kamu_resources::{ResourceID, ResourceIDNotFoundError};
+    use pretty_assertions::assert_eq;
+
+    use super::*;
+
+    #[test]
+    fn guard_hiding_a_resource_denies_the_account() {
+        let account = odf::ResourceOwnerHandle::new_test("bob");
+
+        let err = ResolveManifestAccountError::from_operation_error(
+            &account,
+            ResourceOperationError::NotFound(ResourceIDNotFoundError(
+                "00000000-0000-0000-0000-000000000001"
+                    .parse::<ResourceID>()
+                    .unwrap(),
+            )),
+        );
+
+        let ResolveManifestAccountError::AccountAccess(ResourceAccountAccessError::Access(
+            odf::AccessError::Unauthorized(source),
+        )) = err
+        else {
+            panic!("expected an account access denial, got: {err:?}");
+        };
+        assert_eq!(
+            source.to_string(),
+            "Current subject is not allowed to use resources of account 'bob'"
+        );
     }
 }
 

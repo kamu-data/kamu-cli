@@ -9,6 +9,7 @@
 
 use std::assert_matches;
 
+use kamu_accounts::Principal;
 use kamu_configuration::{
     RESOURCE_LABEL_LEGACY_CONFIG_TARGET_DATASET_SCHEMA_URI,
     SecretSetResource,
@@ -23,7 +24,13 @@ use kamu_datasets::{
     UpsertDatasetEnvVarError,
     UpsertDatasetEnvVarStatus,
 };
-use kamu_resources::ResourceSchemaProvider;
+use kamu_resources::{
+    CreationOrigin,
+    CreationOriginApi,
+    CreationProvenance,
+    ResourceHandle,
+    ResourceSchemaProvider,
+};
 use secrecy::SecretString;
 
 use crate::tests::services::dataset_env_var_service_harness::DatasetEnvVarServiceHarness;
@@ -587,6 +594,65 @@ async fn test_target_dataset_label_survives_an_update() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
+async fn test_owner_references_survive_an_update() {
+    let harness = DatasetEnvVarServiceHarness::new();
+
+    let (_, dataset_id) = odf::DatasetID::new_generated_ed25519();
+    let account_handle = harness.ensure_test_account("test-owner").await;
+    harness
+        .seed_dataset_entry(&dataset_id, &account_handle.did)
+        .await;
+
+    harness
+        .upsert_variable(&dataset_id, "VARIABLE", "first")
+        .await
+        .unwrap();
+    harness
+        .upsert_secret(&dataset_id, "SECRET", "first")
+        .await
+        .unwrap();
+
+    let variable_set_id = harness
+        .variable_sets_targeting(&account_handle, &dataset_id)
+        .await[0];
+    let secret_set_id = harness
+        .secret_sets_targeting(&account_handle, &dataset_id)
+        .await[0];
+    let owners = [
+        (
+            variable_set_id,
+            harness
+                .set_owner::<VariableSetResource>(&variable_set_id)
+                .await,
+        ),
+        (
+            secret_set_id,
+            harness.set_owner::<SecretSetResource>(&secret_set_id).await,
+        ),
+    ];
+
+    harness
+        .upsert_variable(&dataset_id, "VARIABLE", "second")
+        .await
+        .unwrap();
+    harness
+        .upsert_secret(&dataset_id, "SECRET", "second")
+        .await
+        .unwrap();
+
+    for (id, owner) in owners {
+        let snapshot = harness.get_snapshot_by_id(&id).await.unwrap();
+        let expected = ResourceHandle {
+            account: snapshot.headers.account,
+            ..owner
+        };
+        assert_eq!(snapshot.headers.owner_references, Some(vec![expected]));
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
 async fn test_legacy_key_does_not_block_writes() {
     let harness = DatasetEnvVarServiceHarness::new();
 
@@ -883,6 +949,94 @@ async fn test_create_refuses_key_written_after_its_lookup() {
                     .collect()
             );
         }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_writes_for_a_principal_other_than_the_owner_are_not_checked_again() {
+    // A maintainer of another's dataset, whom the caller has checked already
+    let harness =
+        DatasetEnvVarServiceHarness::new_acting_as(Principal::new_test_with(&"maintainer"));
+
+    let (_, dataset_id) = odf::DatasetID::new_generated_ed25519();
+    let account_handle = harness.ensure_test_account("test-owner").await;
+    harness
+        .seed_dataset_entry(&dataset_id, &account_handle.did)
+        .await;
+
+    for key in ["A", "B"] {
+        let result = harness
+            .upsert_env_var(&dataset_id, key, &DatasetEnvVarValue::Regular("v1".into()))
+            .await
+            .unwrap();
+        DatasetEnvVarServiceHarness::assert_upsert_created(&result);
+    }
+    let result = harness
+        .upsert_env_var(&dataset_id, "A", &DatasetEnvVarValue::Regular("v2".into()))
+        .await
+        .unwrap();
+    DatasetEnvVarServiceHarness::assert_upsert_updated(&result);
+    // Rewrites the set, which keeps `B`
+    harness.delete_env_var(&dataset_id, "A").await.unwrap();
+
+    assert_eq!(
+        harness.variable_values(&dataset_id).await,
+        [("B".to_string(), "v1".to_string())].into()
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_auto_created_sets_record_the_caller_as_their_creator() {
+    let caller = Principal::new_test_with(&"maintainer");
+    let harness = DatasetEnvVarServiceHarness::new_acting_as(caller.clone());
+
+    let (_, dataset_id) = odf::DatasetID::new_generated_ed25519();
+    let account_handle = harness.ensure_test_account("test-owner").await;
+    harness
+        .seed_dataset_entry(&dataset_id, &account_handle.did)
+        .await;
+
+    let expected = CreationProvenance {
+        principal: caller.handle().unwrap(),
+        origin: CreationOrigin::Api {
+            api: CreationOriginApi::GraphQl,
+        },
+    };
+
+    for value in ["v1", "v2"] {
+        harness
+            .upsert_variable(&dataset_id, "VAR", value)
+            .await
+            .unwrap();
+        harness
+            .upsert_secret(&dataset_id, "SECRET", value)
+            .await
+            .unwrap();
+
+        let variable_set_id = harness
+            .variable_sets_targeting(&account_handle, &dataset_id)
+            .await[0];
+        let secret_set_id = harness
+            .secret_sets_targeting(&account_handle, &dataset_id)
+            .await[0];
+        assert_eq!(
+            harness
+                .creation_provenance::<VariableSetResource>(&variable_set_id)
+                .await,
+            expected,
+            "{value}"
+        );
+        assert_eq!(
+            harness
+                .creation_provenance::<SecretSetResource>(&secret_set_id)
+                .await,
+            expected,
+            "{value}"
+        );
     }
 }
 

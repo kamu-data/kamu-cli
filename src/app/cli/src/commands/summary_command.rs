@@ -9,8 +9,9 @@
 
 use std::sync::Arc;
 
-use datafusion::arrow::array::{RecordBatch, StringArray, UInt64Array};
+use datafusion::arrow::array::{ArrayRef, RecordBatch, StringArray, UInt64Array};
 use datafusion::arrow::datatypes::{DataType, Field, Schema};
+use kamu_resources::ResourceTypeCountSummary;
 
 use super::{CLIError, Command};
 use crate::cli::SummaryOutputFormat;
@@ -50,77 +51,50 @@ impl SummaryCommand {
         println!();
         println!("Resource Counts");
 
-        let schema = Arc::new(Schema::new(vec![
-            Field::new("Type", DataType::Utf8, false),
-            Field::new("Total", DataType::UInt64, false),
-            Field::new("Pending", DataType::UInt64, false),
-            Field::new("Reconciling", DataType::UInt64, false),
-            Field::new("Ready", DataType::UInt64, false),
-            Field::new("Degraded", DataType::UInt64, false),
-            Field::new("Failed", DataType::UInt64, false),
-            Field::new("Deleting", DataType::UInt64, false),
-        ]));
+        type Count = fn(&ResourceTypeCountSummary) -> u64;
 
+        // The count columns after `Type`: header, alignment and value
+        let count_columns: [(&str, &str, Count); 8] = [
+            ("Total", "l", |item| item.total_count),
+            ("Pending", "r", |item| item.phase_counts.pending),
+            ("Reconciling", "r", |item| item.phase_counts.reconciling),
+            ("Ready", "r", |item| item.phase_counts.ready),
+            ("Degraded", "r", |item| item.phase_counts.degraded),
+            ("Failed", "r", |item| item.phase_counts.failed),
+            ("Deleting", "r", |item| item.phase_counts.deleting),
+            ("Deleted", "r", |item| item.phase_counts.deleted),
+        ];
+
+        let schema = Arc::new(Schema::new(
+            std::iter::once(Field::new("Type", DataType::Utf8, false))
+                .chain(
+                    count_columns
+                        .iter()
+                        .map(|(name, _, _)| Field::new(*name, DataType::UInt64, false)),
+                )
+                .collect::<Vec<_>>(),
+        ));
+
+        let type_column: ArrayRef = Arc::new(StringArray::from(
+            summary
+                .resource_counts
+                .iter()
+                .map(|item| item.type_name.to_string())
+                .collect::<Vec<_>>(),
+        ));
         let record_batch = RecordBatch::try_new(
             schema.clone(),
-            vec![
-                Arc::new(StringArray::from(
-                    summary
-                        .resource_counts
-                        .iter()
-                        .map(|item| item.type_name.to_string())
-                        .collect::<Vec<_>>(),
-                )),
-                Arc::new(UInt64Array::from(
-                    summary
-                        .resource_counts
-                        .iter()
-                        .map(|item| item.total_count)
-                        .collect::<Vec<_>>(),
-                )),
-                Arc::new(UInt64Array::from(
-                    summary
-                        .resource_counts
-                        .iter()
-                        .map(|item| item.phase_counts.pending)
-                        .collect::<Vec<_>>(),
-                )),
-                Arc::new(UInt64Array::from(
-                    summary
-                        .resource_counts
-                        .iter()
-                        .map(|item| item.phase_counts.reconciling)
-                        .collect::<Vec<_>>(),
-                )),
-                Arc::new(UInt64Array::from(
-                    summary
-                        .resource_counts
-                        .iter()
-                        .map(|item| item.phase_counts.ready)
-                        .collect::<Vec<_>>(),
-                )),
-                Arc::new(UInt64Array::from(
-                    summary
-                        .resource_counts
-                        .iter()
-                        .map(|item| item.phase_counts.degraded)
-                        .collect::<Vec<_>>(),
-                )),
-                Arc::new(UInt64Array::from(
-                    summary
-                        .resource_counts
-                        .iter()
-                        .map(|item| item.phase_counts.failed)
-                        .collect::<Vec<_>>(),
-                )),
-                Arc::new(UInt64Array::from(
-                    summary
-                        .resource_counts
-                        .iter()
-                        .map(|item| item.phase_counts.deleting)
-                        .collect::<Vec<_>>(),
-                )),
-            ],
+            std::iter::once(type_column)
+                .chain(count_columns.iter().map(|(_, _, count)| {
+                    Arc::new(UInt64Array::from(
+                        summary
+                            .resource_counts
+                            .iter()
+                            .map(count)
+                            .collect::<Vec<_>>(),
+                    )) as ArrayRef
+                }))
+                .collect(),
         )
         .map_err(CLIError::critical)?;
 
@@ -130,16 +104,15 @@ impl SummaryCommand {
         };
         let records_format = RecordsFormat::new()
             .with_default_column_format(ColumnFormat::default())
-            .with_column_formats(vec![
-                ColumnFormat::new().with_style_spec("l"),
-                ColumnFormat::new().with_style_spec("l"),
-                ColumnFormat::new().with_style_spec("r"),
-                ColumnFormat::new().with_style_spec("r"),
-                ColumnFormat::new().with_style_spec("r"),
-                ColumnFormat::new().with_style_spec("r"),
-                ColumnFormat::new().with_style_spec("r"),
-                ColumnFormat::new().with_style_spec("r"),
-            ]);
+            .with_column_formats(
+                std::iter::once(ColumnFormat::new().with_style_spec("l"))
+                    .chain(
+                        count_columns
+                            .iter()
+                            .map(|(_, style, _)| ColumnFormat::new().with_style_spec(*style)),
+                    )
+                    .collect(),
+            );
 
         let mut writer = output_config.get_records_writer(&schema, records_format);
         writer

@@ -1,0 +1,53 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT\n                resource_id AS \"id: uuid::Uuid\",\n                resource_schema,\n                purge_at AS \"purge_at!: DateTime<Utc>\"\n            FROM resources\n            WHERE purge_at IS NOT NULL AND purge_at <= $1\n            ORDER BY purge_at ASC, resource_id ASC\n            LIMIT $2\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id: uuid::Uuid",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "resources",
+            "name": "resource_id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "resource_schema",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "resources",
+            "name": "resource_schema"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "purge_at!: DateTime<Utc>",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "resources",
+            "name": "purge_at"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Timestamptz",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      true
+    ]
+  },
+  "hash": "f7161e64f8e9ebe695146b347c9eac682221ccf3f364852070dd9d5c1344415e"
+}

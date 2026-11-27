@@ -85,6 +85,9 @@ database_transactional_test!(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+// Postgres only: SQLite serializes writers and the in-memory bridge orders by
+// message ID alone, so only Postgres orders messages by transaction ID
+
 #[test_group::group(database, postgres)]
 #[test_log::test(sqlx::test(migrations = "../../../../migrations/postgres"))]
 async fn test_tx_id_priority_over_message_id_in_ordering(pg_pool: PgPool) {
@@ -194,6 +197,34 @@ async fn test_tx_id_priority_over_message_id_in_ordering(pg_pool: PgPool) {
 database_concurrent_transactions_test!(
     storage = postgres,
     fixture = kamu_messaging_outbox_repo_tests::test_first_consumption_boundaries_in_concurrent_transactions,
+    harness = PostgresOutboxMessageBridgeHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// The held-back fixtures have no SQLite wiring: SQLite serialises writers, so
+// no message is ever held back there
+database_concurrent_transactions_test!(
+    storage = postgres,
+    fixture = kamu_messaging_outbox_repo_tests::test_drain_waits_for_messages_held_back_by_older_transaction,
+    harness = PostgresOutboxMessageBridgeHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_concurrent_transactions_test!(
+    storage = postgres,
+    fixture =
+        kamu_messaging_outbox_repo_tests::test_drain_ignores_held_back_messages_nobody_consumes,
+    harness = PostgresOutboxMessageBridgeHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_concurrent_transactions_test!(
+    storage = postgres,
+    fixture =
+        kamu_messaging_outbox_repo_tests::test_drain_ignores_held_back_messages_of_failed_consumers,
     harness = PostgresOutboxMessageBridgeHarness
 );
 

@@ -57,6 +57,10 @@ pub struct CLIConfig {
     #[config(default)]
     pub background_agents: BackgroundAgentsConfig,
 
+    /// Resources configuration
+    #[config(default)]
+    pub resources: ResourcesConfig,
+
     /// Network protocols configuration
     #[config(default)]
     pub protocol: ProtocolConfig,
@@ -92,6 +96,145 @@ pub struct CLIConfig {
     /// Experimental and temporary configuration options
     #[config(default)]
     pub extra: ExtraConfig,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Resources
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(setty::Config, setty::Default)]
+pub struct ResourcesConfig {
+    /// How long deleted resources are kept before they may be purged
+    #[config(default)]
+    pub retention: ResourceRetentionConfig,
+}
+
+/// A type's retention is, first found: its entry in `types`, the type's own
+/// default, `default`. Each value is a duration such as `7d`, `forever` or
+/// `immediately`
+#[derive(setty::Config, setty::Default)]
+pub struct ResourceRetentionConfig {
+    /// Retention of the types that neither are listed in `types` nor declare
+    /// their own
+    #[config(default_str = "7d", combine(replace))]
+    pub default: ResourceRetentionValue,
+
+    /// Retention per resource type, by short type name such as `VariableSet`
+    #[config(default)]
+    pub types: BTreeMap<String, ResourceRetentionValue>,
+}
+
+impl ResourceRetentionConfig {
+    pub fn into_system(&self) -> Result<kamu_resources::ResourceRetentionConfig, CLIError> {
+        let types = self
+            .types
+            .iter()
+            .map(|(type_name, value)| {
+                let type_name = type_name
+                    .parse::<kamu_resources::TypeName>()
+                    .map_err(|err| {
+                        CLIError::usage_error(format!(
+                            "Invalid resource type '{type_name}' in resources.retention.types: \
+                             {err}"
+                        ))
+                    })?;
+                Ok((type_name, value.into_system()))
+            })
+            .collect::<Result<_, CLIError>>()?;
+
+        Ok(kamu_resources::ResourceRetentionConfig {
+            default: self.default.into_system(),
+            types,
+        })
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// A retention period: a duration, `forever` or `immediately`
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub enum ResourceRetentionValue {
+    Immediately,
+    For(DurationString),
+    Forever,
+}
+
+impl ResourceRetentionValue {
+    const FOREVER: &str = "forever";
+    const IMMEDIATELY: &str = "immediately";
+
+    pub fn into_system(self) -> kamu_resources::ResourceRetentionPolicy {
+        use kamu_resources::ResourceRetentionPolicy as P;
+
+        match self {
+            Self::Immediately => P::PurgeImmediately,
+            Self::For(duration) => P::RetainFor(
+                chrono::TimeDelta::from_std(duration.into()).unwrap_or(chrono::TimeDelta::MAX),
+            ),
+            Self::Forever => P::RetainForever,
+        }
+    }
+}
+
+impl std::str::FromStr for ResourceRetentionValue {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            Self::FOREVER => Ok(Self::Forever),
+            Self::IMMEDIATELY => Ok(Self::Immediately),
+            duration => duration.parse().map(Self::For).map_err(|_| {
+                format!(
+                    "Invalid retention '{duration}': expected a duration such as '7d', '{}' or \
+                     '{}'",
+                    Self::FOREVER,
+                    Self::IMMEDIATELY
+                )
+            }),
+        }
+    }
+}
+
+impl std::fmt::Display for ResourceRetentionValue {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Immediately => f.write_str(Self::IMMEDIATELY),
+            Self::For(duration) => duration.fmt(f),
+            Self::Forever => f.write_str(Self::FOREVER),
+        }
+    }
+}
+
+impl std::fmt::Debug for ResourceRetentionValue {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        std::fmt::Display::fmt(self, f)
+    }
+}
+
+impl serde::Serialize for ResourceRetentionValue {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        serializer.collect_str(self)
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for ResourceRetentionValue {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let s = String::deserialize(deserializer)?;
+        s.parse().map_err(serde::de::Error::custom)
+    }
+}
+
+impl schemars::JsonSchema for ResourceRetentionValue {
+    fn schema_name() -> std::borrow::Cow<'static, str> {
+        "ResourceRetentionValue".into()
+    }
+
+    fn json_schema(_generator: &mut schemars::SchemaGenerator) -> schemars::Schema {
+        schemars::json_schema!({
+            "type": "string",
+            "description": "A duration such as `7d`, `forever` or `immediately`",
+        })
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -760,6 +903,11 @@ pub struct BackgroundAgentsConfig {
     #[config(default)]
     pub resource_controllers: BackgroundAgentsResourceControllersConfig,
 
+    /// Periodic jobs removing data nobody needs any more. Each runs as an agent
+    /// of its own in the API server, and one batch after each CLI command
+    #[config(default)]
+    pub housekeeping: BackgroundAgentsHousekeepingConfig,
+
     /// Delay before an agent that failed, panicked or returned early is
     /// restarted, growing with consecutive restarts. A run that lasted at
     /// least `maxDelay` resets the count
@@ -820,6 +968,80 @@ pub struct BackgroundAgentsResourceControllersConfig {
     /// with consecutive failures
     #[config(default)]
     pub loop_restart_backoff: RestartBackoffConfig,
+}
+
+#[derive(setty::Config, setty::Default)]
+pub struct BackgroundAgentsHousekeepingConfig {
+    /// Purge of deleted resources whose retention (`resources.retention`)
+    /// ended
+    #[config(default)]
+    pub resource_retention: HousekeepingJobConfig,
+}
+
+impl BackgroundAgentsHousekeepingConfig {
+    pub fn into_system(&self) -> Result<background_agent_host::HousekeepingConfig, CLIError> {
+        Ok(background_agent_host::HousekeepingConfig {
+            jobs: BTreeMap::from([(
+                kamu_resources_services::RESOURCE_RETENTION_JOB_NAME.to_string(),
+                self.resource_retention
+                    .into_system("backgroundAgents.housekeeping.resourceRetention")?,
+            )]),
+        })
+    }
+}
+
+/// How a housekeeping job runs
+#[derive(setty::Config, setty::Default)]
+pub struct HousekeepingJobConfig {
+    /// Whether the job runs
+    #[config(default = true)]
+    pub enabled: bool,
+
+    /// Items removed per transaction, at most 1000. 0 is treated as 1
+    #[config(default = 100)]
+    pub batch_size: usize,
+
+    /// The longest pause between two passes of the job, greater than zero. A
+    /// job with deadlines of its own wakes up at the nearest one, so this
+    /// bounds how late it notices an earlier deadline
+    #[config(default_str = "5m")]
+    pub interval: DurationString,
+
+    /// The pause between two batches while a backlog remains
+    #[config(default_str = "100ms")]
+    pub pause_between_batches: DurationString,
+}
+
+impl HousekeepingJobConfig {
+    /// A batch binds a statement parameter per item, and `SQLite` allows
+    /// 32766 per statement
+    pub const MAX_BATCH_SIZE: usize = 1000;
+
+    /// Fails with a usage error naming `key`, the job's configuration key, on
+    /// a value the job cannot run with
+    pub fn into_system(
+        &self,
+        key: &str,
+    ) -> Result<background_agent_host::HousekeepingJobConfig, CLIError> {
+        if self.batch_size > Self::MAX_BATCH_SIZE {
+            return Err(CLIError::usage_error(format!(
+                "{key}.batchSize must be at most {}",
+                Self::MAX_BATCH_SIZE
+            )));
+        }
+        let interval: std::time::Duration = self.interval.into();
+        if interval.is_zero() {
+            return Err(CLIError::usage_error(format!(
+                "{key}.interval must be greater than zero"
+            )));
+        }
+        Ok(background_agent_host::HousekeepingJobConfig {
+            enabled: self.enabled,
+            batch_size: self.batch_size.max(1),
+            interval,
+            pause_between_batches: self.pause_between_batches.into(),
+        })
+    }
 }
 
 // The two backoffs are separate types only for their defaults: a partial
@@ -1027,6 +1249,129 @@ pub struct WebhooksConfig {
     /// Some(String::from("aBcDeFgHiJkLmNoPqRsTuVwXyZ012345")) };
     /// ```
     pub secret_encryption_key: Option<String>,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[cfg(test)]
+mod tests {
+    use std::assert_matches;
+
+    use chrono::TimeDelta;
+    use kamu_resources::ResourceRetentionPolicy;
+    use kamu_resources_services::RESOURCE_RETENTION_JOB_NAME;
+    use pretty_assertions::assert_eq;
+
+    use super::*;
+
+    const KEY: &str = "backgroundAgents.housekeeping.resourceRetention";
+
+    fn job_config(batch_size: usize, interval: &str) -> HousekeepingJobConfig {
+        HousekeepingJobConfig {
+            batch_size,
+            interval: interval.parse().unwrap(),
+            ..HousekeepingJobConfig::default()
+        }
+    }
+
+    fn validation_error(config: &HousekeepingJobConfig) -> Option<String> {
+        config.into_system(KEY).err().map(|e| e.to_string())
+    }
+
+    #[test]
+    fn test_housekeeping_job_config_validation() {
+        let max = HousekeepingJobConfig::MAX_BATCH_SIZE;
+        let cases = [
+            (job_config(0, "5m"), None),
+            (job_config(max, "1s"), None),
+            (
+                job_config(max + 1, "5m"),
+                Some(format!("{KEY}.batchSize must be at most {max}")),
+            ),
+            (
+                job_config(100, "0s"),
+                Some(format!("{KEY}.interval must be greater than zero")),
+            ),
+        ];
+
+        for (config, expected) in cases {
+            assert_eq!(validation_error(&config), expected);
+        }
+    }
+
+    #[test]
+    fn test_housekeeping_job_batch_size_zero_runs_batches_of_one() {
+        assert_eq!(job_config(0, "5m").into_system(KEY).unwrap().batch_size, 1);
+    }
+
+    #[test]
+    fn test_housekeeping_config_is_keyed_by_the_retention_job_name() {
+        let config = BackgroundAgentsHousekeepingConfig {
+            resource_retention: HousekeepingJobConfig {
+                enabled: false,
+                batch_size: 7,
+                ..HousekeepingJobConfig::default()
+            },
+        };
+
+        let job = config
+            .into_system()
+            .unwrap()
+            .job(RESOURCE_RETENTION_JOB_NAME);
+
+        assert_eq!((job.enabled, job.batch_size), (false, 7));
+    }
+
+    #[test]
+    fn test_resource_retention_value_maps_to_a_policy() {
+        let cases = [
+            ("forever", Ok(ResourceRetentionPolicy::RetainForever)),
+            ("immediately", Ok(ResourceRetentionPolicy::PurgeImmediately)),
+            (
+                "7d",
+                Ok(ResourceRetentionPolicy::RetainFor(TimeDelta::days(7))),
+            ),
+            (
+                "1000000000y",
+                Ok(ResourceRetentionPolicy::RetainFor(TimeDelta::MAX)),
+            ),
+            (
+                "bogus",
+                Err(
+                    "Invalid retention 'bogus': expected a duration such as '7d', 'forever' or \
+                     'immediately'"
+                        .to_string(),
+                ),
+            ),
+        ];
+
+        for (value, expected) in cases {
+            assert_eq!(
+                value
+                    .parse::<ResourceRetentionValue>()
+                    .map(ResourceRetentionValue::into_system),
+                expected,
+                "{value}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_resource_retention_of_an_invalid_type_name_is_a_usage_error() {
+        let config = ResourceRetentionConfig {
+            types: BTreeMap::from([("Bad Type".to_string(), ResourceRetentionValue::Forever)]),
+            ..ResourceRetentionConfig::default()
+        };
+
+        let err = config.into_system().unwrap_err();
+
+        assert_matches!(err, CLIError::UsageError(_));
+        assert!(
+            err.to_string()
+                .starts_with("Invalid resource type 'Bad Type' in resources.retention.types"),
+            "{err}"
+        );
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -10,14 +10,14 @@
 use std::assert_matches;
 
 use kamu_resources::{ResourceEvent, ResourcePhase, ResourceStatusConflictError};
-use pretty_assertions::assert_eq;
-
-use crate::tests::utils::{
-    ResourceLifecycleHarness,
+use kamu_resources_services::testing::{
+    BaseResourceServiceHarness,
     TestResourceLifecycleError,
-    make_id,
     test_stage_condition_key,
 };
+use pretty_assertions::assert_eq;
+
+use crate::tests::utils::{ResourceLifecycleHarness, make_id};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -39,14 +39,18 @@ fn test_new_resource_starts_with_the_initial_conditions_of_its_type() {
     assert_eq!(harness.phase(), ResourcePhase::Pending);
     assert_eq!(
         harness.status().conditions.entries,
-        [(test_stage_condition_key(), serde_json::json!("queued"))].into()
+        [
+            (test_stage_condition_key(), serde_json::json!("queued")),
+            BaseResourceServiceHarness::make_provenance_entry()
+        ]
+        .into()
     );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test]
-fn test_created_event_records_initial_conditions_only_when_there_are_some() {
+fn test_created_event_records_provenance_next_to_initial_conditions() {
     let initial_conditions = |value| {
         let ResourceEvent::Created(event) =
             ResourceLifecycleHarness::created_event(make_id(), value)
@@ -58,10 +62,19 @@ fn test_created_event_records_initial_conditions_only_when_there_are_some() {
             .map(|conditions| conditions.entries)
     };
 
-    assert_eq!(initial_conditions("v1"), None);
+    assert_eq!(
+        initial_conditions("v1"),
+        Some([BaseResourceServiceHarness::make_provenance_entry()].into())
+    );
     assert_eq!(
         initial_conditions("staged:queued"),
-        Some([(test_stage_condition_key(), serde_json::json!("queued"))].into())
+        Some(
+            [
+                (test_stage_condition_key(), serde_json::json!("queued")),
+                BaseResourceServiceHarness::make_provenance_entry()
+            ]
+            .into()
+        )
     );
 }
 
@@ -201,6 +214,23 @@ fn test_unchanged_status_is_not_an_update() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test]
+fn test_status_differing_only_in_phase_is_not_an_update() {
+    // The phase is derived, so the one a status carries is replaced
+    let mut harness = ResourceLifecycleHarness::reconciled().saved();
+    let status_before = harness.status();
+    let mut new_status = harness.status();
+    new_status.phase = ResourcePhase::Failed;
+
+    harness.update_status(3, new_status).unwrap();
+
+    assert_eq!(harness.generations(), (1, 3));
+    assert_eq!(harness.status(), status_before);
+    assert!(!harness.has_pending_events());
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test]
 fn test_failed_then_retried_then_degraded() {
     let mut harness = ResourceLifecycleHarness::new();
 
@@ -210,10 +240,10 @@ fn test_failed_then_retried_then_degraded() {
     assert!(harness.needs_reconciliation());
     harness.assert_reconciliation_error(Some("internal-error"));
 
-    // The error of the previous attempt stays visible during a retry
+    // A retry removes the error of the previous attempt
     harness.mark_started();
     assert_eq!(harness.phase(), ResourcePhase::Reconciling);
-    harness.assert_reconciliation_error(Some("internal-error"));
+    harness.assert_reconciliation_error(None);
 
     harness.mark_succeeded();
     assert_eq!(harness.phase(), ResourcePhase::Ready);
@@ -263,6 +293,9 @@ fn test_success_of_unobserved_generation_is_an_invariant_violation() {
 #[test]
 fn test_observing_an_older_generation_is_an_invariant_violation() {
     let mut harness = ResourceLifecycleHarness::new();
+    // A failed attempt, so that the start is not skipped as already reconciling
+    harness.mark_started();
+    harness.mark_failed();
     let mut status = harness.status();
     status.observed_generation = Some(5);
     let status_generation = harness.generations().1;

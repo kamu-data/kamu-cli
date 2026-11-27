@@ -9,6 +9,8 @@
 
 use dill::CatalogBuilder;
 use kamu_resources::{
+    CreationProvenanceCondition,
+    RESOURCE_CONDITION_CREATION_PROVENANCE_SCHEMA_URI,
     RESOURCE_CONDITION_RECONCILIATION_ERROR_SCHEMA_URI,
     ReconciliationErrorCondition,
     ResourceConditionSchemaMeta,
@@ -44,8 +46,25 @@ declare_resource_extension_schema_dispatcher!(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+declare_resource_extension_schema_dispatcher!(
+    dispatcher = CreationProvenanceConditionDispatcher,
+    value = CreationProvenanceCondition,
+    schema_id = RESOURCE_CONDITION_CREATION_PROVENANCE_SCHEMA_URI,
+    kind = ResourceExtensionKind::Condition,
+    document = None,
+    applications = CONDITION_APPLICATIONS,
+    condition = Some(ResourceConditionSchemaMeta {
+        // Written once, in the `Created` event, and never changed
+        max_serialized_size: 4 * 1024,
+        carried: true,
+    })
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 pub fn register_built_in_condition_schema_dispatchers(catalog_builder: &mut CatalogBuilder) {
     catalog_builder.add::<ReconciliationErrorConditionDispatcher>();
+    catalog_builder.add::<CreationProvenanceConditionDispatcher>();
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

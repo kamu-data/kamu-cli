@@ -8,40 +8,44 @@
 // by the Apache License, Version 2.0.
 
 use chrono::{DateTime, Utc};
-use event_sourcing::ConcurrentModificationError;
-use internal_error::ErrorIntoInternal;
+use internal_error::InternalError;
 use messaging_outbox::{Outbox, OutboxExt};
 use serde::Serialize;
-use time_source::SystemTimeSource;
 
 use crate::domain::{
+    ApplyResourceAccessCheck,
+    ApplyResourceAccountSource,
     ApplyResourceAction,
     ApplyResourceApplicationDecision,
+    ApplyResourceHeaders,
     ApplyResourceParams,
-    ApplyResourcePrecondition,
+    ApplyResourceRejection,
     ApplyResourceResult,
     ApplyResourceUseCaseError,
+    CreationProvenance,
     DeclarativeResource,
     EventSourcedResource,
-    GenericResourceQueryService,
     IntoApplyResourceRejection,
     InvariantViolationOf,
     MESSAGE_PRODUCER_KAMU_RESOURCE_SERVICE,
-    ResourceAggregateLoader,
     ResourceHeadersExt,
     ResourceHeadersValidationError,
     ResourceLifecycleMessage,
     ResourceLifecycleMessageOutcome,
     ResourceLinterSpec,
-    ResourceLoadError,
     ResourcePersistenceError,
     ResourcePersistenceService,
     ResourceSchemaProvider,
     ResourceSpecFromInput,
     ResourceValidateSpec,
-    TypedResourceQueryService,
 };
-use crate::{ApplyResourcePlanner, PlannedApplyResource, PlannedApplyResourceDecision};
+use crate::{
+    ApplyResourcePlanner,
+    OmittedNameHandling,
+    PlannedApplyResource,
+    PlannedApplyResourceDecision,
+    ResourceNaming,
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -49,12 +53,9 @@ pub struct ApplyResourcePlanExecutor<'a, R>
 where
     R: EventSourcedResource + ResourceSchemaProvider,
 {
-    generic_resource_query_service: &'a dyn GenericResourceQueryService,
-    typed_resource_query_service: &'a dyn TypedResourceQueryService<R>,
-    resource_aggregate_loader: &'a dyn ResourceAggregateLoader<R>,
+    planner: ApplyResourcePlanner<'a, R>,
     resource_persistence_service: &'a dyn ResourcePersistenceService<R>,
     outbox: &'a dyn Outbox,
-    time_source: &'a dyn SystemTimeSource,
 }
 
 impl<'a, R> ApplyResourcePlanExecutor<'a, R>
@@ -68,32 +69,25 @@ where
         + IntoApplyResourceRejection,
 {
     pub fn new(
-        generic_resource_query_service: &'a dyn GenericResourceQueryService,
-        typed_resource_query_service: &'a dyn TypedResourceQueryService<R>,
-        resource_aggregate_loader: &'a dyn ResourceAggregateLoader<R>,
+        planner: ApplyResourcePlanner<'a, R>,
         resource_persistence_service: &'a dyn ResourcePersistenceService<R>,
         outbox: &'a dyn Outbox,
-        time_source: &'a dyn SystemTimeSource,
     ) -> Self {
         Self {
-            generic_resource_query_service,
-            typed_resource_query_service,
-            resource_aggregate_loader,
+            planner,
             resource_persistence_service,
             outbox,
-            time_source,
         }
     }
 
     pub async fn execute(
         &self,
         plan: PlannedApplyResource<R>,
-        precondition: ApplyResourcePrecondition,
-    ) -> Result<ApplyResourceApplicationDecision<R>, ApplyResourceUseCaseError<R>> {
+    ) -> Result<ApplyResourceExecution<R>, ApplyResourceUseCaseError<R>> {
         match plan.action {
-            ApplyResourceAction::Create => self.execute_create(plan, precondition).await,
+            ApplyResourceAction::Create => self.execute_create(plan).await,
             ApplyResourceAction::Update => self.execute_update(plan).await,
-            ApplyResourceAction::Untouched => Ok(ApplyResourceApplicationDecision::Applied(
+            ApplyResourceAction::Untouched => Ok(ApplyResourceExecution::applied(
                 self.make_apply_result(plan),
             )),
         }
@@ -102,27 +96,39 @@ where
     async fn execute_create(
         &self,
         mut plan: PlannedApplyResource<R>,
-        precondition: ApplyResourcePrecondition,
-    ) -> Result<ApplyResourceApplicationDecision<R>, ApplyResourceUseCaseError<R>> {
-        match self
+    ) -> Result<ApplyResourceExecution<R>, ApplyResourceUseCaseError<R>> {
+        while let Err(err) = self
             .resource_persistence_service
             .create(&mut plan.resource)
             .await
         {
-            Ok(()) => {}
-            // Someone created the resource first; replanning as an update would
-            // overwrite what they wrote
-            Err(ResourcePersistenceError::Duplicate(_))
-                if precondition == ApplyResourcePrecondition::Absent =>
-            {
-                return Err(ApplyResourceUseCaseError::ConcurrentModification(
-                    ConcurrentModificationError {},
-                ));
+            match err {
+                ResourcePersistenceError::Duplicate(_) => {}
+                err @ (ResourcePersistenceError::ConcurrentModification(_)
+                | ResourcePersistenceError::InvalidDurableState(_)
+                | ResourcePersistenceError::Internal(_)) => {
+                    return Err(ApplyResourceUseCaseError::from(err));
+                }
             }
-            Err(ResourcePersistenceError::Duplicate(_)) => {
-                return self.retry_apply_after_duplicate_create(plan).await;
+
+            match plan.naming {
+                // Nobody asked for this name, so whoever holds it is not the
+                // resource to update
+                ResourceNaming::Generated { attempts_left } => {
+                    match self.replan_under_another_name(plan, attempts_left).await? {
+                        PlannedApplyResourceDecision::Planned(replanned) => plan = replanned,
+                        PlannedApplyResourceDecision::Rejected(rejection) => {
+                            return Ok(ApplyResourceExecution::rejected(rejection));
+                        }
+                    }
+                }
+                // The plan's spec was prepared without that of the resource
+                // holding the name, so it can't become an update here
+                ResourceNaming::Given => return Ok(ApplyResourceExecution::NameTaken),
+                ResourceNaming::Pending => {
+                    unreachable!("a plan with a pending name is never executed")
+                }
             }
-            Err(err) => return Err(ApplyResourceUseCaseError::from(err)),
         }
 
         self.notify_resource_applied(
@@ -132,7 +138,7 @@ where
         )
         .await?;
 
-        Ok(ApplyResourceApplicationDecision::Applied(
+        Ok(ApplyResourceExecution::applied(
             self.make_apply_result(plan),
         ))
     }
@@ -140,7 +146,7 @@ where
     async fn execute_update(
         &self,
         mut plan: PlannedApplyResource<R>,
-    ) -> Result<ApplyResourceApplicationDecision<R>, ApplyResourceUseCaseError<R>> {
+    ) -> Result<ApplyResourceExecution<R>, ApplyResourceUseCaseError<R>> {
         self.resource_persistence_service
             .save(&mut plan.resource)
             .await
@@ -153,84 +159,42 @@ where
         )
         .await?;
 
-        Ok(ApplyResourceApplicationDecision::Applied(
+        Ok(ApplyResourceExecution::applied(
             self.make_apply_result(plan),
         ))
     }
 
-    async fn retry_apply_after_duplicate_create(
+    async fn replan_under_another_name(
         &self,
         plan: PlannedApplyResource<R>,
-    ) -> Result<ApplyResourceApplicationDecision<R>, ApplyResourceUseCaseError<R>> {
-        let headers = plan.resource.headers();
-
-        let headers_input = headers.to_input();
-
-        let planner = ApplyResourcePlanner::<R>::new(
-            self.generic_resource_query_service,
-            self.typed_resource_query_service,
-            self.resource_aggregate_loader,
-            self.time_source,
-        );
-
-        let Some(id) = planner
-            .resolve_existing_resource_id(None, &headers_input)
-            .await?
-        else {
-            return Err(ApplyResourceUseCaseError::Internal(
-                "Resource create hit duplicate constraint, but no existing resource was found"
-                    .int_err()
-                    .with_context(format!(
-                        "account_id={:?}, schema='{}', name='{}'",
-                        headers_input.account,
-                        R::type_uri(),
-                        headers_input.name
-                    )),
-            ));
+        attempts_left: usize,
+    ) -> Result<PlannedApplyResourceDecision<R>, ApplyResourceUseCaseError<R>> {
+        let headers = ApplyResourceHeaders {
+            name: None,
+            ..plan.resource.headers().to_input().into()
         };
+        let provenance = CreationProvenance::from_conditions(&plan.resource.status().conditions)?
+            .ok_or_else(|| {
+            InternalError::new("A resource planned for creation has no creation provenance")
+        })?;
 
-        planner.ensure_resource_id_matches_type(&id).await?;
-
-        let existing_resource = self
-            .resource_aggregate_loader
-            .load(&id)
+        self.planner
+            .plan_create_resource(
+                ApplyResourceParams {
+                    id: None,
+                    headers,
+                    // Placed already
+                    account_source: ApplyResourceAccountSource::Manifest,
+                    access_check: ApplyResourceAccessCheck::ByGuard,
+                    spec: plan.resource.spec().clone().into_input(),
+                    provenance,
+                },
+                plan.planned_at,
+                OmittedNameHandling::Generate {
+                    max_attempts: attempts_left,
+                },
+            )
             .await
-            .map_err(ResourceLoadError)
-            .map_err(ApplyResourceUseCaseError::LoadFailed)?;
-
-        let spec = plan.resource.spec().clone();
-
-        let replanned = planner.plan_update_resource(
-            existing_resource,
-            ApplyResourceParams {
-                id: Some(id),
-                headers: headers_input,
-                spec: spec.into_input(),
-            },
-            plan.planned_at,
-        )?;
-
-        match replanned {
-            PlannedApplyResourceDecision::Planned(replanned) => match replanned.action {
-                ApplyResourceAction::Create => Err(ApplyResourceUseCaseError::Internal(
-                    "Resource duplicate create retry unexpectedly produced a create plan"
-                        .int_err()
-                        .with_context(format!(
-                            "account_id={:?}, schema='{}', name='{}'",
-                            plan.resource.headers().account,
-                            R::type_uri(),
-                            plan.resource.headers().name
-                        )),
-                )),
-                ApplyResourceAction::Update => self.execute_update(replanned).await,
-                ApplyResourceAction::Untouched => Ok(ApplyResourceApplicationDecision::Applied(
-                    self.make_apply_result(replanned),
-                )),
-            },
-            PlannedApplyResourceDecision::Rejected(rejection) => {
-                Ok(ApplyResourceApplicationDecision::Rejected(rejection))
-            }
-        }
     }
 
     fn make_apply_result(&self, plan: PlannedApplyResource<R>) -> ApplyResourceResult<R> {
@@ -260,6 +224,27 @@ where
             )
             .await
             .map_err(ApplyResourceUseCaseError::Internal)
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// What became of a plan
+#[derive(Debug)]
+pub enum ApplyResourceExecution<R: DeclarativeResource> {
+    Decided(ApplyResourceApplicationDecision<R>),
+    /// Another writer took the name given to the resource to create; nothing is
+    /// written
+    NameTaken,
+}
+
+impl<R: DeclarativeResource> ApplyResourceExecution<R> {
+    pub(crate) fn applied(result: ApplyResourceResult<R>) -> Self {
+        Self::Decided(ApplyResourceApplicationDecision::Applied(result))
+    }
+
+    pub(crate) fn rejected(rejection: ApplyResourceRejection) -> Self {
+        Self::Decided(ApplyResourceApplicationDecision::Rejected(rejection))
     }
 }
 

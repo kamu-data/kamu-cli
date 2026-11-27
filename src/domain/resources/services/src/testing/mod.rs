@@ -8,5 +8,17 @@
 // by the Apache License, Version 2.0.
 
 mod base_resource_service_harness;
+mod immutable_test_resource;
+mod own_account_resource_access;
+mod test_conditions;
+mod test_resource;
+mod test_resource_access;
+mod test_resource_reconciler;
 
 pub use base_resource_service_harness::*;
+pub use immutable_test_resource::*;
+pub(crate) use own_account_resource_access::*;
+pub use test_conditions::*;
+pub use test_resource::*;
+pub use test_resource_access::*;
+pub use test_resource_reconciler::*;

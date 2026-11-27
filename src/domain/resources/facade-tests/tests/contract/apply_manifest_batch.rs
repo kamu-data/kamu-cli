@@ -14,10 +14,9 @@ use kamu_resources::{
     ApplyManifestRejection,
     ApplyResourceOutcome,
     ApplyResourceRejectionCategory,
-    ResourceRef,
+    ResourceID,
     ResourceSchemaProvider,
     ResourceVisibility,
-    TypeName,
 };
 use kamu_resources_facade::{
     ApplyManifestBatchRequest,
@@ -30,18 +29,20 @@ use kamu_resources_facade::{
     SpecViewOpts,
 };
 use pretty_assertions::{assert_eq, assert_matches};
+use uuid::Uuid;
 
 use crate::contract_test;
 use crate::harness::{FacadeContractHarness, RemoteGraphqlFacadeHarness, TestAccount};
 use crate::helpers::{
     SECRET_SET_SCHEMA_STR,
-    VARIABLE_SET_CANONICAL_SELECTOR,
     VARIABLE_SET_SCHEMA_STR,
     assert_resource_view_fields,
     assert_single_batch_problem,
     assert_single_batch_success,
     secret_set_manifest_json,
     variable_set_manifest_json,
+    variable_set_manifest_json_with_id,
+    variable_set_ref_by_name,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -95,46 +96,13 @@ fn variable_set_manifest_json_with_unknown_account(name: &str) -> String {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-fn variable_set_manifest_json_with_id(id: kamu_resources::ResourceID, name: &str) -> String {
-    serde_json::json!({
-        "$schema": VARIABLE_SET_SCHEMA_STR,
-        "headers": {
-            "id": id,
-            "name": name
-        },
-        "spec": {
-            "variables": {
-                "K": {"value": "v"}
-            }
-        }
-    })
-    .to_string()
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-fn by_name(name: &str) -> ResourceRef {
-    ResourceRef {
-        account: None,
-        r#type: Some(
-            VARIABLE_SET_CANONICAL_SELECTOR
-                .parse::<TypeName>()
-                .unwrap()
-                .into(),
-        ),
-        id: None,
-        did: None,
-        name: Some(name.parse().unwrap()),
-    }
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 async fn assert_absent(h: &impl FacadeContractHarness, name: &str) {
     let result = h
         .facade_for(TestAccount::Alice)
         .get(
-            vec![by_name(name)],
+            vec![variable_set_ref_by_name(name)],
             SpecViewOpts::ENCRYPTED,
             ResourceVisibility::Active,
         )
@@ -301,7 +269,7 @@ pub async fn test_batch_apply_all_successes_preserves_order(h: &impl FacadeContr
     let fetched = assert_single_batch_success(
         facade
             .get(
-                vec![by_name("batch-contract-b")],
+                vec![variable_set_ref_by_name("batch-contract-b")],
                 SpecViewOpts::ENCRYPTED,
                 ResourceVisibility::Active,
             )
@@ -385,12 +353,12 @@ contract_test!(
 );
 
 pub async fn test_batch_apply_rollback_reconstructs_id_not_found(h: &impl FacadeContractHarness) {
-    let missing_id = kamu_resources::ResourceID::new(uuid::Uuid::new_v4());
+    let missing_id = ResourceID::new(Uuid::new_v4());
     let response = h
         .facade_for(TestAccount::Alice)
         .apply_manifests(batch_request(vec![
             variable_set_manifest_json("batch-id-not-found-before", None, &[("K", "1")]),
-            variable_set_manifest_json_with_id(missing_id, "batch-id-not-found-missing"),
+            variable_set_manifest_json_with_id(missing_id, "batch-id-not-found-missing", "v"),
             variable_set_manifest_json("batch-id-not-found-after", None, &[("K", "2")]),
         ]))
         .await
@@ -485,7 +453,7 @@ pub async fn test_batch_apply_rollback_reconstructs_type_mismatch(h: &impl Facad
         .facade_for(TestAccount::Alice)
         .apply_manifests(batch_request(vec![
             variable_set_manifest_json("batch-type-mismatch-before", None, &[("K", "1")]),
-            variable_set_manifest_json_with_id(secret_id, "batch-type-mismatch-variable"),
+            variable_set_manifest_json_with_id(secret_id, "batch-type-mismatch-variable", "v"),
             variable_set_manifest_json("batch-type-mismatch-after", None, &[("K", "2")]),
         ]))
         .await

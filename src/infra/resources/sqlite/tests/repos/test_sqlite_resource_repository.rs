@@ -12,7 +12,11 @@ use database_common_macros::{database_concurrent_transactions_test, database_tra
 use dill::{Catalog, CatalogBuilder};
 use kamu_accounts_sqlite::SqliteAccountRepository;
 use kamu_resources_repo_tests::resource_repository_test_suite as resource_repo_suite;
-use kamu_resources_sqlite::{SqliteResourceLabelProjectionRepository, SqliteResourceRepository};
+use kamu_resources_sqlite::{
+    SqliteResourceLabelProjectionRepository,
+    SqliteResourceOwnerProjectionRepository,
+    SqliteResourceRepository,
+};
 use sqlx::SqlitePool;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -53,6 +57,14 @@ database_transactional_test!(
 database_transactional_test!(
     storage = sqlite,
     fixture = resource_repo_suite::test_find_resource_handles_by_ids,
+    harness = SqliteResourceRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = sqlite,
+    fixture = resource_repo_suite::test_touch_live_resources,
     harness = SqliteResourceRepositoryHarness
 );
 
@@ -164,6 +176,14 @@ database_transactional_test!(
 
 database_transactional_test!(
     storage = sqlite,
+    fixture = resource_repo_suite::test_create_resource_with_taken_id_fails,
+    harness = SqliteResourceRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = sqlite,
     fixture = resource_repo_suite::test_create_resource_duplicate_ignore_case_fails,
     harness = SqliteResourceRepositoryHarness
 );
@@ -252,7 +272,7 @@ database_transactional_test!(
 
 database_transactional_test!(
     storage = sqlite,
-    fixture = resource_repo_suite::test_find_deleted_resource_not_returned,
+    fixture = resource_repo_suite::test_resource_in_deletion_round_trips,
     harness = SqliteResourceRepositoryHarness
 );
 
@@ -260,7 +280,7 @@ database_transactional_test!(
 
 database_transactional_test!(
     storage = sqlite,
-    fixture = resource_repo_suite::test_resource_being_deleted_round_trips,
+    fixture = resource_repo_suite::test_visibility_by_deletion_state,
     harness = SqliteResourceRepositoryHarness
 );
 
@@ -268,7 +288,7 @@ database_transactional_test!(
 
 database_transactional_test!(
     storage = sqlite,
-    fixture = resource_repo_suite::test_resource_being_deleted_is_hidden_unless_included,
+    fixture = resource_repo_suite::test_deleted_resources_share_name_with_live_one,
     harness = SqliteResourceRepositoryHarness
 );
 
@@ -276,7 +296,7 @@ database_transactional_test!(
 
 database_transactional_test!(
     storage = sqlite,
-    fixture = resource_repo_suite::test_name_of_resource_being_deleted_can_be_taken,
+    fixture = resource_repo_suite::test_listings_with_deleted_resources_run_newest_deletion_first,
     harness = SqliteResourceRepositoryHarness
 );
 
@@ -284,7 +304,25 @@ database_transactional_test!(
 
 database_transactional_test!(
     storage = sqlite,
-    fixture = resource_repo_suite::test_summarize_resources_counts_deleting,
+    fixture = resource_repo_suite::test_find_resources_due_for_purge,
+    harness = SqliteResourceRepositoryHarness
+);
+
+database_transactional_test!(
+    storage = sqlite,
+    fixture = resource_repo_suite::test_purge_deadline_is_kept_apart_from_snapshot,
+    harness = SqliteResourceRepositoryHarness
+);
+
+database_transactional_test!(
+    storage = sqlite,
+    fixture = resource_repo_suite::test_purge_resources,
+    harness = SqliteResourceRepositoryHarness
+);
+
+database_transactional_test!(
+    storage = sqlite,
+    fixture = resource_repo_suite::test_purging_an_owner_keeps_owner_rows_of_owned_resources,
     harness = SqliteResourceRepositoryHarness
 );
 
@@ -341,6 +379,7 @@ impl SqliteResourceRepositoryHarness {
         catalog_builder.add::<SqliteTransactionManager>();
         catalog_builder.add::<SqliteResourceRepository>();
         catalog_builder.add::<SqliteResourceLabelProjectionRepository>();
+        catalog_builder.add::<SqliteResourceOwnerProjectionRepository>();
         catalog_builder.add::<SqliteAccountRepository>();
         Self {
             catalog: catalog_builder.build(),
@@ -377,14 +416,6 @@ database_transactional_test!(
 
 database_transactional_test!(
     storage = sqlite,
-    fixture = resource_repo_suite::test_find_resource_ids_by_schema_and_label_excludes_deleted,
-    harness = SqliteResourceRepositoryHarness
-);
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-database_transactional_test!(
-    storage = sqlite,
     fixture =
         resource_repo_suite::test_find_resource_ids_by_schema_and_label_excludes_other_accounts,
     harness = SqliteResourceRepositoryHarness
@@ -405,6 +436,22 @@ database_transactional_test!(
     storage = sqlite,
     fixture =
         resource_repo_suite::test_find_resource_ids_by_schema_and_label_any_account_discriminates,
+    harness = SqliteResourceRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = sqlite,
+    fixture = resource_repo_suite::test_owner_references_round_trip,
+    harness = SqliteResourceRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = sqlite,
+    fixture = resource_repo_suite::test_search_by_owner,
     harness = SqliteResourceRepositoryHarness
 );
 

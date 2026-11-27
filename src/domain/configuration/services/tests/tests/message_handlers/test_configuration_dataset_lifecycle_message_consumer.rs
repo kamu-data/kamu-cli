@@ -47,13 +47,13 @@ async fn test_deleted_dataset_deletes_auto_managed_sets_of_both_kinds() {
 
     harness.consume_deleted(&dataset_id).await.unwrap();
 
-    // Actually tombstoned, not merely de-indexed
+    // Actually deleted, not merely de-indexed
     assert!(
-        harness.get_snapshot_by_id(&vars_id).await.is_none(),
+        harness.is_deleted(&vars_id).await,
         "auto-managed VariableSet must be deleted"
     );
     assert!(
-        harness.get_snapshot_by_id(&secrets_id).await.is_none(),
+        harness.is_deleted(&secrets_id).await,
         "auto-managed SecretSet must be deleted"
     );
 
@@ -166,7 +166,7 @@ async fn test_deleted_dataset_strips_label_from_user_authored_secret_set() {
     assert_eq!(
         after.headers.generation,
         before.headers.generation + 1,
-        "only the label changes for an already-sanitized secret set, bumping the generation once"
+        "only the label changes for an already-encrypted secret set, bumping the generation once"
     );
 }
 
@@ -193,7 +193,7 @@ async fn test_auto_managed_and_user_authored_are_treated_differently() {
     harness.consume_deleted(&dataset_id).await.unwrap();
 
     assert!(
-        harness.get_snapshot_by_id(&legacy_id).await.is_none(),
+        harness.is_deleted(&legacy_id).await,
         "the auto-managed set is deleted"
     );
     let survivor = harness
@@ -261,10 +261,7 @@ async fn test_resources_of_other_accounts_are_swept_too() {
     harness.consume_deleted(&dataset_id).await.unwrap();
 
     assert!(
-        harness
-            .get_snapshot_by_id(&stranger_legacy_id)
-            .await
-            .is_none(),
+        harness.is_deleted(&stranger_legacy_id).await,
         "another account's auto-managed set is deleted too"
     );
     let survivor = harness
@@ -399,7 +396,7 @@ async fn test_consuming_the_same_deleted_message_twice_is_idempotent() {
         .await
         .expect("redelivery must not fail");
 
-    assert!(harness.get_snapshot_by_id(&legacy_id).await.is_none());
+    assert!(harness.is_deleted(&legacy_id).await);
     let survivor = harness.get_snapshot_by_id(&user_id).await.unwrap();
     assert!(!has_target_label(&survivor));
 }

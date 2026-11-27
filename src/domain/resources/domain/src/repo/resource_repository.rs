@@ -14,9 +14,13 @@ use internal_error::InternalError;
 use thiserror::Error;
 
 use crate::{
+    ResourceDueForPurge,
+    ResourceHandle,
+    ResourceHeaders,
     ResourceID,
     ResourceName,
     ResourcePhaseCounts,
+    ResourcePurgeDeadline,
     ResourceRawEventQuery,
     ResourceSnapshot,
     ResourceSnapshotStream,
@@ -35,6 +39,8 @@ use crate::{
 pub trait ResourceRepository: Send + Sync {
     async fn new_resource_id(&self) -> Result<ResourceID, InternalError>;
 
+    /// A taken name is reported without failing the transaction, so the caller
+    /// may read and write on in it.
     async fn create_resource(
         &self,
         resource_snapshot: &ResourceSnapshot,
@@ -61,8 +67,8 @@ pub trait ResourceRepository: Send + Sync {
         Ok(())
     }
 
-    /// Finds the live resource holding the name; resources being deleted no
-    /// longer hold one.
+    /// Finds the live resource holding the name; a resource gives it up when
+    /// its deletion is requested.
     async fn find_resource_id_by_name(
         &self,
         account_id: &odf::AccountID,
@@ -70,23 +76,33 @@ pub trait ResourceRepository: Send + Sync {
         name: &ResourceName,
     ) -> Result<Option<ResourceID>, InternalError>;
 
-    /// Returns rows in the order their IDs appear in `ids`, including resources
-    /// being deleted. IDs that do not exist, are deleted, or belong to another
-    /// account are absent, so the result may be shorter than the request but
-    /// never reordered.
+    /// Returns rows in the order their IDs appear in `ids`, in any state. IDs
+    /// that do not exist or belong to another account are absent, so the result
+    /// may be shorter than the request but never reordered.
     async fn find_resource_handles_by_ids(
         &self,
         account_id: &odf::AccountID,
         ids: &[ResourceID],
     ) -> Result<Vec<ResourceHandleRow>, InternalError>;
 
+    /// Writes the rows of the resources among `ids` of the account whose
+    /// deletion is not requested, without changing them, and returns their
+    /// IDs in no particular order. A concurrent write of such a row, such as a
+    /// deletion request, then conflicts with this transaction: whichever
+    /// commits second sees the first. The other IDs are absent.
+    async fn touch_live_resources(
+        &self,
+        account_id: &odf::AccountID,
+        ids: &[ResourceID],
+    ) -> Result<Vec<ResourceID>, InternalError>;
+
     /// Matches names case-insensitively. Names that do not exist are absent
-    /// from the result. With [`ResourceVisibility::IncludeDeleting`] a name may
-    /// resolve to several IDs: one live resource and those being deleted.
+    /// from the result. Unless only live resources are visible, a name may
+    /// resolve to several IDs.
     ///
     /// Returns pairs in the order their names appear in `names`. Within a name
     /// the live resource comes first, then those being deleted, oldest request
-    /// first.
+    /// first, then the deleted ones, newest deletion first.
     async fn resolve_resource_ids_by_names(
         &self,
         account_id: &odf::AccountID,
@@ -129,11 +145,17 @@ pub trait ResourceRepository: Send + Sync {
 
     /// Label filtering rides on `scope`: each row carries the pairs it must
     /// satisfy, so one call may filter differently per type.
+    ///
+    /// An `owner_id` narrows every row to the resources it owns, whether or not
+    /// the owner still exists.
+    ///
+    /// Orders as [`Self::list_resource_snapshots`] does.
     async fn search_resource_handles(
         &self,
         account_id: &odf::AccountID,
         scope: &ResourceScope,
         visibility: ResourceVisibility,
+        owner_id: Option<ResourceID>,
         pagination: PaginationOpts,
     ) -> Result<Vec<ResourceHandleRow>, InternalError>;
 
@@ -142,30 +164,32 @@ pub trait ResourceRepository: Send + Sync {
         account_id: &odf::AccountID,
         scope: &ResourceScope,
         visibility: ResourceVisibility,
+        owner_id: Option<ResourceID>,
     ) -> Result<usize, InternalError>;
 
+    /// Returns the resource in any state.
     async fn find_resource_snapshot(
         &self,
         query: &ResourceRawEventQuery,
     ) -> Result<Option<ResourceSnapshot>, InternalError>;
 
-    /// Returns snapshots in the order their IDs appear in `ids`. This lookup is
-    /// by schema, not by account, so it spans accounts.
+    /// Returns snapshots in the order their IDs appear in `ids`, in any state.
+    /// This lookup is by schema, not by account, so it spans accounts.
     async fn find_resource_snapshots_by_schema_and_ids(
         &self,
         schema: &TypeUri,
         ids: &[ResourceID],
     ) -> Result<Vec<ResourceSnapshot>, InternalError>;
 
+    /// Returns the resource in any state.
     async fn find_resource_snapshot_by_id(
         &self,
         id: &ResourceID,
     ) -> Result<Option<ResourceSnapshot>, InternalError>;
 
-    /// Returns snapshots in the order their IDs appear in `ids`, including
-    /// resources being deleted. IDs that do not exist, are deleted, or belong
-    /// to another account are absent, so the result may be shorter than the
-    /// request but never reordered.
+    /// Returns snapshots in the order their IDs appear in `ids`, in any state.
+    /// IDs that do not exist or belong to another account are absent, so the
+    /// result may be shorter than the request but never reordered.
     async fn find_resource_snapshots_by_ids(
         &self,
         account_id: &odf::AccountID,
@@ -173,27 +197,78 @@ pub trait ResourceRepository: Send + Sync {
     ) -> Result<Vec<ResourceSnapshot>, InternalError>;
 
     /// Spans the schemas named by `scope`, each with its own query and label
-    /// pairs.
+    /// pairs. Takes `owner_id` as [`Self::search_resource_handles`] does.
+    ///
+    /// Orders by last update, newest first. When deleted resources are visible,
+    /// the live ones keep that order and come first; the others follow, newest
+    /// first by the time their deletion completed, or was requested while it
+    /// has not.
     fn list_resource_snapshots(
         &self,
         account_id: &odf::AccountID,
         scope: &ResourceScope,
         visibility: ResourceVisibility,
+        owner_id: Option<ResourceID>,
         pagination: PaginationOpts,
     ) -> ResourceSnapshotStream<'_>;
 
+    /// Counts resources in any state.
     async fn summarize_resources(
         &self,
         account_id: odf::AccountID,
     ) -> Result<Vec<ResourceSummaryRow>, InternalError>;
+
+    /// Sets when deleted resources may be purged, ignoring IDs of no resource.
+    /// The deadline is kept apart from the snapshot: updating a resource leaves
+    /// it as it is.
+    async fn set_purge_deadlines(
+        &self,
+        deadlines: &[ResourcePurgeDeadline],
+    ) -> Result<(), InternalError>;
+
+    /// Returns at most `limit` resources, of every account and type, whose
+    /// purge deadline is not after `now`, earliest deadline first.
+    async fn find_resources_due_for_purge(
+        &self,
+        now: DateTime<Utc>,
+        limit: usize,
+    ) -> Result<Vec<ResourceDueForPurge>, InternalError>;
+
+    /// Counts the resources whose purge deadline is not after `now`.
+    async fn count_resources_due_for_purge(&self, now: DateTime<Utc>)
+    -> Result<u64, InternalError>;
+
+    /// Claims the given resources whose purge deadline is not after `now` for
+    /// a purge, and returns the IDs it claimed: a compare-and-set that clears
+    /// the deadline, so a concurrent purger of the same resources claims none
+    /// of them.
+    async fn claim_resources_for_purge(
+        &self,
+        ids: &[ResourceID],
+        now: DateTime<Utc>,
+    ) -> Result<Vec<ResourceID>, InternalError>;
+
+    /// Deletes the snapshot rows of resources claimed for a purge, with what
+    /// the storage removes along with them by cascade (labels, owners,
+    /// configuration projections), after every registered
+    /// [`crate::ResourceRemovalListener`] removed what it keeps of them. The
+    /// events and the controller bookkeeping of the resources are removed
+    /// first, by their own repositories.
+    async fn purge_resources(&self, ids: &[ResourceID]) -> Result<(), InternalError>;
+
+    /// Returns the earliest purge deadline after `now`.
+    async fn find_nearest_purge_at(
+        &self,
+        now: DateTime<Utc>,
+    ) -> Result<Option<DateTime<Utc>>, InternalError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Which resources a lookup by name, search or listing returns. Deleted
-/// resources are never returned. The reads by ID (`find_resource_snapshot*`,
-/// `find_resource_handles_by_ids`) always return resources being deleted; an
-/// ID query in a search scope follows the visibility like any other.
+/// Which resources a lookup by name, search or listing returns. The reads by ID
+/// (`find_resource_snapshot*`, `find_resource_handles_by_ids`) return resources
+/// in any state; an ID query in a search scope follows the visibility like any
+/// other.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub enum ResourceVisibility {
     /// Resources whose deletion was not requested
@@ -201,21 +276,58 @@ pub enum ResourceVisibility {
     Active,
     /// Also resources whose deletion is in progress
     IncludeDeleting,
+    /// Resources in any state
+    IncludeDeleted,
+    /// Only resources whose deletion is in progress or completed
+    DeletedOnly,
 }
 
 impl ResourceVisibility {
-    pub fn with_deleting(include_deleting: bool) -> Self {
-        if include_deleting {
-            Self::IncludeDeleting
-        } else {
-            Self::Active
+    /// The visibility of resources addressed by ID: an ID finds a resource in
+    /// any state, and only [`Self::DeletedOnly`] hides live ones from it
+    pub fn of_ids(self) -> Self {
+        match self {
+            Self::Active | Self::IncludeDeleting | Self::IncludeDeleted => Self::IncludeDeleted,
+            Self::DeletedOnly => Self::DeletedOnly,
         }
     }
 
+    /// Whether resources whose deletion was not requested are visible
+    pub fn includes_live(self) -> bool {
+        match self {
+            Self::Active | Self::IncludeDeleting | Self::IncludeDeleted => true,
+            Self::DeletedOnly => false,
+        }
+    }
+
+    /// Whether resources whose deletion is in progress are visible
     pub fn includes_deleting(self) -> bool {
         match self {
             Self::Active => false,
-            Self::IncludeDeleting => true,
+            Self::IncludeDeleting | Self::IncludeDeleted | Self::DeletedOnly => true,
+        }
+    }
+
+    /// Whether resources whose deletion completed are visible
+    pub fn includes_deleted(self) -> bool {
+        match self {
+            Self::Active | Self::IncludeDeleting => false,
+            Self::IncludeDeleted | Self::DeletedOnly => true,
+        }
+    }
+
+    /// Whether a resource in this state of deletion is visible
+    pub fn includes(
+        self,
+        deletion_requested_at: Option<DateTime<Utc>>,
+        deleted_at: Option<DateTime<Utc>>,
+    ) -> bool {
+        if deleted_at.is_some() {
+            self.includes_deleted()
+        } else if deletion_requested_at.is_some() {
+            self.includes_deleting()
+        } else {
+            self.includes_live()
         }
     }
 }
@@ -431,6 +543,22 @@ pub struct ResourceDuplicateError {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+fn user_account_handle(
+    did: odf::AccountID,
+    resource_id: uuid::Uuid,
+    name: &str,
+) -> odf::ResourceOwnerHandle {
+    odf::ResourceOwnerHandle {
+        // TODO: Support Org accounts
+        r#type: odf::metadata::auth::User::type_uri().cheap_clone(),
+        id: ResourceID::new(resource_id),
+        did,
+        name: odf::AccountName::new_unchecked(name),
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "sqlx", derive(sqlx::FromRow))]
 pub struct ResourceHandleRow {
@@ -440,16 +568,44 @@ pub struct ResourceHandleRow {
     pub account_id: odf::AccountID,
     pub account_resource_id: uuid::Uuid,
     pub account_name: String,
+    pub deletion_requested_at: Option<DateTime<Utc>>,
+    pub deleted_at: Option<DateTime<Utc>>,
 }
 
 impl ResourceHandleRow {
     pub fn account_handle(&self) -> odf::ResourceOwnerHandle {
-        odf::ResourceOwnerHandle {
-            // TODO: Support Org accounts
-            r#type: odf::metadata::auth::User::type_uri().cheap_clone(),
-            id: ResourceID::new(self.account_resource_id),
-            did: self.account_id.clone(),
-            name: odf::AccountName::new_unchecked(&self.account_name),
+        user_account_handle(
+            self.account_id.clone(),
+            self.account_resource_id,
+            &self.account_name,
+        )
+    }
+
+    pub fn into_handle(self) -> ResourceHandle {
+        ResourceHandle {
+            account: self.account_handle(),
+            r#type: TypeUri::new_unchecked(&self.schema),
+            id: ResourceID::new(self.id),
+            // TODO: temporary until we support DID-aware resource types; once we do,
+            // this must be populated instead of always `None`.
+            did: None,
+            name: ResourceName::new_unchecked(&self.name),
+        }
+    }
+}
+
+impl From<&ResourceSnapshot> for ResourceHandleRow {
+    fn from(snapshot: &ResourceSnapshot) -> Self {
+        let headers = &snapshot.headers;
+        Self {
+            id: *snapshot.id.as_ref(),
+            schema: snapshot.schema.to_string(),
+            name: headers.name.to_string(),
+            account_id: headers.account.did.clone(),
+            account_resource_id: *headers.account.id.as_ref(),
+            account_name: headers.account.name.to_string(),
+            deletion_requested_at: headers.deletion_requested_at,
+            deleted_at: headers.deleted_at,
         }
     }
 }
@@ -467,6 +623,7 @@ pub struct ResourceSnapshotRow {
     pub resource_name: String,
     pub labels: serde_json::Value,
     pub annotations: serde_json::Value,
+    pub owner_references: Option<serde_json::Value>,
     pub spec: serde_json::Value,
     pub status: Option<serde_json::Value>,
     pub generation: i64,
@@ -481,19 +638,17 @@ pub struct ResourceSnapshotRow {
 impl ResourceSnapshotRow {
     pub fn into_snapshot(self) -> ResourceSnapshot {
         let id = ResourceID::new(self.id);
+        let account = user_account_handle(
+            self.account_id,
+            self.account_resource_id,
+            &self.account_name,
+        );
 
         ResourceSnapshot {
             id,
             schema: TypeUri::new_unchecked(&self.resource_schema),
-            headers: crate::ResourceHeaders {
+            headers: ResourceHeaders {
                 id,
-                account: odf::ResourceOwnerHandle {
-                    // TODO: Support Org accounts
-                    r#type: odf::metadata::auth::User::type_uri().cheap_clone(),
-                    id: ResourceID::new(self.account_resource_id),
-                    did: self.account_id,
-                    name: odf::AccountName::new_unchecked(&self.account_name),
-                },
                 name: ResourceName::new_unchecked(&self.resource_name),
                 labels: crate::resource_labels_from_json(self.labels),
                 annotations: crate::resource_annotations_from_json(self.annotations),
@@ -503,7 +658,11 @@ impl ResourceSnapshotRow {
                 updated_at: self.updated_at,
                 deletion_requested_at: self.deletion_requested_at,
                 deleted_at: self.deleted_at,
-                owner_references: None,
+                owner_references: crate::resource_owner_references_from_json(
+                    self.owner_references,
+                    &account,
+                ),
+                account,
             },
             spec: self.spec,
             status: self

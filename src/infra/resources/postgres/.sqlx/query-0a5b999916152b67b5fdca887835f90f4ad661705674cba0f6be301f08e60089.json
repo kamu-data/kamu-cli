@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT purge_at AS \"purge_at!: DateTime<Utc>\"\n            FROM resources\n            WHERE purge_at IS NOT NULL AND purge_at > $1\n            ORDER BY purge_at ASC\n            LIMIT 1\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "purge_at!: DateTime<Utc>",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "resources",
+            "name": "purge_at"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Timestamptz"
+      ]
+    },
+    "nullable": [
+      true
+    ]
+  },
+  "hash": "0a5b999916152b67b5fdca887835f90f4ad661705674cba0f6be301f08e60089"
+}

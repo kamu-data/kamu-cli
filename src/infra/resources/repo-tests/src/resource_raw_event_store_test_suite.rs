@@ -191,6 +191,49 @@ pub async fn test_events_isolated_by_query(catalog: &Catalog) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+pub async fn test_delete_events_of_resources(catalog: &Catalog) {
+    let event_store = catalog.get_one::<dyn ResourceRawEventStore>().unwrap();
+
+    let deleted = make_resource(catalog, "TestKind").await;
+    let kept = make_resource(catalog, "TestKind").await;
+    for query in [&deleted, &kept] {
+        event_store
+            .save_events(
+                query,
+                None,
+                vec![
+                    make_raw_event(query, "Created", serde_json::json!({})),
+                    make_raw_event(query, "SpecUpdated", serde_json::json!({})),
+                ],
+            )
+            .await
+            .unwrap();
+    }
+
+    event_store
+        .delete_events_of_resources(&[deleted.id, ResourceID::new(uuid::Uuid::new_v4())])
+        .await
+        .unwrap();
+
+    for (query, expected_count) in [(&deleted, 0), (&kept, 2)] {
+        let events: Vec<_> = event_store
+            .get_events(query, GetEventsOpts::default())
+            .try_collect()
+            .await
+            .unwrap();
+        assert_eq!(events.len(), expected_count);
+    }
+    assert_eq!(
+        event_store
+            .total_events_stored_by_schema("TestKind")
+            .await
+            .unwrap(),
+        2
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 pub async fn test_get_all_events(catalog: &Catalog) {
     let event_store = catalog.get_one::<dyn ResourceRawEventStore>().unwrap();
 

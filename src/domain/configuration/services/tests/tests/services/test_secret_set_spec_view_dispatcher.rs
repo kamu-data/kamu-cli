@@ -9,11 +9,7 @@
 
 use kamu_configuration::{SecretExt, SecretSetResource, SecretSetSpec, SecretSetSpecInput};
 use kamu_configuration_services::testing::BaseConfigurationServiceHarness;
-use kamu_resources::{
-    ApplyResourceApplicationDecision,
-    ApplyResourceParams,
-    ResourceSchemaProvider,
-};
+use kamu_resources::{ApplyResourceApplicationDecision, ResourceSchemaProvider};
 use kamu_resources_services::ResourceDispatcherFactory;
 use kamu_resources_services::testing::BaseResourceServiceHarness;
 
@@ -49,11 +45,11 @@ async fn test_spec_view_dispatcher_reveals_encrypted_secrets_as_plaintext() {
 
     let decision = harness
         .apply_secret_use_case()
-        .apply(ApplyResourceParams {
-            id: None,
-            headers: BaseResourceServiceHarness::make_headers_input(account_handle, "test-secrets"),
+        .apply(BaseResourceServiceHarness::make_apply_params(
+            account_handle,
+            Some("test-secrets"),
             spec,
-        })
+        ))
         .await
         .unwrap();
 

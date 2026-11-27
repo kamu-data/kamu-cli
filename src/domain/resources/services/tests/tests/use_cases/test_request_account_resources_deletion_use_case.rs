@@ -30,7 +30,7 @@ async fn test_request_account_deletion_leaves_other_accounts_intact() {
         .request_account_resources_deletion(account_handle_a.did)
         .await;
 
-    harness.assert_exists(&id_b).await;
+    harness.assert_live(&id_b).await;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -49,7 +49,7 @@ async fn test_request_account_deletion_handles_pagination() {
         .await;
     harness.settle().await;
 
-    harness.assert_gone(&ids).await;
+    harness.assert_deleted(&ids).await;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -11,7 +11,7 @@ use std::num::NonZeroUsize;
 use std::sync::Arc;
 use std::time::Duration;
 
-use background_agent_host::CancellationToken;
+use background_agent_host::{BackgroundWorkFinalizer, CancellationToken};
 use chrono::TimeDelta;
 use database_common::transaction;
 use dill::CatalogBuilder;
@@ -37,12 +37,11 @@ use kamu_resources::{
 use kamu_resources_services::testing::{
     BaseResourceServiceHarness,
     BaseResourceServiceHarnessOpts,
+    TestResource,
+    TestResourceSpec,
+    test_stage_condition_key,
 };
-use kamu_resources_services::{
-    BackgroundWorkFinalizer,
-    ResourceControllerRuntimeImpl,
-    ResourceControllerRuntimeMetrics,
-};
+use kamu_resources_services::{ResourceControllerRuntimeImpl, ResourceControllerRuntimeMetrics};
 use messaging_outbox::{OutboxMessageBridge, OutboxProvider};
 use retry_backoff::{RetryBackoff, RetryBackoffType};
 use time_source::FakeSystemTimeSource;
@@ -60,13 +59,7 @@ use crate::tests::controller_runtime::utils::{
     TestResourceSecondController,
     TestResourceStatusReactingController,
 };
-use crate::tests::utils::{
-    ServiceLayerTestHarness,
-    ServiceLayerTestHarnessOpts,
-    TestResource,
-    TestResourceSpec,
-    test_stage_condition_key,
-};
+use crate::tests::utils::{ServiceLayerTestHarness, ServiceLayerTestHarnessOpts};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -224,7 +217,7 @@ impl ControllerRuntimeHarness {
     /// Delivers the outbox messages and drains the controllers in turn, as a
     /// CLI command does before it exits
     pub async fn try_run_outbox_and_controllers_until_idle(&self) -> Result<(), InternalError> {
-        BackgroundWorkFinalizer::for_dispatching_outbox()
+        BackgroundWorkFinalizer::settle_only()
             .finalize(&self.process_catalog)
             .await
     }
@@ -236,7 +229,7 @@ impl ControllerRuntimeHarness {
         for _ in 0..count {
             let catalog = self.process_catalog.clone();
             finalizations.spawn(async move {
-                BackgroundWorkFinalizer::for_dispatching_outbox()
+                BackgroundWorkFinalizer::settle_only()
                     .finalize(&catalog)
                     .await
             });
@@ -361,13 +354,13 @@ impl ControllerRuntimeHarness {
         self.apply_test_uc()
             .apply(ApplyResourceParams {
                 id: Some(id),
-                headers: BaseResourceServiceHarness::make_headers_input(
+                ..BaseResourceServiceHarness::make_apply_params(
                     self.account.clone(),
-                    snapshot.headers.name.as_str(),
-                ),
-                spec: TestResourceSpec {
-                    value: value.to_string(),
-                },
+                    Some(snapshot.headers.name.as_str()),
+                    TestResourceSpec {
+                        value: value.to_string(),
+                    },
+                )
             })
             .await
             .unwrap()
@@ -398,10 +391,6 @@ impl ControllerRuntimeHarness {
 
     pub async fn version(&self, id: ResourceID) -> ResourceVersion {
         ResourceVersion::from(&self.get_snapshot_by_id(&id).await.unwrap().headers)
-    }
-
-    pub async fn exists(&self, id: ResourceID) -> bool {
-        self.get_snapshot_by_id(&id).await.is_some()
     }
 
     pub async fn phase(&self, id: ResourceID) -> ResourcePhase {

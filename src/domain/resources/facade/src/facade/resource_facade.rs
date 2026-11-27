@@ -52,11 +52,15 @@ use crate::{
 /// boundary belongs to the caller (the CLI's `--continue-on-error` path opens
 /// one transaction per manifest), not to the facade.
 ///
-/// Name lookups and searches see resources being deleted only under
-/// [`ResourceVisibility::IncludeDeleting`]. A name may then resolve to several
-/// resources: the live one first, then those being deleted, each reported as a
-/// success at the same `request_index`. A lookup by id finds a resource being
-/// deleted either way. `delete` resolves names to live resources only.
+/// Name lookups and searches see the resources their [`ResourceVisibility`]
+/// includes. A name may then resolve to several resources: the live one first,
+/// then those being deleted, then the deleted ones, each reported as a success
+/// at the same `request_index`. A lookup by id finds a resource in any state;
+/// only [`ResourceVisibility::DeletedOnly`] hides live ones from it.
+///
+/// `delete` resolves names to live resources only. Deleting or applying by the
+/// id of a deleted resource does not find it. The spec of a deleted resource is
+/// not revealed.
 #[cfg_attr(feature = "testing", mockall::automock)]
 #[async_trait::async_trait]
 pub trait ResourceFacade: Send + Sync {
@@ -235,11 +239,26 @@ pub struct SearchResourcesRequest {
     /// Label filtering and account scoping ride here too: each selector carries
     /// its own `labels` and `account`, so one call may filter differently per
     /// type and span several accounts. There is deliberately no call-level
-    /// filter or account — a uniform one is the special case where every
+    /// label filter or account — a uniform one is the special case where every
     /// selector carries the same.
     pub selectors: Vec<ResourceSelector>,
+    /// Only the resources this one owns, among those the selectors match. By ID
+    /// it may be in any state, even purged; by name it must be live.
+    pub owner: Option<ResourceRef>,
     pub visibility: ResourceVisibility,
     pub pagination: PaginationOpts,
+}
+
+impl SearchResourcesRequest {
+    /// A search of active resources, of any owner
+    pub fn new(selectors: Vec<ResourceSelector>, pagination: PaginationOpts) -> Self {
+        Self {
+            selectors,
+            owner: None,
+            visibility: ResourceVisibility::Active,
+            pagination,
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

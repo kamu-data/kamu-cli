@@ -8,9 +8,8 @@
 // by the Apache License, Version 2.0.
 
 use chrono::{DateTime, Utc};
-use odf::metadata::auth;
 
-use crate::{ResourceHeadersInput, ResourceID};
+use crate::{ResourceHeadersInput, ResourceID, have_same_owners, owner_handles_from_input};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -37,8 +36,8 @@ pub type ResourceHeaders = odf::metadata::resources::ResourceHeaders;
 /// if this value ever changes.
 pub const DELETED_ACCOUNT_NAME_SENTINEL: &str = "deleted-account";
 
-pub fn deleted_account_name_sentinel() -> auth::AccountName {
-    auth::AccountName::new_unchecked(DELETED_ACCOUNT_NAME_SENTINEL)
+pub fn deleted_account_name_sentinel() -> odf::AccountName {
+    odf::AccountName::new_unchecked(DELETED_ACCOUNT_NAME_SENTINEL)
 }
 
 /// Placeholder account-resource id substituted alongside
@@ -65,7 +64,7 @@ pub trait ResourceHeadersExt {
     fn simple(
         now: DateTime<Utc>,
         id: ResourceID,
-        account: auth::ResourceOwnerHandle,
+        account: odf::ResourceOwnerHandle,
         name: &str,
     ) -> Self;
     fn from_input(now: DateTime<Utc>, id: ResourceID, input: ResourceHeadersInput) -> Self;
@@ -78,13 +77,19 @@ pub trait ResourceHeadersExt {
     fn to_input(&self) -> ResourceHeadersInput;
     fn is_equivalent_to(&self, input: &ResourceHeadersInput) -> bool;
     fn apply_update(&mut self, now: DateTime<Utc>, input: ResourceHeadersInput);
+
+    /// Replaces the account of the resource and of its owners, which share it
+    fn set_account(&mut self, account: odf::ResourceOwnerHandle);
+
+    /// Whether the resource is deleted, not only being deleted
+    fn is_deleted(&self) -> bool;
 }
 
 impl ResourceHeadersExt for ResourceHeaders {
     fn simple(
         now: DateTime<Utc>,
         id: ResourceID,
-        account: auth::ResourceOwnerHandle,
+        account: odf::ResourceOwnerHandle,
         name: &str,
     ) -> Self {
         Self {
@@ -110,14 +115,8 @@ impl ResourceHeadersExt for ResourceHeaders {
     fn from_input(now: DateTime<Utc>, id: ResourceID, input: ResourceHeadersInput) -> Self {
         let account = account_handle_from_input(input.account.as_ref());
 
-        assert!(
-            input.owner_references.is_none(),
-            "Owner referece resolution is not yet supported"
-        );
-
         Self {
             id,
-            account,
             name: input.name,
             labels: input
                 .labels
@@ -129,7 +128,8 @@ impl ResourceHeadersExt for ResourceHeaders {
                     entries: std::collections::BTreeMap::new(),
                 }
             }),
-            owner_references: None,
+            owner_references: owner_handles_from_input(input.owner_references, &account),
+            account,
             generation: 1,
             status_generation: INITIAL_STATUS_GENERATION,
             created_at: now,
@@ -164,14 +164,14 @@ impl ResourceHeadersExt for ResourceHeaders {
             .as_ref()
             .map_or(&empty_map, |a| &a.entries);
 
-        if self.owner_references.is_some() || input.owner_references.is_some() {
-            unimplemented!("Owner references are not yet supported");
-        }
-
         self.account == account_handle_from_input(input.account.as_ref())
             && self.name == input.name
             && self.labels.entries == *input_labels
             && self.annotations.entries == *input_annotations
+            && have_same_owners(
+                self.owner_references.as_ref(),
+                input.owner_references.as_ref(),
+            )
     }
 
     fn apply_update(&mut self, now: DateTime<Utc>, input: ResourceHeadersInput) {
@@ -188,27 +188,38 @@ impl ResourceHeadersExt for ResourceHeaders {
                 .unwrap_or_else(|| odf::metadata::resources::ResourceAnnotations {
                     entries: std::collections::BTreeMap::new(),
                 });
+        self.owner_references = owner_handles_from_input(input.owner_references, &self.account);
 
         self.updated_at = now;
+    }
+
+    fn set_account(&mut self, account: odf::ResourceOwnerHandle) {
+        for owner in self.owner_references.iter_mut().flatten() {
+            owner.account = account.clone();
+        }
+        self.account = account;
+    }
+
+    fn is_deleted(&self) -> bool {
+        self.deleted_at.is_some()
     }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Account resolution (id + did + name lookup) happens upstream, as part of
-/// the apply process (see `ResourceAccountResolver`), before a
-/// [`ResourceHeadersInput`] is ever constructed — every production caller
-/// populates `account` with a fully-resolved [`auth::ResourceOwnerRef`]. Panics if
-/// handed a partially-resolved reference, which would indicate a caller
-/// bypassed account resolution.
-fn account_handle_from_input(input: Option<&auth::ResourceOwnerRef>) -> auth::ResourceOwnerHandle {
+/// Panics unless `input` is fully resolved: a type URI, ID, DID and name. The
+/// apply process resolves the account (`ResourceAccountResolver`) before it
+/// builds headers, so a partial one means a caller bypassed that.
+pub(crate) fn account_handle_from_input(
+    input: Option<&odf::metadata::auth::ResourceOwnerRef>,
+) -> odf::ResourceOwnerHandle {
     match input {
-        Some(auth::ResourceOwnerRef {
+        Some(odf::metadata::auth::ResourceOwnerRef {
             r#type: Some(odf::metadata::resources::TypeRef::Uri(r#type)),
             id: Some(id),
             did: Some(did),
             name: Some(name),
-        }) => auth::ResourceOwnerHandle {
+        }) => odf::ResourceOwnerHandle {
             r#type: r#type.clone(),
             id: *id,
             did: did.clone(),

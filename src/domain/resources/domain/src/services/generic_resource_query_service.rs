@@ -25,7 +25,8 @@ use crate::{
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// Read-side access to resources for use cases and higher layers, which never
-/// reach for [`crate::ResourceRepository`] directly.
+/// reach for [`crate::ResourceRepository`] directly. The one write,
+/// [`Self::touch_live_resources`], changes nothing a read can see.
 ///
 /// See [`crate::ResourceRepository`] for the rule governing which methods
 /// filter by label — the scoped searches carry the pairs inside
@@ -41,11 +42,19 @@ pub trait GenericResourceQueryService: Send + Sync {
         name: &ResourceName,
     ) -> Result<Option<ResourceID>, InternalError>;
 
+    /// Returns resources in any state.
     async fn find_resource_handles_by_ids(
         &self,
         account_id: &odf::AccountID,
         ids: &[ResourceID],
     ) -> Result<Vec<ResourceHandleRow>, InternalError>;
+
+    /// See [`crate::ResourceRepository::touch_live_resources`]
+    async fn touch_live_resources(
+        &self,
+        account_id: &odf::AccountID,
+        ids: &[ResourceID],
+    ) -> Result<Vec<ResourceID>, InternalError>;
 
     /// Matches names case-insensitively. Names that do not exist are absent
     /// from the result.
@@ -62,6 +71,7 @@ pub trait GenericResourceQueryService: Send + Sync {
         account_id: &odf::AccountID,
         scope: &ResourceScope,
         visibility: ResourceVisibility,
+        owner_id: Option<ResourceID>,
         pagination: PaginationOpts,
     ) -> Result<Vec<ResourceHandleRow>, InternalError>;
 
@@ -70,8 +80,10 @@ pub trait GenericResourceQueryService: Send + Sync {
         account_id: &odf::AccountID,
         scope: &ResourceScope,
         visibility: ResourceVisibility,
+        owner_id: Option<ResourceID>,
     ) -> Result<usize, InternalError>;
 
+    /// A deleted resource is not found.
     async fn find_owned_snapshot(
         &self,
         account_id: &odf::AccountID,
@@ -79,6 +91,7 @@ pub trait GenericResourceQueryService: Send + Sync {
         id: ResourceID,
     ) -> Result<Option<ResourceSnapshot>, FindOwnedResourceError>;
 
+    /// Deleted resources are not found.
     async fn find_owned_snapshots(
         &self,
         account_id: &odf::AccountID,
@@ -86,11 +99,13 @@ pub trait GenericResourceQueryService: Send + Sync {
         ids: &[ResourceID],
     ) -> Result<FindOwnedSnapshotsOutcome, InternalError>;
 
+    /// Returns the resource in any state.
     async fn get_snapshot_by_id(
         &self,
         id: &crate::ResourceID,
     ) -> Result<Option<ResourceSnapshot>, InternalError>;
 
+    /// Returns resources in any state.
     async fn find_snapshots_by_ids(
         &self,
         account_id: &odf::AccountID,
@@ -102,6 +117,7 @@ pub trait GenericResourceQueryService: Send + Sync {
         account_id: &odf::AccountID,
         scope: &ResourceScope,
         visibility: ResourceVisibility,
+        owner_id: Option<ResourceID>,
         pagination: PaginationOpts,
     ) -> Result<Vec<ResourceSnapshot>, InternalError>;
 

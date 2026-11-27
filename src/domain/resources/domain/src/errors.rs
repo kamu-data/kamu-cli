@@ -86,6 +86,17 @@ pub struct ResourceDeletionInProgressError {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// The resource is of a type with
+/// [`SpecMutability::Immutable`](crate::SpecMutability::Immutable) and its spec
+/// differs from the given one.
+#[derive(thiserror::Error, Debug, Clone, Copy, PartialEq, Eq)]
+#[error("Spec of resource {id} is immutable and cannot be changed")]
+pub struct ResourceSpecImmutableError {
+    pub id: ResourceID,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[derive(thiserror::Error, Debug)]
 #[error("Resource '{id}' of type '{resource_type}' is not owned by the specified account")]
 pub struct ResourceNotOwnedByAccountError {

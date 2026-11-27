@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use database_common::SqliteTransactionManager;
-use database_common_macros::database_transactional_test;
+use database_common_macros::{database_concurrent_transactions_test, database_transactional_test};
 use dill::{Catalog, CatalogBuilder};
 use kamu_configuration_repo_tests::secret_set_projection_repository_test_suite as secret_set_repo;
 use kamu_configuration_sqlite::SqliteSecretSetProjectionRepository;
@@ -108,6 +108,38 @@ database_transactional_test!(
 database_transactional_test!(
     storage = sqlite,
     fixture = secret_set_repo::test_delete_all_entries,
+    harness = SqliteSecretSetProjectionRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = sqlite,
+    fixture = secret_set_repo::test_purging_the_resource_removes_its_entries,
+    harness = SqliteSecretSetProjectionRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_concurrent_transactions_test!(
+    storage = sqlite,
+    fixture = secret_set_repo::test_rolled_back_delete_all_entries_keeps_entries,
+    harness = SqliteSecretSetProjectionRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_concurrent_transactions_test!(
+    storage = sqlite,
+    fixture = secret_set_repo::test_rolled_back_replace_entries_leaves_generation_free,
+    harness = SqliteSecretSetProjectionRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_concurrent_transactions_test!(
+    storage = sqlite,
+    fixture = secret_set_repo::test_rolled_back_cleanup_keeps_older_generations,
     harness = SqliteSecretSetProjectionRepositoryHarness
 );
 

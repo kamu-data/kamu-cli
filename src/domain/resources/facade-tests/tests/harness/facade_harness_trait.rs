@@ -9,6 +9,7 @@
 
 use std::sync::Arc;
 
+use kamu_resources::CreationOrigin;
 use kamu_resources_facade::ResourceFacade;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -55,6 +56,10 @@ pub trait FacadeContractHarness: Send + Sync {
     /// Returns the stable `AccountName` for the given fixture account.
     fn account_name(&self, account: TestAccount) -> odf::AccountName;
 
+    /// Renames the account. [`Self::account_name`] and the subjects the facades
+    /// act for keep the old name, so address it by ID.
+    async fn rename_account(&self, account: TestAccount, new_name: &odf::AccountName);
+
     /// Runs the background work that follows a write: delivers the pending
     /// outbox messages, then lets the resource controllers reconcile and
     /// complete deletions, until nothing is left to do.
@@ -62,6 +67,10 @@ pub trait FacadeContractHarness: Send + Sync {
     /// Writes only record desired state, so a test that reads reconciled
     /// state, or a completed deletion, calls this first.
     async fn settle(&self);
+
+    /// The origin the facades of [`Self::facade_for`] record in the
+    /// provenance of the resources they create
+    fn creation_origin(&self) -> CreationOrigin;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

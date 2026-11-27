@@ -28,6 +28,7 @@ use kamu_resources_facade::{
     GetResourceError,
     ListResourcesError,
     ListSupportedResourceTypesError,
+    ResourceDeletedNotRevealedError,
     ResourceLookupProblem,
     ResourcesSummaryError,
 };
@@ -313,6 +314,7 @@ impl From<ListResourcesError> for CLIError {
             | E::AccountAccess(_)
             | E::InvalidLabelFilter(_)
             | E::UnrepresentableScope(_)
+            | E::OwnerLookup(_)
             | E::UnsupportedSelectorField(_)) => Self::failure(e),
             E::RemoteRequest(err) => Self::from(err),
             E::Internal(err) => Self::critical(err),
@@ -471,6 +473,12 @@ pub enum ResourceLookupCliError {
         expected_name: String,
         actual_name: String,
     },
+
+    #[error(transparent)]
+    DeletedNotRevealed(ResourceDeletedNotRevealedError),
+
+    #[error(transparent)]
+    Access(odf::AccessError),
 }
 
 impl From<ResourceLookupProblem> for ResourceLookupCliError {
@@ -493,6 +501,8 @@ impl From<ResourceLookupProblem> for ResourceLookupCliError {
             },
             ResourceLookupProblem::EmptyRef => Self::EmptyRef,
             ResourceLookupProblem::UntypedName => Self::UntypedName,
+            ResourceLookupProblem::DeletedNotRevealed(err) => Self::DeletedNotRevealed(err),
+            ResourceLookupProblem::Access(err) => Self::Access(err),
         }
     }
 }

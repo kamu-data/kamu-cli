@@ -40,6 +40,7 @@ use crate::{
     WorkspaceLayout,
     WorkspaceService,
     WorkspaceVersion,
+    background_work,
     build_db_connection_settings,
     cli,
     cli_commands,
@@ -190,6 +191,7 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
             )?;
 
             let base_catalog = base_catalog_builder.build();
+            check_resource_retention_config(&base_catalog)?;
 
             // Database requires extra actions:
             if let Some(db_config) = &database_config {
@@ -252,6 +254,7 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
         let cli_catalog = {
             let mut b = configure_cli_catalog(cli_base_catalog, tenancy_config);
             cli_account_subject.register(&mut b);
+            b.add_value(RequestOrigin::Cli);
             b.build()
         };
 
@@ -300,8 +303,8 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
 
         let is_transactional = maybe_db_connection_settings.is_some()
             && cli_commands::command_needs_transaction(&args);
-        let is_outbox_processing_required = maybe_db_connection_settings.is_some()
-            && cli_commands::command_needs_outbox_processing(&args);
+        let is_background_work_required = maybe_db_connection_settings.is_some()
+            && cli_commands::command_needs_background_work(&args);
 
         let command_run_result = transaction!(
             #[catalog(cli_catalog)]
@@ -336,9 +339,13 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
         );
 
         // A failed command may still have committed some of its work in
-        // transactions of its own, so the Outbox is processed either way
-        if is_outbox_processing_required {
-            outbox::process_outbox_after_command(background_catalog, command_run_result).await?;
+        // transactions of its own, so its background work is finalized either way
+        if is_background_work_required {
+            background_work::finalize_background_work_after_command(
+                background_catalog,
+                command_run_result,
+            )
+            .await?;
         } else {
             command_run_result?;
         }
@@ -597,6 +604,7 @@ pub fn configure_base_catalog(
     outbox::register_outbox_components(&mut b);
     b.add::<wakeup_listener::WakeupListenerMetrics>();
     b.add::<background_agent_host::BackgroundAgentHost>();
+    b.add::<background_agent_host::HousekeepingMetrics>();
     b.add::<background_agent_host::BackgroundAgentHostMetrics>();
 
     kamu_auth_web3_services::register_dependencies(&mut b);
@@ -731,6 +739,20 @@ async fn run_startup_initializations(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Config
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Fails on retention configured for a type the node does not have
+pub fn check_resource_retention_config(catalog: &dill::Catalog) -> Result<(), CLIError> {
+    let registered =
+        kamu_resources_services::ResourceDispatcherFactory::registered_type_names_in(catalog)
+            .map_err(CLIError::critical)?;
+    catalog
+        .get_one::<kamu_resources::ResourceRetentionConfig>()
+        .map_err(CLIError::critical)?
+        .check_types(&registered)
+        .map_err(CLIError::usage_error_from)
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 fn load_config(workspace_layout: &WorkspaceLayout) -> Result<config::CLIConfig, CLIError> {
@@ -930,6 +952,7 @@ pub fn register_config_in_catalog(
 
     // Background agents configuration
     catalog_builder.add_value(config.background_agents.background_agent_host_config());
+    catalog_builder.add_value(config.background_agents.housekeeping.into_system()?);
     catalog_builder.add_value(config.background_agents.wakeup_listener_config());
     catalog_builder.add_value(config.background_agents.outbox_agent_config());
     catalog_builder.add_value(config.background_agents.flow_system_event_agent_config());
@@ -939,6 +962,10 @@ pub fn register_config_in_catalog(
             .background_agents
             .resource_controller_runtime_config(),
     );
+    //
+
+    // Resources configuration
+    catalog_builder.add_value(config.resources.retention.into_system()?);
     //
 
     // Password hashing mode configuration

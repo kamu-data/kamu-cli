@@ -60,6 +60,13 @@ def note_rust_edit(session_id: str) -> None:
         sessions[session_id] = now()
         cutoff = now() - 14 * 24 * 3600
         state["edited_sessions"] = {k: v for k, v in sessions.items() if v >= cutoff}
+        state.setdefault("edited_this_turn", {})[session_id] = True
+
+
+def take_turn_edit(session_id: str) -> bool:
+    """Whether the session edited Rust since its previous stop, clearing the mark."""
+    with locked_state(STATE) as state:
+        return bool(state.setdefault("edited_this_turn", {}).pop(session_id, False))
 
 
 def stop_reminder(session_id: str) -> str | None:

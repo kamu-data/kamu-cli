@@ -9,6 +9,7 @@
 
 use crate::ResourceExtensionSchemaRegistry;
 use crate::domain::{
+    RESOURCE_CONDITION_CREATION_PROVENANCE_SCHEMA_URI,
     RESOURCE_CONDITION_RECONCILIATION_ERROR_SCHEMA_URI,
     ResourceConditionPatchChange,
     ResourceConditionPatchError,
@@ -17,6 +18,15 @@ use crate::domain::{
     ResourceSchemaId,
     TypeUri,
 };
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Conditions only the framework writes, which no condition patch may set or
+/// remove
+const FRAMEWORK_OWNED_CONDITIONS: &[&str] = &[
+    RESOURCE_CONDITION_RECONCILIATION_ERROR_SCHEMA_URI,
+    RESOURCE_CONDITION_CREATION_PROVENANCE_SCHEMA_URI,
+];
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -43,7 +53,7 @@ impl<'a> ResourceConditionPatchChecker<'a> {
         resource_schema: &ResourceSchemaId,
     ) -> Result<(), ResourceConditionPatchError> {
         for (key, change) in patch.changes() {
-            if key.as_str() == RESOURCE_CONDITION_RECONCILIATION_ERROR_SCHEMA_URI {
+            if FRAMEWORK_OWNED_CONDITIONS.contains(&key.as_str()) {
                 return Err(ResourceConditionPatchError::FrameworkOwned { key: key.clone() });
             }
 

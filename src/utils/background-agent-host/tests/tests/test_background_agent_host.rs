@@ -8,31 +8,18 @@
 // by the Apache License, Version 2.0.
 
 use std::collections::VecDeque;
-use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
-use std::time::Duration;
 
-use background_agent_host::{
-    BackgroundAgent,
-    BackgroundAgentHost,
-    BackgroundAgentHostConfig,
-    BackgroundAgentHostMetrics,
-    BackgroundAgentRestartReason,
-    CancellationToken,
-};
-use chrono::{TimeDelta, TimeZone, Utc};
+use background_agent_host::{BackgroundAgent, BackgroundAgentRestartReason, CancellationToken};
+use chrono::TimeDelta;
 use internal_error::InternalError;
-use observability::metrics::unix_timestamp_seconds;
 use pretty_assertions::assert_eq;
-use retry_backoff::{RetryBackoff, RetryBackoffType};
-use time_source::{FakeSystemTimeSource, SystemTimeSource};
 use tokio::sync::Notify;
-use tokio::task::JoinHandle;
+
+use crate::tests::utils::{EventCounter, HostHarness};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-// The host runs on the fake clock: restart backoffs and the shutdown bound
-// pass only when a test moves it
 
 const AGENT_A: &str = "test.AgentA";
 const AGENT_B: &str = "test.AgentB";
@@ -144,7 +131,7 @@ async fn test_run_lasting_the_longest_delay_resets_the_backoff() {
     a.wait_for_runs(3).await;
 
     // A third consecutive restart would wait 4s; after a healthy run, 1s
-    harness.advance(MAX_RESTART_DELAY).await;
+    harness.advance(HostHarness::MAX_RESTART_DELAY).await;
     a.release();
     harness.settle().await;
     harness.advance(TimeDelta::seconds(1)).await;
@@ -247,7 +234,7 @@ async fn test_shutdown_aborts_agents_still_running_after_the_bound() {
 
     harness.request_shutdown();
     harness.settle().await;
-    harness.advance(SHUTDOWN_TIMEOUT).await;
+    harness.advance(HostHarness::SHUTDOWN_TIMEOUT).await;
 
     host.wait_for_end().await.unwrap();
     assert!(a.was_aborted());
@@ -276,147 +263,12 @@ async fn test_shutdown_ends_a_restart_backoff() {
 #[test_log::test(tokio::test)]
 #[should_panic(expected = "No background agents found")]
 async fn test_host_without_agents_panics() {
-    let harness = HostHarness::new([]);
+    let harness = HostHarness::without_agents();
     harness.host.run(CancellationToken::new()).await.unwrap();
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Harness
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-const MAX_RESTART_DELAY: TimeDelta = TimeDelta::seconds(4);
-const SHUTDOWN_TIMEOUT: TimeDelta = TimeDelta::seconds(10);
-
-struct HostHarness {
-    host: Arc<BackgroundAgentHost>,
-    metrics: Arc<BackgroundAgentHostMetrics>,
-    time_source: FakeSystemTimeSource,
-    shutdown: CancellationToken,
-}
-
-impl HostHarness {
-    fn new<const N: usize>(agents: [Arc<ScriptedAgent>; N]) -> Self {
-        Self::with_shutdown_timeout(agents, SHUTDOWN_TIMEOUT)
-    }
-
-    fn with_shutdown_timeout<const N: usize>(
-        agents: [Arc<ScriptedAgent>; N],
-        shutdown_timeout: TimeDelta,
-    ) -> Self {
-        let time_source =
-            FakeSystemTimeSource::new(Utc.with_ymd_and_hms(2050, 1, 1, 12, 0, 0).unwrap());
-        let metrics = Arc::new(BackgroundAgentHostMetrics::new());
-        let config = BackgroundAgentHostConfig {
-            restart_backoff: RetryBackoff {
-                backoff_type: RetryBackoffType::Exponential,
-                min_delay: Duration::from_secs(1),
-                max_delay: Some(MAX_RESTART_DELAY.to_std().unwrap()),
-            },
-            shutdown_timeout: shutdown_timeout.to_std().unwrap(),
-        };
-
-        let host = Arc::new(BackgroundAgentHost::new(
-            agents
-                .into_iter()
-                .map(|agent| agent as Arc<dyn BackgroundAgent>)
-                .collect(),
-            Arc::new(config),
-            metrics.clone(),
-            Arc::new(time_source.clone()),
-        ));
-
-        Self {
-            host,
-            metrics,
-            time_source,
-            shutdown: CancellationToken::new(),
-        }
-    }
-
-    fn start(&self) -> RunningHost {
-        let host = self.host.clone();
-        let shutdown = self.shutdown.clone();
-        RunningHost {
-            task: tokio::spawn(async move { host.run(shutdown).await }),
-        }
-    }
-
-    fn request_shutdown(&self) {
-        self.shutdown.cancel();
-    }
-
-    /// Moves the clock, then lets the host react
-    async fn advance(&self, delta: TimeDelta) {
-        self.time_source.advance(delta);
-        self.settle().await;
-    }
-
-    /// Real time, for the host's tasks to reach their next wait
-    async fn settle(&self) {
-        tokio::time::sleep(Duration::from_millis(50)).await;
-    }
-
-    /// The last failure time is the clock's current time
-    fn last_failed_now(&self, agent: &str) -> bool {
-        (self.last_failure(agent) - unix_timestamp_seconds(self.time_source.now())).abs() < 1e-3
-    }
-
-    fn never_failed(&self, agent: &str) -> bool {
-        self.last_failure(agent).abs() < 1e-3
-    }
-
-    fn restarts(&self, agent: &str, reason: BackgroundAgentRestartReason) -> u64 {
-        self.metrics
-            .restarts_total
-            .with_label_values(&[agent, reason.into()])
-            .get()
-    }
-
-    fn running(&self, agent: &str) -> i64 {
-        self.metrics.running.with_label_values(&[agent]).get()
-    }
-
-    fn last_failure(&self, agent: &str) -> f64 {
-        self.metrics
-            .last_failure_timestamp_seconds
-            .with_label_values(&[agent])
-            .get()
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-struct RunningHost {
-    task: JoinHandle<Result<(), InternalError>>,
-}
-
-impl RunningHost {
-    fn has_ended(&self) -> bool {
-        self.task.is_finished()
-    }
-
-    /// Waits for the host to return. Real time, bounded, so that a host that
-    /// never ends fails the test
-    async fn wait_for_end(&mut self) -> Result<(), InternalError> {
-        tokio::time::timeout(Duration::from_secs(5), &mut self.task)
-            .await
-            .expect("the host did not end")
-            .unwrap()
-    }
-
-    /// Requests a shutdown and waits for the host to return
-    async fn shutdown(&mut self, harness: &HostHarness) -> Result<(), InternalError> {
-        harness.request_shutdown();
-        self.wait_for_end().await
-    }
-}
-
-impl Drop for RunningHost {
-    fn drop(&mut self) {
-        self.task.abort();
-    }
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// What one run of a `ScriptedAgent` does
@@ -437,13 +289,14 @@ enum ScriptedRun {
     IgnoreShutdown,
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 /// Runs its script, one entry per run, then runs until a shutdown
 struct ScriptedAgent {
     name: &'static str,
     fatal: bool,
     script: Mutex<VecDeque<ScriptedRun>>,
-    runs: AtomicUsize,
-    run_started: Notify,
+    runs: EventCounter,
     released: Notify,
     stopped_on_shutdown: AtomicBool,
     aborted: Arc<AtomicBool>,
@@ -467,8 +320,7 @@ impl ScriptedAgent {
             name,
             fatal,
             script: Mutex::new(script.into()),
-            runs: AtomicUsize::new(0),
-            run_started: Notify::new(),
+            runs: EventCounter::new(),
             released: Notify::new(),
             stopped_on_shutdown: AtomicBool::new(false),
             aborted: Arc::new(AtomicBool::new(false)),
@@ -476,24 +328,13 @@ impl ScriptedAgent {
     }
 
     fn runs(&self) -> usize {
-        self.runs.load(Ordering::SeqCst)
+        self.runs.get()
     }
 
-    /// Real time, bounded, so that a run that never comes fails the test
     async fn wait_for_runs(&self, total: usize) {
-        tokio::time::timeout(Duration::from_secs(1), async {
-            while self.runs() < total {
-                self.run_started.notified().await;
-            }
-        })
-        .await
-        .unwrap_or_else(|_| {
-            panic!(
-                "expected {total} runs of {}, got {}",
-                self.name,
-                self.runs()
-            )
-        });
+        self.runs
+            .wait_for(total, format!("runs of {}", self.name))
+            .await;
     }
 
     fn release(&self) {
@@ -525,8 +366,7 @@ impl BackgroundAgent for ScriptedAgent {
 
     async fn run(&self, shutdown: CancellationToken) -> Result<(), InternalError> {
         let run = self.next_run();
-        self.runs.fetch_add(1, Ordering::SeqCst);
-        self.run_started.notify_waiters();
+        self.runs.increment();
 
         match run {
             ScriptedRun::UntilShutdown => {
@@ -556,6 +396,8 @@ impl BackgroundAgent for ScriptedAgent {
         self.fatal
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// Marks the agent aborted when its run is dropped before returning
 struct AbortGuard(Arc<AtomicBool>);

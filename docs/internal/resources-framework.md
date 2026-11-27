@@ -29,7 +29,7 @@ a remote server.
 | Understand storage, uniqueness, soft-delete | [§6 Persistence model](#6-persistence-model) |
 | Understand account scoping & permissions | [§7 Account resolution & authorization](#7-account-resolution--authorization) |
 | Trace an `apply` / reconcile end-to-end | [§13 Data flow](#13-data-flow-walkthroughs) |
-| Understand how a resource is deleted | [(c) Deletion](#c-deletion) |
+| Understand how a resource is deleted and purged | [(c) Deletion](#c-deletion), [Purge](#purge) |
 | Add a new resource type | [§14 Concrete types + recipe](#14-concrete-resource-types-kamu-configuration) |
 | Find the file for X | [§16 Reference map](#16-filecrate-reference-map) |
 | Filter by label (`-l`, wire, storage) | [Resource label filtering](resources-label-filtering.md) |
@@ -62,14 +62,22 @@ make clippy
   - [4. Layered architecture](#4-layered-architecture)
   - [5. Domain model (`kamu-resources`)](#5-domain-model-kamu-resources)
     - [Core traits](#core-traits)
+    - [Preparing a spec](#preparing-a-spec)
+    - [Immutable specs](#immutable-specs)
+    - [Owner references](#owner-references)
     - [Events](#events)
+    - [Creation provenance](#creation-provenance)
     - [Repository](#repository)
     - [Dispatchers](#dispatchers)
     - [Use-case traits](#use-case-traits)
     - [5a. Resource anatomy — input vs auto-generated](#5a-resource-anatomy--input-vs-auto-generated)
   - [6. Persistence model](#6-persistence-model)
+    - [Retention](#retention)
+    - [Purge](#purge)
   - [7. Account resolution \& authorization](#7-account-resolution--authorization)
+    - [Per-type guard and placement](#per-type-guard-and-placement)
   - [8. Rename \& conflict rules](#8-rename--conflict-rules)
+    - [Generated names](#generated-names)
   - [9. Services (`kamu-resources-services`)](#9-services-kamu-resources-services)
   - [10. Facade (`kamu-resources-facade`)](#10-facade-kamu-resources-facade)
   - [11. GraphQL API](#11-graphql-api)
@@ -138,9 +146,9 @@ long-term goal. This page documents what exists now.
 | **Spec** | The desired-state portion authored by the user; stored as `serde_json::Value`. |
 | **Status** | Server-owned observed state (`ResourceStatus`), written only by the lifecycle primitives ([§9](#lifecycle-primitives)); see [Status fields](#status-fields). `generation` lives in **headers**, not status. |
 | **Snapshot** | The persisted materialized form of a resource (`ResourceSnapshot`). |
-| **Phase** | Lifecycle stage: `Pending`, `Reconciling`, `Ready`, `Degraded`, `Failed`, `Deleting`, `Deleted` (ODF `ResourcePhase`). `Pending`, `Deleting` and `Deleted` are derived from the headers, deletion first: `Deleted` once `deletedAt` is set, `Deleting` once `deletionRequestedAt` is set, otherwise `Pending` whenever `observedGeneration` is absent or lower than `generation`. See [§13 state machine](#lifecycle-state-machine). |
+| **Phase** | Lifecycle stage: `Pending`, `Reconciling`, `Ready`, `Degraded`, `Failed`, `Deleting`, `Deleted` (ODF `ResourcePhase`). Never written by a status writer: derived from the headers and the rest of the status. See [§13 state machine](#lifecycle-state-machine). |
 | **Two-phase deletion** | Deleting a resource requests its deletion (`Deleting`); its main controller cleans up, then the deletion completes (`Deleted`). A resource being deleted gives up its name at once. See [(c) Deletion](#c-deletion). |
-| **Condition** | A status signal keyed by a registered condition schema URI, set and removed one by one through [condition patches](#condition-patches). See [Status fields](#status-fields) for the built-in one. |
+| **Condition** | A status signal keyed by a registered condition schema URI, set and removed one by one through [condition patches](#condition-patches). See [Status fields](#status-fields) for the built-in ones. |
 | **generation / observedGeneration / reconciledGeneration** | `generation` bumps on each spec/headers change; `observedGeneration` is the last one a reconciliation started on, `reconciledGeneration` the last one reconciled successfully. Reconciliation is needed while `reconciledGeneration` is absent or lower than `generation`. |
 | **statusGeneration** | Header counting status updates: 1 for a new resource, +1 per `StatusUpdated`, `DeletionRequested` and `Deleted` event (the last two move the derived phase). A status writer passes the value it read as a precondition and fails with a status conflict if it is stale (compare-and-swap). |
 | **Reconciliation** | Driving actual state toward the spec (e.g. `SecretSet` materializes its encrypted read-side projection). |
@@ -158,11 +166,13 @@ long-term goal. This page documents what exists now.
 
 - `ResourceStatus` holds `phase`, the optional `observedGeneration`, `observedAt`,
   `reconciledGeneration` and `reconciledAt`, and `conditions`, a `TypeRef → JSON` map.
-- On a `Resource` (domain and GraphQL), `status` is always present: a resource with no
-  reconciliation yet gets a synthesized `Pending` status with no conditions. Only the persisted
+- On a `Resource` (domain and GraphQL), `status` is always present: a new resource starts
+  `Pending`, with the conditions its `Created` event carries ([Events](#events)). Only the persisted
   `ResourceSnapshot` row holds an `Option` (`None` before the first write completes).
 - The built-in ODF `ReconciliationError` condition (`code`, `message`) is present while the latest
   reconciliation or cleanup has failed; only the framework writes it.
+- The Kamu `CreationProvenance` condition records who created the resource and through which
+  boundary ([§5, Creation provenance](#creation-provenance)).
 
 ---
 
@@ -199,9 +209,10 @@ not break; most are enforced in code and exercised by tests — pointers given w
   or one left in `Reconciling` still needs it.
 - **`status` is never accepted from manifests.** It is server-owned end to end; manifests use
   `deny_unknown_fields`, so a `status` key is rejected ([§5a](#5a-resource-anatomy--input-vs-auto-generated)).
-- **`SecretSet` plaintext never crosses a durable boundary.** It is encrypted by the spec sanitizer
-  *before the first event/snapshot write*; plaintext must not appear in events, snapshots, the
-  read-side projection, logs, GraphQL responses, CLI output, diffs, or outbox payloads
+- **`SecretSet` plaintext never crosses a durable boundary.** It is encrypted by its
+  [pre-apply hook](#preparing-a-spec) *before the first event/snapshot write*; plaintext must not
+  appear in events, snapshots, the read-side projection, logs, GraphQL responses, CLI output, diffs,
+  or outbox payloads
   ([Secret handling](#secret-handling-invariant)).
 - **Local and remote facade behavior must match for all contract-tested cases.** The `contract_test!`
   suite runs each case against both implementations; new facade behavior must be added there
@@ -296,8 +307,8 @@ step (see below). `VariableSet` and `SecretSet` declare `SpecInput` as a separat
 field-identical to `Spec`, so validation and linting attach to the write-path type. `Storage` uses
 one type for both, with the identity conversion from `declare_identity_resource_spec_from_input!`.
 
-**Validating an update.** A create runs `ResourceValidateSpec::validate`; a spec update runs
-`validate_update(current)`, where `current` is the stored spec in input form. Its default is
+**Validating an update.** A create runs `ResourceValidateSpec::validate`; an update of a mutable spec
+runs `validate_update(current)`, where `current` is the stored spec in input form. Its default is
 `validate`. A type whose rules can get stricter than data already stored overrides it, so that an
 old entry does not block every later write to its resource: `VariableSetSpecInput` and
 `SecretSetSpecInput` skip the name rule for names `current` already has, skip the value rules for
@@ -324,8 +335,8 @@ pub trait ManagedResource: DeclarativeResource + ResourceStatusRules {
     // A repeated request is a no-op. Headers and spec updates are then rejected with
     // `ResourceDeletionInProgressError`
     fn try_request_deletion(&mut self, now) -> ...;
-    // Renames to the tombstone `deleted-<id>`; a no-op once deleted. An invariant violation
-    // unless deletion was requested, since completing it would skip the cleanup
+    // Keeps the name; a no-op once deleted. An invariant violation unless deletion was
+    // requested, since completing it would skip the cleanup
     fn try_complete_deletion(&mut self, now) -> ...;
     // Compare-and-swap on `statusGeneration`: a stale expected value is a status conflict
     fn try_update_status(&mut self, now, expected_status_generation, new_status) -> ...;
@@ -356,31 +367,132 @@ and an aggregate. This is the bound that all generic use cases require.
   > dispatchers on `dill` metadata (`ResourceDispatcherMeta`) and compares it against the target
   > `TypeUri`/selector — see [§9](#9-services-kamu-resources-services) for the const-string details.
 
+### Preparing a spec
+
+A type may have one `ResourceSpecPreApply`
+([`use_cases/resource_spec_pre_apply.rs`](/src/domain/resources/domain/src/use_cases/resource_spec_pre_apply.rs)),
+a DI component that runs first in both plan and apply, before validation and the planner. It may use
+other services, so it fills defaults, resolves references to identities, and encrypts secrets. It
+gets the account and the current spec, and it may reject.
+
+- **What is equivalent comes back in its stored form.** Otherwise applying the same manifest again
+  would change the resource, or, for an immutable spec, be rejected. A reference by ID or DID that
+  matches the stored one is kept without being resolved, so it is a no-op even after its object was
+  renamed or deleted. A reference by name is resolved, since another object may have taken the name.
+  The type decides what is equivalent: `SecretSet` keeps the stored ciphertext of an equal
+  plaintext, but takes a given JWE token as a new value.
+- **Preparing a prepared spec again changes nothing.**
+- **It has no side effects.** It runs for plans too, again when [placement](#per-type-guard-and-placement)
+  moves the resource to another account, and again in an apply that loses a race for its name.
+- **Defaults are filled here, never in `ResourceSpecFromInput::from_input`.** That runs on every
+  replay, so changing a default there would change specs already stored.
+- **A default of a type with an [immutable spec](#immutable-specs) never changes.** Applying again a
+  manifest that omits the field would be rejected as a change.
+
+### Immutable specs
+
+`ResourceStateModel::SPEC_MUTABILITY` says what applying a different spec to an existing resource
+does. `Mutable`, the default, updates the spec. `Immutable` rejects the apply as a whole, headers
+included, with the category `ImmutableFieldChanged`, in plan and apply alike.
+
+- The prepared spec is compared with the stored one, and an equal one is a no-op. It is not
+  validated again: rules added after the resource was created do not concern it.
+- Headers stay mutable, and changing them bumps the generation as for any other type.
+- The projector refuses a `SpecUpdated` event of an immutable type, so such a stream does not load.
+  A type whose specs were ever updated therefore cannot become immutable.
+
+### Owner references
+
+`headers.ownerReferences` names the resources that own a resource, up to `MAX_OWNER_REFERENCES`. It
+is a record for lineage and for controllers that act on what a resource owns; the framework itself
+neither deletes nor blocks anything by it. Accounts are a different kind of owner.
+
+- **A manifest names an owner** by ID, or by type and name, also as `Type:name`. The account, if
+  given, must be that of the resource, which is the default. ODF has no such rule.
+- **The facade replaces type names by schemas, and the planner resolves the owners**
+  ([`owner_reference_resolver.rs`](/src/domain/resources/services/src/services/owner_reference_resolver.rs)),
+  so plan and apply decide alike. Events and headers carry full handles only. A handle records what
+  the owner was like when it was added, so its name may be out of date. Its account is always that of
+  the resource (`ResourceHeadersExt::set_account`).
+- **A new owner must be a live resource of the same account,** other than the resource itself, named
+  once, and it must match every given part of the reference. Anything else rejects the apply. An
+  apply also writes the row of each new owner without changing it
+  (`ResourceRepository::touch_live_resources`), so it conflicts with a concurrent deletion request
+  of the owner: if the request commits first, the apply is rejected; otherwise the request waits
+  for the apply, and whatever lists the owned resources after writing the request sees the new
+  one. A plan only reads the owners, since its transaction may commit. Owners kept by ID are not
+  written.
+- **An owner the resource already has is kept without being looked up,** whatever became of it, if
+  it is referenced by ID. A resource therefore stays updatable after its owner is renamed, deleted
+  or purged. Of the other parts, the account and the type must match, since they never change; the
+  name is not checked. A reference by name is always resolved, since another resource may have taken
+  the name.
+- **The set of owner IDs is what counts as the value:** another order changes nothing. A changed set
+  bumps the generation like any headers change.
+- **An apply that omits the references clears them,** as it does labels. Code that rebuilds the
+  headers of an existing resource carries them over, as `DatasetEnvVarMutationAdapter` does.
+- **A dry run of a batch does not see the resources the batch creates,** so it rejects a resource
+  owned by one of them, which applying the batch accepts.
+- **The references form a graph that may have cycles.** Only a resource owning itself is rejected:
+  two resources may own each other, and a check at apply could not exclude that without locking
+  every resource on the path. Whatever follows the references, such as a cascade, must remember
+  what it has visited.
+
+`resource_owners_projection` indexes the owners for
+[searches by owner](#10-facade-kamu-resources-facade). `ResourcePersistenceServiceHelper` writes it
+when the owners change. The owned resource must exist; the owner may be gone.
+
 ### Events
 
 `ResourceEvent<TSpec>` is the event-sourcing alphabet:
 `Created`, `HeadersUpdated`, `SpecUpdated`, `StatusUpdated`, `DeletionRequested`, `Deleted`.
 
-- `Created` carries the conditions the type starts every new resource with
-  (`ResourceStatusRules::initial_conditions`), so no `StatusUpdated` follows creation. The field is
-  absent when there are none, and in events stored before types could set them, which replay
-  without conditions.
+- `Created` carries the conditions every new resource starts with: its `CreationProvenance` and
+  the type's own (`ResourceStatusRules::initial_conditions`), so no `StatusUpdated` follows
+  creation. The field is absent in events stored before resources started with conditions, which
+  replay without them.
 - `HeadersUpdated` and `SpecUpdated` carry the new `generation`. `HeadersUpdated.new_generation` is
   optional; an event without it leaves the generation as is.
 - `StatusUpdated` carries the whole new status, written by a reconciliation or cleanup transition
   or by a condition patch. It bumps `statusGeneration` and `updatedAt`.
 - `DeletionRequested` sets `deletionRequestedAt` and bumps `statusGeneration`. After it the
   projector accepts only `StatusUpdated` and `Deleted`.
-- `Deleted` sets `deletedAt` and the tombstone name, and bumps `statusGeneration`. Resources
-  deleted before `DeletionRequested` existed have a `Deleted` event alone; replaying it also sets
-  `deletionRequestedAt`.
-- The projector derives the `Pending`, `Deleting` and `Deleted` phases after each of them
+- `Deleted` sets `deletedAt` and bumps `statusGeneration`. Resources deleted before
+  `DeletionRequested` existed have a `Deleted` event alone; replaying it also sets
+  `deletionRequestedAt`. The `tombstone_name` of older `Deleted` events is ignored.
+- The projector derives the phase after each of them, and after every other event
   ([state machine](#lifecycle-state-machine)); that derivation is not a status update.
 
-`Created.spec` and `SpecUpdated.new_spec` are instantiated with `R::SpecInput`, not `R::Spec` — the event log stores what was submitted, same as
+`Created.spec` and `SpecUpdated.new_spec` are instantiated with `R::SpecInput`, not `R::Spec` — the
+event log stores what was submitted, as [prepared](#preparing-a-spec), same as
 `Created.headers`/`HeadersUpdated.new_headers` store `ResourceHeadersInput`. The `ResourceState`
 projection folds these into current state, converting `SpecInput` -> `Spec` (and `HeadersInput` ->
 `Headers`) at fold time — see `Spec` vs `SpecInput` above.
+
+### Creation provenance
+
+Work that runs after a request has ended, such as task admission, still needs to know who created
+a resource. Apply records it as the `CreationProvenance` condition
+(`https://kamu.dev/schemas/resource/v1alpha1/conditions/CreationProvenance`) in the `Created`
+event of every type:
+
+- `principal`: the ODF `PrincipalHandle` of the acting `Principal` (`User` or `Node`);
+- `origin`: `Api` with the API kind (`GraphQl`, `Rest`, `FlightSql`), `Cli`, or `Internal` with
+  the stable name of the producer and a `detail` the producer defines.
+
+It can be trusted as the creator's identity, never labels or other fields users write:
+
+- **Server-written.** `ApplyResourceParams::provenance` (and the CRUD dispatcher request) carries
+  it; it is recorded on create and ignored by an update. The facade builds it with
+  `request_creation_provenance` from the `Principal` and the `RequestOrigin` of the request
+  ([identity](identity.md#who-registers-it)); internal producers that apply directly pass their
+  own. A remote apply records the server's boundary, never an origin the client claims.
+- **Never from manifests**: apply accepts no status.
+- **Locked**: a condition patch that sets or removes it is `FrameworkOwned`
+  ([Condition patches](#condition-patches)).
+
+Resources created before it was recorded have none; readers treat a missing provenance as
+unknown.
 
 ### Repository
 
@@ -392,22 +504,37 @@ siblings, which share the scope predicate and must agree with it.
 **Batch reads return rows in request order.** `resolve_resource_ids_by_names`,
 `find_resource_handles_by_ids`, `find_resource_snapshots_by_ids` and
 `find_resource_snapshots_by_schema_and_ids` return rows ordered to match the input slice; rows that
-do not exist, are deleted, or belong to another account are simply absent, so a result may be
-*shorter* than the request but never reordered. Callers rely on this to zip results back onto
+do not exist or belong to another account are simply absent, so a result may be *shorter* than the
+request but never reordered. Callers rely on this to zip results back onto
 positional `request_index` values. Postgres pins the order in SQL with `array_position`; SQLite has
 no equivalent, so its repository re-sorts in Rust after the query (`IN (...)` makes no ordering
 promise); the in-memory backend iterates the request slice directly. Pinned by the shared repository
 suite, which asserts the *reversed* request too — an arbitrary-but-stable scan order would pass a
 forward-only assertion.
 
-**Resources being deleted** are found by id. Name resolution, searches, listings and their counts
-take a `ResourceVisibility`: `Active` hides resources being deleted, `IncludeDeleting` returns them
-too, and a name may then resolve to several IDs, the live resource first. `find_resource_id_by_name`
-and `find_resource_ids_by_schema_and_label(_any_account)` see live resources only; label filters in
-a search follow its visibility. Deleted resources are never returned.
+**Visibility.** Reads by id return a resource in any state. Name resolution, searches, listings and
+their counts take a `ResourceVisibility`:
+
+| `ResourceVisibility` | Live | Being deleted | Deleted | Order of listings and searches |
+| --- | --- | --- | --- | --- |
+| `Active` | yes | — | — | last update, newest first |
+| `IncludeDeleting` | yes | yes | — | last update, newest first |
+| `IncludeDeleted` | yes | yes | yes | live ones as above, then the others by deletion time, newest first |
+| `DeletedOnly` | — | yes | yes | deletion time, newest first |
+
+- The deletion time is `deletedAt`, or `deletionRequestedAt` while the deletion is not completed. A
+  partial index, `idx_resources_deletion_time`, serves the `DeletedOnly` listing of one account and
+  type in order; wider listings are sorted.
+- A name may resolve to several IDs unless only live resources are visible: the live one first, then
+  those being deleted, oldest request first, then the deleted ones, newest deletion first.
+- `find_resource_id_by_name` and `find_resource_ids_by_schema_and_label(_any_account)` see live
+  resources only; label filters in a search follow its visibility.
+- **A read by id does not tell that a resource still exists.** Code that acts on the resource checks
+  `deleted_at`, as `find_owned_snapshots` and `ensure_resource_id_matches_type` do.
 
 **Label filters apply only to scoped searches**, never to direct identity reads: the scoped calls
 carry their pairs per row inside `ResourceScope`, while the by-id/by-name reads take none at all.
+The same calls take an optional owner ID, which narrows every row.
 
 `ResourceControllerStateRepository` (`repo/`) stores the controller runtime's bookkeeping and finds
 the resources a controller must act on; see [Controller bookkeeping](#controller-bookkeeping).
@@ -437,8 +564,8 @@ which takes a `ResourceScope` and answers a multi-type request in one query.
 ### 5a. Resource anatomy — input vs auto-generated
 
 Only a subset of a resource is user-authored: a manifest carries `$schema`,
-`headers.{id?, account?, name, labels, annotations}` and `spec`, and nothing else —
-`deny_unknown_fields` rejects `status`, timestamps and `generation`, which are server-owned. The
+`headers.{id?, account?, name?, labels, annotations, ownerReferences}` and `spec`, and nothing else
+— `deny_unknown_fields` rejects `status`, timestamps and `generation`, which are server-owned. The
 framework generates the remaining headers (`id`, resolved `account`, `generation`,
 `status_generation`, `created_at`/`updated_at`/`deletion_requested_at`/`deleted_at`) and the whole
 `status`. `SecretSet` goes further: authored
@@ -466,15 +593,16 @@ and the later `*_resource_*` migrations (SQLite mirrors alongside).
 
 - **`resources`** — one row per resource (the snapshot): `resource_id` (UUID, **PK**),
   `account_id`, `resource_schema`, `resource_name`, `labels`/`annotations`
-  (JSONB), `spec` (JSONB), `status` (JSONB, nullable), `generation`, `status_generation`,
-  `created_at`/`updated_at`,
-  `deletion_requested_at`/`deleted_at` (nullable), `last_event_id`. **Uniqueness:** a unique index
+  (JSONB), `owner_references` (JSONB, nullable), `spec` (JSONB), `status` (JSONB, nullable),
+  `generation`, `status_generation`, `created_at`/`updated_at`,
+  `deletion_requested_at`/`deleted_at` (nullable), `last_event_id`, and `purge_at` (nullable,
+  not part of the snapshot: [Retention](#retention)). **Uniqueness:** a unique index
   on `(account_id, resource_schema, resource_name)`, case-insensitive, partial
   `WHERE deletion_requested_at IS NULL`.
-  A partial index on `(account_id, resource_schema, status->>'phase') WHERE deleted_at IS NULL`
-  backs the summary projection. `labels`/`annotations` are untyped JSONB with **no index of their
-  own**; label selector queries are served by the separate `resource_labels_projection` table
-  (below), never by scanning this JSONB. There is no dedicated
+  An index on `(account_id, resource_schema, status->>'phase')` backs the summary projection.
+  `labels`/`annotations` are untyped JSONB with **no index of their own**; label selector queries
+  are served by the separate `resource_labels_projection` table (below), never by scanning this
+  JSONB. There is no dedicated
   `description` column: `description` lives inside `annotations` as the first well-known
   annotation entry, so adding future well-known annotations needs no schema change.
 - **`resource_events`** — append-only log: `event_id` (BIGINT from a sequence, PK), `resource_id`
@@ -483,7 +611,8 @@ and the later `*_resource_*` migrations (SQLite mirrors alongside).
 **Source of truth.** The event log is authoritative — aggregates are rebuilt by projecting events
 (`ResourceAggregateLoader`). The `resources` row is a **derived snapshot** maintained in the same
 transaction as the event append; it exists for efficient queries/listing/uniqueness and should never
-diverge. If they ever disagree, the events win and the snapshot is the bug.
+diverge. If they ever disagree, the events win and the snapshot is the bug. `purge_at` is the
+one column no event records ([Retention](#retention)).
 
 **List columns.** Concrete resources do not extend status with per-type `stats`. Presentation
 columns are derived from the current spec/read model instead: `VariableSet.variables` is
@@ -495,15 +624,23 @@ only applies if the stored `last_event_id` equals the caller's `expected_last_ev
 returns `UpdateResourceError::concurrent_modification()`. A unique-constraint violation surfaces as
 `UpdateResourceError::Duplicate`, which the apply use case reports as an internal error.
 
+**Taken names.** `create_resource` inserts with `ON CONFLICT … DO NOTHING` on the unique name index
+and reports a row that was not inserted as `CreateResourceError::Duplicate`. The statement does not
+fail, so the transaction stays usable: Postgres would otherwise abort it, and the apply retries in
+it ([§8](#8-rename--conflict-rules)).
+
 **Soft delete in two steps.** Rows are never removed ([(c) Deletion](#c-deletion)):
 
 - Requesting deletion sets `deletion_requested_at`, which takes the row out of the unique name
   index. The name is free for a new resource at once, while the resource being deleted still
   carries it.
-- Completing the deletion sets `deleted_at` and renames the resource to the tombstone
-  `deleted-<id>`.
-- Reads hide resources being deleted unless asked; see [Repository](#repository). The summary
-  counts resources being deleted as `deleting`.
+- Completing the deletion sets `deleted_at`. The deleted resource keeps its name, so several
+  deleted resources and a live one may carry the same name.
+- A deleted resource keeps its rows in `resource_labels_projection` and
+  `resource_owners_projection`, so label selectors and searches by owner find it.
+- Names, searches and listings hide resources whose deletion was requested unless asked; see
+  [Repository](#repository). The summary counts them as `deleting` and `deleted`, and the total
+  includes both.
 
 **Migration / backfill.** Schema changes are ordinary SQLx migrations under `migrations/{postgres,sqlite}`.
 There is a precedent for data backfill into resources —
@@ -546,15 +683,84 @@ segment. Supporting a new schema version therefore requires an explicit compatib
 story for that resource type: update manifests, projections, dispatcher registration, and any
 existing rows/events that should move to the new schema.
 
+### Retention
+
+A deleted resource is kept for a retention period, after which it may be purged. The period starts
+when the deletion completes, so a resource still being deleted has none.
+
+- **Policy:** `ResourceRetentionPolicy` is `PurgeImmediately`, `RetainFor(duration)` or
+  `RetainForever`. A type's policy is, first found: the node's entry for the type in
+  `resources.retention.types`, the type's `DeclarativeResource::RETENTION_POLICY`, the node's
+  `resources.retention.default`, which is 7 days unless configured. The configuration lists types
+  by short name, and one that no registered type has stops the CLI at startup.
+- **Deadline:** `complete_deletion` writes `purge_at = deleted_at + retention`, none for
+  `RetainForever`, with `ResourceRepository::set_purge_deadlines` in its transaction. The deadline
+  is a column of `resources` that no event records and the snapshot update leaves alone, so it is
+  never recomputed: a policy change applies to later deletions only.
+- **Queries:** `find_resources_due_for_purge(now, limit)`, earliest deadline first,
+  `count_resources_due_for_purge(now)` and `find_nearest_purge_at(now)` span every account and
+  type, on a partial index of `purge_at`.
+- **Earlier deletions:** the migration adding `purge_at` gave resources already deleted 7 days
+  from their deletion. A migration cannot read the node's configuration.
+
+### Purge
+
+`ResourceRetentionJob`, a [housekeeping job](housekeeping.md), removes a deleted resource once its
+`purge_at` has passed: on the API server as an agent of its own, after a CLI command one batch at a
+time. It never runs controller logic. Each batch is one transaction:
+
+1. Find at most `batchSize` due resources (`find_resources_due_for_purge`).
+2. Claim them: `claim_resources_for_purge(ids, now)` clears `purge_at` where it is still set and
+   not after `now`, a compare-and-set in the `UPDATE`'s own `WHERE`. Of two purgers that
+   found the same resources, the second waits for the first's rows and claims none of them, so
+   each resource is purged once. The in-memory repository fails the second commit instead.
+3. Delete the claimed resources' controller bookkeeping (`delete_states_for_resources`) and
+   their events (`delete_events_of_resources`).
+4. Delete their rows (`purge_resources`). The repository first calls every registered
+   `ResourceRemovalListener` with the IDs, then deletes the rows, which take their labels, owners
+   and configuration projections with them by cascade.
+5. Post one `Purged` lifecycle message per type of the batch, and report the removed counts by
+   type and whether more is due.
+
+A failed batch rolls back whole, so a crash loses nothing and the next batch purges the same
+resources. The purge never touches the outbox: messages already posted about a resource, such as a
+`StatusUpdated` carrying a task's outcome, are delivered after it is purged, so no consumer
+needs to read a resource to learn how it ended.
+
+**Purge contract.** Every table keyed by a resource ID (a column named `resource_id` or ending in
+`_resource_id`, or one listed in `RESOURCE_ID_COLUMNS_OF_OTHER_NAMES`) has a foreign key to
+`resources` with `ON DELETE CASCADE`, or is declared in `RESOURCE_KEYED_TABLES_WITHOUT_CASCADE`
+with how its rows go. A column of another name is listed with a cascade or with the reason its rows
+stay: `resource_owners_projection.owner_id` stays, since an owner may be purged before what it
+owns, and the row goes with the owned resource.
+
+| How | Tables |
+| --- | --- |
+| By the purge itself | `resource_events`, `resource_controller_state` |
+| They outlive the resource, with the reason | `accounts`, `dataset_entries`: the permanent resource IDs of accounts and datasets, which are not stored as resources |
+
+The contract test reads the migrated schema of each database (`test_*_resource_purge_contract.rs`)
+and fails for a resource-keyed table that is neither, and for a declaration that matches no such
+table or column.
+
+**Removal listeners** follow `DatasetEntryRemovalListener` of the datasets context: the repository
+takes every `dyn ResourceRemovalListener` registered in its catalog. A database-backed repository
+registers as one only for a table without a cascade; the first such table adds a
+`ResourceKeyedTablePurge` variant to be declared with. The in-memory repositories of what cascades
+in SQL (the labels and owners projections, the configuration projections) register as listeners in
+every in-memory catalog, so that tests on the in-memory stack see purged resources gone everywhere.
+
 ### Controller bookkeeping
 
 - **`resource_controller_state`** has one row per controller and resource. It is keyed by
   `(controller, resource_id)`, where `controller` is a `ResourceControllerName`, and has an FK to
   `resources`. A row records the generation and status generation the controller finished with,
   or, with `not_before` set, a retry or a failure, with `attempts` and `last_error`.
-- Rows are not event-sourced: an upsert replaces the row. The FK means a resource's rows must be
-  removed (`delete_states_for_resource`) before the resource itself. Nothing removes a deleted
-  resource, which stays as its tombstone, so its rows stay too; every query leaves them out.
+- Rows are not event-sourced: an upsert replaces the row, and writes nothing for a resource that
+  does not exist, since a purge may remove it between `process` and the record of its outcome. The
+  FK means a resource's rows must be
+  removed (`delete_states_for_resources`) before the resource itself, which the
+  [purge](#purge) does. Until then a deleted resource's rows stay; every query leaves them out.
 - Postgres stores `last_error` with NUL characters replaced by U+FFFD, since a TEXT column
   rejects them and the failed write would fail every later drain.
 - **A change clears the rows.** Saving a new generation or a deletion request removes the
@@ -591,13 +797,19 @@ existing rows/events that should move to the new schema.
 ## 7. Account resolution & authorization
 
 Every resource belongs to exactly one account, and that scoping is also the authorization boundary.
-Resolution + permission checks live in `ResourceAccountResolverImpl`
-([`facade/local/resource_account_resolver_impl.rs`](/src/domain/resources/facade/src/facade/local/resource_account_resolver_impl.rs)).
+`ResourceAccountResolverImpl`
+([`facade/local/resource_account_resolver_impl.rs`](/src/domain/resources/facade/src/facade/local/resource_account_resolver_impl.rs))
+resolves account selectors; who may act on a resolved account is decided per type, below.
 
-- **Who may specify `headers.account`.** The manifest `account` field is optional and **defaults to
-  the calling subject's own account**. To target *another* account, the resolver requires the caller
-  to be an **admin** (`rebac_service.is_account_admin`); otherwise it returns
-  `AccessError::Unauthorized`. An **anonymous** subject cannot resolve any account (rejected).
+- **The default rule** decides for types without a guard of their own: the node, the account
+  itself, or a platform administrator may use every resource of an account, for every operation.
+  The framework does not know what makes an account usable. It asks `ResourceAccountAccessPort`
+  ([`access/resource_account_access_port.rs`](/src/domain/resources/domain/src/access/resource_account_access_port.rs)),
+  which the accounts context implements (`ResourceAccountAccessAdapter` in `kamu-accounts-services`,
+  through `RebacService::is_account_admin`). A denial is `AccessError::Unauthorized`. An
+  **anonymous** subject cannot resolve any account.
+- **`headers.account` is optional** and defaults to the caller's own account, unless the type's
+  placement puts the resource elsewhere ([below](#per-type-guard-and-placement)).
 - **Account selector forms.** `account` (`ResourceOwnerRef`) carries `id`/`did`/`name`, all
   optional. The account is looked up by `did` if given, else by `name`; any other selector field(s)
   present are then checked for agreement against the resolved account (a mismatch on `id`, `did`, or
@@ -610,10 +822,11 @@ Resolution + permission checks live in `ResourceAccountResolverImpl`
   exactly as above — the client never asserts its own account id.
 - **Local workspace context.** The resolver defaults `headers.account` to the workspace's caller
   (`CurrentAccountSubject`) and checks access for the `Principal` the CLI catalog registers beside
-  it ([identity](identity.md#who-registers-it)); the same admin rule applies for cross-account
-  targeting. Background work runs as `Principal::Node`, which may target any account.
-- **UID belonging to a different account.** Lookups are account-scoped: `find_account_snapshot`
-  treats a snapshot owned by another account as absent. A UID that exists but belongs to another account is reported as
+  it ([identity](identity.md#who-registers-it)); the same rules apply for cross-account targeting.
+  Background work runs as `Principal::Node`, which the default rule lets target any account.
+- **UID belonging to a different account.** A lookup by UID finds the resource in any account,
+  then the operation guard decides whether the principal may read it there
+  ([below](#per-type-guard-and-placement)). A UID the principal may not read is reported as
   **not-found** (`ResourceIDNotFoundError`), not "forbidden" — so existence is not leaked across
   accounts. A UID of the wrong schema yields `ResourceTypeMismatchError` in the domain and
   `ResourceLookupProblem::SchemaMismatch` at the facade boundary.
@@ -621,6 +834,42 @@ Resolution + permission checks live in `ResourceAccountResolverImpl`
   requests deletion of that account's resources (see [§13](#13-data-flow-walkthroughs)). Resources
   already being deleted are included again, which posts their message again; deleted ones are skipped,
   so the cascade is idempotent with respect to prior deletions.
+
+### Per-type guard and placement
+
+A type may register two optional hooks
+([`access/`](/src/domain/resources/domain/src/access/)), as it registers `ResourceSpecPreApply`.
+Both take the principal as an ODF `PrincipalHandle`.
+
+- **`ResourceOperationGuard<R>`** replaces the default rule for the type, and may delegate to it
+  (`DefaultResourceOperationGuard`). `check_operation` and `check_operations` decide one
+  `ResourceOperation`: `Create`, `Update`, `Read`, `Delete` or `List`. Its doc comment holds the
+  type's rule table.
+- **`ResourcePlacement<R>`** names the account that owns a resource with a given prepared spec,
+  such as the owner of a dataset the spec targets.
+
+Where each operation is decided:
+
+| Operation | Decided | A denial |
+| --- | --- | --- |
+| Apply (plan alike) | In the apply runner, after placement: `Create`, or `Update` with the current resource | `AccountAccess`, the whole call |
+| Get, render, handles, delete | First `check_account` before the query: allowed, denied, or per resource. Per resource, each loaded resource after | On the account, the whole call. Per resource, an unreadable one is not found and a readable one is an `Access` problem of its item |
+| Search | One `List` per selector naming an account, on what it filters by (`ResourceListScope`) | The whole call |
+
+- **Placement runs after preparation.** The runner prepares the spec in the account the manifest
+  names, or the caller's own, then places it. A manifest naming another account than the placement
+  is rejected. One naming none moves there, so the current spec is looked up in the placed account
+  and the spec is prepared again. Placing it again must give the same account.
+- **The default rule decides what has no type to ask:** a type-less ref or selector in another
+  account, the search's own-account default, and the summary.
+- **A guard never widens a query across accounts.** It decides which account may be used and
+  whether the caller may see a resource there; repository queries stay scoped to one account.
+- **The principal of an apply** is the one in its `CreationProvenance`, so internal producers are
+  checked as the node.
+- **An apply its caller has authorized** skips the check (`ApplyResourceAccessCheck::CheckedByCaller`).
+  The dataset environment variable API is one: it checks `Maintain` on the dataset, then writes the
+  dataset's sets in the owner's account for a maintainer who does not own it. The facade always
+  checks.
 
 ---
 
@@ -631,6 +880,7 @@ decides create vs update by resolving the target resource first:
 
 - **No `id` in manifest** → resolve by `(account, schema, name)`. Found → update; not found → create
   (new UID allocated).
+- **Neither `id` nor `name`** → always create, under a [generated name](#generated-names).
 - **`id` in manifest** → load that exact resource (the "exact pointer"). This is what enables a
   **rename**: supply the `id` and a new `headers.name`; identity stays stable while the name
   changes.
@@ -642,15 +892,45 @@ Concrete conflict cases:
 | `id` + changed `headers.name` | **Rename** — name updated on the same resource (`Update`). |
 | `id` whose resource has a different schema | **Reject** — `ResourceTypeMismatchError` in domain code, mapped to `SchemaMismatch` in the facade. |
 | `id` resolving to a resource in a different account | **Not found** — `ResourceIDNotFoundError` (account-scoped lookup; existence not leaked). |
-| `headers.account` targeting another account without admin | **Reject** — `AccessError::Unauthorized` ([§7](#7-account-resolution--authorization)). |
+| `headers.account` targeting an account the caller may not use | **Reject** — `AccessError::Unauthorized` ([§7](#7-account-resolution--authorization)). |
 | Rename target name already taken (same account+schema) | **Reject** — the unique index fails the update, reported as an internal error. |
+| Create whose name another writer takes first | **Update** of the resource that writer created: the apply runs once more ([§9](#9-services-kamu-resources-services)). With a generated name: **Create** under another name. |
 | Update by name where another account has the same name | **No conflict** — the account disambiguates; each `(account, schema, name)` is independent. |
 | Apply re-using the name of a resource being deleted | **Create** — the resource being deleted gave up its name. The outcome carries a `replaces_resource_being_deleted` warning naming its id. |
-| Apply re-using the name of a deleted resource | **Create** — the deleted resource was renamed to a tombstone. |
+| Apply re-using the name of a deleted resource | **Create** — the deleted resource gave up its name when its deletion was requested. No warning, unlike one still being deleted. |
+| Different spec for a type with an [immutable spec](#immutable-specs) | **Reject** — `ResourceSpecImmutableError`, an `ImmutableFieldChanged` rejection. |
 | `id` of a resource being deleted | **Reject** — `ResourceDeletionInProgressError`, a `LifecycleRuleConflict` rejection. |
+| `id` of a deleted resource | **Not found** — `ResourceIDNotFoundError`, although reads by id find it. |
 | Apply with no real change | **`Untouched`** — no generation bump, no events, no reconcile. |
 
 Note names are normalized to lowercase on write, so case-only differences are not distinct names.
+
+### Generated names
+
+A type whose resources may be applied without a name gives a
+`DeclarativeResource::GENERATED_NAME_PREFIX`, which derives a prefix from the spec. Every other type
+requires `headers.name`: a manifest without it is refused as `InvalidHeaders`
+(`ResourceHeadersValidationProblemCode::MissingName`). `name: null` counts as omitted; an empty name
+is invalid for every type. `ApplyResourceHeaders` carries the optional name up to the planner, and
+events and stored headers always have one.
+
+| Manifest of a type that generates names | Outcome |
+| --- | --- |
+| Neither `id` nor `name`, applied | **Create** as `<prefix>-<6 random lowercase letters and digits>`. |
+| Neither `id` nor `name`, planned | **Create** with the placeholder `<prefix>-xxxxxx`, `name_pending` set, and no name in the `after` document. |
+| `id`, no `name` | The resource keeps its name. |
+
+- A name that a resource of the same type and account carries is not used, deleted resources
+  included, so that a generated name normally finds one resource in the history too. Only names of
+  live resources are unique by index.
+- A taken name is replaced by another, up to 5 names in one apply, whether it was taken before the
+  insert or by it. Then the apply fails with an internal error.
+- **Applying without a name is not idempotent.** A repeated apply, such as after a lost response,
+  creates another resource.
+- **Omitting the name deviates from ODF,** whose `ResourceHeadersInput` schema requires it; such a
+  manifest does not validate against the published schema. The canonical form always has a name and
+  conforms. Whether input may omit it is asked in
+  [open-data-fabric#140](https://github.com/open-data-fabric/open-data-fabric/issues/140).
 
 ---
 
@@ -670,6 +950,8 @@ This crate turns the domain traits into running code. Module layout: `services/`
 - **`GenericResourceQueryService`** (impl `GenericResourceQueryServiceImpl`) — descriptor-agnostic
   queries (allocate UID, find by name, search identities) delegating to `ResourceRepository`.
 - **`TypedResourceQueryService<R>`** — type-safe queries for a single type.
+- **`ResourceNameSuffixGenerator`** — the random part of a [generated name](#generated-names); tests
+  script it to force collisions.
 - **`SimpleResourceReconciler<R>`** — the per-type callbacks of a type whose reconciliation and
   cleanup each fit in one step (implemented in the type's crate): `reconcile` drives the resource
   toward its spec, and `cleanup` removes what it built before the deletion completes
@@ -702,9 +984,17 @@ pub enum ApplyResourceOutcome { Created, Updated, Untouched }
 The `--dry-run` path uses `plan`; a live apply uses `apply`. A read-modify-write caller uses
 `apply_with_precondition`, passing the state it read (`ApplyResourcePrecondition::Absent` or
 `Generation(n)`). If the stored resource no longer matches, the apply fails with
-`ConcurrentModification`. That includes a create that hits an existing name, which is otherwise
-retried as an update. The planner checks the generation of the aggregate it loads, and saving
+`ConcurrentModification`. The planner checks the generation of the loaded aggregate, and saving
 checks that no event was appended since, so the check and the write are atomic.
+
+`ApplyResourceRunner`
+([`services/apply_resource_runner.rs`](/src/domain/resources/services/src/services/apply_resource_runner.rs))
+strings the steps together: find the existing resource, [prepare the spec](#preparing-a-spec), plan,
+execute. The resource is loaded once for all of them: a resource updated or deleted by another writer
+since then fails the save with `ConcurrentModification`, so a spec is never saved over one it was not
+prepared against. A create that loses its given name to another writer runs all of them once more, as
+the spec was prepared without the one that writer stored; losing again is an internal error. A
+[generated name](#generated-names) is replaced within the execution instead.
 
 Use-case implementations are generated by **`declare_*_use_case!`** macros so each type gets a
 fully-wired instance without boilerplate.
@@ -808,7 +1098,7 @@ persists its event and posts the matching lifecycle message:
 | `complete_reconciliation(id, expected)` | `Ready`, reconciled generation recorded | `StatusUpdated` |
 | `fail_reconciliation(id, expected, error)` | `Failed` or `Degraded`, `ReconciliationError` | `StatusUpdated` |
 | `request_deletion(ids)` | `Deleting` | one `DeletionRequested` for the batch |
-| `complete_deletion(completions)` | `Deleted`, tombstone name | one `Deleted` for the completed ones |
+| `complete_deletion(completions)` | `Deleted`, purge deadline set ([Retention](#retention)) | one `Deleted` for the completed ones |
 | `record_cleanup_failure(failures)` | stays `Deleting`, `ReconciliationError{code: cleanup-failed}` | one `StatusUpdated` per resource |
 | `update_conditions(id, expected_status_generation, patch)` | the named conditions set or removed ([below](#condition-patches)) | `StatusUpdated` |
 
@@ -851,8 +1141,8 @@ write through `update_conditions`, which sets or removes the conditions a
    with `ResourceConditionUpdateError::StatusGenerationChanged`.
 2. **The patch** (`ResourceConditionPatchChecker`). A set condition must be registered for the
    resource type, pass its dispatcher and stay within the size limit of its registration, because
-   every `StatusUpdated` event stores the whole status. `ReconciliationError` belongs to the
-   framework and cannot be patched. A removed condition needs no registration, so one whose schema
+   every `StatusUpdated` event stores the whole status. `ReconciliationError` and
+   `CreationProvenance` belong to the framework and cannot be patched (`FrameworkOwned`). A removed condition needs no registration, so one whose schema
    is gone can still be removed. A failure is `InvalidPatch`.
 3. **Nothing changed.** A patch that only repeats the current values records and posts nothing.
 4. **The type's rules.** `ResourceStatusRules::validate_status_change` sees the old and new status
@@ -868,8 +1158,8 @@ against their schemas as any persisted condition, but not against the size limit
 status rules, which apply to patches.
 
 **Condition ownership.** Each type documents which writer owns which of its conditions. For
-`VariableSet`, `SecretSet` and `Storage` the framework writes their only condition,
-`ReconciliationError`, and nothing patches conditions.
+`VariableSet`, `SecretSet` and `Storage` the framework writes their only conditions,
+`ReconciliationError` and `CreationProvenance`, and nothing patches conditions.
 
 ### Controller runtime
 
@@ -964,7 +1254,8 @@ call, which hints its own loop. The
 sleep uses `SystemTimeSource`, so tests drive it with `FakeSystemTimeSource`.
 
 **Hints.** The lifecycle message consumer hints the schema's loop on every `Applied`,
-`DeletionRequested` and `StatusUpdated`, through `ResourceControllerHints`. The hint carries no
+`DeletionRequested` and `StatusUpdated`, through `ResourceControllerHints`; `Deleted` and `Purged`
+leave nothing to do. The hint carries no
 data: the loop re-reads storage, so a missed hint costs only latency, up to the fallback timeout.
 The hub is in-process on every backend
 ([wakeup-listeners.md](wakeup-listeners.md#3-inventory)).
@@ -973,9 +1264,9 @@ The hub is in-process on every backend
 (`new_drain_session()`), whose `drain_due_resources()` drains every controller once and does not
 wait for deadlines: a resource waiting for time stays for a later drain. The CLI, after a command,
 the e2e API server, after a mutating request, and the test harnesses, after a write, alternate
-it with the outbox until a drain is idle
-([`BackgroundWorkFinalizer`](/src/domain/resources/services/src/controller_runtime/background_work_finalizer.rs)): a message may
-make a resource actionable, and processing posts messages of its own. A session keeps what its drains held back until it ends, so
+it with the outbox until a pass finds both idle: the runtime is a `BackgroundWorkDrain` of the
+[`BackgroundWorkFinalizer`](background-agents.md#finalizing-background-work-without-agents). A
+message may make a resource actionable, and processing posts messages of its own. A session keeps what its drains held back until it ends, so
 that alternation ends too, even with a controller that never settles a resource. A session's
 drains and the agent's never overlap for one controller (`ResourceControllerDrainGate`), which
 also counts every drain's `process` calls. A session's drain is idle only when no drain of the
@@ -1054,12 +1345,20 @@ pub trait ResourceFacade: Send + Sync {
 }
 ```
 
-**Resources being deleted are hidden unless asked for.** With `ResourceVisibility::IncludeDeleting`
-a ref by name may match several resources: each is a success at the same `request_index`, the live
-resource first. A ref by id finds a resource being deleted either way. `delete` takes no visibility:
-a name finds the live resource only, and a resource being deleted is deleted again by its id. That
-posts its message again; a failed cleanup is retried by the controller runtime either way, once its
-backoff ends ([(c) Deletion](#c-deletion)).
+**Resources whose deletion was requested are hidden unless asked for** ([visibility](#repository)).
+Unless only live resources are visible, a ref by name may match several: each is a success at the
+same `request_index`, the live resource first. A ref by id finds a resource in any state; only
+`DeletedOnly` hides live ones from it.
+
+`delete` takes no visibility: a name finds the live resource only, a resource being deleted is
+deleted again by its id, and a deleted one is not found. Deleting again posts the message again; a
+failed cleanup is retried by the controller runtime either way, once its backoff ends
+([(c) Deletion](#c-deletion)).
+
+**The spec of a deleted resource is not revealed.** With `SpecViewOpts::REVEALED` a deleted resource
+whose type has a spec-view dispatcher is a `ResourceLookupProblem::DeletedNotRevealed`; a live
+resource sharing its name is revealed beside it, so one `request_index` may have both a success and
+a problem. The encrypted spec stays readable.
 
 **The two families are deliberately asymmetric about which form is the
 primitive.** Ref-keyed reads and deletes (`get`, `get_handles`,
@@ -1185,8 +1484,9 @@ the normal per-item `data` is unavailable (see `GqlError::gql_extended` /
   a `ResourceAccountResolver`, `GenericResourceQueryService`, and
   `ResourceExtensionSchemaResolver`. For `plan_apply_manifest` / `apply_manifest`, the shared
   preparation step parses the manifest, resolves the account, resolves the CRUD dispatcher,
-  canonicalizes and validates labels/annotations, collects header warnings, then builds
-  `ResourceHeadersInput`; this is why plan/apply accept, reject, and warn identically.
+  canonicalizes and validates labels/annotations, replaces type names in owner references by
+  schemas, collects header warnings, then builds
+  `ApplyResourceHeaders`; this is why plan/apply accept, reject, and warn identically.
 - **`RemoteGraphqlResourceFacadeImpl`** — a `cynic`-based GraphQL client that issues the queries /
   mutations of a remote server (whose resolvers use a *local* facade there). It lives in the
   `kamu-adapter-resources-facade-graphql` crate: operations under
@@ -1199,14 +1499,21 @@ the normal per-item `data` is unavailable (see `GqlError::gql_extended` /
 on demand by the CLI for remote contexts — see [§12](#12-cli).)
 
 **Label filtering** rides on the selectors themselves: each `ResourceSelector` carries an optional
-`labels`, and there is **no** call-level filter — search requests carry only `selectors`, `account`
-and `pagination`, while the batch ref calls take a bare `Vec<ResourceRef>`, which has no `labels`
-field at all. A uniform filter is just the case where every selector carries the same labels; what
-per-selector labels add is two selectors filtering *differently* in one call.
+`labels`, and there is **no** call-level label filter — search requests carry only `selectors`,
+`owner`, `visibility` and `pagination`, while the batch ref calls take a bare `Vec<ResourceRef>`,
+which has no `labels` field at all. A uniform filter is just the case where every selector carries
+the same labels; what per-selector labels add is two selectors filtering *differently* in one call.
 
 **→ [Resource label filtering](resources-label-filtering.md)** — the full path: resolution through
 `ResourceExtensionSchemaResolver`, the AND-only evaluation boundary in `flatten_conjunction`,
 per-row scope pairs, the `resource_labels_projection` table, and the known rebuild gap.
+
+**Searching by owner** is the one call-level filter: `SearchResourcesRequest.owner` narrows every
+selector to the resources that one resource [owns](#owner-references), since the ODF
+`ResourceSelector` has no such field. An owner given by ID may be in any state or gone; the rest of
+the reference is checked only against a live resource with that ID. One given by name must be live,
+whatever the visibility. The lookup covers the reference's account, by default the caller's,
+whatever accounts the selectors name. A failed one is `ListResourcesError::OwnerLookup`.
 
 ---
 
@@ -1220,8 +1527,8 @@ Every resolver delegates to `ResourceFacade`.
 `handlesByRefs`, `bySelectors` / `handlesBySelectors`, `renderManifests`. Each ref-keyed
 query takes `[ResourceRefInput!]!` — there are no single-ref variants, matching the facade. The
 `opts: SpecViewOptsInput` argument (`{ revealed: bool }`) maps to the facade's `SpecViewOpts`.
-`includeDeleting: Boolean! = false` on the ref-keyed queries and on
-`SearchResourcesInput`, maps to `ResourceVisibility::IncludeDeleting`.
+`visibility: ResourceVisibility! = ACTIVE`, on the ref-keyed queries and on
+`SearchResourcesInput`, maps to the domain enum.
 
 **Mutations (`ResourcesMut`):** `apply_manifest(manifest, format, dry_run?)`,
 `apply_manifests(manifests, dry_run?)`, `delete(resourceRefs)`. `dry_run` routes to
@@ -1231,8 +1538,9 @@ query takes `[ResourceRefInput!]!` — there are no single-ref variants, matchin
 
 **Per-item lookup problems.** The ref-keyed queries and `delete` report per-entry failures through
 the `ResourceLookupProblem` union: `ResourceIDNotFoundProblem`, `ResourceNameNotFoundProblem`,
-`ResourceSchemaMismatchProblem`, `ResourceNameMismatchProblem`, `ResourceEmptyRefProblem` and
-`ResourceUntypedNameProblem`. The last marks a ref that addressed by `name` without a `type`
+`ResourceSchemaMismatchProblem`, `ResourceNameMismatchProblem`, `ResourceEmptyRefProblem`,
+`ResourceUntypedNameProblem` and `ResourceDeletedNotRevealedProblem`. `ResourceUntypedNameProblem`
+marks a ref that addressed by `name` without a `type`
 ([§10](#10-facade-kamu-resources-facade)); it is kept distinct from `EmptyRef` so a caller who did
 supply a name is not told they supplied none. Over GraphQL such a ref is normally rejected earlier,
 by the adapter's `validate_ref`, so the variant is what an *in-process* caller sees — the local
@@ -1247,7 +1555,8 @@ typed `Problem` variants *and* transport-level GraphQL errors. The apply outcome
 (`resource_apply_outcome_model.rs`) is the richest example of the union:
 
 - `Success` → operation (`Created`/`Updated`/`Untouched`) + `before`/`after` (canonical manifest
-  documents as JSON; `after` is non-null, `before` is null **iff** creating) + `warnings`. Sent for a live apply as well as a
+  documents as JSON; `after` is non-null, `before` is null **iff** creating) + `warnings` +
+  `namePending` ([Generated names](#generated-names)). Sent for a live apply as well as a
   dry run — see [Canonical manifest documents](#canonical-manifest-documents).
 - `Rejection` → category (`ImmutableFieldChanged`, `BusinessValidationFailed`,
   `ReferencedObjectMissing`, `LifecycleRuleConflict`) + message.
@@ -1280,9 +1589,9 @@ benefit of the ODF-shaped API. Naming an account you are not allowed to read den
 call rather than dropping that selector (RF-105).
 
 **Accounts live on the selectors, at one level only.** There is no call-level `account`:
-`SearchResourcesInput` carries nothing but `selectors`, and a selector naming no account resolves to
-the calling subject's own. A type-less selector may name one, which is how an all-types listing is
-scoped to an account. Per-row mechanics are in
+beside `selectors`, `SearchResourcesInput` carries only `owner` and `visibility`, and a selector
+naming no account resolves to the calling subject's own. A type-less selector may name one, which
+is how an all-types listing is scoped to an account. Per-row mechanics are in
 [resources-label-filtering.md](resources-label-filtering.md).
 
 RFC-018 specifies no search-request type at all, so `SearchResourcesInput` is ours; accepting a
@@ -1337,8 +1646,8 @@ implementation files carry `_resource(s)_` names:
 | Subcommand | Implementation file | Purpose |
 | --- | --- | --- |
 | `kamu apply` | `apply_command.rs` | Discover manifests (files/dir/stdin) and apply/plan them as a single all-or-nothing batch by default; `--dry-run`, `--recursive`, `--stdin`, `--continue-on-error`. |
-| `kamu list` | `list_resources_command.rs` | List resources by type or `%` for all; renders Table/CSV/JSON/Parquet. `--include-deleting` lists resources being deleted too; a list of ids alone always does. |
-| `kamu get` | `get_resource_command.rs` | Get resource(s) by selector(s); names or full manifest; `--spec`, `--revealed`, `--include-deleting`. |
+| `kamu list` | `list_resources_command.rs` | List resources by type or `%` for all; renders Table/CSV/JSON/Parquet. `--include-deleting`, `--include-deleted` and `--deleted` choose the visibility; a list of ids alone finds resources in any state, unless `--deleted` is given. |
+| `kamu get` | `get_resource_command.rs` | Get resource(s) by selector(s); names or full manifest; `--spec`, `--revealed`, `--include-deleting`, `--include-deleted`, `--deleted`. |
 | `kamu delete` | `delete_resources_command.rs` | Request deletion by selector(s), printing `Deleting` or `Deleted` per resource; `--force`, `--ignore-not-found`, `--dry-run`. |
 
 **Context commands** (manage which server/workspace resources target): `kamu context add` / `list` /
@@ -1366,7 +1675,7 @@ implementations under `impl/`):
 | `ResourceManifestDiscoveryService` | Finds `.yaml`/`.yml`/`.json` manifests from paths/stdin (recursive optional). |
 | `ResourceManifestExecutionService` | Reads a discovered manifest and calls `plan_apply_manifest` / `apply_manifest`. |
 | `ResourceTypeLookupService` | Resolves a resource type by selector name/alias/raw string; caches `list_supported_resource_types` per context. |
-| `ResourceSelectionSyntaxService` | Parses the `get`/`delete` selector grammar. |
+| `ResourceSelectionSyntaxService` | Parses the `get`/`delete` selector grammar, and the value of `--owner`. |
 | `ResourceLabelSelectorParser` | Parses `--label`/`-l` arguments into the wire-level `ResourceLabelFilterInput` (scanner + parser pair). Passes keys/values through verbatim — alias resolution and schema validation belong to the facade. |
 | `ResourceSelectionResolutionService` | Expands parsed selectors into concrete targets via facade queries. |
 | `ResourceSelectorResolutionService` | Resolves a single selector string to a `ResourceRef`. |
@@ -1386,9 +1695,11 @@ themselves are agnostic. Selector grammar is specified below, after the semantic
 | May return / act on multiple | yes (per manifest) | **yes, but bounded** — selector-driven, capped by `max_results`, `--unbounded` to lift | yes (bounded by `--max-results`/`--unbounded`) | yes |
 | Output modes | summary + canonical diff (dry-run *and* live apply)/warnings; verbose | `-o name` \| `-o json` \| `-o yaml`; `--spec` for apply-compatible spec | Table/CSV/JSON/Parquet (via `OutputConfig`), `-w` for wider detail | summary / dry-run preview |
 | Default secret visibility | n/a | **`Encrypted`** (ciphertext); `--revealed` to decrypt | secrets not expanded in list columns | n/a |
-| Relevant flags | `--dry-run`, `--recursive`, `--stdin`, `--continue-on-error` | `--ignore-not-found`, `--spec`, `--revealed`, `--max-results`/`--unbounded`, `--label`/`-l` | `--max-results`/`--unbounded`, `-w`, `-o`, `--label`/`-l` | `--force`, `--ignore-not-found`, `--dry-run`, `--label`/`-l` |
+| Relevant flags | `--dry-run`, `--recursive`, `--stdin`, `--continue-on-error` | `--ignore-not-found`, `--spec`, `--revealed`, `--max-results`/`--unbounded`, `--label`/`-l`, `--owner` | `--max-results`/`--unbounded`, `-w`, `-o`, `--label`/`-l`, `--owner` | `--force`, `--ignore-not-found`, `--dry-run`, `--label`/`-l` |
 | Label filtering | n/a | `-l` narrows the selector expansion | `-l` narrows the listing (incl. `list %`) | `-l` narrows what `--all`/patterns resolve to |
-| Resources being deleted | a manifest taking the name of one creates a new resource and warns | hidden; `--include-deleting` shows them, and a name may then match several | hidden; `--include-deleting` lists them, as does a list of ids alone | names select live resources only; an id selects a resource being deleted again |
+| Filtering by owner | n/a | `--owner` narrows the selector expansion, exact names and ids included | `--owner` narrows the listing; refused for `datasets` | n/a |
+| Resources being deleted | a manifest taking the name of one creates a new resource and warns | hidden; `--include-deleting` shows them, and a name may then match several; an id finds them | hidden; `--include-deleting` lists them, as does a list of ids alone | names select live resources only; an id selects a resource being deleted again |
+| Deleted resources | a manifest taking the name of one creates a new resource | hidden; `--include-deleted` shows them, `--deleted` only them and those being deleted; an id finds them; `--revealed` is refused | as `get`; `--include-deleted` lists the live ones by name, then the others newest deletion first | never selected |
 | Flag semantics | default: whole batch is one transaction, a rejection/failure rolls back every manifest including earlier successes; `--continue-on-error`: apply each manifest independently so earlier successes survive a later failure; `--dry-run`: plan only, no writes | `--ignore-not-found`: skip missing selectors instead of erroring | — | `--force`: skip confirmation prompt; `--ignore-not-found`: exit OK if absent; `--dry-run`: preview resolved deletions |
 | Local vs remote | identical behavior; chosen by context (`--context` to override) | identical | identical | identical |
 
@@ -1510,7 +1821,7 @@ mixed dataset+resource form) are rejected — datasets carry no labels, and filt
 resource half of a mixed delete would still delete every named dataset unfiltered.
 
 **`-l` narrows the whole invocation, which the CLI expresses per selector.** The facade has no
-call-level filter, so the CLI stamps the parsed filter onto *every* selector it builds — in
+call-level label filter, so the CLI stamps the parsed filter onto *every* selector it builds — in
 `selectors_for_query` for `list`, and via `with_labels` in the selection-resolution service for
 `get`/`delete`. Because selectors are OR'd, `(A ∧ L) ∨ (B ∧ L)` is exactly `(A ∨ B) ∧ L`, so
 `kamu list vs/a-% ss/b-% -l env=prod` runs the same query a call-level filter would. The CLI has
@@ -1565,8 +1876,8 @@ they get from `kamu get -o yaml` provably agree, and the parity is pinned by the
 `apply_documents_match_rendered_manifest`.
 
 The canonical form is the authored subset — `$schema` + `headers.{account, name, labels,
-annotations}` + `spec` — deliberately excluding `headers.id`, `generation`, the timestamps, and
-`status`. Two consequences follow directly:
+annotations, ownerReferences}` + `spec` — deliberately excluding `headers.id`, `generation`, the
+timestamps, and `status`. Two consequences follow directly:
 
 - **An unchanged apply yields byte-identical documents** (`before == Some(after)`, which
   `ApplyManifestDocuments::has_changes()` reports). There are no spurious differences to normalize:
@@ -1683,7 +1994,7 @@ sequenceDiagram
     end
     rect rgba(100, 150, 255, 0.15)
         alt cleaned up
-            A->>P: complete_deletion(id) → Deleted (tombstone name)
+            A->>P: complete_deletion(id) → Deleted
             P->>OB: produce ResourceLifecycleMessage::Deleted
         else cleanup failed
             A->>P: record_cleanup_failure(id) → StatusUpdated (cleanup-failed)
@@ -1700,9 +2011,9 @@ Deletion runs in two steps, as the ODF resource framework defines them
   reconciled. Requesting the deletion of a resource already being deleted, by its id, posts the
   message again.
 - **Completing the deletion** is one `process` call per resource: it runs the reconciler's
-  `cleanup`, then appends `Deleted`, which renames the resource to its tombstone and posts a
-  `Deleted` message of its own. A resource that no longer waits for cleanup is skipped, so
-  processing it twice completes its deletion once.
+  `cleanup`, then appends `Deleted` and posts a `Deleted` message of its own. A resource that no
+  longer waits for cleanup is skipped, so processing it twice completes its deletion once.
+- **A deleted resource is kept** until its [retention](#retention) ends, then [purged](#purge).
 - **The cleanup runs in a transaction of its own**, so a failure, a database error included,
   discards whatever the reconciler wrote before failing; the outcome is recorded in the next one.
   A concurrent modification while completing the deletion makes `process` return `RetryAt(now)`:
@@ -1717,7 +2028,7 @@ Deletion runs in two steps, as the ODF resource framework defines them
 - **The phase a delete reports** is the one at the time of the response: `Deleting` unless the
   controller runtime completed the deletion before it. A local workspace processes a command's messages once
   its transaction has committed, so `kamu delete` there reports afterwards, through a
-  `PostCommandActions` step: a resource still found by its id is `Deleting`, one gone is `Deleted`.
+  `PostCommandActions` step, which reads the phase again.
   A resource still `Deleting` there gets a hint to retry by id. The command runs in one
   transaction, so when any deletion fails the others are reported as rolled back.
 
@@ -1733,6 +2044,7 @@ flowchart LR
     DEL["request_deletion.rs"] -->|DeletionRequested| MSG
     COMP["resource controllers"] -->|Deleted| MSG
     PRIM["lifecycle primitives:<br/>every status write"] -->|StatusUpdated| MSG
+    PURGE["ResourceRetentionJob"] -->|Purged| MSG
 
     MSG --> OB[("Outbox")]
 
@@ -1750,7 +2062,8 @@ flowchart LR
 - **Resource lifecycle** — `Applied` (from `use_cases/apply.rs`), `DeletionRequested`
   (`use_cases/request_deletion.rs`), `Deleted` (a controller completing a deletion), and
   `StatusUpdated` for every status write of a [lifecycle primitive](#lifecycle-primitives): a
-  reconciliation started, succeeded or failed, a cleanup failed, or a condition patch. Consumed by
+  reconciliation started, succeeded or failed, a cleanup failed, or a condition patch, and `Purged`
+  once deleted resources are [purged](#purge) (their IDs, one message per type). Consumed by
   the **event bridge**, which hints the [controller runtime](#controller-runtime), and by the
   configuration crate's
   projection-maintenance consumer. See
@@ -1798,14 +2111,30 @@ projections**.
 
 ### Lifecycle state machine
 
-Below is the machine as implemented for `VariableSet`, `SecretSet` and `Storage`. The status transitions
-come from `ResourceStatusExt` in
-[`state/resource_status.rs`](/src/domain/resources/domain/src/state/resource_status.rs)
-(`mark_reconciling` → `Reconciling`, `mark_ready` → `Ready`, `mark_failed_or_degraded` → `Failed`
-or `Degraded`, `mark_cleanup_failed` → still `Deleting`); `Pending`, `Deleting` and `Deleted` are
-derived by `align_phase`. A `mark_reconciling` that would move `observedGeneration` back, or a
-`mark_ready` for a generation not observed or already reconciled, fails the command with an
-invariant violation and leaves the status unchanged.
+Below is the machine as implemented for `VariableSet`, `SecretSet` and `Storage`. No status writer
+sets the phase: `ResourceStatusExt::derive_phase` in
+[`state/resource_status.rs`](/src/domain/resources/domain/src/state/resource_status.rs) computes it
+from the headers and the rest of the status. The projector applies it after every event, also
+when old events are replayed, and `try_update_resource_status` applies it to a new status before
+saving it, so a stored `StatusUpdated` carries the phase the projector would compute. The first
+matching row wins:
+
+| Headers and status | Phase |
+|---|---|
+| `deletedAt` set | `Deleted` |
+| `deletionRequestedAt` set | `Deleting` |
+| `observedGeneration` absent or lower than `generation` | `Pending` |
+| `reconciledGeneration` at least `generation` | `Ready` |
+| no `ReconciliationError` condition | `Reconciling` |
+| no `reconciledGeneration` | `Failed` |
+| otherwise | `Degraded` |
+
+The `ResourceStatusExt` transitions change only those inputs: `mark_reconciling` sets
+`observedGeneration` and removes the `ReconciliationError`, `mark_ready` sets
+`reconciledGeneration` and removes it, `mark_failed_or_degraded` and `mark_cleanup_failed` set it.
+A `mark_reconciling` that would move `observedGeneration` back, or a `mark_ready` for a generation
+not observed or already reconciled, fails the command with an invariant violation and leaves the
+status unchanged.
 
 ```mermaid
 stateDiagram-v2
@@ -1816,6 +2145,8 @@ stateDiagram-v2
     Reconciling --> Degraded: failed, an earlier generation reconciled
     Reconciling --> Pending: spec/headers changed<br/>(outcome discarded)
     Ready --> Pending: spec/headers changed<br/>(generation bumps)
+    Failed --> Reconciling: transient failure retried<br/>(error removed)
+    Degraded --> Reconciling: transient failure retried<br/>(error removed)
     Failed --> Pending: re-apply (generation bumps)
     Degraded --> Pending: re-apply (generation bumps)
     Ready --> Deleting: delete
@@ -1830,13 +2161,13 @@ stateDiagram-v2
 
 **Notes on current behavior:**
 
-- **`Pending` is not written, it is derived.** A spec or header change bumps `generation` and leaves
-  the status as it was last written, so the conditions of the previous reconciliation stay
-  visible while the phase shows `Pending` and then `Reconciling`. The outcome of that
-  reconciliation replaces them: success clears `ReconciliationError`, a failure sets it again.
-- **`Failed` and `Degraded` are the unhealthy phases**, set by `mark_failed_or_degraded` with a
-  `ReconciliationError` condition carrying the code and message: `Failed` when no generation was ever
-  reconciled, `Degraded` when an earlier one was and is presumably still in effect.
+- **A spec or header change leaves the status as it was last written.** `generation` bumps, so the
+  phase shows `Pending` while the conditions of the previous reconciliation stay visible. Starting
+  the next reconciliation removes the previous `ReconciliationError`, so the phase shows
+  `Reconciling`; a failure writes it again.
+- **`Failed` and `Degraded` are the unhealthy phases**, shown while a `ReconciliationError`
+  condition with the code and message is present: `Failed` when no generation was ever reconciled,
+  `Degraded` when an earlier one was and is presumably still in effect.
 - **Neither is terminal.** A failure the reconciler marks transient is retried by the controller
   runtime with a growing backoff. Any other failure waits for the user to re-apply a changed
   manifest: the generation bumps and the runtime reconciles it again.
@@ -1844,6 +2175,9 @@ stateDiagram-v2
   reconciliation.
 - **Deletion phases take precedence** over every other phase, and are final: a resource being
   deleted is never reconciled again.
+- **Replay ignores the phase stored in an event.** A `StatusUpdated` whose phase disagrees with
+  its inputs, such as `Reconciling` with the error of the previous attempt still present, loads
+  with the derived one (`Failed`) until the next reconciliation starts.
 
 ---
 
@@ -1955,7 +2289,7 @@ legitimately match several user-authored sets that this path must not touch.
 *It reads the stored spec, never the projection.* Upsert and delete both rebuild the whole set and
 apply it back, so here a pre-reconcile read is not merely stale but **destructive**: it would
 silently retract every entry added since the last reconcile — adding a second secret moments after
-the first would drop the first. Secrets are recoverable from the spec (the sanitizer encrypts before
+the first would drop the first. Secrets are recoverable from the spec (the pre-apply hook encrypts before
 the first durable write), so that path decrypts via `SecretExt::decrypt_plaintext_bytes` rather than
 reading the projection's raw-AES columns.
 
@@ -2000,7 +2334,7 @@ belongs to another account. Nothing in `ResourceEventDeleted` or
 resource contract working as intended. Behaviourally it is a headers-only change: `try_update_spec`
 short-circuits on an unchanged spec. Like any header change it bumps `generation` once, so the
 resource is reconciled again. A `SecretSet` whose stored spec is still the backfill migration's
-read-only `aes256gcm` form also changes its spec, as `SecretSetSpecSanitizer` upgrades it to `jwe`
+read-only `aes256gcm` form also changes its spec, as `SecretSetSpecPreApply` upgrades it to `jwe`
 on the way through; that still bumps the generation only once. The `aes256gcm` form cannot reach
 the auto-managed sets (those are deleted, not stripped), and a normally-authored set is always
 already `jwe`.
@@ -2021,31 +2355,32 @@ orphaned binding rows.
 Encryption happens in **two places — not (primarily) in the reconciler**, which is the easy wrong
 assumption:
 
-1. **Spec sanitizer — the pre-persistence boundary** ([`sanitizers/secret_set.rs`](/src/domain/configuration/services/src/sanitizers/secret_set.rs)).
-   `SecretSetSpecSanitizer` runs as the **very first step** of both `plan` and `apply`, before the
-   planner and before any event/snapshot write. It encrypts each non-encrypted secret into a compact
-   **JWE** token (`dir` + `A256GCM`, via `crypto_utils::SecretCryptor` / `crypto_utils::jwe`) and
+1. **Pre-apply hook — the pre-persistence boundary** ([`spec_pre_apply/secret_set.rs`](/src/domain/configuration/services/src/spec_pre_apply/secret_set.rs)).
+   `SecretSetSpecPreApply`, the type's [`ResourceSpecPreApply`](#preparing-a-spec), runs as the
+   **very first step** of both `plan` and `apply`, before the planner and before any event/snapshot
+   write. It encrypts each non-encrypted secret into a compact **JWE** token (`dir` + `A256GCM`, via
+   `crypto_utils::SecretCryptor` / `crypto_utils::jwe`) and
    stores it as `Secret { value: <jwe>, contentEncoding: Some("jwe") }`, so the persisted `spec`
    **already holds ciphertext.**
 
    > This ordering is what makes the apply `before`/`after` documents safe: they are built from the
-   > sanitized state, carry the **stored (unrevealed)** spec, and never invoke
+   > prepared state, carry the **stored (unrevealed)** spec, and never invoke
    > `ResourceSpecViewDispatcher::reveal_spec`. Pinned by the contract test
    > `apply_documents_never_expose_secret_plaintext`, which runs against both facades. "diffs" in
    > the invariant above means exactly these documents.
 
-   The sanitizer also handles three edge cases:
+   The hook also handles three edge cases:
    - If new plaintext decrypts-equal to the stored JWE token, it reuses that token to avoid a
      spurious change.
-   - If input is already tagged as `contentEncoding: "jwe"`, the sanitizer decrypts it under the
+   - If input is already tagged as `contentEncoding: "jwe"`, the hook decrypts it under the
      current key before trusting it. A wrong-key or tampered token becomes
      `ApplyResourceRejectionCategory::BusinessValidationFailed` (`ApplyResource*Decision::Rejected`),
      not a later reconciliation/reveal failure.
    - The read-only `contentEncoding: "aes256gcm"` form (`hex(nonce ‖ ciphertext)`) exists only for
-     env-var backfill migrations, which cannot compute JWE in SQL. On the next apply, the sanitizer
+     env-var backfill migrations, which cannot compute JWE in SQL. On the next apply, the hook
      re-materializes it as JWE even when the plaintext has not changed.
 
-   `ResourceSpecSanitizer::sanitize_new_spec` returns `SanitizeSpecOutcome<R>` so sanitizers can
+   `ResourceSpecPreApply::pre_apply` returns `ResourceSpecPreApplyOutcome<R>` so hooks can
    report key-dependent business rejections without adding resource-specific `LifecycleError`
    variants; technical failures still return `InternalError`.
 2. **Reconciler — encrypted read-side projection** ([`reconcilers/secret_set.rs`](/src/domain/configuration/services/src/reconcilers/secret_set.rs)).
@@ -2110,7 +2445,9 @@ pub fn register_variable_set_resource_crud_dispatcher(catalog_builder: &mut dill
    canonical should be the schema `TypeName`; include at least the singular and plural lowercase
    forms and a short code as aliases). No `status.rs` is needed — status is inherited automatically
    via the shared `ResourceStatus`/`ResourceStatusExt`, written through the generic
-   `StatusUpdated` event by the type's controller.
+   `StatusUpdated` event by the type's controller. Declare in `state.rs` whether the spec is
+   [immutable](#immutable-specs), and add a [`ResourceSpecPreApply`](#preparing-a-spec) to the
+   services crate if the spec has defaults or references.
 2. **Implement a `SimpleResourceReconciler<R>`** in `configuration/services/src/reconcilers/`
    (no-op projection is fine if there's nothing to do; transform the spec here if needed — see
    `SecretSet`).
@@ -2132,7 +2469,7 @@ pub fn register_variable_set_resource_crud_dispatcher(catalog_builder: &mut dill
 operations work without touching CLI or GraphQL code. **But "no changes" holds only for the generic
 path** — a complete type still needs its DI registration, presentation metadata (aliases + list
 columns), facade contract coverage, CLI golden-output test, `cynic`/schema updates if the remote
-client depends on type-specific shapes, and any type-specific spec-view/sanitizer logic (+ tests).
+client depends on type-specific shapes, and any type-specific spec-view/pre-apply logic (+ tests).
 
 ### Recipe: driving a type with a resource controller
 
@@ -2165,10 +2502,12 @@ work: the harnesses' `settle` runs the `BackgroundWorkFinalizer`, as the CLI doe
 apply planner/executor, the simple controller adapter's reconciliation, deletion and retries, CRUD
 dispatch, persistence, the event-store bridge, and the message consumers. Configuration tests also
 leave real resources `Reconciling` or `Deleting` without the runtime, as a crash would, and check
-that the first drain completes them, and that a failing `SecretSet` holds back no `VariableSet`. A `TestResource` mock
-(`services/tests/tests/utils/`) and `BaseResourceServiceHarness` (`services/src/testing/`) provide
-a type-agnostic harness;
-configuration tests cover the real reconcilers (incl. the `SecretSet` spec sanitizer, encrypted projection, and `reveal_spec`).
+that the first drain completes them, and that a failing `SecretSet` holds back no `VariableSet`. A
+`TestResource` mock and `BaseResourceServiceHarness` (both in `services/src/testing/`) provide a
+type-agnostic harness, and `ImmutableTestResource` has an immutable spec with a reference to
+resolve; the facade contract tests serve both beside the real types where they need a feature no
+real type has (`LocalFacadeHarnessOpts::test_resources`);
+configuration tests cover the real reconcilers (incl. the `SecretSet` pre-apply hook, encrypted projection, and `reveal_spec`).
 
 **Controller runtime** —
 [`services/tests/tests/controller_runtime`](/src/domain/resources/services/tests/tests/controller_runtime/).
@@ -2178,6 +2517,15 @@ storage. Tests either drain as the CLI does (outbox and drain session in turn, u
 the agent and move the clock, asserting call counts rather than timing. The eligibility queries
 and `count_failing_resources` have a storage-agnostic suite in `kamu-resources-repo-tests`, wired
 to all three storages.
+
+**Retention and purge** —
+[`services/tests/tests/services/test_resource_retention.rs`](/src/domain/resources/services/tests/tests/services/test_resource_retention.rs)
+checks the deadlines and runs `ResourceRetentionJob` batches on the in-memory stack: what is due
+goes, what is not stays, batches are bounded, a failed batch leaves everything for the next,
+concurrent batches purge each resource once, and the outbox keeps its messages. The purge queries
+have shared repository tests, a Postgres race test of the claim, and the
+[purge contract](#purge) tests read each migrated schema. The e2e scenario
+`test_resources_purged_after_retention` checks the purge after CLI commands.
 
 **Facade contract tests** —
 [`src/domain/resources/facade-tests`](/src/domain/resources/facade-tests). The key idea: a
@@ -2216,7 +2564,7 @@ Each tier has a distinct job; put a test at the lowest tier that can express it:
 
 - **Service tests** validate internal state transitions and persistence edge cases — reconcile
   transitions, generation/observed-generation bookkeeping, optimistic-concurrency conflicts,
-  tombstone/uniqueness behavior, event-store projection. Fast, no transport.
+  deletion/uniqueness behavior, event-store projection. Fast, no transport.
 - **Facade contract tests** validate **semantic API parity** between the local and remote facade:
   one `contract_test!` body runs against both, so behavior (including error taxonomy and batch
   positional results) stays identical. This is the canonical place to lock in facade behavior.
@@ -2235,9 +2583,9 @@ Otherwise the behavior is already guaranteed for both implementations by the con
 
 | Layer | Crate | Directory | Key files |
 | --- | --- | --- | --- |
-| Domain model | `kamu-resources` | `src/domain/resources/domain/src` | `core/`, `state/`, `values/`, `manifests/`, `repo/`, `dispatchers/`, `messages/`, `use_cases/`, `views/` |
+| Domain model | `kamu-resources` | `src/domain/resources/domain/src` | `access/`, `core/`, `state/`, `values/`, `manifests/`, `repo/`, `retention/`, `dispatchers/`, `messages/`, `use_cases/`, `views/` |
 | Domain schemas | `kamu-resources` | `src/domain/resources/schemas` | Informational JSON schemas for framework-owned resource extensions: built-in labels and annotations. ODF-defined extensions, such as the `ReconciliationError` condition, have none here. |
-| Services | `kamu-resources-services` | `src/domain/resources/services/src` | `use_cases/{apply,request_deletion}.rs`, `controllers/`, `controller_runtime/`, `crud_dispatchers/resource_dispatcher_factory.rs`, `resource_extension_schemas/`, `message_handlers/`, `event_stores/`, `dependencies.rs` |
+| Services | `kamu-resources-services` | `src/domain/resources/services/src` | `use_cases/{apply,request_deletion}.rs`, `controllers/`, `controller_runtime/`, `crud_dispatchers/resource_dispatcher_factory.rs`, `resource_extension_schemas/`, `message_handlers/`, `event_stores/`, `retention/resource_retention_job.rs`, `dependencies.rs` |
 | Facade | `kamu-resources-facade` | `src/domain/resources/facade/src/facade` | `resource_facade.rs`, `local/` |
 | Remote facade | `kamu-adapter-resources-facade-graphql` | `src/adapter/resources-facade-graphql/src` | `remote_graphql_resource_facade_impl.rs`, `cynic_api/`, `outcome_mapper/` |
 | GraphQL | (adapter) | `src/adapter/graphql/src` | `queries/resources/`, `mutations/resources_mut/` |
@@ -2293,7 +2641,7 @@ Otherwise the behavior is already guaranteed for both implementations by the con
   URLs, whitespace, query strings, fragments, trailing slashes, and too-few path segments, but it
   preserves the accepted string (stored as the inner `TypeUri`) and allows non-`opendatafabric.org`
   hosts for future custom schema namespaces.
-- **Secrets are encrypted before the first durable write** (by the spec sanitizer, not the
+- **Secrets are encrypted before the first durable write** (by the pre-apply hook, not the
   controller) and only decrypted on read with `SpecViewOpts::REVEALED` (CLI `--revealed`,
   GraphQL `revealed: true`); the default `SpecViewOpts::ENCRYPTED` returns the stored ciphertext
   envelope. See [Secret handling](#secret-handling-invariant) — never assume plaintext is safe to

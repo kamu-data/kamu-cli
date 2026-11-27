@@ -23,41 +23,38 @@ mod helpers;
 #[macro_export]
 macro_rules! contract_test {
     ($mod_name:ident, $suite_fn:path) => {
+        $crate::contract_test!(
+            $mod_name,
+            $suite_fn,
+            opts = $crate::harness::LocalFacadeHarnessOpts::default()
+        );
+    };
+
+    ($mod_name:ident, $suite_fn:path, opts = $opts:expr) => {
         mod $mod_name {
             #[test_log::test(tokio::test)]
             async fn local() {
-                let h = $crate::harness::LocalFacadeHarness::new().await;
+                let h = $crate::harness::LocalFacadeHarness::new_with_opts($opts).await;
                 $suite_fn(&h).await;
             }
 
             #[test_log::test(tokio::test)]
             async fn remote() {
-                let h = $crate::harness::RemoteGraphqlFacadeHarness::new().await;
+                let h = $crate::harness::RemoteGraphqlFacadeHarness::new_with_opts($opts).await;
                 $suite_fn(&h).await;
             }
         }
     };
 
     ($mod_name:ident, $suite_fn:path, $outbox:expr) => {
-        mod $mod_name {
-            #[test_log::test(tokio::test)]
-            async fn local() {
-                let opts = $crate::harness::LocalFacadeHarnessOpts {
-                    outbox_provider: $outbox,
-                };
-                let h = $crate::harness::LocalFacadeHarness::new_with_opts(opts).await;
-                $suite_fn(&h).await;
+        $crate::contract_test!(
+            $mod_name,
+            $suite_fn,
+            opts = $crate::harness::LocalFacadeHarnessOpts {
+                outbox_provider: $outbox,
+                ..Default::default()
             }
-
-            #[test_log::test(tokio::test)]
-            async fn remote() {
-                let opts = $crate::harness::LocalFacadeHarnessOpts {
-                    outbox_provider: $outbox,
-                };
-                let h = $crate::harness::RemoteGraphqlFacadeHarness::new_with_opts(opts).await;
-                $suite_fn(&h).await;
-            }
-        }
+        );
     };
 }
 

@@ -12,9 +12,10 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 
 use axum::Extension;
-use kamu_accounts::CurrentAccountSubject;
+use kamu_accounts::{Account, ApiKind, CurrentAccountSubject, RequestOrigin};
 use kamu_adapter_graphql::data_loader::{account_entity_data_loader, dataset_handle_data_loader};
 use kamu_adapter_resources_facade_graphql::RemoteGraphqlResourceFacadeImpl;
+use kamu_resources::{CreationOrigin, CreationOriginApi};
 use kamu_resources_facade::ResourceFacade;
 use strum::IntoEnumIterator;
 
@@ -51,19 +52,7 @@ impl RemoteGraphqlFacadeHarness {
         let mut token_to_catalog: HashMap<String, dill::Catalog> = HashMap::new();
 
         for account in TestAccount::iter() {
-            let account_name = local.account_name(account);
-            let account_id = local.account_id(account);
-            let subject = CurrentAccountSubject::logged(
-                kamu_accounts::Account::seed_resource_id_from_name(account_name.as_str()),
-                account_id,
-                account_name,
-            );
-
-            let mut b = dill::CatalogBuilder::new_chained(local.base_catalog());
-            subject.register(&mut b);
-            kamu_resources_facade::register_dependencies(&mut b);
-            let catalog = b.build();
-            token_to_catalog.insert(test_token(account), catalog);
+            token_to_catalog.insert(test_token(account), Self::request_catalog(local, account));
         }
 
         let token_map = Arc::new(token_to_catalog);
@@ -86,6 +75,23 @@ impl RemoteGraphqlFacadeHarness {
         (addr, handle)
     }
 
+    /// The catalog of a GraphQL request `account` makes
+    fn request_catalog(local: &LocalFacadeHarness, account: TestAccount) -> dill::Catalog {
+        let account_name = local.account_name(account);
+        let account_id = local.account_id(account);
+        let subject = CurrentAccountSubject::logged(
+            Account::seed_resource_id_from_name(account_name.as_str()),
+            account_id,
+            account_name,
+        );
+
+        let mut b = dill::CatalogBuilder::new_chained(local.base_catalog());
+        subject.register(&mut b);
+        b.add_value(RequestOrigin::Api(ApiKind::GraphQl));
+        kamu_resources_facade::register_dependencies(&mut b);
+        b.build()
+    }
+
     fn server_url(&self) -> url::Url {
         url::Url::parse(&format!("http://{}", self.server_addr)).unwrap()
     }
@@ -95,18 +101,7 @@ impl RemoteGraphqlFacadeHarness {
         account: TestAccount,
         request: async_graphql::Request,
     ) -> async_graphql::Response {
-        let account_name = self.local.account_name(account);
-        let account_id = self.local.account_id(account);
-        let subject = CurrentAccountSubject::logged(
-            kamu_accounts::Account::seed_resource_id_from_name(account_name.as_str()),
-            account_id,
-            account_name,
-        );
-
-        let mut b = dill::CatalogBuilder::new_chained(self.local.base_catalog());
-        subject.register(&mut b);
-        kamu_resources_facade::register_dependencies(&mut b);
-        let catalog = b.build();
+        let catalog = Self::request_catalog(&self.local, account);
 
         kamu_adapter_graphql::schema_quiet()
             .execute(
@@ -182,6 +177,16 @@ impl FacadeContractHarness for RemoteGraphqlFacadeHarness {
 
     fn account_name(&self, account: TestAccount) -> odf::AccountName {
         self.local.account_name(account)
+    }
+
+    async fn rename_account(&self, account: TestAccount, new_name: &odf::AccountName) {
+        self.local.rename_account(account, new_name).await;
+    }
+
+    fn creation_origin(&self) -> CreationOrigin {
+        CreationOrigin::Api {
+            api: CreationOriginApi::GraphQl,
+        }
     }
 
     async fn settle(&self) {

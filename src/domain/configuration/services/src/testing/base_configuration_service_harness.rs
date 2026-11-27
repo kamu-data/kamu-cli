@@ -20,13 +20,8 @@ use kamu_configuration::{
     VariableSetResource,
     VariableSetSpecInput,
 };
-use kamu_configuration_inmem::{
-    InMemorySecretSetProjectionRepository,
-    InMemoryVariableSetProjectionRepository,
-};
 use kamu_datasets::SecretsEncryptionConfig;
 use kamu_resources::{
-    ApplyResourceParams,
     ApplyResourceUseCase,
     DeclarativeResource,
     RequestResourcesDeletionUseCase,
@@ -61,9 +56,8 @@ impl BaseConfigurationServiceHarness {
     pub fn new() -> Self {
         let base = BaseResourceServiceHarness::new_with_additional_dependencies(|b| {
             kamu_datasets_inmem::register_dependencies(b);
-            b.add_value(SecretsEncryptionConfig::sample())
-                .add::<InMemoryVariableSetProjectionRepository>()
-                .add::<InMemorySecretSetProjectionRepository>();
+            kamu_configuration_inmem::register_dependencies(b);
+            b.add_value(SecretsEncryptionConfig::sample());
 
             crate::register_dependencies(b);
         });
@@ -213,7 +207,7 @@ impl BaseConfigurationServiceHarness {
     }
 
     /// [`Self::apply_variable_set`] for secrets, which arrive as plaintext
-    /// and are sanitized to `jwe` like any normally-authored set.
+    /// and are upgraded to `jwe` like any normally-authored set.
     pub async fn apply_secret_set(
         &self,
         account: &odf::ResourceOwnerHandle,
@@ -284,11 +278,10 @@ impl BaseConfigurationServiceHarness {
 
         let decision = self
             .apply_variable_use_case()
-            .apply(ApplyResourceParams {
-                id: None,
-                headers,
+            .apply(BaseResourceServiceHarness::make_apply_params_with_headers(
+                headers.into(),
                 spec,
-            })
+            ))
             .await
             .unwrap();
         self.settle().await;
@@ -320,11 +313,10 @@ impl BaseConfigurationServiceHarness {
 
         let decision = self
             .apply_secret_use_case()
-            .apply(ApplyResourceParams {
-                id: None,
-                headers,
+            .apply(BaseResourceServiceHarness::make_apply_params_with_headers(
+                headers.into(),
                 spec,
-            })
+            ))
             .await
             .unwrap();
         self.settle().await;

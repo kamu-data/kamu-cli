@@ -1,0 +1,26 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            SELECT owner_id as \"owner_id: uuid::Uuid\"\n            FROM resource_owners_projection\n            WHERE resource_id = $1\n            ORDER BY owner_id\n            ",
+  "describe": {
+    "columns": [
+      {
+        "name": "owner_id: uuid::Uuid",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "resource_owners_projection",
+            "name": "owner_id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "15acfbb4aef9b0191c4843672a44cacdb182ce7338dd6ef5ef7291b8bb1c2b77"
+}

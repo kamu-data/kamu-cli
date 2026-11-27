@@ -11,6 +11,7 @@ use kamu_resources::{
     ResourceID,
     ResourceLabelFilterInput,
     ResourceName,
+    ResourceRef,
     ResourceSelectorName,
     ResourceTypeDescriptor,
     ResourceVisibility,
@@ -45,9 +46,14 @@ pub struct ResourceSelectionResolutionOptions {
     /// counts only resources that actually match.
     pub label_filter: Option<ResourceLabelFilterInput>,
 
-    /// Which resources names and patterns find; ids always find resources
-    /// being deleted
+    /// Narrows every expansion to the resources this one owns, as labels do
+    pub owner: Option<ResourceRef>,
+
+    /// Which resources names and patterns find
     pub visibility: ResourceVisibility,
+
+    /// Which resources ids find
+    pub id_visibility: ResourceVisibility,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

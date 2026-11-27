@@ -1,0 +1,98 @@
+{
+  "db_name": "SQLite",
+  "query": "\n                SELECT\n                    dataset_id   as \"id: _\",\n                    resource_id  as \"resource_id!: _\",\n                    owner_id     as \"owner_id: _\",\n                    owner_name,\n                    dataset_name as name,\n                    created_at   as \"created_at: _\",\n                    kind         as \"kind: _\"\n                FROM dataset_entries\n                ORDER BY owner_name, dataset_name\n                LIMIT $1 OFFSET $2\n                ",
+  "describe": {
+    "columns": [
+      {
+        "name": "id: _",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "dataset_entries",
+            "name": "dataset_id"
+          }
+        }
+      },
+      {
+        "name": "resource_id!: _",
+        "ordinal": 1,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "dataset_entries",
+            "name": "resource_id"
+          }
+        }
+      },
+      {
+        "name": "owner_id: _",
+        "ordinal": 2,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "dataset_entries",
+            "name": "owner_id"
+          }
+        }
+      },
+      {
+        "name": "owner_name",
+        "ordinal": 3,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "dataset_entries",
+            "name": "owner_name"
+          }
+        }
+      },
+      {
+        "name": "name",
+        "ordinal": 4,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "dataset_entries",
+            "name": "dataset_name"
+          }
+        }
+      },
+      {
+        "name": "created_at: _",
+        "ordinal": 5,
+        "type_info": "Null",
+        "origin": {
+          "Table": {
+            "table": "dataset_entries",
+            "name": "created_at"
+          }
+        }
+      },
+      {
+        "name": "kind: _",
+        "ordinal": 6,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "dataset_entries",
+            "name": "kind"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false,
+      true,
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "f6e168f04f7b8a9e0896c141d9ec006cfb4e7fbd00d8be58f6e3f95a366e8e3a"
+}

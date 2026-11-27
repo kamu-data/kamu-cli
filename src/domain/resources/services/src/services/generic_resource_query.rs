@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
 use database_common::PaginationOpts;
@@ -18,6 +18,7 @@ use crate::domain::{
     FindOwnedSnapshotsOutcome,
     GenericResourceQueryService,
     ResourceHandleRow,
+    ResourceHeadersExt,
     ResourceID,
     ResourceName,
     ResourceNotOwnedByAccountError,
@@ -68,6 +69,16 @@ impl GenericResourceQueryService for GenericResourceQueryServiceImpl {
             .await
     }
 
+    async fn touch_live_resources(
+        &self,
+        account_id: &odf::AccountID,
+        ids: &[ResourceID],
+    ) -> Result<Vec<ResourceID>, InternalError> {
+        self.resource_repository
+            .touch_live_resources(account_id, ids)
+            .await
+    }
+
     async fn resolve_resource_ids_by_names(
         &self,
         account_id: &odf::AccountID,
@@ -85,10 +96,11 @@ impl GenericResourceQueryService for GenericResourceQueryServiceImpl {
         account_id: &odf::AccountID,
         scope: &ResourceScope,
         visibility: ResourceVisibility,
+        owner_id: Option<ResourceID>,
         pagination: PaginationOpts,
     ) -> Result<Vec<ResourceHandleRow>, InternalError> {
         self.resource_repository
-            .search_resource_handles(account_id, scope, visibility, pagination)
+            .search_resource_handles(account_id, scope, visibility, owner_id, pagination)
             .await
     }
 
@@ -97,9 +109,10 @@ impl GenericResourceQueryService for GenericResourceQueryServiceImpl {
         account_id: &odf::AccountID,
         scope: &ResourceScope,
         visibility: ResourceVisibility,
+        owner_id: Option<ResourceID>,
     ) -> Result<usize, InternalError> {
         self.resource_repository
-            .count_search_resource_handles(account_id, scope, visibility)
+            .count_search_resource_handles(account_id, scope, visibility, owner_id)
             .await
     }
 
@@ -118,6 +131,7 @@ impl GenericResourceQueryService for GenericResourceQueryServiceImpl {
             .resource_repository
             .find_resource_snapshot(&query)
             .await?
+            .filter(|snapshot| !snapshot.headers.is_deleted())
         else {
             return Ok(None);
         };
@@ -156,6 +170,7 @@ impl GenericResourceQueryService for GenericResourceQueryServiceImpl {
             .find_resource_snapshots_by_ids(account_id, ids)
             .await?
             .into_iter()
+            .filter(|snapshot| !snapshot.headers.is_deleted())
             .map(|snapshot| (snapshot.id, snapshot))
             .collect();
 
@@ -171,12 +186,14 @@ impl GenericResourceQueryService for GenericResourceQueryServiceImpl {
             .filter(|id| !owned_any_kind.contains_key(id))
             .collect();
 
-        let access_denied_snapshots = self
+        let access_denied_ids: HashSet<ResourceID> = self
             .resource_repository
             .find_resource_snapshots_by_schema_and_ids(schema, &missing_ids)
-            .await?;
-        let access_denied_ids: std::collections::HashSet<ResourceID> =
-            access_denied_snapshots.iter().map(|s| s.id).collect();
+            .await?
+            .into_iter()
+            .filter(|snapshot| !snapshot.headers.is_deleted())
+            .map(|snapshot| snapshot.id)
+            .collect();
 
         let access_denied: Vec<ResourceID> = access_denied_ids.iter().copied().collect();
 
@@ -222,11 +239,12 @@ impl GenericResourceQueryService for GenericResourceQueryServiceImpl {
         account_id: &odf::AccountID,
         scope: &ResourceScope,
         visibility: ResourceVisibility,
+        owner_id: Option<ResourceID>,
         pagination: PaginationOpts,
     ) -> Result<Vec<ResourceSnapshot>, InternalError> {
         let mut resource_snapshots_stream = self
             .resource_repository
-            .list_resource_snapshots(account_id, scope, visibility, pagination);
+            .list_resource_snapshots(account_id, scope, visibility, owner_id, pagination);
 
         use tokio_stream::StreamExt;
 

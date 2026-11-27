@@ -233,19 +233,22 @@ pub(crate) fn any_resource_selector() -> kamu_resources::ResourceSelector {
 /// Selects resources to search, for both `search` and `searchHandles` — only
 /// the response shape differs.
 ///
-/// Every narrowing lives on the selectors, accounts included: there is no
-/// call-level `account` or `labelFilter`. A uniform filter is the special case
-/// where every selector carries the same one, and selectors being OR'd makes
-/// that exactly equivalent.
+/// Accounts and labels live on the selectors: there is no call-level `account`
+/// or `labelFilter`. A uniform filter is the special case where every selector
+/// carries the same one, and selectors being OR'd makes that exactly
+/// equivalent.
 #[derive(InputObject, Debug, Clone)]
 pub struct SearchResourcesInput {
     /// Several selectors act as a logical OR, while the fields within one are a
     /// conjunction. Omitted spans every type; an empty list matches nothing — a
     /// narrowing to zero, not a widening to everything.
     pub selectors: Option<Vec<ResourceSelectorInput>>,
-    /// Also match resources whose deletion is in progress
+    /// Matches only the resources this one owns. By ID the owner may be in any
+    /// state, even purged; by name it must be live.
+    pub owner: Option<ResourceRefInput>,
+    /// Which resources to match
     #[graphql(default)]
-    pub include_deleting: bool,
+    pub visibility: ResourceVisibility,
 }
 
 impl SearchResourcesInput {
@@ -258,7 +261,8 @@ impl SearchResourcesInput {
                 Some(selectors) => into_resource_selectors(selectors)?,
                 None => vec![any_resource_selector()],
             },
-            visibility: kamu_resources::ResourceVisibility::with_deleting(self.include_deleting),
+            owner: self.owner.map(TryInto::try_into).transpose()?,
+            visibility: self.visibility.into(),
             pagination,
         })
     }
@@ -266,9 +270,29 @@ impl SearchResourcesInput {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Which resources a query returns, by the state of their deletion
+#[derive(Enum, Debug, Copy, Clone, Default, Eq, PartialEq)]
+#[graphql(remote = "kamu_resources::ResourceVisibility")]
+pub enum ResourceVisibility {
+    /// Resources whose deletion was not requested
+    #[default]
+    Active,
+    /// Also resources whose deletion is in progress
+    IncludeDeleting,
+    /// Resources in any state. Listings return the live ones first, then the
+    /// others, newest deletion first
+    IncludeDeleted,
+    /// Only resources whose deletion is in progress or completed, newest
+    /// deletion first in listings
+    DeletedOnly,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 /// Reference to one resource, mirroring the ODF `ResourceRef`. A name matches
-/// the live resource holding it; with `includeDeleting` it also matches
-/// resources being deleted, so it may resolve to several.
+/// the live resource holding it; unless `visibility` is `ACTIVE`, it may also
+/// match resources that gave it up on their deletion, and so resolve to
+/// several.
 ///
 /// A resource is addressed either by `id`, or by `type` **and** `name` — ODF's
 /// uniqueness key is `(account, type, name)`, and resources of different types
@@ -524,6 +548,40 @@ pub struct ResourceUntypedNameProblem {
     pub message: String,
 }
 
+/// A reveal of the spec was requested, but the resource is deleted
+#[derive(SimpleObject, Debug, Clone)]
+pub struct ResourceDeletedNotRevealedProblem {
+    /// ID of the deleted resource
+    pub id: ResourceID<'static>,
+    /// Human-readable description of the problem
+    pub message: String,
+}
+
+/// The caller may see the resource, but not run the operation on it
+#[derive(SimpleObject, Debug, Clone)]
+pub struct ResourceAccessDeniedProblem {
+    /// Human-readable description of the problem
+    pub message: String,
+}
+
+impl From<odf::AccessError> for ResourceAccessDeniedProblem {
+    /// The message is the detail the denial carries, when it has one
+    fn from(err: odf::AccessError) -> Self {
+        let detail = match &err {
+            odf::AccessError::ReadOnly(detail) => detail.as_ref(),
+            odf::AccessError::Unauthenticated(detail) | odf::AccessError::Unauthorized(detail) => {
+                Some(detail)
+            }
+        };
+
+        Self {
+            message: detail.map_or_else(|| err.to_string(), ToString::to_string),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 /// Reason a resource reference could not be resolved
 #[derive(Union, Debug, Clone)]
 pub enum ResourceLookupProblem {
@@ -533,6 +591,8 @@ pub enum ResourceLookupProblem {
     NameMismatch(ResourceNameMismatchProblem),
     EmptyRef(ResourceEmptyRefProblem),
     UntypedName(ResourceUntypedNameProblem),
+    DeletedNotRevealed(ResourceDeletedNotRevealedProblem),
+    AccessDenied(ResourceAccessDeniedProblem),
 }
 
 impl From<kamu_resources_facade::ResourceLookupProblem> for ResourceLookupProblem {
@@ -572,6 +632,30 @@ impl From<kamu_resources_facade::ResourceLookupProblem> for ResourceLookupProble
             P::UntypedName => Self::UntypedName(ResourceUntypedNameProblem {
                 message: P::UntypedName.to_string(),
             }),
+            P::DeletedNotRevealed(e) => {
+                Self::DeletedNotRevealed(ResourceDeletedNotRevealedProblem {
+                    id: e.id.into(),
+                    message: e.to_string(),
+                })
+            }
+            P::Access(e) => Self::AccessDenied(e.into()),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// The owner to search by could not be resolved
+#[derive(SimpleObject, Debug, Clone)]
+pub struct ResourceOwnerLookupProblem {
+    /// Why the reference to the owner could not be resolved
+    pub problem: ResourceLookupProblem,
+}
+
+impl From<kamu_resources_facade::ResourceLookupProblem> for ResourceOwnerLookupProblem {
+    fn from(value: kamu_resources_facade::ResourceLookupProblem) -> Self {
+        Self {
+            problem: value.into(),
         }
     }
 }
@@ -666,8 +750,8 @@ pub enum BatchResourcesOutcome {
 /// Resources found and references that could not be resolved
 #[derive(SimpleObject, Debug, Clone)]
 pub struct BatchResourcesResult {
-    /// Resources found, one per resolved reference; with `includeDeleting` a
-    /// name may match several, which share its `requestIndex`
+    /// Resources found, one per resolved reference; unless `visibility` is
+    /// `ACTIVE`, a name may match several, which share its `requestIndex`
     pub resources: Vec<BatchResourceSuccess>,
     /// References that could not be resolved
     pub problems: Vec<BatchResourceProblem>,
@@ -713,8 +797,8 @@ pub enum BatchResourceManifestsOutcome {
 /// Rendered manifests and references that could not be resolved
 #[derive(SimpleObject, Debug, Clone)]
 pub struct BatchResourceManifestsResult {
-    /// Manifests rendered, one per resolved reference; with `includeDeleting`
-    /// a name may match several, which share its `requestIndex`
+    /// Manifests rendered, one per resolved reference; unless `visibility` is
+    /// `ACTIVE`, a name may match several, which share its `requestIndex`
     pub manifests: Vec<BatchResourceManifestSuccess>,
     /// References that could not be resolved
     pub problems: Vec<BatchResourceProblem>,
@@ -763,8 +847,8 @@ pub enum BatchResourceHandlesOutcome {
 /// Resource handles found and references that could not be resolved
 #[derive(SimpleObject, Debug, Clone)]
 pub struct BatchResourceHandlesResult {
-    /// Handles found, one per resolved reference; with `includeDeleting` a
-    /// name may match several, which share its `requestIndex`
+    /// Handles found, one per resolved reference; unless `visibility` is
+    /// `ACTIVE`, a name may match several, which share its `requestIndex`
     pub handles: Vec<BatchResourceHandleSuccess>,
     /// References that could not be resolved
     pub problems: Vec<BatchResourceProblem>,
@@ -1004,7 +1088,8 @@ pub struct ResourceTypeCountSummary {
     pub schema: TypeUri<'static>,
     /// ODF type name of the resource type, e.g. `VariableSet`
     pub type_name: TypeName<'static>,
-    /// Number of resources of this type
+    /// Number of resources of this type, including deleted ones that are still
+    /// stored
     pub total_count: UInt64,
     /// Number of resources of this type in each phase
     pub phase_counts: ResourcePhaseCounts,
@@ -1038,6 +1123,8 @@ pub struct ResourcePhaseCounts {
     pub failed: UInt64,
     /// Resources whose deletion waits for their controllers to clean up
     pub deleting: UInt64,
+    /// Deleted resources that are still stored
+    pub deleted: UInt64,
 }
 
 impl From<kamu_resources::ResourcePhaseCounts> for ResourcePhaseCounts {
@@ -1049,6 +1136,7 @@ impl From<kamu_resources::ResourcePhaseCounts> for ResourcePhaseCounts {
             degraded,
             failed,
             deleting,
+            deleted,
         } = value;
         Self {
             pending: pending.into(),
@@ -1057,6 +1145,7 @@ impl From<kamu_resources::ResourcePhaseCounts> for ResourcePhaseCounts {
             degraded: degraded.into(),
             failed: failed.into(),
             deleting: deleting.into(),
+            deleted: deleted.into(),
         }
     }
 }

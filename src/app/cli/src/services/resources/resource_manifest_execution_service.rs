@@ -55,6 +55,7 @@ impl TryFrom<ApplyManifestPlanningDecision> for ExecuteResourceManifestOutcome {
                 Self::Accepted(ExecutedResourceManifestResult {
                     outcome: plan.outcome,
                     resource: plan.resource,
+                    name_pending: plan.name_pending,
                     warnings: plan.warnings,
                     documents,
                 })
@@ -81,6 +82,7 @@ impl TryFrom<ApplyManifestApplicationDecision> for ExecuteResourceManifestOutcom
                 Self::Accepted(ExecutedResourceManifestResult {
                     outcome,
                     resource,
+                    name_pending: false,
                     warnings,
                     documents,
                 })
@@ -96,6 +98,8 @@ impl TryFrom<ApplyManifestApplicationDecision> for ExecuteResourceManifestOutcom
 pub struct ExecutedResourceManifestResult {
     pub outcome: ApplyResourceOutcome,
     pub resource: Resource,
+    /// The name in `resource` is a placeholder: the apply generates the real one
+    pub name_pending: bool,
     pub warnings: Vec<ResourceWarning>,
     pub documents: ApplyManifestDocuments,
 }

@@ -9,7 +9,8 @@
 
 use std::assert_matches;
 
-use chrono::{SubsecRound, Utc};
+use chrono::{SubsecRound, TimeDelta, Utc};
+use database_common::testing::{in_committed_transaction, in_rolled_back_transaction};
 use dill::Catalog;
 use kamu_configuration::{
     ReplaceProjectionEntriesError,
@@ -22,6 +23,7 @@ use kamu_resources::{
     ResourceHeaders,
     ResourceHeadersExt,
     ResourceID,
+    ResourcePurgeDeadline,
     ResourceRepository,
     ResourceSchemaProvider,
     ResourceSnapshot,
@@ -78,6 +80,45 @@ async fn make_secret_set_resource(catalog: &Catalog) -> ResourceID {
     .unwrap();
 
     secret_set_id
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Claims the resources for a purge and purges them, as the purger does
+async fn purge_resources(catalog: &Catalog, ids: &[ResourceID]) {
+    let repo = catalog.get_one::<dyn ResourceRepository>().unwrap();
+    let now = Utc::now();
+    let deadlines = ids
+        .iter()
+        .map(|id| ResourcePurgeDeadline {
+            id: *id,
+            purge_at: now - TimeDelta::hours(1),
+        })
+        .collect::<Vec<_>>();
+    repo.set_purge_deadlines(&deadlines).await.unwrap();
+
+    let claimed = repo.claim_resources_for_purge(ids, now).await.unwrap();
+    assert_eq!(claimed.len(), ids.len());
+    repo.purge_resources(&claimed).await.unwrap();
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// The entries of a generation, read in a transaction of their own
+async fn committed_entries(
+    catalog: &Catalog,
+    resource_id: ResourceID,
+    resource_generation: u64,
+) -> Vec<SecretSetEntry> {
+    in_committed_transaction(catalog, |catalog| async move {
+        catalog
+            .get_one::<dyn SecretSetProjectionRepository>()
+            .unwrap()
+            .get_entries(&resource_id, resource_generation)
+            .await
+            .unwrap()
+    })
+    .await
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -431,6 +472,137 @@ pub async fn test_delete_all_entries(catalog: &Catalog) {
     let c_entries = repo.get_entries(&resource_c, 1).await.unwrap();
     assert_eq!(1, c_entries.len());
     assert_eq!(c_entries[0].value, b"c-gen1");
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_purging_the_resource_removes_its_entries(catalog: &Catalog) {
+    let repo = catalog
+        .get_one::<dyn SecretSetProjectionRepository>()
+        .unwrap();
+    let purged = make_secret_set_resource(catalog).await;
+    let kept = make_secret_set_resource(catalog).await;
+
+    repo.replace_entries(&purged, 0, &[make_entry("K1", b"gen0")])
+        .await
+        .unwrap();
+    repo.replace_entries(&purged, 1, &[make_entry("K1", b"gen1")])
+        .await
+        .unwrap();
+    repo.replace_entries(&kept, 0, &[make_entry("K1", b"kept")])
+        .await
+        .unwrap();
+
+    assert_eq!(repo.get_latest_entries(&purged).await.unwrap().len(), 1);
+
+    purge_resources(catalog, &[purged]).await;
+
+    assert_eq!(repo.get_entries(&purged, 0).await.unwrap(), []);
+    assert_eq!(repo.get_entries(&purged, 1).await.unwrap(), []);
+    assert_eq!(repo.get_latest_entries(&purged).await.unwrap(), []);
+
+    let kept_entries = repo.get_latest_entries(&kept).await.unwrap();
+    assert_eq!(1, kept_entries.len());
+    assert_eq!(kept_entries[0].value, b"kept");
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_rolled_back_delete_all_entries_keeps_entries(catalog: &Catalog) {
+    let resource_id = in_committed_transaction(catalog, |catalog| async move {
+        let resource_id = make_secret_set_resource(&catalog).await;
+        catalog
+            .get_one::<dyn SecretSetProjectionRepository>()
+            .unwrap()
+            .replace_entries(&resource_id, 1, &[make_entry("K1", b"gen1")])
+            .await
+            .unwrap();
+        resource_id
+    })
+    .await;
+
+    in_rolled_back_transaction(catalog, |catalog| async move {
+        catalog
+            .get_one::<dyn SecretSetProjectionRepository>()
+            .unwrap()
+            .delete_all_entries(&[resource_id])
+            .await
+            .unwrap();
+    })
+    .await;
+
+    let entries = committed_entries(catalog, resource_id, 1).await;
+    assert_eq!(1, entries.len());
+    assert_eq!(entries[0].value, b"gen1");
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_rolled_back_replace_entries_leaves_generation_free(catalog: &Catalog) {
+    let resource_id = in_committed_transaction(catalog, |catalog| async move {
+        make_secret_set_resource(&catalog).await
+    })
+    .await;
+
+    in_rolled_back_transaction(catalog, |catalog| async move {
+        catalog
+            .get_one::<dyn SecretSetProjectionRepository>()
+            .unwrap()
+            .replace_entries(&resource_id, 1, &[make_entry("K1", b"rolled-back")])
+            .await
+            .unwrap();
+    })
+    .await;
+
+    assert_eq!(committed_entries(catalog, resource_id, 1).await, []);
+
+    in_committed_transaction(catalog, |catalog| async move {
+        catalog
+            .get_one::<dyn SecretSetProjectionRepository>()
+            .unwrap()
+            .replace_entries(&resource_id, 1, &[make_entry("K1", b"committed")])
+            .await
+            .unwrap();
+    })
+    .await;
+
+    let entries = committed_entries(catalog, resource_id, 1).await;
+    assert_eq!(1, entries.len());
+    assert_eq!(entries[0].value, b"committed");
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_rolled_back_cleanup_keeps_older_generations(catalog: &Catalog) {
+    let resource_id = in_committed_transaction(catalog, |catalog| async move {
+        let resource_id = make_secret_set_resource(&catalog).await;
+        let repo = catalog
+            .get_one::<dyn SecretSetProjectionRepository>()
+            .unwrap();
+        for (generation, value) in [(1, b"gen1"), (2, b"gen2"), (3, b"gen3")] {
+            repo.replace_entries(&resource_id, generation, &[make_entry("K1", value)])
+                .await
+                .unwrap();
+        }
+        resource_id
+    })
+    .await;
+
+    in_rolled_back_transaction(catalog, |catalog| async move {
+        catalog
+            .get_one::<dyn SecretSetProjectionRepository>()
+            .unwrap()
+            .cleanup_entries_before_generation(&resource_id, 3)
+            .await
+            .unwrap();
+    })
+    .await;
+
+    for (generation, value) in [(1, b"gen1"), (2, b"gen2"), (3, b"gen3")] {
+        let entries = committed_entries(catalog, resource_id, generation).await;
+        assert_eq!(1, entries.len(), "generation {generation}");
+        assert_eq!(entries[0].value, value, "generation {generation}");
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

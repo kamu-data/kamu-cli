@@ -9,10 +9,12 @@
 ## Quick-start
 
 **One-paragraph mental model.** A **background agent** is a loop that runs for the whole life of
-the server: the outbox agent, the flow agent, the flow system event agent, the task agent and the
-resource controller runtime. Each implements `BackgroundAgent`, and `BackgroundAgentHost` runs them
-all (crate `background-agent-host`). The host supervises every agent on its own: a run that fails,
-panics or returns early is restarted after a growing backoff while the other agents keep running.
+the server: the outbox agent, the flow agent, the flow system event agent, the task agent, the
+resource controller runtime, and one agent per housekeeping job
+([housekeeping.md](housekeeping.md)). Each implements `BackgroundAgent`, and
+`BackgroundAgentHost` runs them all (crate `background-agent-host`). The host supervises every
+agent on its own: a run that fails, panics or returns early is restarted after a growing backoff
+while the other agents keep running.
 On a shutdown, the host cancels a token every agent watches, gives them a bounded time to finish
 their current step, then aborts the ones still running.
 
@@ -21,6 +23,7 @@ their current step, then aborts the ones still running.
 | Write a new agent | [§1 The contract](#1-the-contract) and [§5 Recipe](#5-recipe-adding-an-agent) |
 | Know what happens when an agent fails | [§3 Supervision](#3-supervision) |
 | Know what a shutdown waits for | [§4 Shutdown](#4-shutdown) |
+| Know what runs after a CLI command | [§2 Where agents run](#2-where-agents-run) |
 | Tune restarts or the shutdown bound | [§4 Shutdown](#4-shutdown), [wakeup-listeners.md](wakeup-listeners.md#7-configuration) |
 
 ---
@@ -41,7 +44,7 @@ their current step, then aborts the ones still running.
 
 | Part | Contract |
 | --- | --- |
-| `agent_name()` | A stable name: the `agent` label of the host's metrics and of `wakeup_listener_last_heartbeat_timestamp_seconds` (the resource controller runtime labels its heartbeats per controller instead) |
+| `agent_name()` | A stable name: the `agent` label of the host's metrics and of `wakeup_listener_last_heartbeat_timestamp_seconds` (the resource controller runtime labels its heartbeats per controller instead); a housekeeping agent, which has no wakeup listener, carries its job's name as the `job` label |
 | `run(&self, shutdown: CancellationToken)` | Runs until `shutdown` is cancelled, then returns `Ok`. The agent checks the token between steps and stops waiting for work when it is cancelled; it never cuts a step short itself |
 | Returning `Ok` before a shutdown | An unexpected completion: the host restarts the agent |
 | Returning `Err`, or panicking | A failure: the host restarts the agent, unless the failure is fatal |
@@ -59,6 +62,7 @@ read; `CancellationToken::run_until_cancelled` wraps them.
 | Flow agent | activating the due flows | while waiting for the next activation moment |
 | Task agent | taking a task, and running it | while waiting for a task; never between taking and running one |
 | Resource controller runtime | each controller loop's drain | after each loop's drain, in its wait; a loop that fails then is not restarted |
+| Housekeeping agent | each batch of a pass ([housekeeping.md](housekeeping.md#3-the-agent)) | between batches, in the pause between them, and in the sleep after a pass |
 
 For example, the task agent requeues tasks left `Running` on every run
 ([task-system.md](task-system.md#startup-recovery)).
@@ -71,10 +75,38 @@ For example, the task agent requeues tasks left `Running` on every run
 | --- | --- |
 | `kamu system api-server` | all of them, on `BackgroundAgentHost` (`src/app/cli/src/explore/api_server.rs`) |
 | `kamu ui` | none: flows, tasks and resource controllers do not run there |
-| One-shot CLI commands | none: the outbox messages and resource controller work a command causes are drained before it exits (`BackgroundWorkFinalizer`, [resources-framework.md](resources-framework.md#controller-runtime)) |
+| One-shot CLI commands | none: `BackgroundWorkFinalizer` completes the work the command caused before it exits, below |
 
-Nothing is drained after the API server stops (`command_needs_outbox_processing` excludes it), so
+Nothing is finalized after the API server stops (`command_needs_background_work` excludes it), so
 a shutdown stays within its bound; the next start picks up what is left.
+
+### Finalizing background work without agents
+
+`BackgroundWorkFinalizer` does, on demand, what the agents would do for a caller that does not run
+them or does not wait for them. It has two phases with different contracts:
+
+| Phase | What it does | A failure |
+| --- | --- | --- |
+| **Settle** | Drains every registered `BackgroundWorkDrain` in turn until one full pass finds all of them idle | Is returned, as the caller's effects are incomplete; it fails a command that succeeded |
+| **Housekeeping** | One batch of each enabled housekeeping job ([housekeeping.md](housekeeping.md#4-after-a-cli-command)) | A failed batch is logged as a warning ([housekeeping.md](housekeeping.md#4-after-a-cli-command)) |
+
+The outbox agent and the resource controller runtime are drains. A settle alternates them because
+each feeds the other: the outbox delivers messages that make resources actionable, and processing
+them posts messages of its own.
+
+| Caller | Settle | Housekeeping |
+| --- | --- | --- |
+| A CLI command (`finalize_background_work_after_command`), whether it succeeded or failed, as a failed command may have committed work of its own | yes | yes |
+| The e2e API server, after a mutating request (`e2e_middleware.rs`) | yes | no: the agents run in the server |
+| Test harnesses, after a write (`settle`) | yes | when the test asks for it |
+
+A drain reports `Idle` only when no runner of its work, its own session or the agent, did any work
+since the session's previous drain, so a settle running next to the agents ends once the agents
+are idle too. How each drain does this: [outbox.md](outbox.md#5-the-outbox-agent) and
+[resources-framework.md](resources-framework.md#controller-runtime). A drain works on the catalog
+it is registered in, so callers finalize the catalog that has both the drains and the
+housekeeping jobs; a catalog without the outbox agent, such as one with an immediate outbox, has
+no outbox drain.
 
 Agents run in the background catalog, as `Principal::Node` ([identity.md](identity.md)).
 
@@ -187,4 +219,6 @@ sequenceDiagram
 | `BackgroundAgentHostConfig` | `src/utils/background-agent-host/src/background_agent_host_config.rs`, mapped from `backgroundAgents` in `src/app/cli/src/services/config/models.rs` |
 | `BackgroundAgentHostMetrics`, `BackgroundAgentRestartReason` | `src/utils/background-agent-host/src/background_agent_host_metrics.rs`, `background_agent_restart_reason.rs` |
 | Shutdown sources, HTTP server bound | `src/app/cli/src/explore/api_server.rs` |
-| Host tests | `src/utils/background-agent-host/tests/tests/test_background_agent_host.rs` |
+| `BackgroundWorkFinalizer`, `BackgroundWorkDrain` | `src/utils/background-agent-host/src/finalizer/`; the CLI's call in `src/app/cli/src/background_work.rs` |
+| `HousekeepingAgent` and the jobs | [housekeeping.md](housekeeping.md#12-file-reference-map) |
+| Host and finalizer tests | `src/utils/background-agent-host/tests/tests/test_background_agent_host.rs`, `test_background_work_finalizer.rs` |

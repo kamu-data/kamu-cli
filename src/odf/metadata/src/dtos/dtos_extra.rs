@@ -216,6 +216,37 @@ impl From<auth::ResourceOwnerRef> for resources::ResourceRef {
     }
 }
 
+impl auth::ResourceOwnerRef {
+    /// Whether every field this reference gives agrees with `handle`. A type
+    /// given by its short name is compared with the last segment of the
+    /// handle's canonical type URI (`.../{context}/{version}/{TypeName}`).
+    pub fn matches(&self, handle: &auth::ResourceOwnerHandle) -> bool {
+        let Self {
+            r#type,
+            id,
+            did,
+            name,
+        } = self;
+
+        let type_matches = match r#type {
+            Some(resources::TypeRef::Uri(uri)) => *uri == handle.r#type,
+            Some(resources::TypeRef::Name(type_name)) => handle
+                .r#type
+                .as_str()
+                .rsplit_once('/')
+                .is_some_and(|(_, last_segment)| {
+                    type_name.as_str().eq_ignore_ascii_case(last_segment)
+                }),
+            None => true,
+        };
+
+        type_matches
+            && id.is_none_or(|id| id == handle.id)
+            && did.as_ref().is_none_or(|did| *did == handle.did)
+            && name.as_ref().is_none_or(|name| *name == handle.name)
+    }
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // ResourceOwnerHandle
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -336,6 +367,22 @@ impl From<auth::PrincipalHandle> for resources::ResourceRef {
     }
 }
 
+impl auth::PrincipalHandle {
+    /// Whether the principal is the node, acting in system work
+    pub fn is_node(&self) -> bool {
+        self.r#type == *auth::Node::type_uri()
+    }
+
+    /// The account of a principal that is a user; `None` for any other
+    /// principal
+    pub fn user_account_did(&self) -> Option<AccountID> {
+        if self.r#type != *auth::User::type_uri() {
+            return None;
+        }
+        self.did.clone().map(AccountID::from)
+    }
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // DatasetRef
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -394,6 +441,25 @@ impl From<datasets::DatasetRef> for resources::ResourceRef {
             did: did.map(Into::into),
             name,
         }
+    }
+}
+
+impl datasets::DatasetRef {
+    /// Whether every field this reference gives agrees with `handle`
+    pub fn matches(&self, handle: &datasets::DatasetHandle) -> bool {
+        let Self {
+            account,
+            id,
+            did,
+            name,
+        } = self;
+
+        account
+            .as_ref()
+            .is_none_or(|account| account.matches(&handle.account))
+            && id.is_none_or(|id| id == handle.id)
+            && did.as_ref().is_none_or(|did| *did == handle.did)
+            && name.as_ref().is_none_or(|name| *name == handle.name)
     }
 }
 

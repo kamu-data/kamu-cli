@@ -18,7 +18,7 @@ use database_common::{
 };
 use dill::*;
 use internal_error::InternalError;
-use kamu_resources::{ResourceID, ResourceLabelProjectionRepository};
+use kamu_resources::{ResourceID, ResourceLabelProjectionRepository, ResourceRemovalListener};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -48,6 +48,7 @@ pub struct InMemoryResourceLabelProjectionRepository {
 
 #[component(pub)]
 #[interface(dyn ResourceLabelProjectionRepository)]
+#[interface(dyn ResourceRemovalListener)]
 impl InMemoryResourceLabelProjectionRepository {
     pub fn new(
         state: Arc<InMemoryResourceLabelProjectionState>,
@@ -97,6 +98,21 @@ impl ResourceLabelProjectionRepository for InMemoryResourceLabelProjectionReposi
                     .cloned()
                     .unwrap_or_default()
             }))
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Drops the entries of purged resources, as the cascade of the SQL backends does
+#[async_trait::async_trait]
+impl ResourceRemovalListener for InMemoryResourceLabelProjectionRepository {
+    async fn on_resources_removed(&self, ids: &[ResourceID]) -> Result<(), InternalError> {
+        self.state
+            .entries_by_resource_id
+            .write(self.transaction_id, |entries_by_resource_id| {
+                entries_by_resource_id.delete_where(|id| ids.contains(id));
+            });
+        Ok(())
     }
 }
 

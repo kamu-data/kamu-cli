@@ -83,8 +83,8 @@ pub(crate) fn group_batch_resource_refs(resource_refs: Vec<ResourceRef>) -> Batc
 
 /// Resolve all `ByName` groups to UIDs using a single batched query per schema.
 /// Returns a combined list of `(request_index, request, id)` entries plus any
-/// name-not-found problems. Under [`ResourceVisibility::IncludeDeleting`] a
-/// name may yield several entries, the live resource first.
+/// name-not-found problems. Unless only live resources are visible, a name may
+/// yield several entries, the live resource first.
 pub(crate) async fn resolve_batch_ids(
     query_service: &dyn GenericResourceQueryService,
     account_id: &odf::AccountID,
@@ -142,6 +142,28 @@ pub(crate) async fn resolve_batch_ids(
 /// UID not-found error for use after a batch UID fetch misses an entry.
 pub(crate) fn id_not_found(id: ResourceID) -> ResourceLookupProblem {
     ResourceLookupProblem::IDNotFound(ResourceIDNotFoundError(id))
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// A miss reported in the terms the caller selected by. A ref carrying both
+/// is resolved by its id, so it reports as an id miss.
+pub(crate) fn ref_not_found(
+    schema: &TypeUri,
+    resource_ref: &ResourceRef,
+    id: ResourceID,
+) -> ResourceLookupProblem {
+    match (&resource_ref.id, &resource_ref.name) {
+        (None, Some(name)) => resource_type_name(schema)
+            .map(|type_name| {
+                ResourceLookupProblem::NameNotFound(ResourceNameNotFoundError {
+                    type_name,
+                    name: name.clone(),
+                })
+            })
+            .unwrap_or_else(|_| id_not_found(id)),
+        _ => id_not_found(id),
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -16,9 +16,11 @@ use futures::Future;
 use kamu_accounts::{
     Account,
     AnonymousAccountReason,
+    ApiKind,
     AuthenticationService,
     CurrentAccountSubject,
     GetAccountInfoError,
+    RequestOrigin,
 };
 use tonic::Status;
 use tower::{Layer, Service};
@@ -181,6 +183,7 @@ where
                 derived_catalog_builder.add_value(session_id);
             }
             subject.register(&mut derived_catalog_builder);
+            derived_catalog_builder.add_value(RequestOrigin::Api(ApiKind::FlightSql));
 
             let derived_catalog = derived_catalog_builder.build();
             request.extensions_mut().insert(derived_catalog);

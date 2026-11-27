@@ -41,13 +41,15 @@ pub trait ResourceControllerStateRepository: Send + Sync {
         resource_id: &ResourceID,
     ) -> Result<Option<ResourceControllerState>, InternalError>;
 
-    /// Inserts the row or replaces the stored one.
+    /// Inserts the row or replaces the stored one. Writes nothing when the
+    /// resource does not exist: the outcome of an attempt is recorded after
+    /// `process` committed, and a purge may remove the resource in between.
     async fn upsert_state(&self, state: &ResourceControllerState) -> Result<(), InternalError>;
 
-    /// Removes the rows of every controller for the resource.
-    async fn delete_states_for_resource(
+    /// Removes the rows of every controller for the resources.
+    async fn delete_states_for_resources(
         &self,
-        resource_id: &ResourceID,
+        resource_ids: &[ResourceID],
     ) -> Result<(), InternalError>;
 
     /// Returns at most `limit` distinct actionable resources, in no

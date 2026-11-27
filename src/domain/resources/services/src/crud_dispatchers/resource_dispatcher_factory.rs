@@ -9,14 +9,17 @@
 
 use std::sync::Arc;
 
+use dill::BuilderExt;
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu_resources::{
     ResourceCrudDispatcher,
     ResourceDispatcherMeta,
     ResourcePresentationDispatcher,
     ResourceSpecViewDispatcher,
+    TypeName,
     TypeUri,
     UnsupportedResourceDescriptorError,
+    resource_type_name,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -110,6 +113,22 @@ impl ResourceDispatcherFactory {
             schema,
             "CRUD dispatcher",
         )
+    }
+
+    /// The short names of the types that have a CRUD dispatcher in
+    /// `target_catalog`
+    pub fn registered_type_names_in(
+        target_catalog: &dill::Catalog,
+    ) -> Result<Vec<TypeName>, InternalError> {
+        target_catalog
+            .builders_for::<dyn ResourceCrudDispatcher>()
+            .filter_map(|builder| {
+                builder
+                    .metadata_get_first::<ResourceDispatcherMeta>()
+                    .map(|meta| meta.schema)
+            })
+            .map(|schema| resource_type_name(&TypeUri::new_unchecked(schema)))
+            .collect()
     }
 
     /// Resolves a CRUD dispatcher for a schema that came from unvalidated input

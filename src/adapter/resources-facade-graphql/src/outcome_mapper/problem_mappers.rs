@@ -13,6 +13,7 @@ use kamu_resources_facade::{
     BatchResourceError,
     ResourceAccountResolutionError,
     ResourceAccountResolutionProblemCode,
+    ResourceDeletedNotRevealedError,
     ResourceLookupProblem,
     ResourceNameMismatchError,
     ResourceSchemaMismatchError,
@@ -31,6 +32,10 @@ pub(crate) fn map_batch_lookup_problem(
         P::ResourceNameNotFoundProblem(p) => Ok(map_name_not_found(p)),
         P::ResourceSchemaMismatchProblem(p) => Ok(map_schema_mismatch(p)),
         P::ResourceNameMismatchProblem(p) => Ok(map_name_mismatch(p)),
+        P::ResourceDeletedNotRevealedProblem(p) => Ok(map_deleted_not_revealed(p)),
+        P::ResourceAccessDeniedProblem(p) => Ok(ResourceLookupProblem::Access(
+            odf::AccessError::Unauthorized(p.message.into()),
+        )),
         P::Unknown => Err(BatchResourceError::Internal(InternalError::new(
             "Remote batch problem contains unrecognized ResourceLookupProblem variant",
         ))),
@@ -111,6 +116,14 @@ pub(crate) fn map_schema_mismatch(
         expected_schema: p.expected_schema,
         actual_schema: p.actual_schema,
     })
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub(crate) fn map_deleted_not_revealed(
+    p: cynic_api::fragments::ResourceDeletedNotRevealedProblem,
+) -> ResourceLookupProblem {
+    ResourceLookupProblem::DeletedNotRevealed(ResourceDeletedNotRevealedError { id: p.id })
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

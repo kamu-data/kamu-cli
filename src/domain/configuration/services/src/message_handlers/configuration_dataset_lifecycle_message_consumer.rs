@@ -12,6 +12,7 @@ use std::sync::Arc;
 
 use dill::{Catalog, component, interface, meta};
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
+use kamu_accounts::{Principal, RequestOrigin};
 use kamu_configuration::{
     RESOURCE_LABEL_LEGACY_CONFIG_TARGET_DATASET_SCHEMA_URI,
     SecretSetResource,
@@ -20,6 +21,8 @@ use kamu_configuration::{
 use kamu_datasets::{DatasetLifecycleMessage, MESSAGE_PRODUCER_KAMU_DATASET_SERVICE};
 use kamu_resources::{
     ApplyManifestApplicationDecision,
+    ApplyResourceAccessCheck,
+    ApplyResourceAccountSource,
     ResourceCrudDispatcher,
     ResourceCrudDispatcherApplyRequest,
     ResourceCrudDispatcherDeletionRequest,
@@ -33,7 +36,7 @@ use kamu_resources::{
     TypeRef,
     TypeUri,
 };
-use kamu_resources_services::ResourceDispatcherFactory;
+use kamu_resources_services::{ResourceDispatcherFactory, request_creation_provenance};
 use messaging_outbox::{
     InitialConsumerBoundary,
     MessageConsumer,
@@ -98,11 +101,13 @@ impl ConfigurationDatasetLifecycleMessageConsumer {
             return Ok(());
         }
 
-        // Skips anything concurrently deleted, so this may be shorter than
-        // `ids` -- in which case there is nothing left to clean up.
+        // Anything concurrently deleted has nothing left to clean up
         let snapshots = resource_repo
             .find_resource_snapshots_by_schema_and_ids(schema, &ids)
-            .await?;
+            .await?
+            .into_iter()
+            .filter(|snapshot| !snapshot.headers.is_deleted())
+            .collect::<Vec<_>>();
 
         // Full derived name, never a `legacy-vars-` prefix: a set named after
         // some *other* dataset is not ours to delete.
@@ -167,7 +172,7 @@ impl ConfigurationDatasetLifecycleMessageConsumer {
     /// once and so reconciles the resource again.
     ///
     /// The exception is a `SecretSet` still in the migration's `aes256gcm`
-    /// form, which the sanitizer upgrades to `jwe` -- a real spec change in the
+    /// form, which the pre-apply hook upgrades to `jwe` -- a real spec change in the
     /// same apply. Only reachable here, since auto-managed sets are deleted
     /// rather than stripped.
     async fn strip_dangling_label(
@@ -180,6 +185,16 @@ impl ConfigurationDatasetLifecycleMessageConsumer {
         let label_key = TypeRef::Uri(TypeUri::new_unchecked(
             RESOURCE_LABEL_LEGACY_CONFIG_TARGET_DATASET_SCHEMA_URI,
         ));
+
+        // Only a create records its provenance, and this edits existing
+        // resources only
+        let provenance = request_creation_provenance(
+            &Principal::Node,
+            &RequestOrigin::Internal {
+                producer: MESSAGE_CONSUMER_KAMU_CONFIGURATION_DATASET_LIFECYCLE_HANDLER.to_string(),
+                detail: Some(dataset_id.to_string()),
+            },
+        )?;
 
         for snapshot in snapshots {
             // Surfaced because this edits a resource on its owner's behalf,
@@ -198,11 +213,14 @@ impl ConfigurationDatasetLifecycleMessageConsumer {
 
             let decision = dispatcher
                 .apply(ResourceCrudDispatcherApplyRequest {
+                    account_source: ApplyResourceAccountSource::Manifest,
+                    access_check: ApplyResourceAccessCheck::ByGuard,
                     id: Some(snapshot.id),
-                    headers,
+                    headers: headers.into(),
                     // Verbatim: the dispatcher decodes it back per type, so
                     // both kinds share this path without naming a spec type.
                     spec: snapshot.spec,
+                    provenance: provenance.clone(),
                 })
                 .await
                 .int_err()?;

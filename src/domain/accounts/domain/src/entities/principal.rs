@@ -38,25 +38,25 @@ pub enum Principal {
 }
 
 impl Principal {
-    /// The ODF handle of the principal; `None` for [`Principal::Anonymous`],
-    /// which carries no identity
-    pub fn handle(&self) -> Option<odf::metadata::auth::PrincipalHandle> {
+    /// The ODF handle of the principal; [`Principal::Anonymous`] carries no
+    /// identity, so it has none
+    pub fn handle(&self) -> Result<odf::metadata::auth::PrincipalHandle, AnonymousPrincipalError> {
         match self {
-            Self::User(account_handle) => Some(odf::metadata::auth::PrincipalHandle {
+            Self::User(account_handle) => Ok(odf::metadata::auth::PrincipalHandle {
                 r#type: odf::metadata::auth::User::type_uri().clone(),
                 account: None,
                 id: account_handle.id,
                 did: Some(account_handle.did.clone().into()),
                 name: account_handle.name.clone().into(),
             }),
-            Self::Node => Some(odf::metadata::auth::PrincipalHandle {
+            Self::Node => Ok(odf::metadata::auth::PrincipalHandle {
                 r#type: odf::metadata::auth::Node::type_uri().clone(),
                 account: None,
                 id: *NODE_PRINCIPAL_RESOURCE_ID,
                 did: None,
                 name: odf::metadata::resources::ResourceName::new_unchecked(NODE_PRINCIPAL_NAME),
             }),
-            Self::Anonymous => None,
+            Self::Anonymous => Err(AnonymousPrincipalError),
         }
     }
 
@@ -90,9 +90,15 @@ impl From<&CurrentAccountSubject> for Principal {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[derive(thiserror::Error, Debug)]
+#[error("An anonymous principal has no identity")]
+pub struct AnonymousPrincipalError;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[cfg(test)]
 mod tests {
-    use pretty_assertions::assert_eq;
+    use pretty_assertions::{assert_eq, assert_matches};
 
     use super::*;
     use crate::AnonymousAccountReason;
@@ -130,7 +136,7 @@ mod tests {
         assert_eq!(node.did, None);
         assert_eq!(node.name.as_str(), "node");
 
-        assert_eq!(Principal::Anonymous.handle(), None);
+        assert_matches!(Principal::Anonymous.handle(), Err(AnonymousPrincipalError));
     }
 }
 

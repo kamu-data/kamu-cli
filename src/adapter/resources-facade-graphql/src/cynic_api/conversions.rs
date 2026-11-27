@@ -192,6 +192,7 @@ impl TryFrom<fragments::ResourceTypeCountSummary> for domain::ResourceTypeCountS
                 degraded: value.phase_counts.degraded.into(),
                 failed: value.phase_counts.failed.into(),
                 deleting: value.phase_counts.deleting.into(),
+                deleted: value.phase_counts.deleted.into(),
             },
         })
     }

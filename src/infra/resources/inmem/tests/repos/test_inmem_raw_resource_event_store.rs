@@ -36,6 +36,12 @@ database_transactional_test!(
     harness = InMemoryResourceRepositoriesHarness
 );
 
+database_transactional_test!(
+    storage = inmem_with_transaction,
+    fixture = event_store_suite::test_delete_events_of_resources,
+    harness = InMemoryResourceRepositoriesHarness
+);
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 database_transactional_test!(

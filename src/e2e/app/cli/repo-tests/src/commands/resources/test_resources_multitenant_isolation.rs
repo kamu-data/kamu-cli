@@ -158,11 +158,12 @@ async fn test_resources_manifest_account(ctx: &mut ResourceCtx) {
     .await;
 
     pretty_assertions::assert_eq!(ctx.list_names("vs").await, vec!["from-manifest"]);
-    assert_eq!(ctx.summary_count(fixtures::VARIABLE_SET_SCHEMA).await, 1);
+    // The summary counts alice's deleted VariableSets too
+    assert_eq!(ctx.summary_count(fixtures::VARIABLE_SET_SCHEMA).await, 5);
 
     ctx.set_account(Some(bob));
     pretty_assertions::assert_eq!(ctx.list_names("vs").await, Vec::<String>::new());
-    assert_eq!(ctx.summary_count(fixtures::VARIABLE_SET_SCHEMA).await, 0);
+    assert_eq!(ctx.summary_count(fixtures::VARIABLE_SET_SCHEMA).await, 3);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

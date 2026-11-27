@@ -33,21 +33,44 @@ changesets whose diff does not fit in one careful read.
 
 | # | Step | The one question | Owner of the rules | Mode |
 |---|---|---|---|---|
-| 1 | Dead code | What did the branch leave unused? Functions, types, variants, errors, mock and harness helpers, config fields, dependencies, feature flags, leftovers of renames | `kamu-rust-style` | Report, then fix |
+| 1 | Dead code | What did the branch leave unused? Functions, types, variants, errors, mock and harness helpers, config fields, leftovers of renames | `kamu-rust-style` | Report, then fix |
 | 2 | Duplication | Which code is duplicated or nearly so, and could be generalized, parameterized or decomposed? Production code, test harnesses and e2e scenarios alike, never at the cost of a method's visible transaction blocks | `kamu-rust-style`, `kamu-test-harness`, [database-transactions.md §3.2](../../../docs/internal/database-transactions.md#32-inside-a-level) | Report, then fix |
 | 3 | Rust rules | Does the branch's Rust follow the written rules? Exhaustive matches, imports, conversions, module layout, visibility, DI grouping, error mapping, test structure | `kamu-rust-style`, `kamu-dill-di`, `kamu-domain-design`, `kamu-test-harness` | Fix, then report |
-| 4 | Comments and docs | Does every comment and doc line the branch added or invalidated meet the prose rules? Include text made stale by merges from the base | `kamu-prose-and-comments` | Fix, then report |
-| 5 | Changelog | Is there one consolidated entry per user-visible change, written for users, with "breaking" checked against release tags? | `kamu-release-dependency-workflows` | Fix, then report |
-| 6 | Integration audit | Where do pieces reviewed one at a time break together? Functional regressions, new bugs, authorization and input bounds, performance (transactions held during long work, repeated queries), parallel paths that drifted apart (CLI and task, telemetry) | AGENTS.md, the area's design doc | Report, then fix |
-| 7 | Coverage gaps | Which behavior the branch changed has no test that fails when the change is reverted? At every level, unit to e2e | `kamu-test-harness`, `kamu-cli-e2e-tests`, `kamu-repository-tests` | Report, then fix |
-| 8 | Redundant tests | Which tests add no coverage, which look-alikes should be merged or table-driven, which e2e tests repeat a lower level, which Postgres wirings the repository cannot affect? | `kamu-test-harness`, `kamu-cli-e2e-tests` | Report, then fix |
-| 9 | Design docs | Do the `docs/internal/` sections the branch touched or invalidated match the code, read well, and stay routed in AGENTS.md? | `kamu-prose-and-comments`, AGENTS.md "Documentation classes" | Fix, then report |
-| 10 | Wrap-up | Is the whole branch verified and described? | `kamu-github-operations` | See below |
+| 4 | Integration audit | Where do pieces reviewed one at a time break together? Functional regressions, new bugs, authorization and input bounds, performance (transactions held during long work, repeated queries), parallel paths that drifted apart (CLI and task, telemetry) | AGENTS.md, the area's design doc | Report, then fix |
+| 5 | Coverage gaps | Which behavior the branch changed has no test that fails when the change is reverted? At every level, unit to e2e | `kamu-test-harness`, `kamu-cli-e2e-tests`, `kamu-repository-tests` | Report, then fix |
+| 6 | Redundant tests | Which tests add no coverage, which look-alikes should be merged or table-driven, which e2e tests repeat a lower level, which Postgres wirings the repository cannot affect? | `kamu-test-harness`, `kamu-cli-e2e-tests` | Report, then fix |
+| 7 | Dependencies | Does each crate the branch touched depend on what it uses, at the narrowest level? [Checklist](#the-dependency-step) | `kamu-release-dependency-workflows`, `kamu-test-harness` | Report, then fix |
+| 8 | Comments and docs | Does every comment and doc line the branch added or invalidated meet the prose rules? Include text made stale by merges from the base | `kamu-prose-and-comments` | Fix, then report |
+| 9 | Changelog | Is there one consolidated entry per user-visible change, written for users, with "breaking" checked against release tags? | `kamu-release-dependency-workflows` | Fix, then report |
+| 10 | Design docs | Do the `docs/internal/` sections the branch touched or invalidated match the code, read well, and stay routed in AGENTS.md? | `kamu-prose-and-comments`, AGENTS.md "Documentation classes" | Fix, then report |
+| 11 | Wrap-up | Is the whole branch verified and described? | `kamu-github-operations` | See below |
 
-**Why this order.** Removing code first shrinks what every later pass reads. Rules and prose come
-after the code stops moving, and the changelog after the prose. The integration audit reads
-settled code. Coverage gaps come before the trim, so trimming knows which coverage must stay.
-Design docs come last, because every earlier step can invalidate them.
+**Why this order.** Removing code first shrinks what every later pass reads. Duplication and the
+Rust rules reshape the code before the integration audit reads it, so the audit sees settled code.
+Coverage gaps come before the trim, so trimming knows which coverage must stay. Every step up to
+the trim can add or drop a dependency, so the dependency step follows it. The text steps come
+last, once code and tests stop moving: comments, then the changelog written from them, then the
+design docs, which every earlier step can invalidate.
+
+### The dependency step
+
+Every dependency is code to update, audit and build. For each `Cargo.toml` the branch touched, or
+whose crate's code it changed, check:
+
+| Check | Fix |
+|---|---|
+| A dependency nothing in the crate uses any more | Remove it. `cargo shear` and `make lint-udeps` find candidates; `git grep` over the crate decides, as both miss a crate reached only through another dependency's API |
+| A `[dependencies]` entry used only by `tests/`, benches or `#[cfg(test)]` code | Move it to `[dev-dependencies]` |
+| A runtime dependency used only by the crate's `testing` module | Make it optional and enable it from the `testing` feature ([`kamu-test-harness`](../kamu-test-harness/SKILL.md#scope-2--crate-level-reusable-harness)) |
+| A feature of a dependency, or its default features, that no code needs | Drop the feature; take `default-features = false` and list only the features used |
+| A feature of the crate itself that no dependent enables, or one that enables crates it does not need | Remove the feature, or narrow what it enables |
+| A dependency that a crate already in the tree, or the standard library, can replace | Replace it |
+| A crate that depends on another layer's crate only for one type or helper | Report it: the type may belong lower, the call may belong in a caller |
+
+After the fixes, `make clippy` and the tests of the touched crates show that nothing needed was
+dropped. A feature the crate needs but does not name can still build here, enabled by another
+crate of the workspace build (AGENTS.md, "Build scope"); check that the crate's code reaches only
+the features it lists.
 
 ## Running one step
 
@@ -65,11 +88,12 @@ Design docs come last, because every earlier step can invalidate them.
      decisions, then apply them.
 4. **Report** with an ID per finding (`D1`, `R3`, `G2` …) so the user can answer in one line
    ("fix D1–D4, D5 as you recommend, skip D6"). For each: where, what is wrong, the fix or the
-   options. Every finding is reported. Skipping or deferring one is the user's decision, never
-   yours.
+   options, and its [value against effort](#value-against-effort). Every finding is reported.
+   Skipping or deferring one is the user's decision, never yours.
 5. **Validate** what the step touched: `make clippy` after Rust changes, `make lint-harness` after
-   docs or skills, the tests of the touched areas through nextest filtersets. The full suite runs
-   once, in the wrap-up, unless the user asks earlier; the user often runs it in parallel.
+   docs or skills, and the tests of the crates a fix changed, through nextest filtersets
+   (`package(...)`, not `rdeps(...)`). The wide run, every dependent and the full suite, happens
+   once in the wrap-up, unless the user asks earlier; the user often runs it in parallel.
 6. **Commit, once approved.** One commit per step, titled after the step and the scope, e.g.
    "Stage 0 Rust rules audit". If a step also applied decisions the user made after the report,
    a second commit may separate them ("… audit decisions"). The commit titles record which
@@ -77,6 +101,28 @@ Design docs come last, because every earlier step can invalidate them.
 
 The user's reply to a step's report often approves its commit and starts the next step at once.
 Within an approved step, do not ask again about each fix.
+
+### Value against effort
+
+Read as wide as the question needs, code older than the branch included: a pattern that spans
+areas is one finding, and limiting the reading to the diff misses it. What a step recommends doing
+is decided per finding, by what the work gains against what it costs. Rate each finding high,
+medium or low on both, with a one-line reason. Recommend the work only where the value clearly
+exceeds the effort. Report the rest in one line each as "not worth it", so the user can still
+take one. A pattern worth the work but too large for the branch becomes a follow-up ticket.
+
+The rating never removes a floor: a bug is always reported, and a written rule or a wrong
+statement is always fixed. It decides how much to do beyond that.
+
+| Step | Value is higher when | Effort is higher when | What the rating decides |
+|---|---|---|---|
+| Duplication | The copies changed more than once already, are large, or would drift into a bug | The fix spans many crates, changes a public API, or needs regeneration or wide test runs | Which copies get one home |
+| Rust rules | Readers and editors hit the code often | Restructuring: splitting a module, regrouping DI, moving a type across crates | The judgment calls only; the written rules apply as they are |
+| Integration audit | The failure is severe and likely: data loss and authorization before a slow path nobody runs | The fix is large, or changes behaviour that needs a changelog or a migration | Whether a fix lands in the branch or in a ticket; performance findings entirely |
+| Coverage gaps | A regression would do damage, the code is likely to change, other code relies on the behaviour | The level the test needs, cheapest first: unit, repository suite, service harness, e2e; a Postgres wiring adds a database | The lowest level that catches the regression; e2e only for a contract no lower level reaches |
+| Redundant tests | Removing it saves run time or upkeep: an e2e test or a database wiring saves most, a unit test almost nothing | Showing that another test still catches the same regression | Which e2e tests and wirings go; unit look-alikes merge only when that reads better |
+| Dependencies | The dependency is heavy, rarely updated, or widens the attack surface | Code must be rewritten to drop it | Feature trimming and replacements; an unused dependency always goes |
+| Design docs | The section is read often | Restructuring rather than fixing a sentence | Rewrites of sections that are correct but read badly |
 
 ## Wrap-up
 

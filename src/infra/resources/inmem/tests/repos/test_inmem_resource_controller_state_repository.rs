@@ -133,7 +133,7 @@ database_transactional_test!(
 
 database_transactional_test!(
     storage = inmem_with_transaction,
-    fixture = controller_state_repo_suite::test_upsert_state_of_unknown_resource_fails,
+    fixture = controller_state_repo_suite::test_upsert_state_of_absent_resource_writes_nothing,
     harness = InMemoryResourceRepositoriesHarness
 );
 
@@ -141,7 +141,7 @@ database_transactional_test!(
 
 database_transactional_test!(
     storage = inmem_with_transaction,
-    fixture = controller_state_repo_suite::test_delete_states_for_resource,
+    fixture = controller_state_repo_suite::test_delete_states_for_resources,
     harness = InMemoryResourceRepositoriesHarness
 );
 

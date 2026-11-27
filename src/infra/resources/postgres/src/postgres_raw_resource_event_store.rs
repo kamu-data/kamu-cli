@@ -559,6 +559,26 @@ impl ResourceRawEventStore for PostgresRawResourceEventStore {
         Ok(usize::try_from(events_count).unwrap())
     }
 
+    async fn delete_events_of_resources(&self, ids: &[ResourceID]) -> Result<(), InternalError> {
+        if ids.is_empty() {
+            return Ok(());
+        }
+
+        let mut tr = self.transaction.lock().await;
+        let connection_mut = tr.connection_mut().await?;
+
+        let ids: Vec<uuid::Uuid> = ids.iter().map(|id| *id.as_ref()).collect();
+        sqlx::query!(
+            "DELETE FROM resource_events WHERE resource_id = ANY($1)",
+            &ids,
+        )
+        .execute(connection_mut)
+        .await
+        .int_err()?;
+
+        Ok(())
+    }
+
     fn get_all_events_by_schema(
         &self,
         schema: &str,

@@ -9,6 +9,7 @@
 
 use chrono::{DateTime, Utc};
 use event_sourcing::ConcurrentModificationError;
+use internal_error::ErrorIntoInternal;
 use kamu_resources::{
     ResourceVisibility,
     ResourceWarning,
@@ -19,6 +20,7 @@ use time_source::SystemTimeSource;
 
 use crate::domain::{
     ApplyResourceAction,
+    ApplyResourceHeaders,
     ApplyResourceLifecycleErrorHandling,
     ApplyResourceParams,
     ApplyResourcePlan,
@@ -38,11 +40,29 @@ use crate::domain::{
     ResourceID,
     ResourceLinterSpec,
     ResourceLoadError,
+    ResourceName,
+    ResourceNameSuffixGenerator,
+    ResourceRef,
     ResourceSchemaProvider,
     ResourceSpecFromInput,
     ResourceValidateSpec,
     TypedResourceQueryService,
 };
+use crate::{
+    GENERATED_NAME_SUFFIX_LENGTH,
+    NewOwnerCheck,
+    OwnerReferenceResolver,
+    ResolveOwnerReferencesError,
+    ResourceDispatcherFactory,
+};
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// How many names are tried for a resource applied without one
+pub(crate) const MAX_GENERATED_NAME_ATTEMPTS: usize = 5;
+
+/// Fills the place of the random suffix in a plan
+const PENDING_NAME_SUFFIX_CHAR: &str = "x";
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -53,6 +73,8 @@ where
     generic_resource_query_service: &'a dyn GenericResourceQueryService,
     typed_resource_query_service: &'a dyn TypedResourceQueryService<R>,
     resource_aggregate_loader: &'a dyn ResourceAggregateLoader<R>,
+    resource_dispatcher_factory: &'a ResourceDispatcherFactory,
+    name_suffix_generator: &'a dyn ResourceNameSuffixGenerator,
     time_source: &'a dyn SystemTimeSource,
 }
 
@@ -70,22 +92,34 @@ where
         generic_resource_query_service: &'a dyn GenericResourceQueryService,
         typed_resource_query_service: &'a dyn TypedResourceQueryService<R>,
         resource_aggregate_loader: &'a dyn ResourceAggregateLoader<R>,
+        resource_dispatcher_factory: &'a ResourceDispatcherFactory,
+        name_suffix_generator: &'a dyn ResourceNameSuffixGenerator,
         time_source: &'a dyn SystemTimeSource,
     ) -> Self {
         Self {
             generic_resource_query_service,
             typed_resource_query_service,
             resource_aggregate_loader,
+            resource_dispatcher_factory,
+            name_suffix_generator,
             time_source,
         }
     }
 
+    /// `maybe_existing` is the result of [`Self::find_existing_resource`]
     pub async fn plan(
         &self,
         params: ApplyResourceParams<R>,
+        maybe_existing: Option<R>,
     ) -> Result<ApplyResourcePlanningDecision<R>, ApplyResourceUseCaseError<R>> {
         let plan = self
-            .plan_internal(params, ApplyResourcePrecondition::None)
+            .plan_with_naming(
+                params,
+                maybe_existing,
+                ApplyResourcePrecondition::None,
+                OmittedNameHandling::LeavePending,
+                NewOwnerCheck::Read,
+            )
             .await?;
         Ok(match plan {
             PlannedApplyResourceDecision::Planned(plan) => {
@@ -97,21 +131,54 @@ where
         })
     }
 
+    /// `maybe_existing` is the result of [`Self::find_existing_resource`]
     pub async fn plan_internal(
         &self,
         params: ApplyResourceParams<R>,
+        maybe_existing: Option<R>,
         precondition: ApplyResourcePrecondition,
     ) -> Result<PlannedApplyResourceDecision<R>, ApplyResourceUseCaseError<R>> {
+        self.plan_with_naming(
+            params,
+            maybe_existing,
+            precondition,
+            OmittedNameHandling::Generate {
+                max_attempts: MAX_GENERATED_NAME_ATTEMPTS,
+            },
+            NewOwnerCheck::Touch,
+        )
+        .await
+    }
+
+    /// A plan reads the new owners, since its transaction may commit; an
+    /// apply touches them
+    async fn plan_with_naming(
+        &self,
+        params: ApplyResourceParams<R>,
+        maybe_existing: Option<R>,
+        precondition: ApplyResourcePrecondition,
+        omitted_name_handling: OmittedNameHandling,
+        new_owner_check: NewOwnerCheck,
+    ) -> Result<PlannedApplyResourceDecision<R>, ApplyResourceUseCaseError<R>> {
+        Self::ensure_name_given_or_generated(&params.headers)?;
+
         let now = self.time_source.now();
 
-        let maybe_existing_id = self
-            .resolve_existing_resource_id(params.id, &params.headers)
-            .await?;
-
-        let Some(id) = maybe_existing_id else {
+        let Some(resource) = maybe_existing else {
             return match precondition {
                 ApplyResourcePrecondition::None | ApplyResourcePrecondition::Absent => {
-                    self.plan_create_resource(params, now).await
+                    match self
+                        .resolve_owner_references(params, None, new_owner_check)
+                        .await?
+                    {
+                        OwnerReferencesResolution::Resolved(params) => {
+                            self.plan_create_resource(params, now, omitted_name_handling)
+                                .await
+                        }
+                        OwnerReferencesResolution::Rejected(rejection) => {
+                            Ok(PlannedApplyResourceDecision::Rejected(rejection))
+                        }
+                    }
                 }
                 ApplyResourcePrecondition::Generation(_) => {
                     Err(ApplyResourceUseCaseError::ConcurrentModification(
@@ -120,15 +187,6 @@ where
                 }
             };
         };
-
-        self.ensure_resource_id_matches_type(&id).await?;
-
-        let resource = self
-            .resource_aggregate_loader
-            .load(&id)
-            .await
-            .map_err(ResourceLoadError)
-            .map_err(ApplyResourceUseCaseError::LoadFailed)?;
 
         let precondition_holds = match precondition {
             ApplyResourcePrecondition::None => true,
@@ -143,40 +201,127 @@ where
             ));
         }
 
-        self.plan_update_resource(resource, params, now)
-    }
-
-    pub(crate) async fn resolve_existing_resource_id(
-        &self,
-        id: Option<ResourceID>,
-        headers: &ResourceHeadersInput,
-    ) -> Result<Option<ResourceID>, ApplyResourceUseCaseError<R>> {
-        match id {
-            Some(id) => Ok(Some(id)),
-            None => self
-                .generic_resource_query_service
-                .find_resource_id_by_name(
-                    Self::resolved_account_id(headers),
-                    R::type_uri(),
-                    &headers.name,
-                )
-                .await
-                .map_err(ApplyResourceUseCaseError::Internal),
+        match self
+            .resolve_owner_references(params, Some(&resource), new_owner_check)
+            .await?
+        {
+            OwnerReferencesResolution::Resolved(params) => {
+                self.plan_update_resource(resource, params, now)
+            }
+            OwnerReferencesResolution::Rejected(rejection) => {
+                Ok(PlannedApplyResourceDecision::Rejected(rejection))
+            }
         }
     }
 
-    /// Account resolution (id + did + name lookup) already happened upstream,
-    /// as part of the apply process (see `ResourceAccountResolver`), so
-    /// `headers.account` is always fully resolved by this point.
-    fn resolved_account_id(headers: &ResourceHeadersInput) -> &odf::AccountID {
-        headers
-            .account
-            .as_ref()
-            .and_then(|a| a.did.as_ref())
-            .expect("resource headers must carry a resolved account by apply time")
+    async fn resolve_owner_references(
+        &self,
+        mut params: ApplyResourceParams<R>,
+        maybe_existing: Option<&R>,
+        new_owner_check: NewOwnerCheck,
+    ) -> Result<OwnerReferencesResolution<R>, ApplyResourceUseCaseError<R>> {
+        // Events record an empty list as no list
+        let Some(owner_references) = params
+            .headers
+            .owner_references
+            .take()
+            .filter(|owner_references| !owner_references.is_empty())
+        else {
+            return Ok(OwnerReferencesResolution::Resolved(params));
+        };
+
+        let account = params.headers.resolved_account_handle();
+        let resolver = OwnerReferenceResolver {
+            generic_resource_query_service: self.generic_resource_query_service,
+            resource_dispatcher_factory: self.resource_dispatcher_factory,
+            principal: &params.provenance.principal,
+            account: &account,
+            owned_id: maybe_existing.map(|resource| *resource.id()),
+            current_owners: maybe_existing
+                .and_then(|resource| resource.headers().owner_references.as_deref())
+                .unwrap_or_default(),
+            new_owner_check,
+        };
+
+        use ResolveOwnerReferencesError as E;
+        match resolver.resolve(&owner_references).await {
+            Ok(owners) => {
+                params.headers.owner_references =
+                    Some(owners.into_iter().map(ResourceRef::from).collect());
+                Ok(OwnerReferencesResolution::Resolved(params))
+            }
+            Err(E::Rejected(err)) => Ok(OwnerReferencesResolution::Rejected(err.into())),
+            Err(E::InvalidHeaders(err)) => Err(err.into()),
+            Err(E::Internal(err)) => Err(err.into()),
+        }
     }
 
-    pub(crate) async fn ensure_resource_id_matches_type(
+    /// Fails for an omitted name that the type does not generate
+    fn ensure_name_given_or_generated(
+        headers: &ApplyResourceHeaders,
+    ) -> Result<(), ResourceHeadersValidationError> {
+        if headers.name.is_none() && R::GENERATED_NAME_PREFIX.is_none() {
+            return Err(Self::missing_name_error());
+        }
+        Ok(())
+    }
+
+    fn missing_name_error() -> ResourceHeadersValidationError {
+        ResourceHeadersValidationError::MissingName {
+            schema: R::type_uri().cheap_clone(),
+        }
+    }
+
+    /// The resource to update, `None` for one to create.
+    ///
+    /// An apply calls it once: whatever depends on the current state, the
+    /// prepared spec included, is based on the returned resource, so that
+    /// saving detects any change made since.
+    pub async fn find_existing_resource(
+        &self,
+        params: &ApplyResourceParams<R>,
+    ) -> Result<Option<R>, ApplyResourceUseCaseError<R>> {
+        let Some(id) = self
+            .resolve_existing_resource_id(params.id, &params.headers)
+            .await?
+        else {
+            return Ok(None);
+        };
+
+        self.ensure_resource_id_matches_type(&id).await?;
+
+        let resource = self
+            .resource_aggregate_loader
+            .load(&id)
+            .await
+            .map_err(ResourceLoadError)
+            .map_err(ApplyResourceUseCaseError::LoadFailed)?;
+
+        Ok(Some(resource))
+    }
+
+    /// `None` for a resource to create, which one without an ID and a name
+    /// always is
+    async fn resolve_existing_resource_id(
+        &self,
+        id: Option<ResourceID>,
+        headers: &ApplyResourceHeaders,
+    ) -> Result<Option<ResourceID>, ApplyResourceUseCaseError<R>> {
+        if id.is_some() {
+            return Ok(id);
+        }
+
+        let Some(name) = &headers.name else {
+            return Ok(None);
+        };
+
+        self.generic_resource_query_service
+            .find_resource_id_by_name(headers.resolved_account_id(), R::type_uri(), name)
+            .await
+            .map_err(ApplyResourceUseCaseError::Internal)
+    }
+
+    async fn ensure_resource_id_matches_type(
         &self,
         id: &ResourceID,
     ) -> Result<(), ApplyResourceUseCaseError<R>> {
@@ -186,10 +331,11 @@ where
             .map_err(ApplyResourceUseCaseError::from)
     }
 
-    async fn plan_create_resource(
+    pub(crate) async fn plan_create_resource(
         &self,
         params: ApplyResourceParams<R>,
         now: DateTime<Utc>,
+        omitted_name_handling: OmittedNameHandling,
     ) -> Result<PlannedApplyResourceDecision<R>, ApplyResourceUseCaseError<R>> {
         let id = self
             .generic_resource_query_service
@@ -198,23 +344,42 @@ where
             .map_err(ApplyResourceUseCaseError::Internal)?;
 
         let mut warnings = params.spec.lint_warnings();
-        warnings.extend(self.replaced_resources_warnings(&params.headers).await?);
 
-        let resource =
-            match <R as ManagedResource>::try_create(now, id, params.headers, params.spec) {
-                Ok(resource) => resource,
-                Err(err) => {
-                    return Ok(PlannedApplyResourceDecision::Rejected(
-                        Self::map_lifecycle_error(err)?,
-                    ));
-                }
-            };
+        let (headers, naming) = match params.headers.name.clone() {
+            Some(name) => {
+                warnings.extend(
+                    self.replaced_resources_warnings(&params.headers, &name)
+                        .await?,
+                );
+                (params.headers.into_named(name), ResourceNaming::Given)
+            }
+            None => {
+                self.name_resource(params.headers, &params.spec, omitted_name_handling)
+                    .await?
+            }
+        };
+
+        let resource = match <R as ManagedResource>::try_create(
+            now,
+            id,
+            headers,
+            params.spec,
+            &params.provenance,
+        ) {
+            Ok(resource) => resource,
+            Err(err) => {
+                return Ok(PlannedApplyResourceDecision::Rejected(
+                    Self::map_lifecycle_error(err)?,
+                ));
+            }
+        };
 
         Ok(PlannedApplyResourceDecision::Planned(
             PlannedApplyResource {
                 reconciliation_required: resource.needs_reconciliation(),
                 resource,
                 action: ApplyResourceAction::Create,
+                naming,
                 executable: true,
                 planned_at: now,
                 warnings,
@@ -223,22 +388,95 @@ where
         ))
     }
 
+    /// Names a resource to create that was applied without a name
+    async fn name_resource(
+        &self,
+        headers: ApplyResourceHeaders,
+        spec: &R::SpecInput,
+        omitted_name_handling: OmittedNameHandling,
+    ) -> Result<(ResourceHeadersInput, ResourceNaming), ApplyResourceUseCaseError<R>> {
+        let Some(make_prefix) = R::GENERATED_NAME_PREFIX else {
+            return Err(Self::missing_name_error().into());
+        };
+        let prefix = make_prefix(spec);
+
+        match omitted_name_handling {
+            OmittedNameHandling::LeavePending => {
+                let placeholder = PENDING_NAME_SUFFIX_CHAR.repeat(GENERATED_NAME_SUFFIX_LENGTH);
+                let name = Self::make_name(&prefix, &placeholder)?;
+                Ok((headers.into_named(name), ResourceNaming::Pending))
+            }
+            OmittedNameHandling::Generate { max_attempts } => {
+                for attempt in 1..=max_attempts {
+                    let name =
+                        Self::make_name(&prefix, &self.name_suffix_generator.generate_suffix())?;
+                    if self.is_name_unused(&headers, &name).await? {
+                        return Ok((
+                            headers.into_named(name),
+                            ResourceNaming::Generated {
+                                attempts_left: max_attempts - attempt,
+                            },
+                        ));
+                    }
+                }
+
+                Err(ApplyResourceUseCaseError::Internal(
+                    "Every generated resource name is taken"
+                        .int_err()
+                        .with_context(format!("schema='{}', prefix='{prefix}'", R::type_uri())),
+                ))
+            }
+        }
+    }
+
+    fn make_name(prefix: &str, suffix: &str) -> Result<ResourceName, ApplyResourceUseCaseError<R>> {
+        Ok(ApplyResourceHeaders::parse_name(&format!(
+            "{prefix}-{suffix}"
+        ))?)
+    }
+
+    /// Counts deleted resources as well, which keep their names, so that a
+    /// generated name finds one resource in the history too
+    async fn is_name_unused(
+        &self,
+        headers: &ApplyResourceHeaders,
+        name: &ResourceName,
+    ) -> Result<bool, ApplyResourceUseCaseError<R>> {
+        let holders = self
+            .name_holders(headers, name, ResourceVisibility::IncludeDeleted)
+            .await?;
+
+        Ok(holders.is_empty())
+    }
+
+    /// The resources of the type holding `name` in the account of `headers`
+    async fn name_holders(
+        &self,
+        headers: &ApplyResourceHeaders,
+        name: &ResourceName,
+        visibility: ResourceVisibility,
+    ) -> Result<Vec<(ResourceName, ResourceID)>, ApplyResourceUseCaseError<R>> {
+        self.generic_resource_query_service
+            .resolve_resource_ids_by_names(
+                headers.resolved_account_id(),
+                R::type_uri(),
+                std::slice::from_ref(name),
+                visibility,
+            )
+            .await
+            .map_err(ApplyResourceUseCaseError::Internal)
+    }
+
     /// Warns about each resource being deleted whose name the created resource
     /// takes.
     async fn replaced_resources_warnings(
         &self,
-        headers: &ResourceHeadersInput,
+        headers: &ApplyResourceHeaders,
+        name: &ResourceName,
     ) -> Result<Vec<ResourceWarning>, ApplyResourceUseCaseError<R>> {
         let replaced = self
-            .generic_resource_query_service
-            .resolve_resource_ids_by_names(
-                Self::resolved_account_id(headers),
-                R::type_uri(),
-                std::slice::from_ref(&headers.name),
-                ResourceVisibility::IncludeDeleting,
-            )
-            .await
-            .map_err(ApplyResourceUseCaseError::Internal)?;
+            .name_holders(headers, name, ResourceVisibility::IncludeDeleting)
+            .await?;
 
         Ok(replaced
             .iter()
@@ -246,7 +484,7 @@ where
             .collect())
     }
 
-    pub(crate) fn plan_update_resource(
+    fn plan_update_resource(
         &self,
         mut resource: R,
         params: ApplyResourceParams<R>,
@@ -257,13 +495,19 @@ where
         // already loaded, so nothing has to be re-read from storage.
         let previous_state = resource.as_ref().clone();
 
+        let name = params
+            .headers
+            .name
+            .clone()
+            .unwrap_or_else(|| resource.headers().name.clone());
+
         // Headers and spec changes of one apply bump the generation once
         let new_generation = resource.headers().generation + 1;
 
         if let Err(err) = <R as ManagedResource>::try_update_headers(
             &mut resource,
             now,
-            params.headers,
+            params.headers.into_named(name),
             new_generation,
         ) {
             return Ok(PlannedApplyResourceDecision::Rejected(
@@ -292,6 +536,7 @@ where
                 reconciliation_required: resource.needs_reconciliation(),
                 resource,
                 action,
+                naming: ResourceNaming::Given,
                 executable: true,
                 planned_at: now,
                 warnings,
@@ -314,6 +559,40 @@ where
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+enum OwnerReferencesResolution<R: DeclarativeResource> {
+    Resolved(ApplyResourceParams<R>),
+    Rejected(ApplyResourceRejection),
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// What planning does about the name of a new resource applied without one
+#[derive(Debug, Clone, Copy)]
+pub(crate) enum OmittedNameHandling {
+    /// Puts a placeholder in its place
+    LeavePending,
+    Generate {
+        max_attempts: usize,
+    },
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Where the name of a planned resource comes from
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum ResourceNaming {
+    /// The manifest, or the existing resource
+    Given,
+    /// A placeholder, as the apply generates the name
+    Pending,
+    Generated {
+        /// How many more names may be tried if this one gets taken
+        attempts_left: usize,
+    },
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 pub enum PlannedApplyResourceDecision<R: EventSourcedResource> {
     Planned(PlannedApplyResource<R>),
     Rejected(ApplyResourceRejection),
@@ -325,6 +604,7 @@ pub enum PlannedApplyResourceDecision<R: EventSourcedResource> {
 pub struct PlannedApplyResource<R: EventSourcedResource> {
     pub(crate) resource: R,
     pub(crate) action: ApplyResourceAction,
+    pub(crate) naming: ResourceNaming,
     pub(crate) reconciliation_required: bool,
     pub(crate) executable: bool,
     pub(crate) planned_at: DateTime<Utc>,
@@ -353,6 +633,29 @@ where
             executable: self.executable,
             warnings: self.warnings,
             previous_state: self.previous_state,
+            name_pending: self.naming == ResourceNaming::Pending,
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[cfg(test)]
+mod tests {
+    use std::assert_matches;
+
+    use super::*;
+    use crate::domain::MAX_NAME_LEN;
+    use crate::testing::TestResource;
+
+    #[test]
+    fn test_generated_name_that_is_not_valid_is_invalid_headers() {
+        let too_long = "a".repeat(MAX_NAME_LEN);
+        for prefix in ["Not A Name", too_long.as_str()] {
+            assert_matches!(
+                ApplyResourcePlanner::<TestResource>::make_name(prefix, "abc123"),
+                Err(ApplyResourceUseCaseError::InvalidHeaders(_))
+            );
         }
     }
 }

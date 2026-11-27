@@ -21,6 +21,7 @@ mod did_secret_key;
 mod password;
 mod predefined_accounts_config;
 mod principal;
+mod request_origin;
 
 pub use access_token::*;
 pub use account::*;
@@ -36,3 +37,4 @@ pub use did_secret_key::*;
 pub use password::*;
 pub use predefined_accounts_config::*;
 pub use principal::*;
+pub use request_origin::*;

@@ -108,6 +108,7 @@ uuid = { version = "1", default-features = false, features = [
 
 
 [dev-dependencies]
+background-agent-host = { workspace = true }
 file-utils = { workspace = true }
 init-on-startup = { workspace = true }
 kamu = { workspace = true, features = [

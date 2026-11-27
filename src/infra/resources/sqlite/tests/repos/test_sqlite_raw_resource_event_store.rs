@@ -37,6 +37,12 @@ database_transactional_test!(
     harness = SqliteResourceRawEventStoreHarness
 );
 
+database_transactional_test!(
+    storage = sqlite,
+    fixture = event_store_suite::test_delete_events_of_resources,
+    harness = SqliteResourceRawEventStoreHarness
+);
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 database_transactional_test!(

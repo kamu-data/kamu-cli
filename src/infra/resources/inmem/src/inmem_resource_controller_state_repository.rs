@@ -24,6 +24,7 @@ use kamu_resources::{
     ResourceControllerName,
     ResourceControllerState,
     ResourceControllerStateRepository,
+    ResourceHeadersExt,
     ResourceID,
     ResourceSnapshot,
 };
@@ -165,29 +166,24 @@ impl ResourceControllerStateRepository for InMemoryResourceControllerStateReposi
     }
 
     async fn upsert_state(&self, state: &ResourceControllerState) -> Result<(), InternalError> {
-        // The foreign key of the database storages. Locks in the order of
-        // `matching_resources`
+        // The database storages write only next to an existing resource row.
+        // Locks in the order of `matching_resources`
         self.resource_state.read(self.transaction_id, |resources| {
-            if resources.snapshot(&state.resource_id).is_none() {
-                return Err(InternalError::new(format!(
-                    "Resource {} not found for the state of controller {}",
-                    state.resource_id,
-                    state.controller.as_str()
-                )));
+            if resources.snapshot(&state.resource_id).is_some() {
+                self.store.states.write(self.transaction_id, |states| {
+                    states.overwrite((state.controller.clone(), state.resource_id), state.clone());
+                });
             }
-            self.store.states.write(self.transaction_id, |states| {
-                states.overwrite((state.controller.clone(), state.resource_id), state.clone());
-            });
-            Ok(())
-        })
+        });
+        Ok(())
     }
 
-    async fn delete_states_for_resource(
+    async fn delete_states_for_resources(
         &self,
-        resource_id: &ResourceID,
+        resource_ids: &[ResourceID],
     ) -> Result<(), InternalError> {
         self.store.states.write(self.transaction_id, |states| {
-            states.delete_where(|(_, state_resource_id)| state_resource_id == resource_id);
+            states.delete_where(|(_, state_resource_id)| resource_ids.contains(state_resource_id));
         });
 
         Ok(())
@@ -231,7 +227,7 @@ impl ResourceControllerStateRepository for InMemoryResourceControllerStateReposi
             self.store.states.read(self.transaction_id, |states| {
                 resources
                     .snapshots()
-                    .filter(|snapshot| snapshot.headers.deleted_at.is_none())
+                    .filter(|snapshot| !snapshot.headers.is_deleted())
                     .filter(|snapshot| {
                         states
                             .get(&(controller.clone(), snapshot.id))

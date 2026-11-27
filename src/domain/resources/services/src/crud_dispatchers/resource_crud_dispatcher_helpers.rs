@@ -7,7 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use internal_error::{InternalError, ResultIntoInternal};
+use event_sourcing::LoadError;
+use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_resources::{
     ApplyManifestApplicationDecision,
     ApplyManifestDocumentSource,
@@ -16,30 +17,58 @@ use kamu_resources::{
     ApplyManifestResult,
     ApplyResourceApplicationDecision,
     ApplyResourceCrudDispatcherError,
+    ApplyResourceParams,
     ApplyResourcePlanningDecision,
     DeclarativeResource,
     DeclarativeResourceState,
     EventSourcedResource,
     Resource,
+    ResourceAccountOperation,
+    ResourceAggregateLoader,
+    ResourceCrudDispatcherApplyRequest,
+    ResourceID,
+    ResourceIDNotFoundError,
+    ResourceOperation,
+    ResourceOperationError,
+    ResourceOperationGuard,
+    ResourceOperationRequest,
     ResourceSchemaProvider,
-    TypeUri,
 };
 use serde::Serialize;
 use serde::de::DeserializeOwned;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub fn decode_resource_spec<R>(
-    schema: &TypeUri,
-    spec: serde_json::Value,
-) -> Result<R::SpecInput, ApplyResourceCrudDispatcherError>
+pub fn decode_apply_resource_params<R>(
+    request: ResourceCrudDispatcherApplyRequest,
+) -> Result<ApplyResourceParams<R>, ApplyResourceCrudDispatcherError>
 where
-    R: EventSourcedResource,
+    R: EventSourcedResource + ResourceSchemaProvider,
     R::SpecInput: DeserializeOwned,
 {
-    serde_json::from_value(spec).map_err(|e| ApplyResourceCrudDispatcherError::InvalidSpec {
-        schema: schema.clone(),
-        message: e.to_string(),
+    let ResourceCrudDispatcherApplyRequest {
+        id,
+        headers,
+        account_source,
+        access_check,
+        spec,
+        provenance,
+    } = request;
+
+    let spec = serde_json::from_value(spec).map_err(|e| {
+        ApplyResourceCrudDispatcherError::InvalidSpec {
+            schema: R::type_uri().clone(),
+            message: e.to_string(),
+        }
+    })?;
+
+    Ok(ApplyResourceParams {
+        id,
+        headers,
+        account_source,
+        access_check,
+        spec,
+        provenance,
     })
 }
 
@@ -61,6 +90,7 @@ where
                 executable,
                 warnings,
                 previous_state,
+                name_pending,
                 ..
             } = plan;
 
@@ -76,6 +106,7 @@ where
                 reconciliation_required,
                 executable,
                 warnings,
+                name_pending,
                 // Deliberately not canonicalized here: the facade corrects
                 // `headers.account` after this dispatcher returns, and the
                 // account is part of the canonical manifest.
@@ -149,3 +180,62 @@ where
         status,
     })
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// One result per ID, in ID order. A resource deleted since its ID was
+/// resolved is not found
+pub async fn check_resource_operations<R>(
+    resource_aggregate_loader: &dyn ResourceAggregateLoader<R>,
+    operation_guard: &dyn ResourceOperationGuard<R>,
+    principal: &odf::metadata::auth::PrincipalHandle,
+    account: &odf::ResourceOwnerHandle,
+    operation: ResourceAccountOperation,
+    ids: &[ResourceID],
+) -> Result<Vec<Result<(), ResourceOperationError>>, InternalError>
+where
+    R: EventSourcedResource,
+{
+    let mut loaded = Vec::with_capacity(ids.len());
+    for (id, result) in ids
+        .iter()
+        .zip(resource_aggregate_loader.load_many(ids).await.int_err()?)
+    {
+        match result {
+            Ok(resource) => loaded.push(Ok(resource)),
+            Err(LoadError::NotFound(_)) => loaded.push(Err(ResourceOperationError::NotFound(
+                ResourceIDNotFoundError(*id),
+            ))),
+            Err(err @ (LoadError::ProjectionError(_) | LoadError::Internal(_))) => {
+                return Err(err.int_err());
+            }
+        }
+    }
+
+    let requests = loaded
+        .iter()
+        .filter_map(|result| result.as_ref().ok())
+        .map(|resource| ResourceOperationRequest {
+            account,
+            operation: match operation {
+                ResourceAccountOperation::Read => ResourceOperation::Read { resource },
+                ResourceAccountOperation::Delete => ResourceOperation::Delete { resource },
+            },
+        })
+        .collect::<Vec<_>>();
+
+    let mut checked = operation_guard
+        .check_operations(principal, &requests)
+        .await?
+        .into_iter();
+
+    Ok(loaded
+        .into_iter()
+        .map(|result| match result {
+            Ok(_) => checked.next().expect("one result per request"),
+            Err(err) => Err(err),
+        })
+        .collect())
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

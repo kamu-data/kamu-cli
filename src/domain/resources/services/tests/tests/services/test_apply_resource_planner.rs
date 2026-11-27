@@ -10,32 +10,32 @@
 use std::sync::Arc;
 
 use chrono::Utc;
-use dill::CatalogBuilder;
 use kamu_resources::{
     ApplyResourceAction,
     ApplyResourceApplicationDecision,
     ApplyResourceParams,
+    ApplyResourcePlan,
     ApplyResourcePlanningDecision,
     ApplyResourceUseCase,
     ApplyResourceUseCaseError,
-    ResourceAggregateLoader,
     ResourceHeaders,
     ResourceHeadersExt,
     ResourceID,
     ResourceSnapshot,
-    TypedResourceQueryService,
 };
-use kamu_resources_services::ApplyResourcePlanner;
-use kamu_resources_services::testing::BaseResourceServiceHarness;
+use kamu_resources_services::testing::{
+    BaseResourceServiceHarness,
+    BaseResourceServiceHarnessOpts,
+    TestResource,
+    TestResourceSpec,
+};
 use odf::metadata::resources::TypeUri;
 
 use crate::tests::utils::{
-    TestResource,
-    TestResourceReconciler,
-    TestResourceSpec,
+    ApplyResourcePlanningHarness,
+    ScriptedNameSuffixGenerator,
     make_id,
     make_resource_params,
-    register_test_resource_resource_service_layer,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -183,50 +183,68 @@ async fn test_plan_type_mismatch_rejects() {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_plan_without_name_leaves_it_pending() {
+    let harness = ApplyResourcePlannerHarness::new();
+
+    for (value, placeholder) in [
+        ("something", "plain-xxxxxx"),
+        ("staged:initial", "staged-xxxxxx"),
+    ] {
+        let plan = harness.plan_nameless(None, value).await;
+
+        assert_eq!(plan.action, ApplyResourceAction::Create);
+        assert!(plan.name_pending);
+        assert_eq!(plan.state.headers.name.as_str(), placeholder);
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_plan_with_id_and_without_name_keeps_the_name() {
+    let harness = ApplyResourcePlannerHarness::new();
+    let id = harness.apply_and_get_id("res-a").await;
+
+    for (value, action) in [
+        ("res-a", ApplyResourceAction::Untouched),
+        ("changed", ApplyResourceAction::Update),
+    ] {
+        let plan = harness.plan_nameless(Some(id), value).await;
+
+        assert_eq!(plan.id, id);
+        assert_eq!(plan.action, action);
+        assert!(!plan.name_pending);
+        assert_eq!(plan.state.headers.name.as_str(), "res-a");
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Harness
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[oop::extend(BaseResourceServiceHarness, base)]
+#[oop::extend(ApplyResourcePlanningHarness, base)]
 struct ApplyResourcePlannerHarness {
-    base: BaseResourceServiceHarness,
-    _catalog: dill::Catalog,
-    typed_query_svc: Arc<dyn TypedResourceQueryService<TestResource>>,
-    aggregate_loader: Arc<dyn ResourceAggregateLoader<TestResource>>,
+    base: ApplyResourcePlanningHarness,
     apply_svc: Arc<dyn ApplyResourceUseCase<TestResource>>,
     account_handle: odf::ResourceOwnerHandle,
 }
 
 impl ApplyResourcePlannerHarness {
     fn new() -> Self {
-        let base = BaseResourceServiceHarness::new();
-
-        let mut b = CatalogBuilder::new_chained(base.catalog());
-        register_test_resource_resource_service_layer(&mut b);
-        b.add::<TestResourceReconciler>();
-
-        let catalog = b.build();
-
-        let typed_query_svc = catalog.get_one().unwrap();
-        let aggregate_loader = catalog.get_one().unwrap();
-        let apply_svc = catalog.get_one().unwrap();
+        let base = ApplyResourcePlanningHarness::new(
+            BaseResourceServiceHarnessOpts::default(),
+            // Planning without applying generates no names
+            ScriptedNameSuffixGenerator::default(),
+        );
+        let apply_svc = base.catalog().get_one().unwrap();
 
         Self {
             base,
-            _catalog: catalog,
-            typed_query_svc,
-            aggregate_loader,
             apply_svc,
             account_handle: odf::ResourceOwnerHandle::new_test("test"),
         }
-    }
-
-    fn make_planner(&self) -> ApplyResourcePlanner<'_, TestResource> {
-        ApplyResourcePlanner::new(
-            self.generic_query_svc(),
-            self.typed_query_svc.as_ref(),
-            self.aggregate_loader.as_ref(),
-            self.time_source(),
-        )
     }
 
     async fn plan(
@@ -241,7 +259,9 @@ impl ApplyResourcePlannerHarness {
         params: ApplyResourceParams<TestResource>,
     ) -> Result<ApplyResourcePlanningDecision<TestResource>, ApplyResourceUseCaseError<TestResource>>
     {
-        self.make_planner().plan(params).await
+        let planner = self.make_planner();
+        let maybe_existing = planner.find_existing_resource(&params).await?;
+        planner.plan(params, maybe_existing).await
     }
 
     fn make_apply_params(
@@ -252,13 +272,41 @@ impl ApplyResourcePlannerHarness {
     ) -> ApplyResourceParams<TestResource> {
         ApplyResourceParams {
             id,
-            headers: BaseResourceServiceHarness::make_headers_input(
+            ..BaseResourceServiceHarness::make_apply_params(
                 self.account_handle.clone(),
-                name,
-            ),
-            spec: TestResourceSpec {
-                value: value.into(),
-            },
+                Some(name),
+                TestResourceSpec {
+                    value: value.into(),
+                },
+            )
+        }
+    }
+
+    fn make_nameless_params(
+        &self,
+        id: Option<ResourceID>,
+        value: &str,
+    ) -> ApplyResourceParams<TestResource> {
+        ApplyResourceParams {
+            id,
+            ..BaseResourceServiceHarness::make_apply_params(
+                self.account_handle.clone(),
+                None,
+                TestResourceSpec {
+                    value: value.to_string(),
+                },
+            )
+        }
+    }
+
+    async fn plan_nameless(
+        &self,
+        id: Option<ResourceID>,
+        value: &str,
+    ) -> ApplyResourcePlan<TestResource> {
+        match self.plan(self.make_nameless_params(id, value)).await {
+            ApplyResourcePlanningDecision::Planned(plan) => plan,
+            ApplyResourcePlanningDecision::Rejected(r) => panic!("plan rejected: {}", r.message),
         }
     }
 

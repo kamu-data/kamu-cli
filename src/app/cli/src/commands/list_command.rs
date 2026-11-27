@@ -24,6 +24,7 @@ use crate::resources::{
     ResourceFacadeFactory,
     ResourceLabelSelectorParser,
     ResourceSelectionScanner,
+    ResourceSelectionSyntaxService,
     ResourceTypeLookupErrorOptions,
     ResourceTypeLookupService,
     is_dataset_target,
@@ -42,6 +43,7 @@ pub struct ListCommand {
     remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
     rebac_service: Arc<dyn kamu_auth_rebac::RebacService>,
     resource_facade_factory: Arc<dyn ResourceFacadeFactory>,
+    resource_selection_syntax_service: Arc<dyn ResourceSelectionSyntaxService>,
     resource_type_lookup_service: Arc<dyn ResourceTypeLookupService>,
     resource_context_resolver: Arc<ResourceContextResolver>,
     resource_context_reporter: Arc<ResourceContextReporter>,
@@ -74,7 +76,10 @@ pub struct ListCommand {
     label_selectors: Vec<String>,
 
     #[dill::component(explicit)]
-    include_deleting: bool,
+    owner: Option<String>,
+
+    #[dill::component(explicit)]
+    visibility: ResourceVisibility,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -228,6 +233,11 @@ impl ListCommand {
             .resource_facade_factory
             .get_resource_facade(self.explicit_context_name.as_deref())?;
 
+        let owner = self
+            .resource_selection_syntax_service
+            .parse_owner(self.explicit_context_name.as_deref(), self.owner.as_deref())
+            .await?;
+
         let scope = match mode {
             ListMode::ResourcesAll(query) => ListResourcesScope::All(query),
             ListMode::ResourcesByTypes(type_queries) => {
@@ -255,7 +265,8 @@ impl ListCommand {
                 self.max_results
             },
             ResourceLabelSelectorParser::parse(&self.label_selectors)?,
-            ResourceVisibility::with_deleting(self.include_deleting),
+            owner,
+            self.visibility,
         ))
     }
 
@@ -293,9 +304,16 @@ impl Command for ListCommand {
                     ));
                 }
 
-                if self.include_deleting {
+                if self.owner.is_some() {
                     return Err(CLIError::usage_error(
-                        "--include-deleting is supported only when listing resources",
+                        "--owner is supported only when listing resources",
+                    ));
+                }
+
+                if self.visibility != ResourceVisibility::Active {
+                    return Err(CLIError::usage_error(
+                        "--include-deleting, --include-deleted and --deleted are supported only \
+                         when listing resources",
                     ));
                 }
 
@@ -424,9 +442,9 @@ mod tests {
         ResourceQuery::ExactIds(vec![kamu_resources::ResourceID::new(uuid::Uuid::new_v4())])
     }
 
-    // Ids always find resources being deleted, as `get` and `delete` do
+    // Ids find resources in any state, as `get` does
     #[test]
-    fn test_scope_of_ids_alone_includes_resources_being_deleted() {
+    fn test_scope_of_ids_alone_finds_resources_in_any_state() {
         let by_type = ListResourcesScope::ByType(descriptor("variablesets"), Some(id_query()));
         let types = ListResourcesScope::Types(vec![
             (descriptor("variablesets"), Some(id_query())),
@@ -435,9 +453,19 @@ mod tests {
         let all = ListResourcesScope::All(Some(id_query()));
 
         for scope in [by_type, types, all] {
+            for requested in [
+                ResourceVisibility::Active,
+                ResourceVisibility::IncludeDeleting,
+                ResourceVisibility::IncludeDeleted,
+            ] {
+                assert_eq!(
+                    scope.effective_visibility(requested),
+                    ResourceVisibility::IncludeDeleted
+                );
+            }
             assert_eq!(
-                scope.effective_visibility(ResourceVisibility::Active),
-                ResourceVisibility::IncludeDeleting
+                scope.effective_visibility(ResourceVisibility::DeletedOnly),
+                ResourceVisibility::DeletedOnly
             );
         }
     }
@@ -457,6 +485,8 @@ mod tests {
         for requested in [
             ResourceVisibility::Active,
             ResourceVisibility::IncludeDeleting,
+            ResourceVisibility::IncludeDeleted,
+            ResourceVisibility::DeletedOnly,
         ] {
             assert_eq!(scope.effective_visibility(requested), requested);
         }

@@ -40,6 +40,21 @@ MIGRATION_DIRS := ./migrations/postgres ./migrations/sqlite
 
 KAMU_CONTAINER_RUNTIME_TYPE ?= podman
 
+# $(call Run_In_Crates,crates,command): runs the command in every crate, even after a failure,
+# then lists the crates where it failed and fails
+define Run_In_Crates
+@failed=; \
+for crate in $(1); do \
+	echo "[$$crate] $(2)"; \
+	(cd "$$crate" && $(2)) || failed="$$failed $$crate"; \
+done; \
+if [ -n "$$failed" ]; then \
+	echo "error: '$(2)' failed in:"; \
+	printf '  %s\n' $$failed; \
+	exit 1; \
+fi
+endef
+
 # Keep in sync with `services.postgres.image` in `.github/workflows/build.yaml`
 POSTGRES_IMAGE ?= postgres:18
 
@@ -84,7 +99,7 @@ lint-deps:
 
 .PHONY: lint-sqlx
 lint-sqlx:
-	$(foreach crate,$(ALL_DATABASE_CRATES),(cd $(crate) && cargo sqlx prepare --check);)
+	$(call Run_In_Crates,$(ALL_DATABASE_CRATES),cargo sqlx prepare --check)
 
 
 .PHONY: check
@@ -151,7 +166,7 @@ sqlx-local-setup: sqlx-local-setup-postgres sqlx-local-setup-sqlite
 sqlx-local-setup-postgres:
 	$(KAMU_CONTAINER_RUNTIME_TYPE) pull $(POSTGRES_IMAGE)
 	$(KAMU_CONTAINER_RUNTIME_TYPE) stop kamu-postgres || true && $(KAMU_CONTAINER_RUNTIME_TYPE) rm kamu-postgres || true
-	$(KAMU_CONTAINER_RUNTIME_TYPE) run --name kamu-postgres -p 5432:5432 -e POSTGRES_USER=root -e POSTGRES_PASSWORD=root -d $(POSTGRES_IMAGE)
+	$(KAMU_CONTAINER_RUNTIME_TYPE) run --name kamu-postgres -p 5432:5432 -e POSTGRES_USER=root -e POSTGRES_PASSWORD=root -d $(POSTGRES_IMAGE) -c max_connections=300
 	$(foreach crate,$(POSTGRES_CRATES),$(call Setup_EnvFile,postgres,5432,$(crate)))
 	sleep 3  # Letting the container to start
 	until PGPASSWORD=root psql -h localhost -U root -p 5432 -d root -c '\q'; do sleep 3; done
@@ -184,15 +199,15 @@ sqlx-local-clean-sqlite:
 
 .PHONY: sqlx-prepare
 sqlx-prepare:
-	$(foreach crate,$(ALL_DATABASE_CRATES),(cd $(crate) && cargo sqlx prepare);)
+	$(call Run_In_Crates,$(ALL_DATABASE_CRATES),cargo sqlx prepare)
 
 .PHONY: sqlx-prepare-postgres
 sqlx-prepare-postgres:
-	$(foreach crate,$(POSTGRES_CRATES),(cd $(crate) && cargo sqlx prepare);)
+	$(call Run_In_Crates,$(POSTGRES_CRATES),cargo sqlx prepare)
 
 .PHONY: sqlx-prepare-sqlite
 sqlx-prepare-sqlite:
-	$(foreach crate,$(SQLITE_CRATES),(cd $(crate) && cargo sqlx prepare);)
+	$(call Run_In_Crates,$(SQLITE_CRATES),cargo sqlx prepare)
 
 ###############################################################################
 # Sqlx: add migration

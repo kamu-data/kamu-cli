@@ -51,9 +51,7 @@ background-agent-host = { workspace = true }
 database-common-macros = { workspace = true }
 kamu-messaging-outbox-repo-tests = { workspace = true }
 
-serde = { version = "1", features = [
-    "derive",
-] }
+oop = { version = "0.0.2", default-features = false }
 test-group = { version = "1" }
 test-log = { version = "0.2", features = [
     "trace",

@@ -14,6 +14,7 @@ use chrono::Utc;
 use dill::CatalogBuilder;
 use event_sourcing::Aggregate;
 use internal_error::InternalError;
+use kamu_accounts::{ApiKind, Principal, RequestOrigin};
 use kamu_accounts_services::AccountServiceImpl;
 use kamu_configuration::{
     Secret,
@@ -38,7 +39,19 @@ use kamu_datasets::{
     UpsertDatasetEnvVarError,
     UpsertDatasetEnvVarStatus,
 };
-use kamu_resources::{EventSourcedResource, ResourcePersistenceService};
+use kamu_resources::{
+    CreationProvenance,
+    EventSourcedResource,
+    ManagedResource,
+    ResourceAggregateLoader,
+    ResourceHandle,
+    ResourceHeadersExt,
+    ResourceID,
+    ResourceName,
+    ResourcePersistenceService,
+    ResourceSchemaProvider,
+};
+use kamu_resources_services::testing::BaseResourceServiceHarness;
 use secrecy::SecretString;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -55,10 +68,18 @@ pub struct DatasetEnvVarServiceHarness {
 
 impl DatasetEnvVarServiceHarness {
     pub fn new() -> Self {
+        Self::new_acting_as(Principal::Node)
+    }
+
+    /// The adapter acts for `principal`, whose dataset permission its caller
+    /// has checked
+    pub fn new_acting_as(principal: Principal) -> Self {
         let base = BaseConfigurationServiceHarness::new();
 
         let mut b = CatalogBuilder::new_chained(base.catalog());
         b.add::<AccountServiceImpl>();
+        b.add_value(principal);
+        b.add_value(RequestOrigin::Api(ApiKind::GraphQl));
 
         let catalog = b.build();
 
@@ -90,6 +111,8 @@ impl DatasetEnvVarServiceHarness {
             self.catalog.get_one().unwrap(),
             Arc::new(racing_spec_resolver),
             self.catalog.get_one().unwrap(),
+            self.catalog.get_one().unwrap(),
+            self.catalog.get_one().unwrap(),
         ))
     }
 
@@ -116,6 +139,7 @@ impl DatasetEnvVarServiceHarness {
 
         repo.save_dataset_entry(&DatasetEntry::new(
             dataset_id.clone(),
+            DatasetEntry::generate_resource_id(),
             account_id.clone(),
             odf::AccountName::new_unchecked("test-account"),
             odf::DatasetName::new_unchecked("test-dataset"),
@@ -210,12 +234,67 @@ impl DatasetEnvVarServiceHarness {
             [],
         );
 
-        let event = R::make_created_event(Utc::now(), id, headers, spec);
+        let event = R::make_created_event(
+            Utc::now(),
+            id,
+            headers,
+            spec,
+            &BaseResourceServiceHarness::make_provenance(),
+        );
         let mut resource = R::from_aggregate(Aggregate::new(id, event).unwrap());
 
         let persistence_service: Arc<dyn ResourcePersistenceService<R>> =
             self.catalog.get_one().unwrap();
         persistence_service.create(&mut resource).await.unwrap();
+    }
+
+    /// Gives the resource an owner, which need not exist
+    pub async fn set_owner<R>(&self, id: &ResourceID) -> ResourceHandle
+    where
+        R: EventSourcedResource + ManagedResource + 'static,
+        R::ResourceState: std::fmt::Debug,
+        R::LifecycleError: std::fmt::Debug,
+    {
+        let loader: Arc<dyn ResourceAggregateLoader<R>> = self.catalog.get_one().unwrap();
+        let mut resource = loader.load(id).await.unwrap();
+
+        let owner = ResourceHandle {
+            account: resource.headers().account.clone(),
+            r#type: VariableSetResource::type_uri().cheap_clone(),
+            id: self.resource_repo().new_resource_id().await.unwrap(),
+            did: None,
+            name: ResourceName::new_unchecked("owner"),
+        };
+        let mut headers = resource.headers().to_input();
+        headers.owner_references = Some(vec![owner.clone().into()]);
+        let new_generation = resource.headers().generation + 1;
+        <R as ManagedResource>::try_update_headers(
+            &mut resource,
+            Utc::now(),
+            headers,
+            new_generation,
+        )
+        .unwrap();
+
+        let persistence_service: Arc<dyn ResourcePersistenceService<R>> =
+            self.catalog.get_one().unwrap();
+        persistence_service.save(&mut resource).await.unwrap();
+
+        owner
+    }
+
+    /// The provenance the resource's creation recorded
+    pub async fn creation_provenance<R>(&self, id: &ResourceID) -> CreationProvenance
+    where
+        R: EventSourcedResource + ManagedResource + 'static,
+        R::ResourceState: std::fmt::Debug,
+        R::LifecycleError: std::fmt::Debug,
+    {
+        let loader: Arc<dyn ResourceAggregateLoader<R>> = self.catalog.get_one().unwrap();
+        let resource = loader.load(id).await.unwrap();
+        CreationProvenance::from_conditions(&resource.status().conditions)
+            .unwrap()
+            .expect("the resource must record its creation provenance")
     }
 
     /// Upserts through the mutation adapter, then lets the controller runtime

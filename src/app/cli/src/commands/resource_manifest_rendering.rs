@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use chrono::{DateTime, Utc};
-use kamu_resources::Resource;
+use kamu_resources::{Resource, ResourceAnnotations, ResourceHandle, ResourceID, ResourceLabels};
 
 use super::{CLIError, common};
 
@@ -57,14 +57,17 @@ struct RenderedResource<'a, TSpec, TStatus> {
 #[derive(serde::Serialize)]
 #[serde(rename_all = "camelCase")]
 struct RenderedResourceHeaders<'a> {
-    id: &'a kamu_resources::ResourceID,
+    id: &'a ResourceID,
     #[serde_as(as = "odf::metadata::serde::yaml::auth::ResourceOwnerHandle")]
     account: &'a odf::ResourceOwnerHandle,
     name: &'a str,
     #[serde_as(as = "odf::metadata::serde::yaml::resources::ResourceLabels")]
-    labels: &'a kamu_resources::ResourceLabels,
+    labels: &'a ResourceLabels,
     #[serde_as(as = "odf::metadata::serde::yaml::resources::ResourceAnnotations")]
-    annotations: &'a kamu_resources::ResourceAnnotations,
+    annotations: &'a ResourceAnnotations,
+    #[serde_as(as = "Option<Vec<odf::metadata::serde::yaml::resources::ResourceHandle>>")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    owner_references: &'a Option<Vec<ResourceHandle>>,
     generation: u64,
     status_generation: u64,
     created_at: &'a DateTime<Utc>,
@@ -83,6 +86,7 @@ impl<'a> RenderedResourceHeaders<'a> {
             name: &resource.headers.name,
             labels: &resource.headers.labels,
             annotations: &resource.headers.annotations,
+            owner_references: &resource.headers.owner_references,
             generation: resource.headers.generation,
             status_generation: resource.headers.status_generation,
             created_at: &resource.headers.created_at,

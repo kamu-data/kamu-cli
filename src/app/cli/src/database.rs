@@ -220,8 +220,7 @@ pub fn configure_in_memory_components(b: &mut CatalogBuilder) {
 
     kamu_resources_inmem::register_dependencies(b);
 
-    b.add::<kamu_configuration_inmem::InMemoryVariableSetProjectionRepository>();
-    b.add::<kamu_configuration_inmem::InMemorySecretSetProjectionRepository>();
+    kamu_configuration_inmem::register_dependencies(b);
 
     b.add::<kamu_auth_rebac_inmem::InMemoryRebacRepository>();
 

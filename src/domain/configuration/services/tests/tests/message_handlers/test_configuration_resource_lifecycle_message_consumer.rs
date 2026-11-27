@@ -19,10 +19,7 @@ use kamu_configuration::{
     VariableSetProjectionRepository,
     VariableSetResource,
 };
-use kamu_configuration_inmem::{
-    InMemorySecretSetProjectionRepository,
-    InMemoryVariableSetProjectionRepository,
-};
+use kamu_configuration_inmem::register_dependencies;
 use kamu_configuration_services::ConfigurationResourceLifecycleMessageConsumer;
 use kamu_resources::{
     MESSAGE_PRODUCER_KAMU_RESOURCE_SERVICE,
@@ -306,8 +303,7 @@ impl ConfigurationResourceLifecycleConsumerHarness {
         }
         .embed_into_catalog(&mut b);
 
-        b.add::<InMemoryVariableSetProjectionRepository>();
-        b.add::<InMemorySecretSetProjectionRepository>();
+        register_dependencies(&mut b);
         b.add::<ConfigurationResourceLifecycleMessageConsumer>();
 
         register_message_dispatcher::<ResourceLifecycleMessage>(

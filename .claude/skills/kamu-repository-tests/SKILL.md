@@ -78,6 +78,10 @@ To model a unique index, take its key with `claim`. Before failing on a taken ke
 `is_deleted_by_another_transaction`: when another open transaction is releasing the key, the
 writer may take it over, as Postgres lets a second writer do once the first commits.
 
+To model a compare-and-set that only takes a row's lock (an `UPDATE` assigning a column its own
+value), use `touch`: it writes nothing, and the commit fails if another transaction committed the
+key since, while a transaction committing after it still succeeds.
+
 Example:
 
 ```rust

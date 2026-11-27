@@ -9,10 +9,9 @@
 
 use std::sync::Arc;
 
-use internal_error::ResultIntoInternal;
 use kamu_accounts::{AccountHandle, AccountService, Principal};
-use kamu_auth_rebac::{RebacService, RebacServiceExt};
 use kamu_resources::ResourceOwnerRef;
+use kamu_resources_services::DefaultResourceOperationGuard;
 
 use crate::{ResolveManifestAccountError, ResourceAccountAccessError, ResourceAccountResolver};
 
@@ -22,33 +21,25 @@ use crate::{ResolveManifestAccountError, ResourceAccountAccessError, ResourceAcc
 #[dill::interface(dyn ResourceAccountResolver)]
 pub(crate) struct ResourceAccountResolverImpl {
     account_service: Arc<dyn AccountService>,
-    rebac_service: Arc<dyn RebacService>,
+    default_resource_operation_guard: Arc<DefaultResourceOperationGuard>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
 impl ResourceAccountResolver for ResourceAccountResolverImpl {
-    async fn resolve_target_account(
-        &self,
-        principal: &Principal,
-        selector: Option<&ResourceOwnerRef>,
-    ) -> Result<odf::ResourceOwnerHandle, ResolveManifestAccountError> {
-        let target_account = self.resolve_account(principal, selector).await?;
-        self.ensure_can_use_account_resources(principal, &target_account)
-            .await?;
-        Ok(target_account)
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-impl ResourceAccountResolverImpl {
     async fn resolve_account(
         &self,
         principal: &Principal,
         selector: Option<&ResourceOwnerRef>,
     ) -> Result<odf::ResourceOwnerHandle, ResolveManifestAccountError> {
+        match principal {
+            Principal::User(_) | Principal::Node => {}
+            Principal::Anonymous => {
+                return Err(ResourceAccountAccessError::AnonymousSubject.into());
+            }
+        }
+
         let Some(selector) = selector else {
             return Self::resolve_principal_account(principal);
         };
@@ -90,6 +81,23 @@ impl ResourceAccountResolverImpl {
         Ok(AccountHandle::from(&account).into())
     }
 
+    async fn ensure_can_use_account(
+        &self,
+        principal: &Principal,
+        account: &odf::ResourceOwnerHandle,
+    ) -> Result<(), ResolveManifestAccountError> {
+        let principal = principal.handle()?;
+
+        self.default_resource_operation_guard
+            .check_account_rule(&principal, account)
+            .await
+            .map_err(|err| ResolveManifestAccountError::from_operation_error(account, err))
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl ResourceAccountResolverImpl {
     /// The account a manifest without a selector is placed in: the principal's
     /// own; the node has none, so it must name one
     fn resolve_principal_account(
@@ -98,39 +106,6 @@ impl ResourceAccountResolverImpl {
         match principal {
             Principal::User(account) => Ok(account.into()),
             Principal::Node => Err(ResolveManifestAccountError::empty_selector()),
-            Principal::Anonymous => Err(ResourceAccountAccessError::AnonymousSubject.into()),
-        }
-    }
-
-    async fn ensure_can_use_account_resources(
-        &self,
-        principal: &Principal,
-        target_account: &odf::ResourceOwnerHandle,
-    ) -> Result<(), ResolveManifestAccountError> {
-        match principal {
-            Principal::Node => Ok(()),
-            Principal::User(account_handle) if account_handle.did == target_account.did => Ok(()),
-            Principal::User(account_handle) => {
-                let is_admin = self
-                    .rebac_service
-                    .is_account_admin(&account_handle.did)
-                    .await
-                    .int_err()?;
-                if is_admin {
-                    Ok(())
-                } else {
-                    Err(
-                        ResourceAccountAccessError::Access(odf::AccessError::Unauthorized(
-                            format!(
-                                "Current subject is not allowed to use resources of account '{}'",
-                                target_account.name
-                            )
-                            .into(),
-                        ))
-                        .into(),
-                    )
-                }
-            }
             Principal::Anonymous => Err(ResourceAccountAccessError::AnonymousSubject.into()),
         }
     }

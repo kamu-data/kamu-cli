@@ -7,12 +7,33 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use database_common::PaginationOpts;
 use kamu_configuration::{SecretSetResource, VariableSetResource};
-use kamu_resources::{ApplyResourceOutcome, ResourceID, ResourceLabelFilterInput, TypeUri};
-use kamu_resources_facade::{ApplyManifestRequest, ResourceManifestFormat};
+use kamu_resources::{
+    ApplyManifestApplicationDecision,
+    ApplyResourceOutcome,
+    Resource,
+    ResourceHandle,
+    ResourceID,
+    ResourceLabelFilterInput,
+    ResourceRef,
+    ResourceSelector,
+    ResourceSummaryView,
+    ResourceVisibility,
+    ResourcesSummary,
+    TypeUri,
+};
+use kamu_resources_facade::{
+    ApplyManifestRequest,
+    ResourceFacade,
+    ResourceManifestFormat,
+    SearchResourcesRequest,
+    SpecViewOpts,
+};
+use pretty_assertions::assert_matches;
 
 use crate::harness::{FacadeContractHarness, TestAccount};
-use crate::helpers::assert_applied_outcome;
+use crate::helpers::{assert_applied_outcome, assert_single_batch_success};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -65,6 +86,26 @@ pub fn variable_set_manifest_json(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Builds a `VariableSet` manifest JSON string addressing the resource by
+/// `headers.id`, with one `K` variable.
+pub fn variable_set_manifest_json_with_id(id: ResourceID, name: &str, value: &str) -> String {
+    serde_json::json!({
+        "$schema": VARIABLE_SET_SCHEMA_STR,
+        "headers": {
+            "id": id,
+            "name": name
+        },
+        "spec": {
+            "variables": {
+                "K": {"value": value}
+            }
+        }
+    })
+    .to_string()
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 /// Builds a `VariableSet` manifest YAML string.
 pub fn variable_set_manifest_yaml(
     name: &str,
@@ -100,7 +141,7 @@ pub fn variable_set_manifest_yaml(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub fn sorted_handle_names(mut items: Vec<kamu_resources::ResourceHandle>) -> Vec<String> {
+pub fn sorted_handle_names(mut items: Vec<ResourceHandle>) -> Vec<String> {
     crate::helpers::normalize_handles(&mut items);
     items
         .into_iter()
@@ -108,7 +149,9 @@ pub fn sorted_handle_names(mut items: Vec<kamu_resources::ResourceHandle>) -> Ve
         .collect()
 }
 
-pub fn sorted_summary_names(mut items: Vec<kamu_resources::ResourceSummaryView>) -> Vec<String> {
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub fn sorted_summary_names(mut items: Vec<ResourceSummaryView>) -> Vec<String> {
     crate::helpers::normalize_summary_views(&mut items);
     items
         .into_iter()
@@ -116,12 +159,54 @@ pub fn sorted_summary_names(mut items: Vec<kamu_resources::ResourceSummaryView>)
         .collect()
 }
 
-pub fn total_schema_count(summary: kamu_resources::ResourcesSummary, schema: &TypeUri) -> u64 {
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub fn total_schema_count(summary: ResourcesSummary, schema: &TypeUri) -> u64 {
     summary
         .resource_counts
         .into_iter()
         .find(|count| count.schema == *schema)
         .map_or(0, |count| count.total_count)
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// A search request for `selectors`, with the defaults of
+/// [`SearchResourcesRequest::new`] and a page large enough for any fixture
+pub fn search_request(selectors: Vec<ResourceSelector>) -> SearchResourcesRequest {
+    SearchResourcesRequest::new(selectors, PaginationOpts::from_max_results(1000))
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// A ref to the `VariableSet` of this name, in the caller's account.
+pub fn variable_set_ref_by_name(name: &str) -> ResourceRef {
+    ResourceRef {
+        r#type: Some(VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap()),
+        name: Some(name.parse().unwrap()),
+        ..ResourceRef::default()
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// A ref to the `VariableSet` of this id.
+pub fn variable_set_ref_by_id(id: ResourceID) -> ResourceRef {
+    ResourceRef {
+        r#type: Some(VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap()),
+        id: Some(id),
+        ..ResourceRef::default()
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// A ref to the resource of this id, whatever its type.
+pub fn ref_by_id(id: ResourceID) -> ResourceRef {
+    ResourceRef {
+        id: Some(id),
+        ..ResourceRef::default()
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -196,6 +281,35 @@ pub fn label_filter(entries: &[(&str, &str)]) -> ResourceLabelFilterInput {
             })
             .collect(),
     }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Applies a `VariableSet` manifest through `facade`, asserting it is applied.
+pub async fn apply_variable_set(facade: &dyn ResourceFacade, name: &str, vars: &[(&str, &str)]) {
+    let decision = facade
+        .apply_manifest(ApplyManifestRequest {
+            format: ResourceManifestFormat::Json,
+            manifest: variable_set_manifest_json(name, None, vars),
+        })
+        .await
+        .unwrap();
+    assert_matches!(decision, ApplyManifestApplicationDecision::Applied(_));
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Gets the active resource `resource_ref` names, with its spec encrypted.
+pub async fn get_resource(facade: &dyn ResourceFacade, resource_ref: ResourceRef) -> Resource {
+    let response = facade
+        .get(
+            vec![resource_ref],
+            SpecViewOpts::ENCRYPTED,
+            ResourceVisibility::Active,
+        )
+        .await
+        .unwrap();
+    assert_single_batch_success(response)
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

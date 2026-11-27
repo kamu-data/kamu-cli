@@ -20,9 +20,7 @@ use kamu_resources::{
     ResourceSnapshot,
     TypeUri,
 };
-use kamu_resources_services::testing::BaseResourceServiceHarness;
-
-use crate::tests::utils::TestResource;
+use kamu_resources_services::testing::{BaseResourceServiceHarness, TestResource};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -187,6 +185,41 @@ async fn test_find_owned_snapshots_all_found() {
     assert_eq!(outcome.access_denied, []);
     assert_eq!(outcome.schema_mismatch, []);
     assert_eq!(outcome.schema_mismatch, []);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_find_owned_snapshots_deleted_are_not_found() {
+    let harness = GenericResourceQueryServiceHarness::new();
+    let account_handle = odf::ResourceOwnerHandle::new_test("test-owner");
+    let other_account_handle = odf::ResourceOwnerHandle::new_test("other-owner");
+
+    let id = harness.allocate_id().await;
+    let other_id = harness.allocate_id().await;
+    harness
+        .insert_deleted_snapshot(id, &account_handle, "res-a")
+        .await;
+    harness
+        .insert_deleted_snapshot(other_id, &other_account_handle, "res-b")
+        .await;
+
+    let found = harness
+        .find_owned_snapshot(&account_handle.did, TestResource::type_uri(), id)
+        .await;
+    assert!(found.unwrap().is_none());
+
+    let outcome = harness
+        .find_owned_snapshots(
+            &account_handle.did,
+            TestResource::type_uri(),
+            &[id, other_id],
+        )
+        .await;
+    assert_eq!(outcome.found, []);
+    assert_eq!(outcome.not_found, [id, other_id]);
+    assert_eq!(outcome.schema_mismatch, []);
+    assert_eq!(outcome.access_denied, []);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -369,11 +402,37 @@ impl GenericResourceQueryServiceHarness {
         schema: &TypeUri,
         name: &str,
     ) {
+        self.insert_snapshot_with_headers(
+            schema,
+            ResourceHeaders::simple(Utc::now(), id, account_handle.clone(), name),
+        )
+        .await;
+    }
+
+    async fn insert_deleted_snapshot(
+        &self,
+        id: ResourceID,
+        account_handle: &odf::ResourceOwnerHandle,
+        name: &str,
+    ) {
+        let now = Utc::now();
+        self.insert_snapshot_with_headers(
+            TestResource::type_uri(),
+            ResourceHeaders {
+                deletion_requested_at: Some(now),
+                deleted_at: Some(now),
+                ..ResourceHeaders::simple(now, id, account_handle.clone(), name)
+            },
+        )
+        .await;
+    }
+
+    async fn insert_snapshot_with_headers(&self, schema: &TypeUri, headers: ResourceHeaders) {
         let snapshot = ResourceSnapshot {
-            id,
+            id: headers.id,
             schema: schema.clone(),
-            headers: ResourceHeaders::simple(Utc::now(), id, account_handle.clone(), name),
-            spec: serde_json::json!({"value": name}),
+            spec: serde_json::json!({"value": headers.name}),
+            headers,
             status: None,
             last_event_id: None,
         };

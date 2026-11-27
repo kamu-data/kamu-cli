@@ -375,6 +375,12 @@ backgroundAgents:
       backoffType: Exponential
       minDelay: 1s
       maxDelay: 1m
+  housekeeping:             # HousekeepingConfig, see housekeeping.md
+    resourceRetention:
+      enabled: true
+      batchSize: 100
+      interval: 5m
+      pauseBetweenBatches: 100ms
   restartBackoff:           # BackgroundAgentHostConfig::restart_backoff
     backoffType: Exponential
     minDelay: 1s
@@ -402,6 +408,8 @@ backgroundAgents:
   loop, by consecutive failures (`backoffType` is one of `Fixed`, `Linear`, `Exponential`,
   `ExponentialWithJitter`). See
   [resources-framework.md](resources-framework.md#controller-bookkeeping).
+- `housekeeping` — the housekeeping jobs, which have no wakeup listener: each sleeps until its
+  next deadline, at most its `interval` ([housekeeping.md](housekeeping.md#6-configuration)).
 - `restartBackoff` and `shutdownTimeout` — the agent host: the delay before an agent that failed is
   restarted, and how long agents and in-flight API requests get on a shutdown. See
   [background-agents.md](background-agents.md).

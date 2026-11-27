@@ -22,15 +22,12 @@ use kamu_resources::{
 use kamu_resources_services::testing::{
     BaseResourceServiceHarness,
     BaseResourceServiceHarnessOpts,
-};
-use messaging_outbox::{MockOutbox, OutboxProvider};
-
-use crate::tests::utils::{
-    ServiceLayerTestHarness,
-    ServiceLayerTestHarnessOpts,
     TestResource,
     TestResourceReconcilerProvider,
 };
+use messaging_outbox::{MockOutbox, OutboxProvider};
+
+use crate::tests::utils::{ServiceLayerTestHarness, ServiceLayerTestHarnessOpts};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -47,9 +44,9 @@ async fn test_cleanup_completes_requested_deletion() {
         ResourceProcessOutcome::Done(ResourceVersion::from(resource.headers()))
     );
     assert!(resource.headers().deleted_at.is_some());
-    assert_eq!(resource.headers().name.as_str(), format!("deleted-{id}"));
+    assert_eq!(resource.headers().name.as_str(), "res-a");
     assert_eq!(resource.status().phase, ResourcePhase::Deleted);
-    assert!(harness.get_snapshot_by_id(&id).await.is_none());
+    harness.assert_deleted(&[id]).await;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -94,7 +91,7 @@ async fn test_failed_cleanup_is_retried_after_backoff() {
 
     let resource = harness.load(&id).await;
     assert_eq!(resource.status().phase, ResourcePhase::Deleted);
-    assert_eq!(resource.headers().name.as_str(), format!("deleted-{id}"));
+    assert_eq!(resource.headers().name.as_str(), "res-a");
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

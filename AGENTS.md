@@ -11,7 +11,7 @@ These hold without exception unless the user lifts one for a named case. Hooks i
 `scripts/agents/` check common violations when enabled and trusted; agents must follow the rules
 on every tool path. A blocked command or refused edit is the rule speaking — fix the command or
 load the skill, never route around it through another tool. Hook setup and limitations are in
-[`DEVELOPER.md`](DEVELOPER.md#agent-harness).
+[`scripts/agents/README.md`](scripts/agents/README.md).
 
 - **Never commit without explicit approval.** Do not run `git commit`, `git push`, `git merge`,
   `git rebase`, or any other history-altering command unless the user asks for it in that specific
@@ -83,6 +83,10 @@ problem is cost.
 - Keep build, test and lint output available in full. Do not pipe it into `head` or `tail`;
   save long output to a file and read the relevant sections after checking the exit status.
 - `make lint` runs every lint CI runs, plus `lint-sqlx` and `lint-harness`.
+- Before committing Rust changes, run
+  `python3 -m scripts.agents.repeated_lines --base <the branch it merges into>` and give each
+  reported shape one home, or say why its copies are right (`kamu-rust-style`, "Leave no dead or
+  duplicate code"). The Claude Stop hook runs the same check over the uncommitted change.
 - Run only the tests whose outcome the change can alter, narrowed to the crates whose behaviour
   changed. A change that only deletes tests or dead code needs `make clippy` alone; say so instead
   of running tests. Leave nextest's build and test parallelism at its defaults.
@@ -117,10 +121,11 @@ compact entry when the feature is finalized.
 
 `*-inmem` repository crates exist for tests only and do not model transactions by default (no
 rollback on a failed transaction). The exception is opt-in: under `InMemoryTransactionManager`
-(`database-common`), the `kamu-datasets-inmem` and `kamu-resources-inmem` repositories and the
-`kamu-messaging-outbox-inmem` bridge keep each transaction's changes in a working set until it
-commits. Do not raise missing rollback elsewhere, or "in-memory used in production", as findings.
-Do fix genuine in-memory bugs that break test fidelity (e.g. index corruption on a rejected save).
+(`database-common`), the `kamu-datasets-inmem`, `kamu-resources-inmem` and
+`kamu-configuration-inmem` repositories and the `kamu-messaging-outbox-inmem` bridge keep each
+transaction's changes in a working set until it commits. Do not raise missing rollback elsewhere,
+or "in-memory used in production", as findings. Do fix genuine in-memory bugs that break test
+fidelity (e.g. index corruption on a rejected save).
 
 ## Code style and tests
 
@@ -154,7 +159,7 @@ addition to that match (a GraphQL resolver needs both `kamu-graphql-api` and `ka
 | GraphQL queries, mutations, roots, resolvers, enum mappings, schema regeneration | `kamu-graphql-api` | `src/adapter/graphql/**`, `src/adapter/resources-facade-graphql/**` |
 | Test harness structs, per-account catalog wiring, in-memory test doubles | `kamu-test-harness` | `src/**/tests/**/*.rs` |
 | Changelog, release, general Cargo dependency updates | `kamu-release-dependency-workflows` | `CHANGELOG.md` |
-| Comments, doc comments, and any prose in docs or skills | `kamu-prose-and-comments` | `AGENTS.md`, `CLAUDE.md`, `docs/**/*.md`, `.claude/skills/**` |
+| Comments, doc comments, and any prose in docs or skills | `kamu-prose-and-comments` | `AGENTS.md`, `CLAUDE.md`, `docs/**/*.md`, `.claude/skills/**`, `scripts/agents/README.md` |
 | dill components, interfaces, scopes, catalog building and chaining | `kamu-dill-di` | |
 | Outbox, repositories, domain/view construction, event modeling, operation-specific errors | `kamu-domain-design` | |
 | Renaming a type, field, message, flag or any other concept across layers | `kamu-renaming-a-concept` | |
@@ -174,7 +179,8 @@ change invalidates what it says.
 |---|---|
 | Posting messages, new message types or consumers, consumption modes, the outbox agent, delivery ordering | [`docs/internal/outbox.md`](docs/internal/outbox.md) |
 | How background agents wake up, Postgres `LISTEN`/`NOTIFY`, SQLite polling, deadline-driven waits | [`docs/internal/wakeup-listeners.md`](docs/internal/wakeup-listeners.md) |
-| Writing a background agent, its restarts and graceful shutdown, `BackgroundAgentHost` | [`docs/internal/background-agents.md`](docs/internal/background-agents.md) |
+| Writing a background agent, its restarts and graceful shutdown, `BackgroundAgentHost`, what runs after a CLI command (`BackgroundWorkFinalizer`) | [`docs/internal/background-agents.md`](docs/internal/background-agents.md) |
+| Periodic cleanup of data nobody needs (resource retention, purges), `HousekeepingJob` | [`docs/internal/housekeeping.md`](docs/internal/housekeeping.md) |
 | Exported Prometheus metrics, recommended alerts, adding metrics | [`docs/internal/metrics.md`](docs/internal/metrics.md) |
 | Task scheduling and execution, the task agent, planners and runners, new task types | [`docs/internal/task-system.md`](docs/internal/task-system.md) |
 | Flows, triggers, configurations, scheduling, sensors, flow process state, new flow types | [`docs/internal/flow-system.md`](docs/internal/flow-system.md) |
@@ -195,7 +201,7 @@ change invalidates what it says.
 | Resource label selectors and filtering | [`docs/internal/resources-label-filtering.md`](docs/internal/resources-label-filtering.md) |
 | `RF-*` test-slice identifiers of the resources contract tests | [`COVERAGE.md`](src/domain/resources/facade-tests/tests/contract/COVERAGE.md) |
 | Local DB setup, migrations, Elasticsearch, test groups, build-speed tips, release procedures | [`DEVELOPER.md`](DEVELOPER.md) |
-| How the agent harness works: hooks, skills, drift lints | [`DEVELOPER.md`](DEVELOPER.md#agent-harness) |
+| How the agent harness works: hooks, skills, drift lints | [`scripts/agents/README.md`](scripts/agents/README.md) |
 
 ## Documentation classes
 
@@ -206,7 +212,8 @@ change invalidates what it says.
 | `.claude/skills/` | Canonical task procedures. Each skill's `name` equals its directory and has a row in the table above. |
 | `.agents/skills/` | Relative symlinks to `.claude/skills/` only — never real files. |
 | `docs/internal/` | Living design docs. Changing behaviour a document describes means amending it in the same change. |
-| `DEVELOPER.md` | The human developer guide and owner of human procedures. Skills link to its sections rather than copying them. |
+| `DEVELOPER.md` | The human developer guide and owner of human procedures. Skills link to its sections rather than copying them. Of agents, it says only how to set them up. |
+| `scripts/agents/README.md` | How the agent harness is built: hooks, their limitations, how to add a skill or change a hook. |
 | `CHANGELOG.md` | Written at finalization only (see [Changelog review context](#changelog-review-context)). |
 | `resources/schema.gql` | Generated — `make resources-graphql-schema`. |
 | `resources/openapi*.json`, `resources/config-*`, `resources/cli-reference.md`, `resources/di.puml` | Generated — `make resources`. |
@@ -232,5 +239,6 @@ of duplicating them.
 
 - Keep this file repo-specific. Task procedures go into skills; human procedures into
   `DEVELOPER.md`.
-- Do not move agent guidance into `DEVELOPER.md`. It may describe the agent harness itself (what
-  lives where, how to add a skill or change a hook) because humans maintain it.
+- Do not put agent material into `DEVELOPER.md`: agent guidance belongs here or in a skill, and
+  how the harness is built in [`scripts/agents/README.md`](scripts/agents/README.md).
+  `DEVELOPER.md` only tells developers how to set coding agents up.

@@ -211,6 +211,18 @@
           },
           "description": "Concurrency limits of agents processing records in parallel"
         },
+        "housekeeping": {
+          "$ref": "#/$defs/BackgroundAgentsHousekeepingConfig",
+          "default": {
+            "resourceRetention": {
+              "batchSize": 100,
+              "enabled": true,
+              "interval": "5m",
+              "pauseBetweenBatches": "100ms"
+            }
+          },
+          "description": "Periodic jobs removing data nobody needs any more. Each runs as an agent\nof its own in the API server, and one batch after each CLI command"
+        },
         "maxListeningTimeout": {
           "$ref": "#/$defs/DurationString",
           "default": "2s",
@@ -250,6 +262,22 @@
           "$ref": "#/$defs/DurationString",
           "default": "10s",
           "description": "How long background agents and in-flight API requests get to finish\non a shutdown, before they are aborted"
+        }
+      },
+      "type": "object"
+    },
+    "BackgroundAgentsHousekeepingConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "resourceRetention": {
+          "$ref": "#/$defs/HousekeepingJobConfig",
+          "default": {
+            "batchSize": 100,
+            "enabled": true,
+            "interval": "5m",
+            "pauseBetweenBatches": "100ms"
+          },
+          "description": "Purge of deleted resources whose retention (`resources.retention`)\nended"
         }
       },
       "type": "object"
@@ -814,6 +842,35 @@
       "additionalProperties": false,
       "type": "object"
     },
+    "HousekeepingJobConfig": {
+      "additionalProperties": false,
+      "description": "How a housekeeping job runs",
+      "properties": {
+        "batchSize": {
+          "default": 100,
+          "description": "Items removed per transaction, at most 1000. 0 is treated as 1",
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "enabled": {
+          "default": true,
+          "description": "Whether the job runs",
+          "type": "boolean"
+        },
+        "interval": {
+          "$ref": "#/$defs/DurationString",
+          "default": "5m",
+          "description": "The longest pause between two passes of the job, greater than zero. A\njob with deadlines of its own wakes up at the nearest one, so this\nbounds how late it notices an earlier deadline"
+        },
+        "pauseBetweenBatches": {
+          "$ref": "#/$defs/DurationString",
+          "default": "100ms",
+          "description": "The pause between two batches while a backlog remains"
+        }
+      },
+      "type": "object"
+    },
     "HttpSourceConfig": {
       "additionalProperties": false,
       "properties": {
@@ -999,6 +1056,45 @@
         "minDelay": {
           "$ref": "#/$defs/DurationString",
           "default": "1s"
+        }
+      },
+      "type": "object"
+    },
+    "ResourceRetentionConfig": {
+      "additionalProperties": false,
+      "description": "A type's retention is, first found: its entry in `types`, the type's own\ndefault, `default`. Each value is a duration such as `7d`, `forever` or\n`immediately`",
+      "properties": {
+        "default": {
+          "$ref": "#/$defs/ResourceRetentionValue",
+          "combine": "replace",
+          "default": "1w",
+          "description": "Retention of the types that neither are listed in `types` nor declare\ntheir own"
+        },
+        "types": {
+          "additionalProperties": {
+            "$ref": "#/$defs/ResourceRetentionValue"
+          },
+          "default": {},
+          "description": "Retention per resource type, by short type name such as `VariableSet`",
+          "type": "object"
+        }
+      },
+      "type": "object"
+    },
+    "ResourceRetentionValue": {
+      "description": "A duration such as `7d`, `forever` or `immediately`",
+      "type": "string"
+    },
+    "ResourcesConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "retention": {
+          "$ref": "#/$defs/ResourceRetentionConfig",
+          "default": {
+            "default": "1w",
+            "types": {}
+          },
+          "description": "How long deleted resources are kept before they may be purged"
         }
       },
       "type": "object"
@@ -1351,6 +1447,14 @@
           "outboxConsumers": 1,
           "resourceControllers": 1
         },
+        "housekeeping": {
+          "resourceRetention": {
+            "batchSize": 100,
+            "enabled": true,
+            "interval": "5m",
+            "pauseBetweenBatches": "100ms"
+          }
+        },
         "maxListeningTimeout": "2s",
         "minDebounceInterval": "20ms",
         "resourceControllers": {
@@ -1481,6 +1585,16 @@
         "storage": 1000000000
       },
       "description": "Default quotas configured by type"
+    },
+    "resources": {
+      "$ref": "#/$defs/ResourcesConfig",
+      "default": {
+        "retention": {
+          "default": "1w",
+          "types": {}
+        }
+      },
+      "description": "Resources configuration"
     },
     "search": {
       "$ref": "#/$defs/SearchConfig",

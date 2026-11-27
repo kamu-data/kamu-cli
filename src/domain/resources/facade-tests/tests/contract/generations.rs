@@ -7,28 +7,13 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_resources::{
-    ApplyManifestApplicationDecision,
-    ResourcePhase,
-    ResourceRef,
-    ResourceVisibility,
-    TypeName,
-};
-use kamu_resources_facade::{
-    ApplyManifestRequest,
-    ResourceFacade,
-    ResourceManifestFormat,
-    SpecViewOpts,
-};
+use kamu_resources::{ApplyManifestApplicationDecision, ResourcePhase};
+use kamu_resources_facade::{ApplyManifestRequest, ResourceFacade, ResourceManifestFormat};
 use pretty_assertions::{assert_eq, assert_matches};
 
 use crate::contract_test;
 use crate::harness::{FacadeContractHarness, TestAccount};
-use crate::helpers::{
-    VARIABLE_SET_CANONICAL_SELECTOR,
-    VARIABLE_SET_SCHEMA_STR,
-    assert_single_batch_success,
-};
+use crate::helpers::{VARIABLE_SET_SCHEMA_STR, get_resource, variable_set_ref_by_name};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -100,27 +85,7 @@ async fn apply(facade: &dyn ResourceFacade, value: &str, team_label: Option<&str
 
 /// `(generation, status_generation, phase)` of the resource
 async fn observe(facade: &dyn ResourceFacade) -> (u64, u64, ResourcePhase) {
-    let resource = assert_single_batch_success(
-        facade
-            .get(
-                vec![ResourceRef {
-                    account: None,
-                    r#type: Some(
-                        VARIABLE_SET_CANONICAL_SELECTOR
-                            .parse::<TypeName>()
-                            .unwrap()
-                            .into(),
-                    ),
-                    id: None,
-                    did: None,
-                    name: Some(RESOURCE_NAME.parse().unwrap()),
-                }],
-                SpecViewOpts::ENCRYPTED,
-                ResourceVisibility::Active,
-            )
-            .await
-            .unwrap(),
-    );
+    let resource = get_resource(facade, variable_set_ref_by_name(RESOURCE_NAME)).await;
 
     (
         resource.headers.generation,

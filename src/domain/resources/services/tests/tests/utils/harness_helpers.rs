@@ -16,9 +16,11 @@ use kamu_resources::{
     ResourceEventSpecUpdated,
     ResourceID,
 };
-use kamu_resources_services::testing::BaseResourceServiceHarness;
-
-use crate::tests::utils::{TestResource, TestResourceSpec};
+use kamu_resources_services::testing::{
+    BaseResourceServiceHarness,
+    TestResource,
+    TestResourceSpec,
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -26,13 +28,13 @@ pub fn make_resource_params(
     account: odf::ResourceOwnerHandle,
     name: &str,
 ) -> ApplyResourceParams<TestResource> {
-    ApplyResourceParams {
-        id: None,
-        headers: BaseResourceServiceHarness::make_headers_input(account, name),
-        spec: TestResourceSpec {
+    BaseResourceServiceHarness::make_apply_params(
+        account,
+        Some(name),
+        TestResourceSpec {
             value: name.to_string(),
         },
-    }
+    )
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -46,14 +48,20 @@ pub fn make_id() -> ResourceID {
 pub fn make_fresh_aggregate(
     account: odf::ResourceOwnerHandle,
     name: &str,
-) -> (ResourceID, crate::tests::utils::TestResource) {
-    use crate::tests::utils::TestResourceSpec;
+) -> (ResourceID, TestResource) {
     let id = make_id();
     let headers = BaseResourceServiceHarness::make_headers_input(account, name);
     let spec = TestResourceSpec {
         value: name.to_string(),
     };
-    let agg = crate::tests::utils::TestResource::try_create(Utc::now(), id, headers, spec).unwrap();
+    let agg = TestResource::try_create(
+        Utc::now(),
+        id,
+        headers,
+        spec,
+        &BaseResourceServiceHarness::make_provenance(),
+    )
+    .unwrap();
     (id, agg)
 }
 

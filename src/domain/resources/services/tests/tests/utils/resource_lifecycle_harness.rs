@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use chrono::{DateTime, Duration, TimeZone, Utc};
-use event_sourcing::Aggregate;
+use event_sourcing::{Aggregate, EventID};
 use internal_error::InternalError;
 use kamu_resources::{
     DeclarativeResource,
@@ -17,23 +17,21 @@ use kamu_resources::{
     ResourceCleanupError,
     ResourceEvent,
     ResourceEventCreated,
-    ResourceEventDeleted,
     ResourceEventHeadersUpdated,
     ResourceHeadersInput,
     ResourceID,
-    ResourceName,
     ResourcePhase,
     ResourceStatus,
 };
-use kamu_resources_services::testing::BaseResourceServiceHarness;
-
-use crate::tests::utils::{
+use kamu_resources_services::testing::{
+    BaseResourceServiceHarness,
     TestResource,
     TestResourceLifecycleError,
     TestResourceReconcileError,
     TestResourceSpec,
-    make_id,
 };
+
+use crate::tests::utils::make_id;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -56,6 +54,7 @@ impl ResourceLifecycleHarness {
             make_id(),
             Self::headers_input(None),
             Self::spec(value),
+            &BaseResourceServiceHarness::make_provenance(),
         )
         .unwrap();
         Self { resource, now }
@@ -94,6 +93,7 @@ impl ResourceLifecycleHarness {
             id,
             Self::headers_input(None),
             Self::spec(value),
+            &BaseResourceServiceHarness::make_provenance(),
         )
     }
 
@@ -107,6 +107,20 @@ impl ResourceLifecycleHarness {
         harness.mark_started();
         harness.mark_succeeded();
         harness
+    }
+
+    /// The resource as loaded back from its store, with no events pending
+    pub fn saved(self) -> Self {
+        let id = *self.resource.id();
+        let state = self.resource.0.into_state();
+        Self {
+            resource: TestResource::from_aggregate(Aggregate::from_stored_snapshot(
+                id,
+                EventID::new(1),
+                state,
+            )),
+            now: self.now,
+        }
     }
 
     pub fn headers_input(env_label: Option<&str>) -> ResourceHeadersInput {
@@ -288,16 +302,19 @@ impl ResourceLifecycleHarness {
         self.resource.try_complete_deletion(now)
     }
 
-    /// Applies a deletion as stored before it was preceded by a request.
+    /// Applies a stored legacy `Deleted` event, one that no deletion request
+    /// preceded and that carries a `tombstone_name`
     pub fn apply_stored_deletion(&mut self) {
         let id = *self.resource.id();
-        let event = ResourceEventDeleted {
-            event_time: self.tick(),
-            id,
-            tombstone_name: ResourceName::new_unchecked(&format!("deleted-{id}")),
-        };
+        let event = serde_json::json!({
+            "Deleted": {
+                "event_time": self.tick(),
+                "id": id,
+                "tombstone_name": format!("deleted-{id}"),
+            }
+        });
         self.resource
-            .apply_event(ResourceEvent::Deleted(event))
+            .apply_event(serde_json::from_value(event).unwrap())
             .unwrap();
     }
 
@@ -326,6 +343,10 @@ impl ResourceLifecycleHarness {
 
     pub fn updated_at(&self) -> DateTime<Utc> {
         self.resource.headers().updated_at
+    }
+
+    pub fn has_pending_events(&self) -> bool {
+        self.resource.0.has_updates()
     }
 
     pub fn needs_reconciliation(&self) -> bool {

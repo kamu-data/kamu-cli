@@ -178,6 +178,16 @@ pub(crate) struct ResourceNameMismatchProblem {
     pub actual_name: kamu_resources::ResourceName,
 }
 
+#[derive(cynic::QueryFragment, Debug, Copy, Clone)]
+pub(crate) struct ResourceDeletedNotRevealedProblem {
+    pub id: kamu_resources::ResourceID,
+}
+
+#[derive(cynic::QueryFragment, Debug, Clone)]
+pub(crate) struct ResourceAccessDeniedProblem {
+    pub message: String,
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(cynic::InlineFragments, Debug, Clone)]
@@ -186,8 +196,17 @@ pub(crate) enum ResourceLookupProblem {
     ResourceNameNotFoundProblem(ResourceNameNotFoundProblem),
     ResourceSchemaMismatchProblem(ResourceSchemaMismatchProblem),
     ResourceNameMismatchProblem(ResourceNameMismatchProblem),
+    ResourceDeletedNotRevealedProblem(ResourceDeletedNotRevealedProblem),
+    ResourceAccessDeniedProblem(ResourceAccessDeniedProblem),
     #[cynic(fallback)]
     Unknown,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(cynic::QueryFragment, Debug, Clone)]
+pub(crate) struct ResourceOwnerLookupProblem {
+    pub problem: ResourceLookupProblem,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -252,6 +271,7 @@ pub(crate) struct ResourcePhaseCounts {
     pub degraded: Uint64,
     pub failed: Uint64,
     pub deleting: Uint64,
+    pub deleted: Uint64,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

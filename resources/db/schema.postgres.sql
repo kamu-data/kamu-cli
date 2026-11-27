@@ -517,7 +517,8 @@ CREATE TABLE public.dataset_entries (
     dataset_name character varying(100) NOT NULL,
     created_at timestamp with time zone NOT NULL,
     kind public.dataset_kind NOT NULL,
-    owner_name character varying(100) NOT NULL
+    owner_name character varying(100) NOT NULL,
+    resource_id uuid NOT NULL
 );
 
 
@@ -895,6 +896,16 @@ CREATE TABLE public.resource_labels_projection (
 
 
 --
+-- Name: resource_owners_projection; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.resource_owners_projection (
+    resource_id uuid NOT NULL,
+    owner_id uuid NOT NULL
+);
+
+
+--
 -- Name: resources; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -913,7 +924,9 @@ CREATE TABLE public.resources (
     deleted_at timestamp with time zone,
     last_event_id bigint,
     status_generation bigint DEFAULT 1 NOT NULL,
-    deletion_requested_at timestamp with time zone
+    deletion_requested_at timestamp with time zone,
+    owner_references jsonb,
+    purge_at timestamp with time zone
 );
 
 
@@ -1236,6 +1249,14 @@ ALTER TABLE ONLY public.resource_labels_projection
 
 
 --
+-- Name: resource_owners_projection resource_owners_projection_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.resource_owners_projection
+    ADD CONSTRAINT resource_owners_projection_pkey PRIMARY KEY (resource_id, owner_id);
+
+
+--
 -- Name: resources resources_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1505,6 +1526,13 @@ CREATE UNIQUE INDEX idx_dataset_entries_owner_id_dataset_name ON public.dataset_
 
 
 --
+-- Name: idx_dataset_entries_resource_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_dataset_entries_resource_id ON public.dataset_entries USING btree (resource_id);
+
+
+--
 -- Name: idx_dataset_key_blocks_by_hash; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -1764,6 +1792,20 @@ CREATE INDEX idx_resource_labels_projection_key_value_resource_id ON public.reso
 
 
 --
+-- Name: idx_resource_owners_projection_owner_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_resource_owners_projection_owner_id ON public.resource_owners_projection USING btree (owner_id, resource_id);
+
+
+--
+-- Name: idx_resources_account_schema_name_any_visibility; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_resources_account_schema_name_any_visibility ON public.resources USING btree (account_id, resource_schema, lower((resource_name)::text));
+
+
+--
 -- Name: idx_resources_account_schema_name_ci; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -1785,6 +1827,13 @@ CREATE INDEX idx_resources_deletion_pending ON public.resources USING btree (res
 
 
 --
+-- Name: idx_resources_deletion_time; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_resources_deletion_time ON public.resources USING btree (account_id, resource_schema, COALESCE(deleted_at, deletion_requested_at) DESC, updated_at DESC, resource_id DESC) WHERE (deletion_requested_at IS NOT NULL);
+
+
+--
 -- Name: idx_resources_not_reconciled; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -1792,10 +1841,17 @@ CREATE INDEX idx_resources_not_reconciled ON public.resources USING btree (resou
 
 
 --
+-- Name: idx_resources_purge_at; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_resources_purge_at ON public.resources USING btree (purge_at) WHERE (purge_at IS NOT NULL);
+
+
+--
 -- Name: idx_resources_summary_projection; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_resources_summary_projection ON public.resources USING btree (account_id, resource_schema, ((status ->> 'phase'::text))) WHERE (deleted_at IS NULL);
+CREATE INDEX idx_resources_summary_projection ON public.resources USING btree (account_id, resource_schema, ((status ->> 'phase'::text)));
 
 
 --
@@ -2004,6 +2060,14 @@ ALTER TABLE ONLY public.resource_events
 
 ALTER TABLE ONLY public.resource_labels_projection
     ADD CONSTRAINT fk_resource_labels_projection_resource_id FOREIGN KEY (resource_id) REFERENCES public.resources(resource_id) ON DELETE CASCADE;
+
+
+--
+-- Name: resource_owners_projection fk_resource_owners_projection_resource_id; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.resource_owners_projection
+    ADD CONSTRAINT fk_resource_owners_projection_resource_id FOREIGN KEY (resource_id) REFERENCES public.resources(resource_id) ON DELETE CASCADE;
 
 
 --

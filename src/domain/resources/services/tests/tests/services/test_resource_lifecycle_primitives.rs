@@ -18,8 +18,8 @@ use internal_error::InternalError;
 use kamu_resources::{
     ApplyResourceParams,
     DeclarativeResource,
-    MESSAGE_PRODUCER_KAMU_RESOURCE_SERVICE,
     ManagedResource,
+    RESOURCE_CONDITION_CREATION_PROVENANCE_SCHEMA_URI,
     RESOURCE_CONDITION_RECONCILIATION_ERROR_SCHEMA_URI,
     RESOURCE_LABEL_ENVIRONMENT_SCHEMA_URI,
     ResourceAggregateLoader,
@@ -52,12 +52,6 @@ use kamu_resources::{
 use kamu_resources_services::testing::{
     BaseResourceServiceHarness,
     BaseResourceServiceHarnessOpts,
-};
-use messaging_outbox::{OutboxMessageBoundary, OutboxMessageBridge, OutboxProvider};
-
-use crate::tests::utils::{
-    ServiceLayerTestHarness,
-    ServiceLayerTestHarnessOpts,
     TEST_OTHER_TYPE_CONDITION_URI,
     TEST_PAYLOAD_CONDITION_URI,
     TEST_STAGE_CONDITION_URI,
@@ -65,6 +59,9 @@ use crate::tests::utils::{
     TestResourceReconcileError,
     TestResourceSpec,
 };
+use messaging_outbox::OutboxProvider;
+
+use crate::tests::utils::{ServiceLayerTestHarness, ServiceLayerTestHarnessOpts};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -401,6 +398,7 @@ async fn test_writers_patching_different_conditions_keep_both() {
                 condition_key(TEST_PAYLOAD_CONDITION_URI),
                 serde_json::json!({ "step": 1 })
             ),
+            BaseResourceServiceHarness::make_provenance_entry(),
         ]
         .into()
     );
@@ -484,6 +482,22 @@ async fn test_invalid_condition_patch_changes_nothing() {
                 .remove(uri(RESOURCE_CONDITION_RECONCILIATION_ERROR_SCHEMA_URI)),
             ResourceConditionPatchError::FrameworkOwned {
                 key: uri(RESOURCE_CONDITION_RECONCILIATION_ERROR_SCHEMA_URI),
+            },
+        ),
+        (
+            ResourceConditionsPatch::new().set(
+                uri(RESOURCE_CONDITION_CREATION_PROVENANCE_SCHEMA_URI),
+                serde_json::to_value(BaseResourceServiceHarness::make_provenance()).unwrap(),
+            ),
+            ResourceConditionPatchError::FrameworkOwned {
+                key: uri(RESOURCE_CONDITION_CREATION_PROVENANCE_SCHEMA_URI),
+            },
+        ),
+        (
+            ResourceConditionsPatch::new()
+                .remove(uri(RESOURCE_CONDITION_CREATION_PROVENANCE_SCHEMA_URI)),
+            ResourceConditionPatchError::FrameworkOwned {
+                key: uri(RESOURCE_CONDITION_CREATION_PROVENANCE_SCHEMA_URI),
             },
         ),
     ];
@@ -938,13 +952,13 @@ impl LifecyclePrimitivesHarness {
                 self.apply_test_uc()
                     .apply(ApplyResourceParams {
                         id: Some(*id),
-                        headers: BaseResourceServiceHarness::make_headers_input(
+                        ..BaseResourceServiceHarness::make_apply_params(
                             self.account.clone(),
-                            snapshot.headers.name.as_str(),
-                        ),
-                        spec: TestResourceSpec {
-                            value: "updated".to_string(),
-                        },
+                            Some(snapshot.headers.name.as_str()),
+                            TestResourceSpec {
+                                value: "updated".to_string(),
+                            },
+                        )
                     })
                     .await
                     .unwrap()
@@ -1052,6 +1066,9 @@ impl LifecyclePrimitivesHarness {
                 ResourceLifecycleMessage::StatusUpdated(message) => {
                     format!("StatusUpdated({:?})", message.status.phase)
                 }
+                ResourceLifecycleMessage::Purged(message) => {
+                    format!("Purged({})", message.ids.len())
+                }
             })
             .collect()
     }
@@ -1068,36 +1085,9 @@ impl LifecyclePrimitivesHarness {
                 ResourceLifecycleMessage::StatusUpdated(message) => Some(message),
                 ResourceLifecycleMessage::Applied(_)
                 | ResourceLifecycleMessage::DeletionRequested(_)
-                | ResourceLifecycleMessage::Deleted(_) => None,
+                | ResourceLifecycleMessage::Deleted(_)
+                | ResourceLifecycleMessage::Purged(_) => None,
             })
-            .collect()
-    }
-
-    async fn lifecycle_messages(&self) -> Vec<ResourceLifecycleMessage> {
-        self.raw_messages_since(0)
-            .await
-            .into_iter()
-            .map(|content| serde_json::from_value(content).unwrap())
-            .collect()
-    }
-
-    /// The JSON of every lifecycle message posted after the first `mark`, as
-    /// the outbox stores it
-    async fn raw_messages_since(&self, mark: usize) -> Vec<serde_json::Value> {
-        self.catalog()
-            .get_one::<dyn OutboxMessageBridge>()
-            .unwrap()
-            .get_messages_by_producer(
-                self.catalog(),
-                MESSAGE_PRODUCER_KAMU_RESOURCE_SERVICE,
-                OutboxMessageBoundary::default(),
-                usize::MAX,
-            )
-            .await
-            .unwrap()
-            .into_iter()
-            .skip(mark)
-            .map(|message| message.content_json)
             .collect()
     }
 }

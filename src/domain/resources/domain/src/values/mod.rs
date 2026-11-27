@@ -7,6 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+mod apply_resource_headers;
+mod creation_provenance;
 mod reconciliation_error;
 mod resource;
 mod resource_annotation;
@@ -22,6 +24,7 @@ mod resource_label_filter_parser;
 mod resource_label_filter_predicate;
 mod resource_labels_annotations;
 mod resource_owner_ref;
+mod resource_owner_references;
 mod resource_phase;
 mod resource_ref;
 mod resource_schema_id;
@@ -32,6 +35,8 @@ mod resource_version;
 mod resource_warning;
 mod rfc_spec_newtype;
 
+pub use apply_resource_headers::*;
+pub use creation_provenance::*;
 pub use reconciliation_error::*;
 pub use resource::*;
 pub use resource_annotation::*;
@@ -47,6 +52,7 @@ pub use resource_label_filter_parser::*;
 pub use resource_label_filter_predicate::*;
 pub use resource_labels_annotations::*;
 pub use resource_owner_ref::*;
+pub use resource_owner_references::*;
 pub use resource_phase::*;
 pub use resource_ref::*;
 pub use resource_schema_id::*;

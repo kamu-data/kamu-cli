@@ -17,13 +17,16 @@ use event_sourcing::{
 };
 use internal_error::InternalError;
 
-use crate::{ResourceRawEvent, ResourceRawEventQuery};
+use crate::{ResourceID, ResourceRawEvent, ResourceRawEventQuery};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
 pub trait ResourceRawEventStore: EventStore<ResourceRawEventProjection> {
     async fn total_events_stored_by_schema(&self, schema: &str) -> Result<usize, InternalError>;
+
+    /// Deletes every event of the resources, for their purge
+    async fn delete_events_of_resources(&self, ids: &[ResourceID]) -> Result<(), InternalError>;
 
     fn get_all_events_by_schema(
         &self,

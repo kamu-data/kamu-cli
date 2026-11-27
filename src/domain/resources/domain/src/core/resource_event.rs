@@ -12,7 +12,7 @@ use enum_variants::*;
 use event_sourcing::ProjectionEvent;
 use serde::{Deserialize, Serialize};
 
-use crate::{ResourceConditions, ResourceHeadersInput, ResourceID, ResourceName, ResourceStatus};
+use crate::{ResourceConditions, ResourceHeadersInput, ResourceID, ResourceStatus};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -36,8 +36,9 @@ pub struct ResourceEventCreated<TSpec> {
     #[serde_as(as = "odf::meta::serde::yaml::resources::ResourceHeadersInput")]
     pub headers: ResourceHeadersInput,
     pub spec: TSpec,
-    /// The conditions the resource type starts every new resource with, from
-    /// `ResourceStatusRules::initial_conditions`; absent when there are none
+    /// The conditions every new resource starts with: its `CreationProvenance`
+    /// and the type's `ResourceStatusRules::initial_conditions`. Absent in
+    /// events stored before resources started with conditions
     #[serde_as(as = "Option<odf::meta::serde::yaml::resources::ResourceConditions>")]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub initial_conditions: Option<ResourceConditions>,
@@ -82,12 +83,12 @@ pub struct ResourceEventDeletionRequested {
 }
 
 /// Deletion completed. Events stored before deletion had two steps have no
-/// preceding [`ResourceEventDeletionRequested`].
+/// preceding [`ResourceEventDeletionRequested`]. Some stored events also carry
+/// a `tombstone_name`, which is ignored: a deleted resource keeps its name.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ResourceEventDeleted {
     pub event_time: DateTime<Utc>,
     pub id: ResourceID,
-    pub tombstone_name: ResourceName,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

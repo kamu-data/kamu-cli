@@ -19,6 +19,7 @@ mod test_login_flow_service;
 mod test_new_dataset_command;
 mod test_output;
 mod test_resource_context_service;
+mod test_resource_retention_types;
 mod test_resource_selection_resolution_service;
 mod test_system_info_command;
 mod test_workspace_svc;

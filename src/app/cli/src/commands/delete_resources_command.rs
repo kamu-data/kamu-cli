@@ -25,6 +25,7 @@ use kamu_resources_facade::{
     ResourceDeletion,
     ResourceFacade,
     ResourceLookupProblem,
+    SpecViewOpts,
 };
 
 use super::{BatchError, CLIError, Command};
@@ -101,8 +102,11 @@ impl DeleteResourcesCommand {
                     ignore_not_found: self.ignore_not_found,
                     max_expanded_results: None,
                     label_filter: self.label_filter.clone(),
-                    // A resource being deleted is selected by its id only
+                    owner: None,
                     visibility: ResourceVisibility::Active,
+                    // Deleting a resource being deleted again reports where
+                    // its deletion stands
+                    id_visibility: ResourceVisibility::IncludeDeleting,
                 },
             )
             .await?;
@@ -423,7 +427,7 @@ impl Command for DeleteResourcesCommand {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// Reports the phase each resource reached once its controllers had the chance
-/// to clean up: still found by its id means `Deleting`, gone means `Deleted`
+/// to clean up
 struct ReportDeletionPhases {
     deletions: Vec<(DeleteResourceTarget, ResourcePhase)>,
     summary: DeleteResourcesSummary,
@@ -442,7 +446,11 @@ impl ReportDeletionPhases {
             .collect();
 
         let response = match resource_facade
-            .get_handles(resource_refs, ResourceVisibility::Active)
+            .get(
+                resource_refs,
+                SpecViewOpts::ENCRYPTED,
+                ResourceVisibility::Active,
+            )
             .await
         {
             Ok(response) => response,
@@ -454,7 +462,7 @@ impl ReportDeletionPhases {
 
         let mut reached_phases = requested_phases.collect::<Vec<_>>();
         for success in response.successes {
-            reached_phases[success.request_index] = ResourcePhase::Deleting;
+            reached_phases[success.request_index] = success.item.status.phase;
         }
         for problem in response.problems {
             if let Some(phase) = phase_when_not_found(&problem.error) {
@@ -487,7 +495,7 @@ impl PostCommandAction for ReportDeletionPhases {
     }
 }
 
-/// Only a resource its id no longer finds has completed its deletion
+/// A resource its id no longer finds was purged after its deletion completed
 fn phase_when_not_found(problem: &ResourceLookupProblem) -> Option<ResourcePhase> {
     match problem {
         ResourceLookupProblem::IDNotFound(_) => Some(ResourcePhase::Deleted),
@@ -495,7 +503,9 @@ fn phase_when_not_found(problem: &ResourceLookupProblem) -> Option<ResourcePhase
         | ResourceLookupProblem::SchemaMismatch(_)
         | ResourceLookupProblem::NameMismatch(_)
         | ResourceLookupProblem::EmptyRef
-        | ResourceLookupProblem::UntypedName => None,
+        | ResourceLookupProblem::UntypedName
+        | ResourceLookupProblem::DeletedNotRevealed(_)
+        | ResourceLookupProblem::Access(_) => None,
     }
 }
 

@@ -19,7 +19,14 @@ use database_common::{
     PaginationOpts,
 };
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
-use kamu_accounts::{AccountNotFoundByNameError, AccountService, GetAccountByNameError, Principal};
+use kamu_accounts::{
+    AccountHandle,
+    AccountNotFoundByNameError,
+    AccountService,
+    GetAccountByIdError,
+    GetAccountByNameError,
+    Principal,
+};
 use kamu_core::TenancyConfig;
 use kamu_datasets::*;
 use thiserror::Error;
@@ -232,6 +239,103 @@ impl DatasetEntryServiceImpl {
             resolved_account_ids,
             unresolved_account_names,
         })
+    }
+
+    /// The entry a reference looks up by its strongest field, before its other
+    /// fields are compared
+    async fn find_entry_by_ref(
+        &self,
+        dataset_ref: &odf::metadata::datasets::DatasetRef,
+        bare_name_account: Option<&odf::AccountName>,
+    ) -> Result<Option<DatasetEntry>, ResolveDatasetHandleError> {
+        if let Some(resource_id) = &dataset_ref.id {
+            return Ok(self
+                .dataset_entry_repo
+                .find_dataset_entry_by_resource_id(resource_id)
+                .await?);
+        }
+
+        if let Some(did) = &dataset_ref.did {
+            return match self.get_entry(did).await {
+                Ok(entry) => Ok(Some(entry)),
+                Err(GetDatasetEntryError::NotFound(_)) => Ok(None),
+                Err(GetDatasetEntryError::Internal(e)) => Err(e.into()),
+            };
+        }
+
+        let Some(name) = &dataset_ref.name else {
+            return Err(InvalidDatasetRefError::no_id_did_or_name().into());
+        };
+        // A name that is not a valid dataset name names no dataset
+        let Ok(dataset_name) = odf::DatasetName::try_from(name.as_str()) else {
+            return Ok(None);
+        };
+        let Some(owner_id) = self
+            .find_owner_id(dataset_ref.account.as_ref(), bare_name_account)
+            .await?
+        else {
+            return Ok(None);
+        };
+
+        match self
+            .dataset_entry_repo
+            .get_dataset_entry_by_owner_and_name(&owner_id, &dataset_name)
+            .await
+        {
+            Ok(entry) => Ok(Some(entry)),
+            Err(GetDatasetEntryByNameError::NotFound(_)) => Ok(None),
+            Err(GetDatasetEntryByNameError::Internal(e)) => Err(e.into()),
+        }
+    }
+
+    /// The account a reference by name is looked up in; `None` when no such
+    /// account exists
+    async fn find_owner_id(
+        &self,
+        account_ref: Option<&odf::metadata::auth::ResourceOwnerRef>,
+        bare_name_account: Option<&odf::AccountName>,
+    ) -> Result<Option<odf::AccountID>, ResolveDatasetHandleError> {
+        use odf::metadata::auth::ResourceOwnerRef;
+
+        let account_name = match account_ref {
+            Some(ResourceOwnerRef { did: Some(did), .. }) => return Ok(Some(did.clone())),
+            Some(ResourceOwnerRef {
+                did: None,
+                name: Some(name),
+                ..
+            }) => name,
+            Some(ResourceOwnerRef {
+                did: None,
+                name: None,
+                ..
+            }) => {
+                return Err(InvalidDatasetRefError::account_has_no_did_or_name().into());
+            }
+            None => bare_name_account.ok_or_else(InvalidDatasetRefError::name_without_account)?,
+        };
+
+        match self.resolve_account_id_by_name(account_name).await {
+            Ok(account_id) => Ok(Some(account_id)),
+            Err(ResolveAccountIdByNameError::NotFound(_)) => Ok(None),
+            Err(ResolveAccountIdByNameError::Internal(e)) => Err(e.into()),
+        }
+    }
+
+    /// The handle of an entry; `None` when its owner account is gone, as it
+    /// is while the account's datasets wait for their asynchronous cleanup
+    async fn dataset_handle(
+        &self,
+        entry: DatasetEntry,
+    ) -> Result<Option<odf::metadata::datasets::DatasetHandle>, InternalError> {
+        let owner = match self.account_svc.get_account_by_id(&entry.owner_id).await {
+            Ok(owner) => owner,
+            Err(GetAccountByIdError::NotFound(_)) => return Ok(None),
+            Err(GetAccountByIdError::Internal(e)) => return Err(e),
+        };
+
+        Ok(Some(
+            entry.to_odf_handle(AccountHandle::from(&owner).into()),
+        ))
     }
 
     async fn list_all_entries(
@@ -619,6 +723,25 @@ impl DatasetEntryService for DatasetEntryServiceImpl {
             },
         ))
     }
+
+    async fn resolve_dataset_handle(
+        &self,
+        dataset_ref: &odf::metadata::datasets::DatasetRef,
+        bare_name_account: Option<&odf::AccountName>,
+    ) -> Result<Option<odf::metadata::datasets::DatasetHandle>, ResolveDatasetHandleError> {
+        let Some(entry) = self
+            .find_entry_by_ref(dataset_ref, bare_name_account)
+            .await?
+        else {
+            return Ok(None);
+        };
+
+        let Some(handle) = self.dataset_handle(entry).await? else {
+            return Ok(None);
+        };
+
+        Ok(dataset_ref.matches(&handle).then_some(handle))
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -925,6 +1048,7 @@ impl DatasetEntryWriter for DatasetEntryServiceImpl {
 
         let entry = DatasetEntry::new(
             dataset_id.clone(),
+            DatasetEntry::generate_resource_id(),
             owner_account_id.clone(),
             owner_account_name.clone(),
             dataset_name.clone(),

@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use chrono::{DateTime, Utc};
-use database_common::TransactionRefT;
+use database_common::{TransactionRefT, sqlite_push_bind_list};
 use dill::{component, interface};
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_configuration::{
@@ -18,6 +18,8 @@ use kamu_configuration::{
 };
 use kamu_resources::ResourceID;
 use uuid::Uuid;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[component]
 #[interface(dyn SecretSetProjectionRepository)]
@@ -275,16 +277,13 @@ impl SecretSetProjectionRepository for SqliteSecretSetProjectionRepository {
         let mut tr = self.transaction.lock().await;
         let connection_mut = tr.connection_mut().await?;
 
-        let ids: Vec<uuid::Uuid> = resource_ids.iter().map(|id| *id.as_ref()).collect();
-
         let mut query_builder = sqlx::QueryBuilder::<sqlx::Sqlite>::new(
-            "DELETE FROM config_secret_set_entries WHERE resource_id IN (",
+            "DELETE FROM config_secret_set_entries WHERE resource_id IN ",
         );
-        let mut separated = query_builder.separated(", ");
-        for id in &ids {
-            separated.push_bind(*id);
-        }
-        query_builder.push(")");
+        sqlite_push_bind_list(
+            &mut query_builder,
+            resource_ids.iter().map(|id| *id.as_ref()),
+        );
 
         query_builder
             .build()
