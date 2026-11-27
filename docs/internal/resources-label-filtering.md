@@ -11,10 +11,9 @@
 selectors themselves: each `ResourceSelector` carries an optional
 `labels: Option<LabelFilter>` (`ResourceLabelFilterInput` is a `kamu_resources`
 type alias to `odf::metadata::resource::LabelFilter`, raw `String`-keyed
-entries). There is **no** call-level `label_filter` — the search requests carry
-only `selectors`, `owner`, `visibility` and `pagination`. The batch ref calls take a bare
-`Vec<ResourceRef>` and carry no filter at all, since `ResourceRef` has no
-`labels` field.
+entries). There is **no** call-level `label_filter`: the fields of a search request are listed in
+[§10](resources-framework.md#10-facade-kamu-resources-facade). The batch ref calls take a bare
+`Vec<ResourceRef>` and carry no filter at all, since `ResourceRef` has no `labels` field.
 
 <a id="uniform-filter-identity"></a>
 A **uniform** filter is the special case where every selector carries the same

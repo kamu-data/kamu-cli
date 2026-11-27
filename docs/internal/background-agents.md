@@ -44,7 +44,7 @@ their current step, then aborts the ones still running.
 
 | Part | Contract |
 | --- | --- |
-| `agent_name()` | A stable name: the `agent` label of the host's metrics and of `wakeup_listener_last_heartbeat_timestamp_seconds` (the resource controller runtime labels its heartbeats per controller instead) |
+| `agent_name()` | A stable name: the `agent` label of the host's metrics and of `wakeup_listener_last_heartbeat_timestamp_seconds` (the resource controller runtime labels its heartbeats per controller instead); a housekeeping agent, which has no wakeup listener, carries its job's name as the `job` label |
 | `run(&self, shutdown: CancellationToken)` | Runs until `shutdown` is cancelled, then returns `Ok`. The agent checks the token between steps and stops waiting for work when it is cancelled; it never cuts a step short itself |
 | Returning `Ok` before a shutdown | An unexpected completion: the host restarts the agent |
 | Returning `Err`, or panicking | A failure: the host restarts the agent, unless the failure is fatal |
@@ -88,7 +88,7 @@ them or does not wait for them. It has two phases with different contracts:
 | Phase | What it does | A failure |
 | --- | --- | --- |
 | **Settle** | Drains every registered `BackgroundWorkDrain` in turn until one full pass finds all of them idle | Is returned, as the caller's effects are incomplete; it fails a command that succeeded |
-| **Housekeeping** | One batch of each enabled housekeeping job, then a second settle if any batch removed items, for the messages it posted ([housekeeping.md](housekeeping.md#4-after-a-cli-command)) | Is logged as a warning; the next finalization retries it |
+| **Housekeeping** | One batch of each enabled housekeeping job ([housekeeping.md](housekeeping.md#4-after-a-cli-command)) | A failed batch is logged as a warning ([housekeeping.md](housekeeping.md#4-after-a-cli-command)) |
 
 The outbox agent and the resource controller runtime are drains. A settle alternates them because
 each feeds the other: the outbox delivers messages that make resources actionable, and processing
