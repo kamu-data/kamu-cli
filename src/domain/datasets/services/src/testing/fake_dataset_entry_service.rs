@@ -63,17 +63,14 @@ impl FakeDatasetEntryService {
     }
 
     fn dataset_handle(entry: &DatasetEntry) -> odf::metadata::datasets::DatasetHandle {
-        odf::metadata::datasets::DatasetHandle {
-            account: AccountHandle {
+        entry.to_odf_handle(
+            AccountHandle {
                 id: Account::seed_resource_id_from_name(entry.owner_name.as_str()),
                 did: entry.owner_id.clone(),
                 name: entry.owner_name.clone(),
             }
             .into(),
-            id: entry.resource_id,
-            did: entry.id.clone(),
-            name: odf::metadata::resources::ResourceName::new_unchecked(entry.name.as_str()),
-        }
+        )
     }
 }
 
@@ -202,18 +199,13 @@ impl DatasetEntryService for FakeDatasetEntryService {
         bare_name_account: Option<&odf::AccountName>,
     ) -> Result<Option<odf::metadata::datasets::DatasetHandle>, ResolveDatasetHandleError> {
         if dataset_ref.id.is_none() && dataset_ref.did.is_none() && dataset_ref.name.is_none() {
-            return Err(InvalidDatasetRefError {
-                reason: "it has no ID, DID or name",
-            }
-            .into());
+            return Err(InvalidDatasetRefError::no_id_did_or_name().into());
         }
         let bare_name_owner = if dataset_ref.id.is_none()
             && dataset_ref.did.is_none()
             && dataset_ref.account.is_none()
         {
-            Some(bare_name_account.ok_or(InvalidDatasetRefError {
-                reason: "it names a dataset without an account",
-            })?)
+            Some(bare_name_account.ok_or_else(InvalidDatasetRefError::name_without_account)?)
         } else {
             None
         };

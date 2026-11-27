@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use chrono::{DateTime, Utc};
-use database_common::TransactionRefT;
+use database_common::{TransactionRefT, sqlite_push_bind_list};
 use dill::{component, interface};
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu_resources::{
@@ -134,15 +134,13 @@ impl ResourceControllerStateRepository for SqliteResourceControllerStateReposito
         let mut tr = self.transaction.lock().await;
         let connection_mut = tr.connection_mut().await?;
 
-        // UUIDs bind as blobs, so the IDs go in as bound values, not JSON
         let mut query_builder = sqlx::QueryBuilder::<sqlx::Sqlite>::new(
-            "DELETE FROM resource_controller_state WHERE resource_id IN (",
+            "DELETE FROM resource_controller_state WHERE resource_id IN ",
         );
-        let mut separated = query_builder.separated(", ");
-        for resource_id in resource_ids {
-            separated.push_bind(*resource_id.as_ref());
-        }
-        query_builder.push(")");
+        sqlite_push_bind_list(
+            &mut query_builder,
+            resource_ids.iter().map(|id| *id.as_ref()),
+        );
 
         query_builder
             .build()

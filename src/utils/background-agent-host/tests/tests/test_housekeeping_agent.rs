@@ -14,24 +14,18 @@ use std::time::Duration;
 
 use background_agent_host::{
     BackgroundAgent,
-    BackgroundAgentHost,
-    BackgroundAgentHostConfig,
-    BackgroundAgentHostMetrics,
     CancellationToken,
     HousekeepingAgent,
     HousekeepingConfig,
-    HousekeepingJob,
     HousekeepingJobConfig,
     HousekeepingMetrics,
 };
-use chrono::{DateTime, TimeDelta, TimeZone, Utc};
+use chrono::{DateTime, TimeDelta, Utc};
 use internal_error::InternalError;
-use observability::metrics::unix_timestamp_seconds;
 use pretty_assertions::assert_eq;
-use time_source::{FakeSystemTimeSource, SystemTimeSource};
 use tokio::task::JoinHandle;
 
-use crate::tests::utils::{ScriptedBatch, ScriptedHousekeepingJob};
+use crate::tests::utils::{FakeClock, HostHarness, ScriptedBatch, ScriptedHousekeepingJob};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -159,16 +153,19 @@ async fn test_host_runs_each_enabled_job_as_an_agent_of_its_own() {
     let failing = Arc::new(ScriptedHousekeepingJob::new(JOB, [ScriptedBatch::Fails]));
     let other = Arc::new(ScriptedHousekeepingJob::new(OTHER_JOB, []));
     let disabled = Arc::new(ScriptedHousekeepingJob::new("test.DisabledJob", []));
-    let host_harness = HostHarness::new(
+    let host_harness = HostHarness::with_housekeeping_jobs(
         [failing.clone(), other.clone(), disabled.clone()],
-        "test.DisabledJob",
+        HousekeepingConfig {
+            jobs: BTreeMap::from([(
+                "test.DisabledJob".to_string(),
+                HousekeepingJobConfig {
+                    enabled: false,
+                    ..AgentHarness::job_config()
+                },
+            )]),
+        },
     );
-    let shutdown = CancellationToken::new();
-    let host = host_harness.host.clone();
-    let task = tokio::spawn({
-        let shutdown = shutdown.clone();
-        async move { host.run(shutdown).await }
-    });
+    let mut host = host_harness.start();
 
     failing.wait_for_batches(1).await;
     other.wait_for_batches(1).await;
@@ -178,8 +175,7 @@ async fn test_host_runs_each_enabled_job_as_an_agent_of_its_own() {
     assert_eq!(other.batch_count(), 1, "the other job sleeps on");
     assert_eq!(disabled.batch_count(), 0);
 
-    shutdown.cancel();
-    task.await.unwrap().unwrap();
+    host.shutdown(&host_harness).await.unwrap();
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -190,42 +186,11 @@ const BATCH_SIZE: usize = 3;
 const PAUSE: TimeDelta = TimeDelta::seconds(1);
 const INTERVAL: TimeDelta = TimeDelta::minutes(5);
 
-/// The fake clock the agents run on
-#[derive(Clone)]
-struct Clock {
-    time_source: FakeSystemTimeSource,
-}
-
-impl Clock {
-    fn new() -> Self {
-        Self {
-            time_source: FakeSystemTimeSource::new(
-                Utc.with_ymd_and_hms(2050, 1, 1, 12, 0, 0).unwrap(),
-            ),
-        }
-    }
-
-    fn now(&self) -> DateTime<Utc> {
-        self.time_source.now()
-    }
-
-    /// Real time, for spawned tasks to reach their next wait
-    async fn settle(&self) {
-        tokio::time::sleep(Duration::from_millis(50)).await;
-    }
-
-    /// Moves the clock, then lets the tasks react
-    async fn advance(&self, delta: TimeDelta) {
-        self.time_source.advance(delta);
-        self.settle().await;
-    }
-}
-
 struct AgentHarness {
     job: Arc<ScriptedHousekeepingJob>,
     agent: Arc<HousekeepingAgent>,
     metrics: Arc<HousekeepingMetrics>,
-    clock: Clock,
+    clock: FakeClock,
     start_time: DateTime<Utc>,
     shutdown: CancellationToken,
 }
@@ -233,13 +198,13 @@ struct AgentHarness {
 impl AgentHarness {
     fn new(job: ScriptedHousekeepingJob) -> Self {
         let job = Arc::new(job);
-        let clock = Clock::new();
+        let clock = FakeClock::new();
         let metrics = Arc::new(HousekeepingMetrics::new());
         let agent = Arc::new(HousekeepingAgent::new(
             job.clone(),
             Self::job_config(),
             metrics.clone(),
-            Arc::new(clock.time_source.clone()),
+            Arc::new(clock.time_source().clone()),
         ));
 
         Self {
@@ -296,12 +261,12 @@ impl AgentHarness {
     }
 
     fn has_finished_a_pass(&self) -> bool {
-        self.last_pass().abs() >= 1e-3
+        !FakeClock::is_unset(self.last_pass())
     }
 
     /// The last pass finished at the clock's current time
     fn finished_a_pass_now(&self) -> bool {
-        (self.last_pass() - unix_timestamp_seconds(self.clock.now())).abs() < 1e-3
+        self.clock.is_now(self.last_pass())
     }
 }
 
@@ -316,44 +281,6 @@ impl RunningAgent {
             .await
             .expect("the agent stops on a shutdown")
             .unwrap()
-    }
-}
-
-struct HostHarness {
-    host: Arc<BackgroundAgentHost>,
-    clock: Clock,
-}
-
-impl HostHarness {
-    fn new<const N: usize>(jobs: [Arc<ScriptedHousekeepingJob>; N], disabled_job: &str) -> Self {
-        let clock = Clock::new();
-        let housekeeping_config = HousekeepingConfig {
-            jobs: BTreeMap::from([(
-                disabled_job.to_string(),
-                HousekeepingJobConfig {
-                    enabled: false,
-                    ..AgentHarness::job_config()
-                },
-            )]),
-        };
-
-        let host = Arc::new(BackgroundAgentHost::new(
-            Vec::<Arc<dyn BackgroundAgent>>::new(),
-            jobs.into_iter()
-                .map(|job| job as Arc<dyn HousekeepingJob>)
-                .collect(),
-            Arc::new(housekeeping_config),
-            Arc::new(HousekeepingMetrics::new()),
-            Arc::new(BackgroundAgentHostConfig::default()),
-            Arc::new(BackgroundAgentHostMetrics::new()),
-            Arc::new(clock.time_source.clone()),
-        ));
-
-        Self { host, clock }
-    }
-
-    async fn advance(&self, delta: TimeDelta) {
-        self.clock.advance(delta).await;
     }
 }
 

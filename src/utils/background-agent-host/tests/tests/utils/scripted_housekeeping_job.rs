@@ -9,13 +9,12 @@
 
 use std::collections::{BTreeMap, VecDeque};
 use std::sync::Mutex;
-use std::sync::atomic::{AtomicUsize, Ordering};
-use std::time::Duration;
 
 use background_agent_host::{HousekeepingBatchReport, HousekeepingJob};
 use chrono::{DateTime, Utc};
 use internal_error::InternalError;
-use tokio::sync::Notify;
+
+use super::EventCounter;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -36,8 +35,7 @@ pub struct ScriptedHousekeepingJob {
     script: Mutex<VecDeque<ScriptedBatch>>,
     next_due: Mutex<Option<DateTime<Utc>>>,
     batches: Mutex<Vec<(DateTime<Utc>, usize)>>,
-    batch_count: AtomicUsize,
-    batch_done: Notify,
+    batch_count: EventCounter,
 }
 
 impl ScriptedHousekeepingJob {
@@ -49,8 +47,7 @@ impl ScriptedHousekeepingJob {
             script: Mutex::new(script.into()),
             next_due: Mutex::new(None),
             batches: Mutex::new(Vec::new()),
-            batch_count: AtomicUsize::new(0),
-            batch_done: Notify::new(),
+            batch_count: EventCounter::new(),
         }
     }
 
@@ -59,7 +56,7 @@ impl ScriptedHousekeepingJob {
     }
 
     pub fn batch_count(&self) -> usize {
-        self.batch_count.load(Ordering::SeqCst)
+        self.batch_count.get()
     }
 
     /// The time and size of each batch run so far
@@ -67,21 +64,10 @@ impl ScriptedHousekeepingJob {
         self.batches.lock().unwrap().clone()
     }
 
-    /// Real time, bounded, so that a batch that never comes fails the test
     pub async fn wait_for_batches(&self, total: usize) {
-        tokio::time::timeout(Duration::from_secs(1), async {
-            while self.batch_count() < total {
-                self.batch_done.notified().await;
-            }
-        })
-        .await
-        .unwrap_or_else(|_| {
-            panic!(
-                "expected {total} batches of {}, got {}",
-                self.name,
-                self.batch_count()
-            )
-        });
+        self.batch_count
+            .wait_for(total, format!("batches of {}", self.name))
+            .await;
     }
 }
 
@@ -98,8 +84,7 @@ impl HousekeepingJob for ScriptedHousekeepingJob {
     ) -> Result<HousekeepingBatchReport, InternalError> {
         let batch = self.script.lock().unwrap().pop_front();
         self.batches.lock().unwrap().push((now, batch_size));
-        self.batch_count.fetch_add(1, Ordering::SeqCst);
-        self.batch_done.notify_waiters();
+        self.batch_count.increment();
 
         match batch {
             None => Ok(HousekeepingBatchReport::default()),

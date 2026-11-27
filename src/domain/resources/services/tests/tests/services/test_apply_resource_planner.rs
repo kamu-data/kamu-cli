@@ -10,10 +10,7 @@
 use std::sync::Arc;
 
 use chrono::Utc;
-use dill::CatalogBuilder;
 use kamu_resources::{
-    ApplyResourceAccessCheck,
-    ApplyResourceAccountSource,
     ApplyResourceAction,
     ApplyResourceApplicationDecision,
     ApplyResourceParams,
@@ -21,24 +18,25 @@ use kamu_resources::{
     ApplyResourcePlanningDecision,
     ApplyResourceUseCase,
     ApplyResourceUseCaseError,
-    ResourceAggregateLoader,
     ResourceHeaders,
     ResourceHeadersExt,
     ResourceID,
     ResourceSnapshot,
-    TypedResourceQueryService,
 };
-use kamu_resources_services::ApplyResourcePlanner;
 use kamu_resources_services::testing::{
     BaseResourceServiceHarness,
+    BaseResourceServiceHarnessOpts,
     TestResource,
-    TestResourceReconciler,
     TestResourceSpec,
-    register_test_resource_resource_service_layer,
 };
 use odf::metadata::resources::TypeUri;
 
-use crate::tests::utils::{ScriptedNameSuffixGenerator, make_id, make_resource_params};
+use crate::tests::utils::{
+    ApplyResourcePlanningHarness,
+    ScriptedNameSuffixGenerator,
+    make_id,
+    make_resource_params,
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Tests
@@ -226,51 +224,27 @@ async fn test_plan_with_id_and_without_name_keeps_the_name() {
 // Harness
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[oop::extend(BaseResourceServiceHarness, base)]
+#[oop::extend(ApplyResourcePlanningHarness, base)]
 struct ApplyResourcePlannerHarness {
-    base: BaseResourceServiceHarness,
-    _catalog: dill::Catalog,
-    typed_query_svc: Arc<dyn TypedResourceQueryService<TestResource>>,
-    aggregate_loader: Arc<dyn ResourceAggregateLoader<TestResource>>,
+    base: ApplyResourcePlanningHarness,
     apply_svc: Arc<dyn ApplyResourceUseCase<TestResource>>,
-    // Planning without applying generates no names
-    name_suffix_generator: ScriptedNameSuffixGenerator,
     account_handle: odf::ResourceOwnerHandle,
 }
 
 impl ApplyResourcePlannerHarness {
     fn new() -> Self {
-        let base = BaseResourceServiceHarness::new();
-
-        let mut b = CatalogBuilder::new_chained(base.catalog());
-        register_test_resource_resource_service_layer(&mut b);
-        b.add::<TestResourceReconciler>();
-
-        let catalog = b.build();
-
-        let typed_query_svc = catalog.get_one().unwrap();
-        let aggregate_loader = catalog.get_one().unwrap();
-        let apply_svc = catalog.get_one().unwrap();
+        let base = ApplyResourcePlanningHarness::new(
+            BaseResourceServiceHarnessOpts::default(),
+            // Planning without applying generates no names
+            ScriptedNameSuffixGenerator::default(),
+        );
+        let apply_svc = base.catalog().get_one().unwrap();
 
         Self {
             base,
-            _catalog: catalog,
-            typed_query_svc,
-            aggregate_loader,
             apply_svc,
-            name_suffix_generator: ScriptedNameSuffixGenerator::default(),
             account_handle: odf::ResourceOwnerHandle::new_test("test"),
         }
-    }
-
-    fn make_planner(&self) -> ApplyResourcePlanner<'_, TestResource> {
-        ApplyResourcePlanner::new(
-            self.generic_query_svc(),
-            self.typed_query_svc.as_ref(),
-            self.aggregate_loader.as_ref(),
-            &self.name_suffix_generator,
-            self.time_source(),
-        )
     }
 
     async fn plan(
@@ -297,18 +271,14 @@ impl ApplyResourcePlannerHarness {
         value: impl Into<String>,
     ) -> ApplyResourceParams<TestResource> {
         ApplyResourceParams {
-            account_source: ApplyResourceAccountSource::Manifest,
-            access_check: ApplyResourceAccessCheck::ByGuard,
             id,
-            headers: BaseResourceServiceHarness::make_headers_input(
+            ..BaseResourceServiceHarness::make_apply_params(
                 self.account_handle.clone(),
-                name,
+                Some(name),
+                TestResourceSpec {
+                    value: value.into(),
+                },
             )
-            .into(),
-            spec: TestResourceSpec {
-                value: value.into(),
-            },
-            provenance: BaseResourceServiceHarness::make_provenance(),
         }
     }
 
@@ -318,14 +288,14 @@ impl ApplyResourcePlannerHarness {
         value: &str,
     ) -> ApplyResourceParams<TestResource> {
         ApplyResourceParams {
-            account_source: ApplyResourceAccountSource::Manifest,
-            access_check: ApplyResourceAccessCheck::ByGuard,
             id,
-            headers: BaseResourceServiceHarness::make_nameless_headers(self.account_handle.clone()),
-            spec: TestResourceSpec {
-                value: value.to_string(),
-            },
-            provenance: BaseResourceServiceHarness::make_provenance(),
+            ..BaseResourceServiceHarness::make_apply_params(
+                self.account_handle.clone(),
+                None,
+                TestResourceSpec {
+                    value: value.to_string(),
+                },
+            )
         }
     }
 

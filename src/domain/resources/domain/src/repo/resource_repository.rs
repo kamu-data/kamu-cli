@@ -532,6 +532,22 @@ pub struct ResourceDuplicateError {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+fn user_account_handle(
+    did: odf::AccountID,
+    resource_id: uuid::Uuid,
+    name: &str,
+) -> odf::ResourceOwnerHandle {
+    odf::ResourceOwnerHandle {
+        // TODO: Support Org accounts
+        r#type: odf::metadata::auth::User::type_uri().cheap_clone(),
+        id: ResourceID::new(resource_id),
+        did,
+        name: odf::AccountName::new_unchecked(name),
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "sqlx", derive(sqlx::FromRow))]
 pub struct ResourceHandleRow {
@@ -547,13 +563,11 @@ pub struct ResourceHandleRow {
 
 impl ResourceHandleRow {
     pub fn account_handle(&self) -> odf::ResourceOwnerHandle {
-        odf::ResourceOwnerHandle {
-            // TODO: Support Org accounts
-            r#type: odf::metadata::auth::User::type_uri().cheap_clone(),
-            id: ResourceID::new(self.account_resource_id),
-            did: self.account_id.clone(),
-            name: odf::AccountName::new_unchecked(&self.account_name),
-        }
+        user_account_handle(
+            self.account_id.clone(),
+            self.account_resource_id,
+            &self.account_name,
+        )
     }
 
     pub fn into_handle(self) -> ResourceHandle {
@@ -613,13 +627,11 @@ pub struct ResourceSnapshotRow {
 impl ResourceSnapshotRow {
     pub fn into_snapshot(self) -> ResourceSnapshot {
         let id = ResourceID::new(self.id);
-        let account = odf::ResourceOwnerHandle {
-            // TODO: Support Org accounts
-            r#type: odf::metadata::auth::User::type_uri().cheap_clone(),
-            id: ResourceID::new(self.account_resource_id),
-            did: self.account_id,
-            name: odf::AccountName::new_unchecked(&self.account_name),
-        };
+        let account = user_account_handle(
+            self.account_id,
+            self.account_resource_id,
+            &self.account_name,
+        );
 
         ResourceSnapshot {
             id,

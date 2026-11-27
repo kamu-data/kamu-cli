@@ -89,8 +89,11 @@ impl ResourceSelectionSyntaxService for ResourceSelectionSyntaxServiceImpl {
     async fn parse_owner(
         &self,
         explicit_context_name: Option<&str>,
-        owner: &str,
-    ) -> Result<ResourceRef, CLIError> {
+        owner: Option<&str>,
+    ) -> Result<Option<ResourceRef>, CLIError> {
+        let Some(owner) = owner else {
+            return Ok(None);
+        };
         let args = [owner.to_owned()];
 
         let (type_str, selector_input) = match ResourceSelectionSyntaxParser::parse(&args)? {
@@ -126,7 +129,7 @@ impl ResourceSelectionSyntaxService for ResourceSelectionSyntaxServiceImpl {
             .resolve_single_selector(selector_input)
             .await?;
 
-        Ok(resolved.resource_ref.into_resource_ref(schema))
+        Ok(Some(resolved.resource_ref.into_resource_ref(schema)))
     }
 }
 

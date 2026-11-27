@@ -17,8 +17,6 @@ use kamu_configuration::{
 use kamu_configuration_services::testing::BaseConfigurationServiceHarness;
 use kamu_datasets::SAMPLE_SECRETS_ENCRYPTION_KEY;
 use kamu_resources::{
-    ApplyResourceAccessCheck,
-    ApplyResourceAccountSource,
     ApplyResourceApplicationDecision,
     ApplyResourceOutcome,
     ApplyResourceParams,
@@ -76,15 +74,11 @@ async fn test_apply_secret_set_encrypts_literal_values() {
 
     let decision = harness
         .apply_secret_use_case()
-        .apply(ApplyResourceParams {
-            account_source: ApplyResourceAccountSource::Manifest,
-            access_check: ApplyResourceAccessCheck::ByGuard,
-            id: None,
-            headers: BaseResourceServiceHarness::make_headers_input(account_handle, "test-secrets")
-                .into(),
+        .apply(BaseResourceServiceHarness::make_apply_params(
+            account_handle,
+            Some("test-secrets"),
             spec,
-            provenance: BaseResourceServiceHarness::make_provenance(),
-        })
+        ))
         .await
         .unwrap();
 
@@ -138,18 +132,11 @@ async fn test_apply_secret_set_already_encrypted_passes_through_idempotently() {
 
     let decision = harness
         .apply_secret_use_case()
-        .apply(ApplyResourceParams {
-            account_source: ApplyResourceAccountSource::Manifest,
-            access_check: ApplyResourceAccessCheck::ByGuard,
-            id: None,
-            headers: BaseResourceServiceHarness::make_headers_input(
-                account_handle.clone(),
-                "test-secrets",
-            )
-            .into(),
+        .apply(BaseResourceServiceHarness::make_apply_params(
+            account_handle.clone(),
+            Some("test-secrets"),
             spec,
-            provenance: BaseResourceServiceHarness::make_provenance(),
-        })
+        ))
         .await
         .unwrap();
 
@@ -182,13 +169,12 @@ async fn test_apply_secret_set_already_encrypted_passes_through_idempotently() {
     let decision2 = harness
         .apply_secret_use_case()
         .apply(ApplyResourceParams {
-            account_source: ApplyResourceAccountSource::Manifest,
-            access_check: ApplyResourceAccessCheck::ByGuard,
             id: Some(id),
-            headers: BaseResourceServiceHarness::make_headers_input(account_handle, "test-secrets")
-                .into(),
-            spec: encrypted_spec.clone().into_input(),
-            provenance: BaseResourceServiceHarness::make_provenance(),
+            ..BaseResourceServiceHarness::make_apply_params(
+                account_handle,
+                Some("test-secrets"),
+                encrypted_spec.clone().into_input(),
+            )
         })
         .await
         .unwrap();
@@ -238,18 +224,11 @@ async fn test_apply_secret_set_same_plaintext_is_untouched() {
 
     let decision = harness
         .apply_secret_use_case()
-        .apply(ApplyResourceParams {
-            account_source: ApplyResourceAccountSource::Manifest,
-            access_check: ApplyResourceAccessCheck::ByGuard,
-            id: None,
-            headers: BaseResourceServiceHarness::make_headers_input(
-                account_handle.clone(),
-                "test-secrets",
-            )
-            .into(),
-            spec: spec.clone(),
-            provenance: BaseResourceServiceHarness::make_provenance(),
-        })
+        .apply(BaseResourceServiceHarness::make_apply_params(
+            account_handle.clone(),
+            Some("test-secrets"),
+            spec.clone(),
+        ))
         .await
         .unwrap();
 
@@ -273,13 +252,12 @@ async fn test_apply_secret_set_same_plaintext_is_untouched() {
     let decision2 = harness
         .apply_secret_use_case()
         .apply(ApplyResourceParams {
-            account_source: ApplyResourceAccountSource::Manifest,
-            access_check: ApplyResourceAccessCheck::ByGuard,
             id: Some(id),
-            headers: BaseResourceServiceHarness::make_headers_input(account_handle, "test-secrets")
-                .into(),
-            spec,
-            provenance: BaseResourceServiceHarness::make_provenance(),
+            ..BaseResourceServiceHarness::make_apply_params(
+                account_handle,
+                Some("test-secrets"),
+                spec,
+            )
         })
         .await
         .unwrap();
@@ -334,15 +312,11 @@ async fn test_apply_secret_set_rejects_jwe_that_does_not_decrypt_under_current_k
 
     let decision = harness
         .apply_secret_use_case()
-        .apply(ApplyResourceParams {
-            account_source: ApplyResourceAccountSource::Manifest,
-            access_check: ApplyResourceAccessCheck::ByGuard,
-            id: None,
-            headers: BaseResourceServiceHarness::make_headers_input(account_handle, "test-secrets")
-                .into(),
+        .apply(BaseResourceServiceHarness::make_apply_params(
+            account_handle,
+            Some("test-secrets"),
             spec,
-            provenance: BaseResourceServiceHarness::make_provenance(),
-        })
+        ))
         .await
         .unwrap();
 
@@ -376,15 +350,11 @@ async fn test_apply_secret_set_upgrades_legacy_aes256gcm_to_jwe() {
 
     let decision = harness
         .apply_secret_use_case()
-        .apply(ApplyResourceParams {
-            account_source: ApplyResourceAccountSource::Manifest,
-            access_check: ApplyResourceAccessCheck::ByGuard,
-            id: None,
-            headers: BaseResourceServiceHarness::make_headers_input(account_handle, "test-secrets")
-                .into(),
-            spec: legacy_spec,
-            provenance: BaseResourceServiceHarness::make_provenance(),
-        })
+        .apply(BaseResourceServiceHarness::make_apply_params(
+            account_handle,
+            Some("test-secrets"),
+            legacy_spec,
+        ))
         .await
         .unwrap();
 

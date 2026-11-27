@@ -9,8 +9,6 @@
 
 use std::sync::Arc;
 
-use dill::CatalogBuilder;
-use event_sourcing::GetEventsOpts;
 use kamu_accounts::Principal;
 use kamu_core::{ApiKind, RequestOrigin};
 use kamu_resources::{
@@ -19,21 +17,13 @@ use kamu_resources::{
     CreationOrigin,
     CreationOriginApi,
     CreationProvenance,
-    ResourceEvent,
     ResourceID,
 };
 use kamu_resources_services::request_creation_provenance;
-use kamu_resources_services::testing::{
-    BaseResourceServiceHarness,
-    TestResource,
-    TestResourceEventStore,
-    TestResourceSpec,
-    register_test_resource_resource_service_layer,
-};
+use kamu_resources_services::testing::TestResource;
 use pretty_assertions::assert_eq;
-use tokio_stream::StreamExt;
 
-use crate::tests::utils::make_resource_params;
+use crate::tests::utils::{ServiceLayerTestHarness, make_resource_params};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Tests
@@ -76,10 +66,13 @@ async fn test_create_records_provenance_in_created_event() {
             principal: principal.handle().unwrap(),
             origin: expected_origin,
         };
-        let events = harness.events(id).await;
-        assert_eq!(events.len(), 1, "no status event follows creation");
         assert_eq!(
-            CreationProvenanceHarness::created_event_provenance(&events[0]),
+            harness.events(id).await.len(),
+            1,
+            "no status event follows creation"
+        );
+        assert_eq!(
+            harness.created_event_provenance(id).await,
             Some(expected.clone())
         );
         assert_eq!(harness.stored_provenance(id).await, Some(expected));
@@ -117,25 +110,19 @@ async fn test_update_keeps_provenance_of_creation() {
 // Harness
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[oop::extend(BaseResourceServiceHarness, base)]
+#[oop::extend(ServiceLayerTestHarness, base)]
 struct CreationProvenanceHarness {
-    base: BaseResourceServiceHarness,
-    catalog: dill::Catalog,
+    base: ServiceLayerTestHarness,
     apply_svc: Arc<dyn ApplyResourceUseCase<TestResource>>,
 }
 
 impl CreationProvenanceHarness {
     fn new() -> Self {
-        let base = BaseResourceServiceHarness::new();
-
-        let mut b = CatalogBuilder::new_chained(base.catalog());
-        register_test_resource_resource_service_layer(&mut b);
-        let catalog = b.build();
+        let base = ServiceLayerTestHarness::new();
 
         Self {
+            apply_svc: base.apply_test_uc(),
             base,
-            apply_svc: catalog.get_one().unwrap(),
-            catalog,
         }
     }
 
@@ -180,21 +167,8 @@ impl CreationProvenanceHarness {
             .outcome
     }
 
-    async fn events(&self, id: ResourceID) -> Vec<ResourceEvent<TestResourceSpec>> {
-        let event_store: Arc<dyn TestResourceEventStore> = self.catalog.get_one().unwrap();
-        event_store
-            .get_events(&id, GetEventsOpts::default())
-            .map(|result| result.unwrap().1)
-            .collect()
-            .await
-    }
-
-    fn created_event_provenance(
-        event: &ResourceEvent<TestResourceSpec>,
-    ) -> Option<CreationProvenance> {
-        let ResourceEvent::Created(created) = event else {
-            panic!("unexpected first event: {event:?}");
-        };
+    async fn created_event_provenance(&self, id: ResourceID) -> Option<CreationProvenance> {
+        let created = self.created_event(id).await;
         CreationProvenance::from_conditions(created.initial_conditions.as_ref()?).unwrap()
     }
 

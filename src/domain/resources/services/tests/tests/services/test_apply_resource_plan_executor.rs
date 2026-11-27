@@ -11,10 +11,7 @@ use std::assert_matches;
 use std::sync::Arc;
 
 use chrono::Utc;
-use dill::CatalogBuilder;
 use kamu_resources::{
-    ApplyResourceAccessCheck,
-    ApplyResourceAccountSource,
     ApplyResourceOutcome,
     ApplyResourceParams,
     ApplyResourcePrecondition,
@@ -22,32 +19,31 @@ use kamu_resources::{
     ApplyResourceUseCaseError,
     DeclarativeResource,
     ManagedResource,
-    ResourceAggregateLoader,
     ResourceID,
     ResourceLifecycleMessageOutcome,
     ResourcePersistenceService,
     ResourceRef,
-    TypedResourceQueryService,
     owner_ids,
 };
 use kamu_resources_services::testing::{
     BaseResourceServiceHarness,
     BaseResourceServiceHarnessOpts,
     TestResource,
-    TestResourceReconciler,
     TestResourceSpec,
-    register_test_resource_resource_service_layer,
 };
 use kamu_resources_services::{
     ApplyResourceExecution,
     ApplyResourcePlanExecutor,
-    ApplyResourcePlanner,
     PlannedApplyResource,
     PlannedApplyResourceDecision,
 };
 use messaging_outbox::{MockOutbox, OutboxProvider};
 
-use crate::tests::utils::{ScriptedNameSuffixGenerator, make_fresh_aggregate};
+use crate::tests::utils::{
+    ApplyResourcePlanningHarness,
+    ScriptedNameSuffixGenerator,
+    make_fresh_aggregate,
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Tests
@@ -218,7 +214,7 @@ async fn test_generated_name_avoids_names_of_resources_in_any_state() {
 
     assert_eq!(result.outcome, ApplyResourceOutcome::Created);
     assert_eq!(result.state.headers.name.as_str(), "plain-free00");
-    harness.name_suffix_generator.assert_all_used();
+    harness.name_suffix_generator().assert_all_used();
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -257,7 +253,7 @@ async fn test_generating_a_name_gives_up_after_five_attempts() {
         harness.plan_nameless().await.err(),
         Some(ApplyResourceUseCaseError::Internal(_))
     );
-    harness.name_suffix_generator.assert_all_used();
+    harness.name_suffix_generator().assert_all_used();
 
     // Attempts of planning count while applying
     let harness = ApplyResourcePlanExecutorHarness::with_name_suffixes(
@@ -271,57 +267,40 @@ async fn test_generating_a_name_gives_up_after_five_attempts() {
         harness.make_executor().execute(plan).await,
         Err(ApplyResourceUseCaseError::Internal(_))
     );
-    harness.name_suffix_generator.assert_all_used();
+    harness.name_suffix_generator().assert_all_used();
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Harness
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[oop::extend(BaseResourceServiceHarness, base)]
+#[oop::extend(ApplyResourcePlanningHarness, base)]
 struct ApplyResourcePlanExecutorHarness {
-    base: BaseResourceServiceHarness,
-    _catalog: dill::Catalog,
-    typed_query_svc: Arc<dyn TypedResourceQueryService<TestResource>>,
-    aggregate_loader: Arc<dyn ResourceAggregateLoader<TestResource>>,
+    base: ApplyResourcePlanningHarness,
     persistence_svc: Arc<dyn ResourcePersistenceService<TestResource>>,
-    name_suffix_generator: ScriptedNameSuffixGenerator,
 }
 
 impl ApplyResourcePlanExecutorHarness {
     fn new(mock_outbox: MockOutbox) -> Self {
-        let base = BaseResourceServiceHarness::new_with_opts(BaseResourceServiceHarnessOpts {
-            outbox_provider: OutboxProvider::Mock(mock_outbox),
-            ..Default::default()
-        });
-
-        let mut b = CatalogBuilder::new_chained(base.catalog());
-        register_test_resource_resource_service_layer(&mut b);
-        b.add::<TestResourceReconciler>();
-
-        let catalog = b.build();
-
-        let typed_query_svc = catalog.get_one().unwrap();
-        let aggregate_loader = catalog.get_one().unwrap();
-        let persistence_svc = catalog.get_one().unwrap();
-
-        Self {
-            base,
-            _catalog: catalog,
-            typed_query_svc,
-            aggregate_loader,
-            persistence_svc,
-            name_suffix_generator: ScriptedNameSuffixGenerator::default(),
-        }
+        Self::with_name_suffixes(mock_outbox, [])
     }
 
     fn with_name_suffixes(
         mock_outbox: MockOutbox,
         suffixes: impl IntoIterator<Item = &'static str>,
     ) -> Self {
+        let base = ApplyResourcePlanningHarness::new(
+            BaseResourceServiceHarnessOpts {
+                outbox_provider: OutboxProvider::Mock(mock_outbox),
+                ..Default::default()
+            },
+            ScriptedNameSuffixGenerator::new(suffixes),
+        );
+        let persistence_svc = base.catalog().get_one().unwrap();
+
         Self {
-            name_suffix_generator: ScriptedNameSuffixGenerator::new(suffixes),
-            ..Self::new(mock_outbox)
+            base,
+            persistence_svc,
         }
     }
 
@@ -361,16 +340,13 @@ impl ApplyResourcePlanExecutorHarness {
     }
 
     fn make_nameless_params() -> ApplyResourceParams<TestResource> {
-        ApplyResourceParams {
-            account_source: ApplyResourceAccountSource::Manifest,
-            access_check: ApplyResourceAccessCheck::ByGuard,
-            id: None,
-            headers: BaseResourceServiceHarness::make_nameless_headers(Self::account_handle()),
-            spec: TestResourceSpec {
+        BaseResourceServiceHarness::make_apply_params(
+            Self::account_handle(),
+            None,
+            TestResourceSpec {
                 value: "nameless".to_string(),
             },
-            provenance: BaseResourceServiceHarness::make_provenance(),
-        }
+        )
     }
 
     async fn plan_nameless(
@@ -429,30 +405,16 @@ impl ApplyResourcePlanExecutorHarness {
     }
 
     async fn assert_untouched(&self, resource: &TestResource) {
-        let stored = self.aggregate_loader.load(resource.id()).await.unwrap();
+        let stored = self.aggregate_loader().load(resource.id()).await.unwrap();
         assert_eq!(stored.spec(), resource.spec());
         assert_eq!(stored.headers().generation, 1);
     }
 
-    fn make_planner(&self) -> ApplyResourcePlanner<'_, TestResource> {
-        ApplyResourcePlanner::new(
-            self.generic_query_svc(),
-            self.typed_query_svc.as_ref(),
-            self.aggregate_loader.as_ref(),
-            &self.name_suffix_generator,
-            self.time_source(),
-        )
-    }
-
     fn make_executor(&self) -> ApplyResourcePlanExecutor<'_, TestResource> {
         ApplyResourcePlanExecutor::new(
-            self.generic_query_svc(),
-            self.typed_query_svc.as_ref(),
-            self.aggregate_loader.as_ref(),
+            self.make_planner(),
             self.persistence_svc.as_ref(),
-            &self.name_suffix_generator,
             self.outbox(),
-            self.time_source(),
         )
     }
 
@@ -462,14 +424,7 @@ impl ApplyResourcePlanExecutorHarness {
         name: &str,
         spec: TestResourceSpec,
     ) -> PlannedApplyResource<TestResource> {
-        let params = ApplyResourceParams {
-            account_source: ApplyResourceAccountSource::Manifest,
-            access_check: ApplyResourceAccessCheck::ByGuard,
-            id: None,
-            headers: BaseResourceServiceHarness::make_headers_input(account, name).into(),
-            spec,
-            provenance: BaseResourceServiceHarness::make_provenance(),
-        };
+        let params = BaseResourceServiceHarness::make_apply_params(account, Some(name), spec);
 
         match self.plan(params).await.unwrap() {
             PlannedApplyResourceDecision::Planned(plan) => plan,

@@ -26,7 +26,6 @@ use futures::TryStreamExt;
 use internal_error::InternalError;
 use kamu_resources::{
     DeclarativeResource,
-    MESSAGE_PRODUCER_KAMU_RESOURCE_SERVICE,
     ResourceAggregateLoader,
     ResourceDeletionCompletion,
     ResourceID,
@@ -43,7 +42,7 @@ use kamu_resources::{
 };
 use kamu_resources_services::ResourceRetentionJob;
 use kamu_resources_services::testing::{BaseResourceServiceHarnessOpts, TestResource};
-use messaging_outbox::{OutboxMessageBoundary, OutboxMessageBridge, OutboxProvider};
+use messaging_outbox::OutboxProvider;
 
 use crate::tests::utils::{ServiceLayerTestHarness, ServiceLayerTestHarnessOpts};
 
@@ -455,23 +454,6 @@ impl RetentionHarness {
             "the events go with the resource"
         );
         snapshot.is_none()
-    }
-
-    async fn lifecycle_messages(&self) -> Vec<ResourceLifecycleMessage> {
-        self.catalog()
-            .get_one::<dyn OutboxMessageBridge>()
-            .unwrap()
-            .get_messages_by_producer(
-                self.catalog(),
-                MESSAGE_PRODUCER_KAMU_RESOURCE_SERVICE,
-                OutboxMessageBoundary::default(),
-                usize::MAX,
-            )
-            .await
-            .unwrap()
-            .into_iter()
-            .map(|message| serde_json::from_value(message.content_json).unwrap())
-            .collect()
     }
 
     /// The resources of every `Purged` message, in order

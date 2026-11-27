@@ -14,6 +14,7 @@ use tokio_stream::StreamExt;
 use crate::domain::{
     DeclarativeResource,
     ResolvedResourceLabelFilter,
+    ResourceHeadersExt,
     ResourceID,
     ResourceIDNotFoundError,
     ResourceLabelFilterPredicate,
@@ -58,7 +59,7 @@ where
             .resource_repository
             .find_resource_snapshot_by_id(id)
             .await?
-            .filter(|snapshot| snapshot.headers.deleted_at.is_none())
+            .filter(|snapshot| !snapshot.headers.is_deleted())
             .ok_or(ResourceIDNotFoundError(*id))?;
 
         if snapshot.schema != *R::type_uri() {

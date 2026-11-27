@@ -13,4 +13,3 @@ mod test_postgres_resource_label_projection_repository;
 mod test_postgres_resource_owner_projection_repository;
 mod test_postgres_resource_purge_contract;
 mod test_postgres_resource_repository;
-mod test_postgres_resource_repository_concurrent_updates;

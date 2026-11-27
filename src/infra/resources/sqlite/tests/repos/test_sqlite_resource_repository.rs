@@ -264,15 +264,7 @@ database_transactional_test!(
 
 database_transactional_test!(
     storage = sqlite,
-    fixture = resource_repo_suite::test_deleted_resource_round_trips,
-    harness = SqliteResourceRepositoryHarness
-);
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-database_transactional_test!(
-    storage = sqlite,
-    fixture = resource_repo_suite::test_resource_being_deleted_round_trips,
+    fixture = resource_repo_suite::test_resource_in_deletion_round_trips,
     harness = SqliteResourceRepositoryHarness
 );
 

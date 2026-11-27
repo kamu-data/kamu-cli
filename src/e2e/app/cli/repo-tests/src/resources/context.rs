@@ -626,6 +626,27 @@ impl ResourceCtx {
         self.stdout_json(args).await
     }
 
+    /// Run `list <args>… -o json` and return the name and phase of each
+    /// resource, in order.
+    pub async fn list_names_and_phases(&self, args: &[&str]) -> Vec<(String, String)> {
+        let doc = self.list_json(args).await;
+        let label = format!("list {} -o json", args.join(" "));
+
+        doc.as_array()
+            .unwrap_or_else(|| panic!("`{label}` should be a JSON array:\n{doc}"))
+            .iter()
+            .map(|row| {
+                let column = |name: &str| {
+                    row.get(name)
+                        .and_then(serde_json::Value::as_str)
+                        .unwrap_or_else(|| panic!("`{label}` row has no {name}:\n{row}"))
+                        .to_string()
+                };
+                (column("Name"), column("Phase"))
+            })
+            .collect()
+    }
+
     /// The column names a `list` invocation renders, in order.
     pub async fn list_columns(&self, targets: &[&str]) -> Vec<String> {
         let doc = self.list_json(targets).await;

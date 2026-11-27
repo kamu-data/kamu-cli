@@ -17,6 +17,7 @@ use database_common::{
     TransactionRefT,
     sql_like_escape_pattern,
     sqlite_generate_placeholders_list,
+    sqlite_push_bind_list,
 };
 use dill::{component, interface};
 use event_sourcing::EventID;
@@ -429,17 +430,8 @@ impl ResourceRepository for SqliteResourceRepository {
             WHERE "#,
         );
 
-        query_builder.push(visibility_predicate(visibility));
-        push_scope_predicate(&mut query_builder, scope, account_id);
-        push_owner_predicate(&mut query_builder, owner_id);
-
-        query_builder
-            .push(" ORDER BY ")
-            .push(listing_order(visibility))
-            .push(" LIMIT ")
-            .push_bind(limit)
-            .push(" OFFSET ")
-            .push_bind(offset);
+        push_scoped_filter(&mut query_builder, scope, account_id, visibility, owner_id);
+        push_listing_page(&mut query_builder, visibility, limit, offset);
 
         query_builder
             .build_query_as::<ResourceHandleRow>()
@@ -469,9 +461,7 @@ impl ResourceRepository for SqliteResourceRepository {
             WHERE "#,
         );
 
-        query_builder.push(visibility_predicate(visibility));
-        push_scope_predicate(&mut query_builder, scope, account_id);
-        push_owner_predicate(&mut query_builder, owner_id);
+        push_scoped_filter(&mut query_builder, scope, account_id, visibility, owner_id);
 
         let row = query_builder
             .build_query_scalar::<i64>()
@@ -823,17 +813,8 @@ impl ResourceRepository for SqliteResourceRepository {
                 WHERE "#,
             );
 
-            query_builder.push(visibility_predicate(visibility));
-            push_scope_predicate(&mut query_builder, &scope, &account_id);
-            push_owner_predicate(&mut query_builder, owner_id);
-
-            query_builder
-                .push(" ORDER BY ")
-                .push(listing_order(visibility))
-                .push(" LIMIT ")
-                .push_bind(limit)
-                .push(" OFFSET ")
-                .push_bind(offset);
+            push_scoped_filter(&mut query_builder, &scope, &account_id, visibility, owner_id);
+            push_listing_page(&mut query_builder, visibility, limit, offset);
 
             let mut query_stream = query_builder
                 .build_query_as::<ResourceSnapshotRow>()
@@ -1023,16 +1004,12 @@ impl ResourceRepository for SqliteResourceRepository {
         let mut tr = self.transaction.lock().await;
         let connection_mut = tr.connection_mut().await?;
 
-        // UUIDs bind as blobs, so the IDs go in as bound values, not JSON
         let mut query_builder = sqlx::QueryBuilder::<sqlx::Sqlite>::new(
-            "UPDATE resources SET purge_at = NULL WHERE resource_id IN (",
+            "UPDATE resources SET purge_at = NULL WHERE resource_id IN ",
         );
-        let mut separated = query_builder.separated(", ");
-        for id in ids {
-            separated.push_bind(*id.as_ref());
-        }
+        sqlite_push_bind_list(&mut query_builder, ids.iter().map(|id| *id.as_ref()));
         query_builder
-            .push(") AND purge_at IS NOT NULL AND purge_at <= ")
+            .push(" AND purge_at IS NOT NULL AND purge_at <= ")
             .push_bind(now)
             .push(" RETURNING resource_id");
 
@@ -1057,14 +1034,9 @@ impl ResourceRepository for SqliteResourceRepository {
         let mut tr = self.transaction.lock().await;
         let connection_mut = tr.connection_mut().await?;
 
-        // UUIDs bind as blobs, so the IDs go in as bound values, not JSON
         let mut query_builder =
-            sqlx::QueryBuilder::<sqlx::Sqlite>::new("DELETE FROM resources WHERE resource_id IN (");
-        let mut separated = query_builder.separated(", ");
-        for id in ids {
-            separated.push_bind(*id.as_ref());
-        }
-        query_builder.push(")");
+            sqlx::QueryBuilder::<sqlx::Sqlite>::new("DELETE FROM resources WHERE resource_id IN ");
+        sqlite_push_bind_list(&mut query_builder, ids.iter().map(|id| *id.as_ref()));
 
         query_builder
             .build()
@@ -1152,6 +1124,40 @@ fn listing_order(visibility: ResourceVisibility) -> &'static str {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Appends the `WHERE` body shared by searches, counts and listings: the
+/// visibility, the scope and the owner.
+fn push_scoped_filter(
+    query_builder: &mut sqlx::QueryBuilder<sqlx::Sqlite>,
+    scope: &ResourceScope,
+    account_id: &odf::AccountID,
+    visibility: ResourceVisibility,
+    owner_id: Option<ResourceID>,
+) {
+    query_builder.push(visibility_predicate(visibility));
+    push_scope_predicate(query_builder, scope, account_id);
+    push_owner_predicate(query_builder, owner_id);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Appends the listing order and the page.
+fn push_listing_page(
+    query_builder: &mut sqlx::QueryBuilder<sqlx::Sqlite>,
+    visibility: ResourceVisibility,
+    limit: i64,
+    offset: i64,
+) {
+    query_builder
+        .push(" ORDER BY ")
+        .push(listing_order(visibility))
+        .push(" LIMIT ")
+        .push_bind(limit)
+        .push(" OFFSET ")
+        .push_bind(offset);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 /// Appends the bare predicate matching `query`'s one active mode, with no
 /// leading connective so it can be combined either way.
 fn push_query_predicate(
@@ -1168,12 +1174,8 @@ fn push_query_predicate(
             query_builder.push(")");
         }
         ResourceQuery::ExactIds(ids) => {
-            query_builder.push("r.resource_id IN (");
-            let mut separated = query_builder.separated(", ");
-            for id in ids {
-                separated.push_bind(*id.as_ref());
-            }
-            query_builder.push(")");
+            query_builder.push("r.resource_id IN ");
+            sqlite_push_bind_list(query_builder, ids.iter().map(|id| *id.as_ref()));
         }
         // An ID is matched exactly above; only a pattern is LIKE-escaped.
         ResourceQuery::NamePattern(pattern) => {

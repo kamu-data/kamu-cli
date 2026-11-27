@@ -16,30 +16,50 @@ use kamu_resources::{
     ApplyManifestResult,
     ApplyResourceApplicationDecision,
     ApplyResourceCrudDispatcherError,
+    ApplyResourceParams,
     ApplyResourcePlanningDecision,
     DeclarativeResource,
     DeclarativeResourceState,
     EventSourcedResource,
     Resource,
+    ResourceCrudDispatcherApplyRequest,
     ResourceSchemaProvider,
-    TypeUri,
 };
 use serde::Serialize;
 use serde::de::DeserializeOwned;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub fn decode_resource_spec<R>(
-    schema: &TypeUri,
-    spec: serde_json::Value,
-) -> Result<R::SpecInput, ApplyResourceCrudDispatcherError>
+pub fn decode_apply_resource_params<R>(
+    request: ResourceCrudDispatcherApplyRequest,
+) -> Result<ApplyResourceParams<R>, ApplyResourceCrudDispatcherError>
 where
-    R: EventSourcedResource,
+    R: EventSourcedResource + ResourceSchemaProvider,
     R::SpecInput: DeserializeOwned,
 {
-    serde_json::from_value(spec).map_err(|e| ApplyResourceCrudDispatcherError::InvalidSpec {
-        schema: schema.clone(),
-        message: e.to_string(),
+    let ResourceCrudDispatcherApplyRequest {
+        id,
+        headers,
+        account_source,
+        access_check,
+        spec,
+        provenance,
+    } = request;
+
+    let spec = serde_json::from_value(spec).map_err(|e| {
+        ApplyResourceCrudDispatcherError::InvalidSpec {
+            schema: R::type_uri().clone(),
+            message: e.to_string(),
+        }
+    })?;
+
+    Ok(ApplyResourceParams {
+        id,
+        headers,
+        account_source,
+        access_check,
+        spec,
+        provenance,
     })
 }
 

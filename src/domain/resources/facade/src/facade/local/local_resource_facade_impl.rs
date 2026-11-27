@@ -10,6 +10,7 @@
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
+use database_common::PaginationOpts;
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu_accounts::Principal;
 use kamu_core::RequestOrigin;
@@ -114,25 +115,14 @@ impl ResourceFacade for LocalResourceFacadeImpl {
             .await?;
 
         for (group, access) in groups {
-            let (indexes, refs): (Vec<_>, Vec<_>) = group.entries.into_iter().unzip();
-
-            let grouped = group_batch_resource_refs(refs);
-            let mut resolution_response = resolve_batch_ids(
-                self.generic_resource_query_service.as_ref(),
-                &group.account.did,
-                &group.schema,
-                grouped,
-                visibility,
-            )
-            .await?;
-            resolution_response.id_entries = self
-                .retain_permitted_entries(
+            let (indexes, resolution_response) = self
+                .resolve_permitted_ids(
                     &group.account,
                     &group.schema,
+                    group.entries,
                     access,
                     ResourceAccountOperation::Read,
-                    resolution_response.id_entries,
-                    &mut resolution_response.problems,
+                    visibility,
                 )
                 .await?;
 
@@ -209,22 +199,12 @@ impl ResourceFacade for LocalResourceFacadeImpl {
         &self,
         request: SearchResourcesRequest,
     ) -> Result<SearchResourcesResponse, ListResourcesError> {
-        // The principal's own account: the default for selectors naming no
-        // account, and the check that a principal without one cannot search.
-        let target_account = self
-            .resource_account_resolver
-            .resolve_target_account(&self.principal, None)
-            .await?;
-
-        let owner_id = self.resolve_owner(request.owner).await?;
-        let scope = self.resolve_scope(request.selectors, owner_id).await?;
-
-        if scope.is_vacuous() {
+        let Some(prepared) = self.prepare_search(request).await? else {
             return Ok(SearchResourcesResponse {
                 items: Vec::new(),
                 total_count: 0,
             });
-        }
+        };
 
         // One scoped query covering every type in the scope, so pagination is
         // global rather than per type. Querying each type separately cannot
@@ -232,67 +212,41 @@ impl ResourceFacade for LocalResourceFacadeImpl {
         let snapshots = self
             .generic_resource_query_service
             .list_snapshots(
-                &target_account.did,
-                &scope,
-                request.visibility,
-                owner_id,
-                request.pagination,
-            )
-            .await?;
-        let total_count = self
-            .generic_resource_query_service
-            .count_search_resource_handles(
-                &target_account.did,
-                &scope,
-                request.visibility,
-                owner_id,
+                &prepared.account_id,
+                &prepared.scope,
+                prepared.visibility,
+                prepared.owner_id,
+                prepared.pagination,
             )
             .await?;
 
         let items = self.summary_views_with_columns(snapshots)?;
 
-        Ok(SearchResourcesResponse { items, total_count })
+        Ok(SearchResourcesResponse {
+            items,
+            total_count: prepared.total_count,
+        })
     }
 
     async fn search_handles(
         &self,
         request: SearchResourcesRequest,
     ) -> Result<SearchResourceHandlesResponse, ListResourcesError> {
-        // The principal's own account: the default for selectors naming no
-        // account, and the check that a principal without one cannot search.
-        let target_account = self
-            .resource_account_resolver
-            .resolve_target_account(&self.principal, None)
-            .await?;
-
-        let owner_id = self.resolve_owner(request.owner).await?;
-        let scope = self.resolve_scope(request.selectors, owner_id).await?;
-
-        // Empty exact-name/id queries are vacuous.
-        if scope.is_vacuous() {
+        let Some(prepared) = self.prepare_search(request).await? else {
             return Ok(SearchResourceHandlesResponse {
                 items: Vec::new(),
                 total_count: 0,
             });
-        }
+        };
 
         let rows = self
             .generic_resource_query_service
             .search_resource_handles(
-                &target_account.did,
-                &scope,
-                request.visibility,
-                owner_id,
-                request.pagination,
-            )
-            .await?;
-        let total_count = self
-            .generic_resource_query_service
-            .count_search_resource_handles(
-                &target_account.did,
-                &scope,
-                request.visibility,
-                owner_id,
+                &prepared.account_id,
+                &prepared.scope,
+                prepared.visibility,
+                prepared.owner_id,
+                prepared.pagination,
             )
             .await?;
 
@@ -301,7 +255,10 @@ impl ResourceFacade for LocalResourceFacadeImpl {
             .map(ResourceHandleRow::into_handle)
             .collect::<Vec<_>>();
 
-        Ok(SearchResourceHandlesResponse { items, total_count })
+        Ok(SearchResourceHandlesResponse {
+            items,
+            total_count: prepared.total_count,
+        })
     }
 
     async fn plan_apply_manifest(
@@ -325,11 +282,7 @@ impl ResourceFacade for LocalResourceFacadeImpl {
         Ok(match plan {
             ApplyManifestPlanningDecision::Planned(mut plan) => {
                 plan.warnings.splice(0..0, prepared.header_warnings);
-                // The resolved handle names the account as it is now; a
-                // resource placed elsewhere keeps the handle placement gave
-                if plan.resource.headers.account.did == prepared.target_account.did {
-                    plan.resource.headers.set_account(prepared.target_account);
-                }
+                refresh_target_account(&mut plan.resource.headers, prepared.target_account);
 
                 ApplyManifestPlanningDecision::Planned(plan)
             }
@@ -360,11 +313,7 @@ impl ResourceFacade for LocalResourceFacadeImpl {
         Ok(match result {
             ApplyManifestApplicationDecision::Applied(mut result) => {
                 result.warnings.splice(0..0, prepared.header_warnings);
-                // The resolved handle names the account as it is now; a
-                // resource placed elsewhere keeps the handle placement gave
-                if result.resource.headers.account.did == prepared.target_account.did {
-                    result.resource.headers.set_account(prepared.target_account);
-                }
+                refresh_target_account(&mut result.resource.headers, prepared.target_account);
 
                 ApplyManifestApplicationDecision::Applied(result)
             }
@@ -444,25 +393,14 @@ impl ResourceFacade for LocalResourceFacadeImpl {
         // transaction (the `#[transactional_handler]` GraphQL handler, or the CLI command's
         // `transaction!` block), so a failure in a later group rolls back earlier deletions.
         for (group, access) in groups {
-            let (indexes, refs): (Vec<_>, Vec<_>) = group.entries.into_iter().unzip();
-
-            let grouped = group_batch_resource_refs(refs);
-            let mut resolution_response = resolve_batch_ids(
-                self.generic_resource_query_service.as_ref(),
-                &group.account.did,
-                &group.schema,
-                grouped,
-                ResourceVisibility::Active,
-            )
-            .await?;
-            resolution_response.id_entries = self
-                .retain_permitted_entries(
+            let (indexes, resolution_response) = self
+                .resolve_permitted_ids(
                     &group.account,
                     &group.schema,
+                    group.entries,
                     access,
                     ResourceAccountOperation::Delete,
-                    resolution_response.id_entries,
-                    &mut resolution_response.problems,
+                    ResourceVisibility::Active,
                 )
                 .await?;
 
@@ -766,13 +704,50 @@ impl LocalResourceFacadeImpl {
             let access = self
                 .dispatcher_factory
                 .crud_dispatcher_for_trusted_schema(group.schema.as_str())?
-                .check_account_access(&self.principal_handle()?, &group.account, operation)
+                .check_account_access(&self.principal.handle()?, &group.account, operation)
                 .await
                 .map_err(ResolveManifestAccountError::from_operation_error)?;
             groups.push((group, access));
         }
 
         Ok((groups, problems))
+    }
+
+    /// Resolves a group's refs to IDs and keeps those the principal may run
+    /// `operation` on. The response is indexed within the group; the returned
+    /// indexes map it back to the caller's positions.
+    async fn resolve_permitted_ids(
+        &self,
+        account: &odf::ResourceOwnerHandle,
+        schema: &TypeUri,
+        entries: Vec<(usize, ResourceRef)>,
+        access: ResourceAccountAccess,
+        operation: ResourceAccountOperation,
+        visibility: ResourceVisibility,
+    ) -> Result<(Vec<usize>, BatchIdsResolutionResponse), BatchResourceError> {
+        let (indexes, refs): (Vec<_>, Vec<_>) = entries.into_iter().unzip();
+
+        let grouped = group_batch_resource_refs(refs);
+        let mut resolution_response = resolve_batch_ids(
+            self.generic_resource_query_service.as_ref(),
+            &account.did,
+            schema,
+            grouped,
+            visibility,
+        )
+        .await?;
+        resolution_response.id_entries = self
+            .retain_permitted_entries(
+                account,
+                schema,
+                access,
+                operation,
+                resolution_response.id_entries,
+                &mut resolution_response.problems,
+            )
+            .await?;
+
+        Ok((indexes, resolution_response))
     }
 
     /// Keeps the entries whose resources the principal may run `operation`
@@ -813,7 +788,7 @@ impl LocalResourceFacadeImpl {
         let checked = self
             .dispatcher_factory
             .crud_dispatcher_for_trusted_schema(schema.as_str())?
-            .check_resource_operations(&self.principal_handle()?, account, operation, &checked_ids)
+            .check_resource_operations(&self.principal.handle()?, account, operation, &checked_ids)
             .await?;
         let mut results = HashMap::with_capacity(checked_ids.len());
         for (id, result) in checked_ids.into_iter().zip(checked) {
@@ -852,14 +827,6 @@ impl LocalResourceFacadeImpl {
         Ok(permitted)
     }
 
-    fn principal_handle(
-        &self,
-    ) -> Result<odf::metadata::auth::PrincipalHandle, ResolveManifestAccountError> {
-        self.principal
-            .handle()
-            .ok_or_else(|| ResourceAccountAccessError::AnonymousSubject.into())
-    }
-
     /// A selector of a type is checked by the type's guard; one without a
     /// type by the default rule
     async fn ensure_can_list(
@@ -878,7 +845,7 @@ impl LocalResourceFacadeImpl {
         self.dispatcher_factory
             .crud_dispatcher_for_trusted_schema(schema.as_str())
             .int_err()?
-            .check_list(&self.principal_handle()?, account, scope)
+            .check_list(&self.principal.handle()?, account, scope)
             .await
             .map_err(ResolveManifestAccountError::from_operation_error)
     }
@@ -920,6 +887,47 @@ impl LocalResourceFacadeImpl {
                 Ok(view)
             })
             .collect()
+    }
+
+    /// Resolves a search's account, owner and scope, and counts its matches.
+    /// `None` when the scope is vacuous, so nothing can match.
+    async fn prepare_search(
+        &self,
+        request: SearchResourcesRequest,
+    ) -> Result<Option<PreparedSearch>, ListResourcesError> {
+        // The principal's own account: the default for selectors naming no
+        // account, and the check that a principal without one cannot search.
+        let target_account = self
+            .resource_account_resolver
+            .resolve_target_account(&self.principal, None)
+            .await?;
+
+        let owner_id = self.resolve_owner(request.owner).await?;
+        let scope = self.resolve_scope(request.selectors, owner_id).await?;
+
+        // Empty exact-name/id queries are vacuous.
+        if scope.is_vacuous() {
+            return Ok(None);
+        }
+
+        let total_count = self
+            .generic_resource_query_service
+            .count_search_resource_handles(
+                &target_account.did,
+                &scope,
+                request.visibility,
+                owner_id,
+            )
+            .await?;
+
+        Ok(Some(PreparedSearch {
+            account_id: target_account.did,
+            scope,
+            owner_id,
+            visibility: request.visibility,
+            pagination: request.pagination,
+            total_count,
+        }))
     }
 
     /// Resolves the owner that narrows a search. One given by ID need not exist
@@ -1126,27 +1134,14 @@ impl LocalResourceFacadeImpl {
             .await?;
 
         for (group, access) in groups {
-            let (indexes, refs): (Vec<_>, Vec<_>) = group.entries.into_iter().unzip();
-
-            // Batch refs name their targets explicitly.
-            let grouped = group_batch_resource_refs(refs);
-
-            let mut resolution_response = resolve_batch_ids(
-                self.generic_resource_query_service.as_ref(),
-                &group.account.did,
-                &group.schema,
-                grouped,
-                visibility,
-            )
-            .await?;
-            resolution_response.id_entries = self
-                .retain_permitted_entries(
+            let (indexes, resolution_response) = self
+                .resolve_permitted_ids(
                     &group.account,
                     &group.schema,
+                    group.entries,
                     access,
                     ResourceAccountOperation::Read,
-                    resolution_response.id_entries,
-                    &mut resolution_response.problems,
+                    visibility,
                 )
                 .await?;
 
@@ -1494,9 +1489,30 @@ struct PreparedApplyManifest {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+struct PreparedSearch {
+    account_id: odf::AccountID,
+    scope: ResourceScope,
+    owner_id: Option<ResourceID>,
+    visibility: ResourceVisibility,
+    pagination: PaginationOpts,
+    total_count: usize,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 struct IndexedResource<T> {
     request_index: usize,
     item: T,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// The resolved handle names the account as it is now; a resource placed
+/// elsewhere keeps the handle placement gave
+fn refresh_target_account(headers: &mut ResourceHeaders, target_account: odf::ResourceOwnerHandle) {
+    if headers.account.did == target_account.did {
+        headers.set_account(target_account);
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

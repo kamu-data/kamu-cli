@@ -68,12 +68,12 @@ pub trait ResourceSelectionSyntaxService: Send + Sync {
     ) -> Result<ResourceSelectionSyntax, CLIError>;
 
     /// Parses the value of `--owner`, which names one resource: `type/name`,
-    /// `type/<id>` or `<id>`
+    /// `type/<id>` or `<id>`; `None` when the option is not given
     async fn parse_owner(
         &self,
         explicit_context_name: Option<&str>,
-        owner: &str,
-    ) -> Result<ResourceRef, CLIError>;
+        owner: Option<&str>,
+    ) -> Result<Option<ResourceRef>, CLIError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -30,12 +30,16 @@ pub async fn test_resources_owner_references(ctx: ResourceCtx) {
         &owner_id,
     ] {
         assert_eq!(
-            list_owned(&ctx, "%", owner).await,
+            ctx.list_names_of(&["%", "--owner", owner]).await,
             ["by-id", "by-name"],
             "{owner}"
         );
     }
-    assert_eq!(list_owned(&ctx, "vs/by-n%", "vs/owner").await, ["by-name"]);
+    assert_eq!(
+        ctx.list_names_of(&["vs/by-n%", "--owner", "vs/owner"])
+            .await,
+        ["by-name"]
+    );
 
     // -- 2. `get` narrows exact names and patterns alike ----------------------
     for (selector, expected) in [
@@ -81,7 +85,7 @@ pub async fn test_resources_owner_references(ctx: ResourceCtx) {
     ctx.assert_deleted(["delete", "vs/owner", "--force"], &["VariableSet/owner"])
         .await;
     assert_eq!(
-        list_owned(&ctx, "vs", &owner_id).await,
+        ctx.list_names_of(&["vs", "--owner", &owner_id]).await,
         ["by-id", "by-name"]
     );
     ctx.assert_failure(
@@ -135,20 +139,6 @@ async fn apply_owned(ctx: &ResourceCtx, name: &str, owner_reference: &str) {
         None,
     )
     .await;
-}
-
-async fn list_owned(ctx: &ResourceCtx, target: &str, owner: &str) -> Vec<String> {
-    let doc = ctx
-        .stdout_json(["list", target, "--owner", owner, "-o", "json"])
-        .await;
-    let mut names = doc
-        .as_array()
-        .unwrap()
-        .iter()
-        .map(|row| row["Name"].as_str().unwrap().to_string())
-        .collect::<Vec<_>>();
-    names.sort();
-    names
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

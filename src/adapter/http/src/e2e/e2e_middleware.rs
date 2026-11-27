@@ -16,6 +16,8 @@ use http::Method;
 use http_common::ApiError;
 use serde::Deserialize;
 
+use crate::GRAPHQL_PATH;
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// Middleware that completes the background work of mutable requests before
@@ -52,7 +54,7 @@ async fn analyze_request_for_mutability(request: Request) -> Result<(bool, Reque
         }
     }
     {
-        let is_rest_api_post_request = request.uri().path() != "/graphql";
+        let is_rest_api_post_request = request.uri().path() != GRAPHQL_PATH;
 
         if is_rest_api_post_request {
             return Ok((true, request));

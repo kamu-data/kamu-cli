@@ -18,6 +18,7 @@ use crate::domain::{
     FindOwnedSnapshotsOutcome,
     GenericResourceQueryService,
     ResourceHandleRow,
+    ResourceHeadersExt,
     ResourceID,
     ResourceName,
     ResourceNotOwnedByAccountError,
@@ -120,7 +121,7 @@ impl GenericResourceQueryService for GenericResourceQueryServiceImpl {
             .resource_repository
             .find_resource_snapshot(&query)
             .await?
-            .filter(|snapshot| snapshot.headers.deleted_at.is_none())
+            .filter(|snapshot| !snapshot.headers.is_deleted())
         else {
             return Ok(None);
         };
@@ -159,7 +160,7 @@ impl GenericResourceQueryService for GenericResourceQueryServiceImpl {
             .find_resource_snapshots_by_ids(account_id, ids)
             .await?
             .into_iter()
-            .filter(|snapshot| snapshot.headers.deleted_at.is_none())
+            .filter(|snapshot| !snapshot.headers.is_deleted())
             .map(|snapshot| (snapshot.id, snapshot))
             .collect();
 
@@ -180,7 +181,7 @@ impl GenericResourceQueryService for GenericResourceQueryServiceImpl {
             .find_resource_snapshots_by_schema_and_ids(schema, &missing_ids)
             .await?
             .into_iter()
-            .filter(|snapshot| snapshot.headers.deleted_at.is_none())
+            .filter(|snapshot| !snapshot.headers.is_deleted())
             .map(|snapshot| snapshot.id)
             .collect();
 

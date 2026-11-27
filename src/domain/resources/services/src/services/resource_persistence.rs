@@ -312,54 +312,40 @@ macro_rules! declare_resource_persistence_service {
             extension_schema_registry: std::sync::Arc<$crate::ResourceExtensionSchemaRegistry>,
         }
 
+        impl $service {
+            fn helper(&self) -> $crate::ResourcePersistenceServiceHelper<'_, $resource> {
+                $crate::ResourcePersistenceServiceHelper::new(
+                    self.resource_repository.as_ref(),
+                    self.label_projection_repository.as_ref(),
+                    self.owner_projection_repository.as_ref(),
+                    self.controller_state_repository.as_ref(),
+                    self.event_store.as_ref(),
+                    self.extension_schema_registry.as_ref(),
+                )
+            }
+        }
+
         #[async_trait::async_trait]
         impl kamu_resources::ResourcePersistenceService<$resource> for $service {
             async fn create(
                 &self,
                 resource: &mut $resource,
             ) -> Result<(), kamu_resources::ResourcePersistenceError> {
-                let helper = $crate::ResourcePersistenceServiceHelper::<$resource>::new(
-                    self.resource_repository.as_ref(),
-                    self.label_projection_repository.as_ref(),
-                    self.owner_projection_repository.as_ref(),
-                    self.controller_state_repository.as_ref(),
-                    self.event_store.as_ref(),
-                    self.extension_schema_registry.as_ref(),
-                );
-
-                helper.create(resource).await
+                self.helper().create(resource).await
             }
 
             async fn save(
                 &self,
                 resource: &mut $resource,
             ) -> Result<(), kamu_resources::ResourcePersistenceError> {
-                let helper = $crate::ResourcePersistenceServiceHelper::<$resource>::new(
-                    self.resource_repository.as_ref(),
-                    self.label_projection_repository.as_ref(),
-                    self.owner_projection_repository.as_ref(),
-                    self.controller_state_repository.as_ref(),
-                    self.event_store.as_ref(),
-                    self.extension_schema_registry.as_ref(),
-                );
-
-                helper.save(resource).await
+                self.helper().save(resource).await
             }
 
             async fn save_many(
                 &self,
                 resources: &mut [$resource],
             ) -> Result<(), kamu_resources::ResourcePersistenceError> {
-                let helper = $crate::ResourcePersistenceServiceHelper::<$resource>::new(
-                    self.resource_repository.as_ref(),
-                    self.label_projection_repository.as_ref(),
-                    self.owner_projection_repository.as_ref(),
-                    self.controller_state_repository.as_ref(),
-                    self.event_store.as_ref(),
-                    self.extension_schema_registry.as_ref(),
-                );
-
-                helper.save_many(resources).await
+                self.helper().save_many(resources).await
             }
         }
     };

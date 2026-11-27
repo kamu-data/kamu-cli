@@ -11,6 +11,7 @@ use kamu_resources::{
     ApplyManifestApplicationDecision,
     ApplyManifestPlanningDecision,
     ApplyResourceOutcome,
+    ApplyResourceRejectionCategory,
     Resource,
     ResourceHandle,
     ResourceID,
@@ -18,7 +19,7 @@ use kamu_resources::{
     ResourceSummaryView,
     TypeUri,
 };
-use kamu_resources_facade::BatchResourceResponse;
+use kamu_resources_facade::{ApplyManifestRequest, BatchResourceResponse, ResourceFacade};
 use pretty_assertions::assert_eq;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -193,5 +194,29 @@ pub fn normalize_handles(views: &mut [ResourceHandle]) {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Plan and apply reject alike
+pub async fn assert_plan_and_apply_rejected(
+    facade: &dyn ResourceFacade,
+    request: ApplyManifestRequest,
+    category: ApplyResourceRejectionCategory,
+) -> String {
+    let planned = facade.plan_apply_manifest(request.clone()).await.unwrap();
+    let ApplyManifestPlanningDecision::Rejected(plan_rejection) = planned else {
+        panic!("expected a rejected plan, got: {planned:?}");
+    };
+
+    let applied = facade.apply_manifest(request).await.unwrap();
+    let ApplyManifestApplicationDecision::Rejected(rejection) = applied else {
+        panic!("expected a rejected apply, got: {applied:?}");
+    };
+
+    assert_eq!(plan_rejection.category, category);
+    assert_eq!(rejection.category, category);
+    assert_eq!(plan_rejection.message, rejection.message);
+    rejection.message
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

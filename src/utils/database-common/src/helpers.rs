@@ -63,6 +63,25 @@ pub fn sqlite_generate_placeholders_tuple_list_2(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Appends `(?, ?, ...)` with one bind per value, for an `IN` list.
+///
+/// UUID lists go through it rather than `json_each`: UUIDs bind as blobs.
+pub fn sqlite_push_bind_list<'t, T>(
+    query_builder: &mut sqlx::QueryBuilder<sqlx::Sqlite>,
+    values: impl IntoIterator<Item = T>,
+) where
+    T: sqlx::Encode<'t, sqlx::Sqlite> + sqlx::Type<sqlx::Sqlite>,
+{
+    query_builder.push("(");
+    let mut separated = query_builder.separated(", ");
+    for value in values {
+        separated.push_bind(value);
+    }
+    query_builder.push(")");
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[test]
 fn test_sqlite_generate_placeholders_list() {
     use sqlite_generate_placeholders_list as f;

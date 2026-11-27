@@ -110,11 +110,7 @@ impl ResourceRemovalListener for InMemoryResourceOwnerProjectionRepository {
         self.state
             .owners_by_resource_id
             .write(self.transaction_id, |owners_by_resource_id| {
-                for id in ids {
-                    if owners_by_resource_id.view().contains_key(id) {
-                        owners_by_resource_id.delete(*id);
-                    }
-                }
+                owners_by_resource_id.delete_where(|id| ids.contains(id));
             });
         Ok(())
     }

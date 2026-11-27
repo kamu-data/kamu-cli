@@ -11,7 +11,6 @@ use chrono::{DateTime, Utc};
 use internal_error::InternalError;
 use messaging_outbox::{Outbox, OutboxExt};
 use serde::Serialize;
-use time_source::SystemTimeSource;
 
 use crate::domain::{
     ApplyResourceAccessCheck,
@@ -26,23 +25,19 @@ use crate::domain::{
     CreationProvenance,
     DeclarativeResource,
     EventSourcedResource,
-    GenericResourceQueryService,
     IntoApplyResourceRejection,
     InvariantViolationOf,
     MESSAGE_PRODUCER_KAMU_RESOURCE_SERVICE,
-    ResourceAggregateLoader,
     ResourceHeadersExt,
     ResourceHeadersValidationError,
     ResourceLifecycleMessage,
     ResourceLifecycleMessageOutcome,
     ResourceLinterSpec,
-    ResourceNameSuffixGenerator,
     ResourcePersistenceError,
     ResourcePersistenceService,
     ResourceSchemaProvider,
     ResourceSpecFromInput,
     ResourceValidateSpec,
-    TypedResourceQueryService,
 };
 use crate::{
     ApplyResourcePlanner,
@@ -58,13 +53,9 @@ pub struct ApplyResourcePlanExecutor<'a, R>
 where
     R: EventSourcedResource + ResourceSchemaProvider,
 {
-    generic_resource_query_service: &'a dyn GenericResourceQueryService,
-    typed_resource_query_service: &'a dyn TypedResourceQueryService<R>,
-    resource_aggregate_loader: &'a dyn ResourceAggregateLoader<R>,
+    planner: ApplyResourcePlanner<'a, R>,
     resource_persistence_service: &'a dyn ResourcePersistenceService<R>,
-    name_suffix_generator: &'a dyn ResourceNameSuffixGenerator,
     outbox: &'a dyn Outbox,
-    time_source: &'a dyn SystemTimeSource,
 }
 
 impl<'a, R> ApplyResourcePlanExecutor<'a, R>
@@ -78,22 +69,14 @@ where
         + IntoApplyResourceRejection,
 {
     pub fn new(
-        generic_resource_query_service: &'a dyn GenericResourceQueryService,
-        typed_resource_query_service: &'a dyn TypedResourceQueryService<R>,
-        resource_aggregate_loader: &'a dyn ResourceAggregateLoader<R>,
+        planner: ApplyResourcePlanner<'a, R>,
         resource_persistence_service: &'a dyn ResourcePersistenceService<R>,
-        name_suffix_generator: &'a dyn ResourceNameSuffixGenerator,
         outbox: &'a dyn Outbox,
-        time_source: &'a dyn SystemTimeSource,
     ) -> Self {
         Self {
-            generic_resource_query_service,
-            typed_resource_query_service,
-            resource_aggregate_loader,
+            planner,
             resource_persistence_service,
-            name_suffix_generator,
             outbox,
-            time_source,
         }
     }
 
@@ -190,7 +173,7 @@ where
             InternalError::new("A resource planned for creation has no creation provenance")
         })?;
 
-        self.planner()
+        self.planner
             .plan_create_resource(
                 ApplyResourceParams {
                     id: None,
@@ -207,16 +190,6 @@ where
                 },
             )
             .await
-    }
-
-    fn planner(&self) -> ApplyResourcePlanner<'a, R> {
-        ApplyResourcePlanner::new(
-            self.generic_resource_query_service,
-            self.typed_resource_query_service,
-            self.resource_aggregate_loader,
-            self.name_suffix_generator,
-            self.time_source,
-        )
     }
 
     fn make_apply_result(&self, plan: PlannedApplyResource<R>) -> ApplyResourceResult<R> {

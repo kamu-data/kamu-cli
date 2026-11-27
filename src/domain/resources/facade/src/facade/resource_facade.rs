@@ -249,6 +249,18 @@ pub struct SearchResourcesRequest {
     pub pagination: PaginationOpts,
 }
 
+impl SearchResourcesRequest {
+    /// A search of active resources, of any owner
+    pub fn new(selectors: Vec<ResourceSelector>, pagination: PaginationOpts) -> Self {
+        Self {
+            selectors,
+            owner: None,
+            visibility: ResourceVisibility::Active,
+            pagination,
+        }
+    }
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone)]

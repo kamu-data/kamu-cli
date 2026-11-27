@@ -16,46 +16,17 @@ use crate::contract_test;
 use crate::harness::{FacadeContractHarness, TestAccount};
 use crate::helpers::{
     SECRET_SET_CANONICAL_SELECTOR,
-    VARIABLE_SET_CANONICAL_SELECTOR,
     VARIABLE_SET_SCHEMA_STR,
     assert_handle_fields,
     assert_resource_view_fields,
     assert_single_batch_problem,
     assert_single_batch_success,
     create_variable_set,
+    variable_set_ref_by_id,
+    variable_set_ref_by_name,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-fn by_name_selector(name: &str) -> ResourceRef {
-    ResourceRef {
-        account: None,
-        r#type: Some(
-            VARIABLE_SET_CANONICAL_SELECTOR
-                .parse::<TypeName>()
-                .unwrap()
-                .into(),
-        ),
-        id: None,
-        did: None,
-        name: Some(name.parse().unwrap()),
-    }
-}
-
-fn by_id_selector(id: &kamu_resources::ResourceID) -> ResourceRef {
-    ResourceRef {
-        account: None,
-        r#type: Some(
-            VARIABLE_SET_CANONICAL_SELECTOR
-                .parse::<TypeName>()
-                .unwrap()
-                .into(),
-        ),
-        id: Some(*id),
-        did: None,
-        name: None,
-    }
-}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -69,7 +40,7 @@ pub async fn test_get_by_name(h: &impl FacadeContractHarness) {
     let view = assert_single_batch_success(
         facade
             .get(
-                vec![by_name_selector("get-name-test")],
+                vec![variable_set_ref_by_name("get-name-test")],
                 SpecViewOpts::ENCRYPTED,
                 ResourceVisibility::Active,
             )
@@ -94,7 +65,7 @@ pub async fn test_get_by_uid(h: &impl FacadeContractHarness) {
     let view_by_uid = assert_single_batch_success(
         facade
             .get(
-                vec![by_id_selector(&id)],
+                vec![variable_set_ref_by_id(id)],
                 SpecViewOpts::ENCRYPTED,
                 ResourceVisibility::Active,
             )
@@ -118,7 +89,7 @@ pub async fn test_get_handle_by_name(h: &impl FacadeContractHarness) {
     let handle = assert_single_batch_success(
         facade
             .get_handles(
-                vec![by_name_selector("ident-name-test")],
+                vec![variable_set_ref_by_name("ident-name-test")],
                 ResourceVisibility::Active,
             )
             .await
@@ -151,7 +122,7 @@ pub async fn test_get_handle_by_uid(h: &impl FacadeContractHarness) {
     let handle_by_name = assert_single_batch_success(
         facade
             .get_handles(
-                vec![by_name_selector("ident-id-test")],
+                vec![variable_set_ref_by_name("ident-id-test")],
                 ResourceVisibility::Active,
             )
             .await
@@ -159,7 +130,7 @@ pub async fn test_get_handle_by_uid(h: &impl FacadeContractHarness) {
     );
     let handle_by_uid = assert_single_batch_success(
         facade
-            .get_handles(vec![by_id_selector(&id)], ResourceVisibility::Active)
+            .get_handles(vec![variable_set_ref_by_id(id)], ResourceVisibility::Active)
             .await
             .unwrap(),
     );
@@ -185,7 +156,7 @@ pub async fn test_get_missing_name_returns_not_found(h: &impl FacadeContractHarn
 
     let get_result = facade
         .get(
-            vec![by_name_selector("no-such-resource")],
+            vec![variable_set_ref_by_name("no-such-resource")],
             SpecViewOpts::ENCRYPTED,
             ResourceVisibility::Active,
         )
@@ -199,7 +170,7 @@ pub async fn test_get_missing_name_returns_not_found(h: &impl FacadeContractHarn
 
     let handle_result = facade
         .get_handles(
-            vec![by_name_selector("no-such-resource")],
+            vec![variable_set_ref_by_name("no-such-resource")],
             ResourceVisibility::Active,
         )
         .await
@@ -225,7 +196,7 @@ pub async fn test_get_missing_uid_returns_not_found(h: &impl FacadeContractHarne
 
     let get_result = facade
         .get(
-            vec![by_id_selector(&absent_uid)],
+            vec![variable_set_ref_by_id(absent_uid)],
             SpecViewOpts::ENCRYPTED,
             ResourceVisibility::Active,
         )
@@ -239,7 +210,7 @@ pub async fn test_get_missing_uid_returns_not_found(h: &impl FacadeContractHarne
 
     let handle_result = facade
         .get_handles(
-            vec![by_id_selector(&absent_uid)],
+            vec![variable_set_ref_by_id(absent_uid)],
             ResourceVisibility::Active,
         )
         .await

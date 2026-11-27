@@ -292,24 +292,27 @@ pub async fn test_resources_deletion_visibility(ctx: ResourceCtx) {
         .await;
     }
     assert_eq!(
-        got_ids_and_phases(&ctx, &["vs", gone, "--include-deleted"]).await,
+        ctx.get_ids_and_phases(&["vs", gone, "--include-deleted"])
+            .await,
         [(gone_id.clone(), "Deleted".to_string())]
     );
-    let reused_phases = got_ids_and_phases(&ctx, &["vs", reused, "--include-deleted"]).await;
+    let reused_phases = ctx
+        .get_ids_and_phases(&["vs", reused, "--include-deleted"])
+        .await;
     assert_eq!(
         reused_phases.iter().map(|(id, _)| id).collect::<Vec<_>>(),
         [&new_id, &reused_id],
         "the live resource comes first"
     );
     assert_eq!(
-        got_ids_and_phases(&ctx, &["vs", reused, "--deleted"]).await,
+        ctx.get_ids_and_phases(&["vs", reused, "--deleted"]).await,
         [(reused_id.clone(), "Deleted".to_string())]
     );
 
     // -- 2. An id finds a resource in any state -------------------------------
     for args in [vec![gone_id.as_str()], vec!["vs", gone_id.as_str()]] {
         assert_eq!(
-            got_ids_and_phases(&ctx, &args).await,
+            ctx.get_ids_and_phases(&args).await,
             [(gone_id.clone(), "Deleted".to_string())]
         );
     }
@@ -326,15 +329,16 @@ pub async fn test_resources_deletion_visibility(ctx: ResourceCtx) {
 
     // -- 3. Listings of deleted resources run newest deletion first -----------
     assert_eq!(
-        listed_names_and_phases(&ctx, &["vs", "--deleted"]).await,
+        ctx.list_names_and_phases(&["vs", "--deleted"]).await,
         [(reused, "Deleted"), (gone, "Deleted")].map(to_owned_pair)
     );
     assert_eq!(
-        listed_names_and_phases(&ctx, &["vs", "--deleted", "--max-results", "1"]).await,
+        ctx.list_names_and_phases(&["vs", "--deleted", "--max-results", "1"])
+            .await,
         [(reused, "Deleted")].map(to_owned_pair)
     );
     assert_eq!(
-        listed_names_and_phases(&ctx, &["%", "--include-deleted"])
+        ctx.list_names_and_phases(&["%", "--include-deleted"])
             .await
             .into_iter()
             .map(|(name, _)| name)
@@ -342,7 +346,7 @@ pub async fn test_resources_deletion_visibility(ctx: ResourceCtx) {
         [live, reused, reused, gone]
     );
     assert_eq!(
-        listed_names_and_phases(&ctx, &["vs", "--include-deleting"])
+        ctx.list_names_and_phases(&["vs", "--include-deleting"])
             .await
             .into_iter()
             .map(|(name, _)| name)
@@ -350,7 +354,7 @@ pub async fn test_resources_deletion_visibility(ctx: ResourceCtx) {
         [live, reused]
     );
     assert_eq!(
-        listed_names_and_phases(&ctx, &[&gone_id]).await,
+        ctx.list_names_and_phases(&[&gone_id]).await,
         [(gone, "Deleted")].map(to_owned_pair)
     );
 
@@ -428,33 +432,6 @@ async fn seed_delete_fixtures(
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-/// Runs `get <args>` and returns the id and phase of each resource, in order.
-async fn got_ids_and_phases(ctx: &ResourceCtx, args: &[&str]) -> Vec<(String, String)> {
-    ctx.get_views(["get"].iter().chain(args).copied())
-        .await
-        .iter()
-        .map(|view| (view.id(), view.phase().to_string()))
-        .collect()
-}
-
-/// Runs `list <args>` and returns the name and phase of each resource, in
-/// order.
-async fn listed_names_and_phases(ctx: &ResourceCtx, args: &[&str]) -> Vec<(String, String)> {
-    let doc = ctx
-        .stdout_json(["list"].iter().chain(args).chain(&["-o", "json"]).copied())
-        .await;
-    doc.as_array()
-        .unwrap()
-        .iter()
-        .map(|row| {
-            to_owned_pair((
-                row["Name"].as_str().unwrap(),
-                row["Phase"].as_str().unwrap(),
-            ))
-        })
-        .collect()
-}
 
 fn to_owned_pair((name, phase): (&str, &str)) -> (String, String) {
     (name.to_string(), phase.to_string())

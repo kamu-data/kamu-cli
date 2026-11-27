@@ -170,14 +170,7 @@ pub struct TestResource(pub Aggregate<TestResourceState, dyn TestResourceEventSt
 impl TestResource {
     pub const SCHEMA_STR: &'static str = "https://test.kamu.dev/schemas/test/v1/TestResource";
 
-    pub const CANONICAL_SELECTOR_NAME_STR: &'static str = "testresources";
-    pub const CANONICAL_SELECTOR_NAME: kamu_resources::ResourceSelectorName =
-        kamu_resources::ResourceSelectorName::new_unchecked_static(
-            Self::CANONICAL_SELECTOR_NAME_STR,
-        );
-
-    pub const SELECTOR_ALIAS_STRS: &'static [&'static str] = &[];
-    pub const SELECTOR_ALIASES: &'static [kamu_resources::ResourceSelectorName] = &[];
+    kamu_resources::declare_resource_selector_constants!("testresources", []);
 
     /// A spec value `staged:<stage>` starts the resource with that
     /// `TestStage` condition

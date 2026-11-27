@@ -11,8 +11,6 @@ use std::collections::BTreeSet;
 
 use database_common::PaginationOpts;
 use kamu_resources::{
-    ApplyManifestApplicationDecision,
-    ApplyManifestPlanningDecision,
     ApplyResourceOutcome,
     ApplyResourceRejectionCategory,
     MAX_OWNER_REFERENCES,
@@ -45,8 +43,12 @@ use crate::helpers::{
     VARIABLE_SET_CANONICAL_SELECTOR,
     VARIABLE_SET_SCHEMA_STR,
     apply_manifest_and_get_id,
+    assert_plan_and_apply_rejected,
     assert_single_batch_success,
     create_variable_set,
+    get_resource,
+    ref_by_id,
+    variable_set_ref_by_name,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -69,7 +71,7 @@ pub async fn test_owners_are_stored_and_rendered(h: &impl FacadeContractHarness)
     )
     .await;
 
-    let resource = get_resource(facade.as_ref(), by_id(id)).await;
+    let resource = get_resource(facade.as_ref(), ref_by_id(id)).await;
     let owners = resource.headers.owner_references.as_ref().unwrap();
     assert_eq!(
         owners
@@ -114,7 +116,7 @@ pub async fn test_wrong_owners_are_rejected(h: &impl FacadeContractHarness) {
     let foreign = create_variable_set(h, TestAccount::Bob, "foreign").await;
     let owned = create_owned(h, "owned", serde_json::json!([])).await;
     let deleting = create_variable_set(h, TestAccount::Alice, "deleting").await;
-    facade.delete(vec![by_id(deleting)]).await.unwrap();
+    facade.delete(vec![ref_by_id(deleting)]).await.unwrap();
 
     use ApplyResourceRejectionCategory as C;
     for (owner_references, expected) in [
@@ -155,23 +157,12 @@ pub async fn test_wrong_owners_are_rejected(h: &impl FacadeContractHarness) {
             C::BusinessValidationFailed,
         ),
     ] {
-        let manifest = owned_manifest("owned", &owner_references);
-
-        let planned = facade
-            .plan_apply_manifest(request(manifest.clone()))
-            .await
-            .unwrap();
-        let ApplyManifestPlanningDecision::Rejected(planned) = planned else {
-            panic!("planned with {owner_references}");
-        };
-        assert_eq!(planned.category, expected, "{owner_references}");
-
-        let applied = facade.apply_manifest(request(manifest)).await.unwrap();
-        let ApplyManifestApplicationDecision::Rejected(applied) = applied else {
-            panic!("applied with {owner_references}");
-        };
-        assert_eq!(applied.category, expected, "{owner_references}");
-        assert_eq!(applied.message, planned.message);
+        assert_plan_and_apply_rejected(
+            facade.as_ref(),
+            request(owned_manifest("owned", &owner_references)),
+            expected,
+        )
+        .await;
     }
 }
 
@@ -238,7 +229,7 @@ pub async fn test_owner_is_kept_after_its_deletion(h: &impl FacadeContractHarnes
     let facade = h.facade_for(TestAccount::Alice);
     let owner = create_variable_set(h, TestAccount::Alice, "owner").await;
     let id = create_owned(h, "owned", serde_json::json!([{ "id": owner }])).await;
-    facade.delete(vec![by_id(owner)]).await.unwrap();
+    facade.delete(vec![ref_by_id(owner)]).await.unwrap();
     h.settle().await;
 
     let rendered = rendered_manifest(facade.as_ref(), id).await;
@@ -266,7 +257,7 @@ pub async fn test_owner_is_kept_after_its_deletion(h: &impl FacadeContractHarnes
     assert_eq!(
         search_owned(
             facade.as_ref(),
-            by_id(owner),
+            ref_by_id(owner),
             ResourceVisibility::IncludeDeleted
         )
         .await
@@ -318,14 +309,14 @@ pub async fn test_owners_follow_the_renamed_account(h: &impl FacadeContractHarne
         facade.as_ref(),
         ResourceRef {
             account: Some(ResourceOwnerRef::from(account_id)),
-            ..by_id(id)
+            ..ref_by_id(id)
         },
     )
     .await;
     assert_owners_account_name(&found, &new_name);
 
     // A session that began before the rename still names the account the old way
-    let found = get_resource(facade.as_ref(), by_id(id)).await;
+    let found = get_resource(facade.as_ref(), ref_by_id(id)).await;
     assert_owners_account_name(&found, &h.account_name(TestAccount::Alice));
 }
 
@@ -346,22 +337,22 @@ pub async fn test_search_by_owner(h: &impl FacadeContractHarness) {
     .await;
     create_owned(h, "of-other", serde_json::json!([{ "id": other }])).await;
     let deleted = create_owned(h, "deleted", serde_json::json!([{ "id": owner }])).await;
-    facade.delete(vec![by_id(deleted)]).await.unwrap();
+    facade.delete(vec![ref_by_id(deleted)]).await.unwrap();
     h.settle().await;
 
     let names = |names: &[&str]| names.iter().copied().map(String::from).collect();
 
     use ResourceVisibility as V;
     for reference in [
-        by_id(owner),
-        by_name("owner"),
+        ref_by_id(owner),
+        variable_set_ref_by_name("owner"),
         ResourceRef {
             id: Some(owner),
-            ..by_name("OWNER")
+            ..variable_set_ref_by_name("OWNER")
         },
         ResourceRef {
             account: Some(ResourceOwnerRef::from(h.account_name(TestAccount::Alice))),
-            ..by_name("owner")
+            ..variable_set_ref_by_name("owner")
         },
     ] {
         for (visibility, expected) in [
@@ -397,7 +388,7 @@ pub async fn test_search_by_owner(h: &impl FacadeContractHarness) {
     ] {
         let request = SearchResourcesRequest {
             selectors: vec![selector],
-            ..search_request(by_id(owner), V::Active)
+            ..search_request(ref_by_id(owner), V::Active)
         };
         assert_eq!(search(facade.as_ref(), request).await.unwrap(), expected);
     }
@@ -406,7 +397,7 @@ pub async fn test_search_by_owner(h: &impl FacadeContractHarness) {
     assert_eq!(
         search_owned(
             h.facade_for(TestAccount::Bob).as_ref(),
-            by_id(owner),
+            ref_by_id(owner),
             V::IncludeDeleted
         )
         .await
@@ -428,7 +419,7 @@ pub async fn test_owner_to_search_by_is_resolved(h: &impl FacadeContractHarness)
     let facade = facade.as_ref();
     let owner = create_variable_set(h, TestAccount::Alice, "owner").await;
     create_owned(h, "owned", serde_json::json!([{ "id": owner }])).await;
-    facade.delete(vec![by_id(owner)]).await.unwrap();
+    facade.delete(vec![ref_by_id(owner)]).await.unwrap();
     h.settle().await;
 
     use ListResourcesError as E;
@@ -437,13 +428,15 @@ pub async fn test_owner_to_search_by_is_resolved(h: &impl FacadeContractHarness)
 
     // An ID finds the resources of an owner that is gone
     assert_eq!(
-        search_owned(facade, by_id(owner), V::Active).await.unwrap(),
+        search_owned(facade, ref_by_id(owner), V::Active)
+            .await
+            .unwrap(),
         BTreeSet::from(["owned".to_string()])
     );
     assert_eq!(
         search_owned(
             facade,
-            by_id(ResourceID::new(uuid::Uuid::new_v4())),
+            ref_by_id(ResourceID::new(uuid::Uuid::new_v4())),
             V::Active
         )
         .await
@@ -454,7 +447,7 @@ pub async fn test_owner_to_search_by_is_resolved(h: &impl FacadeContractHarness)
     // A name finds live owners only, whatever the visibility
     for visibility in [V::Active, V::IncludeDeleted] {
         assert_matches!(
-            search_owned(facade, by_name("owner"), visibility).await,
+            search_owned(facade, variable_set_ref_by_name("owner"), visibility).await,
             Err(E::OwnerLookup(P::NameNotFound(_)))
         );
     }
@@ -464,7 +457,7 @@ pub async fn test_owner_to_search_by_is_resolved(h: &impl FacadeContractHarness)
             facade,
             ResourceRef {
                 id: Some(owner),
-                ..by_name("another")
+                ..variable_set_ref_by_name("another")
             },
             V::Active
         )
@@ -476,7 +469,7 @@ pub async fn test_owner_to_search_by_is_resolved(h: &impl FacadeContractHarness)
             facade,
             ResourceRef {
                 r#type: Some(SECRET_SET_CANONICAL_SELECTOR.parse().unwrap()),
-                ..by_id(owner)
+                ..ref_by_id(owner)
             },
             V::Active
         )
@@ -488,7 +481,7 @@ pub async fn test_owner_to_search_by_is_resolved(h: &impl FacadeContractHarness)
             facade,
             ResourceRef {
                 r#type: Some("UnknownType".parse().unwrap()),
-                ..by_name("owner")
+                ..variable_set_ref_by_name("owner")
             },
             V::Active
         )
@@ -500,7 +493,7 @@ pub async fn test_owner_to_search_by_is_resolved(h: &impl FacadeContractHarness)
             facade,
             ResourceRef {
                 r#type: None,
-                ..by_name("owner")
+                ..variable_set_ref_by_name("owner")
             },
             V::Active
         )
@@ -514,21 +507,6 @@ pub async fn test_owner_to_search_by_is_resolved(h: &impl FacadeContractHarness)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Helpers
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-fn by_id(id: ResourceID) -> ResourceRef {
-    ResourceRef {
-        id: Some(id),
-        ..ResourceRef::default()
-    }
-}
-
-fn by_name(name: &str) -> ResourceRef {
-    ResourceRef {
-        r#type: Some(VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap()),
-        name: Some(name.parse().unwrap()),
-        ..ResourceRef::default()
-    }
-}
 
 fn request(manifest: String) -> ApplyManifestRequest {
     ApplyManifestRequest {
@@ -559,18 +537,6 @@ async fn create_owned(
     .await
 }
 
-async fn get_resource(facade: &dyn ResourceFacade, resource_ref: ResourceRef) -> Resource {
-    let response = facade
-        .get(
-            vec![resource_ref],
-            SpecViewOpts::ENCRYPTED,
-            ResourceVisibility::Active,
-        )
-        .await
-        .unwrap();
-    assert_single_batch_success(response)
-}
-
 fn assert_owners_account_name(resource: &Resource, expected: &odf::AccountName) {
     let names = resource
         .headers
@@ -586,7 +552,7 @@ fn assert_owners_account_name(resource: &Resource, expected: &odf::AccountName) 
 async fn rendered_manifest(facade: &dyn ResourceFacade, id: ResourceID) -> String {
     let response = facade
         .render_manifests(
-            vec![by_id(id)],
+            vec![ref_by_id(id)],
             ResourceManifestFormat::Json,
             SpecViewOpts::ENCRYPTED,
             ResourceVisibility::Active,
@@ -607,13 +573,15 @@ async fn reapply(facade: &dyn ResourceFacade, manifest: String) -> ApplyResource
 
 fn search_request(owner: ResourceRef, visibility: ResourceVisibility) -> SearchResourcesRequest {
     SearchResourcesRequest {
-        selectors: vec![ResourceSelector::default()],
         owner: Some(owner),
         visibility,
-        pagination: PaginationOpts {
-            limit: 100,
-            offset: 0,
-        },
+        ..SearchResourcesRequest::new(
+            vec![ResourceSelector::default()],
+            PaginationOpts {
+                limit: 100,
+                offset: 0,
+            },
+        )
     }
 }
 

@@ -88,11 +88,12 @@ the features it lists.
      decisions, then apply them.
 4. **Report** with an ID per finding (`D1`, `R3`, `G2` …) so the user can answer in one line
    ("fix D1–D4, D5 as you recommend, skip D6"). For each: where, what is wrong, the fix or the
-   options. Every finding is reported. Skipping or deferring one is the user's decision, never
-   yours.
+   options, and its [value against effort](#value-against-effort). Every finding is reported.
+   Skipping or deferring one is the user's decision, never yours.
 5. **Validate** what the step touched: `make clippy` after Rust changes, `make lint-harness` after
-   docs or skills, the tests of the touched areas through nextest filtersets. The full suite runs
-   once, in the wrap-up, unless the user asks earlier; the user often runs it in parallel.
+   docs or skills, and the tests of the crates a fix changed, through nextest filtersets
+   (`package(...)`, not `rdeps(...)`). The wide run, every dependent and the full suite, happens
+   once in the wrap-up, unless the user asks earlier; the user often runs it in parallel.
 6. **Commit, once approved.** One commit per step, titled after the step and the scope, e.g.
    "Stage 0 Rust rules audit". If a step also applied decisions the user made after the report,
    a second commit may separate them ("… audit decisions"). The commit titles record which
@@ -100,6 +101,28 @@ the features it lists.
 
 The user's reply to a step's report often approves its commit and starts the next step at once.
 Within an approved step, do not ask again about each fix.
+
+### Value against effort
+
+Read as wide as the question needs, code older than the branch included: a pattern that spans
+areas is one finding, and limiting the reading to the diff misses it. What a step recommends doing
+is decided per finding, by what the work gains against what it costs. Rate each finding high,
+medium or low on both, with a one-line reason. Recommend the work only where the value clearly
+exceeds the effort. Report the rest in one line each as "not worth it", so the user can still
+take one. A pattern worth the work but too large for the branch becomes a follow-up ticket.
+
+The rating never removes a floor: a bug is always reported, and a written rule or a wrong
+statement is always fixed. It decides how much to do beyond that.
+
+| Step | Value is higher when | Effort is higher when | What the rating decides |
+|---|---|---|---|
+| Duplication | The copies changed more than once already, are large, or would drift into a bug | The fix spans many crates, changes a public API, or needs regeneration or wide test runs | Which copies get one home |
+| Rust rules | Readers and editors hit the code often | Restructuring: splitting a module, regrouping DI, moving a type across crates | The judgment calls only; the written rules apply as they are |
+| Integration audit | The failure is severe and likely: data loss and authorization before a slow path nobody runs | The fix is large, or changes behaviour that needs a changelog or a migration | Whether a fix lands in the branch or in a ticket; performance findings entirely |
+| Coverage gaps | A regression would do damage, the code is likely to change, other code relies on the behaviour | The level the test needs, cheapest first: unit, repository suite, service harness, e2e; a Postgres wiring adds a database | The lowest level that catches the regression; e2e only for a contract no lower level reaches |
+| Redundant tests | Removing it saves run time or upkeep: an e2e test or a database wiring saves most, a unit test almost nothing | Showing that another test still catches the same regression | Which e2e tests and wirings go; unit look-alikes merge only when that reads better |
+| Dependencies | The dependency is heavy, rarely updated, or widens the attack surface | Code must be rewritten to drop it | Feature trimming and replacements; an unused dependency always goes |
+| Design docs | The section is read often | Restructuring rather than fixing a sentence | Rewrites of sections that are correct but read badly |
 
 ## Wrap-up
 

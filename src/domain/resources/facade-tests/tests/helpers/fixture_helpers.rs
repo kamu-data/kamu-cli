@@ -7,12 +7,30 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use database_common::PaginationOpts;
 use kamu_configuration::{SecretSetResource, VariableSetResource};
-use kamu_resources::{ApplyResourceOutcome, ResourceID, ResourceLabelFilterInput, TypeUri};
-use kamu_resources_facade::{ApplyManifestRequest, ResourceManifestFormat};
+use kamu_resources::{
+    ApplyManifestApplicationDecision,
+    ApplyResourceOutcome,
+    Resource,
+    ResourceID,
+    ResourceLabelFilterInput,
+    ResourceRef,
+    ResourceSelector,
+    ResourceVisibility,
+    TypeUri,
+};
+use kamu_resources_facade::{
+    ApplyManifestRequest,
+    ResourceFacade,
+    ResourceManifestFormat,
+    SearchResourcesRequest,
+    SpecViewOpts,
+};
+use pretty_assertions::assert_matches;
 
 use crate::harness::{FacadeContractHarness, TestAccount};
-use crate::helpers::assert_applied_outcome;
+use crate::helpers::{assert_applied_outcome, assert_single_batch_success};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -126,6 +144,42 @@ pub fn total_schema_count(summary: kamu_resources::ResourcesSummary, schema: &Ty
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// A search request for `selectors`, with the defaults of
+/// [`SearchResourcesRequest::new`] and a page large enough for any fixture
+pub fn search_request(selectors: Vec<ResourceSelector>) -> SearchResourcesRequest {
+    SearchResourcesRequest::new(selectors, PaginationOpts::from_max_results(1000))
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// A ref to the `VariableSet` of this name, in the caller's account.
+pub fn variable_set_ref_by_name(name: &str) -> ResourceRef {
+    ResourceRef {
+        r#type: Some(VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap()),
+        name: Some(name.parse().unwrap()),
+        ..ResourceRef::default()
+    }
+}
+
+/// A ref to the `VariableSet` of this id.
+pub fn variable_set_ref_by_id(id: ResourceID) -> ResourceRef {
+    ResourceRef {
+        r#type: Some(VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap()),
+        id: Some(id),
+        ..ResourceRef::default()
+    }
+}
+
+/// A ref to the resource of this id, whatever its type.
+pub fn ref_by_id(id: ResourceID) -> ResourceRef {
+    ResourceRef {
+        id: Some(id),
+        ..ResourceRef::default()
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 /// Creates a default `VariableSet` (one `K=v` variable) and returns its id.
 ///
 /// The default fixture for tests that need *a* resource to exist and do not
@@ -196,6 +250,35 @@ pub fn label_filter(entries: &[(&str, &str)]) -> ResourceLabelFilterInput {
             })
             .collect(),
     }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Applies a `VariableSet` manifest through `facade`, asserting it is applied.
+pub async fn apply_variable_set(facade: &dyn ResourceFacade, name: &str, vars: &[(&str, &str)]) {
+    let decision = facade
+        .apply_manifest(ApplyManifestRequest {
+            format: ResourceManifestFormat::Json,
+            manifest: variable_set_manifest_json(name, None, vars),
+        })
+        .await
+        .unwrap();
+    assert_matches!(decision, ApplyManifestApplicationDecision::Applied(_));
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Gets the active resource `resource_ref` names, with its spec encrypted.
+pub async fn get_resource(facade: &dyn ResourceFacade, resource_ref: ResourceRef) -> Resource {
+    let response = facade
+        .get(
+            vec![resource_ref],
+            SpecViewOpts::ENCRYPTED,
+            ResourceVisibility::Active,
+        )
+        .await
+        .unwrap();
+    assert_single_batch_success(response)
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -22,7 +22,7 @@ pub fn request_creation_provenance(
     principal: &Principal,
     origin: &RequestOrigin,
 ) -> Result<CreationProvenance, InternalError> {
-    let principal = principal.handle().ok_or_else(|| {
+    let principal = principal.handle().map_err(|_| {
         InternalError::new("An anonymous principal reached the creation of a resource")
     })?;
 

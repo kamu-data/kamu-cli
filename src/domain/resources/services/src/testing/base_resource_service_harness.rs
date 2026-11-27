@@ -18,12 +18,17 @@ use kamu_accounts::{Account, AccountRepository, AccountType, Principal};
 use kamu_accounts_inmem::InMemoryAccountRepository;
 use kamu_core::RequestOrigin;
 use kamu_resources::{
+    ApplyResourceAccessCheck,
+    ApplyResourceAccountSource,
     ApplyResourceHeaders,
+    ApplyResourceParams,
     CreationProvenance,
+    DeclarativeResource,
     GenericResourceQueryService,
     MESSAGE_PRODUCER_KAMU_RESOURCE_SERVICE,
     ReconciliationError,
     ResourceControllerRuntimeConfig,
+    ResourceHeadersExt,
     ResourceHeadersInput,
     ResourceID,
     ResourceLifecycleMessage,
@@ -319,13 +324,42 @@ impl BaseResourceServiceHarness {
         ApplyResourceHeaders::try_new(Some(account.into()), None, vec![], vec![]).unwrap()
     }
 
+    /// Params of an apply in `account` that the guard checks, with
+    /// [`Self::make_provenance`]; a `None` name is left to the resource type
+    pub fn make_apply_params<R: DeclarativeResource>(
+        account: odf::ResourceOwnerHandle,
+        name: Option<&str>,
+        spec: R::SpecInput,
+    ) -> ApplyResourceParams<R> {
+        let headers = match name {
+            Some(name) => Self::make_headers_input(account, name).into(),
+            None => Self::make_nameless_headers(account),
+        };
+        Self::make_apply_params_with_headers(headers, spec)
+    }
+
+    /// [`Self::make_apply_params`] with the given headers
+    pub fn make_apply_params_with_headers<R: DeclarativeResource>(
+        headers: ApplyResourceHeaders,
+        spec: R::SpecInput,
+    ) -> ApplyResourceParams<R> {
+        ApplyResourceParams {
+            id: None,
+            headers,
+            account_source: ApplyResourceAccountSource::Manifest,
+            access_check: ApplyResourceAccessCheck::ByGuard,
+            spec,
+            provenance: Self::make_provenance(),
+        }
+    }
+
     pub async fn get_snapshot_by_id(&self, id: &ResourceID) -> Option<ResourceSnapshot> {
         self.generic_query_svc.get_snapshot_by_id(id).await.unwrap()
     }
 
     pub async fn is_deleted(&self, id: &ResourceID) -> bool {
         let snapshot = self.get_snapshot_by_id(id).await.unwrap();
-        snapshot.headers.deleted_at.is_some()
+        snapshot.headers.is_deleted()
     }
 
     pub async fn resource_id_by_name(

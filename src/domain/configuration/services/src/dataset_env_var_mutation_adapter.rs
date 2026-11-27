@@ -232,10 +232,21 @@ impl DatasetEnvVarMutationAdapterImpl {
     async fn apply_and_handle_rejection(
         &self,
         dispatcher: &Arc<dyn ResourceCrudDispatcher>,
-        request: ResourceCrudDispatcherApplyRequest,
+        id: Option<ResourceID>,
+        headers: ResourceHeadersInput,
+        spec: serde_json::Value,
         precondition: ApplyResourcePrecondition,
         resource_type_name: &str,
     ) -> Result<ResourceID, EnvVarSetWriteError> {
+        let request = ResourceCrudDispatcherApplyRequest {
+            account_source: ApplyResourceAccountSource::Manifest,
+            access_check: ApplyResourceAccessCheck::CheckedByCaller,
+            id,
+            headers: headers.into(),
+            spec,
+            provenance: self.creation_provenance()?,
+        };
+
         let apply_decision = match dispatcher
             .apply_with_precondition(request, precondition)
             .await
@@ -372,14 +383,9 @@ impl DatasetEnvVarMutationAdapterImpl {
 
         self.apply_and_handle_rejection(
             &dispatcher,
-            ResourceCrudDispatcherApplyRequest {
-                account_source: ApplyResourceAccountSource::Manifest,
-                access_check: ApplyResourceAccessCheck::CheckedByCaller,
-                id: existing_id,
-                headers: headers.into(),
-                spec: new_spec,
-                provenance: self.creation_provenance()?,
-            },
+            existing_id,
+            headers,
+            new_spec,
             precondition,
             "VariableSet",
         )
@@ -479,14 +485,9 @@ impl DatasetEnvVarMutationAdapterImpl {
 
         self.apply_and_handle_rejection(
             &dispatcher,
-            ResourceCrudDispatcherApplyRequest {
-                account_source: ApplyResourceAccountSource::Manifest,
-                access_check: ApplyResourceAccessCheck::CheckedByCaller,
-                id: existing_id,
-                headers: headers.into(),
-                spec: new_spec,
-                provenance: self.creation_provenance()?,
-            },
+            existing_id,
+            headers,
+            new_spec,
             precondition,
             "SecretSet",
         )
@@ -549,14 +550,9 @@ impl DatasetEnvVarMutationAdapterImpl {
             let headers = snapshot.headers.into_input();
             self.apply_and_handle_rejection(
                 &dispatcher,
-                ResourceCrudDispatcherApplyRequest {
-                    account_source: ApplyResourceAccountSource::Manifest,
-                    access_check: ApplyResourceAccessCheck::CheckedByCaller,
-                    id: Some(resource_id),
-                    headers: headers.into(),
-                    spec: serde_json::to_value(spec.into_input()).int_err()?,
-                    provenance: self.creation_provenance()?,
-                },
+                Some(resource_id),
+                headers,
+                serde_json::to_value(spec.into_input()).int_err()?,
                 precondition,
                 "VariableSet",
             )
@@ -608,14 +604,9 @@ impl DatasetEnvVarMutationAdapterImpl {
             let headers = snapshot.headers.into_input();
             self.apply_and_handle_rejection(
                 &dispatcher,
-                ResourceCrudDispatcherApplyRequest {
-                    account_source: ApplyResourceAccountSource::Manifest,
-                    access_check: ApplyResourceAccessCheck::CheckedByCaller,
-                    id: Some(resource_id),
-                    headers: headers.into(),
-                    spec: serde_json::to_value(new_spec).int_err()?,
-                    provenance: self.creation_provenance()?,
-                },
+                Some(resource_id),
+                headers,
+                serde_json::to_value(new_spec).int_err()?,
                 precondition,
                 "SecretSet",
             )
@@ -816,7 +807,7 @@ impl DatasetEnvVarMutationAdapterImpl {
         self.generic_resource_query_service
             .get_snapshot_by_id(resource_id)
             .await?
-            .filter(|snapshot| snapshot.headers.deleted_at.is_none())
+            .filter(|snapshot| !snapshot.headers.is_deleted())
             .ok_or_else(|| format!("Resource {resource_id} missing snapshot").int_err())
     }
 

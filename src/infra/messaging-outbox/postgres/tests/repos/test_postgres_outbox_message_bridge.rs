@@ -85,6 +85,9 @@ database_transactional_test!(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+// Postgres only: SQLite serializes writers and the in-memory bridge orders by
+// message ID alone, so only Postgres orders messages by transaction ID
+
 #[test_group::group(database, postgres)]
 #[test_log::test(sqlx::test(migrations = "../../../../migrations/postgres"))]
 async fn test_tx_id_priority_over_message_id_in_ordering(pg_pool: PgPool) {

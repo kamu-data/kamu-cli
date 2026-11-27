@@ -296,28 +296,39 @@ impl ResourceCtx {
         idents
     }
 
+    /// Run `get <args>` and return the id and phase of each resource, in
+    /// order
+    pub async fn get_ids_and_phases(&self, args: &[&str]) -> Vec<(String, String)> {
+        self.get_views(["get"].iter().chain(args).copied())
+            .await
+            .iter()
+            .map(|view| (view.id(), view.phase().to_string()))
+            .collect()
+    }
+
     /// Waits until the variable set is `Ready`: flows resolve variables from
     /// reconciled sets only, and reconciliation follows `apply` asynchronously
     pub async fn wait_until_variable_set_ready(&self, variable_set_name: &str) {
-        for _ in 0..60 {
-            if self.get_one(["get", "vs", variable_set_name]).await.phase() == "Ready" {
-                return;
-            }
-            tokio::time::sleep(Duration::from_millis(500)).await;
-        }
-        panic!("VariableSet {variable_set_name} did not become ready");
+        self.wait_until_phase(&["vs", variable_set_name], "Ready")
+            .await;
     }
 
     /// Waits until the resource is `Deleted`: a server cleans up after its
     /// response to the delete command
     pub async fn wait_until_deleted(&self, resource_id: &str) {
+        self.wait_until_phase(&[resource_id], "Deleted").await;
+    }
+
+    /// Waits until the one resource `get <args>` finds is in `phase`
+    pub async fn wait_until_phase(&self, args: &[&str], phase: &str) {
+        let get_args = ["get"].iter().chain(args).copied().collect::<Vec<_>>();
         for _ in 0..60 {
-            if self.get_one(["get", resource_id]).await.phase() == "Deleted" {
+            if self.get_one(get_args.iter().copied()).await.phase() == phase {
                 return;
             }
             tokio::time::sleep(Duration::from_millis(500)).await;
         }
-        panic!("Resource {resource_id} was not deleted");
+        panic!("`{}` did not reach phase {phase}", get_args.join(" "));
     }
 }
 

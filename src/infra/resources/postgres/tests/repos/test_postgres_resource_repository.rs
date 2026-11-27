@@ -264,15 +264,7 @@ database_transactional_test!(
 
 database_transactional_test!(
     storage = postgres,
-    fixture = resource_repo_suite::test_deleted_resource_round_trips,
-    harness = PostgresResourceRepositoryHarness
-);
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-database_transactional_test!(
-    storage = postgres,
-    fixture = resource_repo_suite::test_resource_being_deleted_round_trips,
+    fixture = resource_repo_suite::test_resource_in_deletion_round_trips,
     harness = PostgresResourceRepositoryHarness
 );
 
@@ -378,6 +370,14 @@ database_concurrent_transactions_test!(
 
 database_concurrent_transactions_test!(
     storage = postgres,
+    fixture = resource_repo_suite::test_update_resource_in_concurrent_transactions,
+    harness = PostgresResourceRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_concurrent_transactions_test!(
+    storage = postgres,
     fixture = resource_repo_suite::test_create_same_name_in_concurrent_transactions,
     harness = PostgresResourceRepositoryHarness
 );
@@ -396,6 +396,14 @@ database_concurrent_transactions_test!(
     storage = postgres,
     fixture =
         resource_repo_suite::test_create_name_twice_while_concurrent_deletion_request_frees_it,
+    harness = PostgresResourceRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_concurrent_transactions_test!(
+    storage = postgres,
+    fixture = resource_repo_suite::test_second_of_concurrent_purgers_claims_nothing,
     harness = PostgresResourceRepositoryHarness
 );
 

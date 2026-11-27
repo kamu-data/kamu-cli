@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use internal_error::{ErrorIntoInternal, InternalError};
-use kamu_accounts::Principal;
+use kamu_accounts::{AnonymousPrincipalError, Principal};
 use kamu_resources::{ResourceOperationError, ResourceOwnerRef};
 use thiserror::Error;
 
@@ -111,6 +111,18 @@ pub enum ResourceAccountAccessError {
 
     #[error(transparent)]
     Access(#[from] odf::AccessError),
+}
+
+impl From<AnonymousPrincipalError> for ResourceAccountAccessError {
+    fn from(_: AnonymousPrincipalError) -> Self {
+        Self::AnonymousSubject
+    }
+}
+
+impl From<AnonymousPrincipalError> for ResolveManifestAccountError {
+    fn from(err: AnonymousPrincipalError) -> Self {
+        ResourceAccountAccessError::from(err).into()
+    }
 }
 
 impl ResolveManifestAccountError {

@@ -10,6 +10,7 @@
 use event_sourcing::ConcurrentModificationError;
 use graphql_http::GraphqlHttpRequestError;
 use internal_error::{ErrorIntoInternal, InternalError};
+use kamu_accounts::AnonymousPrincipalError;
 use kamu_resources::{
     ApplyResourceCrudDispatcherError,
     RequestResourcesDeletionCrudDispatcherError,
@@ -310,6 +311,12 @@ pub enum BatchResourceError {
 
     #[error(transparent)]
     Internal(#[from] InternalError),
+}
+
+impl From<AnonymousPrincipalError> for BatchResourceError {
+    fn from(err: AnonymousPrincipalError) -> Self {
+        Self::AccountAccess(err.into())
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

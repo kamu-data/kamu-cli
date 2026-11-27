@@ -44,24 +44,10 @@ use crate::helpers::{
     assert_resource_view_fields,
     assert_single_batch_success,
     variable_set_manifest_json,
+    variable_set_ref_by_name,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-fn by_name(name: &str) -> ResourceRef {
-    ResourceRef {
-        account: None,
-        r#type: Some(
-            VARIABLE_SET_CANONICAL_SELECTOR
-                .parse::<TypeName>()
-                .unwrap()
-                .into(),
-        ),
-        id: None,
-        did: None,
-        name: Some(name.parse().unwrap()),
-    }
-}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -113,7 +99,7 @@ pub async fn test_local_created_readable_remotely(h: &impl FacadeContractHarness
     let view = assert_single_batch_success(
         remote
             .get(
-                vec![by_name("cross-local-to-remote")],
+                vec![variable_set_ref_by_name("cross-local-to-remote")],
                 SpecViewOpts::ENCRYPTED,
                 ResourceVisibility::Active,
             )
@@ -160,7 +146,7 @@ pub async fn test_remote_created_readable_locally(h: &impl FacadeContractHarness
     let view = assert_single_batch_success(
         local
             .get(
-                vec![by_name("cross-remote-to-local")],
+                vec![variable_set_ref_by_name("cross-remote-to-local")],
                 SpecViewOpts::ENCRYPTED,
                 ResourceVisibility::Active,
             )
@@ -196,7 +182,7 @@ pub async fn test_render_manifest_equivalence(h: &impl FacadeContractHarness) {
         .await
         .unwrap();
 
-    let selector = by_name("cross-render-eq");
+    let selector = variable_set_ref_by_name("cross-render-eq");
 
     // JSON equivalence
     let local_json = assert_single_batch_success(

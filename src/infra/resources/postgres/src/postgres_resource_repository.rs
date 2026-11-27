@@ -53,6 +53,133 @@ pub struct PostgresResourceRepository {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Runs a search over `resources r LEFT JOIN accounts a` with the given row type
+/// and `SELECT` list: the scope, visibility and owner filters, the listing order
+/// and the page. `$then` receives the built query as `$query`.
+///
+/// An owner takes a query text of its own: made conditional by an OR, the
+/// subquery can't become a join, which starts at the few rows of the owner.
+macro_rules! search_resources_query {
+    (
+        $row:ident,
+        $select:tt,
+        $flat:ident,
+        $visibility:ident,
+        $owner_id:ident,
+        $limit:ident,
+        $offset:ident,
+        |$query:ident| $then:expr
+    ) => {
+        match $owner_id {
+            Some(owner_id) => {
+                let $query = search_resources_query!(
+                    @query $row, $select, $flat, $visibility, $limit, $offset,
+                    "AND EXISTS (
+                        SELECT 1
+                        FROM resource_owners_projection ro
+                        WHERE ro.resource_id = r.resource_id
+                          AND ro.owner_id = $17
+                    )",
+                    owner_id
+                );
+                $then
+            }
+            None => {
+                let $query = search_resources_query!(
+                    @query $row, $select, $flat, $visibility, $limit, $offset, ""
+                );
+                $then
+            }
+        }
+    };
+    (
+        @query $row:ident, $select:tt, $flat:ident, $visibility:ident, $limit:ident, $offset:ident,
+        $owner_condition:tt $(, $owner_id:expr)?
+    ) => {
+        sqlx::query_as!(
+            $row,
+            $select + r#"
+            FROM resources r
+            LEFT JOIN accounts a ON a.id = r.account_id
+            WHERE (r.deletion_requested_at IS NOT NULL OR $12)
+              AND (r.deletion_requested_at IS NULL OR $13)
+              AND (r.deleted_at IS NULL OR $14)
+              -- Implied by the EXISTS below, but lets the planner read the rows
+              -- of one account and type from an index, in order.
+              AND ($15::text IS NULL OR r.account_id = $15)
+              AND ($16::text IS NULL OR r.resource_schema = $16)
+              "# + $owner_condition + r#"
+              -- Each type carries its own query, account and label pairs,
+              -- re-paired here. A NULL schema array means "every type", in
+              -- which case the single row of query columns applies uniformly.
+              -- The account is inside the EXISTS so a row may span an account
+              -- of its own.
+              AND EXISTS (
+                  SELECT 1
+                  FROM UNNEST(
+                           COALESCE($2::text[], ARRAY[NULL]::text[]),
+                           $3::text[],
+                           $4::text[],
+                           $5::text[],
+                           $1::text[]
+                       ) WITH ORDINALITY
+                         AS f(schema, name_pattern, exact_names, exact_ids, account_id, rn)
+                  WHERE r.account_id = f.account_id
+                    AND (f.schema IS NULL OR r.resource_schema = f.schema)
+                    AND (f.name_pattern IS NULL
+                         OR r.resource_name ILIKE f.name_pattern ESCAPE '\')
+                    AND (f.exact_names IS NULL
+                         OR LOWER(r.resource_name) = ANY(STRING_TO_ARRAY(f.exact_names, ',')))
+                    AND (f.exact_ids IS NULL
+                         OR r.resource_id = ANY(CAST(STRING_TO_ARRAY(f.exact_ids, ',') AS uuid[])))
+                    -- Every label pair belonging to THIS row must be present.
+                    -- Pairs are matched to their row by number rather than
+                    -- delimiter-joined, since label text is free-form.
+                    AND NOT EXISTS (
+                        SELECT 1
+                        FROM UNNEST($6::int[], $7::text[], $8::text[]) AS l(rn, k, v)
+                        WHERE l.rn = f.rn
+                          AND NOT EXISTS (
+                              SELECT 1
+                              FROM resource_labels_projection rl
+                              WHERE rl.resource_id = r.resource_id
+                                AND rl.label_key = l.k
+                                AND rl.label_value = l.v
+                          )
+                    )
+              )
+            -- NULL for live resources, which come first, and for every resource
+            -- when deleted ones are hidden
+            ORDER BY
+                CASE WHEN $14 THEN COALESCE(r.deleted_at, r.deletion_requested_at) END
+                    DESC NULLS FIRST,
+                r.updated_at DESC,
+                r.resource_id DESC
+            LIMIT $9 OFFSET $11
+            "#,
+            $flat.account_ids(),
+            $flat.schemas() as _,
+            $flat.name_patterns() as _,
+            $flat.exact_names() as _,
+            $flat.exact_ids() as _,
+            $flat.label_row_numbers(),
+            $flat.label_keys(),
+            $flat.label_values(),
+            $limit,
+            kamu_resources::DELETED_ACCOUNT_NAME_SENTINEL,
+            $offset,
+            $visibility.includes_live(),
+            $visibility.includes_deleting(),
+            $visibility.includes_deleted(),
+            $flat.only_account_id(),
+            $flat.only_schema(),
+            $($owner_id,)?
+        )
+    };
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[async_trait::async_trait]
 impl ResourceRepository for PostgresResourceRepository {
     async fn new_resource_id(&self) -> Result<ResourceID, InternalError> {
@@ -493,117 +620,27 @@ impl ResourceRepository for PostgresResourceRepository {
         let limit = i64::try_from(pagination.limit).int_err()?;
         let offset = i64::try_from(pagination.offset).int_err()?;
 
-        // An owner takes a query text of its own: made conditional by an OR, the
-        // subquery can't become a join, which starts at the few rows of the owner.
-        macro_rules! search {
-            ($owner_condition:tt $(, $owner_id:expr)?) => {
-                sqlx::query_as!(
-                    ResourceHandleRow,
-                    r#"
-                    SELECT
-                        r.resource_id as "id: uuid::Uuid",
-                        r.resource_schema as schema,
-                        r.resource_name as name,
-                        r.account_id as "account_id: odf::AccountID",
-                        -- Account row may be missing during async cleanup.
-                        COALESCE(a.resource_id, '00000000-0000-0000-0000-000000000000'::uuid) as "account_resource_id!: uuid::Uuid",
-                        COALESCE(a.account_name, $10) as "account_name!",
-                        r.deletion_requested_at,
-                        r.deleted_at
-                    FROM resources r
-                    LEFT JOIN accounts a ON a.id = r.account_id
-                    WHERE (r.deletion_requested_at IS NOT NULL OR $12)
-                      AND (r.deletion_requested_at IS NULL OR $13)
-                      AND (r.deleted_at IS NULL OR $14)
-                      -- Implied by the EXISTS below, but lets the planner read the rows
-                      -- of one account and type from an index, in order.
-                      AND ($15::text IS NULL OR r.account_id = $15)
-                      AND ($16::text IS NULL OR r.resource_schema = $16)
-                      "# + $owner_condition + r#"
-                      -- Each type carries its own query, account and label pairs,
-                      -- re-paired here. A NULL schema array means "every type", in
-                      -- which case the single row of query columns applies uniformly.
-                      -- The account is inside the EXISTS so a row may span an account
-                      -- of its own.
-                      AND EXISTS (
-                          SELECT 1
-                          FROM UNNEST(
-                                   COALESCE($2::text[], ARRAY[NULL]::text[]),
-                                   $3::text[],
-                                   $4::text[],
-                                   $5::text[],
-                                   $1::text[]
-                               ) WITH ORDINALITY
-                                 AS f(schema, name_pattern, exact_names, exact_ids, account_id, rn)
-                          WHERE r.account_id = f.account_id
-                            AND (f.schema IS NULL OR r.resource_schema = f.schema)
-                            AND (f.name_pattern IS NULL
-                                 OR r.resource_name ILIKE f.name_pattern ESCAPE '\')
-                            AND (f.exact_names IS NULL
-                                 OR LOWER(r.resource_name) = ANY(STRING_TO_ARRAY(f.exact_names, ',')))
-                            AND (f.exact_ids IS NULL
-                                 OR r.resource_id = ANY(CAST(STRING_TO_ARRAY(f.exact_ids, ',') AS uuid[])))
-                            -- Every label pair belonging to THIS row must be present.
-                            -- Pairs are matched to their row by number rather than
-                            -- delimiter-joined, since label text is free-form.
-                            AND NOT EXISTS (
-                                SELECT 1
-                                FROM UNNEST($6::int[], $7::text[], $8::text[]) AS l(rn, k, v)
-                                WHERE l.rn = f.rn
-                                  AND NOT EXISTS (
-                                      SELECT 1
-                                      FROM resource_labels_projection rl
-                                      WHERE rl.resource_id = r.resource_id
-                                        AND rl.label_key = l.k
-                                        AND rl.label_value = l.v
-                                  )
-                            )
-                      )
-                    -- NULL for live resources, which come first, and for every resource
-                    -- when deleted ones are hidden
-                    ORDER BY
-                        CASE WHEN $14 THEN COALESCE(r.deleted_at, r.deletion_requested_at) END
-                            DESC NULLS FIRST,
-                        r.updated_at DESC,
-                        r.resource_id DESC
-                    LIMIT $9 OFFSET $11
-                    "#,
-                    flat.account_ids(),
-                    flat.schemas() as _,
-                    flat.name_patterns() as _,
-                    flat.exact_names() as _,
-                    flat.exact_ids() as _,
-                    flat.label_row_numbers(),
-                    flat.label_keys(),
-                    flat.label_values(),
-                    limit,
-                    kamu_resources::DELETED_ACCOUNT_NAME_SENTINEL,
-                    offset,
-                    visibility.includes_live(),
-                    visibility.includes_deleting(),
-                    visibility.includes_deleted(),
-                    flat.only_account_id(),
-                    flat.only_schema(),
-                    $($owner_id,)?
-                )
-                .fetch_all(connection_mut)
-                .await
-                .int_err()
-            };
-        }
-
-        match owner_id {
-            Some(owner_id) => search!(
-                "AND EXISTS (
-                    SELECT 1
-                    FROM resource_owners_projection ro
-                    WHERE ro.resource_id = r.resource_id
-                      AND ro.owner_id = $17
-                )",
-                owner_id
-            ),
-            None => search!(""),
-        }
+        search_resources_query!(
+            ResourceHandleRow,
+            r#"
+            SELECT
+                r.resource_id as "id: uuid::Uuid",
+                r.resource_schema as schema,
+                r.resource_name as name,
+                r.account_id as "account_id: odf::AccountID",
+                -- Account row may be missing during async cleanup.
+                COALESCE(a.resource_id, '00000000-0000-0000-0000-000000000000'::uuid) as "account_resource_id!: uuid::Uuid",
+                COALESCE(a.account_name, $10) as "account_name!",
+                r.deletion_requested_at,
+                r.deleted_at
+            "#,
+            flat,
+            visibility,
+            owner_id,
+            limit,
+            offset,
+            |query| query.fetch_all(connection_mut).await.int_err()
+        )
     }
 
     async fn count_search_resource_handles(
@@ -622,7 +659,7 @@ impl ResourceRepository for PostgresResourceRepository {
         let mut tr = self.transaction.lock().await;
         let connection_mut = tr.connection_mut().await?;
 
-        // Two query texts, see `search_resource_handles`
+        // Two query texts, see `search_resources_query!`
         macro_rules! count {
             ($owner_condition:tt $(, $owner_id:expr)?) => {
                 sqlx::query!(
@@ -632,12 +669,12 @@ impl ResourceRepository for PostgresResourceRepository {
                     WHERE (r.deletion_requested_at IS NOT NULL OR $9)
                       AND (r.deletion_requested_at IS NULL OR $10)
                       AND (r.deleted_at IS NULL OR $11)
-                      -- Implied by the EXISTS below, see `search_resource_handles`.
+                      -- Implied by the EXISTS below, see `search_resources_query!`.
                       AND ($12::text IS NULL OR r.account_id = $12)
                       AND ($13::text IS NULL OR r.resource_schema = $13)
                       "# + $owner_condition + r#"
                       -- Each type carries its own query, account and label pairs,
-                      -- re-paired here. See `search_resource_handles` for the shape.
+                      -- re-paired here. See `search_resources_query!` for the shape.
                       AND EXISTS (
                           SELECT 1
                           FROM UNNEST(
@@ -1024,119 +1061,39 @@ impl ResourceRepository for PostgresResourceRepository {
             let limit = i64::try_from(pagination.limit).int_err()?;
             let offset = i64::try_from(pagination.offset).int_err()?;
 
-            // Two query texts, see `search_resource_handles`
-            macro_rules! list {
-                ($owner_condition:tt $(, $owner_id:expr)?) => {
-                    sqlx::query_as!(
-                        ResourceSnapshotRow,
-                        r#"
-                        SELECT
-                            r.resource_id as "id: uuid::Uuid",
-                            r.account_id as "account_id: odf::AccountID",
-                        -- LEFT JOIN: a.resource_id is NULL only when the owning account
-                        -- row is gone (deletion racing async cleanup), same case the
-                        -- account_name sentinel covers. Substitute the nil resource id.
-                        COALESCE(a.resource_id, '00000000-0000-0000-0000-000000000000'::uuid) as "account_resource_id!: uuid::Uuid",
-                            COALESCE(a.account_name, $10) as "account_name!",
-                            r.resource_schema,
-                            r.resource_name,
-                            r.labels,
-                            r.annotations,
-                            r.owner_references,
-                            r.spec,
-                            r.status,
-                            r.generation,
-                            r.status_generation,
-                            r.created_at,
-                            r.updated_at,
-                            r.deletion_requested_at,
-                            r.deleted_at,
-                            r.last_event_id
-                        FROM resources r
-                        LEFT JOIN accounts a ON a.id = r.account_id
-                        WHERE (r.deletion_requested_at IS NOT NULL OR $12)
-                          AND (r.deletion_requested_at IS NULL OR $13)
-                          AND (r.deleted_at IS NULL OR $14)
-                          -- Implied by the EXISTS below, see `search_resource_handles`.
-                          AND ($15::text IS NULL OR r.account_id = $15)
-                          AND ($16::text IS NULL OR r.resource_schema = $16)
-                          "# + $owner_condition + r#"
-                          -- Each type carries its own query, account and label pairs,
-                          -- re-paired here. See `search_resource_handles` for the shape.
-                          AND EXISTS (
-                              SELECT 1
-                              FROM UNNEST(
-                                       COALESCE($2::text[], ARRAY[NULL]::text[]),
-                                       $3::text[],
-                                       $4::text[],
-                                       $5::text[],
-                                       $1::text[]
-                                   ) WITH ORDINALITY
-                                     AS f(schema, name_pattern, exact_names, exact_ids, account_id, rn)
-                              WHERE r.account_id = f.account_id
-                                AND (f.schema IS NULL OR r.resource_schema = f.schema)
-                                AND (f.name_pattern IS NULL
-                                     OR r.resource_name ILIKE f.name_pattern ESCAPE '\')
-                                AND (f.exact_names IS NULL
-                                     OR LOWER(r.resource_name) = ANY(STRING_TO_ARRAY(f.exact_names, ',')))
-                                AND (f.exact_ids IS NULL
-                                     OR r.resource_id = ANY(CAST(STRING_TO_ARRAY(f.exact_ids, ',') AS uuid[])))
-                                AND NOT EXISTS (
-                                    SELECT 1
-                                    FROM UNNEST($6::int[], $7::text[], $8::text[]) AS l(rn, k, v)
-                                    WHERE l.rn = f.rn
-                                      AND NOT EXISTS (
-                                          SELECT 1
-                                          FROM resource_labels_projection rl
-                                          WHERE rl.resource_id = r.resource_id
-                                            AND rl.label_key = l.k
-                                            AND rl.label_value = l.v
-                                      )
-                                )
-                          )
-                        -- NULL for live resources, which come first, and for every
-                        -- resource when deleted ones are hidden
-                        ORDER BY
-                            CASE WHEN $14 THEN COALESCE(r.deleted_at, r.deletion_requested_at) END
-                                DESC NULLS FIRST,
-                            r.updated_at DESC,
-                            r.resource_id DESC
-                        LIMIT $9 OFFSET $11
-                        "#,
-                        flat.account_ids(),
-                        flat.schemas() as _,
-                        flat.name_patterns() as _,
-                        flat.exact_names() as _,
-                        flat.exact_ids() as _,
-                        flat.label_row_numbers(),
-                        flat.label_keys(),
-                        flat.label_values(),
-                        limit,
-                        kamu_resources::DELETED_ACCOUNT_NAME_SENTINEL,
-                        offset,
-                        visibility.includes_live(),
-                        visibility.includes_deleting(),
-                        visibility.includes_deleted(),
-                        flat.only_account_id(),
-                        flat.only_schema(),
-                        $($owner_id,)?
-                    )
-                    .fetch(connection_mut)
-                };
-            }
-
-            let mut query_stream = match owner_id {
-                Some(owner_id) => list!(
-                    "AND EXISTS (
-                        SELECT 1
-                        FROM resource_owners_projection ro
-                        WHERE ro.resource_id = r.resource_id
-                          AND ro.owner_id = $17
-                    )",
-                    owner_id
-                ),
-                None => list!(""),
-            }
+            let mut query_stream = search_resources_query!(
+                ResourceSnapshotRow,
+                r#"
+                SELECT
+                    r.resource_id as "id: uuid::Uuid",
+                    r.account_id as "account_id: odf::AccountID",
+                    -- LEFT JOIN: a.resource_id is NULL only when the owning account
+                    -- row is gone (deletion racing async cleanup), same case the
+                    -- account_name sentinel covers. Substitute the nil resource id.
+                    COALESCE(a.resource_id, '00000000-0000-0000-0000-000000000000'::uuid) as "account_resource_id!: uuid::Uuid",
+                    COALESCE(a.account_name, $10) as "account_name!",
+                    r.resource_schema,
+                    r.resource_name,
+                    r.labels,
+                    r.annotations,
+                    r.owner_references,
+                    r.spec,
+                    r.status,
+                    r.generation,
+                    r.status_generation,
+                    r.created_at,
+                    r.updated_at,
+                    r.deletion_requested_at,
+                    r.deleted_at,
+                    r.last_event_id
+                "#,
+                flat,
+                visibility,
+                owner_id,
+                limit,
+                offset,
+                |query| query.fetch(connection_mut)
+            )
             .map_err(ErrorIntoInternal::int_err);
 
             while let Some(row) = query_stream.try_next().await? {

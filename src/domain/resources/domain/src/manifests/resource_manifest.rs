@@ -184,10 +184,7 @@ where
 fn owner_reference_from_handle(handle: &ResourceHandle) -> ResourceRef {
     ResourceRef {
         account: None,
-        r#type: Some(handle.r#type.clone().into()),
-        id: Some(handle.id),
-        did: handle.did.clone(),
-        name: Some(handle.name.clone()),
+        ..handle.clone().into()
     }
 }
 

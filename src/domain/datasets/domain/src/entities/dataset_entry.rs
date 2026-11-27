@@ -61,6 +61,19 @@ impl DatasetEntry {
             kind: self.kind,
         }
     }
+
+    /// The ODF handle of this entry, owned by `account`
+    pub fn to_odf_handle(
+        &self,
+        account: odf::ResourceOwnerHandle,
+    ) -> odf::metadata::datasets::DatasetHandle {
+        odf::metadata::datasets::DatasetHandle {
+            account,
+            id: self.resource_id,
+            did: self.id.clone(),
+            name: odf::metadata::resources::ResourceName::new_unchecked(self.name.as_str()),
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

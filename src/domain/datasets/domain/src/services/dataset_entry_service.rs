@@ -160,4 +160,24 @@ pub struct InvalidDatasetRefError {
     pub reason: &'static str,
 }
 
+impl InvalidDatasetRefError {
+    pub fn no_id_did_or_name() -> Self {
+        Self {
+            reason: "it has no ID, DID or name",
+        }
+    }
+
+    pub fn account_has_no_did_or_name() -> Self {
+        Self {
+            reason: "its account has no DID or name",
+        }
+    }
+
+    pub fn name_without_account() -> Self {
+        Self {
+            reason: "it names a dataset without an account",
+        }
+    }
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

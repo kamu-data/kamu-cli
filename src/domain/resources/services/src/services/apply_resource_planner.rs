@@ -422,17 +422,28 @@ where
         name: &ResourceName,
     ) -> Result<bool, ApplyResourceUseCaseError<R>> {
         let holders = self
-            .generic_resource_query_service
+            .name_holders(headers, name, ResourceVisibility::IncludeDeleted)
+            .await?;
+
+        Ok(holders.is_empty())
+    }
+
+    /// The resources of the type holding `name` in the account of `headers`
+    async fn name_holders(
+        &self,
+        headers: &ApplyResourceHeaders,
+        name: &ResourceName,
+        visibility: ResourceVisibility,
+    ) -> Result<Vec<(ResourceName, ResourceID)>, ApplyResourceUseCaseError<R>> {
+        self.generic_resource_query_service
             .resolve_resource_ids_by_names(
                 headers.resolved_account_id(),
                 R::type_uri(),
                 std::slice::from_ref(name),
-                ResourceVisibility::IncludeDeleted,
+                visibility,
             )
             .await
-            .map_err(ApplyResourceUseCaseError::Internal)?;
-
-        Ok(holders.is_empty())
+            .map_err(ApplyResourceUseCaseError::Internal)
     }
 
     /// Warns about each resource being deleted whose name the created resource
@@ -443,15 +454,8 @@ where
         name: &ResourceName,
     ) -> Result<Vec<ResourceWarning>, ApplyResourceUseCaseError<R>> {
         let replaced = self
-            .generic_resource_query_service
-            .resolve_resource_ids_by_names(
-                headers.resolved_account_id(),
-                R::type_uri(),
-                std::slice::from_ref(name),
-                ResourceVisibility::IncludeDeleting,
-            )
-            .await
-            .map_err(ApplyResourceUseCaseError::Internal)?;
+            .name_holders(headers, name, ResourceVisibility::IncludeDeleting)
+            .await?;
 
         Ok(replaced
             .iter()

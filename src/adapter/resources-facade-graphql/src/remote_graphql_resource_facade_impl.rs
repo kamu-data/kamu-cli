@@ -30,8 +30,7 @@ use kamu_resources_facade::{
     SearchResourcesRequest,
     SearchResourcesResponse,
     SpecViewOpts,
-    validate_ref,
-    validate_selector,
+    validate_search_request,
 };
 use url::Url;
 
@@ -180,12 +179,7 @@ impl ResourceFacade for RemoteGraphqlResourceFacadeImpl {
         // `did` has no wire representation, so it would be dropped. Rejecting
         // here keeps the remote surface agreeing with the local one. Labels do
         // travel now, per selector.
-        for selector in &request.selectors {
-            validate_selector(selector)?;
-        }
-        if let Some(owner) = &request.owner {
-            validate_ref(owner)?;
-        }
+        validate_search_request(&request)?;
 
         let variables =
             Operation::SearchVariables::new(&request).map_err(ListResourcesError::Internal)?;
@@ -204,12 +198,7 @@ impl ResourceFacade for RemoteGraphqlResourceFacadeImpl {
     ) -> Result<SearchResourceHandlesResponse, ListResourcesError> {
         use cynic_api::operations::search as SearchOperation;
 
-        for selector in &request.selectors {
-            validate_selector(selector)?;
-        }
-        if let Some(owner) = &request.owner {
-            validate_ref(owner)?;
-        }
+        validate_search_request(&request)?;
 
         let variables = SearchOperation::SearchHandlesVariables::new(&request)
             .map_err(ListResourcesError::Internal)?;

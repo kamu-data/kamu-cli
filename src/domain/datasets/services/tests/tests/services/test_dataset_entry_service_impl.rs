@@ -1135,12 +1135,7 @@ impl DatasetEntryServiceHarness {
             .await
             .unwrap();
 
-        odf::metadata::datasets::DatasetHandle {
-            account: AccountHandle::from(&owner).into(),
-            id: entry.resource_id,
-            did: entry.id,
-            name: odf::metadata::resources::ResourceName::new_unchecked(entry.name.as_str()),
-        }
+        entry.to_odf_handle(AccountHandle::from(&owner).into())
     }
 
     async fn create_dataset(&self, account_name: &str, dataset_name: &str) -> odf::DatasetHandle {

@@ -20,9 +20,6 @@ use kamu_configuration::{
 use kamu_configuration_services::SECRET_SET_CONTROLLER_NAME;
 use kamu_configuration_services::testing::BaseConfigurationServiceHarness;
 use kamu_resources::{
-    ApplyResourceAccessCheck,
-    ApplyResourceAccountSource,
-    ApplyResourceParams,
     EventSourcedResource,
     ResourceControllerName,
     ResourceControllerState,
@@ -134,15 +131,11 @@ impl ControllersHarness {
         });
 
         self.apply_variable_use_case()
-            .apply(ApplyResourceParams {
-                account_source: ApplyResourceAccountSource::Manifest,
-                access_check: ApplyResourceAccessCheck::ByGuard,
-                id: None,
-                headers: BaseResourceServiceHarness::make_headers_input(self.owner.clone(), name)
-                    .into(),
+            .apply(BaseResourceServiceHarness::make_apply_params(
+                self.owner.clone(),
+                Some(name),
                 spec,
-                provenance: BaseResourceServiceHarness::make_provenance(),
-            })
+            ))
             .await
             .unwrap()
             .expect_applied()

@@ -73,17 +73,13 @@ impl BackgroundAgentHost {
 
     /// The registered agents, then one per enabled housekeeping job
     fn all_agents(&self) -> Vec<Arc<dyn BackgroundAgent>> {
-        let housekeeping_agents = self.housekeeping_jobs.iter().filter_map(|job| {
-            let job_config = self.housekeeping_config.job(job.job_name());
-            job_config.enabled.then(|| {
-                Arc::new(HousekeepingAgent::new(
-                    job.clone(),
-                    job_config,
-                    self.housekeeping_metrics.clone(),
-                    self.time_source.clone(),
-                )) as Arc<dyn BackgroundAgent>
-            })
-        });
+        let housekeeping_agents = HousekeepingAgent::for_enabled_jobs(
+            self.housekeeping_jobs.iter().cloned(),
+            &self.housekeeping_config,
+            &self.housekeeping_metrics,
+            &self.time_source,
+        )
+        .map(|agent| Arc::new(agent) as Arc<dyn BackgroundAgent>);
         self.agents
             .iter()
             .cloned()

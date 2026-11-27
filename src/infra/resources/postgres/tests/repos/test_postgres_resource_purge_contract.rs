@@ -12,6 +12,9 @@ use sqlx::PgPool;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+// Per backend: the contract is checked against the migrated schema, which the
+// in-memory repositories do not have
+
 #[test_group::group(database, postgres)]
 #[test_log::test(sqlx::test(migrations = "../../../../migrations/postgres"))]
 async fn test_every_resource_keyed_table_is_purged_with_the_resource(pool: PgPool) {
@@ -97,11 +100,7 @@ impl PurgeContractHarness {
         .unwrap();
 
         rows.into_iter()
-            .map(|(table, column, cascades)| ResourceKeyedColumn {
-                table,
-                column,
-                cascades,
-            })
+            .map(|(table, column, cascades)| ResourceKeyedColumn::new(table, column, cascades))
             .collect()
     }
 }

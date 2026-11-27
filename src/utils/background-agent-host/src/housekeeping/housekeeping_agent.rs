@@ -18,6 +18,7 @@ use crate::{
     BackgroundAgent,
     CancellationToken,
     HousekeepingBatchReport,
+    HousekeepingConfig,
     HousekeepingJob,
     HousekeepingJobConfig,
     HousekeepingMetrics,
@@ -49,6 +50,21 @@ impl HousekeepingAgent {
             metrics,
             time_source,
         }
+    }
+
+    /// One agent per job of `jobs` that `config` enables
+    pub fn for_enabled_jobs(
+        jobs: impl IntoIterator<Item = Arc<dyn HousekeepingJob>>,
+        config: &HousekeepingConfig,
+        metrics: &Arc<HousekeepingMetrics>,
+        time_source: &Arc<dyn SystemTimeSource>,
+    ) -> impl Iterator<Item = Self> {
+        jobs.into_iter().filter_map(|job| {
+            let job_config = config.job(job.job_name());
+            job_config
+                .enabled
+                .then(|| Self::new(job, job_config, metrics.clone(), time_source.clone()))
+        })
     }
 
     /// Runs one batch of the job at the current time

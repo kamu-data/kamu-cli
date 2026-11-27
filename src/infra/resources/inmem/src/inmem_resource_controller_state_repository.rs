@@ -24,6 +24,7 @@ use kamu_resources::{
     ResourceControllerName,
     ResourceControllerState,
     ResourceControllerStateRepository,
+    ResourceHeadersExt,
     ResourceID,
     ResourceSnapshot,
 };
@@ -231,7 +232,7 @@ impl ResourceControllerStateRepository for InMemoryResourceControllerStateReposi
             self.store.states.read(self.transaction_id, |states| {
                 resources
                     .snapshots()
-                    .filter(|snapshot| snapshot.headers.deleted_at.is_none())
+                    .filter(|snapshot| !snapshot.headers.is_deleted())
                     .filter(|snapshot| {
                         states
                             .get(&(controller.clone(), snapshot.id))

@@ -83,9 +83,7 @@ impl ResourceAccountResolver for ResourceAccountResolverImpl {
         principal: &Principal,
         account: &odf::ResourceOwnerHandle,
     ) -> Result<(), ResolveManifestAccountError> {
-        let Some(principal) = principal.handle() else {
-            return Err(ResourceAccountAccessError::AnonymousSubject.into());
-        };
+        let principal = principal.handle()?;
 
         self.default_resource_operation_guard
             .check_account_rule(&principal, account)

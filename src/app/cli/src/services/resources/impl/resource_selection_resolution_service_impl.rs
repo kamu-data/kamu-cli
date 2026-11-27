@@ -68,14 +68,8 @@ impl ResourceSelectionResolutionService for ResourceSelectionResolutionServiceIm
                 .await?;
 
         // Prefetch exact-any-type selectors (bare IDs) in batches, replayed by index.
-        let exact_any_type_results = Self::fetch_exact_any_type_identities(
-            &selection,
-            resource_facade,
-            options.label_filter.as_ref(),
-            options.owner.as_ref(),
-            options.id_visibility,
-        )
-        .await?;
+        let exact_any_type_results =
+            Self::fetch_exact_any_type_identities(&selection, resource_facade, options).await?;
         let mut exact_any_type_results = exact_any_type_results.into_iter();
 
         // Prefetch exact selectors in batches, then replay them in input order.
@@ -333,18 +327,15 @@ impl ResourceSelectionResolutionServiceImpl {
             if !by_id.is_empty() {
                 let ids = by_id.iter().map(|(_, id)| *id).collect::<Vec<_>>();
                 let found = resource_facade
-                    .search_handles(SearchResourcesRequest {
-                        selectors: with_labels(
-                            ResourceSelector::ids_of_type(&schema.clone().into(), ids),
-                            label_filter,
-                        ),
-                        owner: options.owner.clone(),
-                        visibility: options.id_visibility,
-                        pagination: PaginationOpts {
+                    .search_handles(Self::search_request(
+                        options,
+                        ResourceSelector::ids_of_type(&schema.clone().into(), ids),
+                        options.id_visibility,
+                        PaginationOpts {
                             limit: by_id.len(),
                             offset: 0,
                         },
-                    })
+                    ))
                     .await?
                     .items
                     .into_iter()
@@ -447,9 +438,7 @@ impl ResourceSelectionResolutionServiceImpl {
     async fn fetch_exact_any_type_identities(
         selection: &ResourceSelectionSyntax,
         resource_facade: &dyn ResourceFacade,
-        label_filter: Option<&kamu_resources::ResourceLabelFilterInput>,
-        owner: Option<&ResourceRef>,
-        visibility: ResourceVisibility,
+        options: &ResourceSelectionResolutionOptions,
     ) -> Result<Vec<Result<ResourceHandle, GetResourceError>>, CLIError> {
         let ids = selection
             .items
@@ -473,15 +462,15 @@ impl ResourceSelectionResolutionServiceImpl {
         }
 
         let found = resource_facade
-            .search_handles(SearchResourcesRequest {
-                selectors: with_labels(ResourceSelector::any_type_ids(ids.clone()), label_filter),
-                owner: owner.cloned(),
-                visibility,
-                pagination: PaginationOpts {
+            .search_handles(Self::search_request(
+                options,
+                ResourceSelector::any_type_ids(ids.clone()),
+                options.id_visibility,
+                PaginationOpts {
                     limit: ids.len(),
                     offset: 0,
                 },
-            })
+            ))
             .await?
             .items
             .into_iter()
@@ -561,20 +550,16 @@ impl ResourceSelectionResolutionServiceImpl {
             options.max_expanded_results,
             seen_target_keys,
             |pagination| {
-                let request_label_filter = options.label_filter.clone();
                 async move {
                     let response = resource_facade
-                        .search_handles(SearchResourcesRequest {
+                        .search_handles(Self::search_request(
+                            options,
                             // A lone type-less unnarrowed selector spans every
                             // type.
-                            selectors: with_labels(
-                                vec![ResourceSelector::default()],
-                                request_label_filter.as_ref(),
-                            ),
-                            owner: options.owner.clone(),
-                            visibility: options.visibility,
+                            vec![ResourceSelector::default()],
+                            options.visibility,
                             pagination,
-                        })
+                        ))
                         .await?;
                     Ok(response.items)
                 }
@@ -630,24 +615,18 @@ impl ResourceSelectionResolutionServiceImpl {
             Self::remaining_expanded_results(expanded_results, options),
             options.max_expanded_results,
             seen_target_keys,
-            |pagination| {
-                let request_label_filter = options.label_filter.clone();
-                async move {
-                    let response = resource_facade
-                        .search_handles(SearchResourcesRequest {
-                            selectors: with_labels(
-                                vec![ResourceSelector::of_type(
-                                    type_descriptor.schema.clone().into(),
-                                )],
-                                request_label_filter.as_ref(),
-                            ),
-                            owner: options.owner.clone(),
-                            visibility: options.visibility,
-                            pagination,
-                        })
-                        .await?;
-                    Ok(response.items)
-                }
+            |pagination| async move {
+                let response = resource_facade
+                    .search_handles(Self::search_request(
+                        options,
+                        vec![ResourceSelector::of_type(
+                            type_descriptor.schema.clone().into(),
+                        )],
+                        options.visibility,
+                        pagination,
+                    ))
+                    .await?;
+                Ok(response.items)
             },
         )
         .await?;
@@ -681,21 +660,17 @@ impl ResourceSelectionResolutionServiceImpl {
             seen_target_keys,
             |pagination| {
                 let request_name_pattern = name_pattern.clone();
-                let request_label_filter = options.label_filter.clone();
                 async move {
                     resource_facade
-                        .search_handles(SearchResourcesRequest {
-                            selectors: with_labels(
-                                vec![ResourceSelector::name_pattern(
-                                    type_descriptor.schema.clone().into(),
-                                    request_name_pattern,
-                                )],
-                                request_label_filter.as_ref(),
-                            ),
-                            owner: options.owner.clone(),
-                            visibility: options.visibility,
+                        .search_handles(Self::search_request(
+                            options,
+                            vec![ResourceSelector::name_pattern(
+                                type_descriptor.schema.clone().into(),
+                                request_name_pattern,
+                            )],
+                            options.visibility,
                             pagination,
-                        })
+                        ))
                         .await
                         .map(|response| response.items)
                         .map_err(Into::into)
@@ -763,18 +738,14 @@ impl ResourceSelectionResolutionServiceImpl {
             seen_target_keys,
             |pagination| {
                 let request_selector = selector.clone();
-                let request_label_filter = options.label_filter.clone();
                 async move {
                     resource_facade
-                        .search_handles(SearchResourcesRequest {
-                            selectors: with_labels(
-                                vec![request_selector],
-                                request_label_filter.as_ref(),
-                            ),
-                            owner: options.owner.clone(),
+                        .search_handles(Self::search_request(
+                            options,
+                            vec![request_selector],
                             visibility,
                             pagination,
-                        })
+                        ))
                         .await
                         .map(|response| response.items)
                         .map_err(Into::into)
@@ -822,20 +793,16 @@ impl ResourceSelectionResolutionServiceImpl {
             seen_target_keys,
             |pagination| {
                 let request_name_pattern = name_pattern.clone();
-                let request_label_filter = options.label_filter.clone();
                 async move {
                     resource_facade
-                        .search_handles(SearchResourcesRequest {
-                            selectors: with_labels(
-                                vec![ResourceSelector::any_type_name_pattern(
-                                    request_name_pattern,
-                                )],
-                                request_label_filter.as_ref(),
-                            ),
-                            owner: options.owner.clone(),
-                            visibility: options.visibility,
+                        .search_handles(Self::search_request(
+                            options,
+                            vec![ResourceSelector::any_type_name_pattern(
+                                request_name_pattern,
+                            )],
+                            options.visibility,
                             pagination,
-                        })
+                        ))
                         .await
                         .map(|response| response.items)
                         .map_err(Into::into)
@@ -1084,6 +1051,21 @@ impl ResourceSelectionResolutionServiceImpl {
             identities: items,
             had_any_match,
         })
+    }
+
+    /// A search for `selectors` under the invocation's label filter and owner
+    fn search_request(
+        options: &ResourceSelectionResolutionOptions,
+        selectors: Vec<ResourceSelector>,
+        visibility: ResourceVisibility,
+        pagination: PaginationOpts,
+    ) -> SearchResourcesRequest {
+        SearchResourcesRequest {
+            selectors: with_labels(selectors, options.label_filter.as_ref()),
+            owner: options.owner.clone(),
+            visibility,
+            pagination,
+        }
     }
 
     fn remaining_expanded_results(

@@ -12,10 +12,12 @@ use std::sync::{Arc, LazyLock, Mutex};
 
 use dill::CatalogBuilder;
 use kamu_accounts::DEFAULT_ACCOUNT_HANDLE;
+use kamu_cli::CLIError;
 use kamu_cli::services::resources::{
     self,
     ExactResourceRef,
     ResourceSelectionItem,
+    ResourceSelectionResolution,
     ResourceSelectionResolutionOptions,
     ResourceSelectionResolutionService,
     ResourceSelectionSyntax,
@@ -146,25 +148,13 @@ async fn resolves_exact_type_name_patterns_via_search() {
     );
 
     let result = harness
-        .service
         .resolve(
-            ResourceSelectionSyntax {
-                items: vec![ResourceSelectionItem::NamePattern {
-                    type_descriptor: harness.variableset_type_descriptor(),
-                    selector_input: NAME_APP_PATTERN.to_string(),
-                    name_pattern: NAME_APP_PATTERN.to_string(),
-                }],
-                shadowed_selectors: Vec::new(),
-            },
-            &harness.facade,
-            &ResourceSelectionResolutionOptions {
-                visibility: ResourceVisibility::Active,
-                id_visibility: ResourceVisibility::IncludeDeleted,
-                ignore_not_found: false,
-                max_expanded_results: Some(10),
-                label_filter: None,
-                owner: None,
-            },
+            vec![ResourceSelectionItem::NamePattern {
+                type_descriptor: harness.variableset_type_descriptor(),
+                selector_input: NAME_APP_PATTERN.to_string(),
+                name_pattern: NAME_APP_PATTERN.to_string(),
+            }],
+            ResourceSelectionResolutionHarness::default_options(),
         )
         .await
         .unwrap();
@@ -193,24 +183,15 @@ async fn ignores_unmatched_name_patterns_when_requested() {
     harness.expect_search_handles(1, Vec::new());
 
     let result = harness
-        .service
         .resolve(
-            ResourceSelectionSyntax {
-                items: vec![ResourceSelectionItem::NamePattern {
-                    type_descriptor: harness.variableset_type_descriptor(),
-                    selector_input: NAME_MISSING_PATTERN.to_string(),
-                    name_pattern: NAME_MISSING_PATTERN.to_string(),
-                }],
-                shadowed_selectors: Vec::new(),
-            },
-            &harness.facade,
-            &ResourceSelectionResolutionOptions {
-                visibility: ResourceVisibility::Active,
-                id_visibility: ResourceVisibility::IncludeDeleted,
+            vec![ResourceSelectionItem::NamePattern {
+                type_descriptor: harness.variableset_type_descriptor(),
+                selector_input: NAME_MISSING_PATTERN.to_string(),
+                name_pattern: NAME_MISSING_PATTERN.to_string(),
+            }],
+            ResourceSelectionResolutionOptions {
                 ignore_not_found: true,
-                max_expanded_results: Some(10),
-                label_filter: None,
-                owner: None,
+                ..ResourceSelectionResolutionHarness::default_options()
             },
         )
         .await
@@ -232,25 +213,13 @@ async fn errors_on_unmatched_name_patterns_by_default() {
     harness.expect_search_handles(1, Vec::new());
 
     let error = harness
-        .service
         .resolve(
-            ResourceSelectionSyntax {
-                items: vec![ResourceSelectionItem::NamePattern {
-                    type_descriptor: harness.variableset_type_descriptor(),
-                    selector_input: NAME_MISSING_PATTERN.to_string(),
-                    name_pattern: NAME_MISSING_PATTERN.to_string(),
-                }],
-                shadowed_selectors: Vec::new(),
-            },
-            &harness.facade,
-            &ResourceSelectionResolutionOptions {
-                visibility: ResourceVisibility::Active,
-                id_visibility: ResourceVisibility::IncludeDeleted,
-                ignore_not_found: false,
-                max_expanded_results: Some(10),
-                label_filter: None,
-                owner: None,
-            },
+            vec![ResourceSelectionItem::NamePattern {
+                type_descriptor: harness.variableset_type_descriptor(),
+                selector_input: NAME_MISSING_PATTERN.to_string(),
+                name_pattern: NAME_MISSING_PATTERN.to_string(),
+            }],
+            ResourceSelectionResolutionHarness::default_options(),
         )
         .await
         .unwrap_err();
@@ -285,24 +254,12 @@ async fn exact_any_type_searches_across_every_supported_type() {
     );
 
     let result = harness
-        .service
         .resolve(
-            ResourceSelectionSyntax {
-                items: vec![ResourceSelectionItem::ExactAnyType {
-                    selector_input: id.to_string(),
-                    resource_ref: ExactResourceRef::ById(id),
-                }],
-                shadowed_selectors: Vec::new(),
-            },
-            &harness.facade,
-            &ResourceSelectionResolutionOptions {
-                visibility: ResourceVisibility::Active,
-                id_visibility: ResourceVisibility::IncludeDeleted,
-                ignore_not_found: false,
-                max_expanded_results: Some(10),
-                label_filter: None,
-                owner: None,
-            },
+            vec![ResourceSelectionItem::ExactAnyType {
+                selector_input: id.to_string(),
+                resource_ref: ExactResourceRef::ById(id),
+            }],
+            ResourceSelectionResolutionHarness::default_options(),
         )
         .await
         .unwrap();
@@ -335,27 +292,15 @@ async fn ids_are_searched_with_their_own_visibility() {
     );
 
     harness
-        .service
         .resolve(
-            ResourceSelectionSyntax {
-                items: vec![ResourceSelectionItem::Exact(
-                    resources::ResourceExactSelector {
-                        type_descriptor: harness.variableset_type_descriptor(),
-                        selector_input: format!("{VARIABLESETS_SHORT_NAME}/{id}"),
-                        resource_ref: ExactResourceRef::ById(id),
-                    },
-                )],
-                shadowed_selectors: Vec::new(),
-            },
-            &harness.facade,
-            &ResourceSelectionResolutionOptions {
-                visibility: ResourceVisibility::Active,
-                id_visibility: ResourceVisibility::IncludeDeleted,
-                ignore_not_found: false,
-                max_expanded_results: Some(10),
-                label_filter: None,
-                owner: None,
-            },
+            vec![ResourceSelectionItem::Exact(
+                resources::ResourceExactSelector {
+                    type_descriptor: harness.variableset_type_descriptor(),
+                    selector_input: format!("{VARIABLESETS_SHORT_NAME}/{id}"),
+                    resource_ref: ExactResourceRef::ById(id),
+                },
+            )],
+            ResourceSelectionResolutionHarness::default_options(),
         )
         .await
         .unwrap();
@@ -377,24 +322,12 @@ async fn exact_any_type_not_found_errors_by_default() {
     harness.expect_search_handles(1, Vec::new());
 
     let result = harness
-        .service
         .resolve(
-            ResourceSelectionSyntax {
-                items: vec![ResourceSelectionItem::ExactAnyType {
-                    selector_input: id.to_string(),
-                    resource_ref: ExactResourceRef::ById(id),
-                }],
-                shadowed_selectors: Vec::new(),
-            },
-            &harness.facade,
-            &ResourceSelectionResolutionOptions {
-                visibility: ResourceVisibility::Active,
-                id_visibility: ResourceVisibility::IncludeDeleted,
-                ignore_not_found: false,
-                max_expanded_results: Some(10),
-                label_filter: None,
-                owner: None,
-            },
+            vec![ResourceSelectionItem::ExactAnyType {
+                selector_input: id.to_string(),
+                resource_ref: ExactResourceRef::ById(id),
+            }],
+            ResourceSelectionResolutionHarness::default_options(),
         )
         .await;
 
@@ -436,24 +369,12 @@ async fn resolves_any_type_exact_ref_across_every_supported_type() {
 
     let selector_input = format!("%/{RESOURCE_DB_CREDS}");
     let result = harness
-        .service
         .resolve(
-            ResourceSelectionSyntax {
-                items: vec![ResourceSelectionItem::AnyTypeExactRef {
-                    selector_input: selector_input.clone(),
-                    resource_ref: ExactResourceRef::ByName(RESOURCE_DB_CREDS.parse().unwrap()),
-                }],
-                shadowed_selectors: Vec::new(),
-            },
-            &harness.facade,
-            &ResourceSelectionResolutionOptions {
-                visibility: ResourceVisibility::Active,
-                id_visibility: ResourceVisibility::IncludeDeleted,
-                ignore_not_found: false,
-                max_expanded_results: Some(10),
-                label_filter: None,
-                owner: None,
-            },
+            vec![ResourceSelectionItem::AnyTypeExactRef {
+                selector_input: selector_input.clone(),
+                resource_ref: ExactResourceRef::ByName(RESOURCE_DB_CREDS.parse().unwrap()),
+            }],
+            ResourceSelectionResolutionHarness::default_options(),
         )
         .await
         .unwrap();
@@ -543,23 +464,14 @@ async fn resolves_any_type_name_pattern_via_a_single_search() {
     );
 
     let result = harness
-        .service
         .resolve(
-            ResourceSelectionSyntax {
-                items: vec![ResourceSelectionItem::AnyTypeNamePattern {
-                    selector_input: format!("%/{NAME_APP_PATTERN}"),
-                    name_pattern: NAME_APP_PATTERN.to_string(),
-                }],
-                shadowed_selectors: Vec::new(),
-            },
-            &harness.facade,
-            &ResourceSelectionResolutionOptions {
-                visibility: ResourceVisibility::Active,
-                id_visibility: ResourceVisibility::IncludeDeleted,
-                ignore_not_found: false,
-                max_expanded_results: Some(10),
+            vec![ResourceSelectionItem::AnyTypeNamePattern {
+                selector_input: format!("%/{NAME_APP_PATTERN}"),
+                name_pattern: NAME_APP_PATTERN.to_string(),
+            }],
+            ResourceSelectionResolutionOptions {
                 label_filter: Some(environment_label_filter()),
-                owner: None,
+                ..ResourceSelectionResolutionHarness::default_options()
             },
         )
         .await
@@ -595,29 +507,20 @@ async fn ignores_unmatched_any_type_selectors_when_requested() {
     harness.expect_search_handles(2, Vec::new());
 
     let result = harness
-        .service
         .resolve(
-            ResourceSelectionSyntax {
-                items: vec![
-                    ResourceSelectionItem::AnyTypeExactRef {
-                        selector_input: format!("%/{RESOURCE_DB_CREDS}"),
-                        resource_ref: ExactResourceRef::ByName(RESOURCE_DB_CREDS.parse().unwrap()),
-                    },
-                    ResourceSelectionItem::AnyTypeNamePattern {
-                        selector_input: format!("%/{NAME_MISSING_PATTERN}"),
-                        name_pattern: NAME_MISSING_PATTERN.to_string(),
-                    },
-                ],
-                shadowed_selectors: Vec::new(),
-            },
-            &harness.facade,
-            &ResourceSelectionResolutionOptions {
-                visibility: ResourceVisibility::Active,
-                id_visibility: ResourceVisibility::IncludeDeleted,
+            vec![
+                ResourceSelectionItem::AnyTypeExactRef {
+                    selector_input: format!("%/{RESOURCE_DB_CREDS}"),
+                    resource_ref: ExactResourceRef::ByName(RESOURCE_DB_CREDS.parse().unwrap()),
+                },
+                ResourceSelectionItem::AnyTypeNamePattern {
+                    selector_input: format!("%/{NAME_MISSING_PATTERN}"),
+                    name_pattern: NAME_MISSING_PATTERN.to_string(),
+                },
+            ],
+            ResourceSelectionResolutionOptions {
                 ignore_not_found: true,
-                max_expanded_results: Some(10),
-                label_filter: None,
-                owner: None,
+                ..ResourceSelectionResolutionHarness::default_options()
             },
         )
         .await
@@ -636,21 +539,9 @@ async fn any_type_miss_message(item: ResourceSelectionItem) -> String {
     harness.expect_search_handles(1, Vec::new());
 
     harness
-        .service
         .resolve(
-            ResourceSelectionSyntax {
-                items: vec![item],
-                shadowed_selectors: Vec::new(),
-            },
-            &harness.facade,
-            &ResourceSelectionResolutionOptions {
-                visibility: ResourceVisibility::Active,
-                id_visibility: ResourceVisibility::IncludeDeleted,
-                ignore_not_found: false,
-                max_expanded_results: Some(10),
-                label_filter: None,
-                owner: None,
-            },
+            vec![item],
+            ResourceSelectionResolutionHarness::default_options(),
         )
         .await
         .expect_err("an unmatched any-type selector must error by default")
@@ -719,31 +610,22 @@ async fn deduplicates_overlapping_name_patterns_before_counting_max_results() {
     );
 
     let result = harness
-        .service
         .resolve(
-            ResourceSelectionSyntax {
-                items: vec![
-                    ResourceSelectionItem::NamePattern {
-                        type_descriptor: harness.variableset_type_descriptor(),
-                        selector_input: NAME_APP_PATTERN.to_string(),
-                        name_pattern: NAME_APP_PATTERN.to_string(),
-                    },
-                    ResourceSelectionItem::NamePattern {
-                        type_descriptor: harness.variableset_type_descriptor(),
-                        selector_input: "%alpha".to_string(),
-                        name_pattern: "%alpha".to_string(),
-                    },
-                ],
-                shadowed_selectors: Vec::new(),
-            },
-            &harness.facade,
-            &ResourceSelectionResolutionOptions {
-                visibility: ResourceVisibility::Active,
-                id_visibility: ResourceVisibility::IncludeDeleted,
-                ignore_not_found: false,
+            vec![
+                ResourceSelectionItem::NamePattern {
+                    type_descriptor: harness.variableset_type_descriptor(),
+                    selector_input: NAME_APP_PATTERN.to_string(),
+                    name_pattern: NAME_APP_PATTERN.to_string(),
+                },
+                ResourceSelectionItem::NamePattern {
+                    type_descriptor: harness.variableset_type_descriptor(),
+                    selector_input: "%alpha".to_string(),
+                    name_pattern: "%alpha".to_string(),
+                },
+            ],
+            ResourceSelectionResolutionOptions {
                 max_expanded_results: Some(1),
-                label_filter: None,
-                owner: None,
+                ..ResourceSelectionResolutionHarness::default_options()
             },
         )
         .await
@@ -785,31 +667,22 @@ async fn errors_when_unique_targets_exceed_max_results_after_deduplication() {
     );
 
     let error = harness
-        .service
         .resolve(
-            ResourceSelectionSyntax {
-                items: vec![
-                    ResourceSelectionItem::NamePattern {
-                        type_descriptor: harness.variableset_type_descriptor(),
-                        selector_input: NAME_APP_PATTERN.to_string(),
-                        name_pattern: NAME_APP_PATTERN.to_string(),
-                    },
-                    ResourceSelectionItem::NamePattern {
-                        type_descriptor: harness.variableset_type_descriptor(),
-                        selector_input: "%beta".to_string(),
-                        name_pattern: "%beta".to_string(),
-                    },
-                ],
-                shadowed_selectors: Vec::new(),
-            },
-            &harness.facade,
-            &ResourceSelectionResolutionOptions {
-                visibility: ResourceVisibility::Active,
-                id_visibility: ResourceVisibility::IncludeDeleted,
-                ignore_not_found: false,
+            vec![
+                ResourceSelectionItem::NamePattern {
+                    type_descriptor: harness.variableset_type_descriptor(),
+                    selector_input: NAME_APP_PATTERN.to_string(),
+                    name_pattern: NAME_APP_PATTERN.to_string(),
+                },
+                ResourceSelectionItem::NamePattern {
+                    type_descriptor: harness.variableset_type_descriptor(),
+                    selector_input: "%beta".to_string(),
+                    name_pattern: "%beta".to_string(),
+                },
+            ],
+            ResourceSelectionResolutionOptions {
                 max_expanded_results: Some(1),
-                label_filter: None,
-                owner: None,
+                ..ResourceSelectionResolutionHarness::default_options()
             },
         )
         .await
@@ -842,24 +715,15 @@ async fn passes_the_label_filter_to_pattern_expansion() {
     );
 
     let result = harness
-        .service
         .resolve(
-            ResourceSelectionSyntax {
-                items: vec![ResourceSelectionItem::NamePattern {
-                    type_descriptor: harness.variableset_type_descriptor(),
-                    selector_input: NAME_APP_PATTERN.to_string(),
-                    name_pattern: NAME_APP_PATTERN.to_string(),
-                }],
-                shadowed_selectors: Vec::new(),
-            },
-            &harness.facade,
-            &ResourceSelectionResolutionOptions {
-                visibility: ResourceVisibility::Active,
-                id_visibility: ResourceVisibility::IncludeDeleted,
-                ignore_not_found: false,
-                max_expanded_results: Some(10),
+            vec![ResourceSelectionItem::NamePattern {
+                type_descriptor: harness.variableset_type_descriptor(),
+                selector_input: NAME_APP_PATTERN.to_string(),
+                name_pattern: NAME_APP_PATTERN.to_string(),
+            }],
+            ResourceSelectionResolutionOptions {
                 label_filter: Some(environment_label_filter()),
-                owner: None,
+                ..ResourceSelectionResolutionHarness::default_options()
             },
         )
         .await
@@ -891,20 +755,11 @@ async fn passes_the_label_filter_to_the_all_selector() {
     );
 
     let result = harness
-        .service
         .resolve(
-            ResourceSelectionSyntax {
-                items: vec![ResourceSelectionItem::All],
-                shadowed_selectors: Vec::new(),
-            },
-            &harness.facade,
-            &ResourceSelectionResolutionOptions {
-                visibility: ResourceVisibility::Active,
-                id_visibility: ResourceVisibility::IncludeDeleted,
-                ignore_not_found: false,
-                max_expanded_results: Some(10),
+            vec![ResourceSelectionItem::All],
+            ResourceSelectionResolutionOptions {
                 label_filter: Some(environment_label_filter()),
-                owner: None,
+                ..ResourceSelectionResolutionHarness::default_options()
             },
         )
         .await
@@ -935,23 +790,15 @@ async fn narrows_exact_selectors_by_the_label_filter() {
     harness.expect_search_handles(1, vec![matching]);
 
     let result = harness
-        .service
         .resolve(
-            ResourceSelectionSyntax {
-                items: vec![
-                    harness.exact_selection_item("vars-a"),
-                    harness.exact_selection_item("vars-b"),
-                ],
-                shadowed_selectors: Vec::new(),
-            },
-            &harness.facade,
-            &ResourceSelectionResolutionOptions {
-                visibility: ResourceVisibility::Active,
-                id_visibility: ResourceVisibility::IncludeDeleted,
+            vec![
+                harness.exact_selection_item("vars-a"),
+                harness.exact_selection_item("vars-b"),
+            ],
+            ResourceSelectionResolutionOptions {
                 ignore_not_found: true,
-                max_expanded_results: Some(10),
                 label_filter: Some(environment_label_filter()),
-                owner: None,
+                ..ResourceSelectionResolutionHarness::default_options()
             },
         )
         .await
@@ -989,21 +836,9 @@ async fn leaves_exact_selectors_untouched_without_a_label_filter() {
     harness.expect_get_handles(1, vec![handle]);
 
     let result = harness
-        .service
         .resolve(
-            ResourceSelectionSyntax {
-                items: vec![harness.exact_selection_item("vars-a")],
-                shadowed_selectors: Vec::new(),
-            },
-            &harness.facade,
-            &ResourceSelectionResolutionOptions {
-                visibility: ResourceVisibility::Active,
-                id_visibility: ResourceVisibility::IncludeDeleted,
-                ignore_not_found: false,
-                max_expanded_results: Some(10),
-                label_filter: None,
-                owner: None,
-            },
+            vec![harness.exact_selection_item("vars-a")],
+            ResourceSelectionResolutionHarness::default_options(),
         )
         .await
         .unwrap();
@@ -1037,20 +872,11 @@ async fn resolves_exact_name_to_every_resource_holding_it_when_including_deletin
     harness.expect_get_handles_of_one_ref(handles.clone());
 
     let result = harness
-        .service
         .resolve(
-            ResourceSelectionSyntax {
-                items: vec![harness.exact_selection_item("vars-a")],
-                shadowed_selectors: Vec::new(),
-            },
-            &harness.facade,
-            &ResourceSelectionResolutionOptions {
+            vec![harness.exact_selection_item("vars-a")],
+            ResourceSelectionResolutionOptions {
                 visibility: ResourceVisibility::IncludeDeleting,
-                id_visibility: ResourceVisibility::IncludeDeleted,
-                ignore_not_found: false,
-                max_expanded_results: Some(10),
-                label_filter: None,
-                owner: None,
+                ..ResourceSelectionResolutionHarness::default_options()
             },
         )
         .await
@@ -1090,20 +916,12 @@ async fn labelled_exact_name_lists_live_resource_first_when_including_deleting()
     ]);
 
     let result = harness
-        .service
         .resolve(
-            ResourceSelectionSyntax {
-                items: vec![harness.exact_selection_item("vars-a")],
-                shadowed_selectors: Vec::new(),
-            },
-            &harness.facade,
-            &ResourceSelectionResolutionOptions {
+            vec![harness.exact_selection_item("vars-a")],
+            ResourceSelectionResolutionOptions {
                 visibility: ResourceVisibility::IncludeDeleting,
-                id_visibility: ResourceVisibility::IncludeDeleted,
-                ignore_not_found: false,
-                max_expanded_results: Some(10),
                 label_filter: Some(environment_label_filter()),
-                owner: None,
+                ..ResourceSelectionResolutionHarness::default_options()
             },
         )
         .await
@@ -1141,20 +959,12 @@ async fn labelled_exact_name_lists_deleted_resources_last() {
     ]);
 
     let result = harness
-        .service
         .resolve(
-            ResourceSelectionSyntax {
-                items: vec![harness.exact_selection_item("vars-a")],
-                shadowed_selectors: Vec::new(),
-            },
-            &harness.facade,
-            &ResourceSelectionResolutionOptions {
+            vec![harness.exact_selection_item("vars-a")],
+            ResourceSelectionResolutionOptions {
                 visibility: ResourceVisibility::IncludeDeleted,
-                id_visibility: ResourceVisibility::IncludeDeleted,
-                ignore_not_found: false,
-                max_expanded_results: Some(10),
                 label_filter: Some(environment_label_filter()),
-                owner: None,
+                ..ResourceSelectionResolutionHarness::default_options()
             },
         )
         .await
@@ -1190,23 +1000,14 @@ async fn any_type_exact_name_lists_live_resource_first_when_including_deleting()
     ]);
 
     let result = harness
-        .service
         .resolve(
-            ResourceSelectionSyntax {
-                items: vec![ResourceSelectionItem::AnyTypeExactRef {
-                    selector_input: "%/vars-a".to_string(),
-                    resource_ref: ExactResourceRef::ByName("vars-a".parse().unwrap()),
-                }],
-                shadowed_selectors: Vec::new(),
-            },
-            &harness.facade,
-            &ResourceSelectionResolutionOptions {
+            vec![ResourceSelectionItem::AnyTypeExactRef {
+                selector_input: "%/vars-a".to_string(),
+                resource_ref: ExactResourceRef::ByName("vars-a".parse().unwrap()),
+            }],
+            ResourceSelectionResolutionOptions {
                 visibility: ResourceVisibility::IncludeDeleting,
-                id_visibility: ResourceVisibility::IncludeDeleted,
-                ignore_not_found: false,
-                max_expanded_results: Some(10),
-                label_filter: None,
-                owner: None,
+                ..ResourceSelectionResolutionHarness::default_options()
             },
         )
         .await
@@ -1249,6 +1050,34 @@ struct GetHandlesRequest {
 }
 
 impl ResourceSelectionResolutionHarness {
+    fn default_options() -> ResourceSelectionResolutionOptions {
+        ResourceSelectionResolutionOptions {
+            visibility: ResourceVisibility::Active,
+            id_visibility: ResourceVisibility::IncludeDeleted,
+            ignore_not_found: false,
+            max_expanded_results: Some(10),
+            label_filter: None,
+            owner: None,
+        }
+    }
+
+    async fn resolve(
+        &self,
+        items: Vec<ResourceSelectionItem>,
+        options: ResourceSelectionResolutionOptions,
+    ) -> Result<ResourceSelectionResolution, CLIError> {
+        self.service
+            .resolve(
+                ResourceSelectionSyntax {
+                    items,
+                    shadowed_selectors: Vec::new(),
+                },
+                &self.facade,
+                &options,
+            )
+            .await
+    }
+
     fn new() -> Self {
         Self {
             service: Self::build_service(),

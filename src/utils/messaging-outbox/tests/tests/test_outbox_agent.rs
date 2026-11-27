@@ -1275,44 +1275,33 @@ async fn test_run_while_has_tasks_drains_backlog_with_small_batch_size() {
 }
 
 #[test_log::test(tokio::test)]
-async fn test_drain_is_not_idle_after_deliveries_of_another_run() {
-    let harness = OutboxAgentHarness::new();
-    harness.outbox_agent.run_initialization().await.unwrap();
-    let mut session = harness.new_drain_session();
+async fn test_drain_reports_deliveries_until_idle() {
+    for (case, another_run_delivers_first) in [
+        ("its own deliveries", false),
+        // Such as the agent's main loop: the delivery may have made other work
+        // due
+        ("deliveries of another run", true),
+    ] {
+        let harness = OutboxAgentHarness::new();
+        harness.outbox_agent.run_initialization().await.unwrap();
+        let mut session = harness.new_drain_session();
 
-    harness.post_message_a("foo").await;
-    // Another run, such as the agent's main loop, delivers it first
-    harness.outbox_agent.run_while_has_tasks().await.unwrap();
+        harness.post_message_a("foo").await;
+        if another_run_delivers_first {
+            harness.outbox_agent.run_while_has_tasks().await.unwrap();
+        }
 
-    assert_eq!(
-        OutboxAgentHarness::drain(&mut session).await,
-        BackgroundWorkDrainOutcome::Worked,
-        "the delivery may have made other work due"
-    );
-    assert_eq!(
-        OutboxAgentHarness::drain(&mut session).await,
-        BackgroundWorkDrainOutcome::Idle
-    );
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[test_log::test(tokio::test)]
-async fn test_drain_reports_its_own_deliveries() {
-    let harness = OutboxAgentHarness::new();
-    harness.outbox_agent.run_initialization().await.unwrap();
-    let mut session = harness.new_drain_session();
-
-    harness.post_message_a("foo").await;
-
-    assert_eq!(
-        OutboxAgentHarness::drain(&mut session).await,
-        BackgroundWorkDrainOutcome::Worked
-    );
-    assert_eq!(
-        OutboxAgentHarness::drain(&mut session).await,
-        BackgroundWorkDrainOutcome::Idle
-    );
+        assert_eq!(
+            OutboxAgentHarness::drain(&mut session).await,
+            BackgroundWorkDrainOutcome::Worked,
+            "{case}"
+        );
+        assert_eq!(
+            OutboxAgentHarness::drain(&mut session).await,
+            BackgroundWorkDrainOutcome::Idle,
+            "{case}"
+        );
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

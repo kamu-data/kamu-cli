@@ -36,18 +36,38 @@ pub enum InvalidOwnerReferenceError {
     UnknownType(TypeRef),
 }
 
+impl From<UnresolvableResourceRefError> for InvalidOwnerReferenceError {
+    fn from(value: UnresolvableResourceRefError) -> Self {
+        match value {
+            UnresolvableResourceRefError::Did => Self::Did,
+            UnresolvableResourceRefError::Empty => Self::Empty,
+            UnresolvableResourceRefError::UntypedName => Self::UntypedName,
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Why a reference cannot name a resource, judged by its fields alone
+#[derive(Debug, PartialEq, Eq)]
+pub enum UnresolvableResourceRefError {
+    Did,
+    Empty,
+    UntypedName,
+}
+
 pub fn validate_owner_reference(
     owner_reference: &ResourceRef,
-) -> Result<(), InvalidOwnerReferenceError> {
+) -> Result<(), UnresolvableResourceRefError> {
     if owner_reference.did.is_some() {
-        return Err(InvalidOwnerReferenceError::Did);
+        return Err(UnresolvableResourceRefError::Did);
     }
     if owner_reference.id.is_none() {
         if owner_reference.name.is_none() {
-            return Err(InvalidOwnerReferenceError::Empty);
+            return Err(UnresolvableResourceRefError::Empty);
         }
         if owner_reference.r#type.is_none() {
-            return Err(InvalidOwnerReferenceError::UntypedName);
+            return Err(UnresolvableResourceRefError::UntypedName);
         }
     }
     Ok(())

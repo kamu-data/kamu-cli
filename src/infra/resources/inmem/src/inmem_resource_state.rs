@@ -147,6 +147,17 @@ impl<'a> ResourceStateView<'_, 'a> {
             .collect()
     }
 
+    /// The resources whose purge deadline is at or before `now`, with it
+    pub(crate) fn due_for_purge(
+        &self,
+        now: DateTime<Utc>,
+    ) -> Vec<(&'a ResourceSnapshot, DateTime<Utc>)> {
+        self.purge_deadlines()
+            .into_iter()
+            .filter(|(_, purge_at)| *purge_at <= now)
+            .collect()
+    }
+
     /// The live resource holding the name
     pub(crate) fn live_snapshot_by_name(
         &self,

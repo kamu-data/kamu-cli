@@ -52,8 +52,9 @@ impl OwnerReferenceResolver<'_> {
         let mut seen_ids = HashSet::new();
 
         for owner_reference in owner_references {
-            validate_owner_reference(owner_reference)
-                .map_err(ResourceHeadersValidationError::from)?;
+            validate_owner_reference(owner_reference).map_err(|err| {
+                ResourceHeadersValidationError::from(InvalidOwnerReferenceError::from(err))
+            })?;
 
             let id = self.resolve_id(owner_reference).await?;
             if self.owned_id == Some(id) {
@@ -109,12 +110,7 @@ impl OwnerReferenceResolver<'_> {
             .into());
         };
 
-        if !self.is_same_account(owner_reference) {
-            return Err(OwnerReferenceRejectedError::OtherAccount {
-                reference: describe_reference(owner_reference),
-            }
-            .into());
-        }
+        self.ensure_same_account(owner_reference)?;
 
         self.generic_resource_query_service
             .find_resource_id_by_name(self.account_id(), schema, name)
@@ -164,12 +160,7 @@ impl OwnerReferenceResolver<'_> {
         id: ResourceID,
         actual_type: &TypeUri,
     ) -> Result<(), ResolveOwnerReferencesError> {
-        if !self.is_same_account(owner_reference) {
-            return Err(OwnerReferenceRejectedError::OtherAccount {
-                reference: describe_reference(owner_reference),
-            }
-            .into());
-        }
+        self.ensure_same_account(owner_reference)?;
 
         if let Some(expected) = &owner_reference.r#type {
             let type_matches = match expected {
@@ -218,20 +209,30 @@ impl OwnerReferenceResolver<'_> {
             .expect("the account of the owned resource is resolved")
     }
 
-    /// Whether every given part of the reference's account is that of the owned
-    /// resource's account, which is the default
-    fn is_same_account(&self, owner_reference: &ResourceRef) -> bool {
+    /// Rejects a reference unless every given part of its account is that of
+    /// the owned resource's account, which is the default
+    fn ensure_same_account(
+        &self,
+        owner_reference: &ResourceRef,
+    ) -> Result<(), OwnerReferenceRejectedError> {
         let Some(account) = &owner_reference.account else {
-            return true;
+            return Ok(());
         };
 
         fn given_matches<T: PartialEq>(given: Option<&T>, actual: Option<&T>) -> bool {
             given.is_none() || given == actual
         }
 
-        given_matches(account.id.as_ref(), self.account.id.as_ref())
+        if given_matches(account.id.as_ref(), self.account.id.as_ref())
             && given_matches(account.did.as_ref(), self.account.did.as_ref())
             && given_matches(account.name.as_ref(), self.account.name.as_ref())
+        {
+            Ok(())
+        } else {
+            Err(OwnerReferenceRejectedError::OtherAccount {
+                reference: describe_reference(owner_reference),
+            })
+        }
     }
 }
 

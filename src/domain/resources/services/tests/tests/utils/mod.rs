@@ -7,11 +7,13 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+mod apply_resource_planning_harness;
 mod harness_helpers;
 mod resource_lifecycle_harness;
 mod scripted_name_suffix_generator;
 mod service_layer_test_harness;
 
+pub use apply_resource_planning_harness::*;
 pub use harness_helpers::*;
 pub use resource_lifecycle_harness::*;
 pub use scripted_name_suffix_generator::*;

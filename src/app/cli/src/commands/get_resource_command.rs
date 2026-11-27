@@ -83,14 +83,10 @@ impl GetResourceCommand {
     const MATERIALIZATION_BATCH_SIZE: usize = 100;
 
     async fn resolution_options(&self) -> Result<ResourceSelectionResolutionOptions, CLIError> {
-        let owner = match &self.owner {
-            Some(owner) => Some(
-                self.resource_selection_syntax_service
-                    .parse_owner(self.explicit_context_name.as_deref(), owner)
-                    .await?,
-            ),
-            None => None,
-        };
+        let owner = self
+            .resource_selection_syntax_service
+            .parse_owner(self.explicit_context_name.as_deref(), self.owner.as_deref())
+            .await?;
 
         Ok(ResourceSelectionResolutionOptions {
             ignore_not_found: self.ignore_not_found,

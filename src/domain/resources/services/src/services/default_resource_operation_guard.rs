@@ -30,6 +30,17 @@ pub struct DefaultResourceOperationGuard {
 }
 
 impl DefaultResourceOperationGuard {
+    /// The type's own guard when it has one, otherwise `default`
+    pub fn or_default<'a, R: DeclarativeResource>(
+        guard: Option<&'a dyn ResourceOperationGuard<R>>,
+        default: &'a Self,
+    ) -> &'a dyn ResourceOperationGuard<R> {
+        match guard {
+            Some(guard) => guard,
+            None => default,
+        }
+    }
+
     pub async fn check_account_rule(
         &self,
         principal: &odf::metadata::auth::PrincipalHandle,

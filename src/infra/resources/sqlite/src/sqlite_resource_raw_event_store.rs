@@ -10,7 +10,7 @@
 use std::collections::HashMap;
 
 use chrono::{DateTime, Utc};
-use database_common::TransactionRefT;
+use database_common::{TransactionRefT, sqlite_push_bind_list};
 use dill::{component, interface};
 use event_sourcing::{
     EventID,
@@ -537,15 +537,10 @@ impl ResourceRawEventStore for SqliteResourceRawEventStore {
         let mut tr = self.transaction.lock().await;
         let connection_mut = tr.connection_mut().await?;
 
-        // UUIDs bind as blobs, so the IDs go in as bound values, not JSON
         let mut query_builder = sqlx::QueryBuilder::<sqlx::Sqlite>::new(
-            "DELETE FROM resource_events WHERE resource_id IN (",
+            "DELETE FROM resource_events WHERE resource_id IN ",
         );
-        let mut separated = query_builder.separated(", ");
-        for id in ids {
-            separated.push_bind(*id.as_ref());
-        }
-        query_builder.push(")");
+        sqlite_push_bind_list(&mut query_builder, ids.iter().map(|id| *id.as_ref()));
 
         query_builder
             .build()

@@ -50,6 +50,7 @@ pub struct ResourceInvalidHeaderProblem {
 
 /// Kind of resource header validation failure
 #[derive(Enum, Debug, Clone, Copy, PartialEq, Eq)]
+#[graphql(remote = "kamu_resources_facade::ResourceHeadersValidationProblemCode")]
 pub enum ResourceHeaderValidationProblemCode {
     /// Resource name is omitted, and the resource type does not generate names
     MissingName,
@@ -84,28 +85,8 @@ impl From<kamu_resources::ResourceHeadersValidationError> for ResourceInvalidHea
 
 impl From<kamu_resources_facade::ResourceInvalidHeadersError> for ResourceInvalidHeaderProblem {
     fn from(value: kamu_resources_facade::ResourceInvalidHeadersError) -> Self {
-        use kamu_resources_facade::ResourceHeadersValidationProblemCode as C;
-        let code = match value.code {
-            C::MissingName => ResourceHeaderValidationProblemCode::MissingName,
-            C::EmptyName => ResourceHeaderValidationProblemCode::EmptyName,
-            C::NameTooLong => ResourceHeaderValidationProblemCode::NameTooLong,
-            C::InvalidName => ResourceHeaderValidationProblemCode::InvalidName,
-            C::TooManyLabels => ResourceHeaderValidationProblemCode::TooManyLabels,
-            C::DuplicateLabelKey => ResourceHeaderValidationProblemCode::DuplicateLabelKey,
-            C::TooManyAnnotations => ResourceHeaderValidationProblemCode::TooManyAnnotations,
-            C::DuplicateAnnotationKey => {
-                ResourceHeaderValidationProblemCode::DuplicateAnnotationKey
-            }
-            C::TooManyOwnerReferences => {
-                ResourceHeaderValidationProblemCode::TooManyOwnerReferences
-            }
-            C::InvalidOwnerReference => ResourceHeaderValidationProblemCode::InvalidOwnerReference,
-            C::ResourceExtensionSchema => {
-                ResourceHeaderValidationProblemCode::ResourceExtensionSchema
-            }
-        };
         Self {
-            code,
+            code: value.code.into(),
             message: value.message,
         }
     }

@@ -109,7 +109,7 @@ pub(crate) fn validate_owner_references(
     }
 
     for owner_reference in owner_references {
-        validate_owner_reference(owner_reference)?;
+        validate_owner_reference(owner_reference).map_err(InvalidOwnerReferenceError::from)?;
     }
 
     Ok(())

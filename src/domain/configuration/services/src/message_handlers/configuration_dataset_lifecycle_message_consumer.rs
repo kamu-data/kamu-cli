@@ -107,7 +107,7 @@ impl ConfigurationDatasetLifecycleMessageConsumer {
             .find_resource_snapshots_by_schema_and_ids(schema, &ids)
             .await?
             .into_iter()
-            .filter(|snapshot| snapshot.headers.deleted_at.is_none())
+            .filter(|snapshot| !snapshot.headers.is_deleted())
             .collect::<Vec<_>>();
 
         // Full derived name, never a `legacy-vars-` prefix: a set named after

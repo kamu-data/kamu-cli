@@ -264,10 +264,7 @@ impl DatasetEntryServiceImpl {
         }
 
         let Some(name) = &dataset_ref.name else {
-            return Err(InvalidDatasetRefError {
-                reason: "it has no ID, DID or name",
-            }
-            .into());
+            return Err(InvalidDatasetRefError::no_id_did_or_name().into());
         };
         // A name that is not a valid dataset name names no dataset
         let Ok(dataset_name) = odf::DatasetName::try_from(name.as_str()) else {
@@ -312,14 +309,9 @@ impl DatasetEntryServiceImpl {
                 name: None,
                 ..
             }) => {
-                return Err(InvalidDatasetRefError {
-                    reason: "its account has no DID or name",
-                }
-                .into());
+                return Err(InvalidDatasetRefError::account_has_no_did_or_name().into());
             }
-            None => bare_name_account.ok_or(InvalidDatasetRefError {
-                reason: "it names a dataset without an account",
-            })?,
+            None => bare_name_account.ok_or_else(InvalidDatasetRefError::name_without_account)?,
         };
 
         match self.resolve_account_id_by_name(account_name).await {
@@ -341,12 +333,9 @@ impl DatasetEntryServiceImpl {
             Err(GetAccountByIdError::Internal(e)) => return Err(e),
         };
 
-        Ok(Some(odf::metadata::datasets::DatasetHandle {
-            account: AccountHandle::from(&owner).into(),
-            id: entry.resource_id,
-            did: entry.id,
-            name: odf::metadata::resources::ResourceName::new_unchecked(entry.name.as_str()),
-        }))
+        Ok(Some(
+            entry.to_odf_handle(AccountHandle::from(&owner).into()),
+        ))
     }
 
     async fn list_all_entries(

@@ -11,20 +11,26 @@ use std::sync::Arc;
 
 use chrono::TimeDelta;
 use dill::CatalogBuilder;
+use event_sourcing::GetEventsOpts;
 use internal_error::InternalError;
 use kamu_resources::{
-    ApplyResourceAccessCheck,
-    ApplyResourceAccountSource,
     ApplyResourceApplicationDecision,
     ApplyResourceParams,
     ApplyResourceUseCase,
+    MESSAGE_PRODUCER_KAMU_RESOURCE_SERVICE,
+    ManagedResource,
     RequestAccountResourcesDeletionUseCase,
     RequestResourcesDeletionUseCase,
+    ResourceAggregateLoader,
     ResourceController,
     ResourceControllerName,
     ResourceControllerState,
     ResourceControllerStateRepository,
+    ResourceEvent,
+    ResourceEventCreated,
     ResourceID,
+    ResourceLifecycleMessage,
+    ResourcePersistenceService,
     ResourceProcessOutcome,
     ResourceSpecPreApply,
 };
@@ -35,6 +41,7 @@ use kamu_resources_services::testing::{
     TestResource,
     TestResourceAppendingPreApply,
     TestResourceClearingPreApply,
+    TestResourceEventStore,
     TestResourceReconcilerProvider,
     TestResourceSpec,
     register_test_condition_schema_dispatchers,
@@ -42,8 +49,15 @@ use kamu_resources_services::testing::{
     register_test_resource_resource_service_layer,
     register_test_resource_resource_service_layer_without_controller,
 };
-use messaging_outbox::{MockOutbox, OutboxAgent, OutboxProvider};
+use messaging_outbox::{
+    MockOutbox,
+    OutboxAgent,
+    OutboxMessageBoundary,
+    OutboxMessageBridge,
+    OutboxProvider,
+};
 use time_source::FakeSystemTimeSource;
+use tokio_stream::StreamExt;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -259,15 +273,14 @@ impl ServiceLayerTestHarness {
         value: &str,
     ) {
         let params = ApplyResourceParams {
-            account_source: ApplyResourceAccountSource::Manifest,
-            access_check: ApplyResourceAccessCheck::ByGuard,
             id: Some(id),
-            headers: BaseResourceServiceHarness::make_headers_input(account_handle.clone(), name)
-                .into(),
-            spec: TestResourceSpec {
-                value: value.to_string(),
-            },
-            provenance: BaseResourceServiceHarness::make_provenance(),
+            ..BaseResourceServiceHarness::make_apply_params(
+                account_handle.clone(),
+                Some(name),
+                TestResourceSpec {
+                    value: value.to_string(),
+                },
+            )
         };
 
         self.apply_test_uc()
@@ -304,22 +317,103 @@ impl ServiceLayerTestHarness {
         );
     }
 
+    pub async fn load(&self, id: ResourceID) -> TestResource {
+        self.catalog()
+            .get_one::<dyn ResourceAggregateLoader<TestResource>>()
+            .unwrap()
+            .load(&id)
+            .await
+            .unwrap()
+    }
+
+    async fn save(&self, resource: &mut TestResource) {
+        self.catalog()
+            .get_one::<dyn ResourcePersistenceService<TestResource>>()
+            .unwrap()
+            .save(resource)
+            .await
+            .unwrap();
+    }
+
+    /// Stores the resource as being deleted through its aggregate, with no
+    /// lifecycle message
+    pub async fn request_deletion_of(&self, id: ResourceID) {
+        let mut resource = self.load(id).await;
+        resource
+            .try_request_deletion(self.time_source().now())
+            .unwrap();
+        self.save(&mut resource).await;
+    }
+
+    /// Stores the resource being deleted as deleted through its aggregate,
+    /// with no lifecycle message
+    pub async fn complete_deletion_of(&self, id: ResourceID) {
+        let mut resource = self.load(id).await;
+        resource
+            .try_complete_deletion(self.time_source().now())
+            .unwrap();
+        self.save(&mut resource).await;
+    }
+
+    pub async fn events(&self, id: ResourceID) -> Vec<ResourceEvent<TestResourceSpec>> {
+        self.catalog()
+            .get_one::<dyn TestResourceEventStore>()
+            .unwrap()
+            .get_events(&id, GetEventsOpts::default())
+            .map(|result| result.unwrap().1)
+            .collect()
+            .await
+    }
+
+    /// The first event of the resource, which creates it
+    pub async fn created_event(&self, id: ResourceID) -> ResourceEventCreated<TestResourceSpec> {
+        match self.events(id).await.into_iter().next() {
+            Some(ResourceEvent::Created(created)) => created,
+            other => panic!("unexpected first event: {other:?}"),
+        }
+    }
+
+    /// Needs `OutboxProvider::Dispatching`, whose messages stay in the outbox
+    pub async fn lifecycle_messages(&self) -> Vec<ResourceLifecycleMessage> {
+        self.raw_messages_since(0)
+            .await
+            .into_iter()
+            .map(|content| serde_json::from_value(content).unwrap())
+            .collect()
+    }
+
+    /// The JSON of every lifecycle message posted after the first `mark`, as
+    /// the outbox stores it. Needs `OutboxProvider::Dispatching`
+    pub async fn raw_messages_since(&self, mark: usize) -> Vec<serde_json::Value> {
+        self.catalog()
+            .get_one::<dyn OutboxMessageBridge>()
+            .unwrap()
+            .get_messages_by_producer(
+                self.catalog(),
+                MESSAGE_PRODUCER_KAMU_RESOURCE_SERVICE,
+                OutboxMessageBoundary::default(),
+                usize::MAX,
+            )
+            .await
+            .unwrap()
+            .into_iter()
+            .skip(mark)
+            .map(|message| message.content_json)
+            .collect()
+    }
+
     pub async fn apply_and_get_id(
         &self,
         account_handle: &odf::ResourceOwnerHandle,
         name: &str,
     ) -> ResourceID {
-        let params = ApplyResourceParams {
-            account_source: ApplyResourceAccountSource::Manifest,
-            access_check: ApplyResourceAccessCheck::ByGuard,
-            id: None,
-            headers: BaseResourceServiceHarness::make_headers_input(account_handle.clone(), name)
-                .into(),
-            spec: TestResourceSpec {
+        let params = BaseResourceServiceHarness::make_apply_params(
+            account_handle.clone(),
+            Some(name),
+            TestResourceSpec {
                 value: name.to_string(),
             },
-            provenance: BaseResourceServiceHarness::make_provenance(),
-        };
+        );
 
         let decision = self.apply_test_uc().apply(params).await.unwrap();
 

@@ -15,11 +15,8 @@ use chrono::Utc;
 use dill::CatalogBuilder;
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu_resources::{
-    ApplyResourceAccessCheck,
-    ApplyResourceAccountSource,
     ApplyResourceApplicationDecision,
     ApplyResourceOutcome,
-    ApplyResourceParams,
     ApplyResourcePrecondition,
     ApplyResourceRejection,
     ApplyResourceRejectionCategory,
@@ -381,18 +378,11 @@ where
 
         runner
             .apply(
-                ApplyResourceParams {
-                    account_source: ApplyResourceAccountSource::Manifest,
-                    access_check: ApplyResourceAccessCheck::ByGuard,
-                    id: None,
-                    headers: BaseResourceServiceHarness::make_headers_input(
-                        account_handle(),
-                        "res-a",
-                    )
-                    .into(),
+                BaseResourceServiceHarness::make_apply_params(
+                    account_handle(),
+                    Some("res-a"),
                     spec,
-                    provenance: BaseResourceServiceHarness::make_provenance(),
-                },
+                ),
                 precondition,
             )
             .await

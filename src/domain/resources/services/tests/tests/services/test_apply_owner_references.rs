@@ -10,8 +10,6 @@
 use std::assert_matches;
 use std::sync::Arc;
 
-use dill::CatalogBuilder;
-use event_sourcing::GetEventsOpts;
 use kamu_resources::{
     ApplyResourceAction,
     ApplyResourceApplicationDecision,
@@ -24,32 +22,21 @@ use kamu_resources::{
     ApplyResourceUseCaseError,
     DeclarativeResource,
     InvalidOwnerReferenceError,
-    ManagedResource,
-    ResourceAggregateLoader,
-    ResourceEvent,
     ResourceHandle,
     ResourceHeaders,
     ResourceHeadersValidationError,
     ResourceID,
     ResourceOwnerProjectionRepository,
-    ResourcePersistenceService,
     ResourceRef,
     ResourceSchemaProvider,
     TypeUri,
     owner_ids,
 };
-use kamu_resources_services::testing::{
-    BaseResourceServiceHarness,
-    TestResource,
-    TestResourceEventStore,
-    TestResourceReconciler,
-    register_test_resource_resource_service_layer,
-};
+use kamu_resources_services::testing::TestResource;
 use odf::metadata::auth::ResourceOwnerRef;
 use pretty_assertions::assert_eq;
-use tokio_stream::StreamExt;
 
-use crate::tests::utils::{make_id, make_resource_params};
+use crate::tests::utils::{ServiceLayerTestHarness, make_id, make_resource_params};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Tests
@@ -98,7 +85,7 @@ async fn test_reference_that_is_not_an_owner_is_rejected() {
     let owner = harness.create("owner").await;
     let foreign = harness.create_in("other-account", "foreign").await;
     let deleting = harness.create("deleting").await;
-    harness.request_deletion(deleting.id).await;
+    harness.request_deletion_of(deleting.id).await;
     let deleted = harness.create("deleted").await;
     harness.delete(deleted.id).await;
     let other_account: ResourceOwnerRef =
@@ -378,27 +365,20 @@ async fn test_plan_shows_resolved_owners() {
 // Harness
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[oop::extend(BaseResourceServiceHarness, base)]
+#[oop::extend(ServiceLayerTestHarness, base)]
 struct OwnerReferencesHarness {
-    base: BaseResourceServiceHarness,
-    catalog: dill::Catalog,
+    base: ServiceLayerTestHarness,
     apply_svc: Arc<dyn ApplyResourceUseCase<TestResource>>,
     account_handle: odf::ResourceOwnerHandle,
 }
 
 impl OwnerReferencesHarness {
     fn new() -> Self {
-        let base = BaseResourceServiceHarness::new();
-
-        let mut b = CatalogBuilder::new_chained(base.catalog());
-        register_test_resource_resource_service_layer(&mut b);
-        b.add::<TestResourceReconciler>();
-        let catalog = b.build();
+        let base = ServiceLayerTestHarness::new();
 
         Self {
+            apply_svc: base.apply_test_uc(),
             base,
-            apply_svc: catalog.get_one().unwrap(),
-            catalog,
             account_handle: odf::ResourceOwnerHandle::new_test("test"),
         }
     }
@@ -483,33 +463,9 @@ impl OwnerReferencesHarness {
         self.apply_svc.apply(params).await.unwrap().expect_applied();
     }
 
-    async fn request_deletion(&self, id: ResourceID) {
-        let mut resource = self.load(id).await;
-        resource
-            .try_request_deletion(self.time_source().now())
-            .unwrap();
-        self.save(&mut resource).await;
-    }
-
     async fn delete(&self, id: ResourceID) {
-        self.request_deletion(id).await;
-        let mut resource = self.load(id).await;
-        resource
-            .try_complete_deletion(self.time_source().now())
-            .unwrap();
-        self.save(&mut resource).await;
-    }
-
-    async fn load(&self, id: ResourceID) -> TestResource {
-        let loader: Arc<dyn ResourceAggregateLoader<TestResource>> =
-            self.catalog.get_one().unwrap();
-        loader.load(&id).await.unwrap()
-    }
-
-    async fn save(&self, resource: &mut TestResource) {
-        let persistence: Arc<dyn ResourcePersistenceService<TestResource>> =
-            self.catalog.get_one().unwrap();
-        persistence.save(resource).await.unwrap();
+        self.request_deletion_of(id).await;
+        self.complete_deletion_of(id).await;
     }
 
     /// Headers replayed from the events
@@ -524,21 +480,11 @@ impl OwnerReferencesHarness {
     }
 
     async fn created_event_owners(&self, id: ResourceID) -> Option<Vec<ResourceRef>> {
-        let event_store: Arc<dyn TestResourceEventStore> = self.catalog.get_one().unwrap();
-        let events = event_store
-            .get_events(&id, GetEventsOpts::default())
-            .collect::<Result<Vec<_>, _>>()
-            .await
-            .unwrap();
-
-        let (_, ResourceEvent::Created(created)) = &events[0] else {
-            panic!("unexpected first event: {:?}", events[0]);
-        };
-        created.headers.owner_references.clone()
+        self.created_event(id).await.headers.owner_references
     }
 
     async fn indexed_owners(&self, id: ResourceID) -> Vec<ResourceID> {
-        self.catalog
+        self.catalog()
             .get_one::<dyn ResourceOwnerProjectionRepository>()
             .unwrap()
             .find_owners(&id)

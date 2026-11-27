@@ -59,7 +59,6 @@ use kamu_resources::{
     ResourceOwnerRef,
     ResourceRetentionConfig,
     ResourceSelector,
-    ResourceVisibility,
 };
 use kamu_resources_facade::{ListResourcesError, ResourceFacade, SearchResourcesRequest};
 use kamu_resources_services::ResourceControllerRuntimeImpl;
@@ -306,12 +305,7 @@ impl LocalFacadeHarness {
 
     /// A facade acting as the admin account
     pub fn facade_for_admin(&self) -> Arc<dyn ResourceFacade> {
-        let subject = Self::admin_subject();
-        let mut b = dill::CatalogBuilder::new_chained(&self.base_catalog);
-        subject.register(&mut b);
-        b.add_value(RequestOrigin::Cli);
-        let catalog = b.build();
-        Self::facade_in(&catalog)
+        Self::facade_in(&self.subject_catalog(Self::admin_subject()))
     }
 
     /// A facade of background work: [`Principal::Node`] acting, with no caller
@@ -334,10 +328,8 @@ impl LocalFacadeHarness {
         account: Option<TestAccount>,
     ) -> Result<Vec<String>, ListResourcesError> {
         let response = facade
-            .search_handles(SearchResourcesRequest {
-                owner: None,
-                visibility: ResourceVisibility::Active,
-                selectors: vec![ResourceSelector {
+            .search_handles(SearchResourcesRequest::new(
+                vec![ResourceSelector {
                     account: account.map(|account| ResourceOwnerRef {
                         r#type: None,
                         id: None,
@@ -346,8 +338,8 @@ impl LocalFacadeHarness {
                     }),
                     ..ResourceSelector::of_type(VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap())
                 }],
-                pagination: PaginationOpts::from_max_results(1000),
-            })
+                PaginationOpts::from_max_results(1000),
+            ))
             .await?;
         Ok(sorted_handle_names(response.items))
     }
@@ -370,6 +362,11 @@ impl LocalFacadeHarness {
             odf::AccountName::new_unchecked(account.name()),
         );
 
+        self.subject_catalog(subject)
+    }
+
+    /// The catalog of a CLI command `subject` runs
+    fn subject_catalog(&self, subject: CurrentAccountSubject) -> dill::Catalog {
         let mut b = dill::CatalogBuilder::new_chained(&self.base_catalog);
         subject.register(&mut b);
         b.add_value(RequestOrigin::Cli);

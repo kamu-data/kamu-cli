@@ -11,6 +11,7 @@ use internal_error::{InternalError, ResultIntoInternal};
 use time_source::SystemTimeSource;
 
 use crate::{
+    BackgroundAgent,
     BackgroundWorkDrain,
     BackgroundWorkDrainOutcome,
     HousekeepingAgent,
@@ -102,15 +103,8 @@ impl BackgroundWorkFinalizer {
         let time_source = catalog.get_one::<dyn SystemTimeSource>().int_err()?;
 
         let mut removed = 0;
-        for job in jobs {
-            let job_config = config.job(job.job_name());
-            if !job_config.enabled {
-                continue;
-            }
-
-            let job_name = job.job_name();
-            let agent =
-                HousekeepingAgent::new(job, job_config, metrics.clone(), time_source.clone());
+        for agent in HousekeepingAgent::for_enabled_jobs(jobs, &config, &metrics, &time_source) {
+            let job_name = agent.agent_name();
             match agent.run_batch().await {
                 Ok(report) => removed += report.removed(),
                 Err(e) => tracing::warn!(

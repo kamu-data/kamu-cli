@@ -24,12 +24,12 @@ use background_agent_host::{
     HousekeepingJobConfig,
     HousekeepingMetrics,
 };
-use chrono::{DateTime, TimeZone, Utc};
+use chrono::{DateTime, Utc};
 use internal_error::InternalError;
 use pretty_assertions::assert_eq;
 use time_source::{FakeSystemTimeSource, SystemTimeSource};
 
-use crate::tests::utils::{ScriptedBatch, ScriptedHousekeepingJob};
+use crate::tests::utils::{FakeClock, ScriptedBatch, ScriptedHousekeepingJob};
 
 #[test_log::test(tokio::test)]
 async fn test_settle_drains_until_a_full_pass_finds_all_idle() {
@@ -84,7 +84,7 @@ async fn test_housekeeping_runs_one_batch_per_enabled_job_then_settles_again() {
 
     assert_eq!(
         job.batches(),
-        [(harness.time_source.now(), BATCH_SIZE)],
+        [(harness.clock.now(), BATCH_SIZE)],
         "one batch, though a backlog remains"
     );
     assert_eq!(disabled_job.batch_count(), 0);
@@ -155,7 +155,7 @@ const BATCH_SIZE: usize = 7;
 
 struct FinalizerHarness {
     catalog: dill::Catalog,
-    time_source: FakeSystemTimeSource,
+    clock: FakeClock,
 }
 
 impl FinalizerHarness {
@@ -163,8 +163,7 @@ impl FinalizerHarness {
         drains: [Arc<ScriptedDrain>; D],
         jobs: [Arc<ScriptedHousekeepingJob>; J],
     ) -> Self {
-        let time_source =
-            FakeSystemTimeSource::new(Utc.with_ymd_and_hms(2050, 1, 1, 12, 0, 0).unwrap());
+        let clock = FakeClock::new();
         let job_config = HousekeepingJobConfig {
             batch_size: BATCH_SIZE,
             ..HousekeepingJobConfig::default()
@@ -199,12 +198,12 @@ impl FinalizerHarness {
             ]),
         });
         b.add::<HousekeepingMetrics>();
-        b.add_value(time_source.clone())
+        b.add_value(clock.time_source().clone())
             .bind::<dyn SystemTimeSource, FakeSystemTimeSource>();
 
         Self {
             catalog: b.build(),
-            time_source,
+            clock,
         }
     }
 

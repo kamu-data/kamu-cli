@@ -27,5 +27,8 @@ pub mod smart_protocol;
 pub mod system;
 mod ws_common;
 
+/// The path the servers mount their GraphQL endpoint at
+pub(crate) const GRAPHQL_PATH: &str = "/graphql";
+
 pub type SmartTransferProtocolClientWs =
     smart_protocol::ws_tungstenite_client::WsSmartTransferProtocolClient;

@@ -148,12 +148,7 @@ impl ImmutableTestResource {
     pub const SCHEMA_STR: &'static str =
         "https://test.kamu.dev/schemas/test/v1/ImmutableTestResource";
 
-    pub const CANONICAL_SELECTOR_NAME_STR: &'static str = "immutabletestresources";
-    pub const CANONICAL_SELECTOR_NAME: ResourceSelectorName =
-        ResourceSelectorName::new_unchecked_static(Self::CANONICAL_SELECTOR_NAME_STR);
-
-    pub const SELECTOR_ALIAS_STRS: &'static [&'static str] = &[];
-    pub const SELECTOR_ALIASES: &'static [ResourceSelectorName] = &[];
+    kamu_resources::declare_resource_selector_constants!("immutabletestresources", []);
 }
 
 impl ResourceSchemaProvider for ImmutableTestResource {

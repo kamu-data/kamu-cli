@@ -7,6 +7,12 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+mod event_counter;
+mod fake_clock;
+mod host_harness;
 mod scripted_housekeeping_job;
 
+pub use event_counter::*;
+pub use fake_clock::*;
+pub use host_harness::*;
 pub use scripted_housekeeping_job::*;

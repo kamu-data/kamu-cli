@@ -233,14 +233,10 @@ impl ListCommand {
             .resource_facade_factory
             .get_resource_facade(self.explicit_context_name.as_deref())?;
 
-        let owner = match &self.owner {
-            Some(owner) => Some(
-                self.resource_selection_syntax_service
-                    .parse_owner(self.explicit_context_name.as_deref(), owner)
-                    .await?,
-            ),
-            None => None,
-        };
+        let owner = self
+            .resource_selection_syntax_service
+            .parse_owner(self.explicit_context_name.as_deref(), self.owner.as_deref())
+            .await?;
 
         let scope = match mode {
             ListMode::ResourcesAll(query) => ListResourcesScope::All(query),

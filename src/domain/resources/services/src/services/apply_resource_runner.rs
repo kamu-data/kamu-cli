@@ -148,8 +148,8 @@ where
             }
         };
 
-        let plan = match self
-            .planner()
+        let planner = self.planner();
+        let plan = match planner
             .plan_internal(prepared.params, prepared.maybe_existing, precondition)
             .await?
         {
@@ -159,7 +159,9 @@ where
             }
         };
 
-        self.executor().execute(plan).await
+        ApplyResourcePlanExecutor::new(planner, self.resource_persistence_service, self.outbox)
+            .execute(plan)
+            .await
     }
 
     /// Places and prepares the resource, then checks that the principal may
@@ -221,10 +223,10 @@ where
         principal: &odf::metadata::auth::PrincipalHandle,
         request: &ResourceOperationRequest<'_, R>,
     ) -> Result<(), ApplyResourceUseCaseError<R>> {
-        let guard: &dyn ResourceOperationGuard<R> = match self.maybe_resource_operation_guard {
-            Some(guard) => guard,
-            None => self.default_resource_operation_guard,
-        };
+        let guard = DefaultResourceOperationGuard::or_default(
+            self.maybe_resource_operation_guard,
+            self.default_resource_operation_guard,
+        );
 
         match guard.check_operation(principal, request).await {
             Ok(()) => Ok(()),
@@ -250,11 +252,9 @@ where
         &self,
         params: ApplyResourceParams<R>,
     ) -> Result<PlacedApplyResource<R>, ApplyResourceUseCaseError<R>> {
-        let existing = self.find_existing(&params).await?;
-        let prepared = match self.prepare(&params, existing.resource()).await? {
-            Some(Ok(prepared)) => prepared,
-            Some(Err(rejection)) => return Ok(PlacedApplyResource::Rejected(rejection)),
-            None => params.clone(),
+        let (prepared, existing) = match self.find_and_prepare(&params).await? {
+            Ok(found) => found,
+            Err(rejection) => return Ok(PlacedApplyResource::Rejected(rejection)),
         };
 
         let placed_account = match self.place(&prepared).await? {
@@ -285,11 +285,9 @@ where
         let mut params = params;
         params.headers.account = Some(placed_account.clone().into());
 
-        let existing = self.find_existing(&params).await?;
-        let prepared = match self.prepare(&params, existing.resource()).await? {
-            Some(Ok(prepared)) => prepared,
-            Some(Err(rejection)) => return Ok(PlacedApplyResource::Rejected(rejection)),
-            None => params,
+        let (prepared, existing) = match self.find_and_prepare(&params).await? {
+            Ok(found) => found,
+            Err(rejection) => return Ok(PlacedApplyResource::Rejected(rejection)),
         };
 
         match self.place(&prepared).await? {
@@ -304,6 +302,23 @@ where
             ))
             .into()),
             Err(rejection) => Ok(PlacedApplyResource::Rejected(rejection)),
+        }
+    }
+
+    /// Prepares the spec against the resource the apply addresses, which is
+    /// returned along with it
+    async fn find_and_prepare(
+        &self,
+        params: &ApplyResourceParams<R>,
+    ) -> Result<
+        Result<(ApplyResourceParams<R>, ExistingResource<R>), ApplyResourceRejection>,
+        ApplyResourceUseCaseError<R>,
+    > {
+        let existing = self.find_existing(params).await?;
+        match self.prepare(params, existing.resource()).await? {
+            Some(Ok(prepared)) => Ok(Ok((prepared, existing))),
+            Some(Err(rejection)) => Ok(Err(rejection)),
+            None => Ok(Ok((params.clone(), existing))),
         }
     }
 
@@ -419,18 +434,6 @@ where
             self.typed_resource_query_service,
             self.resource_aggregate_loader,
             self.name_suffix_generator,
-            self.time_source,
-        )
-    }
-
-    fn executor(&self) -> ApplyResourcePlanExecutor<'_, R> {
-        ApplyResourcePlanExecutor::new(
-            self.generic_resource_query_service,
-            self.typed_resource_query_service,
-            self.resource_aggregate_loader,
-            self.resource_persistence_service,
-            self.name_suffix_generator,
-            self.outbox,
             self.time_source,
         )
     }

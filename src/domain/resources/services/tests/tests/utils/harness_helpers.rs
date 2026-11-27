@@ -9,8 +9,6 @@
 
 use chrono::Utc;
 use kamu_resources::{
-    ApplyResourceAccessCheck,
-    ApplyResourceAccountSource,
     ApplyResourceParams,
     ManagedResource,
     ResourceEvent,
@@ -30,16 +28,13 @@ pub fn make_resource_params(
     account: odf::ResourceOwnerHandle,
     name: &str,
 ) -> ApplyResourceParams<TestResource> {
-    ApplyResourceParams {
-        account_source: ApplyResourceAccountSource::Manifest,
-        access_check: ApplyResourceAccessCheck::ByGuard,
-        id: None,
-        headers: BaseResourceServiceHarness::make_headers_input(account, name).into(),
-        spec: TestResourceSpec {
+    BaseResourceServiceHarness::make_apply_params(
+        account,
+        Some(name),
+        TestResourceSpec {
             value: name.to_string(),
         },
-        provenance: BaseResourceServiceHarness::make_provenance(),
-    }
+    )
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

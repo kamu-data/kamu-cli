@@ -9,7 +9,6 @@
 
 use std::assert_matches;
 
-use database_common::PaginationOpts;
 use kamu_configuration::{SecretSetResource, VariableSetResource};
 use kamu_resources::{
     ResourceRef,
@@ -19,12 +18,7 @@ use kamu_resources::{
     TypeName,
     UnsupportedResourceSelectorError,
 };
-use kamu_resources_facade::{
-    BatchResourceError,
-    ListResourcesError,
-    SearchResourcesRequest,
-    SpecViewOpts,
-};
+use kamu_resources_facade::{BatchResourceError, ListResourcesError, SpecViewOpts};
 
 use crate::contract_test;
 use crate::harness::{FacadeContractHarness, TestAccount};
@@ -32,6 +26,7 @@ use crate::helpers::{
     VARIABLE_SET_CANONICAL_SELECTOR,
     apply_manifest_and_get_id,
     assert_single_batch_success,
+    search_request,
     variable_set_manifest_json,
 };
 
@@ -128,14 +123,9 @@ pub async fn test_selector_aliases_resolve_consistently(h: &impl FacadeContractH
 
     // Canonical selector name works for search, search_handles, and get
     let summaries = facade
-        .search(SearchResourcesRequest {
-            owner: None,
-            visibility: ResourceVisibility::Active,
-            selectors: vec![ResourceSelector::of_type(
-                VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
-            )],
-            pagination: PaginationOpts::from_max_results(1000),
-        })
+        .search(search_request(vec![ResourceSelector::of_type(
+            VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
+        )]))
         .await
         .expect("search with canonical selector must succeed");
     for s in &summaries.items {
@@ -147,14 +137,9 @@ pub async fn test_selector_aliases_resolve_consistently(h: &impl FacadeContractH
     }
 
     let handles = facade
-        .search_handles(SearchResourcesRequest {
-            owner: None,
-            visibility: ResourceVisibility::Active,
-            selectors: vec![ResourceSelector::of_type(
-                VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
-            )],
-            pagination: PaginationOpts::from_max_results(1000),
-        })
+        .search_handles(search_request(vec![ResourceSelector::of_type(
+            VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
+        )]))
         .await
         .expect("search_handles with canonical selector must succeed");
     for i in &handles.items {
@@ -189,12 +174,9 @@ pub async fn test_selector_aliases_resolve_consistently(h: &impl FacadeContractH
 
     // Short name "vs" resolves to the canonical VariableSet schema.
     let short_name_summaries = facade
-        .search(SearchResourcesRequest {
-            owner: None,
-            visibility: ResourceVisibility::Active,
-            selectors: vec![ResourceSelector::of_type("vs".parse().unwrap())],
-            pagination: PaginationOpts::from_max_results(1000),
-        })
+        .search(search_request(vec![ResourceSelector::of_type(
+            "vs".parse().unwrap(),
+        )]))
         .await
         .expect("short name 'vs' must resolve for search");
     for s in &short_name_summaries.items {
@@ -209,12 +191,9 @@ pub async fn test_selector_aliases_resolve_consistently(h: &impl FacadeContractH
     // (see VARIABLE_SET_CANONICAL_SELECTOR), so it resolves like any other
     // canonical/alias selector.
     let type_name_summaries = facade
-        .search(SearchResourcesRequest {
-            owner: None,
-            visibility: ResourceVisibility::Active,
-            selectors: vec![ResourceSelector::of_type("VariableSet".parse().unwrap())],
-            pagination: PaginationOpts::from_max_results(1000),
-        })
+        .search(search_request(vec![ResourceSelector::of_type(
+            "VariableSet".parse().unwrap(),
+        )]))
         .await
         .expect("schema TypeName 'VariableSet' must resolve for search");
     for s in &type_name_summaries.items {
@@ -228,14 +207,9 @@ pub async fn test_selector_aliases_resolve_consistently(h: &impl FacadeContractH
     // An unregistered singular-of-plural-only spelling still does not resolve
     // (selectors are exact registered strings, not inflected).
     let bad_result = facade
-        .search(SearchResourcesRequest {
-            owner: None,
-            visibility: ResourceVisibility::Active,
-            selectors: vec![ResourceSelector::of_type(
-                "NoSuchResourceTypeXYZ".parse().unwrap(),
-            )],
-            pagination: PaginationOpts::from_max_results(1000),
-        })
+        .search(search_request(vec![ResourceSelector::of_type(
+            "NoSuchResourceTypeXYZ".parse().unwrap(),
+        )]))
         .await;
     match bad_result {
         Err(ListResourcesError::UnsupportedSelector(err)) => {
@@ -327,12 +301,9 @@ pub async fn test_unsupported_schema_rejected_consistently(h: &impl FacadeContra
 
     // search — UnsupportedSelector (type validated before DB query)
     let list_result = facade
-        .search(SearchResourcesRequest {
-            owner: None,
-            visibility: ResourceVisibility::Active,
-            selectors: vec![ResourceSelector::of_type(bad_type.parse().unwrap())],
-            pagination: PaginationOpts::from_max_results(1000),
-        })
+        .search(search_request(vec![ResourceSelector::of_type(
+            bad_type.parse().unwrap(),
+        )]))
         .await;
     match list_result {
         Err(ListResourcesError::UnsupportedSelector(err)) => {
@@ -345,12 +316,9 @@ pub async fn test_unsupported_schema_rejected_consistently(h: &impl FacadeContra
 
     // search_handles — UnsupportedSelector
     let li_result = facade
-        .search_handles(SearchResourcesRequest {
-            owner: None,
-            visibility: ResourceVisibility::Active,
-            selectors: vec![ResourceSelector::of_type(bad_type.parse().unwrap())],
-            pagination: PaginationOpts::from_max_results(1000),
-        })
+        .search_handles(search_request(vec![ResourceSelector::of_type(
+            bad_type.parse().unwrap(),
+        )]))
         .await;
     match li_result {
         Err(ListResourcesError::UnsupportedSelector(err)) => {

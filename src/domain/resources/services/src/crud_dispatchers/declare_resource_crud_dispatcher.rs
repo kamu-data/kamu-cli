@@ -37,10 +37,10 @@ macro_rules! declare_resource_crud_dispatcher {
 
         impl $dispatcher {
             fn operation_guard(&self) -> &dyn kamu_resources::ResourceOperationGuard<$resource> {
-                match &self.maybe_resource_operation_guard {
-                    Some(guard) => guard.as_ref(),
-                    None => self.default_resource_operation_guard.as_ref(),
-                }
+                $crate::DefaultResourceOperationGuard::or_default(
+                    self.maybe_resource_operation_guard.as_deref(),
+                    self.default_resource_operation_guard.as_ref(),
+                )
             }
         }
 
@@ -67,19 +67,11 @@ macro_rules! declare_resource_crud_dispatcher {
                 kamu_resources::ApplyManifestPlanningDecision,
                 $crate::ApplyResourceCrudDispatcherError,
             > {
-                let schema = <$resource as kamu_resources::ResourceSchemaProvider>::type_uri();
-                let spec = $crate::decode_resource_spec::<$resource>(schema, request.spec)?;
+                let params = $crate::decode_apply_resource_params::<$resource>(request)?;
 
                 let plan = self
                     .apply_resource_use_case
-                    .plan(kamu_resources::ApplyResourceParams {
-                        id: request.id,
-                        headers: request.headers,
-                        account_source: request.account_source,
-                        access_check: request.access_check,
-                        spec,
-                        provenance: request.provenance,
-                    })
+                    .plan(params)
                     .await
                     .map_err(kamu_resources::ApplyResourceCrudDispatcherError::from)?;
 
@@ -95,22 +87,11 @@ macro_rules! declare_resource_crud_dispatcher {
                 kamu_resources::ApplyManifestApplicationDecision,
                 $crate::ApplyResourceCrudDispatcherError,
             > {
-                let schema = <$resource as kamu_resources::ResourceSchemaProvider>::type_uri();
-                let spec = $crate::decode_resource_spec::<$resource>(schema, request.spec)?;
+                let params = $crate::decode_apply_resource_params::<$resource>(request)?;
 
                 let result = self
                     .apply_resource_use_case
-                    .apply_with_precondition(
-                        kamu_resources::ApplyResourceParams {
-                            id: request.id,
-                            headers: request.headers,
-                            account_source: request.account_source,
-                            access_check: request.access_check,
-                            spec,
-                            provenance: request.provenance,
-                        },
-                        precondition,
-                    )
+                    .apply_with_precondition(params, precondition)
                     .await
                     .map_err(kamu_resources::ApplyResourceCrudDispatcherError::from)?;
 

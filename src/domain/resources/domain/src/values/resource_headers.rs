@@ -81,6 +81,9 @@ pub trait ResourceHeadersExt {
 
     /// Replaces the account of the resource and of its owners, which share it
     fn set_account(&mut self, account: auth::ResourceOwnerHandle);
+
+    /// Whether the resource is deleted, not only being deleted
+    fn is_deleted(&self) -> bool;
 }
 
 impl ResourceHeadersExt for ResourceHeaders {
@@ -196,6 +199,10 @@ impl ResourceHeadersExt for ResourceHeaders {
             owner.account = account.clone();
         }
         self.account = account;
+    }
+
+    fn is_deleted(&self) -> bool {
+        self.deleted_at.is_some()
     }
 }
 

@@ -14,10 +14,8 @@ use kamu_resources::{
     ApplyManifestRejection,
     ApplyResourceOutcome,
     ApplyResourceRejectionCategory,
-    ResourceRef,
     ResourceSchemaProvider,
     ResourceVisibility,
-    TypeName,
 };
 use kamu_resources_facade::{
     ApplyManifestBatchRequest,
@@ -35,13 +33,13 @@ use crate::contract_test;
 use crate::harness::{FacadeContractHarness, RemoteGraphqlFacadeHarness, TestAccount};
 use crate::helpers::{
     SECRET_SET_SCHEMA_STR,
-    VARIABLE_SET_CANONICAL_SELECTOR,
     VARIABLE_SET_SCHEMA_STR,
     assert_resource_view_fields,
     assert_single_batch_problem,
     assert_single_batch_success,
     secret_set_manifest_json,
     variable_set_manifest_json,
+    variable_set_ref_by_name,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -113,28 +111,13 @@ fn variable_set_manifest_json_with_id(id: kamu_resources::ResourceID, name: &str
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-fn by_name(name: &str) -> ResourceRef {
-    ResourceRef {
-        account: None,
-        r#type: Some(
-            VARIABLE_SET_CANONICAL_SELECTOR
-                .parse::<TypeName>()
-                .unwrap()
-                .into(),
-        ),
-        id: None,
-        did: None,
-        name: Some(name.parse().unwrap()),
-    }
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 async fn assert_absent(h: &impl FacadeContractHarness, name: &str) {
     let result = h
         .facade_for(TestAccount::Alice)
         .get(
-            vec![by_name(name)],
+            vec![variable_set_ref_by_name(name)],
             SpecViewOpts::ENCRYPTED,
             ResourceVisibility::Active,
         )
@@ -301,7 +284,7 @@ pub async fn test_batch_apply_all_successes_preserves_order(h: &impl FacadeContr
     let fetched = assert_single_batch_success(
         facade
             .get(
-                vec![by_name("batch-contract-b")],
+                vec![variable_set_ref_by_name("batch-contract-b")],
                 SpecViewOpts::ENCRYPTED,
                 ResourceVisibility::Active,
             )

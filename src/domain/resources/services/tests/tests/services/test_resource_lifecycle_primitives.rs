@@ -16,11 +16,8 @@ use database_common::testing::{in_committed_transaction, in_rolled_back_transact
 use dill::Catalog;
 use internal_error::InternalError;
 use kamu_resources::{
-    ApplyResourceAccessCheck,
-    ApplyResourceAccountSource,
     ApplyResourceParams,
     DeclarativeResource,
-    MESSAGE_PRODUCER_KAMU_RESOURCE_SERVICE,
     ManagedResource,
     RESOURCE_CONDITION_CREATION_PROVENANCE_SCHEMA_URI,
     RESOURCE_CONDITION_RECONCILIATION_ERROR_SCHEMA_URI,
@@ -62,7 +59,7 @@ use kamu_resources_services::testing::{
     TestResourceReconcileError,
     TestResourceSpec,
 };
-use messaging_outbox::{OutboxMessageBoundary, OutboxMessageBridge, OutboxProvider};
+use messaging_outbox::OutboxProvider;
 
 use crate::tests::utils::{ServiceLayerTestHarness, ServiceLayerTestHarnessOpts};
 
@@ -954,18 +951,14 @@ impl LifecyclePrimitivesHarness {
                 let snapshot = self.get_snapshot_by_id(id).await.unwrap();
                 self.apply_test_uc()
                     .apply(ApplyResourceParams {
-                        account_source: ApplyResourceAccountSource::Manifest,
-                        access_check: ApplyResourceAccessCheck::ByGuard,
                         id: Some(*id),
-                        headers: BaseResourceServiceHarness::make_headers_input(
+                        ..BaseResourceServiceHarness::make_apply_params(
                             self.account.clone(),
-                            snapshot.headers.name.as_str(),
+                            Some(snapshot.headers.name.as_str()),
+                            TestResourceSpec {
+                                value: "updated".to_string(),
+                            },
                         )
-                        .into(),
-                        spec: TestResourceSpec {
-                            value: "updated".to_string(),
-                        },
-                        provenance: BaseResourceServiceHarness::make_provenance(),
                     })
                     .await
                     .unwrap()
@@ -1095,34 +1088,6 @@ impl LifecyclePrimitivesHarness {
                 | ResourceLifecycleMessage::Deleted(_)
                 | ResourceLifecycleMessage::Purged(_) => None,
             })
-            .collect()
-    }
-
-    async fn lifecycle_messages(&self) -> Vec<ResourceLifecycleMessage> {
-        self.raw_messages_since(0)
-            .await
-            .into_iter()
-            .map(|content| serde_json::from_value(content).unwrap())
-            .collect()
-    }
-
-    /// The JSON of every lifecycle message posted after the first `mark`, as
-    /// the outbox stores it
-    async fn raw_messages_since(&self, mark: usize) -> Vec<serde_json::Value> {
-        self.catalog()
-            .get_one::<dyn OutboxMessageBridge>()
-            .unwrap()
-            .get_messages_by_producer(
-                self.catalog(),
-                MESSAGE_PRODUCER_KAMU_RESOURCE_SERVICE,
-                OutboxMessageBoundary::default(),
-                usize::MAX,
-            )
-            .await
-            .unwrap()
-            .into_iter()
-            .skip(mark)
-            .map(|message| message.content_json)
             .collect()
     }
 }

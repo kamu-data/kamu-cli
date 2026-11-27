@@ -257,15 +257,7 @@ database_transactional_test!(
 
 database_transactional_test!(
     storage = inmem_with_transaction,
-    fixture = resource_repo_suite::test_deleted_resource_round_trips,
-    harness = InMemoryResourceRepositoriesHarness
-);
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-database_transactional_test!(
-    storage = inmem_with_transaction,
-    fixture = resource_repo_suite::test_resource_being_deleted_round_trips,
+    fixture = resource_repo_suite::test_resource_in_deletion_round_trips,
     harness = InMemoryResourceRepositoriesHarness
 );
 
@@ -364,6 +356,14 @@ database_transactional_test!(
 database_concurrent_transactions_test!(
     storage = inmem,
     fixture = resource_repo_suite::test_rolled_back_create_leaves_no_resource,
+    harness = InMemoryResourceRepositoriesHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_concurrent_transactions_test!(
+    storage = inmem,
+    fixture = resource_repo_suite::test_update_resource_in_concurrent_transactions,
     harness = InMemoryResourceRepositoriesHarness
 );
 

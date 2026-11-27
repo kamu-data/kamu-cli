@@ -10,8 +10,6 @@
 use std::sync::Arc;
 
 use kamu_resources::{
-    ApplyResourceAccessCheck,
-    ApplyResourceAccountSource,
     ApplyResourceAction,
     ApplyResourceApplicationDecision,
     ApplyResourceOutcome,
@@ -171,18 +169,11 @@ impl ImmutableResourceHarness {
         &self,
         spec: ImmutableTestResourceSpec,
     ) -> ApplyResourceParams<ImmutableTestResource> {
-        ApplyResourceParams {
-            account_source: ApplyResourceAccountSource::Manifest,
-            access_check: ApplyResourceAccessCheck::ByGuard,
-            id: None,
-            headers: BaseResourceServiceHarness::make_headers_input(
-                odf::ResourceOwnerHandle::new_test("test"),
-                "res-a",
-            )
-            .into(),
+        BaseResourceServiceHarness::make_apply_params(
+            odf::ResourceOwnerHandle::new_test("test"),
+            Some("res-a"),
             spec,
-            provenance: BaseResourceServiceHarness::make_provenance(),
-        }
+        )
     }
 
     fn add_label(params: &mut ApplyResourceParams<ImmutableTestResource>) {
@@ -241,12 +232,11 @@ impl ImmutableResourceHarness {
         let planned = self
             .apply_uc
             .plan(ApplyResourceParams {
-                account_source: ApplyResourceAccountSource::Manifest,
-                access_check: ApplyResourceAccessCheck::ByGuard,
                 id: params.id,
-                headers: params.headers.clone(),
-                spec: params.spec.clone(),
-                provenance: BaseResourceServiceHarness::make_provenance(),
+                ..BaseResourceServiceHarness::make_apply_params_with_headers(
+                    params.headers.clone(),
+                    params.spec.clone(),
+                )
             })
             .await
             .unwrap();

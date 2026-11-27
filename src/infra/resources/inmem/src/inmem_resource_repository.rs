@@ -658,9 +658,8 @@ impl ResourceRepository for InMemoryResourceRepository {
         limit: usize,
     ) -> Result<Vec<ResourceDueForPurge>, InternalError> {
         let mut due = self.state.read(self.transaction_id, |view| {
-            view.purge_deadlines()
+            view.due_for_purge(now)
                 .into_iter()
-                .filter(|(_, purge_at)| *purge_at <= now)
                 .map(|(snapshot, purge_at)| ResourceDueForPurge {
                     id: snapshot.id,
                     schema: snapshot.schema.clone(),
@@ -678,12 +677,9 @@ impl ResourceRepository for InMemoryResourceRepository {
         &self,
         now: DateTime<Utc>,
     ) -> Result<u64, InternalError> {
-        let count = self.state.read(self.transaction_id, |view| {
-            view.purge_deadlines()
-                .into_iter()
-                .filter(|(_, purge_at)| *purge_at <= now)
-                .count()
-        });
+        let count = self
+            .state
+            .read(self.transaction_id, |view| view.due_for_purge(now).len());
         u64::try_from(count).int_err()
     }
 
@@ -695,9 +691,9 @@ impl ResourceRepository for InMemoryResourceRepository {
         now: DateTime<Utc>,
     ) -> Result<Vec<ResourceID>, InternalError> {
         let claimed_ids: Vec<ResourceID> = self.state.read(self.transaction_id, |view| {
-            view.purge_deadlines()
+            view.due_for_purge(now)
                 .into_iter()
-                .filter(|(snapshot, purge_at)| *purge_at <= now && ids.contains(&snapshot.id))
+                .filter(|(snapshot, _)| ids.contains(&snapshot.id))
                 .map(|(snapshot, _)| snapshot.id)
                 .collect()
         });

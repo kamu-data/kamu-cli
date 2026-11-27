@@ -231,15 +231,13 @@ pub async fn test_listing_another_account_needs_the_guards_filter(h: &impl Facad
 
     let facade = h.facade_for(TestAccount::Alice);
     let search = |selector: ResourceSelector| {
-        facade.search(SearchResourcesRequest {
-            owner: None,
-            visibility: ResourceVisibility::Active,
-            selectors: vec![ResourceSelector {
+        facade.search(SearchResourcesRequest::new(
+            vec![ResourceSelector {
                 account: Some(bob.clone().into()),
                 ..selector
             }],
-            pagination: PaginationOpts::from_max_results(100),
-        })
+            PaginationOpts::from_max_results(100),
+        ))
     };
 
     // A selector without a type keeps the default rule

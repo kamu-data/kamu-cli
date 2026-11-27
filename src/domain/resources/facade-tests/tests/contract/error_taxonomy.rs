@@ -45,54 +45,26 @@ use crate::helpers::{
     VARIABLE_SET_SCHEMA_STR,
     assert_single_batch_problem,
     create_variable_set,
+    variable_set_ref_by_id,
+    variable_set_ref_by_name,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-fn by_name(name: &str) -> ResourceRef {
-    ResourceRef {
-        account: None,
-        r#type: Some(
-            VARIABLE_SET_CANONICAL_SELECTOR
-                .parse::<TypeName>()
-                .unwrap()
-                .into(),
-        ),
-        id: None,
-        did: None,
-        name: Some(name.parse().unwrap()),
-    }
-}
-
-fn by_id(id: &kamu_resources::ResourceID) -> ResourceRef {
-    ResourceRef {
-        account: None,
-        r#type: Some(
-            VARIABLE_SET_CANONICAL_SELECTOR
-                .parse::<TypeName>()
-                .unwrap()
-                .into(),
-        ),
-        id: Some(*id),
-        did: None,
-        name: None,
-    }
-}
-
 fn batch_by_name(name: &str) -> Vec<ResourceRef> {
-    vec![by_name(name)]
+    vec![variable_set_ref_by_name(name)]
 }
 
 /// A one-element batch naming `account`, for the bad-account paths.
 fn batch_by_name_for_account(name: &str, account: ResourceOwnerRef) -> Vec<ResourceRef> {
     vec![ResourceRef {
         account: Some(account),
-        ..by_name(name)
+        ..variable_set_ref_by_name(name)
     }]
 }
 
 fn batch_by_id(id: kamu_resources::ResourceID) -> Vec<ResourceRef> {
-    vec![by_id(&id)]
+    vec![variable_set_ref_by_id(id)]
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -114,7 +86,7 @@ pub async fn test_single_resource_lookup_taxonomy(h: &impl FacadeContractHarness
 
     let get = facade
         .get(
-            vec![by_name(missing_name)],
+            vec![variable_set_ref_by_name(missing_name)],
             SpecViewOpts::ENCRYPTED,
             ResourceVisibility::Active,
         )
@@ -127,7 +99,10 @@ pub async fn test_single_resource_lookup_taxonomy(h: &impl FacadeContractHarness
     );
 
     let get_id = facade
-        .get_handles(vec![by_name(missing_name)], ResourceVisibility::Active)
+        .get_handles(
+            vec![variable_set_ref_by_name(missing_name)],
+            ResourceVisibility::Active,
+        )
         .await
         .unwrap();
     assert_matches!(
@@ -138,7 +113,7 @@ pub async fn test_single_resource_lookup_taxonomy(h: &impl FacadeContractHarness
 
     let render = facade
         .render_manifests(
-            vec![by_name(missing_name)],
+            vec![variable_set_ref_by_name(missing_name)],
             ResourceManifestFormat::Json,
             SpecViewOpts::ENCRYPTED,
             ResourceVisibility::Active,
@@ -151,7 +126,10 @@ pub async fn test_single_resource_lookup_taxonomy(h: &impl FacadeContractHarness
         "render_manifest: expected NameNotFound"
     );
 
-    let del = facade.delete(vec![by_name(missing_name)]).await.unwrap();
+    let del = facade
+        .delete(vec![variable_set_ref_by_name(missing_name)])
+        .await
+        .unwrap();
     assert_matches!(
         assert_single_batch_problem(del),
         ResourceLookupProblem::NameNotFound(_),
@@ -161,7 +139,7 @@ pub async fn test_single_resource_lookup_taxonomy(h: &impl FacadeContractHarness
     // --- IDNotFound ---
     let get = facade
         .get(
-            vec![by_id(&absent_uid)],
+            vec![variable_set_ref_by_id(absent_uid)],
             SpecViewOpts::ENCRYPTED,
             ResourceVisibility::Active,
         )
@@ -174,7 +152,10 @@ pub async fn test_single_resource_lookup_taxonomy(h: &impl FacadeContractHarness
     );
 
     let get_id = facade
-        .get_handles(vec![by_id(&absent_uid)], ResourceVisibility::Active)
+        .get_handles(
+            vec![variable_set_ref_by_id(absent_uid)],
+            ResourceVisibility::Active,
+        )
         .await
         .unwrap();
     assert_matches!(
@@ -185,7 +166,7 @@ pub async fn test_single_resource_lookup_taxonomy(h: &impl FacadeContractHarness
 
     let render = facade
         .render_manifests(
-            vec![by_id(&absent_uid)],
+            vec![variable_set_ref_by_id(absent_uid)],
             ResourceManifestFormat::Json,
             SpecViewOpts::ENCRYPTED,
             ResourceVisibility::Active,
@@ -198,7 +179,10 @@ pub async fn test_single_resource_lookup_taxonomy(h: &impl FacadeContractHarness
         "render_manifest: expected IDNotFound"
     );
 
-    let del = facade.delete(vec![by_id(&absent_uid)]).await.unwrap();
+    let del = facade
+        .delete(vec![variable_set_ref_by_id(absent_uid)])
+        .await
+        .unwrap();
     assert_matches!(
         assert_single_batch_problem(del),
         ResourceLookupProblem::IDNotFound(_),
@@ -355,7 +339,7 @@ pub async fn test_untyped_name_ref_is_refused(h: &impl FacadeContractHarness) {
     // about the missing type and not about the resource being absent.
     let typed = facade
         .get_handles(
-            vec![by_name("untyped-ref-target")],
+            vec![variable_set_ref_by_name("untyped-ref-target")],
             ResourceVisibility::Active,
         )
         .await
@@ -576,15 +560,13 @@ pub async fn test_account_resolution_taxonomy(h: &impl FacadeContractHarness) {
 
     // --- search ---
     let result = facade
-        .search(SearchResourcesRequest {
-            owner: None,
-            visibility: ResourceVisibility::Active,
-            selectors: vec![ResourceSelector {
+        .search(SearchResourcesRequest::new(
+            vec![ResourceSelector {
                 account: Some(unknown_account.clone()),
                 ..ResourceSelector::of_type(VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap())
             }],
-            pagination: PaginationOpts::from_max_results(1),
-        })
+            PaginationOpts::from_max_results(1),
+        ))
         .await;
     assert_matches!(
         result,
@@ -594,15 +576,13 @@ pub async fn test_account_resolution_taxonomy(h: &impl FacadeContractHarness) {
 
     // --- search_handles ---
     let result = facade
-        .search_handles(SearchResourcesRequest {
-            owner: None,
-            visibility: ResourceVisibility::Active,
-            pagination: PaginationOpts::from_max_results(1),
-            selectors: vec![ResourceSelector {
+        .search_handles(SearchResourcesRequest::new(
+            vec![ResourceSelector {
                 account: Some(unknown_account.clone()),
                 ..ResourceSelector::default()
             }],
-        })
+            PaginationOpts::from_max_results(1),
+        ))
         .await;
     assert_matches!(
         result,

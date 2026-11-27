@@ -12,6 +12,9 @@ use sqlx::SqlitePool;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+// Per backend: the contract is checked against the migrated schema, which the
+// in-memory repositories do not have
+
 #[test_group::group(sqlite)]
 #[test_log::test(sqlx::test(migrations = "../../../../migrations/sqlite"))]
 async fn test_every_resource_keyed_table_is_purged_with_the_resource(pool: SqlitePool) {
@@ -92,11 +95,7 @@ impl PurgeContractHarness {
         .unwrap();
 
         rows.into_iter()
-            .map(|(table, column, cascades)| ResourceKeyedColumn {
-                table,
-                column,
-                cascades,
-            })
+            .map(|(table, column, cascades)| ResourceKeyedColumn::new(table, column, cascades))
             .collect()
     }
 }

@@ -10,9 +10,7 @@
 use kamu_configuration::VariableSetResource;
 use kamu_resources::{
     ApplyResourceOutcome,
-    ResourceID,
     ResourcePhaseCounts,
-    ResourceRef,
     ResourceSchemaProvider,
     ResourcesSummary,
 };
@@ -28,6 +26,7 @@ use crate::harness::{FacadeContractHarness, TestAccount};
 use crate::helpers::{
     assert_applied_outcome,
     create_variable_set,
+    ref_by_id,
     total_schema_count,
     variable_set_manifest_json,
 };
@@ -225,7 +224,7 @@ pub async fn test_summary_counts_resources_being_deleted_and_deleted(
 ) {
     let id = create_variable_set(h, TestAccount::Alice, "phase-deleting").await;
     let facade = h.facade_for(TestAccount::Alice);
-    facade.delete(vec![by_id(id)]).await.unwrap();
+    facade.delete(vec![ref_by_id(id)]).await.unwrap();
 
     let summary = facade
         .summary(ResourcesSummaryRequest { account: None })
@@ -245,16 +244,6 @@ pub async fn test_summary_counts_resources_being_deleted_and_deleted(
         total_schema_count(summary, VariableSetResource::type_uri()),
         1
     );
-}
-
-fn by_id(id: ResourceID) -> ResourceRef {
-    ResourceRef {
-        account: None,
-        r#type: None,
-        id: Some(id),
-        did: None,
-        name: None,
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

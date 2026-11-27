@@ -136,6 +136,9 @@ impl MessageConsumerT<TestMessageFailing> for TestMessageConsumerFailing {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+// Postgres only: SQLite serializes writers and the in-memory bridge orders by
+// message ID alone, so only Postgres orders messages by transaction ID
+
 #[test_group::group(database, postgres)]
 #[test_log::test(sqlx::test(migrations = "../../../../migrations/postgres"))]
 async fn test_agent_consumes_messages_in_tx_id_order_across_iterations(pg_pool: PgPool) {

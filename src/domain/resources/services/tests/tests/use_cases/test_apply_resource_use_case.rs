@@ -10,8 +10,6 @@
 use std::assert_matches;
 
 use kamu_resources::{
-    ApplyResourceAccessCheck,
-    ApplyResourceAccountSource,
     ApplyResourceAction,
     ApplyResourceApplicationDecision,
     ApplyResourceOutcome,
@@ -390,17 +388,13 @@ fn make_params(
     name: &str,
     value: &str,
 ) -> ApplyResourceParams<TestResource> {
-    ApplyResourceParams {
-        account_source: ApplyResourceAccountSource::Manifest,
-        access_check: ApplyResourceAccessCheck::ByGuard,
-        id: None,
-        headers: BaseResourceServiceHarness::make_headers_input(account_handle.clone(), name)
-            .into(),
-        spec: TestResourceSpec {
+    BaseResourceServiceHarness::make_apply_params(
+        account_handle.clone(),
+        Some(name),
+        TestResourceSpec {
             value: value.to_string(),
         },
-        provenance: BaseResourceServiceHarness::make_provenance(),
-    }
+    )
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -409,16 +403,13 @@ fn make_nameless_params(
     account_handle: &odf::ResourceOwnerHandle,
     value: &str,
 ) -> ApplyResourceParams<TestResource> {
-    ApplyResourceParams {
-        account_source: ApplyResourceAccountSource::Manifest,
-        access_check: ApplyResourceAccessCheck::ByGuard,
-        id: None,
-        headers: BaseResourceServiceHarness::make_nameless_headers(account_handle.clone()),
-        spec: TestResourceSpec {
+    BaseResourceServiceHarness::make_apply_params(
+        account_handle.clone(),
+        None,
+        TestResourceSpec {
             value: value.to_string(),
         },
-        provenance: BaseResourceServiceHarness::make_provenance(),
-    }
+    )
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -7,7 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use database_common::PaginationOpts;
 use kamu_configuration::VariableSetResource;
 use kamu_resources::{
     ResourceID,
@@ -27,7 +26,6 @@ use kamu_resources_facade::{
     ResourceAccountResolutionProblemCode,
     ResourceManifestFormat,
     ResourcesSummaryRequest,
-    SearchResourcesRequest,
     SpecViewOpts,
 };
 use pretty_assertions::{assert_eq, assert_matches};
@@ -40,6 +38,7 @@ use crate::helpers::{
     apply_manifest_and_get_id,
     assert_single_batch_success,
     create_variable_set,
+    search_request,
     sorted_handle_names,
     total_schema_count,
 };
@@ -326,14 +325,9 @@ pub async fn test_account_name_id_mismatch_is_rejected(h: &impl FacadeContractHa
 
     let list = h
         .facade_for(TestAccount::Alice)
-        .search(SearchResourcesRequest {
-            owner: None,
-            visibility: ResourceVisibility::Active,
-            selectors: vec![ResourceSelector::of_type(
-                VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
-            )],
-            pagination: PaginationOpts::from_max_results(1000),
-        })
+        .search(search_request(vec![ResourceSelector::of_type(
+            VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
+        )]))
         .await
         .unwrap()
         .items;
@@ -352,28 +346,18 @@ pub async fn test_unknown_account_is_rejected(h: &impl FacadeContractHarness) {
     let facade = h.facade_for(TestAccount::Alice);
 
     let by_name = facade
-        .search(SearchResourcesRequest {
-            owner: None,
-            visibility: ResourceVisibility::Active,
-            selectors: vec![ResourceSelector {
-                account: Some(unknown_account_by_name()),
-                ..ResourceSelector::of_type(VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap())
-            }],
-            pagination: PaginationOpts::from_max_results(1000),
-        })
+        .search(search_request(vec![ResourceSelector {
+            account: Some(unknown_account_by_name()),
+            ..ResourceSelector::of_type(VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap())
+        }]))
         .await;
     // Type-less, so the account rides on an `AnyType` scope rather than a
     // per-type row.
     let by_id = facade
-        .search(SearchResourcesRequest {
-            owner: None,
-            visibility: ResourceVisibility::Active,
-            pagination: PaginationOpts::from_max_results(1000),
-            selectors: vec![ResourceSelector {
-                account: Some(unknown_account_by_id()),
-                ..ResourceSelector::default()
-            }],
-        })
+        .search(search_request(vec![ResourceSelector {
+            account: Some(unknown_account_by_id()),
+            ..ResourceSelector::default()
+        }]))
         .await;
 
     assert_matches!(
@@ -466,26 +450,16 @@ pub async fn test_account_isolation_across_read_apis(h: &impl FacadeContractHarn
     assert_eq!(bob_batch.successes[0].item.headers.id, bob_id);
 
     let alice_list = alice
-        .search_handles(SearchResourcesRequest {
-            owner: None,
-            visibility: ResourceVisibility::Active,
-            selectors: vec![ResourceSelector::of_type(
-                VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
-            )],
-            pagination: PaginationOpts::from_max_results(1000),
-        })
+        .search_handles(search_request(vec![ResourceSelector::of_type(
+            VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
+        )]))
         .await
         .unwrap()
         .items;
     let bob_list = bob
-        .search_handles(SearchResourcesRequest {
-            owner: None,
-            visibility: ResourceVisibility::Active,
-            selectors: vec![ResourceSelector::of_type(
-                VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
-            )],
-            pagination: PaginationOpts::from_max_results(1000),
-        })
+        .search_handles(search_request(vec![ResourceSelector::of_type(
+            VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
+        )]))
         .await
         .unwrap()
         .items;
@@ -499,28 +473,18 @@ pub async fn test_account_isolation_across_read_apis(h: &impl FacadeContractHarn
     );
 
     let alice_search = alice
-        .search_handles(SearchResourcesRequest {
-            owner: None,
-            visibility: ResourceVisibility::Active,
-            selectors: vec![ResourceSelector::name_pattern(
-                VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
-                "acct-%".to_string(),
-            )],
-            pagination: PaginationOpts::from_max_results(1000),
-        })
+        .search_handles(search_request(vec![ResourceSelector::name_pattern(
+            VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
+            "acct-%".to_string(),
+        )]))
         .await
         .unwrap()
         .items;
     let bob_search = bob
-        .search_handles(SearchResourcesRequest {
-            owner: None,
-            visibility: ResourceVisibility::Active,
-            selectors: vec![ResourceSelector::name_pattern(
-                VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
-                "acct-%".to_string(),
-            )],
-            pagination: PaginationOpts::from_max_results(1000),
-        })
+        .search_handles(search_request(vec![ResourceSelector::name_pattern(
+            VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
+            "acct-%".to_string(),
+        )]))
         .await
         .unwrap()
         .items;
@@ -534,23 +498,15 @@ pub async fn test_account_isolation_across_read_apis(h: &impl FacadeContractHarn
     );
 
     let alice_all = alice
-        .search_handles(SearchResourcesRequest {
-            owner: None,
-            visibility: ResourceVisibility::Active,
+        .search_handles(search_request(
             // A default selector narrows by nothing, so it spans every type.
-            selectors: vec![ResourceSelector::default()],
-            pagination: PaginationOpts::from_max_results(1000),
-        })
+            vec![ResourceSelector::default()],
+        ))
         .await
         .unwrap()
         .items;
     let bob_all = bob
-        .search(SearchResourcesRequest {
-            owner: None,
-            visibility: ResourceVisibility::Active,
-            pagination: PaginationOpts::from_max_results(1000),
-            selectors: vec![ResourceSelector::default()],
-        })
+        .search(search_request(vec![ResourceSelector::default()]))
         .await
         .unwrap()
         .items;

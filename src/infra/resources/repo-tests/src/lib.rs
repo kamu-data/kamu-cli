@@ -15,3 +15,4 @@ pub mod resource_raw_event_store_test_suite;
 pub mod resource_repository_test_suite;
 
 pub use resource_purge_contract::*;
+pub use resource_repository_test_suite::make_test_snapshot;

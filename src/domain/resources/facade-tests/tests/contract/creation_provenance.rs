@@ -7,28 +7,13 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_resources::{
-    ApplyManifestApplicationDecision,
-    CreationProvenance,
-    ResourceRef,
-    ResourceVisibility,
-    TypeName,
-};
-use kamu_resources_facade::{
-    ApplyManifestRequest,
-    ResourceFacade,
-    ResourceManifestFormat,
-    SpecViewOpts,
-};
-use pretty_assertions::{assert_eq, assert_matches};
+use kamu_resources::CreationProvenance;
+use kamu_resources_facade::ResourceFacade;
+use pretty_assertions::assert_eq;
 
 use crate::contract_test;
 use crate::harness::{FacadeContractHarness, TestAccount};
-use crate::helpers::{
-    VARIABLE_SET_CANONICAL_SELECTOR,
-    VARIABLE_SET_SCHEMA_STR,
-    assert_single_batch_success,
-};
+use crate::helpers::{apply_variable_set, get_resource, variable_set_ref_by_name};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -66,46 +51,11 @@ pub async fn test_created_resource_records_its_creator(h: &impl FacadeContractHa
 const RESOURCE_NAME: &str = "provenance-vars";
 
 async fn apply(facade: &dyn ResourceFacade, value: &str) {
-    let manifest = format!(
-        r#"{{
-            "$schema": "{VARIABLE_SET_SCHEMA_STR}",
-            "headers": {{"name": "{RESOURCE_NAME}"}},
-            "spec": {{"variables": {{"A": {{"value": "{value}"}}}}}}
-        }}"#
-    );
-
-    let decision = facade
-        .apply_manifest(ApplyManifestRequest {
-            format: ResourceManifestFormat::Json,
-            manifest,
-        })
-        .await
-        .unwrap();
-    assert_matches!(decision, ApplyManifestApplicationDecision::Applied(_));
+    apply_variable_set(facade, RESOURCE_NAME, &[("A", value)]).await;
 }
 
 async fn provenance(facade: &dyn ResourceFacade) -> Option<CreationProvenance> {
-    let resource = assert_single_batch_success(
-        facade
-            .get(
-                vec![ResourceRef {
-                    account: None,
-                    r#type: Some(
-                        VARIABLE_SET_CANONICAL_SELECTOR
-                            .parse::<TypeName>()
-                            .unwrap()
-                            .into(),
-                    ),
-                    id: None,
-                    did: None,
-                    name: Some(RESOURCE_NAME.parse().unwrap()),
-                }],
-                SpecViewOpts::ENCRYPTED,
-                ResourceVisibility::Active,
-            )
-            .await
-            .unwrap(),
-    );
+    let resource = get_resource(facade, variable_set_ref_by_name(RESOURCE_NAME)).await;
 
     CreationProvenance::from_conditions(&resource.status.conditions).unwrap()
 }

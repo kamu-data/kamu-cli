@@ -32,6 +32,7 @@ use kamu_datasets::{
 };
 use kamu_resources::{
     GenericResourceQueryService,
+    ResourceHeadersExt,
     ResourceID,
     ResourceRepository,
     ResourceSchemaProvider,
@@ -115,7 +116,7 @@ impl DatasetEnvVarSpecResolverImpl {
         // the projection resolver would do.
         let mut by_id: HashMap<ResourceID, ResourceSnapshot> = snapshots
             .into_iter()
-            .filter(|snapshot| snapshot.headers.deleted_at.is_none())
+            .filter(|snapshot| !snapshot.headers.is_deleted())
             .map(|snapshot| (snapshot.id, snapshot))
             .collect();
 
