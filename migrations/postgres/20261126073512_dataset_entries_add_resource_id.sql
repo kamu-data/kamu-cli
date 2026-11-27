@@ -1,7 +1,7 @@
 /* ------------------------------ */
 
--- Every dataset gets a stable resource id: the id it keeps once datasets
--- become resources, as task specs refer to datasets by it.
+-- Every dataset gets a stable resource id, by which task specs refer to
+-- datasets.
 
 ALTER TABLE dataset_entries
     ADD COLUMN resource_id UUID;
