@@ -33,21 +33,44 @@ changesets whose diff does not fit in one careful read.
 
 | # | Step | The one question | Owner of the rules | Mode |
 |---|---|---|---|---|
-| 1 | Dead code | What did the branch leave unused? Functions, types, variants, errors, mock and harness helpers, config fields, dependencies, feature flags, leftovers of renames | `kamu-rust-style` | Report, then fix |
+| 1 | Dead code | What did the branch leave unused? Functions, types, variants, errors, mock and harness helpers, config fields, leftovers of renames | `kamu-rust-style` | Report, then fix |
 | 2 | Duplication | Which code is duplicated or nearly so, and could be generalized, parameterized or decomposed? Production code, test harnesses and e2e scenarios alike, never at the cost of a method's visible transaction blocks | `kamu-rust-style`, `kamu-test-harness`, [database-transactions.md §3.2](../../../docs/internal/database-transactions.md#32-inside-a-level) | Report, then fix |
 | 3 | Rust rules | Does the branch's Rust follow the written rules? Exhaustive matches, imports, conversions, module layout, visibility, DI grouping, error mapping, test structure | `kamu-rust-style`, `kamu-dill-di`, `kamu-domain-design`, `kamu-test-harness` | Fix, then report |
-| 4 | Comments and docs | Does every comment and doc line the branch added or invalidated meet the prose rules? Include text made stale by merges from the base | `kamu-prose-and-comments` | Fix, then report |
-| 5 | Changelog | Is there one consolidated entry per user-visible change, written for users, with "breaking" checked against release tags? | `kamu-release-dependency-workflows` | Fix, then report |
-| 6 | Integration audit | Where do pieces reviewed one at a time break together? Functional regressions, new bugs, authorization and input bounds, performance (transactions held during long work, repeated queries), parallel paths that drifted apart (CLI and task, telemetry) | AGENTS.md, the area's design doc | Report, then fix |
-| 7 | Coverage gaps | Which behavior the branch changed has no test that fails when the change is reverted? At every level, unit to e2e | `kamu-test-harness`, `kamu-cli-e2e-tests`, `kamu-repository-tests` | Report, then fix |
-| 8 | Redundant tests | Which tests add no coverage, which look-alikes should be merged or table-driven, which e2e tests repeat a lower level, which Postgres wirings the repository cannot affect? | `kamu-test-harness`, `kamu-cli-e2e-tests` | Report, then fix |
-| 9 | Design docs | Do the `docs/internal/` sections the branch touched or invalidated match the code, read well, and stay routed in AGENTS.md? | `kamu-prose-and-comments`, AGENTS.md "Documentation classes" | Fix, then report |
-| 10 | Wrap-up | Is the whole branch verified and described? | `kamu-github-operations` | See below |
+| 4 | Integration audit | Where do pieces reviewed one at a time break together? Functional regressions, new bugs, authorization and input bounds, performance (transactions held during long work, repeated queries), parallel paths that drifted apart (CLI and task, telemetry) | AGENTS.md, the area's design doc | Report, then fix |
+| 5 | Coverage gaps | Which behavior the branch changed has no test that fails when the change is reverted? At every level, unit to e2e | `kamu-test-harness`, `kamu-cli-e2e-tests`, `kamu-repository-tests` | Report, then fix |
+| 6 | Redundant tests | Which tests add no coverage, which look-alikes should be merged or table-driven, which e2e tests repeat a lower level, which Postgres wirings the repository cannot affect? | `kamu-test-harness`, `kamu-cli-e2e-tests` | Report, then fix |
+| 7 | Dependencies | Does each crate the branch touched depend on what it uses, at the narrowest level? [Checklist](#the-dependency-step) | `kamu-release-dependency-workflows`, `kamu-test-harness` | Report, then fix |
+| 8 | Comments and docs | Does every comment and doc line the branch added or invalidated meet the prose rules? Include text made stale by merges from the base | `kamu-prose-and-comments` | Fix, then report |
+| 9 | Changelog | Is there one consolidated entry per user-visible change, written for users, with "breaking" checked against release tags? | `kamu-release-dependency-workflows` | Fix, then report |
+| 10 | Design docs | Do the `docs/internal/` sections the branch touched or invalidated match the code, read well, and stay routed in AGENTS.md? | `kamu-prose-and-comments`, AGENTS.md "Documentation classes" | Fix, then report |
+| 11 | Wrap-up | Is the whole branch verified and described? | `kamu-github-operations` | See below |
 
-**Why this order.** Removing code first shrinks what every later pass reads. Rules and prose come
-after the code stops moving, and the changelog after the prose. The integration audit reads
-settled code. Coverage gaps come before the trim, so trimming knows which coverage must stay.
-Design docs come last, because every earlier step can invalidate them.
+**Why this order.** Removing code first shrinks what every later pass reads. Duplication and the
+Rust rules reshape the code before the integration audit reads it, so the audit sees settled code.
+Coverage gaps come before the trim, so trimming knows which coverage must stay. Every step up to
+the trim can add or drop a dependency, so the dependency step follows it. The text steps come
+last, once code and tests stop moving: comments, then the changelog written from them, then the
+design docs, which every earlier step can invalidate.
+
+### The dependency step
+
+Every dependency is code to update, audit and build. For each `Cargo.toml` the branch touched, or
+whose crate's code it changed, check:
+
+| Check | Fix |
+|---|---|
+| A dependency nothing in the crate uses any more | Remove it. `cargo shear` and `make lint-udeps` find candidates; `git grep` over the crate decides, as both miss a crate reached only through another dependency's API |
+| A `[dependencies]` entry used only by `tests/`, benches or `#[cfg(test)]` code | Move it to `[dev-dependencies]` |
+| A runtime dependency used only by the crate's `testing` module | Make it optional and enable it from the `testing` feature ([`kamu-test-harness`](../kamu-test-harness/SKILL.md#scope-2--crate-level-reusable-harness)) |
+| A feature of a dependency, or its default features, that no code needs | Drop the feature; take `default-features = false` and list only the features used |
+| A feature of the crate itself that no dependent enables, or one that enables crates it does not need | Remove the feature, or narrow what it enables |
+| A dependency that a crate already in the tree, or the standard library, can replace | Replace it |
+| A crate that depends on another layer's crate only for one type or helper | Report it: the type may belong lower, the call may belong in a caller |
+
+After the fixes, `make clippy` and the tests of the touched crates show that nothing needed was
+dropped. A feature the crate needs but no longer names can still build here, enabled by another
+crate of the workspace build (AGENTS.md, "Build scope"); check that the crate's code reaches only
+the features it lists.
 
 ## Running one step
 
