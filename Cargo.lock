@@ -9034,6 +9034,7 @@ name = "kamu-configuration-inmem"
 version = "0.273.0"
 dependencies = [
  "async-trait",
+ "database-common",
  "database-common-macros",
  "dill",
  "internal-error",
@@ -9076,6 +9077,7 @@ name = "kamu-configuration-repo-tests"
 version = "0.273.0"
 dependencies = [
  "chrono",
+ "database-common",
  "dill",
  "kamu-configuration",
  "kamu-resources",

@@ -50,6 +50,7 @@ use crate::domain::{
 };
 use crate::{
     GENERATED_NAME_SUFFIX_LENGTH,
+    NewOwnerCheck,
     OwnerReferenceResolver,
     ResolveOwnerReferencesError,
     ResourceDispatcherFactory,
@@ -117,6 +118,7 @@ where
                 maybe_existing,
                 ApplyResourcePrecondition::None,
                 OmittedNameHandling::LeavePending,
+                NewOwnerCheck::Read,
             )
             .await?;
         Ok(match plan {
@@ -143,16 +145,20 @@ where
             OmittedNameHandling::Generate {
                 max_attempts: MAX_GENERATED_NAME_ATTEMPTS,
             },
+            NewOwnerCheck::Touch,
         )
         .await
     }
 
+    /// A plan reads the new owners, since its transaction may commit; an
+    /// apply touches them
     async fn plan_with_naming(
         &self,
         params: ApplyResourceParams<R>,
         maybe_existing: Option<R>,
         precondition: ApplyResourcePrecondition,
         omitted_name_handling: OmittedNameHandling,
+        new_owner_check: NewOwnerCheck,
     ) -> Result<PlannedApplyResourceDecision<R>, ApplyResourceUseCaseError<R>> {
         Self::ensure_name_given_or_generated(&params.headers)?;
 
@@ -161,7 +167,10 @@ where
         let Some(resource) = maybe_existing else {
             return match precondition {
                 ApplyResourcePrecondition::None | ApplyResourcePrecondition::Absent => {
-                    match self.resolve_owner_references(params, None).await? {
+                    match self
+                        .resolve_owner_references(params, None, new_owner_check)
+                        .await?
+                    {
                         OwnerReferencesResolution::Resolved(params) => {
                             self.plan_create_resource(params, now, omitted_name_handling)
                                 .await
@@ -193,7 +202,7 @@ where
         }
 
         match self
-            .resolve_owner_references(params, Some(&resource))
+            .resolve_owner_references(params, Some(&resource), new_owner_check)
             .await?
         {
             OwnerReferencesResolution::Resolved(params) => {
@@ -209,6 +218,7 @@ where
         &self,
         mut params: ApplyResourceParams<R>,
         maybe_existing: Option<&R>,
+        new_owner_check: NewOwnerCheck,
     ) -> Result<OwnerReferencesResolution<R>, ApplyResourceUseCaseError<R>> {
         // Events record an empty list as no list
         let Some(owner_references) = params
@@ -230,6 +240,7 @@ where
             current_owners: maybe_existing
                 .and_then(|resource| resource.headers().owner_references.as_deref())
                 .unwrap_or_default(),
+            new_owner_check,
         };
 
         use ResolveOwnerReferencesError as E;

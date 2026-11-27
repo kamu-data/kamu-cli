@@ -8,10 +8,6 @@
 // by the Apache License, Version 2.0.
 
 use background_agent_host::BackgroundWorkFinalizer;
-use kamu_configuration_inmem::{
-    InMemorySecretSetProjectionRepository,
-    InMemoryVariableSetProjectionRepository,
-};
 use kamu_core::TenancyConfig;
 use kamu_resources::{
     MESSAGE_PRODUCER_KAMU_RESOURCE_SERVICE,
@@ -45,8 +41,7 @@ impl BaseGQLResourceHarness {
         let mut b = dill::CatalogBuilder::new_chained(base_catalog);
 
         kamu_resources_inmem::register_dependencies(&mut b);
-        b.add::<InMemoryVariableSetProjectionRepository>()
-            .add::<InMemorySecretSetProjectionRepository>();
+        kamu_configuration_inmem::register_dependencies(&mut b);
 
         kamu_resources_services::register_dependencies(&mut b);
         // For the controller hint hub

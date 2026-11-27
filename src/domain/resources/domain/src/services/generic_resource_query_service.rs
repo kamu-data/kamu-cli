@@ -25,7 +25,8 @@ use crate::{
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// Read-side access to resources for use cases and higher layers, which never
-/// reach for [`crate::ResourceRepository`] directly.
+/// reach for [`crate::ResourceRepository`] directly. The one write,
+/// [`Self::touch_live_resources`], changes nothing a read can see.
 ///
 /// See [`crate::ResourceRepository`] for the rule governing which methods
 /// filter by label — the scoped searches carry the pairs inside
@@ -47,6 +48,13 @@ pub trait GenericResourceQueryService: Send + Sync {
         account_id: &odf::AccountID,
         ids: &[ResourceID],
     ) -> Result<Vec<ResourceHandleRow>, InternalError>;
+
+    /// See [`crate::ResourceRepository::touch_live_resources`]
+    async fn touch_live_resources(
+        &self,
+        account_id: &odf::AccountID,
+        ids: &[ResourceID],
+    ) -> Result<Vec<ResourceID>, InternalError>;
 
     /// Matches names case-insensitively. Names that do not exist are absent
     /// from the result.

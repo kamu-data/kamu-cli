@@ -46,10 +46,6 @@ use kamu_auth_rebac_services::{
     RebacServiceImpl,
     SetDatasetRebacPropertiesUseCaseImpl,
 };
-use kamu_configuration_inmem::{
-    InMemorySecretSetProjectionRepository,
-    InMemoryVariableSetProjectionRepository,
-};
 use kamu_core::RequestOrigin;
 use kamu_datasets::SecretsEncryptionConfig;
 use kamu_resources::{
@@ -256,9 +252,8 @@ impl LocalFacadeHarness {
         kamu_resources_inmem::register_dependencies(&mut b);
 
         // Configuration
-        b.add::<InMemoryVariableSetProjectionRepository>()
-            .add::<InMemorySecretSetProjectionRepository>()
-            .add_value(SecretsEncryptionConfig::sample());
+        kamu_configuration_inmem::register_dependencies(&mut b);
+        b.add_value(SecretsEncryptionConfig::sample());
 
         kamu_resources_services::register_dependencies(&mut b);
         kamu_configuration_services::register_dependencies(&mut b);

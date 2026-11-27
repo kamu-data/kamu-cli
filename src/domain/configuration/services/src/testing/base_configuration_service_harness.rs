@@ -20,10 +20,6 @@ use kamu_configuration::{
     VariableSetResource,
     VariableSetSpecInput,
 };
-use kamu_configuration_inmem::{
-    InMemorySecretSetProjectionRepository,
-    InMemoryVariableSetProjectionRepository,
-};
 use kamu_datasets::SecretsEncryptionConfig;
 use kamu_resources::{
     ApplyResourceUseCase,
@@ -60,9 +56,8 @@ impl BaseConfigurationServiceHarness {
     pub fn new() -> Self {
         let base = BaseResourceServiceHarness::new_with_additional_dependencies(|b| {
             kamu_datasets_inmem::register_dependencies(b);
-            b.add_value(SecretsEncryptionConfig::sample())
-                .add::<InMemoryVariableSetProjectionRepository>()
-                .add::<InMemorySecretSetProjectionRepository>();
+            kamu_configuration_inmem::register_dependencies(b);
+            b.add_value(SecretsEncryptionConfig::sample());
 
             crate::register_dependencies(b);
         });

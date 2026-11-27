@@ -85,6 +85,17 @@ pub trait ResourceRepository: Send + Sync {
         ids: &[ResourceID],
     ) -> Result<Vec<ResourceHandleRow>, InternalError>;
 
+    /// Writes the rows of the resources among `ids` of the account whose
+    /// deletion is not requested, without changing them, and returns their
+    /// IDs in no particular order. A concurrent write of such a row, such as a
+    /// deletion request, then conflicts with this transaction: whichever
+    /// commits second sees the first. The other IDs are absent.
+    async fn touch_live_resources(
+        &self,
+        account_id: &odf::AccountID,
+        ids: &[ResourceID],
+    ) -> Result<Vec<ResourceID>, InternalError>;
+
     /// Matches names case-insensitively. Names that do not exist are absent
     /// from the result. Unless only live resources are visible, a name may
     /// resolve to several IDs.

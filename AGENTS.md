@@ -121,8 +121,8 @@ compact entry when the feature is finalized.
 
 `*-inmem` repository crates exist for tests only and do not model transactions by default (no
 rollback on a failed transaction). The exception is opt-in: under `InMemoryTransactionManager`
-(`database-common`), the `kamu-datasets-inmem` and `kamu-resources-inmem` repositories and the
-`kamu-messaging-outbox-inmem` bridge keep each transaction's changes in a working set until it
+(`database-common`), the `kamu-datasets-inmem`, `kamu-resources-inmem` and
+`kamu-configuration-inmem` repositories and the `kamu-messaging-outbox-inmem` bridge keep each transaction's changes in a working set until it
 commits. Do not raise missing rollback elsewhere, or "in-memory used in production", as findings.
 Do fix genuine in-memory bugs that break test fidelity (e.g. index corruption on a rejected save).
 

@@ -26,6 +26,7 @@ use crate::domain::{
     ResourceName,
     ResourceOperationError,
     ResourceRef,
+    ResourceVisibility,
     TypeRef,
     TypeUri,
     resource_type_name,
@@ -49,6 +50,7 @@ pub(crate) struct OwnerReferenceResolver<'a> {
     /// References the owned resource already has. They stay as they are,
     /// whatever became of the owner, so their names may be out of date.
     pub current_owners: &'a [ResourceHandle],
+    pub new_owner_check: NewOwnerCheck,
 }
 
 impl OwnerReferenceResolver<'_> {
@@ -56,19 +58,12 @@ impl OwnerReferenceResolver<'_> {
         &self,
         owner_references: &[ResourceRef],
     ) -> Result<Vec<ResourceHandle>, ResolveOwnerReferencesError> {
-        let mut owner_ids = Vec::with_capacity(owner_references.len());
+        let owner_ids = self.resolve_ids(owner_references).await?;
         let mut seen_ids = HashSet::new();
-
-        for owner_reference in owner_references {
-            validate_owner_reference(owner_reference).map_err(|err| {
-                ResourceHeadersValidationError::from(InvalidOwnerReferenceError::from(err))
-            })?;
-
-            owner_ids.push(self.resolve_id(owner_reference).await?);
-        }
 
         let mut rows_by_id = self.find_new_owners(&owner_ids).await?;
         self.retain_readable(&mut rows_by_id).await?;
+        let live_ids = self.find_live_new_owners(&rows_by_id).await?;
 
         owner_references
             .iter()
@@ -88,7 +83,7 @@ impl OwnerReferenceResolver<'_> {
                     }
                     (None, Some(row)) => {
                         Self::ensure_first_reference(&mut seen_ids, id)?;
-                        let handle = Self::into_live_owner(row.clone())?;
+                        let handle = Self::into_live_owner(row.clone(), &live_ids)?;
                         self.check_account_and_type(owner_reference, id, &handle.r#type)?;
                         Self::check_name(owner_reference, &handle)?;
                         Ok(handle)
@@ -101,12 +96,52 @@ impl OwnerReferenceResolver<'_> {
             .collect()
     }
 
-    async fn resolve_id(
+    /// Fails as the first reference that is invalid or not found does, in
+    /// their order. Names are looked up once per type.
+    async fn resolve_ids(
         &self,
-        owner_reference: &ResourceRef,
-    ) -> Result<ResourceID, ResolveOwnerReferencesError> {
+        owner_references: &[ResourceRef],
+    ) -> Result<Vec<ResourceID>, ResolveOwnerReferencesError> {
+        let mut keys = Vec::with_capacity(owner_references.len());
+        let mut maybe_invalid = None;
+        for owner_reference in owner_references {
+            match self.owner_key(owner_reference) {
+                Ok(key) => keys.push(key),
+                Err(err) => {
+                    maybe_invalid = Some(err);
+                    break;
+                }
+            }
+        }
+
+        let ids_by_name = self.resolve_names(&keys).await?;
+
+        let mut owner_ids = Vec::with_capacity(keys.len());
+        for (owner_reference, key) in owner_references.iter().zip(keys) {
+            owner_ids.push(match key {
+                OwnerKey::Id(id) => id,
+                OwnerKey::Name(schema, name) => *ids_by_name
+                    .get(&(schema, name.clone()))
+                    .ok_or_else(|| OwnerReferenceRejectedError::not_found(owner_reference))?,
+            });
+        }
+
+        match maybe_invalid {
+            Some(err) => Err(err),
+            None => Ok(owner_ids),
+        }
+    }
+
+    fn owner_key<'r>(
+        &self,
+        owner_reference: &'r ResourceRef,
+    ) -> Result<OwnerKey<'r>, ResolveOwnerReferencesError> {
+        validate_owner_reference(owner_reference).map_err(|err| {
+            ResourceHeadersValidationError::from(InvalidOwnerReferenceError::from(err))
+        })?;
+
         let (name, r#type) = match owner_reference {
-            ResourceRef { id: Some(id), .. } => return Ok(*id),
+            ResourceRef { id: Some(id), .. } => return Ok(OwnerKey::Id(*id)),
             ResourceRef {
                 name: Some(name),
                 r#type: Some(r#type),
@@ -124,10 +159,40 @@ impl OwnerReferenceResolver<'_> {
 
         self.ensure_same_account(owner_reference)?;
 
-        self.generic_resource_query_service
-            .find_resource_id_by_name(self.account_id(), schema, name)
-            .await?
-            .ok_or_else(|| OwnerReferenceRejectedError::not_found(owner_reference).into())
+        Ok(OwnerKey::Name(schema, name))
+    }
+
+    /// The live resources holding the names among `keys`
+    async fn resolve_names<'r>(
+        &self,
+        keys: &[OwnerKey<'r>],
+    ) -> Result<HashMap<(&'r TypeUri, ResourceName), ResourceID>, InternalError> {
+        let mut names_by_schema = HashMap::<&TypeUri, Vec<ResourceName>>::new();
+        for key in keys {
+            match key {
+                OwnerKey::Id(_) => {}
+                OwnerKey::Name(schema, name) => names_by_schema
+                    .entry(schema)
+                    .or_default()
+                    .push((*name).clone()),
+            }
+        }
+
+        let mut ids_by_name = HashMap::new();
+        for (schema, names) in names_by_schema {
+            let resolved = self
+                .generic_resource_query_service
+                .resolve_resource_ids_by_names(
+                    self.account_id(),
+                    schema,
+                    &names,
+                    ResourceVisibility::Active,
+                )
+                .await?;
+            ids_by_name.extend(resolved.into_iter().map(|(name, id)| ((schema, name), id)));
+        }
+
+        Ok(ids_by_name)
     }
 
     async fn find_new_owners(
@@ -137,7 +202,7 @@ impl OwnerReferenceResolver<'_> {
         let new_ids = owner_ids
             .iter()
             .copied()
-            .filter(|id| self.current_owner(*id).is_none())
+            .filter(|id| self.current_owner(*id).is_none() && self.owned_id != Some(*id))
             .collect::<Vec<_>>();
         if new_ids.is_empty() {
             return Ok(HashMap::new());
@@ -211,6 +276,30 @@ impl OwnerReferenceResolver<'_> {
         Ok(())
     }
 
+    /// The new owners whose deletion is not requested. An apply touches them,
+    /// so that a deletion request of one, made meanwhile, either fails the
+    /// apply or comes after it, and sees the owned resource
+    async fn find_live_new_owners(
+        &self,
+        rows_by_id: &HashMap<ResourceID, ResourceHandleRow>,
+    ) -> Result<HashSet<ResourceID>, InternalError> {
+        let read_live_ids = rows_by_id
+            .iter()
+            .filter(|(_, row)| row.deletion_requested_at.is_none())
+            .map(|(id, _)| *id)
+            .collect::<Vec<_>>();
+
+        match self.new_owner_check {
+            NewOwnerCheck::Read => Ok(read_live_ids.into_iter().collect()),
+            NewOwnerCheck::Touch => Ok(self
+                .generic_resource_query_service
+                .touch_live_resources(self.account_id(), &read_live_ids)
+                .await?
+                .into_iter()
+                .collect()),
+        }
+    }
+
     fn ensure_first_reference(
         seen_ids: &mut HashSet<ResourceID>,
         id: ResourceID,
@@ -221,14 +310,14 @@ impl OwnerReferenceResolver<'_> {
         Ok(())
     }
 
+    /// A row left out of `live_ids` is being deleted or deleted
     fn into_live_owner(
         row: ResourceHandleRow,
+        live_ids: &HashSet<ResourceID>,
     ) -> Result<ResourceHandle, OwnerReferenceRejectedError> {
-        // Being deleted or deleted
-        if row.deletion_requested_at.is_some() {
-            return Err(OwnerReferenceRejectedError::NotLive {
-                id: ResourceID::new(row.id),
-            });
+        let id = ResourceID::new(row.id);
+        if !live_ids.contains(&id) {
+            return Err(OwnerReferenceRejectedError::NotLive { id });
         }
         Ok(row.into_handle())
     }
@@ -312,6 +401,25 @@ impl OwnerReferenceResolver<'_> {
             })
         }
     }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// How the resolver finds a new owner live
+#[derive(Debug, Clone, Copy)]
+pub(crate) enum NewOwnerCheck {
+    /// Reads its row, for a plan, which writes nothing
+    Read,
+    /// Touches its row, for an apply
+    Touch,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// What a valid reference identifies its owner by
+enum OwnerKey<'r> {
+    Id(ResourceID),
+    Name(&'r TypeUri, &'r ResourceName),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

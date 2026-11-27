@@ -10,8 +10,12 @@
 // Re-exports
 pub use kamu_configuration as domain;
 
+mod dependencies;
+mod inmem_projection_entries;
 mod inmem_secret_set_projection_repository;
 mod inmem_variable_set_projection_repository;
 
+pub use dependencies::*;
+pub(crate) use inmem_projection_entries::*;
 pub use inmem_secret_set_projection_repository::*;
 pub use inmem_variable_set_projection_repository::*;

@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use database_common::PostgresTransactionManager;
-use database_common_macros::database_transactional_test;
+use database_common_macros::{database_concurrent_transactions_test, database_transactional_test};
 use dill::{Catalog, CatalogBuilder};
 use kamu_configuration_postgres::PostgresVariableSetProjectionRepository;
 use kamu_configuration_repo_tests::variable_set_projection_repository_test_suite as variable_set_repo;
@@ -108,6 +108,14 @@ database_transactional_test!(
 database_transactional_test!(
     storage = postgres,
     fixture = variable_set_repo::test_delete_all_entries,
+    harness = PostgresVariableSetProjectionRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_concurrent_transactions_test!(
+    storage = postgres,
+    fixture = variable_set_repo::test_rolled_back_delete_all_entries_keeps_entries,
     harness = PostgresVariableSetProjectionRepositoryHarness
 );
 

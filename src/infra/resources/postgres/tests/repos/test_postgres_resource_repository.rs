@@ -64,6 +64,14 @@ database_transactional_test!(
 
 database_transactional_test!(
     storage = postgres,
+    fixture = resource_repo_suite::test_touch_live_resources,
+    harness = PostgresResourceRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = postgres,
     fixture = resource_repo_suite::test_find_resource_snapshots_by_schema_and_ids,
     harness = PostgresResourceRepositoryHarness
 );
@@ -371,6 +379,22 @@ database_concurrent_transactions_test!(
 database_concurrent_transactions_test!(
     storage = postgres,
     fixture = resource_repo_suite::test_update_resource_in_concurrent_transactions,
+    harness = PostgresResourceRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_concurrent_transactions_test!(
+    storage = postgres,
+    fixture = resource_repo_suite::test_touch_after_concurrent_deletion_request,
+    harness = PostgresResourceRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_concurrent_transactions_test!(
+    storage = postgres,
+    fixture = resource_repo_suite::test_deletion_request_after_concurrent_touch,
     harness = PostgresResourceRepositoryHarness
 );
 

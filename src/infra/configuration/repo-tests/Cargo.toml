@@ -22,6 +22,9 @@ doctest = false
 
 
 [dependencies]
+database-common = { workspace = true, features = [
+    "testing",
+] }
 kamu-configuration = { workspace = true }
 kamu-resources = { workspace = true }
 odf = { workspace = true }

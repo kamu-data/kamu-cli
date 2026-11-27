@@ -10,6 +10,7 @@
 use std::assert_matches;
 
 use chrono::{SubsecRound, Utc};
+use database_common::testing::{in_committed_transaction, in_rolled_back_transaction};
 use dill::Catalog;
 use kamu_configuration::{
     ReplaceProjectionEntriesError,
@@ -425,6 +426,44 @@ pub async fn test_delete_all_entries(catalog: &Catalog) {
     let c_entries = repo.get_entries(&resource_c, 1).await.unwrap();
     assert_eq!(1, c_entries.len());
     assert_eq!(c_entries[0].value, "c-gen1");
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_rolled_back_delete_all_entries_keeps_entries(catalog: &Catalog) {
+    let resource_id = in_committed_transaction(catalog, |catalog| async move {
+        let resource_id = make_variable_set_resource(&catalog).await;
+        catalog
+            .get_one::<dyn VariableSetProjectionRepository>()
+            .unwrap()
+            .replace_entries(&resource_id, 1, &[make_entry("K1", "gen1")])
+            .await
+            .unwrap();
+        resource_id
+    })
+    .await;
+
+    in_rolled_back_transaction(catalog, |catalog| async move {
+        catalog
+            .get_one::<dyn VariableSetProjectionRepository>()
+            .unwrap()
+            .delete_all_entries(&[resource_id])
+            .await
+            .unwrap();
+    })
+    .await;
+
+    let entries = in_committed_transaction(catalog, |catalog| async move {
+        catalog
+            .get_one::<dyn VariableSetProjectionRepository>()
+            .unwrap()
+            .get_entries(&resource_id, 1)
+            .await
+            .unwrap()
+    })
+    .await;
+    assert_eq!(1, entries.len());
+    assert_eq!(entries[0].value, "gen1");
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -57,6 +57,14 @@ database_transactional_test!(
 
 database_transactional_test!(
     storage = inmem_with_transaction,
+    fixture = resource_repo_suite::test_touch_live_resources,
+    harness = InMemoryResourceRepositoriesHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = inmem_with_transaction,
     fixture = resource_repo_suite::test_find_resource_snapshots_by_schema_and_ids,
     harness = InMemoryResourceRepositoriesHarness
 );
@@ -364,6 +372,22 @@ database_concurrent_transactions_test!(
 database_concurrent_transactions_test!(
     storage = inmem,
     fixture = resource_repo_suite::test_update_resource_in_concurrent_transactions,
+    harness = InMemoryResourceRepositoriesHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_concurrent_transactions_test!(
+    storage = inmem,
+    fixture = resource_repo_suite::test_touch_after_concurrent_deletion_request,
+    harness = InMemoryResourceRepositoriesHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_concurrent_transactions_test!(
+    storage = inmem,
+    fixture = resource_repo_suite::test_deletion_request_after_concurrent_touch,
     harness = InMemoryResourceRepositoriesHarness
 );
 

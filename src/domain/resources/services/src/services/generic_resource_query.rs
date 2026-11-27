@@ -69,6 +69,16 @@ impl GenericResourceQueryService for GenericResourceQueryServiceImpl {
             .await
     }
 
+    async fn touch_live_resources(
+        &self,
+        account_id: &odf::AccountID,
+        ids: &[ResourceID],
+    ) -> Result<Vec<ResourceID>, InternalError> {
+        self.resource_repository
+            .touch_live_resources(account_id, ids)
+            .await
+    }
+
     async fn resolve_resource_ids_by_names(
         &self,
         account_id: &odf::AccountID,

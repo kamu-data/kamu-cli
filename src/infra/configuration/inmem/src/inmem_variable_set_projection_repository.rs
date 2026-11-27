@@ -7,9 +7,15 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
+use database_common::{
+    InMemoryTransactionParticipant,
+    InMemoryTransactionalMap,
+    TransactionId,
+    TransactionRef,
+    in_memory_transaction_participant,
+};
 use dill::{Singleton, component, interface, scope};
 use internal_error::InternalError;
 use kamu_configuration::{
@@ -19,29 +25,57 @@ use kamu_configuration::{
 };
 use kamu_resources::{ResourceID, ResourceRemovalListener};
 
+use crate::{ProjectionEntries, ProjectionEntriesMap};
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub struct InMemoryVariableSetProjectionState {
+    entries_by_resource_id_generation: ProjectionEntriesMap<VariableSetEntry>,
+}
+
+#[component(pub)]
+#[interface(dyn InMemoryTransactionParticipant)]
+#[scope(Singleton)]
+impl InMemoryVariableSetProjectionState {
+    pub fn new() -> Self {
+        Self {
+            entries_by_resource_id_generation: InMemoryTransactionalMap::new(),
+        }
+    }
+}
+
+in_memory_transaction_participant!(
+    InMemoryVariableSetProjectionState,
+    entries_by_resource_id_generation
+);
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct InMemoryVariableSetProjectionRepository {
-    state: Arc<Mutex<State>>,
+    state: Arc<InMemoryVariableSetProjectionState>,
+    transaction_id: Option<TransactionId>,
 }
 
 #[component(pub)]
 #[interface(dyn VariableSetProjectionRepository)]
 #[interface(dyn ResourceRemovalListener)]
-#[scope(Singleton)]
 impl InMemoryVariableSetProjectionRepository {
-    pub fn new() -> Self {
+    pub fn new(
+        state: Arc<InMemoryVariableSetProjectionState>,
+        transaction_ref: Option<TransactionRef>,
+    ) -> Self {
         Self {
-            state: Arc::new(Mutex::new(State::default())),
+            state,
+            transaction_id: transaction_ref.map(|transaction_ref| transaction_ref.id()),
         }
     }
-}
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Default)]
-struct State {
-    entries_by_resource_id_generation: HashMap<(ResourceID, u64), Vec<VariableSetEntry>>,
+    fn entries(&self) -> ProjectionEntries<'_, VariableSetEntry> {
+        ProjectionEntries::new(
+            &self.state.entries_by_resource_id_generation,
+            self.transaction_id,
+        )
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -54,12 +88,9 @@ impl VariableSetProjectionRepository for InMemoryVariableSetProjectionRepository
         resource_generation: u64,
         key: &str,
     ) -> Result<Option<VariableSetEntry>, InternalError> {
-        let guard = self.state.lock().unwrap();
-        Ok(guard
-            .entries_by_resource_id_generation
-            .get(&(*resource_id, resource_generation))
-            .and_then(|entries| entries.iter().find(|entry| entry.key == key))
-            .cloned())
+        Ok(self
+            .entries()
+            .find_entry(resource_id, resource_generation, |entry| entry.key == key))
     }
 
     async fn get_entries(
@@ -67,33 +98,14 @@ impl VariableSetProjectionRepository for InMemoryVariableSetProjectionRepository
         resource_id: &ResourceID,
         resource_generation: u64,
     ) -> Result<Vec<VariableSetEntry>, InternalError> {
-        let guard = self.state.lock().unwrap();
-        Ok(guard
-            .entries_by_resource_id_generation
-            .get(&(*resource_id, resource_generation))
-            .cloned()
-            .unwrap_or_default())
+        Ok(self.entries().get_entries(resource_id, resource_generation))
     }
 
     async fn get_latest_entries(
         &self,
         resource_id: &ResourceID,
     ) -> Result<Vec<VariableSetEntry>, InternalError> {
-        let guard = self.state.lock().unwrap();
-        let max_gen = guard
-            .entries_by_resource_id_generation
-            .keys()
-            .filter(|(id, _)| id == resource_id)
-            .map(|(_, generation)| *generation)
-            .max();
-        Ok(max_gen
-            .and_then(|generation| {
-                guard
-                    .entries_by_resource_id_generation
-                    .get(&(*resource_id, generation))
-            })
-            .cloned()
-            .unwrap_or_default())
+        Ok(self.entries().get_latest_entries(resource_id, None))
     }
 
     async fn get_latest_entries_before_generation(
@@ -101,16 +113,9 @@ impl VariableSetProjectionRepository for InMemoryVariableSetProjectionRepository
         resource_id: &ResourceID,
         resource_generation: u64,
     ) -> Result<Vec<VariableSetEntry>, InternalError> {
-        let guard = self.state.lock().unwrap();
-        Ok(guard
-            .entries_by_resource_id_generation
-            .iter()
-            .filter(|((stored_resource_id, stored_generation), _)| {
-                stored_resource_id == resource_id && *stored_generation < resource_generation
-            })
-            .max_by_key(|((_, stored_generation), _)| *stored_generation)
-            .map(|(_, entries)| entries.clone())
-            .unwrap_or_default())
+        Ok(self
+            .entries()
+            .get_latest_entries(resource_id, Some(resource_generation)))
     }
 
     async fn replace_entries(
@@ -119,15 +124,8 @@ impl VariableSetProjectionRepository for InMemoryVariableSetProjectionRepository
         resource_generation: u64,
         entries: &[VariableSetEntry],
     ) -> Result<(), ReplaceProjectionEntriesError> {
-        let mut guard = self.state.lock().unwrap();
-        let key = (*resource_id, resource_generation);
-        if guard.entries_by_resource_id_generation.contains_key(&key) {
-            return Err(ReplaceProjectionEntriesError::concurrent_modification());
-        }
-        guard
-            .entries_by_resource_id_generation
-            .insert(key, entries.to_vec());
-        Ok(())
+        self.entries()
+            .replace_entries(resource_id, resource_generation, entries)
     }
 
     async fn cleanup_entries_before_generation(
@@ -135,20 +133,13 @@ impl VariableSetProjectionRepository for InMemoryVariableSetProjectionRepository
         resource_id: &ResourceID,
         resource_generation: u64,
     ) -> Result<(), InternalError> {
-        let mut guard = self.state.lock().unwrap();
-        guard.entries_by_resource_id_generation.retain(
-            |(stored_resource_id, stored_generation), _| {
-                stored_resource_id != resource_id || *stored_generation >= resource_generation
-            },
-        );
+        self.entries()
+            .cleanup_entries_before_generation(resource_id, resource_generation);
         Ok(())
     }
 
     async fn delete_all_entries(&self, resource_ids: &[ResourceID]) -> Result<(), InternalError> {
-        let mut guard = self.state.lock().unwrap();
-        guard
-            .entries_by_resource_id_generation
-            .retain(|(stored_resource_id, _), _| !resource_ids.contains(stored_resource_id));
+        self.entries().delete_all_entries(resource_ids);
         Ok(())
     }
 }

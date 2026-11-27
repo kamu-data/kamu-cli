@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use std::cmp::Reverse;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
@@ -373,6 +373,33 @@ impl ResourceRepository for InMemoryResourceRepository {
                 .map(ResourceHandleRow::from)
                 .collect()
         }))
+    }
+
+    async fn touch_live_resources(
+        &self,
+        account_id: &odf::AccountID,
+        ids: &[ResourceID],
+    ) -> Result<Vec<ResourceID>, InternalError> {
+        Ok(self
+            .state
+            .write(self.transaction_id, |snapshots_by_id, _| {
+                let live_ids = ids
+                    .iter()
+                    .copied()
+                    .filter(|id| {
+                        snapshots_by_id.view().get(id).is_some_and(|snapshot| {
+                            snapshot.headers.account.did == *account_id
+                                && snapshot.headers.deletion_requested_at.is_none()
+                        })
+                    })
+                    .collect::<HashSet<_>>();
+                for id in &live_ids {
+                    snapshots_by_id.touch(*id);
+                }
+                live_ids
+            })
+            .into_iter()
+            .collect())
     }
 
     async fn resolve_resource_ids_by_names(

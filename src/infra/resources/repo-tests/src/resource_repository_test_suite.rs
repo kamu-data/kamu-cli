@@ -398,6 +398,161 @@ pub async fn test_find_resource_handles_by_ids(catalog: &Catalog) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+pub async fn test_touch_live_resources(catalog: &Catalog) {
+    let repo = catalog.get_one::<dyn ResourceRepository>().unwrap();
+    let account_handle = odf::ResourceOwnerHandle::new_test("test-account");
+    let other_account_handle = odf::ResourceOwnerHandle::new_test("other-account");
+
+    let touched = repo
+        .touch_live_resources(&account_handle.did, &[])
+        .await
+        .unwrap();
+    assert_eq!(touched, []);
+
+    let live = make_test_snapshot(&account_handle, &TEST_KIND, "live");
+    let deleting = make_test_snapshot(&account_handle, &TEST_KIND, "deleting");
+    let deleted = make_test_snapshot(&account_handle, &OTHER_KIND, "deleted");
+    let other_account = make_test_snapshot(&other_account_handle, &TEST_KIND, "other-account");
+    let missing_id = ResourceID::new(uuid::Uuid::new_v4());
+    for snapshot in [&live, &deleting, &deleted, &other_account] {
+        repo.create_resource(snapshot).await.unwrap();
+    }
+    request_deletion(repo.as_ref(), &deleting, None)
+        .await
+        .unwrap();
+    request_deletion(repo.as_ref(), &deleted, Some(Utc::now()))
+        .await
+        .unwrap();
+    let live_before = repo.find_resource_snapshot_by_id(&live.id).await.unwrap();
+
+    let touched = repo
+        .touch_live_resources(
+            &account_handle.did,
+            &[
+                live.id,
+                deleting.id,
+                deleted.id,
+                other_account.id,
+                missing_id,
+            ],
+        )
+        .await
+        .unwrap();
+    assert_eq!(touched, [live.id]);
+
+    // The touch changes nothing a read sees
+    let live_after = repo.find_resource_snapshot_by_id(&live.id).await.unwrap();
+    assert_eq!(live_after, live_before);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// The touch waits for the deletion request, then finds the owner not live;
+/// the in-memory manager fails its commit instead
+pub async fn test_touch_after_concurrent_deletion_request(catalog: &Catalog) {
+    let account_handle = odf::ResourceOwnerHandle::new_test("test-account");
+    let owner = make_test_snapshot(&account_handle, &TEST_KIND, "owner");
+    let owner_id = owner.id;
+    in_committed_transaction(catalog, {
+        let owner = owner.clone();
+        |catalog| async move {
+            let repo = catalog.get_one::<dyn ResourceRepository>().unwrap();
+            repo.create_resource(&owner).await.unwrap();
+        }
+    })
+    .await;
+
+    let outcome = race_transactions(
+        catalog,
+        |catalog| async move {
+            let repo = catalog.get_one::<dyn ResourceRepository>().unwrap();
+            request_deletion(repo.as_ref(), &owner, None).await.unwrap();
+        },
+        move |catalog| async move {
+            let repo = catalog.get_one::<dyn ResourceRepository>().unwrap();
+            let touched = repo
+                .touch_live_resources(&account_handle.did, &[owner_id])
+                .await
+                .unwrap();
+            if touched.is_empty() {
+                return Err(OwnerNotLive);
+            }
+            Ok(())
+        },
+    )
+    .await;
+
+    assert_matches!(
+        outcome,
+        RacingTransactionOutcome::FailedAtWrite(OwnerNotLive)
+            | RacingTransactionOutcome::FailedAtCommit(_)
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// The deletion request waits for the touch, then requests the deletion
+pub async fn test_deletion_request_after_concurrent_touch(catalog: &Catalog) {
+    let account_handle = odf::ResourceOwnerHandle::new_test("test-account");
+    let owner = make_test_snapshot(&account_handle, &TEST_KIND, "owner");
+    let owner_id = owner.id;
+    in_committed_transaction(catalog, {
+        let owner = owner.clone();
+        |catalog| async move {
+            let repo = catalog.get_one::<dyn ResourceRepository>().unwrap();
+            repo.create_resource(&owner).await.unwrap();
+        }
+    })
+    .await;
+
+    let outcome = race_transactions(
+        catalog,
+        move |catalog| async move {
+            let repo = catalog.get_one::<dyn ResourceRepository>().unwrap();
+            let touched = repo
+                .touch_live_resources(&account_handle.did, &[owner_id])
+                .await
+                .unwrap();
+            assert_eq!(touched, [owner_id]);
+        },
+        move |catalog| async move {
+            let repo = catalog.get_one::<dyn ResourceRepository>().unwrap();
+            request_deletion(repo.as_ref(), &owner, None).await
+        },
+    )
+    .await;
+
+    assert_matches!(outcome, RacingTransactionOutcome::Committed);
+    let found = in_committed_transaction(catalog, |catalog| async move {
+        catalog
+            .get_one::<dyn ResourceRepository>()
+            .unwrap()
+            .find_resource_snapshot_by_id(&owner_id)
+            .await
+            .unwrap()
+            .unwrap()
+    })
+    .await;
+    assert!(found.headers.deletion_requested_at.is_some());
+}
+
+#[derive(Debug)]
+struct OwnerNotLive;
+
+async fn request_deletion(
+    repo: &dyn ResourceRepository,
+    snapshot: &ResourceSnapshot,
+    deleted_at: Option<DateTime<Utc>>,
+) -> Result<(), UpdateResourceError> {
+    let mut snapshot = snapshot.clone();
+    snapshot.headers.deletion_requested_at = Some(Utc::now());
+    snapshot.headers.deleted_at = deleted_at;
+    repo.update_resource(&snapshot, snapshot.last_event_id)
+        .await
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 pub async fn test_find_resource_snapshots_by_schema_and_ids(catalog: &Catalog) {
     let repo = catalog.get_one::<dyn ResourceRepository>().unwrap();
 

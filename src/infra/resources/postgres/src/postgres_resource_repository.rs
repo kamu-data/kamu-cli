@@ -58,6 +58,46 @@ pub struct PostgresResourceRepository {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Calls `$callback!` with `$args` followed by two string literals: the `WHERE`
+/// predicate of the visibility and its listing order, see
+/// [`ResourceRepository::list_resource_snapshots`]. Each visibility gets a query
+/// text of its own: as bound flags, the predicate and the order would keep a
+/// generic plan from reading the partial index of deleted resources, or any
+/// index in order. The orders repeat the expressions of those indexes.
+macro_rules! with_visibility_sql {
+    ($visibility:expr, $callback:ident!($($args:tt)*)) => {
+        match $visibility {
+            ResourceVisibility::Active => $callback!(
+                $($args)*
+                "r.deletion_requested_at IS NULL",
+                "r.updated_at DESC, r.resource_id DESC"
+            ),
+            ResourceVisibility::IncludeDeleting => $callback!(
+                $($args)*
+                "r.deleted_at IS NULL",
+                "r.updated_at DESC, r.resource_id DESC"
+            ),
+            // The deletion time is NULL for live resources, which come first
+            ResourceVisibility::IncludeDeleted => $callback!(
+                $($args)*
+                "TRUE",
+                "COALESCE(r.deleted_at, r.deletion_requested_at) DESC NULLS FIRST,
+                 r.updated_at DESC,
+                 r.resource_id DESC"
+            ),
+            ResourceVisibility::DeletedOnly => $callback!(
+                $($args)*
+                "r.deletion_requested_at IS NOT NULL",
+                "COALESCE(r.deleted_at, r.deletion_requested_at) DESC NULLS FIRST,
+                 r.updated_at DESC,
+                 r.resource_id DESC"
+            ),
+        }
+    };
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 /// Runs a search over `resources r LEFT JOIN accounts a` with the given row type
 /// and `SELECT` list: the scope, visibility and owner filters, the listing order
 /// and the page. `$then` receives the built query as `$query`.
@@ -76,43 +116,45 @@ macro_rules! search_resources_query {
         |$query:ident| $then:expr
     ) => {
         match $owner_id {
-            Some(owner_id) => {
-                let $query = search_resources_query!(
-                    @query $row, $select, $flat, $visibility, $limit, $offset,
+            Some(owner_id) => with_visibility_sql!(
+                $visibility,
+                search_resources_query!(
+                    @query $row, $select, $flat, $limit, $offset, |$query| $then,
                     "AND EXISTS (
                         SELECT 1
                         FROM resource_owners_projection ro
                         WHERE ro.resource_id = r.resource_id
-                          AND ro.owner_id = $17
+                          AND ro.owner_id = $14
                     )",
-                    owner_id
-                );
-                $then
-            }
-            None => {
-                let $query = search_resources_query!(
-                    @query $row, $select, $flat, $visibility, $limit, $offset, ""
-                );
-                $then
-            }
+                    [owner_id],
+                )
+            ),
+            None => with_visibility_sql!(
+                $visibility,
+                search_resources_query!(
+                    @query $row, $select, $flat, $limit, $offset, |$query| $then, "", [],
+                )
+            ),
         }
     };
     (
-        @query $row:ident, $select:tt, $flat:ident, $visibility:ident, $limit:ident, $offset:ident,
-        $owner_condition:tt $(, $owner_id:expr)?
-    ) => {
-        sqlx::query_as!(
+        @query $row:ident, $select:tt, $flat:ident, $limit:ident, $offset:ident,
+        |$query:ident| $then:expr,
+        $owner_condition:tt, [$($owner_id:expr)?], $visibility_predicate:tt, $order:tt
+    ) => {{
+        let $query = sqlx::query_as!(
             $row,
             $select + r#"
             FROM resources r
             LEFT JOIN accounts a ON a.id = r.account_id
-            WHERE (r.deletion_requested_at IS NOT NULL OR $12)
-              AND (r.deletion_requested_at IS NULL OR $13)
-              AND (r.deleted_at IS NULL OR $14)
+            WHERE "# + $visibility_predicate + r#"
               -- Implied by the EXISTS below, but lets the planner read the rows
-              -- of one account and type from an index, in order.
-              AND ($15::text IS NULL OR r.account_id = $15)
-              AND ($16::text IS NULL OR r.resource_schema = $16)
+              -- of one account and type from an index, in order. A generic plan
+              -- cannot drop the IS NULL branches, so the ANY gives it the account
+              -- as an index condition.
+              AND r.account_id = ANY($1::text[])
+              AND ($12::text IS NULL OR r.account_id = $12)
+              AND ($13::text IS NULL OR r.resource_schema = $13)
               "# + $owner_condition + r#"
               -- Each type carries its own query, account and label pairs,
               -- re-paired here. A NULL schema array means "every type", in
@@ -153,13 +195,7 @@ macro_rules! search_resources_query {
                           )
                     )
               )
-            -- NULL for live resources, which come first, and for every resource
-            -- when deleted ones are hidden
-            ORDER BY
-                CASE WHEN $14 THEN COALESCE(r.deleted_at, r.deletion_requested_at) END
-                    DESC NULLS FIRST,
-                r.updated_at DESC,
-                r.resource_id DESC
+            ORDER BY "# + $order + r#"
             LIMIT $9 OFFSET $11
             "#,
             $flat.account_ids(),
@@ -173,14 +209,12 @@ macro_rules! search_resources_query {
             $limit,
             DELETED_ACCOUNT_NAME_SENTINEL,
             $offset,
-            $visibility.includes_live(),
-            $visibility.includes_deleting(),
-            $visibility.includes_deleted(),
             $flat.only_account_id(),
             $flat.only_schema(),
             $($owner_id,)?
-        )
-    };
+        );
+        $then
+    }};
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -510,6 +544,46 @@ impl ResourceRepository for PostgresResourceRepository {
         Ok(rows)
     }
 
+    async fn touch_live_resources(
+        &self,
+        account_id: &odf::AccountID,
+        ids: &[ResourceID],
+    ) -> Result<Vec<ResourceID>, InternalError> {
+        if ids.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        let mut tr = self.transaction.lock().await;
+        let connection_mut = tr.connection_mut().await?;
+
+        let account_id_stack = account_id.as_stack_string();
+        let ids = ids.iter().map(|id| *id.as_ref()).collect::<Vec<_>>();
+
+        // Assigning a column its own value takes the row lock and changes
+        // nothing, `last_event_id` included, so a writer's compare-and-set
+        // still holds after the touch; a trigger on `resources` would fire,
+        // though. Blocked on a concurrent write, the statement re-checks its
+        // `WHERE` against the committed row: a deletion requested meanwhile
+        // leaves the row out.
+        let touched_ids = sqlx::query_scalar!(
+            r#"
+            UPDATE resources
+            SET deletion_requested_at = deletion_requested_at
+            WHERE account_id = $1
+              AND resource_id = ANY($2)
+              AND deletion_requested_at IS NULL
+            RETURNING resource_id as "id: uuid::Uuid"
+            "#,
+            account_id_stack.as_str(),
+            &ids,
+        )
+        .fetch_all(connection_mut)
+        .await
+        .int_err()?;
+
+        Ok(touched_ids.into_iter().map(ResourceID::new).collect())
+    }
+
     async fn resolve_resource_ids_by_names(
         &self,
         account_id: &odf::AccountID,
@@ -660,19 +734,21 @@ impl ResourceRepository for PostgresResourceRepository {
         let mut tr = self.transaction.lock().await;
         let connection_mut = tr.connection_mut().await?;
 
-        // Two query texts, see `search_resources_query!`
+        // A query text per owner presence and visibility, see
+        // `search_resources_query!`. A count has no order.
         macro_rules! count {
-            ($owner_condition:tt $(, $owner_id:expr)?) => {
+            (
+                $owner_condition:tt, [$($owner_id:expr)?], $visibility_predicate:tt, $_order:tt
+            ) => {
                 sqlx::query!(
                     r#"
                     SELECT COUNT(*) AS "count!: i64"
                     FROM resources r
-                    WHERE (r.deletion_requested_at IS NOT NULL OR $9)
-                      AND (r.deletion_requested_at IS NULL OR $10)
-                      AND (r.deleted_at IS NULL OR $11)
+                    WHERE "# + $visibility_predicate + r#"
                       -- Implied by the EXISTS below, see `search_resources_query!`.
-                      AND ($12::text IS NULL OR r.account_id = $12)
-                      AND ($13::text IS NULL OR r.resource_schema = $13)
+                      AND r.account_id = ANY($1::text[])
+                      AND ($9::text IS NULL OR r.account_id = $9)
+                      AND ($10::text IS NULL OR r.resource_schema = $10)
                       "# + $owner_condition + r#"
                       -- Each type carries its own query, account and label pairs,
                       -- re-paired here. See `search_resources_query!` for the shape.
@@ -716,9 +792,6 @@ impl ResourceRepository for PostgresResourceRepository {
                     flat.label_row_numbers(),
                     flat.label_keys(),
                     flat.label_values(),
-                    visibility.includes_live(),
-                    visibility.includes_deleting(),
-                    visibility.includes_deleted(),
                     flat.only_account_id(),
                     flat.only_schema(),
                     $($owner_id,)?
@@ -731,16 +804,19 @@ impl ResourceRepository for PostgresResourceRepository {
         }
 
         let count = match owner_id {
-            Some(owner_id) => count!(
-                "AND EXISTS (
-                    SELECT 1
-                    FROM resource_owners_projection ro
-                    WHERE ro.resource_id = r.resource_id
-                      AND ro.owner_id = $14
-                )",
-                owner_id
+            Some(owner_id) => with_visibility_sql!(
+                visibility,
+                count!(
+                    "AND EXISTS (
+                        SELECT 1
+                        FROM resource_owners_projection ro
+                        WHERE ro.resource_id = r.resource_id
+                          AND ro.owner_id = $11
+                    )",
+                    [owner_id],
+                )
             ),
-            None => count!(""),
+            None => with_visibility_sql!(visibility, count!("", [],)),
         };
 
         usize::try_from(count).int_err()

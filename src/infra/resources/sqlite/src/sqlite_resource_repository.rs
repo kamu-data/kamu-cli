@@ -325,6 +325,49 @@ impl ResourceRepository for SqliteResourceRepository {
         Ok(rows)
     }
 
+    async fn touch_live_resources(
+        &self,
+        account_id: &odf::AccountID,
+        ids: &[ResourceID],
+    ) -> Result<Vec<ResourceID>, InternalError> {
+        if ids.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        let mut tr = self.transaction.lock().await;
+        let connection_mut = tr.connection_mut().await?;
+
+        let account_id_stack = account_id.as_stack_string();
+        let account_id_str = account_id_stack.as_str();
+
+        let uids_placeholders =
+            sqlite_generate_placeholders_list(ids.len(), NonZeroUsize::new(2).unwrap());
+
+        // Assigning a column its own value changes nothing, but the write takes
+        // the database's single write lock, so a concurrent deletion request
+        // runs either before this statement or after the transaction
+        let query_str = format!(
+            r#"
+            UPDATE resources
+            SET deletion_requested_at = deletion_requested_at
+            WHERE account_id = $1
+              AND resource_id IN ({uids_placeholders})
+              AND deletion_requested_at IS NULL
+            RETURNING resource_id
+            "#,
+        );
+
+        let mut query =
+            sqlx::query_scalar::<_, uuid::Uuid>(AssertSqlSafe(query_str)).bind(account_id_str);
+        for id in ids {
+            query = query.bind(*id.as_ref());
+        }
+
+        let touched_ids = query.fetch_all(connection_mut).await.int_err()?;
+
+        Ok(touched_ids.into_iter().map(ResourceID::new).collect())
+    }
+
     async fn resolve_resource_ids_by_names(
         &self,
         account_id: &odf::AccountID,

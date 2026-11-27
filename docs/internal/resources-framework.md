@@ -412,8 +412,13 @@ neither deletes nor blocks anything by it. Accounts are a different kind of owne
   the owner was like when it was added, so its name may be out of date. Its account is always that of
   the resource (`ResourceHeadersExt::set_account`).
 - **A new owner must be a live resource of the same account,** other than the resource itself, named
-  once, and it must match every given part of the reference. Anything else rejects the apply. The
-  check is not a lock: the owner may be deleted right after.
+  once, and it must match every given part of the reference. Anything else rejects the apply. An
+  apply also writes the row of each new owner without changing it
+  (`ResourceRepository::touch_live_resources`), so it conflicts with a concurrent deletion request
+  of the owner: if the request commits first, the apply is rejected; otherwise the request waits
+  for the apply, and whatever lists the owned resources after writing the request sees the new
+  one. A plan only reads the owners, since its transaction may commit. Owners kept by ID are not
+  written.
 - **An owner the resource already has is kept without being looked up,** whatever became of it, if
   it is referenced by ID. A resource therefore stays updatable after its owner is renamed, deleted
   or purged. Of the other parts, the account and the type must match, since they never change; the
@@ -427,8 +432,9 @@ neither deletes nor blocks anything by it. Accounts are a different kind of owne
   owned by one of them, which applying the batch accepts.
 
 - **The references form a graph that may have cycles.** Only a resource owning itself is rejected:
-  two resources may own each other, and a check at apply could not exclude that, since it locks
-  nothing. Whatever follows the references, such as a cascade, must remember what it has visited.
+  two resources may own each other, and a check at apply could not exclude that without locking
+  every resource on the path. Whatever follows the references, such as a cascade, must remember
+  what it has visited.
 
 `resource_owners_projection` indexes the owners for
 [searches by owner](#10-facade-kamu-resources-facade). `ResourcePersistenceServiceHelper` writes it

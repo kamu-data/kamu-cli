@@ -941,45 +941,53 @@ impl ResourceSelectionResolutionServiceImpl {
         Ok(handles)
     }
 
-    /// A search orders by time, a lookup by name by the state of the deletion:
-    /// live resources, those being deleted, the deleted ones. This brings the
-    /// handles into the order of the states; within one they keep the search
-    /// order.
+    /// A search orders by time, a lookup by name by the state of the deletion.
+    /// Sorts the handles as the unfiltered lookup of their names lists them, so
+    /// a filter changes which resources a name selects but not their order.
+    /// Each type and name keeps the place of its first handle.
     async fn order_as_name_lookup(
         resource_facade: &dyn ResourceFacade,
         visibility: ResourceVisibility,
         handles: &mut [ResourceHandle],
     ) -> Result<(), CLIError> {
-        // A search that sees deleted resources puts the live ones first itself
-        let leading_visibility = match visibility {
+        match visibility {
+            // A live resource is the only one under its name
             ResourceVisibility::Active => return Ok(()),
-            ResourceVisibility::IncludeDeleting => ResourceVisibility::Active,
-            ResourceVisibility::IncludeDeleted | ResourceVisibility::DeletedOnly => {
-                ResourceVisibility::IncludeDeleting
-            }
-        };
+            ResourceVisibility::IncludeDeleting
+            | ResourceVisibility::IncludeDeleted
+            | ResourceVisibility::DeletedOnly => {}
+        }
 
         if handles.len() < 2 {
             return Ok(());
         }
 
-        let ids = handles.iter().map(|handle| handle.id).collect::<Vec<_>>();
-        let leading_ids = resource_facade
-            .search_handles(SearchResourcesRequest {
-                selectors: ResourceSelector::any_type_ids(ids),
-                owner: None,
-                visibility: leading_visibility,
-                pagination: PaginationOpts {
-                    limit: handles.len(),
-                    offset: 0,
-                },
+        let mut seen_names = HashSet::new();
+        let refs = handles
+            .iter()
+            .filter(|handle| {
+                seen_names.insert((handle.r#type.clone(), handle.name.to_ascii_lowercase()))
             })
-            .await?
-            .items
+            .map(|handle| ResourceRef {
+                account: None,
+                r#type: Some(handle.r#type.clone().into()),
+                id: None,
+                did: None,
+                name: Some(handle.name.clone()),
+            })
+            .collect::<Vec<_>>();
+
+        let positions = resource_facade
+            .get_handles(refs, visibility)
+            .await
+            .map_err(CLIError::critical)?
+            .successes
             .into_iter()
-            .map(|handle| handle.id)
-            .collect::<HashSet<_>>();
-        handles.sort_by_key(|handle| !leading_ids.contains(&handle.id));
+            .enumerate()
+            .map(|(position, success)| (success.item.id, position))
+            .collect::<HashMap<_, _>>();
+        // A resource gone since the search keeps its place after the others
+        handles.sort_by_key(|handle| positions.get(&handle.id).copied().unwrap_or(usize::MAX));
 
         Ok(())
     }

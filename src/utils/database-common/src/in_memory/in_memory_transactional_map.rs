@@ -26,7 +26,8 @@ use crate::{
 /// own changes over the committed entries, other transactions see them only
 /// after the commit, and a rollback drops them. A commit fails if another
 /// transaction committed a key after this one first changed it with
-/// [`InMemoryMapWrite::put`] or [`InMemoryMapWrite::delete`].
+/// [`InMemoryMapWrite::put`] or [`InMemoryMapWrite::delete`], or touched it
+/// with [`InMemoryMapWrite::touch`].
 ///
 /// Unlike a database, a write never waits for another transaction: two
 /// transactions changing one key both succeed at write time, and the later
@@ -121,6 +122,13 @@ where
                     OnConcurrentCommit::Claim => state.committed.contains_key(key),
                 };
                 if conflicts {
+                    return Err(InMemoryWriteConflictError {
+                        key: format!("{key:?}"),
+                    });
+                }
+            }
+            for (key, base_version) in &working_set.touched {
+                if state.committed_version(key) != *base_version {
                     return Err(InMemoryWriteConflictError {
                         key: format!("{key:?}"),
                     });
@@ -314,6 +322,24 @@ impl<K: Eq + Hash, V> InMemoryMapWrite<'_, K, V> {
         self.change(key, ChangedValue::Delete, OnConcurrentCommit::Fail);
     }
 
+    /// Writes the key without changing it, as an `UPDATE` assigning a row its
+    /// own values does: the commit fails if another transaction committed the
+    /// key after this one touched it, and commits nothing for the key, so
+    /// another transaction that changed it meanwhile may commit after this one
+    pub fn touch(&mut self, key: K) {
+        let Some(transaction_id) = self.transaction_id else {
+            return;
+        };
+        let base_version = self.state.committed_version(&key);
+        self.state
+            .working_sets
+            .get_mut(&transaction_id)
+            .unwrap()
+            .touched
+            .entry(key)
+            .or_insert(base_version);
+    }
+
     /// Deletes every key the transaction sees that matches `predicate`
     pub fn delete_where(&mut self, predicate: impl Fn(&K) -> bool)
     where
@@ -411,7 +437,7 @@ impl<K: Eq + Hash, V> MapState<K, V> {
     fn is_changed_in_open_transaction(&self, key: &K) -> bool {
         self.working_sets
             .values()
-            .any(|working_set| working_set.changes.contains_key(key))
+            .any(|working_set| working_set.watches(key))
     }
 
     /// Drops the deletes no open transaction can still conflict with, once
@@ -421,7 +447,7 @@ impl<K: Eq + Hash, V> MapState<K, V> {
         self.deleted_versions.retain(|key, _| {
             working_sets
                 .values()
-                .any(|working_set| working_set.changes.contains_key(key))
+                .any(|working_set| working_set.watches(key))
         });
     }
 
@@ -439,12 +465,23 @@ struct Versioned<V> {
 
 struct WorkingSet<K, V> {
     changes: HashMap<K, Change<V>>,
+    /// The keys touched, each with the version of the committed key, or of its
+    /// last delete, when the transaction first touched it
+    touched: HashMap<K, Option<u64>>,
+}
+
+impl<K: Eq + Hash, V> WorkingSet<K, V> {
+    /// Whether a commit of another transaction may conflict on the key
+    fn watches(&self, key: &K) -> bool {
+        self.changes.contains_key(key) || self.touched.contains_key(key)
+    }
 }
 
 impl<K, V> Default for WorkingSet<K, V> {
     fn default() -> Self {
         Self {
             changes: HashMap::new(),
+            touched: HashMap::new(),
         }
     }
 }
@@ -964,6 +1001,36 @@ mod tests {
 
         assert_matches!(harness.check_commit(second), Err(_));
         pretty_assertions::assert_eq!(harness.entries(None), [("a", 1)]);
+    }
+
+    #[test]
+    fn test_touch_fails_the_commit_on_a_key_another_transaction_committed() {
+        let harness = MapHarness::with_committed(&[("a", 1)]);
+        let first = harness.begin();
+        let second = harness.begin();
+        harness.map.write(Some(first), |write| write.put("a", 10));
+        harness.map.write(Some(second), |write| write.touch("a"));
+
+        harness.commit(first);
+
+        assert_matches!(
+            harness.check_commit(second),
+            Err(InMemoryWriteConflictError { key }) if key == "\"a\""
+        );
+    }
+
+    #[test]
+    fn test_touch_commits_nothing_another_transaction_conflicts_with() {
+        let harness = MapHarness::with_committed(&[("a", 1)]);
+        let first = harness.begin();
+        let second = harness.begin();
+        harness.map.write(Some(first), |write| write.touch("a"));
+        harness.map.write(Some(second), |write| write.put("a", 20));
+
+        harness.commit(first);
+        harness.commit(second);
+
+        pretty_assertions::assert_eq!(harness.entries(None), [("a", 20)]);
     }
 
     #[test]
