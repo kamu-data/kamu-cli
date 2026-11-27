@@ -23,11 +23,33 @@ Clippy sees unused private items only. Everything else is on whoever changes the
   also pulls in.
 - **Before writing a helper, a conversion or a test setup, search for an existing one** (a `From`
   impl for the same source error, a harness method, a `testing` module helper) and use or extend
-  it. A second copy of the same mapping drifts from the first.
+  it. A second copy of the same mapping drifts from the first. [Where shared code
+  lives](#where-shared-code-lives) says where to look first.
+- **A change that adds the same line in a third place gives the shape one home first.** Threading
+  a new field, argument or filter through every literal, query or call that builds the same shape
+  is the most common source of duplication: each edit is small, so none feels like a copy. At the
+  third copy, stop and add a constructor with defaults, a builder, a helper, a harness method or a
+  shared query macro, move the copies onto it, then add the line once. The Stop hook lists the
+  lines an uncommitted change repeats; `python3 -m scripts.agents.repeated_lines --base <ref>`
+  lists them for a branch.
+- **A second case of an existing path extends it, not a copy of it:** a `search_handles` beside
+  `search`, an executor beside a planner, a new suite beside a sibling's harness. Factor out the
+  shared part when writing the second case, while both are in view.
 - **Code a later stage needs is not dead:** check the plan before removing it, and say in its doc
   comment what it is for.
 - Deduplication stops at a visible transaction block
   ([database-transactions.md §3.2](../../../docs/internal/database-transactions.md#32-inside-a-level)).
+
+#### Where shared code lives
+
+| You need | Look first in |
+|---|---|
+| In-memory repository state: transactional reads and writes, `delete_where`, `overwrite`, `upsert` | `database_common` `in_memory/` (`InMemoryTransactionalMap`, `InMemoryMapWrite`) |
+| SQL helpers: placeholder lists, `LIKE` escaping, SQLite timestamps | `database_common` `helpers.rs` |
+| A resource type's boilerplate: selector constants, lifecycle errors, event sourcing, spec newtypes | the `macro_rules!` in `kamu-resources` (`declare_resource_selector_constants!`, `impl_resource_lifecycle_error!`, `impl_event_sourced_resource!`, `declare_rfc_spec_newtype!`) |
+| A GraphQL enum mirroring a domain enum | `#[graphql(remote = ...)]` ([`kamu-graphql-api`](../kamu-graphql-api/SKILL.md#enums)) |
+| A constant for a value the crate already names | `git grep` the literal in the same crate before adding one |
+| Test helpers | [`kamu-test-harness`](../kamu-test-harness/SKILL.md), Rule 3 |
 
 ### Imports and paths
 

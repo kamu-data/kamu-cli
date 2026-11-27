@@ -20,7 +20,13 @@
     { "skill": "kamu-release-dependency-workflows", "paths": ["CHANGELOG.md"] },
     {
       "skill": "kamu-prose-and-comments",
-      "paths": ["AGENTS.md", "CLAUDE.md", "docs/**/*.md", ".claude/skills/**"]
+      "paths": [
+        "AGENTS.md",
+        "CLAUDE.md",
+        "docs/**/*.md",
+        ".claude/skills/**",
+        "scripts/agents/README.md"
+      ]
     },
     { "skill": "kamu-rust-style", "paths": ["**/*.rs"], "baseline": true }
   ],

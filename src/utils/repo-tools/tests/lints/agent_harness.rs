@@ -268,10 +268,15 @@ fn routing_table(root: &Path) -> Vec<(String, Vec<String>)> {
 }
 
 fn linted_docs(root: &Path) -> Vec<PathBuf> {
-    let mut files: Vec<PathBuf> = ["AGENTS.md", "CLAUDE.md", "DEVELOPER.md"]
-        .iter()
-        .map(|f| root.join(f))
-        .collect();
+    let mut files: Vec<PathBuf> = [
+        "AGENTS.md",
+        "CLAUDE.md",
+        "DEVELOPER.md",
+        "scripts/agents/README.md",
+    ]
+    .iter()
+    .map(|f| root.join(f))
+    .collect();
     files.extend(markdown_files(&root.join(ROUTED_DOCS_DIR)));
     files.extend(
         skill_names(root)
