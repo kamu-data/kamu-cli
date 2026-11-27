@@ -45,9 +45,8 @@ resulting `ResourceRef::ById` set. A label filter is a *narrowing of the candida
 identifier set* — structurally the same job as a name pattern — so it belongs to
 that phase-1 expansion. The
 phase-2 batch calls (`get`, `delete`, `render_manifests`) structurally
-**cannot** carry a filter — they take a bare `Vec<ResourceRef>` — so the old
-"pass `label_filter: None` by convention" precondition is now enforced by the type
-system instead of by discipline.
+**cannot** carry a filter — they take a bare `Vec<ResourceRef>` — so "no filter in
+phase 2" is enforced by the type system rather than by convention.
 
 One consequence of the ref/selector split is worth noting here: because a filtered
 lookup cannot go through the ref API, the CLI routes exact names through
@@ -57,10 +56,8 @@ N-name batch a single row; the second costs one `ILIKE` row per name, which is t
 price of filtering.
 
 `ResourceQuery` (`ExactNames(Vec<ResourceName>)` / `ExactIds(Vec<ResourceID>)` /
-`NamePattern(String)`) replaces what used to be two independently-optional fields
-(`exact_names`, `name_pattern`) that were never legitimately combined — every caller
-set exactly one. The enum makes "exactly one selection mode" a type-level invariant
-instead of a runtime convention.
+`NamePattern(String)`) makes "exactly one selection mode" a type-level invariant:
+exact names, IDs and a pattern are never combined in one query.
 
 It is shared by both listing methods: `search` and `search_handles` both
 narrow through the same type, so the two paths cannot drift apart on pattern or ID
@@ -188,15 +185,17 @@ It is maintained by a dedicated sibling trait, `ResourceLabelProjectionRepositor
 `resource_repository.update_resources(...)` succeeds, with both repositories
 resolved from the same transactional DI scope so the snapshot write and the
 projection write commit or roll back together. A resource keeps its entries when it is
-deleted, so label filters match it when deleted resources are asked for; a query over the projection joins `resources` and applies its
+deleted, so label filters match it when deleted resources are asked for; a query over the
+projection joins `resources` and applies its
 [visibility](resources-framework.md#repository). This keeps `ResourceRepository`
-scoped to `resources`/`resource_events`. Implemented per backend (`Postgres…`/`Sqlite…`/`InMemoryResourceLabelProjectionRepository`,
+scoped to `resources`/`resource_events`. Implemented per backend
+(`Postgres…`/`Sqlite…`/`InMemoryResourceLabelProjectionRepository`,
 registered alongside `ResourceRepository` at every composition root and test
 harness); Postgres's `replace_entries` insert uses a compile-time checked static
 query via `UNNEST($2::text[], $3::text[])` over paired key/value arrays rather than
-a dynamic `QueryBuilder`. Resources are only ever soft-deleted in practice, so
-`ON DELETE CASCADE` exists for maintenance safety but has no dedicated test (same
-as other cascade FKs in this codebase).
+a dynamic `QueryBuilder`. The entries go when the resource is
+[purged](resources-framework.md#purge), by `ON DELETE CASCADE`
+(`test_purge_resources` in the shared repository suite).
 
 **Rebuilding projections — known gap.** If `resource_labels_projection` ever drifts
 from `resources.labels` (manual DB surgery, a bug, a skipped migration step), there
@@ -205,8 +204,6 @@ principle a rebuild only needs a single-table scan (`SELECT resource_id, labels
 FROM resources` → re-derive string entries → `replace_entries`), since
 `resources.labels` is already the trusted materialized value; no `resource_events`
 replay is required for *this* projection. This gap isn't unique to this table: no
-projection anywhere in the resources framework has rebuild tooling today, including
+projection anywhere in the resources framework has rebuild tooling, including
 `resources` itself relative to `resource_events` (which *would* need event replay,
-a materially bigger problem). Building either is out of scope for this feature —
-flagged here as a pre-existing operational gap for a future theme, not something
-introduced by label filtering.
+a materially bigger problem).

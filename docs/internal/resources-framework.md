@@ -29,7 +29,7 @@ a remote server.
 | Understand storage, uniqueness, soft-delete | [§6 Persistence model](#6-persistence-model) |
 | Understand account scoping & permissions | [§7 Account resolution & authorization](#7-account-resolution--authorization) |
 | Trace an `apply` / reconcile end-to-end | [§13 Data flow](#13-data-flow-walkthroughs) |
-| Understand how a resource is deleted | [(c) Deletion](#c-deletion) |
+| Understand how a resource is deleted and purged | [(c) Deletion](#c-deletion), [Purge](#purge) |
 | Add a new resource type | [§14 Concrete types + recipe](#14-concrete-resource-types-kamu-configuration) |
 | Find the file for X | [§16 Reference map](#16-filecrate-reference-map) |
 | Filter by label (`-l`, wire, storage) | [Resource label filtering](resources-label-filtering.md) |
@@ -62,6 +62,8 @@ make clippy
   - [4. Layered architecture](#4-layered-architecture)
   - [5. Domain model (`kamu-resources`)](#5-domain-model-kamu-resources)
     - [Core traits](#core-traits)
+    - [Preparing a spec](#preparing-a-spec)
+    - [Immutable specs](#immutable-specs)
     - [Owner references](#owner-references)
     - [Events](#events)
     - [Creation provenance](#creation-provenance)
@@ -73,6 +75,7 @@ make clippy
     - [Retention](#retention)
     - [Purge](#purge)
   - [7. Account resolution \& authorization](#7-account-resolution--authorization)
+    - [Per-type guard and placement](#per-type-guard-and-placement)
   - [8. Rename \& conflict rules](#8-rename--conflict-rules)
     - [Generated names](#generated-names)
   - [9. Services (`kamu-resources-services`)](#9-services-kamu-resources-services)
@@ -145,7 +148,7 @@ long-term goal. This page documents what exists now.
 | **Snapshot** | The persisted materialized form of a resource (`ResourceSnapshot`). |
 | **Phase** | Lifecycle stage: `Pending`, `Reconciling`, `Ready`, `Degraded`, `Failed`, `Deleting`, `Deleted` (ODF `ResourcePhase`). Never written by a status writer: derived from the headers and the rest of the status. See [§13 state machine](#lifecycle-state-machine). |
 | **Two-phase deletion** | Deleting a resource requests its deletion (`Deleting`); its main controller cleans up, then the deletion completes (`Deleted`). A resource being deleted gives up its name at once. See [(c) Deletion](#c-deletion). |
-| **Condition** | A status signal keyed by a registered condition schema URI, set and removed one by one through [condition patches](#condition-patches). See [Status fields](#status-fields) for the built-in one. |
+| **Condition** | A status signal keyed by a registered condition schema URI, set and removed one by one through [condition patches](#condition-patches). See [Status fields](#status-fields) for the built-in ones. |
 | **generation / observedGeneration / reconciledGeneration** | `generation` bumps on each spec/headers change; `observedGeneration` is the last one a reconciliation started on, `reconciledGeneration` the last one reconciled successfully. Reconciliation is needed while `reconciledGeneration` is absent or lower than `generation`. |
 | **statusGeneration** | Header counting status updates: 1 for a new resource, +1 per `StatusUpdated`, `DeletionRequested` and `Deleted` event (the last two move the derived phase). A status writer passes the value it read as a precondition and fails with a status conflict if it is stale (compare-and-swap). |
 | **Reconciliation** | Driving actual state toward the spec (e.g. `SecretSet` materializes its encrypted read-side projection). |
@@ -163,8 +166,8 @@ long-term goal. This page documents what exists now.
 
 - `ResourceStatus` holds `phase`, the optional `observedGeneration`, `observedAt`,
   `reconciledGeneration` and `reconciledAt`, and `conditions`, a `TypeRef → JSON` map.
-- On a `Resource` (domain and GraphQL), `status` is always present: a resource with no
-  reconciliation yet gets a synthesized `Pending` status with no conditions. Only the persisted
+- On a `Resource` (domain and GraphQL), `status` is always present: a new resource starts
+  `Pending`, with the conditions its `Created` event carries ([Events](#events)). Only the persisted
   `ResourceSnapshot` row holds an `Option` (`None` before the first write completes).
 - The built-in ODF `ReconciliationError` condition (`code`, `message`) is present while the latest
   reconciliation or cleanup has failed; only the framework writes it.
@@ -430,7 +433,6 @@ neither deletes nor blocks anything by it. Accounts are a different kind of owne
   headers of an existing resource carries them over, as `DatasetEnvVarMutationAdapter` does.
 - **A dry run of a batch does not see the resources the batch creates,** so it rejects a resource
   owned by one of them, which applying the batch accepts.
-
 - **The references form a graph that may have cycles.** Only a resource owning itself is rejected:
   two resources may own each other, and a check at apply could not exclude that without locking
   every resource on the path. Whatever follows the references, such as a cascade, must remember
@@ -598,8 +600,9 @@ and the later `*_resource_*` migrations (SQLite mirrors alongside).
   on `(account_id, resource_schema, resource_name)`, case-insensitive, partial
   `WHERE deletion_requested_at IS NULL`.
   An index on `(account_id, resource_schema, status->>'phase')` backs the summary projection.
-  `labels`/`annotations` are untyped JSONB with **no index of their own**; label selector queries are served by the separate `resource_labels_projection` table
-  (below), never by scanning this JSONB. There is no dedicated
+  `labels`/`annotations` are untyped JSONB with **no index of their own**; label selector queries
+  are served by the separate `resource_labels_projection` table (below), never by scanning this
+  JSONB. There is no dedicated
   `description` column: `description` lives inside `annotations` as the first well-known
   annotation entry, so adding future well-known annotations needs no schema change.
 - **`resource_events`** — append-only log: `event_id` (BIGINT from a sequence, PK), `resource_id`
@@ -717,7 +720,7 @@ time. It never runs controller logic. Each batch is one transaction:
    `ResourceRemovalListener` with the IDs, then deletes the rows, which take their labels, owners
    and configuration projections with them by cascade.
 5. Post one `Purged` lifecycle message per type of the batch, and report the removed counts by
-   type and the backlog still due.
+   type and whether more is due.
 
 A failed batch rolls back whole, so a crash loses nothing and the next batch purges the same
 resources. The purge never touches the outbox: messages already posted about a resource, such as a
@@ -734,8 +737,6 @@ owns, and the row goes with the owned resource.
 | How | Tables |
 | --- | --- |
 | By the purge itself | `resource_events`, `resource_controller_state` |
-| By a registered `ResourceRemovalListener` | none yet |
-| By a consumer of `Purged` | none yet |
 | They outlive the resource, with the reason | `accounts`, `dataset_entries`: the permanent resource IDs of accounts and datasets, which are not stored as resources |
 
 The contract test reads the migrated schema of each database (`test_*_resource_purge_contract.rs`)
@@ -744,10 +745,10 @@ table or column.
 
 **Removal listeners** follow `DatasetEntryRemovalListener` of the datasets context: the repository
 takes every `dyn ResourceRemovalListener` registered in its catalog. A database-backed repository
-registers as one only for a table without a cascade, and declares it above. The in-memory
-repositories of what cascades in SQL (the labels and owners projections, the configuration
-projections) register as listeners in every in-memory catalog, so that tests on the in-memory
-stack see purged resources gone everywhere.
+registers as one only for a table without a cascade; the first such table adds a
+`ResourceKeyedTablePurge` variant to be declared with. The in-memory repositories of what cascades
+in SQL (the labels and owners projections, the configuration projections) register as listeners in
+every in-memory catalog, so that tests on the in-memory stack see purged resources gone everywhere.
 
 ### Controller bookkeeping
 
@@ -825,7 +826,7 @@ resolves account selectors; who may act on a resolved account is decided per typ
   Background work runs as `Principal::Node`, which the default rule lets target any account.
 - **UID belonging to a different account.** A lookup by UID finds the resource in any account,
   then the operation guard decides whether the principal may read it there
-  ([§7](#7-account-resolution--authorization)). A UID the principal may not read is reported as
+  ([below](#per-type-guard-and-placement)). A UID the principal may not read is reported as
   **not-found** (`ResourceIDNotFoundError`), not "forbidden" — so existence is not leaked across
   accounts. A UID of the wrong schema yields `ResourceTypeMismatchError` in the domain and
   `ResourceLookupProblem::SchemaMismatch` at the facade boundary.
@@ -833,7 +834,6 @@ resolves account selectors; who may act on a resolved account is decided per typ
   requests deletion of that account's resources (see [§13](#13-data-flow-walkthroughs)). Resources
   already being deleted are included again, which posts their message again; deleted ones are skipped,
   so the cascade is idempotent with respect to prior deletions.
-
 
 ### Per-type guard and placement
 
@@ -892,9 +892,9 @@ Concrete conflict cases:
 | `id` + changed `headers.name` | **Rename** — name updated on the same resource (`Update`). |
 | `id` whose resource has a different schema | **Reject** — `ResourceTypeMismatchError` in domain code, mapped to `SchemaMismatch` in the facade. |
 | `id` resolving to a resource in a different account | **Not found** — `ResourceIDNotFoundError` (account-scoped lookup; existence not leaked). |
-| `headers.account` targeting another account without admin | **Reject** — `AccessError::Unauthorized` ([§7](#7-account-resolution--authorization)). |
+| `headers.account` targeting an account the caller may not use | **Reject** — `AccessError::Unauthorized` ([§7](#7-account-resolution--authorization)). |
 | Rename target name already taken (same account+schema) | **Reject** — the unique index fails the update, reported as an internal error. |
-| Create whose name another writer takes first | The whole apply runs once more in the same transaction, [spec preparation](#preparing-a-spec) included, as if it had come second: normally an **Update** of the resource that writer created. With a generated name: **Create** under another name, never an update. |
+| Create whose name another writer takes first | **Update** of the resource that writer created: the apply runs once more ([§9](#9-services-kamu-resources-services)). With a generated name: **Create** under another name. |
 | Update by name where another account has the same name | **No conflict** — the account disambiguates; each `(account, schema, name)` is independent. |
 | Apply re-using the name of a resource being deleted | **Create** — the resource being deleted gave up its name. The outcome carries a `replaces_resource_being_deleted` warning naming its id. |
 | Apply re-using the name of a deleted resource | **Create** — the deleted resource gave up its name when its deletion was requested. No warning, unlike one still being deleted. |
@@ -2013,6 +2013,7 @@ Deletion runs in two steps, as the ODF resource framework defines them
 - **Completing the deletion** is one `process` call per resource: it runs the reconciler's
   `cleanup`, then appends `Deleted` and posts a `Deleted` message of its own. A resource that no
   longer waits for cleanup is skipped, so processing it twice completes its deletion once.
+- **A deleted resource is kept** until its [retention](#retention) ends, then [purged](#purge).
 - **The cleanup runs in a transaction of its own**, so a failure, a database error included,
   discards whatever the reconciler wrote before failing; the outcome is recorded in the next one.
   A concurrent modification while completing the deletion makes `process` return `RetryAt(now)`:
@@ -2582,7 +2583,7 @@ Otherwise the behavior is already guaranteed for both implementations by the con
 
 | Layer | Crate | Directory | Key files |
 | --- | --- | --- | --- |
-| Domain model | `kamu-resources` | `src/domain/resources/domain/src` | `core/`, `state/`, `values/`, `manifests/`, `repo/`, `retention/`, `dispatchers/`, `messages/`, `use_cases/`, `views/` |
+| Domain model | `kamu-resources` | `src/domain/resources/domain/src` | `access/`, `core/`, `state/`, `values/`, `manifests/`, `repo/`, `retention/`, `dispatchers/`, `messages/`, `use_cases/`, `views/` |
 | Domain schemas | `kamu-resources` | `src/domain/resources/schemas` | Informational JSON schemas for framework-owned resource extensions: built-in labels and annotations. ODF-defined extensions, such as the `ReconciliationError` condition, have none here. |
 | Services | `kamu-resources-services` | `src/domain/resources/services/src` | `use_cases/{apply,request_deletion}.rs`, `controllers/`, `controller_runtime/`, `crud_dispatchers/resource_dispatcher_factory.rs`, `resource_extension_schemas/`, `message_handlers/`, `event_stores/`, `retention/resource_retention_job.rs`, `dependencies.rs` |
 | Facade | `kamu-resources-facade` | `src/domain/resources/facade/src/facade` | `resource_facade.rs`, `local/` |

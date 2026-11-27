@@ -52,7 +52,7 @@ provider must be a `#[scope(Singleton)]` component registered exactly once.
 
 ## 2. Catalog
 
-### Wakeup listeners (all background agents)
+### Wakeup listeners (wakeup-driven agents)
 
 | Metric | Type | Labels | Meaning |
 | --- | --- | --- | --- |
@@ -74,8 +74,8 @@ controller runtime runs a loop per controller and labels each with the controlle
 | `background_agent_restarts_total` | counter | `agent`, `reason` = `failed` / `panicked` / `completed` | Restarts of the agent after its run returned an error, panicked, or returned before a shutdown |
 | `background_agent_last_failure_timestamp_seconds` | gauge | `agent` | Unix time of the agent's last error or panic; `0` if it never failed |
 
-Recorded by `BackgroundAgentHost` for every agent it runs, with the same `agent` names as the
-wakeup listener metrics; label sets are pre-created at startup. How restarts work is in
+Recorded by `BackgroundAgentHost` for every agent it runs, with `agent` its `agent_name()`, as in
+the wakeup listener metrics; label sets are pre-created at startup. How restarts work is in
 [background-agents.md](background-agents.md#3-supervision).
 
 ### Housekeeping jobs
@@ -87,8 +87,9 @@ wakeup listener metrics; label sets are pre-created at startup. How restarts wor
 | `housekeeping_last_pass_timestamp_seconds` | gauge | `job` | Unix time when the job's agent last finished a pass, leaving no backlog; `0` until it does |
 
 Recorded by `HousekeepingAgent` for every enabled job, with `job` its `job_name()`, which is also
-the agent name of the host's metrics; a CLI command's batch records the first two. The agents have
-no wakeup listener: the last pass is their heartbeat ([housekeeping.md](housekeeping.md#3-the-agent)).
+the agent name of the host's metrics; a CLI command's batch records only
+`housekeeping_items_removed_total`. The agents have no wakeup listener: the last pass is their
+heartbeat ([housekeeping.md](housekeeping.md#3-the-agent)).
 
 ### Task agent
 

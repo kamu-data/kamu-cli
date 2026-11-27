@@ -12,12 +12,12 @@
 such as deleted resources past their retention. It implements `HousekeepingJob`: one method
 removes a bounded batch of what is due, in short transactions of its own, and reports what it
 removed and whether more is due; another counts what is due; a third says when the next item
-falls due. The job never decides
-when it runs. On the API server, `BackgroundAgentHost` runs each enabled job as an agent of its own,
-`HousekeepingAgent`, which runs batches while items remain due, then sleeps until the job's next
-deadline, never longer than the job's interval. After a CLI command, `BackgroundWorkFinalizer`
-runs one batch of each enabled job, so a workspace that never runs `api-server` is cleaned too.
-Every process may run a job at once, so a batch must be idempotent and safe next to another runner.
+falls due. The job never decides when it runs. On the API server, `BackgroundAgentHost` runs each
+enabled job as an agent of its own, `HousekeepingAgent`, which runs batches while items remain
+due, then sleeps until the job's next deadline, never longer than the job's interval. After a CLI
+command, `BackgroundWorkFinalizer` runs one batch of each enabled job, so a workspace that never
+runs `api-server` is cleaned too. Every process may run a job at once, so a batch must be
+idempotent and safe next to another runner.
 
 | You want to… | Start at |
 | --- | --- |
@@ -76,8 +76,9 @@ removes: the resource retention job never calls a controller, for example.
   another batch. A batch learns it without counting, by finding one item past its size.
 
 A job is a `#[scope(Singleton)]` component bound as `dyn HousekeepingJob`. It resolves its
-repositories per call through `CatalogWeakRef`, opening its transactions with `transaction!`
-([database-transactions.md](database-transactions.md#4-transaction)).
+repositories per call through `CatalogWeakRef`, opening its transactions with
+`#[transactional_methodN]` or `transaction!`
+([database-transactions.md](database-transactions.md#2-opening-a-transaction-in-code)).
 
 ---
 
@@ -175,9 +176,8 @@ What a job removes and when it falls due is the job's own configuration, such as
 ## 7. Metrics
 
 The runner records the same metrics for every job, labelled by `job`: the items removed by kind,
-the backlog (counted once per pass, then lowered by what later batches remove), and the time of the last finished pass, which serves as the
-job's heartbeat. The catalog and the alerts are in
-[metrics.md](metrics.md#housekeeping-jobs).
+the backlog ([§3](#3-the-agent)), and the time of the last finished pass, which serves as the
+job's heartbeat. The catalog and the alerts are in [metrics.md](metrics.md#housekeeping-jobs).
 
 ---
 
@@ -244,6 +244,6 @@ rules ([kamu-renaming-a-concept](../../.claude/skills/kamu-renaming-a-concept/SK
 | `HousekeepingAgent` | `src/utils/background-agent-host/src/housekeeping/housekeeping_agent.rs` |
 | `HousekeepingConfig`, `HousekeepingJobConfig` | `src/utils/background-agent-host/src/housekeeping/housekeeping_config.rs`, mapped from `backgroundAgents.housekeeping` in `src/app/cli/src/services/config/models.rs` |
 | `HousekeepingMetrics` | `src/utils/background-agent-host/src/housekeeping/housekeeping_metrics.rs` |
-| One agent per enabled job | `BackgroundAgentHost::new` in `src/utils/background-agent-host/src/background_agent_host.rs` |
+| One agent per enabled job | `HousekeepingAgent::for_enabled_jobs`, called by `BackgroundAgentHost` (`background_agent_host.rs`) and the finalizer |
 | `BackgroundWorkFinalizer`, `BackgroundWorkDrain` | `src/utils/background-agent-host/src/finalizer/` |
 | `ResourceRetentionJob` | `src/domain/resources/services/src/retention/resource_retention_job.rs` |

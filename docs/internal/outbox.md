@@ -288,17 +288,15 @@ run_while_has_tasks(): loop { held = has_held_back_messages(); drain; if !held b
 ```
 
 Waking is described in [wakeup-listeners.md](wakeup-listeners.md) (channel `outbox_messages_ready`).
-The same drain is callable as `run_while_has_tasks()`. The
-agent is a `BackgroundWorkDrain` through it: a drain is idle when no run of the agent, the drain
-or the main loop, delivered anything since the session's previous drain (a counter of deliveries
-across runs, raised under the `run_lock`). With a
-database configured, the CLI settles its background work with `BackgroundWorkFinalizer` after
-every command that `command_needs_background_work` selects, alternating this drain with the
-resource controllers' until a full pass is idle; the HTTP E2E middleware does the same after every
-successful mutating request (a REST `POST` or a GraphQL `mutation`), so E2E tests observe
-consumers' and controllers' effects synchronously. Who finalizes when is in
-[background-agents.md](background-agents.md#finalizing-background-work-without-agents). A
-`run_lock` keeps these entrances from overlapping with the main loop.
+The same drain is callable as `run_while_has_tasks()`, and through it the agent is a
+`BackgroundWorkDrain`. The settle phase of `BackgroundWorkFinalizer` alternates this drain with
+the resource controllers' until a full pass is idle. It runs after a CLI command, after a
+successful mutating request of the HTTP E2E middleware, and after a write in test harnesses, so
+these callers observe consumers' effects synchronously
+([background-agents.md](background-agents.md#finalizing-background-work-without-agents)). A drain
+is idle when no run of the agent, the drain's or the main loop's, delivered anything since the
+session's previous drain: a counter of deliveries across runs, raised under the `run_lock`. The
+same `run_lock` keeps these entrances from overlapping with the main loop.
 
 `run_while_has_tasks()` does not stop at the first empty iteration. Committed messages can be held
 back while an older transaction runs ([§6](#reading-below-the-oldest-running-transaction)), anywhere

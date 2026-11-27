@@ -93,7 +93,8 @@ pub struct ResourceHeaders {
 }
 
 pub struct ResourceStatus {                  // ODF-generated; written only by controllers
-    pub phase: ResourcePhase,                // Pending|Reconciling|Ready|Degraded|Failed|Deleting|Deleted
+    pub phase: ResourcePhase,                // derived from the rest (`align_phase`), never set by a writer
+                                             // Pending|Reconciling|Ready|Degraded|Failed|Deleting|Deleted
     pub observed_generation: Option<u64>,    // generation the controller last started reconciling
     pub observed_at: Option<DateTime<Utc>>,
     pub reconciled_generation: Option<u64>,  // generation the controller last reconciled successfully
@@ -178,10 +179,10 @@ The behaviorally-significant consequences of adopting these shapes:
   `datasets::DatasetHandle` such specs store. It reads no caller identity (a bare name is looked up
   in an account the caller passes), checks no access, and returns `None` when no dataset matches.
 - **Account is a precondition, not resolved, at the use-case boundary.**
-  `ResourceHeadersInput.account` is an `Option<auth::ResourceOwnerRef>` selector — `{id, did, name}`, all
-  optional — but by the time headers reach `ApplyResourceUseCase::plan`/`apply` it must already be a
-  fully-resolved `ResourceOwnerRef` (all three fields `Some`); `ResourceHeaders::from_input` panics
-  otherwise. Resolution is the caller's job — via the facade's `ResourceAccountResolver` (which also
+  `ApplyResourceHeaders.account` is an `Option<auth::ResourceOwnerRef>` selector — `{type, id, did,
+  name}`, all optional — but by the time headers reach `ApplyResourceUseCase::plan`/`apply` it must
+  already be a fully-resolved `ResourceOwnerRef` (all four fields `Some`); building
+  `ResourceHeaders` from it panics otherwise. Resolution is the caller's job — via the facade's `ResourceAccountResolver` (which also
   authorizes), or by resolving the account directly when only a DID/name is in hand (e.g.
   `DatasetEnvVarMutationAdapterImpl` looks up the resource id via `AccountService` from
   `DatasetEntry.owner_id`/`owner_name` before building headers). The use case enforces this

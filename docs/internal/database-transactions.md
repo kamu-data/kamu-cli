@@ -60,13 +60,14 @@ implement `From<InternalError>`, the error of opening or ending a transaction.
 
 ### 3.1 Who owns a transaction
 
-Transactions are opened at four levels only. Everything else runs in the caller's transaction.
+Transactions are opened at five levels only. Everything else runs in the caller's transaction.
 
 | Level | Opens | Never |
 |---|---|---|
 | **Boundary**: HTTP and GraphQL middleware, a transactional CLI command | one transaction for request-sized work | slow work: engines, fetching, transfers |
 | **Operation job**: one per dataset operation (`CompactionJob`, `TransformJob`, …) | the short plan and commit transactions of one operation on one dataset | a transaction held across the execution |
 | **Resource controller**: `process` of one resource (`SimpleResourceController`) | the short phase transactions of one reconciliation or deletion, and its own planning reads | a transaction held across work outside the database |
+| **Housekeeping job**: `run_batch` of one [housekeeping job](housekeeping.md) | one transaction per batch, and one for `count_due` | a batch of more than `batch_size` items |
 | **Agent**: task, flow, outbox, webhooks, the resource controller runtime | bookkeeping transactions around its own state | — |
 
 - **Orchestration** opens no transaction around an operation; it calls jobs. This covers dependency

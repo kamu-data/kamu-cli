@@ -11,9 +11,10 @@
 **One-paragraph mental model.** A **background agent** is a loop that runs for the whole life of
 the server: the outbox agent, the flow agent, the flow system event agent, the task agent, the
 resource controller runtime, and one agent per housekeeping job
-([housekeeping.md](housekeeping.md)). Each implements `BackgroundAgent`, and `BackgroundAgentHost`
-runs them all (crate `background-agent-host`). The host supervises every agent on its own: a run that fails,
-panics or returns early is restarted after a growing backoff while the other agents keep running.
+([housekeeping.md](housekeeping.md)). Each implements `BackgroundAgent`, and
+`BackgroundAgentHost` runs them all (crate `background-agent-host`). The host supervises every
+agent on its own: a run that fails, panics or returns early is restarted after a growing backoff
+while the other agents keep running.
 On a shutdown, the host cancels a token every agent watches, gives them a bounded time to finish
 their current step, then aborts the ones still running.
 
@@ -61,6 +62,7 @@ read; `CancellationToken::run_until_cancelled` wraps them.
 | Flow agent | activating the due flows | while waiting for the next activation moment |
 | Task agent | taking a task, and running it | while waiting for a task; never between taking and running one |
 | Resource controller runtime | each controller loop's drain | after each loop's drain, in its wait; a loop that fails then is not restarted |
+| Housekeeping agent | each batch of a pass ([housekeeping.md](housekeeping.md#3-the-agent)) | between batches, in the pause between them, and in the sleep after a pass |
 
 For example, the task agent requeues tasks left `Running` on every run
 ([task-system.md](task-system.md#startup-recovery)).
@@ -85,8 +87,12 @@ them or does not wait for them. It has two phases with different contracts:
 
 | Phase | What it does | A failure |
 | --- | --- | --- |
-| **Settle** | Drains every registered `BackgroundWorkDrain` in turn until one full pass finds all of them idle. The outbox agent and the resource controller runtime are drains: the outbox delivers messages that make resources actionable, and processing them posts messages of its own | Is returned, as the caller's effects are incomplete; it fails a command that succeeded |
+| **Settle** | Drains every registered `BackgroundWorkDrain` in turn until one full pass finds all of them idle | Is returned, as the caller's effects are incomplete; it fails a command that succeeded |
 | **Housekeeping** | One batch of each enabled housekeeping job, then a second settle if any batch removed items, for the messages it posted ([housekeeping.md](housekeeping.md#4-after-a-cli-command)) | Is logged as a warning; the next finalization retries it |
+
+The outbox agent and the resource controller runtime are drains. A settle alternates them because
+each feeds the other: the outbox delivers messages that make resources actionable, and processing
+them posts messages of its own.
 
 | Caller | Settle | Housekeeping |
 | --- | --- | --- |

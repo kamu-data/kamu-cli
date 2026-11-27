@@ -20,7 +20,8 @@ use crate::ResourceID;
 /// listener in its transaction, before it deletes the resources' rows.
 ///
 /// A database-backed listener declares its tables in
-/// [`crate::RESOURCE_KEYED_TABLES_WITHOUT_CASCADE`].
+/// [`crate::RESOURCE_KEYED_TABLES_WITHOUT_CASCADE`], with a
+/// [`crate::ResourceKeyedTablePurge`] variant it adds for listeners.
 #[async_trait::async_trait]
 pub trait ResourceRemovalListener: Send + Sync {
     async fn on_resources_removed(&self, ids: &[ResourceID]) -> Result<(), InternalError>;
